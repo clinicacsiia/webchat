@@ -55,6 +55,13 @@
   .nav button[aria-current=page] { background: var(--verde); color: #fff; }
   .triagem { background: #f1f7f4; border-bottom: 1px solid var(--linha); padding: 8px 14px; font-size: 13.5px; }
   .triagem b { margin-right: 8px; }
+  .pre { background: #fffaf0; border-bottom: 1px solid var(--linha); padding: 8px 14px; font-size: 13.5px; }
+  .pre b { margin-right: 8px; }
+  .pre .acoes { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+  .pre details { margin-top: 4px; }
+  .pre dl { display: grid; grid-template-columns: max-content 1fr; gap: 2px 10px; margin: 6px 0 0; }
+  .pre dt { color: var(--suave); }
+  .pre dd { margin: 0; overflow-wrap: anywhere; }
   .urg { font-size: 12px; font-weight: 700; border-radius: 999px; padding: 1px 8px; background: #e7efe9; color: #14543f; }
   .urg.media { background: #fdf0d2; color: #7a5200; }
   .urg.alta { background: #fbdcd8; color: #a1271c; }
@@ -236,8 +243,46 @@
   const S = {
     me: null, agentes: new Map(), conversas: [], filtro: 'aguardando', abertaId: null, msgs: [], vistos: new Set(),
     aba: 'atendimento', canal: null, ao_vivo: false, contatos: [], mudo: localStorage.getItem('painel.mudo') === '1',
-    buscaContatos: '', periodo: 'todos', tagFiltro: ''
+    buscaContatos: '', periodo: 'todos', tagFiltro: '', pre: null
   };
+  /* ---------- pré-agendamento montado pela IA ---------- */
+  const ROTULO_PRE = { rascunho: 'Em coleta', pronto: 'Pronto para marcar', agendado: 'Agendado', cancelado: 'Cancelado' };
+  const CAMPOS_PRE = [['nome', 'Nome'], ['nome_social', 'Nome social'], ['sexo', 'Sexo'], ['dt_nasc', 'Nascimento'], ['mae', 'Mãe'], ['cpf', 'CPF'], ['rg', 'RG'], ['cns', 'CNS'],
+    ['celular', 'Celular'], ['telefone', 'Telefone'], ['email', 'E-mail'], ['cep', 'CEP'], ['endereco', 'Rua'], ['numero', 'Número'], ['complemento', 'Compl.'],
+    ['bairro', 'Bairro'], ['cidade', 'Cidade'], ['uf', 'UF'], ['matricula', 'Carteirinha'], ['validade', 'Validade']];
+  function textoPre(p) {
+    const topo = [['Tipo', p.tipo], ['Especialidade', p.especialidade], ['Procedimento', p.procedimento], ['Plano', p.plano], ['Unidade', p.unidade], ['Profissional', p.profissional], ['Preferência', p.preferencia_horario]];
+    return topo.concat(CAMPOS_PRE.map(([k, r]) => [r, (p.paciente || {})[k]])).filter(([, v]) => v).map(([r, v]) => r + ': ' + v).join('\n');
+  }
+  async function carregarPre() {
+    const id = S.abertaId;
+    if (!id) { S.pre = null; renderPre(); return; }
+    const { data } = await db.from('pre_agendamentos').select('*').eq('conversa_id', id).maybeSingle();
+    if (S.abertaId === id) { S.pre = data || null; renderPre(); }
+  }
+  async function statusPre(status) {
+    if (!S.pre) return;
+    const { error } = await db.from('pre_agendamentos').update({ status, atualizado_em: new Date().toISOString() }).eq('id', S.pre.id);
+    if (error) { toast(msgErro(error)); return; }
+    S.pre.status = status; renderPre();
+  }
+  function renderPre() {
+    const box = document.getElementById('pre'); if (!box) return;
+    const p = S.pre;
+    if (!p) { box.replaceChildren(); return; }
+    const resumo = [p.tipo, p.especialidade, p.procedimento, p.plano && 'Plano: ' + p.plano, p.unidade, p.profissional && 'Prof.: ' + p.profissional, p.preferencia_horario && 'Preferência: ' + p.preferencia_horario].filter(Boolean).join(' · ');
+    const linhas = CAMPOS_PRE.filter(([k]) => (p.paciente || {})[k]);
+    const aberto = p.status === 'rascunho' || p.status === 'pronto';
+    box.replaceChildren(h('div', { class: 'pre' },
+      h('b', {}, 'Pré-agendamento'), h('span', { class: 'urg ' + (p.status === 'pronto' ? '' : 'media') }, ROTULO_PRE[p.status] || p.status),
+      resumo ? h('div', {}, resumo) : null,
+      linhas.length ? h('details', {}, h('summary', {}, 'Dados do paciente (' + linhas.length + ')'),
+        h('dl', {}, linhas.map(([k, r]) => [h('dt', {}, r), h('dd', {}, p.paciente[k])]))) : null,
+      h('div', { class: 'acoes' },
+        h('button', { class: 'btn', type: 'button', onclick: async () => { try { await navigator.clipboard.writeText(textoPre(p)); toast('Dados copiados.'); } catch { toast('Não consegui copiar.'); } } }, 'Copiar dados'),
+        aberto ? h('button', { class: 'btn prim', type: 'button', onclick: () => statusPre('agendado') }, 'Marcar como agendado') : null,
+        aberto ? h('button', { class: 'btn', type: 'button', onclick: () => statusPre('cancelado') }, 'Cancelar pré-agendamento') : null)));
+  }
   const podeAtender = () => S.me && (S.me.papel === 'admin' || S.me.papel === 'atendente');
   const ehAdmin = () => S.me && S.me.papel === 'admin';
 
@@ -407,7 +452,7 @@
       });
   }
   function desligarTempoReal() { if (S.canal) { db.removeChannel(S.canal); S.canal = null; } }
-  function agendarRecarga() { clearTimeout(tRecarga); tRecarga = setTimeout(async () => { await carregarConversas(); if (S.aba === 'atendimento') { renderLista(); renderTopoChat(); } atualizarSelo(); }, 250); }
+  function agendarRecarga() { clearTimeout(tRecarga); tRecarga = setTimeout(async () => { await carregarConversas(); if (S.aba === 'atendimento') { renderLista(); renderTopoChat(); carregarPre(); } atualizarSelo(); }, 250); }
   function aoNovaMensagem(m) {
     if (m.autor === 'cliente') {
       const c = S.conversas.find((x) => x.id === m.conversa_id);
@@ -475,9 +520,9 @@
     }));
   }
   async function abrirConversa(id) {
-    S.abertaId = id; S.msgs = []; S.vistos = new Set();
+    S.abertaId = id; S.msgs = []; S.vistos = new Set(); S.pre = null;
     document.getElementById('inbox')?.classList.add('aberta');
-    renderLista(); renderChat();
+    renderLista(); renderChat(); carregarPre();
     const { data, error } = await db.from('mensagens').select('id,conversa_id,autor,agente_id,texto,criado_em').eq('conversa_id', id).order('id').limit(1000);
     if (S.abertaId !== id) return;
     if (error) { toast(msgErro(error)); return; }
@@ -493,7 +538,7 @@
     const enviar = h('button', { class: 'btn prim', type: 'button', id: 'btnEnviar', onclick: enviarMsg }, 'Enviar');
     area.addEventListener('input', () => { area.style.height = 'auto'; area.style.height = Math.min(area.scrollHeight, 140) + 'px'; });
     area.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); enviarMsg(); } });
-    box.replaceChildren(h('div', { class: 'chat-topo', id: 'chatTopo' }), h('div', { id: 'triagem' }), h('div', { class: 'msgs', id: 'msgs', 'aria-live': 'polite' }), h('div', { class: 'compor' }, area, enviar));
+    box.replaceChildren(h('div', { class: 'chat-topo', id: 'chatTopo' }), h('div', { id: 'triagem' }), h('div', { id: 'pre' }), h('div', { class: 'msgs', id: 'msgs', 'aria-live': 'polite' }), h('div', { class: 'compor' }, area, enviar));
     renderTopoChat(); desenharMsgs(true);
   }
   function renderTopoChat() {

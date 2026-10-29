@@ -78,3 +78,24 @@ Dica: coloque `?origem=instagram` no link do chat (ex.: na bio) para ver de onde
 - A cada mensagem do paciente o Supabase avisa o n8n, que lê o histórico (funções `ia_contexto` / `ia_responder`, protegidas pela chave `ia_segredo` da tabela `config`), pede ao Claude a resposta e a devolve ao chat.
 - Ao ter o essencial, em urgência ou após 10 falas, a IA para (`ia_ativa = false`) e a conversa fica em Aguardando com resumo e urgência no painel.
 - Desligar a IA: na tabela `config`, `ia_ativa = 'nao'`. Quando um atendente assume, a IA já para sozinha.
+
+## Pré-agendamento pela IA (Klingo)
+
+Quando o paciente quer consulta ou exame, a assistente segue o roteiro: pedido (especialidade/procedimento) > plano (Particular ou convênio) > preferências (unidade, profissional, período) > dados do paciente em grupos (identificação, contato, endereço, carteirinha) > leitura de volta e confirmação > passa para o atendente.
+
+- Os dados ficam na tabela `pre_agendamentos` (uma por conversa), gravados pela função `ia_pre_agendar` via n8n. Só administrador e atendente leem (tem CPF, nome da mãe e endereço); marketing não.
+- No painel, a conversa mostra o cartão **Pré-agendamento** com o pedido, os dados do paciente, **Copiar dados**, **Marcar como agendado** e **Cancelar**.
+- A IA **não marca nem promete horário**: o atendente ocupa o horário no Klingo, valida a autorização do convênio, informa valor e preparo e confirma com o paciente.
+- O treinamento (prompt) está no nó "Triagem com Claude" do workflow `Triagem IA - Atendimento`. O SQL está em `supabase/pre-agendamentos.sql`.
+
+### O que ainda depende da Klingo
+
+A API de marcação (`/externo/register`, `/externo/login`, `/agenda/horarios`, `/agenda/horario`) ainda **não está ligada**: faltam `baseUrl`, login e senha de integração (o `X-APP-TOKEN` que já existe no projeto Indicadores é da API de relatórios, e só lê). Quando chegarem, o próximo passo é a IA consultar horários livres e criar o cadastro do paciente no Klingo sozinha, mantendo a marcação com o humano. Pendências para perguntar ao suporte (suporte@klingo.com.br): pré-agendamento/lista de espera na API, busca de paciente por CPF (evita cadastro duplicado), endpoints de valor e preparo, campos obrigatórios do cadastro e ambiente de testes.
+
+### Catálogo do Klingo para a IA
+
+A IA consulta, a cada mensagem do paciente, um catálogo copiado de relatórios de cadastro do Klingo (sem dado de paciente): procedimentos e preparo (#13981), agenda por profissional (#13984) e operadoras/planos (#12301). As tabelas são `catalogo_*` e a busca é a função `ia_catalogo`, que entende siglas e erros comuns (RM = ressonância, TC = tomografia, US/USG = ultrassonografia, RX = radiografia). Preços não entram: o relatório de preços não traz o valor Particular.
+
+- Atualização: a Edge Function `sync-catalogo-klingo` (publicada no projeto webchat-atendimento) busca os três relatórios e recarrega o catálogo todo dia às 03:00 (Brasília, via pg_cron). Ela usa o secret `KLINGO_APP_TOKEN` do Supabase (o token nunca vai para o repositório) e só aceita chamadas com o header `x-sync-key` igual ao segredo da IA. Para atualizar na hora: `curl -X POST <URL da função> -H "x-sync-key: <segredo>"`. Cada relatório é independente: se um falhar, o catálogo anterior dele continua valendo.
+- Carga manual em lotes: função `ia_catalogo_carregar` (mesmo segredo).
+- A agenda do catálogo é a grade semanal cadastrada, não horário livre: o atendente confirma data e hora.
