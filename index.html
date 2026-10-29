@@ -1,0 +1,448 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Atendimento</title>
+<meta name="theme-color" content="#10302B">
+<meta name="description" content="Fale com a nossa equipe de atendimento.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+  :root {
+    --verde-escuro: #10302b;
+    --verde: #146b50;
+    --verde-claro: #d4efdd;
+    --fundo: #e8efea;
+    --papel: #ffffff;
+    --texto: #16231f;
+    --texto-suave: #5b6b65;
+    --linha: #cfdad3;
+    --erro: #b3261e;
+    --aviso: #8a5a00;
+    --raio: 14px;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 16px; line-height: 1.4; color: var(--texto); background: var(--fundo);
+    -webkit-text-size-adjust: 100%;
+  }
+  button, input, textarea { font: inherit; color: inherit; }
+  :focus-visible { outline: 3px solid #2f9e78; outline-offset: 2px; }
+  [hidden] { display: none !important; }
+
+  .app { height: 100dvh; max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; background: var(--fundo); position: relative; }
+  @media (min-width: 800px) { .app { border-left: 1px solid var(--linha); border-right: 1px solid var(--linha); } }
+
+  /* Cabeçalho */
+  .topo {
+    background: var(--verde-escuro); color: #fff; padding: calc(10px + env(safe-area-inset-top)) 12px 10px 14px;
+    display: flex; align-items: center; gap: 12px; flex: none;
+  }
+  .avatar {
+    width: 42px; height: 42px; border-radius: 50%; background: var(--verde); display: grid; place-items: center;
+    font-weight: 700; font-size: 18px; flex: none;
+  }
+  .topo-info { flex: 1; min-width: 0; }
+  .topo-nome { font-weight: 650; font-size: 17px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .topo-status { font-size: 13px; opacity: .85; display: flex; align-items: center; gap: 6px; }
+  .ponto { width: 8px; height: 8px; border-radius: 50%; background: #9aa9a3; flex: none; }
+  .ponto.aguardando { background: #f2b84b; }
+  .ponto.atendendo { background: #4ade80; }
+  .btn-menu {
+    background: transparent; border: 0; color: #fff; width: 44px; height: 44px; border-radius: 50%; cursor: pointer; font-size: 22px; line-height: 1;
+  }
+  .btn-menu:hover { background: rgba(255,255,255,.12); }
+  .menu {
+    position: absolute; right: 10px; top: calc(58px + env(safe-area-inset-top)); background: var(--papel); border: 1px solid var(--linha);
+    border-radius: 12px; box-shadow: 0 8px 24px rgba(16,48,43,.18); z-index: 20; min-width: 190px; overflow: hidden;
+  }
+  .menu button { display: block; width: 100%; text-align: left; padding: 13px 16px; background: none; border: 0; cursor: pointer; }
+  .menu button:hover { background: #f1f6f3; }
+
+  /* Formulário inicial */
+  .inicio { flex: 1; overflow-y: auto; padding: 20px 18px calc(24px + env(safe-area-inset-bottom)); }
+  .inicio h1 { font-size: 24px; line-height: 1.2; margin: 6px 0 6px; }
+  .inicio p.sub { margin: 0 0 18px; color: var(--texto-suave); }
+  .campo { margin-bottom: 14px; }
+  .campo label { display: block; font-weight: 600; font-size: 14px; margin-bottom: 5px; }
+  .campo .opc { font-weight: 400; color: var(--texto-suave); }
+  .campo input[type=text], .campo input[type=tel], .campo input[type=email], .campo textarea {
+    width: 100%; padding: 12px 13px; border: 1.5px solid var(--linha); border-radius: 10px; background: var(--papel);
+  }
+  .campo input:focus, .campo textarea:focus { border-color: var(--verde); outline: none; box-shadow: 0 0 0 3px rgba(20,107,80,.18); }
+  .campo textarea { min-height: 92px; resize: vertical; }
+  .aceite { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; color: var(--texto-suave); margin: 4px 0 18px; }
+  .aceite input { width: 20px; height: 20px; margin-top: 1px; accent-color: var(--verde); flex: none; }
+  .btn-primario {
+    width: 100%; background: var(--verde); color: #fff; border: 0; border-radius: 12px; padding: 14px 16px; font-weight: 650; font-size: 16px; cursor: pointer;
+  }
+  .btn-primario:hover { background: #0f5a42; }
+  .btn-primario:disabled { opacity: .6; cursor: default; }
+  .erro-form { color: var(--erro); font-size: 14px; margin: 0 0 12px; min-height: 0; }
+
+  /* Conversa */
+  .msgs { flex: 1; overflow-y: auto; padding: 14px 12px 8px; display: flex; flex-direction: column; gap: 4px; overscroll-behavior: contain; }
+  .dia { align-self: center; background: rgba(16,48,43,.1); color: var(--texto-suave); font-size: 12px; padding: 3px 11px; border-radius: 999px; margin: 10px 0 6px; }
+  .msg { max-width: 82%; padding: 8px 11px 6px; border-radius: var(--raio); background: var(--papel); box-shadow: 0 1px 1px rgba(16,48,43,.08); word-wrap: break-word; overflow-wrap: anywhere; white-space: pre-wrap; }
+  .msg.agente { align-self: flex-start; border-top-left-radius: 4px; }
+  .msg.cliente { align-self: flex-end; background: var(--verde-claro); border-top-right-radius: 4px; }
+  .msg.pendente { opacity: .6; }
+  .msg .quem { display: block; font-size: 12.5px; font-weight: 650; color: var(--verde); margin-bottom: 2px; }
+  .msg .hora { display: block; text-align: right; font-size: 11px; color: var(--texto-suave); margin-top: 2px; white-space: normal; }
+  .msg a { color: #0b5cad; }
+  .msg.sistema { align-self: center; background: rgba(16,48,43,.08); box-shadow: none; color: var(--texto-suave); font-size: 13px; text-align: center; max-width: 90%; padding: 5px 12px; }
+  .msg.sistema .hora { display: none; }
+  .boas-vindas { align-self: center; max-width: 88%; text-align: center; color: var(--texto-suave); font-size: 14px; margin: 6px 0 10px; }
+
+  .compor { flex: none; display: flex; gap: 8px; align-items: flex-end; padding: 8px 10px calc(8px + env(safe-area-inset-bottom)); background: #f4f8f5; border-top: 1px solid var(--linha); }
+  .compor textarea {
+    flex: 1; resize: none; border: 1.5px solid var(--linha); border-radius: 22px; padding: 11px 16px; max-height: 140px; min-height: 44px; background: var(--papel); line-height: 1.35;
+  }
+  .compor textarea:focus { outline: none; border-color: var(--verde); }
+  .btn-enviar { width: 46px; height: 46px; border-radius: 50%; border: 0; background: var(--verde); color: #fff; cursor: pointer; display: grid; place-items: center; flex: none; }
+  .btn-enviar:hover { background: #0f5a42; }
+  .btn-enviar:disabled { opacity: .5; cursor: default; }
+  .btn-enviar svg { width: 22px; height: 22px; fill: currentColor; }
+
+  .aviso-encerrado { background: #fff7e5; color: var(--aviso); text-align: center; font-size: 13.5px; padding: 8px 12px; border-top: 1px solid #f0dfb8; flex: none; }
+
+  .toast {
+    position: fixed; left: 50%; bottom: calc(86px + env(safe-area-inset-bottom)); transform: translateX(-50%); background: #2b2f2e; color: #fff;
+    padding: 10px 16px; border-radius: 10px; font-size: 14px; z-index: 30; max-width: calc(100% - 32px); text-align: center;
+  }
+  @media (prefers-reduced-motion: no-preference) { .msg { animation: entra .16s ease-out; } @keyframes entra { from { opacity: 0; transform: translateY(4px); } } }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header class="topo">
+    <div class="avatar" id="avatar" aria-hidden="true">A</div>
+    <div class="topo-info">
+      <div class="topo-nome" id="empresa">Atendimento</div>
+      <div class="topo-status"><span class="ponto" id="ponto"></span><span id="status">Online</span></div>
+    </div>
+    <button class="btn-menu" id="btnMenu" aria-label="Menu" aria-haspopup="true" aria-expanded="false" hidden>&#8942;</button>
+  </header>
+  <div class="menu" id="menu" hidden>
+    <button type="button" id="btnNova">Iniciar nova conversa</button>
+  </div>
+
+  <!-- Tela 1: dados iniciais -->
+  <section class="inicio" id="telaInicio" hidden>
+    <h1>Como podemos ajudar?</h1>
+    <p class="sub" id="boasVindasForm">Preencha seus dados e conte o que você precisa. Respondemos aqui mesmo, na hora.</p>
+    <form id="formInicio" novalidate>
+      <div class="campo">
+        <label for="fNome">Seu nome</label>
+        <input type="text" id="fNome" autocomplete="name" maxlength="120" required>
+      </div>
+      <div class="campo">
+        <label for="fTel">Telefone com DDD</label>
+        <input type="tel" id="fTel" inputmode="tel" autocomplete="tel-national" placeholder="(71) 99999-9999" maxlength="16" required>
+      </div>
+      <div class="campo">
+        <label for="fEmail">E-mail <span class="opc">(opcional)</span></label>
+        <input type="email" id="fEmail" autocomplete="email" maxlength="200">
+      </div>
+      <div class="campo">
+        <label for="fMsg">Sua mensagem</label>
+        <textarea id="fMsg" maxlength="4000" placeholder="Escreva aqui sua dúvida ou o que você precisa"></textarea>
+      </div>
+      <label class="aceite">
+        <input type="checkbox" id="fAceite">
+        <span>Concordo que a empresa guarde meu nome, telefone e a conversa para me atender e entrar em contato (LGPD).</span>
+      </label>
+      <p class="erro-form" id="erroForm" role="alert"></p>
+      <button class="btn-primario" id="btnIniciar" type="submit">Iniciar conversa</button>
+    </form>
+  </section>
+
+  <!-- Tela 2: conversa -->
+  <section id="telaChat" style="display:contents" hidden>
+    <main class="msgs" id="msgs" aria-live="polite" aria-label="Mensagens"></main>
+    <div class="aviso-encerrado" id="avisoEncerrado" hidden>Atendimento encerrado. Envie uma mensagem para abrir de novo.</div>
+    <form class="compor" id="formEnviar">
+      <textarea id="texto" rows="1" maxlength="4000" placeholder="Digite uma mensagem" aria-label="Mensagem"></textarea>
+      <button class="btn-enviar" id="btnEnviar" type="submit" aria-label="Enviar mensagem">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.4 20.4 21 12 3.4 3.6 3.4 10l12 2-12 2z"/></svg>
+      </button>
+    </form>
+  </section>
+</div>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+(() => {
+  'use strict';
+  const SUPABASE_URL = 'https://nrvuynjwcgwpjdptkiay.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_e2GK1YGEj06STa_ESCevow_nvtATB-y';
+  const CHAVE_CONVERSA = 'webchat.conversa.v1';
+  const CHAVE_PERFIL = 'webchat.perfil.v1';
+
+  const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
+  const $ = (s) => document.querySelector(s);
+  const el = {
+    empresa: $('#empresa'), avatar: $('#avatar'), ponto: $('#ponto'), status: $('#status'),
+    btnMenu: $('#btnMenu'), menu: $('#menu'), btnNova: $('#btnNova'),
+    telaInicio: $('#telaInicio'), telaChat: $('#telaChat'), boasForm: $('#boasVindasForm'),
+    form: $('#formInicio'), fNome: $('#fNome'), fTel: $('#fTel'), fEmail: $('#fEmail'), fMsg: $('#fMsg'),
+    fAceite: $('#fAceite'), erroForm: $('#erroForm'), btnIniciar: $('#btnIniciar'),
+    msgs: $('#msgs'), aviso: $('#avisoEncerrado'), formEnviar: $('#formEnviar'), texto: $('#texto'),
+    btnEnviar: $('#btnEnviar'), toast: $('#toast')
+  };
+
+  let config = { nome_empresa: 'Atendimento', boas_vindas: '' };
+  let conv = lerLocal(CHAVE_CONVERSA);
+  let ultimoId = 0, canal = null, timerPoll = null, ultimoDia = '', ultimoAutor = '', naoLidas = 0, tempId = 0;
+  let canalOk = false, carregando = false, statusAtual = '', recebeuBroadcast = false;
+  const vistos = new Set();
+
+  /* ---------- utilidades ---------- */
+  function lerLocal(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } }
+  function gravarLocal(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+  function apagarLocal(k) { try { localStorage.removeItem(k); } catch {} }
+  function toast(msg) {
+    el.toast.textContent = msg; el.toast.hidden = false;
+    clearTimeout(toast.t); toast.t = setTimeout(() => { el.toast.hidden = true; }, 4200);
+  }
+  function mensagemErro(e) {
+    const m = (e && e.message) || '';
+    if (!m || /failed to fetch|networkerror|load failed/i.test(m)) return 'Sem conexão. Confira sua internet e tente de novo.';
+    return m;
+  }
+  function hora(iso) { return new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }); }
+  function rotuloDia(iso) {
+    const d = new Date(iso), h = new Date();
+    const dia = (x) => x.toDateString();
+    const ontem = new Date(h); ontem.setDate(h.getDate() - 1);
+    if (dia(d) === dia(h)) return 'Hoje';
+    if (dia(d) === dia(ontem)) return 'Ontem';
+    return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  }
+  function mascaraTel(v) {
+    let d = v.replace(/\D/g, '');
+    if (d.length > 11 && d.startsWith('55')) d = d.slice(2);
+    d = d.slice(0, 11);
+    if (d.length <= 2) return d ? '(' + d : '';
+    if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+    if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+    return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+  }
+  function linkificar(pai, texto) {
+    const re = /(https?:\/\/[^\s<]+)/g; let ult = 0, m;
+    while ((m = re.exec(texto))) {
+      if (m.index > ult) pai.appendChild(document.createTextNode(texto.slice(ult, m.index)));
+      const a = document.createElement('a');
+      a.href = m[0]; a.textContent = m[0]; a.target = '_blank'; a.rel = 'noopener noreferrer';
+      pai.appendChild(a); ult = m.index + m[0].length;
+    }
+    if (ult < texto.length) pai.appendChild(document.createTextNode(texto.slice(ult)));
+  }
+  function rolarFim(forca) {
+    const perto = el.msgs.scrollHeight - el.msgs.scrollTop - el.msgs.clientHeight < 160;
+    if (forca || perto) el.msgs.scrollTop = el.msgs.scrollHeight;
+  }
+
+  /* ---------- telas ---------- */
+  function mostrarForm() {
+    fecharCanal();
+    el.telaChat.hidden = true; el.telaChat.style.display = 'none';
+    el.telaInicio.hidden = false; el.btnMenu.hidden = true; el.menu.hidden = true;
+    el.ponto.className = 'ponto'; el.status.textContent = 'Online';
+    const p = lerLocal(CHAVE_PERFIL) || {};
+    el.fNome.value = p.nome || ''; el.fTel.value = p.telefone || ''; el.fEmail.value = p.email || '';
+    el.fMsg.value = ''; el.fAceite.checked = false; el.erroForm.textContent = '';
+  }
+  function mostrarChat() {
+    el.telaInicio.hidden = true;
+    el.telaChat.hidden = false; el.telaChat.style.display = 'contents';
+    el.btnMenu.hidden = false;
+  }
+
+  /* ---------- conversa ---------- */
+  function limparConversa() {
+    el.msgs.textContent = ''; vistos.clear(); ultimoId = 0; ultimoDia = ''; ultimoAutor = ''; statusAtual = '';
+    if (config.boas_vindas) {
+      const b = document.createElement('div'); b.className = 'boas-vindas'; b.textContent = config.boas_vindas; el.msgs.appendChild(b);
+    }
+  }
+  function desenhar(m, pendente) {
+    const dia = rotuloDia(m.criado_em);
+    if (dia !== ultimoDia) {
+      const d = document.createElement('div'); d.className = 'dia'; d.textContent = dia; el.msgs.appendChild(d);
+      ultimoDia = dia; ultimoAutor = '';
+    }
+    const n = document.createElement('div');
+    n.className = 'msg ' + m.autor + (pendente ? ' pendente' : '');
+    if (m.autor === 'agente' && m.agente && ultimoAutor !== 'agente:' + m.agente) {
+      const q = document.createElement('span'); q.className = 'quem'; q.textContent = m.agente; n.appendChild(q);
+    }
+    const t = document.createElement('span'); linkificar(t, m.texto); n.appendChild(t);
+    const h = document.createElement('span'); h.className = 'hora'; h.textContent = hora(m.criado_em); n.appendChild(h);
+    ultimoAutor = m.autor === 'agente' ? 'agente:' + (m.agente || '') : m.autor;
+    el.msgs.appendChild(n);
+    return n;
+  }
+  function adicionar(m, dePolling) {
+    if (m.id == null || vistos.has(m.id)) return false;
+    vistos.add(m.id);
+    if (m.id > ultimoId) ultimoId = m.id;
+    desenhar(m, false);
+    rolarFim(m.autor === 'cliente');
+    if (m.autor !== 'cliente' && document.hidden && !dePolling) {
+      naoLidas++; document.title = `(${naoLidas}) ${config.nome_empresa}`;
+    }
+    return true;
+  }
+  function atualizarStatus(status, agente) {
+    statusAtual = status;
+    el.aviso.hidden = status !== 'encerrada';
+    if (status === 'em_atendimento') {
+      el.ponto.className = 'ponto atendendo'; el.status.textContent = agente ? `${agente} está atendendo` : 'Em atendimento';
+    } else if (status === 'encerrada') {
+      el.ponto.className = 'ponto'; el.status.textContent = 'Atendimento encerrado';
+    } else {
+      el.ponto.className = 'ponto aguardando'; el.status.textContent = 'Aguardando um atendente';
+    }
+  }
+  async function carregar() {
+    if (!conv || carregando) return;
+    carregando = true;
+    try {
+      const { data, error } = await db.rpc('chat_listar', { p_conversa: conv.id, p_token: conv.token, p_apos: ultimoId });
+      if (error) {
+        if (error.code === '28000') { apagarLocal(CHAVE_CONVERSA); conv = null; mostrarForm(); }
+        return;
+      }
+      // Mensagem da equipe que só apareceu pela consulta = o aviso instantâneo não chegou; volta a consultar rápido.
+      const novasDaEquipe = (data.mensagens || []).filter((m) => adicionar(m, true) && m.autor !== 'cliente').length;
+      if (novasDaEquipe) recebeuBroadcast = false;
+      atualizarStatus(data.status, data.agente);
+    } catch { /* sem rede: o próximo ciclo tenta de novo */ }
+    finally { carregando = false; }
+  }
+  function fecharCanal() {
+    if (canal) { db.removeChannel(canal); canal = null; }
+    clearInterval(timerPoll); timerPoll = null; canalOk = false;
+  }
+  function assinar() {
+    fecharCanal();
+    canal = db.channel('conversa:' + conv.token)
+      .on('broadcast', { event: 'msg' }, ({ payload }) => {
+        adicionar(payload, false);
+        if (payload.autor !== 'cliente') { recebeuBroadcast = true; carregar(); }
+      })
+      .subscribe((s) => { canalOk = s === 'SUBSCRIBED'; if (canalOk) carregar(); });
+    // Rede de segurança: consulta a cada 4 s até o aviso instantâneo provar que funciona; depois, a cada 20 s.
+    let ciclos = 0; recebeuBroadcast = false;
+    timerPoll = setInterval(() => { ciclos++; if (!canalOk || !recebeuBroadcast || ciclos % 5 === 0) carregar(); }, 4000);
+  }
+  async function abrirChat() {
+    mostrarChat(); limparConversa();
+    atualizarStatus('aguardando');
+    await carregar();
+    if (!conv) return;
+    assinar(); rolarFim(true); el.texto.focus();
+  }
+
+  /* ---------- ações ---------- */
+  async function iniciar(ev) {
+    ev.preventDefault();
+    el.erroForm.textContent = '';
+    const nome = el.fNome.value.trim(), tel = el.fTel.value.replace(/\D/g, '');
+    if (nome.length < 2) { el.erroForm.textContent = 'Informe seu nome.'; el.fNome.focus(); return; }
+    if (tel.length < 10) { el.erroForm.textContent = 'Informe o telefone com DDD.'; el.fTel.focus(); return; }
+    if (!el.fAceite.checked) { el.erroForm.textContent = 'Marque a caixa de concordância para continuar.'; el.fAceite.focus(); return; }
+    el.btnIniciar.disabled = true; el.btnIniciar.textContent = 'Iniciando…';
+    try {
+      const origem = new URLSearchParams(location.search).get('origem');
+      const { data, error } = await db.rpc('chat_iniciar', {
+        p_nome: nome, p_telefone: el.fTel.value, p_email: el.fEmail.value.trim() || null,
+        p_mensagem: el.fMsg.value.trim() || null, p_aceite: true, p_origem: origem
+      });
+      if (error) throw error;
+      conv = { id: data.conversa_id, token: data.token };
+      gravarLocal(CHAVE_CONVERSA, conv);
+      gravarLocal(CHAVE_PERFIL, { nome, telefone: el.fTel.value, email: el.fEmail.value.trim() });
+      await abrirChat();
+    } catch (e) {
+      el.erroForm.textContent = mensagemErro(e);
+    } finally {
+      el.btnIniciar.disabled = false; el.btnIniciar.textContent = 'Iniciar conversa';
+    }
+  }
+  async function enviar(ev) {
+    ev.preventDefault();
+    const texto = el.texto.value.trim();
+    if (!texto || !conv) return;
+    el.texto.value = ''; autoAltura();
+    const temp = desenhar({ autor: 'cliente', texto, criado_em: new Date().toISOString() }, true);
+    temp.dataset.temp = String(++tempId);
+    rolarFim(true); el.btnEnviar.disabled = true;
+    try {
+      const { data, error } = await db.rpc('chat_enviar', { p_conversa: conv.id, p_token: conv.token, p_texto: texto });
+      if (error) throw error;
+      temp.remove();
+      if (!vistos.has(data.id)) { ultimoDia = ''; adicionarLocal(data.id, texto); }
+      carregar();
+    } catch (e) {
+      temp.remove();
+      el.texto.value = texto; autoAltura();
+      toast(mensagemErro(e));
+    } finally { el.btnEnviar.disabled = false; el.texto.focus(); }
+  }
+  function adicionarLocal(id, texto) {
+    // Reconstrói só se a mensagem ainda não chegou por broadcast: busca o estado oficial.
+    vistos.add(id); if (id > ultimoId) ultimoId = id;
+    desenhar({ id, autor: 'cliente', texto, criado_em: new Date().toISOString() }, false);
+    rolarFim(true);
+  }
+  function novaConversa() {
+    el.menu.hidden = true; el.btnMenu.setAttribute('aria-expanded', 'false');
+    if (!confirm('Iniciar uma nova conversa? O histórico desta fica guardado com a equipe.')) return;
+    apagarLocal(CHAVE_CONVERSA); conv = null; mostrarForm();
+  }
+  function autoAltura() { el.texto.style.height = 'auto'; el.texto.style.height = Math.min(el.texto.scrollHeight, 140) + 'px'; }
+
+  /* ---------- eventos ---------- */
+  el.form.addEventListener('submit', iniciar);
+  el.formEnviar.addEventListener('submit', enviar);
+  el.fTel.addEventListener('input', () => { el.fTel.value = mascaraTel(el.fTel.value); });
+  el.texto.addEventListener('input', autoAltura);
+  el.texto.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && matchMedia('(hover: hover)').matches) { e.preventDefault(); el.formEnviar.requestSubmit(); }
+  });
+  el.btnMenu.addEventListener('click', () => {
+    el.menu.hidden = !el.menu.hidden; el.btnMenu.setAttribute('aria-expanded', String(!el.menu.hidden));
+  });
+  document.addEventListener('click', (e) => { if (!el.menu.hidden && !el.menu.contains(e.target) && e.target !== el.btnMenu) el.menu.hidden = true; });
+  el.btnNova.addEventListener('click', novaConversa);
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) { naoLidas = 0; document.title = config.nome_empresa; carregar(); }
+  });
+  addEventListener('online', carregar);
+
+  /* ---------- início ---------- */
+  async function init() {
+    try {
+      const { data } = await db.rpc('chat_config');
+      if (data) config = Object.assign(config, data);
+    } catch {}
+    document.title = config.nome_empresa;
+    el.empresa.textContent = config.nome_empresa;
+    el.avatar.textContent = (config.nome_empresa.trim()[0] || 'A').toUpperCase();
+    if (config.boas_vindas) el.boasForm.textContent = config.boas_vindas;
+    if (conv && conv.id && conv.token) abrirChat(); else mostrarForm();
+  }
+  init();
+
+  if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+})();
+</script>
+</body>
+</html>
