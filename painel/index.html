@@ -53,6 +53,11 @@
   .nav button { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: none; border: 0; color: #cfe3da; text-align: left; padding: 11px 12px; border-radius: 10px; cursor: pointer; font-weight: 600; }
   .nav button:hover { background: rgba(255,255,255,.08); }
   .nav button[aria-current=page] { background: var(--verde); color: #fff; }
+  .triagem { background: #f1f7f4; border-bottom: 1px solid var(--linha); padding: 8px 14px; font-size: 13.5px; }
+  .triagem b { margin-right: 8px; }
+  .urg { font-size: 12px; font-weight: 700; border-radius: 999px; padding: 1px 8px; background: #e7efe9; color: #14543f; }
+  .urg.media { background: #fdf0d2; color: #7a5200; }
+  .urg.alta { background: #fbdcd8; color: #a1271c; }
   .selo { background: #f2b84b; color: #3b2a00; border-radius: 999px; font-size: 12px; font-weight: 700; padding: 1px 8px; min-width: 22px; text-align: center; }
   .espaco { flex: 1; }
   .eu { padding: 10px; border-top: 1px solid rgba(255,255,255,.14); font-size: 13.5px; }
@@ -142,6 +147,7 @@
 
   @media (max-width: 860px) {
     .app { grid-template-columns: 1fr; grid-template-rows: 1fr auto; }
+    .conteudo { grid-row: 1; }
     .lateral { grid-row: 2; flex-direction: row; padding: 4px 6px calc(4px + env(safe-area-inset-bottom)); align-items: center; gap: 0; }
     .marca, .eu .acoes, .eu span { display: none; }
     .eu { border: 0; padding: 0 6px; margin-left: auto; }
@@ -327,7 +333,7 @@
           podeAtender() ? h('button', { type: 'button', id: 'btnSom', onclick: alternarSom }, S.mudo ? 'Som desligado' : 'Som ligado') : null,
           podeAtender() && 'Notification' in window && Notification.permission === 'default' ? h('button', { type: 'button', onclick: pedirNotificacao }, 'Ativar avisos') : null,
           h('button', { type: 'button', onclick: sair }, 'Sair'))));
-    raiz.replaceChildren(h('div', { class: 'app' }, h('div', { class: 'conteudo', id: 'conteudo' }), lateral));
+    raiz.replaceChildren(h('div', { class: 'app' }, lateral, h('div', { class: 'conteudo', id: 'conteudo' })));
   }
   function renderAba() {
     document.querySelectorAll('.nav button').forEach((b) => b.setAttribute('aria-current', b.dataset.aba === S.aba ? 'page' : 'false'));
@@ -402,7 +408,7 @@
   /* ---------- conversas ---------- */
   async function carregarConversas() {
     const { data, error } = await db.from('conversas')
-      .select('id,status,agente_id,ultima_mensagem,nao_lidas_agente,criado_em,atualizado_em,contato_id,contatos(id,nome,telefone,email)')
+      .select('id,status,agente_id,ultima_mensagem,nao_lidas_agente,criado_em,atualizado_em,contato_id,ia_ativa,triagem_resumo,triagem_urgencia,contatos(id,nome,telefone,email)')
       .order('atualizado_em', { ascending: false }).limit(300);
     if (error) { toast(msgErro(error)); return; }
     S.conversas = data || [];
@@ -441,7 +447,7 @@
       return h('button', { class: 'item', type: 'button', 'aria-current': String(c.id === S.abertaId), onclick: () => abrirConversa(c.id) },
         h('div', { class: 'l1' }, h('span', {}, c.contatos ? c.contatos.nome : 'Contato'), h('span', { class: 'hora' }, fmtHoraLista(c.atualizado_em))),
         h('div', { class: 'l2' }, h('span', { class: 'prev' }, c.ultima_mensagem || 'Sem mensagens'), c.nao_lidas_agente > 0 ? h('span', { class: 'nl' }, c.nao_lidas_agente) : null),
-        h('div', { class: 'l3' }, h('span', { class: 'tag ' + c.status }, ROTULO_STATUS[c.status]), ag ? h('span', { style: 'color:var(--suave)' }, ag.nome) : null));
+        h('div', { class: 'l3' }, h('span', { class: 'tag ' + c.status }, ROTULO_STATUS[c.status]), c.triagem_urgencia === 'alta' ? h('span', { class: 'urg alta' }, 'Urgente') : null, c.ia_ativa && c.status === 'aguardando' ? h('span', { style: 'color:var(--suave)' }, 'IA atendendo') : null, ag ? h('span', { style: 'color:var(--suave)' }, ag.nome) : null));
     }));
   }
   async function abrirConversa(id) {
@@ -463,7 +469,7 @@
     const enviar = h('button', { class: 'btn prim', type: 'button', id: 'btnEnviar', onclick: enviarMsg }, 'Enviar');
     area.addEventListener('input', () => { area.style.height = 'auto'; area.style.height = Math.min(area.scrollHeight, 140) + 'px'; });
     area.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); enviarMsg(); } });
-    box.replaceChildren(h('div', { class: 'chat-topo', id: 'chatTopo' }), h('div', { class: 'msgs', id: 'msgs', 'aria-live': 'polite' }), h('div', { class: 'compor' }, area, enviar));
+    box.replaceChildren(h('div', { class: 'chat-topo', id: 'chatTopo' }), h('div', { id: 'triagem' }), h('div', { class: 'msgs', id: 'msgs', 'aria-live': 'polite' }), h('div', { class: 'compor' }, area, enviar));
     renderTopoChat(); desenharMsgs(true);
   }
   function renderTopoChat() {
@@ -473,6 +479,11 @@
     const atendentes = [...S.agentes.values()].filter((a) => a.ativo && (a.papel === 'admin' || a.papel === 'atendente') && a.id !== c.agente_id);
     const sel = atendentes.length ? h('select', { 'aria-label': 'Transferir para', style: 'width:auto', onchange: (e) => { if (e.target.value) transferir(e.target.value); } },
       h('option', { value: '' }, 'Transferir…'), atendentes.map((a) => h('option', { value: a.id }, a.nome))) : null;
+    const tri = document.getElementById('triagem');
+    if (tri) tri.replaceChildren(...(c.triagem_resumo || (c.ia_ativa && c.status === 'aguardando') ? [h('div', { class: 'triagem' },
+      h('b', {}, c.ia_ativa && c.status === 'aguardando' ? 'Assistente virtual atendendo' : 'Triagem da assistente virtual'),
+      c.triagem_urgencia ? h('span', { class: 'urg ' + c.triagem_urgencia }, 'Urgência ' + ({ baixa: 'baixa', media: 'média', alta: 'alta' })[c.triagem_urgencia]) : null,
+      c.triagem_resumo ? h('div', {}, c.triagem_resumo) : null)] : []));
     t.replaceChildren(
       h('button', { class: 'btn voltar', type: 'button', onclick: () => { S.abertaId = null; document.getElementById('inbox')?.classList.remove('aberta'); renderLista(); renderChat(); } }, 'Voltar'),
       h('div', { class: 'quem' }, h('b', {}, ct.nome || 'Contato'),
@@ -491,7 +502,7 @@
       const d = rotuloDia(m.criado_em);
       if (d !== dia) { out.push(h('div', { class: 'dia' }, d)); dia = d; ultimoQuem = ''; }
       const ag = m.agente_id ? S.agentes.get(m.agente_id) : null;
-      const quem = m.autor === 'agente' ? (ag ? ag.nome : 'Atendente') : '';
+      const quem = m.autor === 'agente' ? (ag ? ag.nome : 'Assistente virtual') : '';
       out.push(h('div', { class: 'msg ' + m.autor },
         m.autor === 'agente' && quem !== ultimoQuem ? h('span', { class: 'quem' }, quem) : null,
         h('span', {}, linkificar(m.texto)), h('span', { class: 'hora' }, fmtHora(m.criado_em))));

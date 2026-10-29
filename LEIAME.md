@@ -58,3 +58,10 @@ Dica: coloque `?origem=instagram` no link do chat (ex.: na bio) para ver de onde
 - Respostas rápidas prontas para a equipe
 - Ligação com o WhatsApp oficial (via n8n + API do WhatsApp Business)
 - Resposta automática fora do horário de atendimento
+
+## Triagem por IA (n8n + Claude)
+
+- Workflow `Triagem IA - Atendimento` no n8n (URL Production `/webhook/novo-atendimento` salva em Configurações > Webhook do n8n).
+- A cada mensagem do paciente o Supabase avisa o n8n, que lê o histórico (funções `ia_contexto` / `ia_responder`, protegidas pela chave `ia_segredo` da tabela `config`), pede ao Claude a resposta e a devolve ao chat.
+- Ao ter o essencial, em urgência ou após 10 falas, a IA para (`ia_ativa = false`) e a conversa fica em Aguardando com resumo e urgência no painel.
+- Desligar a IA: na tabela `config`, `ia_ativa = 'nao'`. Quando um atendente assume, a IA já para sozinha.
