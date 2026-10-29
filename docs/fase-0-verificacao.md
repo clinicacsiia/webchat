@@ -58,3 +58,15 @@ Consequências para o plano:
 ## Conclusão
 
 A Fase 0 não encontrou bloqueio. A conferência automática é viável sem criar nada no Klingo. O preço Particular tem fonte, com ressalva de qualidade em 63 de 184 procedimentos. Pendências: respostas do suporte e o teste real do #7 (feito na Fase 3).
+
+## Teste real do relatório #7 (29/10/2026)
+
+Feito pela Edge Function `sync-catalogo-klingo` em modo de inspeção (só estrutura e contagens; colunas com dado de paciente são bloqueadas e devolvem erro 400).
+
+- Sai pela API com o filtro de data `:data_marcacao` (`l` = livre, com `-from` e `-to`; padrão `h` = hoje). Tem também `data_atendimento` (agendado para), `unidade`, `prestador` e `especialidade`.
+- Volume: 287 marcações hoje; 1.420 em 7 dias (cerca de 200 por dia). Basta pedir "hoje" e "amanhã" a cada 10 minutos.
+- Colunas: Unidade, Marcacao, Data_Atendimento, Medico, Paciente, Operadora, Prontuario, Telefone (Contato), Procedimento, Previsto, Obs, Status, Data_Agendamento, Usuario, Origem, Quantidade.
+- **Status = confirmação** (A Confirmar, Confirmado, Sem Resposta), não cancelamento. Cancelada/Bloqueada vêm do #13825 ou do #47.
+- **Origem = cargo de quem marcou** (Teleoperador, Recepcionista, SAC/Texto, Administrativo): não identifica marcação vinda do chat.
+
+**Como a conferência sabe qual paciente é qual (Fase 3):** o pré-agendamento guarda nome, celular, procedimento, unidade e plano que o paciente informou. A função lê o #7 só na memória, procura a marcação por nome + celular + procedimento + data/hora + operadora + unidade e grava apenas o resultado da conferência (conferido, divergente ou não encontrado, e quais campos diferem). O relatório nunca é gravado.

@@ -34,7 +34,8 @@ Resultado completo em `docs/fase-0-verificacao.md`; texto para o suporte em `doc
 - [x] **Preço Particular:** vem do valor das marcações do #13825 (184 procedimentos com valor; 63 com mais de um valor, que exigem regra de confiança). Convênio continua no #13983.
 - [x] **Bloqueio:** existe para procedimento (Faturamento Ativo), marcação (Status) e agenda (vigência). Para plano, perguntar ao suporte.
 - [ ] **Filtros do #13983 pela API:** descobrir os ids na Fase 1 (a resposta da API lista os filtros).
-- [ ] **Perguntas ao suporte e teste real do #7:** pendentes (pessoa).
+- [x] **Teste real do #7:** feito em 29/10/2026 (ver `docs/fase-0-verificacao.md`).
+- [ ] **Perguntas ao suporte:** e-mail pronto como rascunho no Gmail; falta enviar (pessoa).
 
 ## Fase 1: base de conhecimento com histórico (antes de limpar o cadastro) — CONCLUÍDA em 29/10/2026
 

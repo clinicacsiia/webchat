@@ -11,7 +11,12 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 // nunca as linhas. Serve para descobrir os ids dos filtros antes de pedir os dados.
 
 const KLINGO_URL = "https://api-externa.klingo.app/api/info/relatorio";
-const INSPECIONAVEIS = new Set(["13981", "13983", "13984", "12301", "13825"]);
+const INSPECIONAVEIS = new Set(["7", "13981", "13983", "13984", "12301", "13825"]);
+// Colunas com dado de paciente: nunca podem ser agrupadas nem filtradas na inspeção (que devolve valores e contagens).
+const COLUNAS_PACIENTE: Record<string, Set<string>> = {
+  "7": new Set(["Paciente", "Telefone", "Prontuario", "Obs"]),
+  "13825": new Set(["col1", "col2", "col9", "col15", "col16", "col17"]),
+};
 type Row = Record<string, unknown>;
 
 const json = (body: unknown, status = 200) =>
@@ -41,12 +46,12 @@ async function inspecionar(id: string, token: string, filtros: Record<string, st
   };
   const result = payload?.result;
   const todas: Row[] = Array.isArray(result?.data) ? result.data : [];
-  const condicoes = Object.entries(somente).filter(([c]) => /^col\d{1,3}$/.test(c));
+  const condicoes = Object.entries(somente).filter(([c]) => /^[A-Za-z_][A-Za-z0-9_]{0,30}$/.test(c));
   const dados = condicoes.length ? todas.filter((r) => condicoes.every(([c, v]) => String(r[c] ?? "") === v)) : todas;
   const colunas = [...(Array.isArray(result?.group_cols) ? result.group_cols : []), ...(Array.isArray(result?.columns) ? result.columns : [])]
     .map((c: Row) => ({ nome: c?.name, titulo: c?.title }));
   let grupos: unknown = null;
-  if (agrupar && /^col\d{1,3}$/.test(agrupar)) {
+  if (agrupar && /^[A-Za-z_][A-Za-z0-9_]{0,30}$/.test(agrupar)) {
     const m = new Map<string, number>();
     for (const r of dados) { const k = String(r[agrupar] ?? ""); m.set(k, (m.get(k) ?? 0) + 1); }
     grupos = [...m.entries()].slice(0, 200).map(([valor, linhas]) => ({ valor, linhas }));
@@ -198,6 +203,10 @@ Deno.serve(async (req: Request) => {
       for (const [k, v] of Object.entries(corpo.filtros ?? {})) if (/^:?[A-Za-z0-9_-]{1,40}$/.test(k)) filtros[k] = String(v).slice(0, 40);
       const somente: Record<string, string> = {};
       for (const [k, v] of Object.entries(corpo.somente ?? {})) somente[k] = String(v);
+      const bloqueadas = COLUNAS_PACIENTE[id];
+      if (bloqueadas && ([corpo.agrupar, ...Object.keys(somente)].some((c) => typeof c === "string" && bloqueadas.has(c)))) {
+        return json({ error: "Coluna com dado de paciente não pode ser inspecionada" }, 400);
+      }
       return json(await inspecionar(id, token, filtros, typeof corpo.agrupar === "string" ? corpo.agrupar : null, somente));
     } catch (e) {
       return json({ error: e instanceof Error ? e.message : "erro desconhecido" }, 502);
