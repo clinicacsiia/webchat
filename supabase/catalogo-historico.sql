@@ -1,7 +1,8 @@
 -- Fase 1 do plano da memória da IA (docs/plano-ia-memoria-agendamento.md).
--- Já aplicado no projeto webchat-atendimento, em duas migrações:
---   catalogo_foto_referencia  (tabela catalogo_foto + foto de 29/10/2026, antes da limpeza no Klingo)
---   catalogo_historico        (o resto deste arquivo)
+-- Já aplicado no projeto webchat-atendimento, em três migrações:
+--   catalogo_foto_referencia   (tabela catalogo_foto + foto de 29/10/2026, antes da limpeza no Klingo)
+--   catalogo_historico_esquema (colunas, hash, tabela catalogo_mudanca)
+--   catalogo_sincronizar       (a função; ver catalogo-historico-parte2.sql)
 -- Antes: a sincronização apagava e regravava o catálogo, sem rastro. Agora ela compara com o que já existe,
 -- guarda o que mudou em catalogo_mudanca e só marca como removido o que sumiu do Klingo.
 
