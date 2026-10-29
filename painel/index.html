@@ -286,6 +286,28 @@
       h('h1', {}, titulo), h('p', { class: 'sub' }, texto),
       h('button', { class: 'btn', type: 'button', onclick: aoVoltar || sair, style: 'width:100%' }, aoVoltar ? 'Voltar' : 'Sair')));
   }
+  function telaNovaSenha() {
+    const nova = h('input', { type: 'password', id: 'nSenha', autocomplete: 'new-password', required: true, minlength: 8 });
+    const conf = h('input', { type: 'password', id: 'nSenha2', autocomplete: 'new-password', required: true, minlength: 8 });
+    const erro = h('p', { class: 'erro', role: 'alert' });
+    const btn = h('button', { class: 'btn prim', type: 'submit', style: 'width:100%' }, 'Salvar senha e entrar');
+    const f = h('form', {}, h('h1', {}, 'Crie sua senha'),
+      h('p', { class: 'sub' }, 'Este é o seu primeiro acesso. Escolha uma senha só sua, com pelo menos 8 caracteres.'),
+      h('div', { class: 'campo' }, h('label', { class: 'rot', for: 'nSenha' }, 'Nova senha'), nova),
+      h('div', { class: 'campo' }, h('label', { class: 'rot', for: 'nSenha2' }, 'Repita a nova senha'), conf),
+      erro, btn,
+      h('div', { style: 'margin-top:8px;text-align:center' }, h('button', { class: 'link', type: 'button', onclick: sair }, 'Sair')));
+    f.addEventListener('submit', async (ev) => {
+      ev.preventDefault(); erro.textContent = '';
+      if (nova.value.length < 8) { erro.textContent = 'A senha precisa ter pelo menos 8 caracteres.'; return; }
+      if (nova.value !== conf.value) { erro.textContent = 'As senhas não são iguais.'; return; }
+      btn.disabled = true;
+      const { error } = await db.auth.updateUser({ password: nova.value, data: { trocar_senha: false } });
+      if (error) { erro.textContent = /different|same/i.test(msgErro(error)) ? 'Escolha uma senha diferente da provisória.' : msgErro(error); btn.disabled = false; return; }
+      toast('Senha criada.'); entrar();
+    });
+    return h('div', { class: 'centro' }, h('div', { class: 'cartao' }, f));
+  }
   async function sair() {
     desligarTempoReal(); await db.auth.signOut();
     S.me = null; telaLoginMostrar(false);
@@ -295,6 +317,7 @@
   async function entrar() {
     const { data: { session } } = await db.auth.getSession();
     if (!session) { telaLoginMostrar(false); return; }
+    if (session.user.user_metadata && session.user.user_metadata.trocar_senha) { raiz.replaceChildren(telaNovaSenha()); return; }
     const { data: eu, error } = await db.from('agentes').select('id,nome,email,papel,ativo').eq('id', session.user.id).maybeSingle();
     if (error) { raiz.replaceChildren(telaAviso('Não foi possível entrar', msgErro(error), sair)); return; }
     if (!eu || !eu.ativo) {
@@ -701,7 +724,7 @@
     const btn = h('button', { class: 'btn prim', type: 'submit' }, 'Adicionar pessoa');
     const f = h('form', { class: 'pagina-form', style: 'background:var(--papel);border:1px solid var(--linha);border-radius:12px;padding:14px;margin-bottom:16px' },
       h('h3', { style: 'margin:0 0 4px' }, 'Adicionar pessoa'),
-      h('p', { class: 'sub' }, 'A pessoa já entra liberada e poderá ver o painel e responder as conversas (Administrador também gerencia a equipe).'),
+      h('p', { class: 'sub' }, 'No primeiro acesso a pessoa escolhe a própria senha. Ela já entra liberada e poderá ver o painel e responder as conversas (Administrador também gerencia a equipe).'),
       h('div', { class: 'campo' }, h('label', { class: 'rot', for: 'aNome' }, 'Nome'), nome),
       h('div', { class: 'campo' }, h('label', { class: 'rot', for: 'aEmail' }, 'E-mail'), email),
       h('div', { class: 'campo' }, h('label', { class: 'rot', for: 'aSenha' }, 'Senha provisória'), senha),
@@ -719,7 +742,7 @@
   async function adicionarPessoa(nome, email, senha, papel) {
     /* cliente separado, sem guardar sessão, para não deslogar o administrador */
     const outro = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
-    const { data, error } = await outro.auth.signUp({ email, password: senha, options: { data: { nome } } });
+    const { data, error } = await outro.auth.signUp({ email, password: senha, options: { data: { nome, trocar_senha: true } } });
     if (error) throw error;
     if (!data.user || (data.user.identities && !data.user.identities.length)) throw new Error('Este e-mail já está cadastrado.');
     let ok = false;
