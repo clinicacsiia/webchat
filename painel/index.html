@@ -712,7 +712,9 @@
             h('td', {}, a.nome, eu ? ' (você)' : ''), h('td', {}, a.email || ''), h('td', {}, papel),
             h('td', {}, h('label', { style: 'display:flex;gap:6px;align-items:center' }, ativo, a.ativo ? 'Liberado' : 'Aguardando liberação')),
             h('td', {}, `${m.ativas} abertas · ${m.encerradas} encerradas`),
-            h('td', {}, eu ? '' : h('button', { class: 'btn perigo', type: 'button', onclick: () => removerAgente(a) }, 'Remover')));
+            h('td', { style: 'white-space:nowrap' },
+              h('button', { class: 'btn', type: 'button', onclick: () => (eu ? minhaSenha() : redefinirSenha(a)) }, eu ? 'Minha senha' : 'Redefinir senha'),
+              eu ? '' : [' ', h('button', { class: 'btn perigo', type: 'button', onclick: () => removerAgente(a) }, 'Remover')]));
         }))))));
   }
   function formAdicionarPessoa() {
@@ -752,6 +754,21 @@
       ok = !!(r && r.length); if (!ok) await new Promise((res) => setTimeout(res, 400));
     }
     if (!ok) throw new Error('Conta criada, mas não foi possível liberar o acesso. Libere na lista abaixo.');
+  }
+  async function redefinirSenha(a) {
+    const nova = prompt(`Nova senha provisória para ${a.nome} (mínimo 8 caracteres).\nNo próximo acesso a pessoa vai escolher uma senha só dela.`);
+    if (nova === null) return;
+    if (nova.length < 8) { toast('A senha precisa ter pelo menos 8 caracteres.'); return; }
+    const { error } = await db.rpc('admin_redefinir_senha', { p_agente: a.id, p_senha: nova });
+    if (error) { toast(msgErro(error)); return; }
+    toast(`Senha de ${a.nome} redefinida. Passe a nova senha para a pessoa.`);
+  }
+  async function minhaSenha() {
+    const nova = prompt('Nova senha para a sua conta (mínimo 8 caracteres):');
+    if (nova === null) return;
+    if (nova.length < 8) { toast('A senha precisa ter pelo menos 8 caracteres.'); return; }
+    const { error } = await db.auth.updateUser({ password: nova });
+    toast(error ? msgErro(error) : 'Sua senha foi alterada.');
   }
   async function alterarAgente(a, campos) {
     const { error } = await db.from('agentes').update(campos).eq('id', a.id);
