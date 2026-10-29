@@ -177,6 +177,7 @@
   'use strict';
   const SUPABASE_URL = 'https://nrvuynjwcgwpjdptkiay.supabase.co';
   const SUPABASE_KEY = 'sb_publishable_e2GK1YGEj06STa_ESCevow_nvtATB-y';
+  const PAINEL_URL = new URL('./', location.href).href; // o link do e-mail de confirmação volta para o painel
   const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
   /* ---------- helpers ---------- */
@@ -256,7 +257,7 @@
         btn.disabled = true;
         try {
           if (modoCadastro) {
-            const { data, error } = await db.auth.signUp({ email: email.value.trim(), password: senha.value, options: { data: { nome: nome.value.trim() } } });
+            const { data, error } = await db.auth.signUp({ email: email.value.trim(), password: senha.value, options: { emailRedirectTo: PAINEL_URL, data: { nome: nome.value.trim() } } });
             if (error) throw error;
             if (!data.session) { erro.textContent = ''; raiz.replaceChildren(telaAviso('Confirme seu e-mail', 'Enviamos um link de confirmação para ' + email.value.trim() + '. Depois de confirmar, volte aqui e entre.', () => telaLoginMostrar(false))); return; }
           } else {
@@ -744,7 +745,7 @@
   async function adicionarPessoa(nome, email, senha, papel) {
     /* cliente separado, sem guardar sessão, para não deslogar o administrador */
     const outro = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
-    const { data, error } = await outro.auth.signUp({ email, password: senha, options: { data: { nome, trocar_senha: true } } });
+    const { data, error } = await outro.auth.signUp({ email, password: senha, options: { emailRedirectTo: PAINEL_URL, data: { nome, trocar_senha: true } } });
     if (error) throw error;
     if (!data.user || (data.user.identities && !data.user.identities.length)) throw new Error('Este e-mail já está cadastrado.');
     let ok = false;
