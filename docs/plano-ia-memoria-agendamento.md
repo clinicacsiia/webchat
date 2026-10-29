@@ -36,7 +36,9 @@ Resultado completo em `docs/fase-0-verificacao.md`; texto para o suporte em `doc
 - [ ] **Filtros do #13983 pela API:** descobrir os ids na Fase 1 (a resposta da API lista os filtros).
 - [ ] **Perguntas ao suporte e teste real do #7:** pendentes (pessoa).
 
-## Fase 1: base de conhecimento com histórico (antes de limpar o cadastro)
+## Fase 1: base de conhecimento com histórico (antes de limpar o cadastro) — CONCLUÍDA em 29/10/2026
+
+Entregue: foto de referência, comparação noturna com histórico, preços (convênio e Particular com confiança), demanda, lista de limpeza, aba Catálogo, IA citando preço como previsão. Diferenças do plano: não há foto diária (a foto de referência + `catalogo_mudanca` bastam); o Particular vem do #13825, não do #13983.
 
 **Objetivo:** guardar uma foto de tudo que existe hoje, passar a enxergar mudanças, e só então limpar o cadastro no Klingo.
 

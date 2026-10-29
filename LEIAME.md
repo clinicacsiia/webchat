@@ -94,8 +94,17 @@ A API de marcação (`/externo/register`, `/externo/login`, `/agenda/horarios`, 
 
 ### Catálogo do Klingo para a IA
 
-A IA consulta, a cada mensagem do paciente, um catálogo copiado de relatórios de cadastro do Klingo (sem dado de paciente): procedimentos e preparo (#13981), agenda por profissional (#13984) e operadoras/planos (#12301). As tabelas são `catalogo_*` e a busca é a função `ia_catalogo`, que entende siglas e erros comuns (RM = ressonância, TC = tomografia, US/USG = ultrassonografia, RX = radiografia). Preços não entram: o relatório de preços não traz o valor Particular.
+A IA consulta, a cada mensagem do paciente, um catálogo copiado de relatórios de cadastro do Klingo (sem dado de paciente): procedimentos e preparo (#13981), agenda por profissional (#13984) e operadoras/planos (#12301). As tabelas são `catalogo_*` e a busca é a função `ia_catalogo`, que entende siglas e erros comuns (RM = ressonância, TC = tomografia, US/USG = ultrassonografia, RX = radiografia).
 
-- Atualização: a Edge Function `sync-catalogo-klingo` (publicada no projeto webchat-atendimento) busca os três relatórios e recarrega o catálogo todo dia às 03:00 (Brasília, via pg_cron). Ela usa o secret `KLINGO_APP_TOKEN` do Supabase (o token nunca vai para o repositório) e só aceita chamadas com o header `x-sync-key` igual ao segredo da IA. Para atualizar na hora: `curl -X POST <URL da função> -H "x-sync-key: <segredo>"`. Cada relatório é independente: se um falhar, o catálogo anterior dele continua valendo.
+- Atualização: a Edge Function `sync-catalogo-klingo` (publicada no projeto webchat-atendimento) busca os três relatórios todo dia às 03:00 (Brasília, via pg_cron) e **compara** com o que já existe (`catalogo_sincronizar`): o que entra, sai ou muda fica em `catalogo_mudanca`, o que sumiu do Klingo vira `ativo = false` (não é apagado) e um relatório que venha com menos da metade das linhas é recusado. Ela usa o secret `KLINGO_APP_TOKEN` do Supabase (o token nunca vai para o repositório) e só aceita chamadas com o header `x-sync-key` igual ao segredo da IA. Para atualizar na hora: `curl -X POST <URL da função> -H "x-sync-key: <segredo>"`. Cada relatório é independente: se um falhar, o catálogo anterior dele continua valendo.
 - Carga manual em lotes: função `ia_catalogo_carregar` (mesmo segredo).
 - A agenda do catálogo é a grade semanal cadastrada, não horário livre: o atendente confirma data e hora.
+
+### Preços, demanda e lista de limpeza (Fase 1)
+
+- **Preços** (`catalogo_preco`): convênio vem do relatório #13983 pedido por operadora (03:10) e o Particular vem do valor das marcações abertas dos últimos 90 dias do #13825, só agregado, sem dado de paciente (03:25). A IA só usa preço com confiança alta ou média: tabelas CBHPM guardam coeficiente, não reais, e Particular com uma marcação só é baixa. **Todo valor é uma previsão**: a IA diz que o preço pode mudar e que o atendente avalia e confirma valor e data.
+- **Demanda** (`catalogo_procedimento.demanda_90d`): marcações abertas por procedimento nos últimos 90 dias; a IA prefere o exame que a clínica realmente faz.
+- **Foto de referência** (`catalogo_foto`, `referencia = true`): cópia do catálogo de 29/10/2026, antes da limpeza no Klingo. Não apagar.
+- **Aba Catálogo** do painel (só administrador): o que limpar no Klingo (sem agenda vigente, duplicados, agenda de teste, sem preço, mais pedidos sem preparo) e o histórico de mudanças.
+- SQL em `supabase/catalogo-historico*.sql` e `supabase/catalogo-precos.sql`. Plano completo e fases em `docs/`.
+- **n8n**: o fluxo `Triagem IA - Atendimento` precisa estar **publicado** para valer (o rascunho não atende ninguém). O nó "Ler resposta da IA" lê `merged_response` ou o bloco de texto, e o nó do Claude usa `maxTokens` 4000 (com 1200 o JSON vinha cortado e caía na resposta de emergência).
