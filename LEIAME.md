@@ -91,3 +91,10 @@ Quando o paciente quer consulta ou exame, a assistente segue o roteiro: pedido (
 ### O que ainda depende da Klingo
 
 A API de marcação (`/externo/register`, `/externo/login`, `/agenda/horarios`, `/agenda/horario`) ainda **não está ligada**: faltam `baseUrl`, login e senha de integração (o `X-APP-TOKEN` que já existe no projeto Indicadores é da API de relatórios, e só lê). Quando chegarem, o próximo passo é a IA consultar horários livres e criar o cadastro do paciente no Klingo sozinha, mantendo a marcação com o humano. Pendências para perguntar ao suporte (suporte@klingo.com.br): pré-agendamento/lista de espera na API, busca de paciente por CPF (evita cadastro duplicado), endpoints de valor e preparo, campos obrigatórios do cadastro e ambiente de testes.
+
+### Catálogo do Klingo para a IA
+
+A IA consulta, a cada mensagem do paciente, um catálogo copiado de relatórios de cadastro do Klingo (sem dado de paciente): procedimentos e preparo (#13981), agenda por profissional (#13984) e operadoras/planos (#12301). As tabelas são `catalogo_*` e a busca é a função `ia_catalogo`, que entende siglas e erros comuns (RM = ressonância, TC = tomografia, US/USG = ultrassonografia, RX = radiografia). Preços não entram: o relatório de preços não traz o valor Particular.
+
+- Carga/atualização: função `ia_catalogo_carregar` (protegida pelo segredo da IA) ou a Edge Function `supabase/functions/sync-catalogo-klingo`, que ainda **não está publicada**: ela precisa do secret `KLINGO_APP_TOKEN` no projeto webchat-atendimento (Supabase > Edge Functions > Secrets). O token nunca vai para o repositório.
+- A agenda do catálogo é a grade semanal cadastrada, não horário livre: o atendente confirma data e hora.
