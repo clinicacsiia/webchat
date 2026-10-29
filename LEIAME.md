@@ -25,6 +25,19 @@ Supabase > Authentication > Providers > Email > desligue "Confirm email".
 Depois que a equipe estiver cadastrada, desligue também "Allow new users to sign up" (Authentication > Sign In / Providers),
 assim ninguém de fora consegue nem criar conta pendente.
 
+### Link do e-mail de confirmação dando erro 404
+
+O link do e-mail leva ao endereço configurado no Supabase, não ao painel. Em Supabase > Authentication > URL Configuration:
+
+- **Site URL**: `https://SEU-USUARIO.github.io/SEU-REPO/painel/`
+- **Redirect URLs**: adicione `https://SEU-USUARIO.github.io/SEU-REPO/painel/**`
+
+O painel já pede esse endereço ao cadastrar (`emailRedirectTo`), mas o Supabase só o aceita se estiver na lista de Redirect URLs.
+
+### E-mail em português
+
+Supabase > Authentication > Email Templates > "Confirm signup": cole o conteúdo de `supabase-emails/confirmar-cadastro.html` e troque o assunto para "Confirme seu e-mail - Painel de atendimento". Faça o mesmo para "Invite user" e "Reset password" se usar.
+
 ## Ligar o n8n
 
 1. No n8n: Create workflow > menu (...) > Import from file > `n8n/novo-atendimento.json`.
