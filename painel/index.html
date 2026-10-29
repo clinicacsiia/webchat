@@ -698,7 +698,7 @@
     const senha = h('input', { type: 'text', id: 'aSenha', minlength: 8, required: true, autocomplete: 'off', placeholder: 'mínimo 8 caracteres' });
     const papel = h('select', { id: 'aPapel' }, Object.entries(ROTULO_PAPEL).map(([v, r]) => h('option', { value: v, selected: v === 'atendente' }, r)));
     const erro = h('p', { class: 'erro', role: 'alert' });
-    const btn = h('button', { class: 'btn primario', type: 'submit' }, 'Adicionar pessoa');
+    const btn = h('button', { class: 'btn prim', type: 'submit' }, 'Adicionar pessoa');
     const f = h('form', { class: 'pagina-form', style: 'background:var(--papel);border:1px solid var(--linha);border-radius:12px;padding:14px;margin-bottom:16px' },
       h('h3', { style: 'margin:0 0 4px' }, 'Adicionar pessoa'),
       h('p', { class: 'sub' }, 'A pessoa já entra liberada e poderá ver o painel e responder as conversas (Administrador também gerencia a equipe).'),
