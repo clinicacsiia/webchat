@@ -142,6 +142,7 @@
 
   @media (max-width: 860px) {
     .app { grid-template-columns: 1fr; grid-template-rows: 1fr auto; }
+    .conteudo { grid-row: 1; }
     .lateral { grid-row: 2; flex-direction: row; padding: 4px 6px calc(4px + env(safe-area-inset-bottom)); align-items: center; gap: 0; }
     .marca, .eu .acoes, .eu span { display: none; }
     .eu { border: 0; padding: 0 6px; margin-left: auto; }
@@ -327,7 +328,7 @@
           podeAtender() ? h('button', { type: 'button', id: 'btnSom', onclick: alternarSom }, S.mudo ? 'Som desligado' : 'Som ligado') : null,
           podeAtender() && 'Notification' in window && Notification.permission === 'default' ? h('button', { type: 'button', onclick: pedirNotificacao }, 'Ativar avisos') : null,
           h('button', { type: 'button', onclick: sair }, 'Sair'))));
-    raiz.replaceChildren(h('div', { class: 'app' }, h('div', { class: 'conteudo', id: 'conteudo' }), lateral));
+    raiz.replaceChildren(h('div', { class: 'app' }, lateral, h('div', { class: 'conteudo', id: 'conteudo' })));
   }
   function renderAba() {
     document.querySelectorAll('.nav button').forEach((b) => b.setAttribute('aria-current', b.dataset.aba === S.aba ? 'page' : 'false'));
