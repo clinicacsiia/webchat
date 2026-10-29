@@ -96,5 +96,6 @@ A API de marcação (`/externo/register`, `/externo/login`, `/agenda/horarios`, 
 
 A IA consulta, a cada mensagem do paciente, um catálogo copiado de relatórios de cadastro do Klingo (sem dado de paciente): procedimentos e preparo (#13981), agenda por profissional (#13984) e operadoras/planos (#12301). As tabelas são `catalogo_*` e a busca é a função `ia_catalogo`, que entende siglas e erros comuns (RM = ressonância, TC = tomografia, US/USG = ultrassonografia, RX = radiografia). Preços não entram: o relatório de preços não traz o valor Particular.
 
-- Carga/atualização: função `ia_catalogo_carregar` (protegida pelo segredo da IA) ou a Edge Function `supabase/functions/sync-catalogo-klingo`, que ainda **não está publicada**: ela precisa do secret `KLINGO_APP_TOKEN` no projeto webchat-atendimento (Supabase > Edge Functions > Secrets). O token nunca vai para o repositório.
+- Atualização: a Edge Function `sync-catalogo-klingo` (publicada no projeto webchat-atendimento) busca os três relatórios e recarrega o catálogo todo dia às 03:00 (Brasília, via pg_cron). Ela usa o secret `KLINGO_APP_TOKEN` do Supabase (o token nunca vai para o repositório) e só aceita chamadas com o header `x-sync-key` igual ao segredo da IA. Para atualizar na hora: `curl -X POST <URL da função> -H "x-sync-key: <segredo>"`. Cada relatório é independente: se um falhar, o catálogo anterior dele continua valendo.
+- Carga manual em lotes: função `ia_catalogo_carregar` (mesmo segredo).
 - A agenda do catálogo é a grade semanal cadastrada, não horário livre: o atendente confirma data e hora.
