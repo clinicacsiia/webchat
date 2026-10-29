@@ -26,14 +26,15 @@ São quatro camadas:
 
 Nada disso fica ligado à API de marcação o tempo todo. A memória é atualizada por cópias periódicas de relatórios do Klingo, que já funcionam hoje com o `X-APP-TOKEN`.
 
-## Fase 0: confirmar no Klingo antes de programar (sem código)
+## Fase 0: confirmar no Klingo antes de programar (concluída em 29/10/2026)
 
-O resto depende destas respostas.
+Resultado completo em `docs/fase-0-verificacao.md`; texto para o suporte em `docs/fase-0-email-suporte-klingo.md`.
 
-- [ ] **Relatório de marcações.** Criar no editor de relatórios um "CALL CENTER - Marcações (IA)" (área Agendas/Marcações). Colunas: id da marcação, data e hora, procedimento id, profissional, unidade, operadora/plano, status da marcação, data em que foi criada, usuário que marcou, paciente CPF, nome e data de nascimento. Filtro: marcações criadas hoje (ou data do atendimento ≥ hoje). Testar se ele sai pela mesma API dos relatórios (`/api/info/relatorio?id=`). **É a peça que permite a conferência automática.** Se não sair, a conferência fica manual (ver Fase 3).
-- [ ] **Filtro pela API.** Ver se a API de relatórios aceita filtro (operadora, data). O 13983 sem filtro dá "Excesso de registros"; precisamos rodar uma vez por operadora (36).
-- [ ] **Preço Particular.** Descobrir em qual tabela de preço o Particular está cadastrado e incluí-la no 13983.
-- [ ] **Bloqueio.** Ver como o Klingo marca procedimento/plano bloqueado ou inativo (coluna "Faturamento Ativo" no 13981? vigência da tabela no 13983?) e incluir a coluna nos relatórios.
+- [x] **Relatório de marcações:** não precisa criar. Os relatórios #7 (Agendas Marcadas), #13825 (Visão Consolidada por Marcação) e #47 (Bloqueadas e Canceladas) já saem pela API com filtro de data. Nenhum traz CPF; a conferência casa por nome + celular + procedimento + data/hora + operadora + unidade.
+- [x] **Preço Particular:** vem do valor das marcações do #13825 (184 procedimentos com valor; 63 com mais de um valor, que exigem regra de confiança). Convênio continua no #13983.
+- [x] **Bloqueio:** existe para procedimento (Faturamento Ativo), marcação (Status) e agenda (vigência). Para plano, perguntar ao suporte.
+- [ ] **Filtros do #13983 pela API:** descobrir os ids na Fase 1 (a resposta da API lista os filtros).
+- [ ] **Perguntas ao suporte e teste real do #7:** pendentes (pessoa).
 
 ## Fase 1: base de conhecimento com histórico (antes de limpar o cadastro)
 
