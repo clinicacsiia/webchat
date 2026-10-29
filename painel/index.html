@@ -672,7 +672,8 @@
     const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
     const encHoje = S.conversas.filter((x) => x.status === 'encerrada' && new Date(x.atualizado_em) >= hoje).length;
     c.replaceChildren(h('div', { class: 'pagina' }, h('h2', {}, 'Equipe'),
-      h('p', { class: 'sub' }, 'Libere acessos, defina o papel de cada pessoa e acompanhe a carga de atendimento.'),
+      h('p', { class: 'sub' }, 'Adicione pessoas, defina o papel de cada uma e acompanhe a carga de atendimento.'),
+      formAdicionarPessoa(),
       h('div', { class: 'numeros' },
         h('div', { class: 'num' }, h('b', {}, aguardando), h('span', {}, 'na fila agora')),
         h('div', { class: 'num' }, h('b', {}, emAtend), h('span', {}, 'em atendimento')),
@@ -690,6 +691,44 @@
             h('td', {}, `${m.ativas} abertas · ${m.encerradas} encerradas`),
             h('td', {}, eu ? '' : h('button', { class: 'btn perigo', type: 'button', onclick: () => removerAgente(a) }, 'Remover')));
         }))))));
+  }
+  function formAdicionarPessoa() {
+    const nome = h('input', { type: 'text', id: 'aNome', maxlength: '60', required: true, autocomplete: 'off' });
+    const email = h('input', { type: 'email', id: 'aEmail', required: true, autocomplete: 'off' });
+    const senha = h('input', { type: 'text', id: 'aSenha', minlength: 8, required: true, autocomplete: 'off', placeholder: 'mínimo 8 caracteres' });
+    const papel = h('select', { id: 'aPapel' }, Object.entries(ROTULO_PAPEL).map(([v, r]) => h('option', { value: v, selected: v === 'atendente' }, r)));
+    const erro = h('p', { class: 'erro', role: 'alert' });
+    const btn = h('button', { class: 'btn prim', type: 'submit' }, 'Adicionar pessoa');
+    const f = h('form', { class: 'pagina-form', style: 'background:var(--papel);border:1px solid var(--linha);border-radius:12px;padding:14px;margin-bottom:16px' },
+      h('h3', { style: 'margin:0 0 4px' }, 'Adicionar pessoa'),
+      h('p', { class: 'sub' }, 'A pessoa já entra liberada e poderá ver o painel e responder as conversas (Administrador também gerencia a equipe).'),
+      h('div', { class: 'campo' }, h('label', { class: 'rot', for: 'aNome' }, 'Nome'), nome),
+      h('div', { class: 'campo' }, h('label', { class: 'rot', for: 'aEmail' }, 'E-mail'), email),
+      h('div', { class: 'campo' }, h('label', { class: 'rot', for: 'aSenha' }, 'Senha provisória'), senha),
+      h('div', { class: 'campo' }, h('label', { class: 'rot', for: 'aPapel' }, 'Papel'), papel),
+      erro, btn);
+    f.addEventListener('submit', async (ev) => {
+      ev.preventDefault(); erro.textContent = '';
+      if (senha.value.length < 8) { erro.textContent = 'A senha precisa ter pelo menos 8 caracteres.'; return; }
+      btn.disabled = true; btn.textContent = 'Adicionando…';
+      try { await adicionarPessoa(nome.value.trim(), email.value.trim(), senha.value, papel.value); toast('Pessoa adicionada e liberada.'); viewEquipeRecarregar(); }
+      catch (e) { erro.textContent = /already|registered/i.test(msgErro(e)) ? 'Este e-mail já está cadastrado.' : msgErro(e); btn.disabled = false; btn.textContent = 'Adicionar pessoa'; }
+    });
+    return f;
+  }
+  async function adicionarPessoa(nome, email, senha, papel) {
+    /* cliente separado, sem guardar sessão, para não deslogar o administrador */
+    const outro = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
+    const { data, error } = await outro.auth.signUp({ email, password: senha, options: { data: { nome } } });
+    if (error) throw error;
+    if (!data.user || (data.user.identities && !data.user.identities.length)) throw new Error('Este e-mail já está cadastrado.');
+    let ok = false;
+    for (let i = 0; i < 5 && !ok; i++) {
+      const { data: r, error: e2 } = await db.from('agentes').update({ papel, ativo: true }).eq('id', data.user.id).select('id');
+      if (e2) throw e2;
+      ok = !!(r && r.length); if (!ok) await new Promise((res) => setTimeout(res, 400));
+    }
+    if (!ok) throw new Error('Conta criada, mas não foi possível liberar o acesso. Libere na lista abaixo.');
   }
   async function alterarAgente(a, campos) {
     const { error } = await db.from('agentes').update(campos).eq('id', a.id);
