@@ -1,0 +1,734 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Painel de atendimento</title>
+<meta name="theme-color" content="#146b50">
+<meta name="robots" content="noindex, nofollow">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+  :root {
+    --verde-escuro: #10302b; --verde: #146b50; --verde-claro: #d4efdd; --fundo: #f1f5f2; --papel: #fff;
+    --texto: #16231f; --suave: #5b6b65; --linha: #d7e0da; --erro: #b3261e; --aviso: #8a5a00; --azul: #0b5cad;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; font-size: 15px; line-height: 1.4; color: var(--texto); background: var(--fundo); -webkit-text-size-adjust: 100%; }
+  button, input, textarea, select { font: inherit; color: inherit; }
+  :focus-visible { outline: 3px solid #2f9e78; outline-offset: 2px; }
+  [hidden] { display: none !important; }
+  .btn { border: 1.5px solid var(--linha); background: var(--papel); border-radius: 9px; padding: 8px 13px; cursor: pointer; font-weight: 600; font-size: 14px; }
+  .btn:hover { background: #eef4f0; }
+  .btn.prim { background: var(--verde); border-color: var(--verde); color: #fff; }
+  .btn.prim:hover { background: #0f5a42; }
+  .btn.perigo { color: var(--erro); border-color: #e6bcb8; }
+  .btn:disabled { opacity: .55; cursor: default; }
+  input[type=text], input[type=email], input[type=password], input[type=search], input[type=url], textarea, select {
+    width: 100%; padding: 10px 12px; border: 1.5px solid var(--linha); border-radius: 9px; background: var(--papel);
+  }
+  input:focus, textarea:focus, select:focus { outline: none; border-color: var(--verde); box-shadow: 0 0 0 3px rgba(20,107,80,.16); }
+  label.rot { display: block; font-weight: 600; font-size: 13.5px; margin: 0 0 4px; }
+  .campo { margin-bottom: 14px; }
+  .dica { color: var(--suave); font-size: 13px; margin: 4px 0 0; }
+  .erro { color: var(--erro); font-size: 14px; min-height: 1.2em; margin: 0 0 10px; }
+
+  /* Login e telas de espera */
+  .centro { min-height: 100dvh; display: grid; place-items: center; padding: 20px; background: var(--verde-escuro); }
+  .cartao { width: 100%; max-width: 380px; background: var(--papel); border-radius: 16px; padding: 26px 24px; }
+  .cartao h1 { font-size: 22px; margin: 0 0 4px; }
+  .cartao p.sub { margin: 0 0 18px; color: var(--suave); }
+  .cartao .btn.prim { width: 100%; padding: 12px; font-size: 15px; }
+  .link { background: none; border: 0; color: var(--azul); cursor: pointer; padding: 6px 0; font-size: 14px; text-decoration: underline; }
+
+  /* App */
+  .app { display: grid; grid-template-columns: 224px 1fr; height: 100dvh; }
+  .lateral { background: var(--verde-escuro); color: #fff; display: flex; flex-direction: column; padding: 14px 10px; gap: 4px; min-height: 0; }
+  .marca { font-weight: 700; font-size: 16px; padding: 6px 10px 14px; display: flex; align-items: center; gap: 9px; }
+  .marca i { width: 10px; height: 10px; border-radius: 50%; background: #9aa9a3; display: inline-block; }
+  .marca i.on { background: #4ade80; }
+  .nav { display: flex; flex-direction: column; gap: 2px; }
+  .nav button { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: none; border: 0; color: #cfe3da; text-align: left; padding: 11px 12px; border-radius: 10px; cursor: pointer; font-weight: 600; }
+  .nav button:hover { background: rgba(255,255,255,.08); }
+  .nav button[aria-current=page] { background: var(--verde); color: #fff; }
+  .selo { background: #f2b84b; color: #3b2a00; border-radius: 999px; font-size: 12px; font-weight: 700; padding: 1px 8px; min-width: 22px; text-align: center; }
+  .espaco { flex: 1; }
+  .eu { padding: 10px; border-top: 1px solid rgba(255,255,255,.14); font-size: 13.5px; }
+  .eu b { display: block; font-size: 14px; }
+  .eu span { opacity: .75; }
+  .eu .acoes { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .eu .acoes button { background: rgba(255,255,255,.1); color: #fff; border: 0; border-radius: 8px; padding: 6px 10px; cursor: pointer; font-size: 13px; }
+  .eu .acoes button:hover { background: rgba(255,255,255,.2); }
+  .conteudo { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+  .pagina { flex: 1; min-height: 0; overflow-y: auto; padding: 22px; }
+  .pagina h2 { margin: 0 0 4px; font-size: 22px; }
+  .pagina p.sub { margin: 0 0 18px; color: var(--suave); }
+
+  /* Atendimento */
+  .inbox { flex: 1; min-height: 0; display: grid; grid-template-columns: 340px 1fr; }
+  .lista { border-right: 1px solid var(--linha); background: var(--papel); display: flex; flex-direction: column; min-height: 0; }
+  .filtros { display: flex; gap: 6px; padding: 10px; border-bottom: 1px solid var(--linha); flex-wrap: wrap; }
+  .chip { border: 1.5px solid var(--linha); background: var(--papel); border-radius: 999px; padding: 5px 11px; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .chip[aria-pressed=true] { background: var(--verde); border-color: var(--verde); color: #fff; }
+  .itens { overflow-y: auto; flex: 1; }
+  .item { display: block; width: 100%; text-align: left; background: none; border: 0; border-bottom: 1px solid #edf2ee; padding: 12px 14px; cursor: pointer; }
+  .item:hover { background: #f4f8f5; }
+  .item[aria-current=true] { background: #e3f1e8; }
+  .item .l1 { display: flex; justify-content: space-between; gap: 8px; font-weight: 650; }
+  .item .l1 span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .item .hora { font-weight: 400; font-size: 12px; color: var(--suave); flex: none; }
+  .item .l2 { display: flex; justify-content: space-between; gap: 8px; color: var(--suave); font-size: 13.5px; margin-top: 2px; }
+  .item .l2 .prev { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .item .l3 { font-size: 12px; margin-top: 4px; display: flex; gap: 6px; align-items: center; }
+  .tag { display: inline-block; border-radius: 6px; padding: 1px 7px; font-size: 12px; font-weight: 650; }
+  .tag.aguardando { background: #fff0cf; color: var(--aviso); }
+  .tag.em_atendimento { background: #d9f3e3; color: #0d5a3d; }
+  .tag.encerrada { background: #e8ecea; color: var(--suave); }
+  .nl { background: var(--verde); color: #fff; border-radius: 999px; font-size: 12px; font-weight: 700; min-width: 20px; text-align: center; padding: 0 6px; flex: none; }
+  .vazio { color: var(--suave); text-align: center; padding: 36px 20px; }
+  .vazio b { display: block; color: var(--texto); margin-bottom: 4px; }
+
+  .chat { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: #e8efea; }
+  .chat-topo { background: var(--papel); border-bottom: 1px solid var(--linha); padding: 10px 14px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .chat-topo .quem { flex: 1; min-width: 160px; }
+  .chat-topo .quem b { font-size: 16px; display: block; }
+  .chat-topo .quem span { font-size: 13px; color: var(--suave); }
+  .chat-topo .quem a { color: var(--azul); }
+  .voltar { display: none; }
+  .msgs { flex: 1; overflow-y: auto; padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; min-height: 0; }
+  .dia { align-self: center; background: rgba(16,48,43,.1); color: var(--suave); font-size: 12px; padding: 3px 11px; border-radius: 999px; margin: 10px 0 6px; }
+  .msg { max-width: 72%; padding: 8px 11px 6px; border-radius: 14px; background: var(--papel); box-shadow: 0 1px 1px rgba(16,48,43,.08); white-space: pre-wrap; overflow-wrap: anywhere; }
+  .msg.cliente { align-self: flex-start; border-top-left-radius: 4px; }
+  .msg.agente { align-self: flex-end; background: var(--verde-claro); border-top-right-radius: 4px; }
+  .msg.sistema { align-self: center; background: rgba(16,48,43,.08); box-shadow: none; color: var(--suave); font-size: 13px; text-align: center; padding: 5px 12px; }
+  .msg .quem { display: block; font-size: 12.5px; font-weight: 650; color: var(--verde); margin-bottom: 2px; }
+  .msg .hora { display: block; text-align: right; font-size: 11px; color: var(--suave); margin-top: 2px; }
+  .msg.sistema .hora { display: none; }
+  .msg a { color: var(--azul); }
+  .compor { display: flex; gap: 8px; align-items: flex-end; padding: 10px; background: #f6f9f7; border-top: 1px solid var(--linha); }
+  .compor textarea { resize: none; min-height: 44px; max-height: 140px; border-radius: 22px; padding: 11px 16px; }
+  .compor .btn { height: 44px; border-radius: 22px; padding: 0 20px; }
+  .chat-vazio { flex: 1; display: grid; place-items: center; color: var(--suave); text-align: center; padding: 20px; }
+
+  /* Tabelas */
+  .barra { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+  .barra input[type=search] { max-width: 280px; }
+  .barra select { width: auto; }
+  .barra .espaco { flex: 1; }
+  .numeros { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 16px; }
+  .num { background: var(--papel); border: 1px solid var(--linha); border-radius: 12px; padding: 12px 14px; }
+  .num b { display: block; font-size: 26px; line-height: 1.1; }
+  .num span { color: var(--suave); font-size: 13px; }
+  .tabela-wrap { background: var(--papel); border: 1px solid var(--linha); border-radius: 12px; overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid #edf2ee; vertical-align: top; }
+  th { font-size: 13px; color: var(--suave); font-weight: 650; background: #f7faf8; white-space: nowrap; }
+  tr:last-child td { border-bottom: 0; }
+  td a { color: var(--azul); }
+  .tags { display: flex; gap: 4px; flex-wrap: wrap; }
+  .tags .tag { background: #e8efea; color: #2c4a40; }
+  td .btn { padding: 5px 10px; font-size: 13px; }
+  .pendente-linha td { background: #fff8e6; }
+
+  dialog { border: 0; border-radius: 16px; padding: 22px; width: min(480px, calc(100% - 24px)); box-shadow: 0 18px 50px rgba(16,48,43,.35); }
+  dialog::backdrop { background: rgba(16,48,43,.5); }
+  dialog h3 { margin: 0 0 14px; }
+  dialog .rodape { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+  .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: #2b2f2e; color: #fff; padding: 10px 16px; border-radius: 10px; font-size: 14px; z-index: 50; max-width: calc(100% - 32px); }
+  .link-chat { display: flex; gap: 8px; }
+  .link-chat input { flex: 1; }
+
+  @media (max-width: 860px) {
+    .app { grid-template-columns: 1fr; grid-template-rows: 1fr auto; }
+    .lateral { grid-row: 2; flex-direction: row; padding: 4px 6px calc(4px + env(safe-area-inset-bottom)); align-items: center; gap: 0; }
+    .marca, .eu .acoes, .eu span { display: none; }
+    .eu { border: 0; padding: 0 6px; margin-left: auto; }
+    .eu b { font-size: 12px; }
+    .nav { flex-direction: row; flex: 1; justify-content: space-around; }
+    .nav button { flex-direction: column; gap: 2px; font-size: 12px; padding: 7px 8px; text-align: center; }
+    .espaco { display: none; }
+    .pagina { padding: 14px; }
+    .inbox { grid-template-columns: 1fr; }
+    .inbox .chat { display: none; }
+    .inbox.aberta .lista { display: none; }
+    .inbox.aberta .chat { display: flex; }
+    .voltar { display: inline-block; }
+    .msg { max-width: 88%; }
+  }
+  @media (prefers-reduced-motion: no-preference) { .msg { animation: entra .15s ease-out; } @keyframes entra { from { opacity: 0; transform: translateY(4px); } } }
+</style>
+</head>
+<body>
+<div id="raiz"></div>
+<dialog id="dlg"></dialog>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+(() => {
+  'use strict';
+  const SUPABASE_URL = 'https://nrvuynjwcgwpjdptkiay.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_e2GK1YGEj06STa_ESCevow_nvtATB-y';
+  const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  /* ---------- helpers ---------- */
+  const raiz = document.getElementById('raiz');
+  const dlg = document.getElementById('dlg');
+  function h(tag, props, ...kids) {
+    const e = document.createElement(tag);
+    for (const [k, v] of Object.entries(props || {})) {
+      if (v == null || v === false) continue;
+      if (k === 'class') e.className = v;
+      else if (k === 'value' || k === 'checked' || k === 'disabled' || k === 'selected') e[k] = v;
+      else if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
+      else e.setAttribute(k, v === true ? '' : v);
+    }
+    for (const c of kids.flat(Infinity)) { if (c == null || c === false) continue; e.append(c.nodeType ? c : document.createTextNode(String(c))); }
+    return e;
+  }
+  function toast(msg) {
+    const t = document.getElementById('toast'); t.textContent = msg; t.hidden = false;
+    clearTimeout(toast.t); toast.t = setTimeout(() => { t.hidden = true; }, 4200);
+  }
+  const msgErro = (e) => (e && e.message) ? e.message : 'Algo deu errado. Tente de novo.';
+  const soDigitos = (s) => String(s || '').replace(/\D/g, '');
+  function fmtTel(d) {
+    d = soDigitos(d);
+    if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+    if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+    return d;
+  }
+  const mesmoDia = (a, b) => a.toDateString() === b.toDateString();
+  function fmtHoraLista(iso) {
+    const d = new Date(iso), n = new Date();
+    return mesmoDia(d, n) ? d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+      : d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+  }
+  const fmtHora = (iso) => new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  const fmtDataHora = (iso) => new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
+  function rotuloDia(iso) {
+    const d = new Date(iso), n = new Date(), o = new Date(n); o.setDate(n.getDate() - 1);
+    if (mesmoDia(d, n)) return 'Hoje'; if (mesmoDia(d, o)) return 'Ontem';
+    return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  }
+  function linkificar(texto) {
+    const out = []; const re = /(https?:\/\/[^\s<]+)/g; let ult = 0, m;
+    while ((m = re.exec(texto))) {
+      if (m.index > ult) out.push(texto.slice(ult, m.index));
+      out.push(h('a', { href: m[0], target: '_blank', rel: 'noopener noreferrer' }, m[0])); ult = m.index + m[0].length;
+    }
+    if (ult < texto.length) out.push(texto.slice(ult));
+    return out;
+  }
+  const ROTULO_STATUS = { aguardando: 'Aguardando', em_atendimento: 'Em atendimento', encerrada: 'Encerrada' };
+  const ROTULO_PAPEL = { admin: 'Administrador', atendente: 'Atendente', marketing: 'Marketing' };
+
+  /* ---------- estado ---------- */
+  const S = {
+    me: null, agentes: new Map(), conversas: [], filtro: 'aguardando', abertaId: null, msgs: [], vistos: new Set(),
+    aba: 'atendimento', canal: null, ao_vivo: false, contatos: [], mudo: localStorage.getItem('painel.mudo') === '1',
+    buscaContatos: '', periodo: 'todos', tagFiltro: ''
+  };
+  const podeAtender = () => S.me && (S.me.papel === 'admin' || S.me.papel === 'atendente');
+  const ehAdmin = () => S.me && S.me.papel === 'admin';
+
+  /* ---------- login ---------- */
+  function telaLogin(modoCadastro) {
+    const erro = h('p', { class: 'erro', role: 'alert' });
+    const nome = h('input', { type: 'text', id: 'lNome', autocomplete: 'name' });
+    const email = h('input', { type: 'email', id: 'lEmail', autocomplete: 'email', required: true });
+    const senha = h('input', { type: 'password', id: 'lSenha', autocomplete: modoCadastro ? 'new-password' : 'current-password', required: true, minlength: 8 });
+    const btn = h('button', { class: 'btn prim', type: 'submit' }, modoCadastro ? 'Criar conta' : 'Entrar');
+    const form = h('form', {
+      novalidate: true,
+      onsubmit: async (ev) => {
+        ev.preventDefault(); erro.textContent = '';
+        if (modoCadastro && nome.value.trim().length < 2) { erro.textContent = 'Informe seu nome.'; return; }
+        if (!email.value.trim() || senha.value.length < 8) { erro.textContent = 'Informe o e-mail e uma senha de pelo menos 8 caracteres.'; return; }
+        btn.disabled = true;
+        try {
+          if (modoCadastro) {
+            const { data, error } = await db.auth.signUp({ email: email.value.trim(), password: senha.value, options: { data: { nome: nome.value.trim() } } });
+            if (error) throw error;
+            if (!data.session) { erro.textContent = ''; raiz.replaceChildren(telaAviso('Confirme seu e-mail', 'Enviamos um link de confirmação para ' + email.value.trim() + '. Depois de confirmar, volte aqui e entre.', () => telaLoginMostrar(false))); return; }
+          } else {
+            const { error } = await db.auth.signInWithPassword({ email: email.value.trim(), password: senha.value });
+            if (error) throw error;
+          }
+          await entrar();
+        } catch (e) {
+          erro.textContent = /invalid login/i.test(msgErro(e)) ? 'E-mail ou senha incorretos.' : msgErro(e);
+        } finally { btn.disabled = false; }
+      }
+    },
+      modoCadastro ? h('div', { class: 'campo' }, h('label', { class: 'rot', for: 'lNome' }, 'Seu nome'), nome) : null,
+      h('div', { class: 'campo' }, h('label', { class: 'rot', for: 'lEmail' }, 'E-mail'), email),
+      h('div', { class: 'campo' }, h('label', { class: 'rot', for: 'lSenha' }, 'Senha'), senha,
+        modoCadastro ? h('p', { class: 'dica' }, 'Mínimo de 8 caracteres.') : null),
+      erro, btn);
+    return h('div', { class: 'centro' }, h('div', { class: 'cartao' },
+      h('h1', {}, modoCadastro ? 'Criar conta da equipe' : 'Painel de atendimento'),
+      h('p', { class: 'sub' }, modoCadastro ? 'Depois de criar, um administrador precisa liberar seu acesso.' : 'Entre com a sua conta da equipe.'),
+      form,
+      h('button', { class: 'link', type: 'button', onclick: () => telaLoginMostrar(!modoCadastro) }, modoCadastro ? 'Já tenho conta. Entrar' : 'Primeiro acesso? Criar conta')));
+  }
+  function telaLoginMostrar(cad) { raiz.replaceChildren(telaLogin(cad)); }
+  function telaAviso(titulo, texto, aoVoltar) {
+    return h('div', { class: 'centro' }, h('div', { class: 'cartao' },
+      h('h1', {}, titulo), h('p', { class: 'sub' }, texto),
+      h('button', { class: 'btn', type: 'button', onclick: aoVoltar || sair, style: 'width:100%' }, aoVoltar ? 'Voltar' : 'Sair')));
+  }
+  async function sair() {
+    desligarTempoReal(); await db.auth.signOut();
+    S.me = null; telaLoginMostrar(false);
+  }
+
+  /* ---------- entrada ---------- */
+  async function entrar() {
+    const { data: { session } } = await db.auth.getSession();
+    if (!session) { telaLoginMostrar(false); return; }
+    const { data: eu, error } = await db.from('agentes').select('id,nome,email,papel,ativo').eq('id', session.user.id).maybeSingle();
+    if (error) { raiz.replaceChildren(telaAviso('Não foi possível entrar', msgErro(error), sair)); return; }
+    if (!eu || !eu.ativo) {
+      raiz.replaceChildren(h('div', { class: 'centro' }, h('div', { class: 'cartao' },
+        h('h1', {}, 'Acesso aguardando liberação'),
+        h('p', { class: 'sub' }, 'Sua conta foi criada. Peça a um administrador para liberar o acesso e depois toque em Verificar de novo.'),
+        h('button', { class: 'btn prim', type: 'button', onclick: entrar }, 'Verificar de novo'),
+        h('div', { style: 'margin-top:8px;text-align:center' }, h('button', { class: 'link', type: 'button', onclick: sair }, 'Sair')))));
+      return;
+    }
+    S.me = eu;
+    S.aba = podeAtender() ? 'atendimento' : 'contatos';
+    await carregarAgentes();
+    montarApp();
+    if (podeAtender()) { await carregarConversas(); ligarTempoReal(); }
+    renderAba();
+  }
+  async function carregarAgentes() {
+    const { data } = await db.from('agentes').select('id,nome,email,papel,ativo').order('nome');
+    S.agentes = new Map((data || []).map((a) => [a.id, a]));
+  }
+
+  /* ---------- estrutura ---------- */
+  function montarApp() {
+    const abas = [];
+    if (podeAtender()) abas.push(['atendimento', 'Atendimento']);
+    abas.push(['contatos', 'Contatos']);
+    if (ehAdmin()) { abas.push(['equipe', 'Equipe']); abas.push(['config', 'Configurações']); }
+    const nav = h('nav', { class: 'nav', 'aria-label': 'Seções' }, abas.map(([id, rot]) =>
+      h('button', { type: 'button', 'data-aba': id, onclick: () => { S.aba = id; renderAba(); } }, h('span', {}, rot), id === 'atendimento' ? h('span', { class: 'selo', id: 'seloAguardando', hidden: true }, '0') : null)));
+    const lateral = h('aside', { class: 'lateral' },
+      h('div', { class: 'marca' }, h('i', { id: 'pontoVivo' }), 'Atendimento'),
+      nav, h('div', { class: 'espaco' }),
+      h('div', { class: 'eu' }, h('b', {}, S.me.nome), h('span', {}, ROTULO_PAPEL[S.me.papel]),
+        h('div', { class: 'acoes' },
+          podeAtender() ? h('button', { type: 'button', id: 'btnSom', onclick: alternarSom }, S.mudo ? 'Som desligado' : 'Som ligado') : null,
+          podeAtender() && 'Notification' in window && Notification.permission === 'default' ? h('button', { type: 'button', onclick: pedirNotificacao }, 'Ativar avisos') : null,
+          h('button', { type: 'button', onclick: sair }, 'Sair'))));
+    raiz.replaceChildren(h('div', { class: 'app' }, h('div', { class: 'conteudo', id: 'conteudo' }), lateral));
+  }
+  function renderAba() {
+    document.querySelectorAll('.nav button').forEach((b) => b.setAttribute('aria-current', b.dataset.aba === S.aba ? 'page' : 'false'));
+    const c = document.getElementById('conteudo'); c.replaceChildren();
+    if (S.aba === 'atendimento') viewAtendimento(c);
+    else if (S.aba === 'contatos') viewContatos(c);
+    else if (S.aba === 'equipe') viewEquipe(c);
+    else if (S.aba === 'config') viewConfig(c);
+    atualizarSelo();
+  }
+
+  /* ---------- tempo real, som e avisos ---------- */
+  let audioCtx = null, tRecarga = null, tLido = null;
+  function bip() {
+    if (S.mudo) return;
+    try {
+      audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.type = 'sine'; o.frequency.value = 880; g.gain.value = 0.08;
+      o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime + 0.16);
+    } catch {}
+  }
+  function alternarSom() {
+    S.mudo = !S.mudo; localStorage.setItem('painel.mudo', S.mudo ? '1' : '0');
+    const b = document.getElementById('btnSom'); if (b) b.textContent = S.mudo ? 'Som desligado' : 'Som ligado';
+    if (!S.mudo) bip();
+  }
+  async function pedirNotificacao() { try { await Notification.requestPermission(); montarApp(); renderAba(); } catch {} }
+  function avisar(titulo, corpo) {
+    bip();
+    if ('Notification' in window && Notification.permission === 'granted' && document.hidden) {
+      try { new Notification(titulo, { body: corpo, icon: 'icon-192.png', tag: 'webchat' }); } catch {}
+    }
+  }
+  function ligarTempoReal() {
+    desligarTempoReal();
+    S.canal = db.channel('painel-atendimento')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'mensagens' }, (p) => aoNovaMensagem(p.new))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'conversas' }, (p) => {
+        if (p.eventType === 'INSERT') avisar('Nova conversa', 'Um cliente iniciou um atendimento.');
+        agendarRecarga();
+      })
+      .subscribe((s) => {
+        S.ao_vivo = s === 'SUBSCRIBED';
+        const p = document.getElementById('pontoVivo'); if (p) p.className = S.ao_vivo ? 'on' : '';
+        if (S.ao_vivo) agendarRecarga();
+      });
+  }
+  function desligarTempoReal() { if (S.canal) { db.removeChannel(S.canal); S.canal = null; } }
+  function agendarRecarga() { clearTimeout(tRecarga); tRecarga = setTimeout(async () => { await carregarConversas(); if (S.aba === 'atendimento') { renderLista(); renderTopoChat(); } atualizarSelo(); }, 250); }
+  function aoNovaMensagem(m) {
+    if (m.autor === 'cliente') {
+      const c = S.conversas.find((x) => x.id === m.conversa_id);
+      if (m.conversa_id !== S.abertaId || document.hidden) avisar(c && c.contatos ? c.contatos.nome : 'Nova mensagem', String(m.texto).slice(0, 100));
+    }
+    if (m.conversa_id === S.abertaId && !S.vistos.has(m.id)) {
+      S.vistos.add(m.id); S.msgs.push(m); desenharMsgs(true);
+      if (m.autor === 'cliente') marcarLida(m.conversa_id);
+    }
+    agendarRecarga();
+  }
+  function marcarLida(id) {
+    clearTimeout(tLido);
+    tLido = setTimeout(() => { db.from('conversas').update({ nao_lidas_agente: 0 }).eq('id', id).then(() => {}); }, 400);
+  }
+  function atualizarSelo() {
+    const n = S.conversas.filter((c) => c.status === 'aguardando').length;
+    const s = document.getElementById('seloAguardando'); if (s) { s.textContent = n; s.hidden = n === 0; }
+    document.title = (n ? `(${n}) ` : '') + 'Painel de atendimento';
+  }
+
+  /* ---------- conversas ---------- */
+  async function carregarConversas() {
+    const { data, error } = await db.from('conversas')
+      .select('id,status,agente_id,ultima_mensagem,nao_lidas_agente,criado_em,atualizado_em,contato_id,contatos(id,nome,telefone,email)')
+      .order('atualizado_em', { ascending: false }).limit(300);
+    if (error) { toast(msgErro(error)); return; }
+    S.conversas = data || [];
+  }
+  const conversaAberta = () => S.conversas.find((c) => c.id === S.abertaId);
+  function filtradas() {
+    return S.conversas.filter((c) => {
+      if (S.filtro === 'aguardando') return c.status === 'aguardando';
+      if (S.filtro === 'meus') return c.status === 'em_atendimento' && c.agente_id === S.me.id;
+      if (S.filtro === 'abertas') return c.status !== 'encerrada';
+      return c.status === 'encerrada';
+    });
+  }
+  function viewAtendimento(c) {
+    const inbox = h('div', { class: 'inbox' + (S.abertaId ? ' aberta' : ''), id: 'inbox' },
+      h('section', { class: 'lista', 'aria-label': 'Conversas' },
+        h('div', { class: 'filtros', id: 'filtros' }),
+        h('div', { class: 'itens', id: 'itens' })),
+      h('section', { class: 'chat', id: 'chat', 'aria-label': 'Conversa' }));
+    c.append(inbox); renderLista(); renderChat();
+  }
+  function renderLista() {
+    const f = document.getElementById('filtros'), it = document.getElementById('itens'); if (!f || !it) return;
+    const cont = (fn) => S.conversas.filter(fn).length;
+    const defs = [['aguardando', 'Aguardando', cont((x) => x.status === 'aguardando')], ['meus', 'Meus', cont((x) => x.status === 'em_atendimento' && x.agente_id === S.me.id)],
+      ['abertas', 'Abertas', cont((x) => x.status !== 'encerrada')], ['encerradas', 'Encerradas', null]];
+    f.replaceChildren(...defs.map(([id, rot, n]) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(S.filtro === id), onclick: () => { S.filtro = id; renderLista(); } }, n != null ? `${rot} (${n})` : rot)));
+    const lista = filtradas();
+    if (!lista.length) {
+      const msgs = { aguardando: ['Ninguém na fila', 'Novas conversas aparecem aqui na hora.'], meus: ['Nada com você agora', 'Assuma uma conversa da fila para começar.'], abertas: ['Sem conversas abertas', ''], encerradas: ['Nenhuma encerrada ainda', ''] };
+      it.replaceChildren(h('div', { class: 'vazio' }, h('b', {}, msgs[S.filtro][0]), msgs[S.filtro][1]));
+      return;
+    }
+    it.replaceChildren(...lista.map((c) => {
+      const ag = c.agente_id ? S.agentes.get(c.agente_id) : null;
+      return h('button', { class: 'item', type: 'button', 'aria-current': String(c.id === S.abertaId), onclick: () => abrirConversa(c.id) },
+        h('div', { class: 'l1' }, h('span', {}, c.contatos ? c.contatos.nome : 'Contato'), h('span', { class: 'hora' }, fmtHoraLista(c.atualizado_em))),
+        h('div', { class: 'l2' }, h('span', { class: 'prev' }, c.ultima_mensagem || 'Sem mensagens'), c.nao_lidas_agente > 0 ? h('span', { class: 'nl' }, c.nao_lidas_agente) : null),
+        h('div', { class: 'l3' }, h('span', { class: 'tag ' + c.status }, ROTULO_STATUS[c.status]), ag ? h('span', { style: 'color:var(--suave)' }, ag.nome) : null));
+    }));
+  }
+  async function abrirConversa(id) {
+    S.abertaId = id; S.msgs = []; S.vistos = new Set();
+    document.getElementById('inbox')?.classList.add('aberta');
+    renderLista(); renderChat();
+    const { data, error } = await db.from('mensagens').select('id,conversa_id,autor,agente_id,texto,criado_em').eq('conversa_id', id).order('id').limit(1000);
+    if (S.abertaId !== id) return;
+    if (error) { toast(msgErro(error)); return; }
+    S.msgs = data || []; S.vistos = new Set(S.msgs.map((m) => m.id));
+    desenharMsgs(true);
+    const c = conversaAberta(); if (c && c.nao_lidas_agente > 0) { c.nao_lidas_agente = 0; marcarLida(id); renderLista(); }
+  }
+  function renderChat() {
+    const box = document.getElementById('chat'); if (!box) return;
+    const c = conversaAberta();
+    if (!c) { box.replaceChildren(h('div', { class: 'chat-vazio' }, h('div', {}, h('b', {}, 'Escolha uma conversa'), h('br'), 'Selecione alguém na lista para responder.'))); return; }
+    const area = h('textarea', { id: 'caixa', rows: '1', maxlength: '4000', placeholder: 'Digite sua resposta', 'aria-label': 'Resposta' });
+    const enviar = h('button', { class: 'btn prim', type: 'button', id: 'btnEnviar', onclick: enviarMsg }, 'Enviar');
+    area.addEventListener('input', () => { area.style.height = 'auto'; area.style.height = Math.min(area.scrollHeight, 140) + 'px'; });
+    area.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); enviarMsg(); } });
+    box.replaceChildren(h('div', { class: 'chat-topo', id: 'chatTopo' }), h('div', { class: 'msgs', id: 'msgs', 'aria-live': 'polite' }), h('div', { class: 'compor' }, area, enviar));
+    renderTopoChat(); desenharMsgs(true);
+  }
+  function renderTopoChat() {
+    const t = document.getElementById('chatTopo'); const c = conversaAberta(); if (!t || !c) return;
+    const ct = c.contatos || {}; const ag = c.agente_id ? S.agentes.get(c.agente_id) : null;
+    const minha = c.status === 'em_atendimento' && c.agente_id === S.me.id;
+    const atendentes = [...S.agentes.values()].filter((a) => a.ativo && (a.papel === 'admin' || a.papel === 'atendente') && a.id !== c.agente_id);
+    const sel = atendentes.length ? h('select', { 'aria-label': 'Transferir para', style: 'width:auto', onchange: (e) => { if (e.target.value) transferir(e.target.value); } },
+      h('option', { value: '' }, 'Transferir…'), atendentes.map((a) => h('option', { value: a.id }, a.nome))) : null;
+    t.replaceChildren(
+      h('button', { class: 'btn voltar', type: 'button', onclick: () => { S.abertaId = null; document.getElementById('inbox')?.classList.remove('aberta'); renderLista(); renderChat(); } }, 'Voltar'),
+      h('div', { class: 'quem' }, h('b', {}, ct.nome || 'Contato'),
+        h('span', {}, ct.telefone ? h('a', { href: 'https://wa.me/55' + soDigitos(ct.telefone), target: '_blank', rel: 'noopener noreferrer' }, fmtTel(ct.telefone)) : '', ct.email ? ' · ' + ct.email : '',
+          ' · ', ROTULO_STATUS[c.status], ag ? ' com ' + ag.nome : '')),
+      !minha && c.status !== 'encerrada' ? h('button', { class: 'btn prim', type: 'button', onclick: () => assumir(true) }, 'Assumir') : null,
+      c.status === 'encerrada' ? h('button', { class: 'btn', type: 'button', onclick: () => assumir(true) }, 'Reabrir') : null,
+      sel,
+      c.status !== 'encerrada' ? h('button', { class: 'btn perigo', type: 'button', onclick: encerrar }, 'Encerrar') : null);
+  }
+  function desenharMsgs(rolar) {
+    const box = document.getElementById('msgs'); if (!box) return;
+    const perto = box.scrollHeight - box.scrollTop - box.clientHeight < 180;
+    const out = []; let dia = '', ultimoQuem = '';
+    S.msgs.forEach((m) => {
+      const d = rotuloDia(m.criado_em);
+      if (d !== dia) { out.push(h('div', { class: 'dia' }, d)); dia = d; ultimoQuem = ''; }
+      const ag = m.agente_id ? S.agentes.get(m.agente_id) : null;
+      const quem = m.autor === 'agente' ? (ag ? ag.nome : 'Atendente') : '';
+      out.push(h('div', { class: 'msg ' + m.autor },
+        m.autor === 'agente' && quem !== ultimoQuem ? h('span', { class: 'quem' }, quem) : null,
+        h('span', {}, linkificar(m.texto)), h('span', { class: 'hora' }, fmtHora(m.criado_em))));
+      ultimoQuem = m.autor === 'agente' ? quem : '';
+    });
+    box.replaceChildren(...out);
+    if (rolar || perto) box.scrollTop = box.scrollHeight;
+  }
+  async function atualizarConversa(campos) {
+    const { error } = await db.from('conversas').update(campos).eq('id', S.abertaId);
+    if (error) { toast(msgErro(error)); return false; }
+    Object.assign(conversaAberta() || {}, campos);
+    renderTopoChat(); renderLista(); atualizarSelo();
+    return true;
+  }
+  const assumir = () => atualizarConversa({ status: 'em_atendimento', agente_id: S.me.id });
+  async function encerrar() {
+    if (!confirm('Encerrar este atendimento? O cliente será avisado.')) return;
+    await atualizarConversa({ status: 'encerrada' });
+  }
+  async function transferir(agenteId) {
+    const ag = S.agentes.get(agenteId);
+    if (!confirm(`Transferir esta conversa para ${ag ? ag.nome : 'outro atendente'}?`)) { renderTopoChat(); return; }
+    await atualizarConversa({ agente_id: agenteId, status: 'em_atendimento' });
+  }
+  async function enviarMsg() {
+    const caixa = document.getElementById('caixa'), btn = document.getElementById('btnEnviar');
+    const texto = caixa.value.trim(); const c = conversaAberta(); if (!texto || !c) return;
+    btn.disabled = true;
+    try {
+      if (c.status !== 'em_atendimento' || !c.agente_id) { if (!(await assumir())) return; }
+      const { data, error } = await db.from('mensagens').insert({ conversa_id: c.id, autor: 'agente', agente_id: S.me.id, texto })
+        .select('id,conversa_id,autor,agente_id,texto,criado_em').single();
+      if (error) throw error;
+      caixa.value = ''; caixa.style.height = 'auto';
+      if (!S.vistos.has(data.id)) { S.vistos.add(data.id); S.msgs.push(data); desenharMsgs(true); }
+    } catch (e) { toast(msgErro(e)); }
+    finally { btn.disabled = false; caixa.focus(); }
+  }
+
+  /* ---------- contatos ---------- */
+  async function buscarTodos(tabela, colunas, ordem) {
+    const out = [];
+    for (let i = 0; i < 20000; i += 1000) {
+      const { data, error } = await db.from(tabela).select(colunas).order(ordem, { ascending: false }).range(i, i + 999);
+      if (error) throw error;
+      out.push(...data); if (data.length < 1000) break;
+    }
+    return out;
+  }
+  async function viewContatos(c) {
+    c.append(h('div', { class: 'pagina' }, h('h2', {}, 'Contatos'), h('p', { class: 'sub' }, 'Carregando…')));
+    try { S.contatos = await buscarTodos('contatos', 'id,nome,telefone,email,origem,tags,observacoes,aceitou_lgpd_em,criado_em,ultimo_contato_em', 'ultimo_contato_em'); }
+    catch (e) { c.replaceChildren(h('div', { class: 'pagina' }, h('h2', {}, 'Contatos'), h('p', { class: 'erro' }, msgErro(e)))); return; }
+    if (S.aba !== 'contatos') return;
+    renderContatos(c);
+  }
+  function contatosFiltrados() {
+    const q = S.buscaContatos.trim().toLowerCase(), qd = soDigitos(q);
+    const corte = { hoje: 1, '7d': 7, '30d': 30 }[S.periodo];
+    const desde = corte ? new Date(Date.now() - (corte === 1 ? 0 : corte * 86400000)) : null;
+    if (corte === 1) desde.setHours(0, 0, 0, 0);
+    return S.contatos.filter((x) => {
+      if (desde && new Date(x.criado_em) < desde) return false;
+      if (S.tagFiltro && !(x.tags || []).includes(S.tagFiltro)) return false;
+      if (!q) return true;
+      return x.nome.toLowerCase().includes(q) || (x.email || '').toLowerCase().includes(q) || (qd && x.telefone.includes(qd)) || (x.tags || []).some((t) => t.toLowerCase().includes(q)) || (x.origem || '').toLowerCase().includes(q);
+    });
+  }
+  function renderContatos(c) {
+    const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+    const novosHoje = S.contatos.filter((x) => new Date(x.criado_em) >= hoje).length;
+    const novos7 = S.contatos.filter((x) => new Date(x.criado_em) >= new Date(Date.now() - 7 * 86400000)).length;
+    const todasTags = [...new Set(S.contatos.flatMap((x) => x.tags || []))].sort();
+    const busca = h('input', { type: 'search', placeholder: 'Buscar nome, telefone, e-mail ou tag', value: S.buscaContatos, 'aria-label': 'Buscar contatos' });
+    busca.addEventListener('input', () => { S.buscaContatos = busca.value; renderTabelaContatos(); });
+    const per = h('select', { 'aria-label': 'Período', onchange: (e) => { S.periodo = e.target.value; renderTabelaContatos(); } },
+      [['todos', 'Todo o período'], ['hoje', 'Hoje'], ['7d', 'Últimos 7 dias'], ['30d', 'Últimos 30 dias']].map(([v, r]) => h('option', { value: v, selected: S.periodo === v }, r)));
+    const tagSel = h('select', { 'aria-label': 'Filtrar por tag', onchange: (e) => { S.tagFiltro = e.target.value; renderTabelaContatos(); } },
+      h('option', { value: '' }, 'Todas as tags'), todasTags.map((t) => h('option', { value: t, selected: S.tagFiltro === t }, t)));
+    c.replaceChildren(h('div', { class: 'pagina' },
+      h('h2', {}, 'Contatos'), h('p', { class: 'sub' }, 'Quem já conversou com a gente. Exporte a lista para campanhas e acompanhamento.'),
+      h('div', { class: 'numeros' },
+        h('div', { class: 'num' }, h('b', {}, S.contatos.length), h('span', {}, 'contatos no total')),
+        h('div', { class: 'num' }, h('b', {}, novosHoje), h('span', {}, 'novos hoje')),
+        h('div', { class: 'num' }, h('b', {}, novos7), h('span', {}, 'novos em 7 dias'))),
+      h('div', { class: 'barra' }, busca, per, tagSel, h('span', { class: 'espaco' }), h('span', { id: 'contagem', class: 'dica' }),
+        h('button', { class: 'btn prim', type: 'button', onclick: exportarCsv }, 'Exportar CSV')),
+      h('div', { class: 'tabela-wrap', id: 'tabContatos' })));
+    renderTabelaContatos();
+  }
+  function renderTabelaContatos() {
+    const w = document.getElementById('tabContatos'); if (!w) return;
+    const lista = contatosFiltrados();
+    const cont = document.getElementById('contagem'); if (cont) cont.textContent = `${lista.length} de ${S.contatos.length}`;
+    if (!lista.length) { w.replaceChildren(h('div', { class: 'vazio' }, h('b', {}, 'Nenhum contato encontrado'), 'Ajuste a busca ou o período.')); return; }
+    const mostrar = lista.slice(0, 300);
+    w.replaceChildren(h('table', {},
+      h('thead', {}, h('tr', {}, ['Nome', 'Telefone', 'E-mail', 'Origem', 'Tags', 'Última conversa', ''].map((t) => h('th', {}, t)))),
+      h('tbody', {}, mostrar.map((x) => h('tr', {},
+        h('td', {}, x.nome),
+        h('td', {}, h('a', { href: 'https://wa.me/55' + x.telefone, target: '_blank', rel: 'noopener noreferrer' }, fmtTel(x.telefone))),
+        h('td', {}, x.email ? h('a', { href: 'mailto:' + x.email }, x.email) : ''),
+        h('td', {}, x.origem || ''),
+        h('td', {}, h('div', { class: 'tags' }, (x.tags || []).map((t) => h('span', { class: 'tag' }, t)))),
+        h('td', {}, fmtDataHora(x.ultimo_contato_em)),
+        h('td', {}, h('button', { class: 'btn', type: 'button', onclick: () => editarContato(x) }, 'Editar')))))),
+      lista.length > mostrar.length ? h('div', { class: 'dica', style: 'padding:10px 12px' }, `Mostrando ${mostrar.length} de ${lista.length}. Use a busca ou exporte o CSV para ver todos.`) : null);
+  }
+  function editarContato(x) {
+    const nome = h('input', { type: 'text', value: x.nome, maxlength: '120', id: 'eNome' });
+    const email = h('input', { type: 'email', value: x.email || '', maxlength: '200', id: 'eEmail' });
+    const tags = h('input', { type: 'text', value: (x.tags || []).join(', '), id: 'eTags', placeholder: 'ex.: orçamento, retorno' });
+    const obs = h('textarea', { id: 'eObs', rows: '4', maxlength: '2000' }); obs.value = x.observacoes || '';
+    const erro = h('p', { class: 'erro', role: 'alert' });
+    const salvar = h('button', { class: 'btn prim', type: 'button' }, 'Salvar');
+    salvar.addEventListener('click', async () => {
+      if (nome.value.trim().length < 2) { erro.textContent = 'Informe o nome.'; return; }
+      salvar.disabled = true;
+      const novo = { nome: nome.value.trim(), email: email.value.trim() || null, tags: tags.value.split(',').map((t) => t.trim()).filter(Boolean), observacoes: obs.value.trim() || null };
+      const { error } = await db.from('contatos').update(novo).eq('id', x.id);
+      salvar.disabled = false;
+      if (error) { erro.textContent = msgErro(error); return; }
+      Object.assign(x, novo); dlg.close();
+      if (S.aba === 'contatos') renderContatos(document.getElementById('conteudo')); toast('Contato salvo.');
+    });
+    dlg.replaceChildren(h('h3', {}, 'Editar contato'),
+      h('p', { class: 'dica', style: 'margin:-8px 0 12px' }, fmtTel(x.telefone) + (x.aceitou_lgpd_em ? ' · aceitou a política em ' + fmtDataHora(x.aceitou_lgpd_em) : '')),
+      h('div', { class: 'campo' }, h('label', { class: 'rot', for: 'eNome' }, 'Nome'), nome),
+      h('div', { class: 'campo' }, h('label', { class: 'rot', for: 'eEmail' }, 'E-mail'), email),
+      h('div', { class: 'campo' }, h('label', { class: 'rot', for: 'eTags' }, 'Tags'), tags, h('p', { class: 'dica' }, 'Separe por vírgula.')),
+      h('div', { class: 'campo' }, h('label', { class: 'rot', for: 'eObs' }, 'Observações'), obs), erro,
+      h('div', { class: 'rodape' },
+        ehAdmin() ? h('button', { class: 'btn perigo', type: 'button', style: 'margin-right:auto', onclick: async () => {
+          if (!confirm('Excluir este contato e todas as conversas dele? Não dá para desfazer.')) return;
+          const { error } = await db.from('contatos').delete().eq('id', x.id);
+          if (error) { erro.textContent = msgErro(error); return; }
+          S.contatos = S.contatos.filter((y) => y.id !== x.id); dlg.close(); renderContatos(document.getElementById('conteudo')); toast('Contato excluído.');
+        } }, 'Excluir') : null,
+        h('button', { class: 'btn', type: 'button', onclick: () => dlg.close() }, 'Cancelar'), salvar));
+    dlg.showModal();
+  }
+  function exportarCsv() {
+    const lista = contatosFiltrados();
+    if (!lista.length) { toast('Não há contatos para exportar com esses filtros.'); return; }
+    const cel = (v) => { let s = String(v ?? ''); if (/^[=+\-@\t\r]/.test(s)) s = "'" + s; return '"' + s.replace(/"/g, '""') + '"'; };
+    const linhas = [['Nome', 'Telefone', 'E-mail', 'Origem', 'Tags', 'Observações', 'Primeiro contato', 'Última conversa'].map(cel).join(';')];
+    lista.forEach((x) => linhas.push([x.nome, fmtTel(x.telefone), x.email, x.origem, (x.tags || []).join(', '), x.observacoes, fmtDataHora(x.criado_em), fmtDataHora(x.ultimo_contato_em)].map(cel).join(';')));
+    const blob = new Blob(['﻿' + linhas.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+    const a = h('a', { href: URL.createObjectURL(blob), download: `contatos-${new Date().toISOString().slice(0, 10)}.csv` });
+    document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    toast(`${lista.length} contatos exportados.`);
+  }
+
+  /* ---------- equipe ---------- */
+  async function viewEquipe(c) {
+    c.append(h('div', { class: 'pagina' }, h('h2', {}, 'Equipe'), h('p', { class: 'sub' }, 'Carregando…')));
+    await carregarAgentes();
+    const desde = new Date(Date.now() - 7 * 86400000).toISOString();
+    const { data: conv7 } = await db.from('conversas').select('agente_id,status,criado_em').gte('criado_em', desde).limit(1000);
+    if (S.aba !== 'equipe') return;
+    const metr = new Map();
+    (conv7 || []).forEach((x) => { if (!x.agente_id) return; const m = metr.get(x.agente_id) || { ativas: 0, encerradas: 0 }; if (x.status === 'encerrada') m.encerradas++; else m.ativas++; metr.set(x.agente_id, m); });
+    const lista = [...S.agentes.values()].sort((a, b) => Number(a.ativo) - Number(b.ativo) || a.nome.localeCompare(b.nome));
+    const aguardando = S.conversas.filter((x) => x.status === 'aguardando').length;
+    const emAtend = S.conversas.filter((x) => x.status === 'em_atendimento').length;
+    const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+    const encHoje = S.conversas.filter((x) => x.status === 'encerrada' && new Date(x.atualizado_em) >= hoje).length;
+    c.replaceChildren(h('div', { class: 'pagina' }, h('h2', {}, 'Equipe'),
+      h('p', { class: 'sub' }, 'Libere acessos, defina o papel de cada pessoa e acompanhe a carga de atendimento.'),
+      h('div', { class: 'numeros' },
+        h('div', { class: 'num' }, h('b', {}, aguardando), h('span', {}, 'na fila agora')),
+        h('div', { class: 'num' }, h('b', {}, emAtend), h('span', {}, 'em atendimento')),
+        h('div', { class: 'num' }, h('b', {}, encHoje), h('span', {}, 'encerradas hoje'))),
+      h('div', { class: 'tabela-wrap' }, h('table', {},
+        h('thead', {}, h('tr', {}, ['Nome', 'E-mail', 'Papel', 'Acesso', 'Últimos 7 dias', ''].map((t) => h('th', {}, t)))),
+        h('tbody', {}, lista.map((a) => {
+          const eu = a.id === S.me.id, m = metr.get(a.id) || { ativas: 0, encerradas: 0 };
+          const papel = h('select', { 'aria-label': 'Papel de ' + a.nome, disabled: eu, onchange: (e) => alterarAgente(a, { papel: e.target.value }) },
+            Object.entries(ROTULO_PAPEL).map(([v, r]) => h('option', { value: v, selected: a.papel === v }, r)));
+          const ativo = h('input', { type: 'checkbox', checked: a.ativo, disabled: eu, 'aria-label': 'Acesso liberado para ' + a.nome, onchange: (e) => alterarAgente(a, { ativo: e.target.checked }) });
+          return h('tr', { class: a.ativo ? '' : 'pendente-linha' },
+            h('td', {}, a.nome, eu ? ' (você)' : ''), h('td', {}, a.email || ''), h('td', {}, papel),
+            h('td', {}, h('label', { style: 'display:flex;gap:6px;align-items:center' }, ativo, a.ativo ? 'Liberado' : 'Aguardando liberação')),
+            h('td', {}, `${m.ativas} abertas · ${m.encerradas} encerradas`),
+            h('td', {}, eu ? '' : h('button', { class: 'btn perigo', type: 'button', onclick: () => removerAgente(a) }, 'Remover')));
+        }))))));
+  }
+  async function alterarAgente(a, campos) {
+    const { error } = await db.from('agentes').update(campos).eq('id', a.id);
+    if (error) { toast(msgErro(error)); viewEquipeRecarregar(); return; }
+    Object.assign(a, campos); toast('Alteração salva.'); viewEquipeRecarregar();
+  }
+  function viewEquipeRecarregar() { const c = document.getElementById('conteudo'); c.replaceChildren(); viewEquipe(c); }
+  async function removerAgente(a) {
+    if (!confirm(`Remover ${a.nome} da equipe? As conversas dessa pessoa continuam salvas.`)) return;
+    const { error } = await db.from('agentes').delete().eq('id', a.id);
+    if (error) { toast(msgErro(error)); return; }
+    S.agentes.delete(a.id); toast('Pessoa removida da equipe.'); viewEquipeRecarregar();
+  }
+
+  /* ---------- configurações ---------- */
+  async function viewConfig(c) {
+    const { data, error } = await db.from('config').select('chave,valor');
+    if (error) { c.replaceChildren(h('div', { class: 'pagina' }, h('p', { class: 'erro' }, msgErro(error)))); return; }
+    const v = Object.fromEntries((data || []).map((r) => [r.chave, r.valor]));
+    const empresa = h('input', { type: 'text', id: 'cEmpresa', value: v.nome_empresa || '', maxlength: '60' });
+    const boas = h('textarea', { id: 'cBoas', rows: '3', maxlength: '300' }); boas.value = v.boas_vindas || '';
+    const hook = h('input', { type: 'url', id: 'cHook', value: v.n8n_webhook_url || '', placeholder: 'https://seu-n8n.app.n8n.cloud/webhook/…' });
+    const linkChat = new URL('../', location.href).href;
+    const salvar = h('button', { class: 'btn prim', type: 'button' }, 'Salvar configurações');
+    salvar.addEventListener('click', async () => {
+      salvar.disabled = true;
+      const novos = { nome_empresa: empresa.value.trim() || 'Atendimento', boas_vindas: boas.value.trim(), n8n_webhook_url: hook.value.trim() };
+      try {
+        for (const [chave, valor] of Object.entries(novos)) { const { error: e } = await db.from('config').update({ valor }).eq('chave', chave); if (e) throw e; }
+        toast('Configurações salvas.');
+      } catch (e) { toast(msgErro(e)); } finally { salvar.disabled = false; }
+    });
+    c.append(h('div', { class: 'pagina', style: 'max-width:640px' }, h('h2', {}, 'Configurações'),
+      h('p', { class: 'sub' }, 'Ajustes do chat do cliente e da ligação com o n8n.'),
+      h('div', { class: 'campo' }, h('label', { class: 'rot' }, 'Link do chat para clientes'),
+        h('div', { class: 'link-chat' }, h('input', { type: 'text', readonly: true, value: linkChat, 'aria-label': 'Link do chat' }),
+          h('button', { class: 'btn', type: 'button', onclick: async () => { try { await navigator.clipboard.writeText(linkChat); toast('Link copiado.'); } catch { toast('Copie o link manualmente.'); } } }, 'Copiar')),
+        h('p', { class: 'dica' }, 'Dica: adicione ?origem=instagram (ou outro nome) ao link para saber de onde cada contato veio.')),
+      h('div', { class: 'campo' }, h('label', { class: 'rot', for: 'cEmpresa' }, 'Nome exibido no chat'), empresa),
+      h('div', { class: 'campo' }, h('label', { class: 'rot', for: 'cBoas' }, 'Mensagem de boas-vindas'), boas),
+      h('div', { class: 'campo' }, h('label', { class: 'rot', for: 'cHook' }, 'Webhook do n8n (nova conversa)'), hook,
+        h('p', { class: 'dica' }, 'Cada nova conversa envia nome, telefone, e-mail e a primeira mensagem para esse endereço. Deixe vazio para desligar.')),
+      salvar));
+  }
+
+  /* ---------- início ---------- */
+  db.auth.onAuthStateChange((ev) => { if (ev === 'SIGNED_OUT' && S.me) { S.me = null; desligarTempoReal(); telaLoginMostrar(false); } });
+  entrar();
+  if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+})();
+</script>
+</body>
+</html>

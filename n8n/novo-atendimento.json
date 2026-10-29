@@ -1,0 +1,76 @@
+{
+  "name": "Webchat - aviso de nova conversa",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Como usar\n1. Ative o workflow (botão no topo).\n2. Copie a URL de **Production** do nó Webhook e cole no painel, em Configurações > Webhook do n8n.\n3. Troque o nó \"Avisar equipe\" por Telegram, E-mail, WhatsApp ou Slack, usando o campo **texto** do nó anterior.\n\nO painel envia: evento, conversa_id, nome, telefone, email, mensagem, origem, criado_em.",
+        "height": 260,
+        "width": 420
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-60, -120],
+      "id": "7d1f6c3e-0a41-4a45-9d46-5d3a8a0b1001",
+      "name": "Instruções"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "novo-atendimento",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 200],
+      "id": "7d1f6c3e-0a41-4a45-9d46-5d3a8a0b1002",
+      "name": "Nova conversa (webhook)",
+      "webhookId": "b6a1f0b4-52d0-4a8a-9c3b-6d0f2a7e1c11"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1b2c3d4-0001-4000-8000-000000000001",
+              "name": "texto",
+              "value": "=Nova conversa no atendimento\n\nNome: {{ $json.body.nome }}\nTelefone: {{ $json.body.telefone }}\nE-mail: {{ $json.body.email || 'não informado' }}\nOrigem: {{ $json.body.origem || 'direto' }}\n\nMensagem: {{ $json.body.mensagem || '(sem mensagem)' }}",
+              "type": "string"
+            },
+            {
+              "id": "a1b2c3d4-0002-4000-8000-000000000002",
+              "name": "link_whatsapp",
+              "value": "=https://wa.me/55{{ $json.body.telefone }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [240, 200],
+      "id": "7d1f6c3e-0a41-4a45-9d46-5d3a8a0b1003",
+      "name": "Montar aviso"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [480, 200],
+      "id": "7d1f6c3e-0a41-4a45-9d46-5d3a8a0b1004",
+      "name": "Avisar equipe (trocar)"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Nova conversa (webhook)": {
+      "main": [[{ "node": "Montar aviso", "type": "main", "index": 0 }]]
+    },
+    "Montar aviso": {
+      "main": [[{ "node": "Avisar equipe (trocar)", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "tags": []
+}
