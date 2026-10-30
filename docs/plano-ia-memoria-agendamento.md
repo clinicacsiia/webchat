@@ -72,7 +72,7 @@ Uma tela "Mudanças do catálogo" no painel (só admin) mostra o histórico de m
 
 Também antes de entrar em produção: apagar do Supabase as 7 conversas e 48 mensagens de teste.
 
-## Fase 2: etapas, carregamento seletivo e listas de escolha
+## Fase 2 (CONCLUÍDA em 30/10/2026; falta só mergear o PR e republicar o fluxo do n8n, ver LEIAME): etapas, carregamento seletivo e listas de escolha
 
 ### A IA passa a saber em que etapa está
 
