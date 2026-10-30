@@ -40,7 +40,7 @@ begin
   d := pg_get_functiondef('public.paciente_conferir(uuid)'::regprocedure);
   if position('nome_informado' in d) > 0 then return; end if;
   if length(d) - length(replace(d, alvo, '')) <> length(alvo) then raise exception 'paciente_conferir: ponto de inserção ambíguo ou ausente; nada foi alterado.'; end if;
-  d2 := replace(d, alvo, 'select coalesce(c.nome_informado, ct.nome) as nome, ct.telefone, nullif(btrim(coalesce(c.email_informado, ct.email)), '''') as email into v_ct');
+  d2 := replace(d, alvo, 'select coalesce(c.nome_informado, ct.nome) as nome, ct.telefone, nullif(btrim((case when c.nome_informado is not null then c.email_informado else ct.email end)), '''') as email into v_ct');
   execute d2;
 end $$;
 
