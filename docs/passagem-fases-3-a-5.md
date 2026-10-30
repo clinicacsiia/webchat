@@ -11,9 +11,9 @@ Atualizado em 2026-10-30. Leia este arquivo inteiro antes de mexer em qualquer c
 | 2 | Pedido pelo mapa do corpo, calendário, reservas de horário | Concluída e no ar |
 | 3 | Conferência automática da marcação no Klingo | **~80%**: construída, testada no banco e em testes de código; **falta validar com uma marcação real** e 2 pendências pequenas (ver 4) |
 | 4 | Paciente que volta (histórico, atalhos, retomar pedido) | **Construída e no ar** (banco, Edge Function, n8n). Painel e chat novos estão na `main` (PR #12, `336f527`; Pages publicado com sucesso). Falta validar com um paciente real |
-| 5 | Aprendizado com as correções dos atendentes | **Não começada (0%)** |
+| 5 | Aprendizado com as correções dos atendentes | **Construída e no ar** (banco, Edge Function v11, aba Aprendizado no painel). Falta juntar dados reais: o registro começa no dia em que o SQL rodou |
 
-**Situação do código:** o PR #12 (Fases 3 e 4) foi mergeado na `main` (commit `336f527`) e o deploy do GitHub Pages terminou com sucesso. Banco, Edge Function v10 e n8n já estavam no ar. O que falta é conferir o painel e o chat novos no navegador (item 4 da lista de pendências).
+**Situação do código:** o PR #12 (Fases 3 e 4) foi mergeado na `main` (commit `336f527`) e o deploy do GitHub Pages terminou com sucesso. Banco, Edge Function v10 e n8n já estavam no ar (a Fase 5 trouxe a Edge Function v11). O que falta é conferir o painel e o chat novos no navegador (item 4 da lista de pendências).
 
 ## 2. Para retomar em outra conta (checklist)
 
@@ -35,7 +35,7 @@ select
   position('historico_paciente' in pg_get_functiondef('public.ia_contexto(text,uuid)'::regprocedure)) > 0 as ctx,
   position('pre_reaproveitar' in pg_get_functiondef('public.ia_pre_agendar(text,uuid,jsonb,boolean)'::regprocedure)) > 0 as reaproveitar;
 ```
-7. **Edge Function**: versão 10 de `sync-catalogo-klingo` (arquivos `index.ts` e `conferencia.ts` da pasta `supabase/functions/sync-catalogo-klingo/`). Testes locais: `node --experimental-strip-types --test supabase/functions/sync-catalogo-klingo/conferencia.test.ts` (17 devem passar).
+7. **Edge Function**: versão 11 de `sync-catalogo-klingo` (arquivos `index.ts`, `conferencia.ts` e `precos.ts` da pasta `supabase/functions/sync-catalogo-klingo/`). Testes locais: `node --experimental-strip-types --test supabase/functions/sync-catalogo-klingo/conferencia.test.ts` (17 devem passar).
 8. **Se algum dia precisar recriar o banco do zero**: `supabase/00-base-snapshot.sql` tem as tabelas e funções base (chat, painel, login) e os demais `supabase/*.sql` vêm depois, mas os arquivos antigos contêm *correções por substituição* aplicadas na mão e não são uma receita completa. O caminho seguro é `supabase db dump --schema public` do projeto atual. Não rode `00-base-snapshot.sql` no projeto atual.
 
 Ordem dos arquivos SQL (referência do que foi aplicado, nesta ordem): `00-base-snapshot` (referência) → `pre-agendamentos` → `catalogo-klingo` → `catalogo-historico` → `catalogo-historico-parte2` → `catalogo-precos` → `pacientes` → `fase2-pedido-e-agenda` → `fase3-conferencia-automatica` → `fase4-paciente-que-volta`.
@@ -77,17 +77,25 @@ Ordem dos arquivos SQL (referência do que foi aplicado, nesta ordem): `00-base-
 4. No navegador (o merge na `main` já foi feito), conferir: lista com selo de alerta, faixa no cartão, "Histórico do paciente".
 5. Validar com um paciente real que volta: data de nascimento → atalho "Repetir o último exame" → exames copiados → plano/unidade → calendário.
 
+**Fase 5**
+9. Rodar o SQL `supabase/fase5-aprendizado.sql` (já aplicado no projeto `nrvuynjwcgwpjdptkiay` em 30/10/2026) e conferir na aba Aprendizado, depois da primeira marcação real, se os números fazem sentido. Se o projeto for recriado, rode-o depois do `fase4`.
+10. Conferir se a Edge Function v11 está lendo preço: depois da próxima rodada de `agenda-ocupacao`, `select count(*), max(atualizado_em) from public.preco_observado;` deve passar de 0.
+11. Usar o relatório: a cada semana, olhar "Exames com mais problema", "Preço x Klingo" e "Casos para melhorar o prompt"; ajustar o prompt no n8n e o catálogo, com a recepção.
+
 **Geral**
 6. `admin_redefinir_senha` existia só no banco; agora está em `00-base-snapshot.sql`.
 7. Negócio: tempos por modalidade e folgas (15/60 min, 90 min, 48 h, 20 min) são estimativas; preços Particular com confiança média/baixa (validar com a recepção); pedir que as atendentes usem o painel normalmente (o "Agendado" agora é automático, o botão manual continua como reserva).
 8. Segurança: o segredo `ia_segredo` está digitado nos nós HTTP do n8n (aviso do n8n "hardcoded credentials"). Ideal: mover para credencial do n8n. Advisor Supabase: funções `security definer` chamáveis por `anon` são intencionais (token da conversa ou `ia_segredo`); "leaked password protection" no Auth é opcional.
 
-## 5. Fase 5 — aprendizado (próxima, 0%)
-Usar o que os atendentes corrigem para melhorar o sistema:
-- Medir onde a IA erra: pré-agendamentos com `conferencia_status` diferente de `confirmado` (divergente, horário tomado, não encontrado, sumiu, remarcado), exame/lado trocado pelo atendente, preço ou data ajustados.
-- Comparar o preço previsto com a coluna `Previsto` do #7 (valor lançado no Klingo) para corrigir `catalogo_preco`.
-- Relatório de erros da IA no painel (por semana: o que foi corrigido e por quê) e lista de exemplos para melhorar o prompt do n8n.
-- Antes de começar: teste curto e2e no chat, `get_advisors` e releitura de `docs/plano-ia-memoria-agendamento.md`.
+## 5. Fase 5 — aprendizado com o que corrigem depois da IA (construída)
+Arquivo: `supabase/fase5-aprendizado.sql` (aditivo, pode rodar de novo). Mostra no painel, aba **Aprendizado** (só administrador):
+- **`ia_evento`** (gatilho em `pre_agendamentos`): linha do tempo de cada pedido: criado, mudança de status (quem mudou: `atendente` ou `sistema`; `automatico` quando a conferência agendou) e cada veredito da conferência (horário ocupado, divergente, não encontrado, sumiu, remarcado). Antes, o alerta sumia quando o atendente resolvia e o histórico se perdia. Guarda exames, plano, unidade e etapa, **nunca dado de paciente**. Falha de registro só vira aviso: não atrapalha o atendimento.
+- **Relatório** (`ia_relatorio`): criados, % marcados sozinhos sem nenhum alerta, tempo mediano do "pronto" até agendado, alertas por tipo, em que etapa o paciente desiste, exames com mais problema, ações dos atendentes, conversas assumidas e série por semana.
+- **Preços** (`preco_observado`, `ia_precos_divergentes`): a Edge Function v11, ao ler o #7 a cada 10 min (job `agenda-ocupacao`), agrega o `Previsto` por exame e operadora (só o valor mais frequente, mínimo, máximo e amostras; linhas com quantidade > 1 são ignoradas) e o painel compara com o `catalogo_preco` (diferença de 10% ou mais). **Não corrige preço sozinho**: o preço continua sendo previsão e quem decide é a recepção.
+- **Casos para o prompt** (`ia_exemplos`): alertas e cancelamentos recentes, sem dado de paciente, com botão "Copiar casos" para ajustar as instruções da IA no n8n. Ao cancelar um pré-agendamento, o painel pergunta o motivo (opcional; `ia_evento_motivo`).
+- Testes: `node --experimental-strip-types --test supabase/functions/sync-catalogo-klingo/precos.test.ts` (7) e `conferencia.test.ts` (17).
+- Limites conhecidos: o registro começa quando o SQL rodou (nada retroativo); o formato exato da coluna `Previsto` do #7 não foi visto com dados reais, por isso `valorEmReais` aceita número e texto em reais; se a tela de preços vier vazia, rode `{"agenda":"ocupacao"}` à mão e veja `precos_erro` na resposta. O comparador casa exame por nome normalizado e operadora por nome: planos com nomes diferentes entre o #7 e o catálogo aparecem em "sem referência".
+- Ainda não feito (ideias do plano original, só com dados reais): sinônimos aprendidos para a busca de exames, base de perguntas frequentes aprovadas pelo administrador, anonimização de cadastro após 2 anos sem marcação.
 
 ## 6. Regras que não podem ser quebradas
 - Dados de paciente do Klingo só passam pela **memória** da Edge Function para identificar a conversa; **nunca** são gravados, devolvidos ou logados. `agenda_ocupacao` guarda só início, médico, unidade, procedimento, quantidade.

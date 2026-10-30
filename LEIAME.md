@@ -127,4 +127,6 @@ A IA consulta, a cada mensagem do paciente, um catálogo copiado de relatórios 
 
 ## Estado do projeto e como retomar
 
+**Aba Aprendizado (administrador)**: relatório de onde a IA erra, preço do catálogo x Klingo e casos para melhorar o prompt (Fase 5; SQL em `supabase/fase5-aprendizado.sql`).
+
 Veja `docs/passagem-fases-3-a-5.md`: o que cada fase faz, o que falta, o checklist para continuar em outra conta e as regras que não podem ser quebradas. `supabase/00-base-snapshot.sql` é só referência do banco base (não rodar no projeto atual).
