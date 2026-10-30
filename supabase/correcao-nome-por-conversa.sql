@@ -1,4 +1,4 @@
--- Correção: o nome (e e-mail) digitado ao abrir o chat passa a valer POR CONVERSA. NÃO APLICADO ainda no projeto webchat-atendimento.
+-- Correção: o nome (e e-mail) digitado ao abrir o chat passa a valer POR CONVERSA. JÁ APLICADO (30/10/2026) no projeto webchat-atendimento.
 -- Bug: contatos é único por telefone e chat_iniciar nunca atualizava contatos.nome. Quando outra pessoa (ex.: Aline) usava o telefone de
 -- quem já tinha conversado (ex.: Alisson), a IA e a conferência de identidade continuavam enxergando "Alisson": a IA chamava Aline pelo
 -- nome errado e paciente_conferir reaproveitava o cadastro de Alisson (nome, telefone e e-mail "batiam" com o contato antigo).
