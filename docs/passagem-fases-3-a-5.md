@@ -91,7 +91,7 @@ Ordem dos arquivos SQL (referência do que foi aplicado, nesta ordem): `00-base-
 8. Segurança: o segredo `ia_segredo` está digitado nos nós HTTP do n8n (aviso do n8n "hardcoded credentials"). Ideal: mover para credencial *Header Auth* do n8n (o mesmo padrão da Fila). Advisor Supabase (conferido em 30/10/2026): as funções `security definer` chamáveis por `anon` e por `authenticated` são intencionais (token da conversa, `ia_segredo` ou `papel_atual()`), as 13 tabelas com RLS e sem policy são internas e negam tudo por desenho; **"leaked password protection" no Auth está desligada: ligue** (Supabase > Authentication > Passwords).
 
 **Achados da auditoria de 30/10/2026 (detalhe em `docs/auditoria-2026-10-30.md`, seção 2.4)**
-12. **Preços (risco de dado, alto):** 18 de 104 pares exame/operadora com valor do catálogo 10% ou mais diferente do `Previsto` do Klingo. A recepção deve revisar em Aprendizado > "Preço x Klingo" antes de divulgar mais a IA.
+12. **Preços (médio; era alto antes da Fase 6b):** 18 de 104 pares exame/operadora com valor do catálogo 10% ou mais diferente do `Previsto` do Klingo (medido antes da Fase 6b, não remedido). A IA já não recebe preço, então o risco agora é o alerta "Conferir valor" da equipe usar uma referência errada. Falta publicar o prompt novo no n8n (`docs/fase6-roteiro-de-teste-e-producao.md`). A recepção deve revisar em Aprendizado > "Preço x Klingo".
 13. **n8n (médio):** o nó de IA depende de créditos do *n8n Gateway* e não tem repetição nem workflow de erro. Usar credencial Anthropic própria, `retryOnFail` e um *Error Trigger* que avise a equipe.
 14. **`agenda-ocupacao` com 502 (baixo, esperado):** é a proteção contra relatório de agenda vazio, fora do horário de agenda. O cron fica verde mesmo assim, porque só prova que a chamada foi disparada. Ajustar o início do cron ou aceitar como ruído.
 15. **Fila:** o que falta para ir ao ar está em `docs/fila-biometria.md`, seção 5.
@@ -112,7 +112,7 @@ Arquivo: `supabase/fase5-aprendizado.sql` (aditivo, pode rodar de novo). Mostra 
 
 ## 6. Regras que não podem ser quebradas
 - Dados de paciente do Klingo só passam pela **memória** da Edge Function para identificar a conversa; **nunca** são gravados, devolvidos ou logados. `agenda_ocupacao` guarda só início, médico, unidade, procedimento, quantidade.
-- Preço é sempre **previsão**; um atendente humano confirma preço e data. A mensagem de confirmação ao paciente não traz preço.
+- **A IA não informa preço** (Fase 6b: `ia_catalogo` devolve `precos` vazio); o atendente informa e confirma valor e data. O valor que o atendente escreve no chat é conferido contra `catalogo_preco`; fora de 10% gera alerta em `alerta_preco`, que só administrador e atendente leem. A mensagem de confirmação ao paciente não traz preço.
 - Detalhes do histórico só depois da data de nascimento conferida. Ao testar `liberado`, use `coalesce(..., false)`: um NULL já virou "verdadeiro" uma vez.
 - Lado D/E: na frente o L do desenho é o Direito, nas costas é o Esquerdo; bilateral com lado único é recusado.
 - Horários: reserva provisória + advisory lock por dia; folga 15 min (mesma unidade) / 60 min (outra unidade) entre exames do mesmo paciente; antecedência de 120 min. Fuso: `America/Bahia`.

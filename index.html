@@ -62,6 +62,7 @@
   }
   .menu button { display: block; width: 100%; text-align: left; padding: 13px 16px; background: none; border: 0; cursor: pointer; }
   .menu button:hover { background: #f1f6f3; }
+  .menu button[hidden] { display: none; }
 
   /* Formulário inicial */
   .inicio { flex: 1; overflow-y: auto; padding: 20px 18px calc(24px + env(safe-area-inset-bottom)); }
@@ -75,6 +76,22 @@
   }
   .campo input:focus, .campo textarea:focus { border-color: var(--verde); outline: none; box-shadow: 0 0 0 3px rgba(20,107,80,.18); }
   .campo textarea { min-height: 92px; resize: vertical; }
+  .campo select { width: 100%; padding: 12px 12px; font: inherit; border: 1.5px solid var(--linha); border-radius: 12px; background: var(--papel); color: inherit; }
+  .campo select:focus { border-color: var(--verde); outline: none; box-shadow: 0 0 0 3px rgba(20,107,80,.18); }
+  .unidades { display: grid; gap: 8px; }
+  .unidades.dois { grid-template-columns: 1fr 1fr; }
+  .dica-campo { margin: 5px 0 0; font-size: 13px; color: var(--texto-suave); }
+  .irmao-linha { display: flex; gap: 6px; margin-top: 8px; }
+  .irmao-linha input { flex: 1; min-width: 0; padding: 12px; font: inherit; border: 1.5px solid var(--linha); border-radius: 12px; background: var(--papel); color: inherit; }
+  .irmao-linha input:focus { border-color: var(--verde); outline: none; box-shadow: 0 0 0 3px rgba(20,107,80,.18); }
+  .irmao-linha button { border: 0; background: none; color: var(--texto-suave); font-size: 22px; cursor: pointer; padding: 0 8px; }
+  .link-add { margin-top: 8px; background: none; border: 0; color: var(--verde); font: inherit; font-weight: 650; cursor: pointer; padding: 6px 0; }
+  .proximo { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 12px; background: var(--verde-claro); border-top: 1px solid var(--linha); font-size: 14px; }
+  .proximo[hidden] { display: none; }
+  .unidade { text-align: left; border: 1.5px solid var(--linha); background: var(--papel); border-radius: 12px; padding: 11px 14px; cursor: pointer; font: inherit; color: inherit; }
+  .unidade strong { display: block; font-size: 15px; }
+  .unidade span { display: block; font-size: 13px; color: var(--texto-suave); margin-top: 1px; }
+  .unidade[aria-checked="true"] { border-color: var(--verde); background: var(--verde-claro); box-shadow: 0 0 0 2px rgba(20,107,80,.18); }
   .aceite { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; color: var(--texto-suave); margin: 4px 0 18px; }
   .aceite input { width: 20px; height: 20px; margin-top: 1px; accent-color: var(--verde); flex: none; }
   .btn-primario {
@@ -216,6 +233,7 @@
     <button class="btn-menu" id="btnMenu" aria-label="Menu" aria-haspopup="true" aria-expanded="false" hidden>&#8942;</button>
   </header>
   <div class="menu" id="menu" hidden>
+    <button type="button" id="btnOutroFilho" hidden>Agendar para outro filho(a)</button>
     <button type="button" id="btnNova">Iniciar nova conversa</button>
   </div>
 
@@ -224,9 +242,27 @@
     <h1>Como podemos ajudar?</h1>
     <p class="sub" id="boasVindasForm">Preencha seus dados e conte o que você precisa. Respondemos aqui mesmo, na hora.</p>
     <form id="formInicio" novalidate>
+      <div class="campo" id="blocoUnidade" hidden>
+        <label id="lUnidade">Em qual unidade você quer ser atendido?</label>
+        <div class="unidades" id="fUnidades" role="radiogroup" aria-labelledby="lUnidade"></div>
+      </div>
+      <div class="campo" id="blocoQuem" hidden>
+        <label id="lQuem">Quem será atendido?</label>
+        <div class="unidades dois" id="fQuem" role="radiogroup" aria-labelledby="lQuem"></div>
+      </div>
       <div class="campo">
-        <label for="fNome">Seu nome</label>
+        <label for="fNome" id="lNome">Seu nome</label>
         <input type="text" id="fNome" autocomplete="name" maxlength="120" required>
+      </div>
+      <div class="campo" id="blocoFilho" hidden>
+        <label for="fFilho">Nome completo da criança</label>
+        <input type="text" id="fFilho" autocomplete="off" maxlength="120">
+        <div id="listaIrmaos"></div>
+        <button type="button" class="link-add" id="btnAddIrmao">+ Tenho outro filho(a) para agendar</button>
+        <div id="blocoModoIrmaos" hidden>
+          <p class="dica-campo" id="lModoIrmaos">Como você prefere agendar?</p>
+          <div class="unidades dois" id="fModoIrmaos" role="radiogroup" aria-labelledby="lModoIrmaos"></div>
+        </div>
       </div>
       <div class="campo">
         <label for="fTel">Telefone com DDD</label>
@@ -235,6 +271,10 @@
       <div class="campo">
         <label for="fEmail">E-mail <span class="opc">(opcional)</span></label>
         <input type="email" id="fEmail" autocomplete="email" maxlength="200">
+      </div>
+      <div class="campo" id="blocoMedico" hidden>
+        <label for="fMedico">Tem médico de preferência? <span class="opc">(opcional)</span></label>
+        <select id="fMedico"></select>
       </div>
       <div class="campo">
         <label for="fMsg">Sua mensagem</label>
@@ -252,6 +292,10 @@
   <!-- Tela 2: conversa -->
   <section id="telaChat" style="display:contents" hidden>
     <main class="msgs" id="msgs" aria-live="polite" aria-label="Mensagens"></main>
+    <div class="proximo" id="proximo" hidden>
+      <span id="proximoTxt"></span>
+      <button type="button" class="btn-w" id="btnProximo">Agendar</button>
+    </div>
     <div class="aviso-encerrado" id="avisoEncerrado" hidden>Atendimento encerrado. Envie uma mensagem para abrir de novo.</div>
     <form class="compor" id="formEnviar">
       <textarea id="texto" rows="1" maxlength="4000" placeholder="Digite uma mensagem" aria-label="Mensagem"></textarea>
@@ -287,6 +331,10 @@
     telaInicio: $('#telaInicio'), telaChat: $('#telaChat'), boasForm: $('#boasVindasForm'),
     form: $('#formInicio'), fNome: $('#fNome'), fTel: $('#fTel'), fEmail: $('#fEmail'), fMsg: $('#fMsg'),
     fAceite: $('#fAceite'), erroForm: $('#erroForm'), btnIniciar: $('#btnIniciar'),
+    blocoUnidade: $('#blocoUnidade'), fUnidades: $('#fUnidades'), blocoMedico: $('#blocoMedico'), fMedico: $('#fMedico'),
+    blocoQuem: $('#blocoQuem'), fQuem: $('#fQuem'), lNome: $('#lNome'), blocoFilho: $('#blocoFilho'), fFilho: $('#fFilho'), btnOutroFilho: $('#btnOutroFilho'),
+    listaIrmaos: $('#listaIrmaos'), btnAddIrmao: $('#btnAddIrmao'), blocoModoIrmaos: $('#blocoModoIrmaos'), fModoIrmaos: $('#fModoIrmaos'),
+    proximo: $('#proximo'), proximoTxt: $('#proximoTxt'), btnProximo: $('#btnProximo'),
     msgs: $('#msgs'), aviso: $('#avisoEncerrado'), formEnviar: $('#formEnviar'), texto: $('#texto'),
     btnEnviar: $('#btnEnviar'), toast: $('#toast')
   };
@@ -344,16 +392,108 @@
   }
 
   /* ---------- telas ---------- */
-  function mostrarForm() {
+  function mostrarForm(manterEscolha) {
     fecharCanal();
     el.telaChat.hidden = true; el.telaChat.style.display = 'none';
     el.telaInicio.hidden = false; el.btnMenu.hidden = true; el.menu.hidden = true;
     el.ponto.className = 'ponto'; el.status.textContent = 'Online';
     const p = lerLocal(CHAVE_PERFIL) || {};
     el.fNome.value = p.nome || ''; el.fTel.value = p.telefone || ''; el.fEmail.value = p.email || '';
-    el.fMsg.value = ''; el.fAceite.checked = false; el.erroForm.textContent = '';
+    el.fMsg.value = ''; el.fAceite.checked = false; el.erroForm.textContent = ''; el.fFilho.value = '';
+    if (!manterEscolha) escolha = null;
+    irmaosForm = []; modoIrmaos = 'um_de_cada_vez';
+    carregarOpcoesInicio();
+    if (manterEscolha) setTimeout(() => el.fFilho.focus(), 50);
   }
+
+  /* ---------- unidade e médico de preferência (início do formulário) ---------- */
+  // escolha = null (ainda não escolheu) | { unidade: '' (não sei) ou chave, medico: '' (sem preferência) ou nome,
+  //                                         tipo: 'proprio' | 'filho', tipoManual: o paciente mexeu na pergunta "quem será atendido" }
+  let opcoesInicio = null, escolha = null;
+  let irmaosForm = [], modoIrmaos = 'um_de_cada_vez';   // outros filhos digitados no formulário e como agendar
+  const primeiroNome = (s) => String(s || '').trim().split(/\s+/)[0] || '';
+  const PARTICULAS = new Set(['de', 'da', 'do', 'das', 'dos', 'e']);
+  function nomeBonito(s) {
+    return String(s || '').toLowerCase().split(/\s+/).map((p, i) => (i && PARTICULAS.has(p) ? p : p.charAt(0).toUpperCase() + p.slice(1))).join(' ');
+  }
+  async function carregarOpcoesInicio() {
+    if (!opcoesInicio) {
+      try {
+        const { data, error } = await db.rpc('chat_opcoes_inicio');
+        if (!error && Array.isArray(data) && data.length) opcoesInicio = data;
+      } catch { /* sem a lista, o formulário segue sem a pergunta e a IA pergunta a unidade no chat */ }
+    }
+    desenharUnidades();
+  }
+  function cartao(titulo, texto, marcado, aoClicar) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'unidade'; b.setAttribute('role', 'radio'); b.setAttribute('aria-checked', String(marcado));
+    const t = document.createElement('strong'); t.textContent = titulo;
+    const d = document.createElement('span'); d.textContent = texto;
+    b.append(t, d); b.addEventListener('click', aoClicar);
+    return b;
+  }
+  function desenharUnidades() {
+    el.blocoUnidade.hidden = !opcoesInicio;
+    if (!opcoesInicio) { el.blocoQuem.hidden = true; el.blocoMedico.hidden = true; el.blocoFilho.hidden = true; return; }
+    const itens = [...opcoesInicio.map((u) => ({ chave: u.chave, titulo: u.rotulo, texto: u.descricao, filho: u.fluxo === 'pediatria' })),
+      { chave: '', titulo: 'Ainda não sei', texto: 'A gente ajuda você a escolher no chat', filho: false }];
+    el.fUnidades.replaceChildren(...itens.map((u) => cartao(u.titulo, u.texto, !!escolha && escolha.unidade === u.chave, () => {
+      // Unidade pediátrica já sugere "meu filho(a)"; quem mexeu na pergunta mantém a escolha dele.
+      const manual = !!escolha && escolha.tipoManual;
+      escolha = { unidade: u.chave, medico: '', tipo: manual ? escolha.tipo : (u.filho ? 'filho' : 'proprio'), tipoManual: manual };
+      el.erroForm.textContent = ''; desenharUnidades();
+    })));
+
+    // Quem será atendido: define o caminho (responsável falando pelo filho x o próprio paciente).
+    el.blocoQuem.hidden = !escolha;
+    if (escolha) {
+      const quem = (tipo, titulo, texto) => cartao(titulo, texto, escolha.tipo === tipo, () => { escolha.tipo = tipo; escolha.tipoManual = true; desenharUnidades(); });
+      el.fQuem.replaceChildren(quem('proprio', 'Eu mesmo(a)', 'Sou o paciente'), quem('filho', 'Meu filho ou filha', 'Sou o responsável'));
+    }
+    const filho = !!escolha && escolha.tipo === 'filho';
+    el.lNome.textContent = filho ? 'Seu nome (responsável)' : 'Seu nome';
+    el.blocoFilho.hidden = !filho;
+    desenharIrmaos(filho);
+
+    // Médico de preferência: fica depois dos dados de contato.
+    const un = escolha && opcoesInicio.find((u) => u.chave === escolha.unidade);
+    const medicos = un ? un.medicos || [] : [];
+    el.blocoMedico.hidden = !medicos.length;
+    if (medicos.length) {
+      const sem = new Option('Sem preferência', '');
+      el.fMedico.replaceChildren(sem, ...medicos.map((m) => new Option(nomeBonito(m.nome) + (m.especialidade ? ' — ' + m.especialidade : ''), m.nome)));
+      el.fMedico.value = escolha.medico || '';
+    }
+  }
+  const MAX_IRMAOS = 4;
+  function desenharIrmaos(filho) {
+    if (!filho) { irmaosForm = []; }
+    el.listaIrmaos.replaceChildren(...irmaosForm.map((nome, i) => {
+      const inp = h('input', { type: 'text', maxlength: '120', placeholder: `Nome completo do ${i + 2}º filho(a)`, 'aria-label': `Nome do ${i + 2}º filho(a)`, value: nome });
+      inp.addEventListener('input', () => { irmaosForm[i] = inp.value; });
+      const x = h('button', { type: 'button', 'aria-label': `Tirar o ${i + 2}º filho(a)`, onclick: () => { irmaosForm.splice(i, 1); desenharIrmaos(true); } }, '×');
+      return h('div', { class: 'irmao-linha' }, inp, x);
+    }));
+    el.btnAddIrmao.hidden = !filho || irmaosForm.length >= MAX_IRMAOS;
+    el.btnAddIrmao.textContent = irmaosForm.length ? '+ Mais um filho(a)' : '+ Tenho outro filho(a) para agendar';
+    el.blocoModoIrmaos.hidden = !filho || !irmaosForm.length;
+    if (filho && irmaosForm.length) {
+      const total = irmaosForm.length + 1;
+      el.fModoIrmaos.replaceChildren(
+        cartao('Um de cada vez', 'Cada filho(a) com o seu pedido', modoIrmaos === 'um_de_cada_vez', () => { modoIrmaos = 'um_de_cada_vez'; desenharIrmaos(true); }),
+        cartao(total === 2 ? 'Os dois juntos' : 'Todos juntos', 'Mesmo pedido, horários em sequência', modoIrmaos === 'juntos', () => { modoIrmaos = 'juntos'; desenharIrmaos(true); }));
+    }
+  }
+  el.btnAddIrmao.addEventListener('click', () => {
+    if (irmaosForm.length >= MAX_IRMAOS) return;
+    irmaosForm.push(''); desenharIrmaos(true);
+    const ins = el.listaIrmaos.querySelectorAll('input'); if (ins.length) ins[ins.length - 1].focus();
+  });
+  el.fMedico.addEventListener('change', () => { if (escolha) escolha.medico = el.fMedico.value; });
   function mostrarChat() {
+    el.btnOutroFilho.hidden = !(conv && conv.tipo === 'filho');
+    atualizarProximo();
     el.telaInicio.hidden = true;
     el.telaChat.hidden = false; el.telaChat.style.display = 'contents';
     el.btnMenu.hidden = false;
@@ -452,7 +592,12 @@
     ev.preventDefault();
     el.erroForm.textContent = '';
     const nome = el.fNome.value.trim(), tel = el.fTel.value.replace(/\D/g, '');
-    if (nome.length < 2) { el.erroForm.textContent = 'Informe seu nome.'; el.fNome.focus(); return; }
+    if (opcoesInicio && !escolha) { el.erroForm.textContent = 'Escolha a unidade (ou "Ainda não sei").'; el.blocoUnidade.scrollIntoView({ block: 'center' }); return; }
+    const filho = !!escolha && escolha.tipo === 'filho', nomeFilho = el.fFilho.value.trim();
+    if (nome.length < 2) { el.erroForm.textContent = filho ? 'Informe o seu nome (responsável).' : 'Informe seu nome.'; el.fNome.focus(); return; }
+    if (filho && nomeFilho.length < 2) { el.erroForm.textContent = 'Informe o nome da criança.'; el.fFilho.focus(); return; }
+    const irmaos = filho ? irmaosForm.map((x) => x.trim()).filter((x) => x.length >= 2) : [];
+    if (filho && irmaosForm.some((x) => x.trim() && x.trim().length < 2)) { el.erroForm.textContent = 'Confira o nome dos outros filhos.'; return; }
     if (tel.length < 10) { el.erroForm.textContent = 'Informe o telefone com DDD.'; el.fTel.focus(); return; }
     if (!el.fAceite.checked) { el.erroForm.textContent = 'Marque a caixa de concordância para continuar.'; el.fAceite.focus(); return; }
     el.btnIniciar.disabled = true; el.btnIniciar.textContent = 'Iniciando…';
@@ -460,10 +605,14 @@
       const origem = new URLSearchParams(location.search).get('origem');
       const { data, error } = await db.rpc('chat_iniciar', {
         p_nome: nome, p_telefone: el.fTel.value, p_email: el.fEmail.value.trim() || null,
-        p_mensagem: el.fMsg.value.trim() || null, p_aceite: true, p_origem: origem
+        p_mensagem: el.fMsg.value.trim() || null, p_aceite: true, p_origem: origem,
+        ...(escolha ? { p_paciente_tipo: escolha.tipo, p_paciente_nome: filho ? nomeFilho : null } : {}),
+        ...(irmaos.length ? { p_irmaos: irmaos, p_irmaos_modo: modoIrmaos } : {}),
+        ...(escolha && escolha.unidade ? { p_unidade: escolha.unidade, p_medico: escolha.medico || null } : {})
       });
       if (error) throw error;
-      conv = { id: data.conversa_id, token: data.token };
+      const un = escolha && opcoesInicio && opcoesInicio.find((u) => u.chave === escolha.unidade);
+      conv = { id: data.conversa_id, token: data.token, unidade: un ? un.catalogo : '', unidadeChave: un ? un.chave : '', tipo: filho ? 'filho' : 'proprio', nomeCrianca: filho ? nomeFilho : '', irmaos, irmaosModo: irmaos.length ? modoIrmaos : '' };
       gravarLocal(CHAVE_CONVERSA, conv);
       gravarLocal(CHAVE_PERFIL, { nome, telefone: el.fTel.value, email: el.fEmail.value.trim() });
       await abrirChat();
@@ -508,6 +657,36 @@
     el.menu.hidden = true; el.btnMenu.setAttribute('aria-expanded', 'false');
     if (!confirm('Iniciar uma nova conversa? O histórico desta fica guardado com a equipe.')) return;
     apagarLocal(CHAVE_CONVERSA); conv = null; mostrarForm();
+  }
+  function atualizarProximo() {
+    const fila = (conv && conv.irmaos) || [];
+    el.proximo.hidden = !fila.length;
+    if (!fila.length) return;
+    const quem = primeiroNome(fila[0]);
+    el.proximoTxt.textContent = (conv.irmaosModo === 'juntos' ? 'Em seguida, com o mesmo pedido: ' : 'Em seguida: ') + fila[0] + (fila.length > 1 ? ` (e mais ${fila.length - 1})` : '');
+    el.btnProximo.textContent = `Agendar para ${quem}`;
+  }
+  // Próximo filho(a) da fila: abre a conversa dele (no modo "juntos" o pedido vem copiado) sem preencher o formulário de novo.
+  async function proximoFilho() {
+    const fila = (conv && conv.irmaos) || [];
+    if (!fila.length) return;
+    if (!confirm(`Continuar para ${fila[0]}? O pedido${conv.nomeCrianca ? ' de ' + conv.nomeCrianca : ''} fica guardado com a equipe.`)) return;
+    el.btnProximo.disabled = true;
+    try {
+      const { data, error } = await db.rpc('chat_irmao_iniciar', { p_origem: conv.id, p_token: conv.token });
+      if (error) throw error;
+      conv = { ...conv, id: data.conversa_id, token: data.token, nomeCrianca: data.paciente_nome, irmaos: data.irmaos || [], irmaosModo: data.irmaos_modo || '' };
+      gravarLocal(CHAVE_CONVERSA, conv);
+      await abrirChat();
+    } catch (e) { toast(mensagemErro(e)); }
+    finally { el.btnProximo.disabled = false; }
+  }
+  // Outro filho(a): nova conversa com os dados do responsável e a unidade já preenchidos (uma conversa por criança).
+  function outroFilho() {
+    el.menu.hidden = true; el.btnMenu.setAttribute('aria-expanded', 'false');
+    if (!conv) return;
+    escolha = { unidade: conv.unidadeChave || '', medico: '', tipo: 'filho', tipoManual: true };
+    apagarLocal(CHAVE_CONVERSA); conv = null; mostrarForm(true);
   }
   function autoAltura() { el.texto.style.height = 'auto'; el.texto.style.height = Math.min(el.texto.scrollHeight, 140) + 'px'; }
 
@@ -565,11 +744,44 @@
     else if (o.tipo === 'pedido_exames') {
       w.append(h('button', { class: 'btn-w', type: 'button', onclick: abrirPedido }, o.rotulo || 'Escolher exames no mapa do corpo'),
         h('p', { class: 'w-nota' }, 'Você pode marcar várias partes do corpo e vários exames.'));
+    } else if (o.tipo === 'pedido_consulta') {
+      w.append(h('button', { class: 'btn-w', type: 'button', onclick: abrirConsulta }, o.rotulo || 'Escolher o tipo de consulta'),
+        h('p', { class: 'w-nota' }, 'É a escolha que libera o calendário de horários.'));
     } else if (o.tipo === 'calendario') {
       w.append(h('button', { class: 'btn-w', type: 'button', onclick: () => abrirCalendario(1) }, o.rotulo || 'Escolher data e horário'),
         h('p', { class: 'w-nota' }, 'Os horários são uma previsão; o atendente confirma o dia e o horário.'));
     } else return;
     pai.append(w);
+  }
+  // Consulta: o paciente escolhe o tipo (Pediatria, Puericultura, Neuropediatria...); isso cria o item do pedido e libera o calendário.
+  async function abrirConsulta() {
+    if (!conv) return;
+    const f = abrirFolha(conv.nomeCrianca ? `Consulta para ${primeiroNome(conv.nomeCrianca)}` : 'Escolher a consulta');
+    f.corpo.replaceChildren(h('p', { class: 'carregando' }, 'Carregando…'));
+    const minha = conv.id;
+    try {
+      const { data, error } = await db.rpc('chat_consultas', { p_conversa: conv.id, p_token: conv.token });
+      if (error) throw error;
+      if (!conv || conv.id !== minha) return;
+      const lista = (data && data.consultas) || [];
+      let sel = null;
+      const btn = h('button', { class: 'btn-w', type: 'button', disabled: true }, 'Escolha uma consulta');
+      f.corpo.replaceChildren(...[
+        data.medico_preferido ? h('p', { class: 'p-dica' }, 'Médico de preferência: ' + nomeBonito(data.medico_preferido) + '. As consultas dele aparecem primeiro.') : null,
+        lista.length ? h('div', {}, lista.map((c) => h('label', { class: 'w-op' },
+          h('input', { type: 'radio', name: 'consulta', onchange: () => { sel = c; btn.disabled = false; btn.textContent = 'Escolher: ' + c.rotulo; } }),
+          h('span', {}, c.rotulo + (c.do_medico ? ' (do seu médico)' : ''))))) : h('p', { class: 'p-dica' }, 'Não há consultas cadastradas para esta unidade. Descreva no chat o que você precisa que o atendente ajuda.')].filter(Boolean));
+      f.rodape.replaceChildren(btn);
+      btn.addEventListener('click', async () => {
+        if (!sel) return;
+        btn.disabled = true;
+        try {
+          const { error: e2 } = await db.rpc('chat_consulta_salvar', { p_conversa: conv.id, p_token: conv.token, p_procedimento_id: sel.id });
+          if (e2) throw e2;
+          fecharFolha(); toast('Consulta escolhida.'); carregar();
+        } catch (e) { toast(mensagemErro(e)); btn.disabled = false; }
+      });
+    } catch (e) { f.corpo.replaceChildren(h('p', { class: 'erro-form' }, mensagemErro(e))); }
   }
   function widgetLista(w, o) {
     const itens = (Array.isArray(o.itens) ? o.itens : []).slice(0, 16).filter((i) => i && i.rotulo);
@@ -833,7 +1045,7 @@
     if (!conv) return;
     abrirFolha('Escolher data e horário');
     $('#folhaCorpo').replaceChildren(h('p', { class: 'carregando' }, 'Buscando horários…'));
-    C = { grupo, res: null, unidade: '', periodo: '', mes: null, dia: null, slot: null };
+    C = { grupo, res: null, unidade: (conv && conv.unidade) || '', periodo: '', mes: null, dia: null, slot: null };
     await carregarHorarios(true);
   }
   async function carregarHorarios(primeira) {
@@ -848,6 +1060,11 @@
       const primeiro = (data.dias || []).find((d) => d.slots && d.slots.length);
       if (primeira || !C.mes) { const base = primeiro ? dataLocal(primeiro.data) : hoje; C.mes = new Date(base.getFullYear(), base.getMonth(), 1); C.dia = primeiro ? primeiro.data : null; }
       else if (C.dia && !(data.dias || []).some((d) => d.data === C.dia && d.slots.length)) C.dia = null;
+      // Os dois (ou mais) filhos juntos: já deixa marcado o horário logo depois do que o irmão escolheu.
+      if (primeira && data.sugerido) {
+        const sg = data.sugerido, dd = (data.dias || []).find((d) => d.data === sg.data), sl = dd && (dd.slots || []).find((x) => x.hora === sg.hora);
+        if (sl) { const dt = dataLocal(sg.data); C.mes = new Date(dt.getFullYear(), dt.getMonth(), 1); C.dia = sg.data; C.slot = sl; }
+      }
     } catch (e) { $('#folhaCorpo').replaceChildren(h('p', { class: 'erro-form' }, mensagemErro(e))); return; }
     desenharCalendario();
   }
@@ -863,8 +1080,17 @@
         h('button', { class: 'btn-w', type: 'button', onclick: () => { fecharFolha(); abrirPedido(); } }, 'Escolher exames no mapa do corpo'));
       return;
     }
-    if (g && g.nomes) corpo.append(h('p', { class: 'p-dica' }, 'Exames deste horário: ' + g.nomes.join(' + ')));
+    if (g && g.nomes) corpo.append(h('p', { class: 'p-dica' }, 'Neste horário: ' + g.nomes.join(' + ')));
     corpo.append(h('p', { class: 'aviso-cal' }, 'Os horários abaixo são uma previsão. Um atendente confere tudo e confirma o dia e o horário.' + (r.aviso ? ' ' + r.aviso : '')));
+    if (r.sugerido && C.slot && C.slot.hora === r.sugerido.hora && C.dia === r.sugerido.data) {
+      corpo.append(h('p', { class: 'p-dica' }, `Já deixei marcado o horário logo depois de ${primeiroNome(r.sugerido.apos)}, no mesmo dia. Se preferir, escolha outro.`));
+    }
+    if (r.medico_filtrando) {
+      corpo.append(h('p', { class: 'p-dica' }, `Mostrando só os horários de ${nomeBonito(r.medico_preferido)}, seu médico de preferência. `,
+        h('button', { class: 'chip', type: 'button', onclick: trocarMedico }, 'Ver outros médicos')));
+    } else if (r.medico_sem_horario) {
+      corpo.append(h('p', { class: 'p-dica' }, `${nomeBonito(r.medico_preferido)} não tem horário para este pedido nos próximos dias. Mostramos os horários de outros médicos; o atendente confere se é possível com ${nomeBonito(r.medico_preferido)}.`));
+    }
     if ((r.unidades || []).length > 1) {
       corpo.append(h('div', { class: 'chips', role: 'group', 'aria-label': 'Unidade' }, [['', 'Qualquer unidade'], ...r.unidades.map((u) => [u, u.replace(/^CLÍNICA DE SAÚDE E IMAGEM - /, '')])]
         .map(([v, t]) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(C.unidade === v), onclick: () => { C.unidade = v; carregarHorarios(false); } }, t))));
@@ -920,6 +1146,13 @@
       C.slot ? `Escolher ${DIAS_SEMANA[dt.getDay()]}, ${dt.getDate()}/${String(dt.getMonth() + 1).padStart(2, '0')} às ${C.slot.hora}` : 'Escolha um horário'));
     corpo.scrollTop = rolagem;
   }
+  async function trocarMedico() {
+    try {
+      const { error } = await db.rpc('chat_medico_limpar', { p_conversa: conv.id, p_token: conv.token });
+      if (error) throw error;
+      await carregarHorarios(false);
+    } catch (e) { toast(mensagemErro(e)); }
+  }
   async function confirmarHorario() {
     if (!C || !C.slot || !C.dia) return;
     $('#folhaRodape button').disabled = true;
@@ -948,6 +1181,8 @@
   });
   document.addEventListener('click', (e) => { if (!el.menu.hidden && !el.menu.contains(e.target) && e.target !== el.btnMenu) el.menu.hidden = true; });
   el.btnNova.addEventListener('click', novaConversa);
+  el.btnOutroFilho.addEventListener('click', outroFilho);
+  el.btnProximo.addEventListener('click', proximoFilho);
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden) { naoLidas = 0; document.title = config.nome_empresa; carregar(); }
   });

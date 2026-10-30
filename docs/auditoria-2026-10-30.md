@@ -22,7 +22,7 @@ Limite do ambiente: a rede desta sessão bloqueia `*.supabase.co`, o n8n e o Kli
 
 | Item | Evidência |
 |---|---|
-| Deploy do site | GitHub Actions: 15 de 15 publicações do Pages com sucesso; a última é a `main` em `223d1d3` (PR #14). |
+| Deploy do site | Na medição: 15 de 15 publicações do Pages com sucesso, a última na `main` em `223d1d3` (PR #14). Reconferido às 16:10 UTC: 19 publicações; a #18 (merge do PR #18, 13:43 UTC) **falhou** por causa do Jekyll (`{{ }}` nos documentos do n8n) e a #19 (13:46 UTC, `.nojekyll`) corrigiu; a `main` atual, `2dc0d62`, está publicada com sucesso. |
 | Crons (6 jobs ativos) | Últimas 24 h: `agenda-conferir` 2.346 de 2.346 execuções com sucesso (a cada 15 s); `agenda-ocupacao` 27 de 27; `agenda-revisar` 59 de 59; `sync-catalogo-klingo`, `catalogo-precos-convenio` e `catalogo-precos-particular` 1 de 1 cada. Zero falhas. |
 | Objetos das Fases 1 a 5 | O checklist da seção 2 de `docs/passagem-fases-3-a-5.md` deu `true` em todos os itens (6 crons, `paciente_historico`, conferência da Fase 3, `historico_paciente` em `ia_contexto`, reaproveitamento em `ia_pre_agendar`), mais `ia_evento` e `preco_observado` presentes, com 148 leituras de preço gravadas. |
 | Migrações | 24 registradas na medição (`webchat_schema_inicial` até `fila_biometria_revogar_gatilhos`); hoje são 27, com as 3 correções de identidade da seção 2.6. Pacientes, preços, Fase 2 e Fase 4 não aparecem com nome próprio na lista, embora os objetos existam: o histórico de migrações **não** serve como receita para recriar o banco (já avisado na passagem de bastão). |
@@ -54,7 +54,7 @@ O teste de navegador usa Supabase simulado com as formas reais de `ia_relatorio`
 
 Do mais para o menos importante.
 
-1. **Risco de dado, ALTO — 18 de 104 preços divergentes.** O comparador de preços (`ia_precos_divergentes`) achou 18 pares exame/operadora em que o valor do catálogo difere em 10% ou mais do `Previsto` lido do Klingo, em 104 pares comparados. A IA usa o catálogo para falar preço ao paciente. **Recomendação:** a recepção revisar a lista (aba Aprendizado, "Preço x Klingo") antes de divulgar a IA a mais pacientes; enquanto isso, tratar como risco de informar preço errado. O sistema já diz ao paciente que o preço é previsão e que a atendente confirma.
+1. **Preços do catálogo — MÉDIO (medido como ALTO, rebaixado pela Fase 6b).** O comparador de preços (`ia_precos_divergentes`) achou 18 pares exame/operadora em que o valor do catálogo difere em 10% ou mais do `Previsto` lido do Klingo, em 104 pares comparados. Na medição, a IA usava o catálogo para falar preço ao paciente, e por isso o achado era alto. **Depois disso** a Fase 6b (aplicada às 13:41 UTC) tirou o preço da IA: conferido no banco real, `ia_catalogo` já não entrega valores (`ia_sem_preco = true`), então a IA não tem de onde citar preço. O catálogo passou a servir de referência para o alerta "Conferir valor", que só a equipe vê quando o atendente escreve um valor; com 18 divergências esses alertas podem ser falsos ou deixar de aparecer. **Ressalvas:** (a) segundo `docs/fase6-roteiro-de-teste-e-producao.md`, o n8n ainda publica o prompt antigo, que "ainda pode falar preço"; a IA não tem o dado, mas o prompt antigo pode induzi-la a inventar um valor (não verifiquei o n8n); (b) as 18 divergências **não foram remedidas** depois da mudança. **Recomendação:** publicar o prompt novo no n8n (passo 1 do roteiro da Fase 6) e a recepção revisar a lista (aba Aprendizado, "Preço x Klingo") antes de confiar nos alertas.
 2. **Dependência frágil do n8n — MÉDIO.** O nó de IA do workflow depende de créditos do *n8n Gateway* e não tem nova tentativa nem workflow de erro. Se os créditos acabarem ou a chamada falhar, o paciente fica sem resposta e ninguém é avisado. **Recomendação:** credencial Anthropic própria, `retryOnFail` no nó e um workflow com *Error Trigger* que avise a equipe.
 3. **502 nas execuções de `agenda-ocupacao` — BAIXO, esperado.** São a proteção da Edge Function contra relatório de agenda vazio (ela se recusa a apagar a ocupação quando o Klingo devolve zero linhas). Acontecem fora do horário em que há agenda. **Recomendação:** começar o cron na hora em que a agenda abre, ou aceitar como ruído. Não corrompe dado.
 4. **Proteção contra senha vazada desligada — BAIXO.** Supabase > Authentication > Passwords > ligar "Prevent use of leaked passwords". Não dá para ligar por MCP.
@@ -70,7 +70,9 @@ Do mais para o menos importante.
 
 ### 2.6 Mudanças que entraram depois das medições acima
 
-As medições das seções 2.1 a 2.5 foram feitas por volta das 11:00 UTC. Depois disso, outra sessão mesclou na `main` os PRs #16 e #17 e aplicou no banco real três migrações (`correcao_nome_por_conversa` às 11:27, `correcao_login_nome_telefone_email` às 11:31 e `correcao_login_email_sem_fallback` às 11:32 UTC).
+As medições das seções 2.1 a 2.5 foram feitas por volta das 11:00 UTC. Depois disso outras sessões mudaram o sistema em produção, em duas rodadas.
+
+**Rodada 1 (11:27 a 11:34 UTC), PRs #16 e #17.** Três migrações no banco real: `correcao_nome_por_conversa` (11:27), `correcao_login_nome_telefone_email` (11:31) e `correcao_login_email_sem_fallback` (11:32).
 
 | Item | Situação |
 |---|---|
@@ -79,6 +81,16 @@ As medições das seções 2.1 a 2.5 foram feitas por volta das 11:00 UTC. Depoi
 | **Não reauditado** | Avisos do advisor de segurança e de performance; o comportamento real da IA com a regra nova de login (exige conversa de teste com o n8n e o Claude); o painel novo contra o Supabase real. |
 | Atenção | A terceira migração (`correcao_login_email_sem_fallback`) está descrita só como comentário em `supabase/correcao-login-nome-telefone-email.sql` ("aplicado como patch"). O arquivo diz que já reflete o patch, mas não comparei com o banco linha a linha. Antes de recriar o banco a partir desses arquivos, confira com `pg_get_functiondef('public.paciente_conferir(uuid)'::regprocedure)`. |
 | Documento corrigido | O `LEIAME.md` ainda descrevia o status "parcial" em duas frases; foi corrigido com base no banco real. |
+
+**Rodada 2 (13:40 a 13:47 UTC), PRs #18 e #19: Fase 6 e Fase 6b.** Cinco migrações no banco real (`fase6_unidade_filho_e_ia_contexto`, `fase6_remove_chat_iniciar_antiga`, `fase6_catalogo_horarios_identidade`, `fase6_consulta_e_irmaos`, `fase6_fecha_funcoes_internas`, de 13:40 a 13:42) e a `fase6b-alerta-preco.sql`, que foi rodada no SQL Editor e por isso **não aparece** na lista de migrações.
+
+| Item | Situação |
+|---|---|
+| O que mudou | Formulário do chat com unidade e "quem será atendido" (próprio ou filho), médico de preferência, consulta no calendário, vários filhos por conversa; a IA deixa de receber preços; alerta de valor só para a equipe (`alerta_preco`); `chat_iniciar` antiga removida. O chat (`index.html`) e o painel mudaram bastante. |
+| Conferido depois das mudanças | Todas as 12 verificações do roteiro da Fase 6 deram `true` no banco real (unidades, tipos, irmãos, consulta, catálogo, identidade, `alerta_preco`, gatilho de preço, IA sem preço, uma só `chat_iniciar`), mais os 6 crons ativos. O módulo Fila não foi tocado (21 funções, 0 atendimentos). `pacientes` não foi alterada, e o `INSERT` da `fila_entrar` é compatível com as colunas reais. A bateria completa de `testes/` passa sobre a `main` já mesclada, inclusive o teste de navegador do chat novo: 27 + 27 + 46 + 5 + 6. |
+| **Não reauditado** | Avisos do advisor (a Fase 6 fechou funções internas, não medi o efeito); o chat novo contra o Supabase real; o roteiro de 16 testes da Fase 6, que ainda não foi executado e o próprio documento dela diz que os passos 12 e 13 são os únicos sem prova em produção. |
+| **Pendente de outra sessão** | n8n: o roteiro da Fase 6 diz que a versão antiga do fluxo continua publicada e que, sem o prompt novo, a IA não segue as instruções novas nem abre o seletor de consulta. Como o Pages já publica o chat novo, **hoje há um chat novo falando com um prompt antigo**. Não verifiquei o n8n. |
+| Publicação | O deploy do merge do PR #18 falhou (Jekyll) e o do PR #19 corrigiu; ver 2.1. |
 
 ## 3. Módulo novo: Fila + assinatura biométrica
 
@@ -141,7 +153,7 @@ Uma tentativa de gravar o segredo `fila_segredo` dentro de um workflow do n8n fo
 
 | Área | Pronto para produção? |
 |---|---|
-| Chat, painel, catálogo, conferência, aprendizado | **Sim**, com as ressalvas de 2.4 (principalmente os preços divergentes e o nó de IA sem repetição) e de 2.5 (marcação real ainda não validada). |
+| Chat, painel, catálogo, conferência, aprendizado | **Sim, com condições.** A auditoria cobriu o sistema até a Fase 5. A Fase 6 entrou depois e não foi auditada; o próprio roteiro dela lista o n8n como pendente. Ressalvas: o nó de IA sem repetição (2.4), o prompt novo da Fase 6 ainda não publicado no n8n (2.6) e a marcação real ainda não validada (2.5). |
 | Fila + assinatura biométrica | **Não.** Faltam as peças de 3.3. Só o banco (v1) e o algoritmo estão prontos e testados. |
 
 Ordem sugerida para fechar a Fila: ver `docs/fila-biometria.md`, seção 5.
