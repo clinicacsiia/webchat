@@ -1,3 +1,9 @@
+> **Status (30/10/2026): documento desatualizado em parte.** O desenho mudou depois desta primeira versão e este arquivo ainda não foi reescrito.
+>
+> - **Valem:** `supabase/fila-biometria.sql` (token JWT assinado e verificado no banco, segredo no Vault, segredo do n8n no cabeçalho `x-fila-segredo`) e `biometria/avaliar_assinatura.py` (algoritmo em Python puro, executado no nó Python do n8n).
+> - **Não valem mais:** a API FastAPI, o nó Code que assina o JWT no n8n e o JWT assinado com a chave do projeto (seções 3, 4 e 5 abaixo).
+> - **Ainda pendentes:** `fila/fila.js` (ainda usa o cliente com JWT do projeto), a aba **Fila** do painel, os dois workflows do n8n, a aplicação da migração v2 no banco e o merge. Este PR segue como rascunho por isso.
+
 # Fila em tempo real + assinatura biométrica dinâmica
 
 Versão 1.0 — 30/10/2026 / Mudança: Implementação inicial
