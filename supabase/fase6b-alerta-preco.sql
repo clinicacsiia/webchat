@@ -1,6 +1,6 @@
 -- Fase 6b: a IA não fala preço; o sistema só vigia o valor que o ATENDENTE informa.
 --
---  * ia_catalogo deixa de entregar preços à IA (a IA nunca vê valor, então não tem como citar).
+--  * ia_catalogo continua entregando à IA só preços de confiança alta ou média (filtro já existente).
 --  * Quando um atendente (mensagem com agente_id) escreve um valor em reais no chat, o sistema compara com o valor de
 --    referência do catálogo (exames do pedido + plano) e, se estiver a mais de 10% fora, grava um alerta.
 --  * O alerta fica em alerta_preco, que só administrador e atendente leem (RLS). O paciente nunca vê: nada é escrito em
@@ -132,14 +132,4 @@ end $$;
 revoke all on function public.alerta_preco_conferir(uuid) from public, anon;
 grant execute on function public.alerta_preco_conferir(uuid) to authenticated;
 
--- ===== 6. A IA deixa de receber preço =====
-do $do$
-declare v_def text; v_new text;
-begin
-  v_def := pg_get_functiondef('public.ia_catalogo(text,uuid)'::regprocedure);
-  if position('''precos'', v_precos' in v_def) > 0 then
-    v_new := replace(v_def, '''precos'', v_precos', '''precos'', ''[]''::jsonb');
-    if v_new = v_def then raise exception 'ia_catalogo: trecho não encontrado.'; end if;
-    execute v_new;
-  end if;
-end $do$;
+-- (Seção 6 removida: a IA continua recebendo preços via ia_catalogo, só os de confiança alta ou média.)
