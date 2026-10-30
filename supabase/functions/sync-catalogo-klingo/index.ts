@@ -1,5 +1,6 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { avaliar, escolherAlvos, linhaDe, type Alvo, type Linha } from "./conferencia.ts";
+import { AgregadorPrecos } from "./precos.ts";
 
 // Atualiza o catálogo que a IA consulta (procedimentos, agenda e planos) a partir de relatórios do Klingo.
 // Só relatórios de cadastro, sem dado de paciente. O token fica no secret KLINGO_APP_TOKEN.
@@ -219,9 +220,11 @@ async function agendaOcupacao(supabase: Supa, token: string) {
   const lido = (de: string, ate: string) => lerAgendaMarcada(token, de, ate);
   const agrupado = new Map<string, { inicio: string; profissional: string; unidade: string; procedimento: string; qtd: number }>();
   let lidas = 0;
+  const agregador = new AgregadorPrecos();   // guarda só contadores de valor por exame e operadora: nada do paciente
   for (const [de, ate] of faixas) {
     for (const r of await lido(de, ate)) {
       lidas++;
+      agregador.add(r);
       const inicio = String(r.Data_Atendimento ?? "").slice(0, 19).replace("T", " ");
       const profissional = String(r.Medico ?? "").trim(), unidade = String(r.Unidade ?? "").trim();
       if (!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(inicio) || !profissional || !unidade) continue;
@@ -242,7 +245,21 @@ async function agendaOcupacao(supabase: Supa, token: string) {
   }
   const { data: fim, error: erroFim } = await supabase.rpc("agenda_ocupacao_atualizar", { p_linhas: [], p_execucao: inicioExecucao, p_finalizar: true });
   if (erroFim) throw new Error(erroFim.message);
-  return { marcacoes_lidas: lidas, horarios_ocupados: linhas.length, gravadas, vigentes: (fim as Row)?.vigentes ?? null };
+  // Fase 5: preço lançado no Klingo (Previsto), agregado por exame e operadora, para conferir o catalogo_preco. Uma falha aqui não derruba a agenda.
+  let precos: Row = {};
+  try {
+    const agregados = agregador.resultado(faixas[0][0], faixas[faixas.length - 1][1]);
+    let gravados = 0;
+    for (let i = 0; i < agregados.length; i += 1000) {
+      const { data, error } = await supabase.rpc("preco_observado_registrar", { p_linhas: agregados.slice(i, i + 1000) });
+      if (error) throw new Error(error.message);
+      gravados += Number((data as Row)?.gravadas ?? 0);
+    }
+    precos = { precos_agregados: agregados.length, precos_gravados: gravados };
+  } catch (e) {
+    precos = { precos_erro: e instanceof Error ? e.message.slice(0, 200) : "falha" };
+  }
+  return { marcacoes_lidas: lidas, horarios_ocupados: linhas.length, gravadas, vigentes: (fim as Row)?.vigentes ?? null, ...precos };
 }
 
 // Conferência automática (cron a cada 15 s; revisão geral a cada 10 min com {"lento":true}).

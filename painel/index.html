@@ -301,11 +301,38 @@
   }
   // O status "Agendado" muda sozinho (conferência automática a cada 15 s): reler enquanto uma conversa está aberta.
   setInterval(() => { if (S.abertaId && S.aba === 'atendimento' && !document.hidden) carregarPre(); }, 15000);
+  const MOTIVOS_CANCELAMENTO = ['Paciente desistiu', 'Horário indisponível', 'Exame errado ou faltando', 'Plano ou convênio', 'Preço', 'Duplicado ou teste', 'Outro motivo'];
+  // Janela de confirmação do cancelamento, com o motivo numa lista fixa. Devolve undefined (voltou), null (cancelar sem motivo) ou o motivo.
+  function pedirMotivo() {
+    return new Promise((resolve) => {
+      const sel = h('select', { id: 'motivoCancel' }, [h('option', { value: '' }, 'Sem informar o motivo'), ...MOTIVOS_CANCELAMENTO.map((m) => h('option', { value: m }, m))]);
+      let feito = false;
+      const fechar = (v) => { if (feito) return; feito = true; if (dlg.open) dlg.close(); resolve(v); };
+      dlg.addEventListener('close', () => fechar(undefined), { once: true });
+      dlg.replaceChildren(h('h3', {}, 'Cancelar este pré-agendamento?'),
+        h('p', { class: 'dica' }, 'O motivo é opcional e ajuda a melhorar a IA. A lista é fixa de propósito: nada de dado do paciente.'),
+        h('div', { class: 'campo' }, h('label', { class: 'rot', for: 'motivoCancel' }, 'Motivo'), sel),
+        h('div', { class: 'rodape' }, h('button', { class: 'btn', type: 'button', onclick: () => fechar(undefined) }, 'Voltar'),
+          h('button', { class: 'btn perigo', type: 'button', onclick: () => fechar(sel.value || null) }, 'Cancelar pedido')));
+      dlg.showModal();
+    });
+  }
   async function statusPre(status) {
     if (!S.pre) return;
+    // Fase 5: ao cancelar, pergunta o motivo ANTES (opcional, de uma lista fixa, sem texto livre: nunca vira dado de paciente); ajuda a ver por que a IA errou.
+    let motivo = null;
+    if (status === 'cancelado') {
+      const r = await pedirMotivo();
+      if (r === undefined) return;   // "Voltar" ou Esc: não cancela
+      motivo = r;
+    }
     // O atendente resolveu: some o alerta da conferência automática (faixa do pré-agendamento e selo da lista).
     const { error } = await db.from('pre_agendamentos').update({ status, conferencia_status: null, conferencia_detalhe: null, atualizado_em: new Date().toISOString() }).eq('id', S.pre.id);
     if (error) { toast(msgErro(error)); return; }
+    if (motivo) {   // logo depois do cancelamento: o servidor só aceita o motivo de quem cancelou, nos 10 minutos seguintes
+      const { error: e2 } = await db.rpc('ia_evento_motivo', { p_pre: S.pre.id, p_motivo: motivo });
+      if (e2) toast('Cancelado, mas o motivo não foi registrado: ' + msgErro(e2));
+    }
     await db.from('conversas').update({ alerta_agenda: null }).eq('id', S.pre.conversa_id);
     S.pre.status = status; S.pre.conferencia_status = null; S.pre.conferencia_detalhe = null; S.preSig = null; renderPre();
     const c = conversaAberta(); if (c) { c.alerta_agenda = null; renderLista(); }
@@ -449,7 +476,7 @@
     const abas = [];
     if (podeAtender()) abas.push(['atendimento', 'Atendimento']);
     abas.push(['contatos', 'Contatos']);
-    if (ehAdmin()) { abas.push(['equipe', 'Equipe']); abas.push(['catalogo', 'Catálogo']); abas.push(['config', 'Configurações']); }
+    if (ehAdmin()) { abas.push(['equipe', 'Equipe']); abas.push(['catalogo', 'Catálogo']); abas.push(['aprendizado', 'Aprendizado']); abas.push(['config', 'Configurações']); }
     const nav = h('nav', { class: 'nav', 'aria-label': 'Seções' }, abas.map(([id, rot]) =>
       h('button', { type: 'button', 'data-aba': id, onclick: () => { S.aba = id; renderAba(); } }, h('span', {}, rot), id === 'atendimento' ? h('span', { class: 'selo', id: 'seloAguardando', hidden: true }, '0') : null)));
     const lateral = h('aside', { class: 'lateral' },
@@ -469,6 +496,7 @@
     else if (S.aba === 'contatos') viewContatos(c);
     else if (S.aba === 'equipe') viewEquipe(c);
     else if (S.aba === 'catalogo') viewCatalogo(c);
+    else if (S.aba === 'aprendizado') viewAprendizado(c);
     else if (S.aba === 'config') viewConfig(c);
     atualizarSelo();
   }
@@ -960,6 +988,64 @@
       h('h3', {}, 'O que mudou'), filtro,
       h('div', { class: 'tabela-wrap', style: 'margin-top:8px' }, h('table', {},
         h('thead', {}, h('tr', {}, ['Quando', 'Tipo', 'O quê', 'Item', 'Detalhe'].map((t) => h('th', {}, t)))), corpo))));
+  }
+
+  /* ---------- aprendizado (Fase 5): onde a IA erra e o que corrigir ---------- */
+  const ROTULO_ETAPA = { pedido: 'Escolha do exame', plano: 'Plano', preferencias: 'Preferências', data_hora: 'Data e hora', dados: 'Dados pessoais', confirmacao: 'Confirmação', pronto: 'Pronto' };
+  const brl = (v) => Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  const rotuloCaso = (c) => CONF_ROTULO[c] || (c === 'cancelado' ? 'Cancelado' : c);
+  const pct = (a, b) => (b ? Math.round((a / b) * 100) + '%' : '—');
+  async function viewAprendizado(c, dias = 28) {
+    c.replaceChildren(h('div', { class: 'pagina' }, h('h2', {}, 'Aprendizado da IA'), h('p', { class: 'sub' }, 'Carregando…')));
+    const minha = viewAprendizado.seq = (viewAprendizado.seq || 0) + 1;   // só a última escolha de período pinta a tela
+    const [r, p, e] = await Promise.all([db.rpc('ia_relatorio', { p_dias: dias }), db.rpc('ia_precos_divergentes', { p_limite: 30 }), db.rpc('ia_exemplos', { p_dias: dias, p_limite: 40 })]);
+    if (S.aba !== 'aprendizado' || minha !== viewAprendizado.seq) return;
+    const falha = r.error || p.error || e.error;
+    if (falha) { c.replaceChildren(h('div', { class: 'pagina' }, h('h2', {}, 'Aprendizado da IA'), h('p', { class: 'erro' }, msgErro(falha)),
+      h('p', { class: 'dica' }, 'Se a mensagem fala de função inexistente, falta rodar o SQL da Fase 5 (supabase/fase5-aprendizado.sql).'))); return; }
+    const R = r.data || {}, X = R.resumo || {}, P = p.data || {}, EX = e.data || [];
+    const tabela = (cab, linhas, vazio) => h('div', { class: 'tabela-wrap', style: 'margin-bottom:12px' }, h('table', {},
+      h('thead', {}, h('tr', {}, cab.map((t) => h('th', {}, t)))),
+      h('tbody', {}, linhas.length ? linhas.map((l) => h('tr', {}, l.map((v) => h('td', {}, v)))) : [h('tr', {}, h('td', { colspan: cab.length }, vazio))])));
+    const periodo = h('select', { 'aria-label': 'Período', onchange: (ev) => viewAprendizado(c, Number(ev.target.value)) },
+      [[7, 'Últimos 7 dias'], [28, 'Últimos 28 dias'], [90, 'Últimos 90 dias']].map(([v, t]) => h('option', { value: v, selected: v === dias }, t)));
+    const fim = (X.agendados_auto || 0) + (X.agendados_manual || 0);
+    const alertas = Object.entries(R.alertas || {}).sort((a, b) => b[1] - a[1]);
+    const etapas = Object.entries(R.abandono_por_etapa || {}).sort((a, b) => b[1] - a[1]);
+    const A = R.atendentes || {}, V = R.conversas || {};
+    const semana = (d) => { const [y, m, dd] = String(d).split('-'); return dd + '/' + m; };
+    const textoExemplos = EX.map((x) => '- [' + rotuloCaso(x.caso) + '] exames: ' + ((x.exames || []).join('; ') || '—')
+      + ' | plano: ' + (x.plano || '—') + ' | unidade: ' + (x.unidade || '—') + ' | etapa: ' + (ROTULO_ETAPA[x.etapa] || x.etapa || '—') + (x.detalhe ? ' | ' + x.detalhe : '')).join('\n');
+    c.replaceChildren(h('div', { class: 'pagina' }, h('h2', {}, 'Aprendizado da IA'),
+      h('p', { class: 'sub' }, 'Onde a IA acerta, onde o atendente ou o Klingo precisou corrigir e o que vale ajustar. Não mostra dado de paciente. ', R.observacao || ''), periodo,
+      h('div', { class: 'numeros', style: 'margin-top:10px' },
+        h('div', { class: 'num' }, h('b', {}, X.criados ?? 0), h('span', {}, 'pré-agendamentos criados')),
+        h('div', { class: 'num' }, h('b', {}, pct(X.agendados_auto_sem_alerta || 0, X.agendados_auto || 0)), h('span', {}, 'marcados sozinhos sem nenhum alerta')),
+        h('div', { class: 'num' }, h('b', {}, (X.agendados_auto || 0) + ' / ' + fim), h('span', {}, 'agendados pela conferência / total')),
+        h('div', { class: 'num' }, h('b', {}, R.tempo_mediano_pronto_agendado_min == null ? '—' : Math.round(R.tempo_mediano_pronto_agendado_min) + ' min'), h('span', {}, 'do "pronto" até agendado (mediana)')),
+        h('div', { class: 'num' }, h('b', {}, X.com_alerta_agora ?? 0), h('span', {}, 'com alerta agora')),
+        h('div', { class: 'num' }, h('b', {}, X.abandonados ?? 0), h('span', {}, 'abandonados (sem mexer há 24 h)'))),
+      R.pedidos_sem_registro > 0 ? h('p', { class: 'erro' }, `Atenção: ${R.pedidos_sem_registro} pedido(s) criado(s) depois do início do registro não aparecem na linha do tempo. O gatilho da Fase 5 pode estar falhando: veja os avisos do banco (logs do Postgres) por ia_evento_trg.`) : null,
+      h('h3', {}, 'Alertas da conferência com o Klingo'),
+      tabela(['Tipo', 'Pedidos'], alertas.map(([k, n]) => [CONF_ROTULO[k] || k, n]), 'Nenhum alerta no período.'),
+      h('h3', {}, 'Onde o paciente desiste'),
+      tabela(['Etapa em que parou', 'Pedidos'], etapas.map(([k, n]) => [ROTULO_ETAPA[k] || k, n]), 'Nenhum pedido abandonado no período.'),
+      h('h3', {}, 'Exames com mais problema'),
+      h('p', { class: 'dica' }, 'Conta o pedido inteiro: se um pedido tem vários exames, todos entram na contagem do alerta.'),
+      tabela(['Exame', 'Com problema', 'Pedidos do exame'], (R.exames_problema || []).map((x) => [x.exame, x.problemas, x.total]), 'Nenhum exame com alerta ou cancelamento.'),
+      h('h3', {}, 'O que os atendentes fizeram'),
+      tabela(['Ação', 'Quantidade'], [['Marcaram como agendado à mão', A.marcou_agendado ?? 0], ['Cancelaram o pedido', A.cancelou ?? 0], ['…com o motivo escrito', A.cancelou_com_motivo ?? 0],
+        ['Desfizeram um agendamento', A.desfez_agendado ?? 0], ['Conversas assumidas por atendente', (V.assumidas_por_atendente ?? 0) + ' de ' + (V.total ?? 0)]], ''),
+      h('h3', {}, 'Por semana'),
+      tabela(['Semana de', 'Criados', 'Agendados', 'Com alerta', 'Cancelados'], (R.semanas || []).map((s) => [semana(s.semana), s.criados, s.agendados, s.com_alerta, s.cancelados]), 'Sem dados ainda.'),
+      h('h3', {}, 'Preço do catálogo x preço lançado no Klingo'),
+      h('p', { class: 'dica' }, P.atualizado_em ? `${P.comparados ?? 0} combinações de exame e operadora comparadas${P.com_varias_linhas ? ` (${P.com_varias_linhas} têm mais de uma linha no catálogo: a comparação usa a mais próxima do Klingo)` : ''}, ${P.sem_referencia ?? 0} sem referência no catálogo, ${P.divergentes_total ?? 0} com diferença de 10% ou mais (mostrando até 30). Atualizado em ${fmtDataHora(P.atualizado_em)}. A IA continua usando o preço do catálogo: corrija no Klingo ou no catálogo e confirme com a recepção.`
+        : 'Ainda não há preços lidos do Klingo: o primeiro cálculo acontece na próxima atualização da agenda (a cada 10 minutos).'),
+      tabela(['Exame', 'Operadora', 'Catálogo', 'Klingo', 'Diferença', 'Amostras'], (P.divergentes || []).map((x) => [x.exame, x.operadora, brl(x.catalogo), brl(x.klingo), (x.dif_pct > 0 ? '+' : '') + x.dif_pct + '%', x.amostras]), 'Nenhuma diferença relevante.'),
+      h('h3', {}, 'Casos para melhorar o prompt'),
+      h('p', { class: 'dica' }, 'Alertas e cancelamentos recentes, sem dado de paciente. Copie e use para ajustar as instruções da IA no n8n.'),
+      h('div', { class: 'acoes' }, h('button', { class: 'btn', type: 'button', disabled: !EX.length, onclick: async () => { try { await navigator.clipboard.writeText(textoExemplos); toast('Casos copiados.'); } catch { toast('Não consegui copiar.'); } } }, 'Copiar casos')),
+      tabela(['Quando', 'Caso', 'Exames', 'Plano', 'Etapa', 'Detalhe'], EX.map((x) => [fmtDataHora(x.quando), rotuloCaso(x.caso), (x.exames || []).join('; ') || '—', x.plano || '—', ROTULO_ETAPA[x.etapa] || x.etapa || '—', x.detalhe || '']), 'Nenhum caso no período.')));
   }
 
   /* ---------- início ---------- */
