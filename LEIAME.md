@@ -125,3 +125,6 @@ A IA consulta, a cada mensagem do paciente, um catálogo copiado de relatórios 
 - SQL em `supabase/fase2-pedido-e-agenda.sql`.
 - **Ativar**: o chat novo só aparece depois do merge deste PR (GitHub Pages). O fluxo do n8n com o prompt novo (versão "Prompt por etapas...") já está salvo, mas a versão **publicada** continua a anterior até o merge; depois do merge, publique a versão mais recente do fluxo `Triagem IA - Atendimento`.
 
+## Estado do projeto e como retomar
+
+Veja `docs/passagem-fases-3-a-5.md`: o que cada fase faz, o que falta, o checklist para continuar em outra conta e as regras que não podem ser quebradas. `supabase/00-base-snapshot.sql` é só referência do banco base (não rodar no projeto atual).
