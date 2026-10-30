@@ -304,16 +304,18 @@
   const MOTIVOS_CANCELAMENTO = ['Paciente desistiu', 'Horário indisponível', 'Exame errado ou faltando', 'Plano ou convênio', 'Preço', 'Duplicado ou teste', 'Outro motivo'];
   async function statusPre(status) {
     if (!S.pre) return;
+    // Fase 5: ao cancelar, pergunta o motivo ANTES (opcional, de uma lista fixa, sem texto livre: nunca vira dado de paciente); ajuda a ver por que a IA errou.
+    let motivo = null;
+    if (status === 'cancelado') {
+      const resp = window.prompt('Por que cancelar? Digite o número (ou deixe em branco):\n' + MOTIVOS_CANCELAMENTO.map((m, i) => (i + 1) + ' - ' + m).join('\n'));
+      motivo = MOTIVOS_CANCELAMENTO[Number(String(resp || '').trim()) - 1] || null;
+    }
     // O atendente resolveu: some o alerta da conferência automática (faixa do pré-agendamento e selo da lista).
     const { error } = await db.from('pre_agendamentos').update({ status, conferencia_status: null, conferencia_detalhe: null, atualizado_em: new Date().toISOString() }).eq('id', S.pre.id);
     if (error) { toast(msgErro(error)); return; }
-    if (status === 'cancelado') {   // Fase 5: motivo opcional, de uma lista fixa (sem texto livre: nunca vira dado de paciente); ajuda a ver por que a IA errou
-      const resp = window.prompt('Por que foi cancelado? Digite o número (ou deixe em branco):\n' + MOTIVOS_CANCELAMENTO.map((m, i) => (i + 1) + ' - ' + m).join('\n'));
-      const motivo = MOTIVOS_CANCELAMENTO[Number(String(resp || '').trim()) - 1];
-      if (motivo) {
-        const { error: e2 } = await db.rpc('ia_evento_motivo', { p_pre: S.pre.id, p_motivo: motivo });
-        if (e2) toast('Cancelado, mas o motivo não foi registrado: ' + msgErro(e2));
-      }
+    if (motivo) {   // logo depois do cancelamento: o servidor só aceita o motivo de quem cancelou, nos 10 minutos seguintes
+      const { error: e2 } = await db.rpc('ia_evento_motivo', { p_pre: S.pre.id, p_motivo: motivo });
+      if (e2) toast('Cancelado, mas o motivo não foi registrado: ' + msgErro(e2));
     }
     await db.from('conversas').update({ alerta_agenda: null }).eq('id', S.pre.conversa_id);
     S.pre.status = status; S.pre.conferencia_status = null; S.pre.conferencia_detalhe = null; S.preSig = null; renderPre();
@@ -975,6 +977,7 @@
   /* ---------- aprendizado (Fase 5): onde a IA erra e o que corrigir ---------- */
   const ROTULO_ETAPA = { pedido: 'Escolha do exame', plano: 'Plano', preferencias: 'Preferências', data_hora: 'Data e hora', dados: 'Dados pessoais', confirmacao: 'Confirmação', pronto: 'Pronto' };
   const brl = (v) => Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  const rotuloCaso = (c) => CONF_ROTULO[c] || (c === 'cancelado' ? 'Cancelado' : c);
   const pct = (a, b) => (b ? Math.round((a / b) * 100) + '%' : '—');
   async function viewAprendizado(c, dias = 28) {
     c.replaceChildren(h('div', { class: 'pagina' }, h('h2', {}, 'Aprendizado da IA'), h('p', { class: 'sub' }, 'Carregando…')));
@@ -995,7 +998,7 @@
     const etapas = Object.entries(R.abandono_por_etapa || {}).sort((a, b) => b[1] - a[1]);
     const A = R.atendentes || {}, V = R.conversas || {};
     const semana = (d) => { const [y, m, dd] = String(d).split('-'); return dd + '/' + m; };
-    const textoExemplos = EX.map((x) => '- [' + (CONF_ROTULO[x.caso] || (x.caso === 'cancelado' ? 'Cancelado' : x.caso)) + '] exames: ' + ((x.exames || []).join('; ') || '—')
+    const textoExemplos = EX.map((x) => '- [' + rotuloCaso(x.caso) + '] exames: ' + ((x.exames || []).join('; ') || '—')
       + ' | plano: ' + (x.plano || '—') + ' | unidade: ' + (x.unidade || '—') + ' | etapa: ' + (ROTULO_ETAPA[x.etapa] || x.etapa || '—') + (x.detalhe ? ' | ' + x.detalhe : '')).join('\n');
     c.replaceChildren(h('div', { class: 'pagina' }, h('h2', {}, 'Aprendizado da IA'),
       h('p', { class: 'sub' }, 'Onde a IA acerta, onde o atendente ou o Klingo precisou corrigir e o que vale ajustar. Não mostra dado de paciente. ', R.observacao || ''), periodo,
@@ -1024,7 +1027,7 @@
       h('h3', {}, 'Casos para melhorar o prompt'),
       h('p', { class: 'dica' }, 'Alertas e cancelamentos recentes, sem dado de paciente. Copie e use para ajustar as instruções da IA no n8n.'),
       h('div', { class: 'acoes' }, h('button', { class: 'btn', type: 'button', disabled: !EX.length, onclick: async () => { try { await navigator.clipboard.writeText(textoExemplos); toast('Casos copiados.'); } catch { toast('Não consegui copiar.'); } } }, 'Copiar casos')),
-      tabela(['Quando', 'Caso', 'Exames', 'Plano', 'Etapa', 'Detalhe'], EX.map((x) => [fmtDataHora(x.quando), CONF_ROTULO[x.caso] || (x.caso === 'cancelado' ? 'Cancelado' : x.caso), (x.exames || []).join('; ') || '—', x.plano || '—', ROTULO_ETAPA[x.etapa] || x.etapa || '—', x.detalhe || '']), 'Nenhum caso no período.')));
+      tabela(['Quando', 'Caso', 'Exames', 'Plano', 'Etapa', 'Detalhe'], EX.map((x) => [fmtDataHora(x.quando), rotuloCaso(x.caso), (x.exames || []).join('; ') || '—', x.plano || '—', ROTULO_ETAPA[x.etapa] || x.etapa || '—', x.detalhe || '']), 'Nenhum caso no período.')));
   }
 
   /* ---------- início ---------- */

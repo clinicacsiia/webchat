@@ -5,7 +5,7 @@
 -- 1. ia_evento           : linha do tempo de cada pré-agendamento (criado, mudança de status, veredito da conferência). Preenchida por gatilho.
 -- 2. preco_observado     : preço "Previsto" lançado no Klingo, agregado por exame e operadora (a Edge Function envia só o agregado).
 -- 3. ia_relatorio        : números do painel.  ia_precos_divergentes : catálogo x Klingo.  ia_exemplos : casos para melhorar o prompt.
--- 4. ia_evento_motivo    : o atendente pode registrar por que cancelou (motivos da lista do painel; números e e-mails são mascarados).
+-- 4. ia_evento_motivo    : o atendente pode registrar por que cancelou (só os motivos da lista do painel).
 -- Tudo é aditivo: nada existente é alterado. Pode ser rodado mais de uma vez.
 
 -- ===== 1. Linha do tempo =====
@@ -81,7 +81,7 @@ create or replace trigger ia_evento_pre
   for each row execute function public.ia_evento_trg();
 
 -- Motivo do cancelamento, informado pelo atendente que cancelou (opcional). Só vale para um cancelamento feito por quem chama, nos últimos 10 minutos.
--- Números longos (telefone, CPF) e e-mails são mascarados por segurança: o motivo nunca deve carregar dado de paciente.
+-- Só aceita os motivos da lista do painel; qualquer outro texto vira "Outro motivo". Assim o motivo nunca carrega dado de paciente, mesmo por chamada direta.
 create or replace function public.ia_evento_motivo(p_pre uuid, p_motivo text) returns void
 language plpgsql security definer set search_path to '' as $$
 declare v_txt text; v_id bigint;
@@ -89,8 +89,9 @@ begin
   if coalesce((select public.papel_atual()), '') not in ('admin','atendente') then
     raise exception 'Sem permissão.' using errcode = '42501';
   end if;
-  v_txt := nullif(btrim(regexp_replace(regexp_replace(coalesce(p_motivo, ''), '[^[:space:]]+@[^[:space:]]+', '[e-mail]', 'g'), '[0-9][0-9. ()-]{2,}[0-9]', '[número]', 'g')), '');
-  if v_txt is null then return; end if;
+  if nullif(btrim(coalesce(p_motivo, '')), '') is null then return; end if;
+  v_txt := case when btrim(p_motivo) in ('Paciente desistiu', 'Horário indisponível', 'Exame errado ou faltando', 'Plano ou convênio', 'Preço', 'Duplicado ou teste')
+                then btrim(p_motivo) else 'Outro motivo' end;
   select e.id into v_id from public.ia_evento e
    where e.pre_agendamento_id = p_pre and e.tipo = 'status' and e.para = 'cancelado' and e.por = 'atendente'
      and e.agente_id = (select auth.uid()) and e.criado_em > now() - interval '10 minutes'
@@ -98,7 +99,7 @@ begin
   if v_id is null then
     raise exception 'Não achei um cancelamento seu, feito há menos de 10 minutos, para registrar o motivo.' using errcode = 'P0002';
   end if;
-  update public.ia_evento set detalhe = left(v_txt, 300) where id = v_id;
+  update public.ia_evento set detalhe = v_txt where id = v_id;
 end $$;
 revoke all on function public.ia_evento_motivo(uuid, text) from public, anon;
 grant execute on function public.ia_evento_motivo(uuid, text) to authenticated;
@@ -176,7 +177,8 @@ create or replace function public.ia_relatorio(p_dias integer default 28) return
 language plpgsql stable security definer set search_path to '' as $$
 declare
   v_dias int := least(greatest(coalesce(p_dias, 28), 7), 365);
-  v_ini timestamptz := now() - make_interval(days => least(greatest(coalesce(p_dias, 28), 7), 365));
+  v_ini timestamptz := now() - make_interval(days => v_dias);
+  v_ids uuid[] := array(select c.id from public.ia_coorte(now() - make_interval(days => v_dias)) c);   -- pedidos acompanhados, calculados uma vez
   v_desde timestamptz := (select min(e.criado_em) from public.ia_evento e);
   v_resumo jsonb; v_alertas jsonb; v_abandono jsonb; v_semanas jsonb; v_exames jsonb; v_atend jsonb; v_conv jsonb; v_tempo numeric;
 begin
@@ -186,32 +188,32 @@ begin
 
   select jsonb_build_object(
     'criados', count(*),
-    'agendados_auto', count(*) filter (where p.status = 'agendado' and p.agendado_auto_em is not null),
-    'agendados_auto_sem_alerta', count(*) filter (where p.status = 'agendado' and p.agendado_auto_em is not null
+    'agendados_auto', count(*) filter (where p.status = 'agendado' and (select e2.detalhe from public.ia_evento e2 where e2.pre_agendamento_id = p.id and e2.tipo = 'status' and e2.para = 'agendado' order by e2.criado_em desc limit 1) is not distinct from 'automatico'),
+    'agendados_auto_sem_alerta', count(*) filter (where p.status = 'agendado' and (select e2.detalhe from public.ia_evento e2 where e2.pre_agendamento_id = p.id and e2.tipo = 'status' and e2.para = 'agendado' order by e2.criado_em desc limit 1) is not distinct from 'automatico'
         and not exists (select 1 from public.ia_evento e where e.pre_agendamento_id = p.id and e.tipo = 'conferencia' and e.para <> 'confirmado')),
-    'agendados_manual', count(*) filter (where p.status = 'agendado' and p.agendado_auto_em is null),
+    'agendados_manual', count(*) filter (where p.status = 'agendado' and not ((select e2.detalhe from public.ia_evento e2 where e2.pre_agendamento_id = p.id and e2.tipo = 'status' and e2.para = 'agendado' order by e2.criado_em desc limit 1) is not distinct from 'automatico')),
     'cancelados', count(*) filter (where p.status = 'cancelado'),
     'prontos_esperando', count(*) filter (where p.status = 'pronto'),
     'em_andamento', count(*) filter (where p.status = 'rascunho' and p.atualizado_em >= now() - interval '24 hours'),
     'abandonados', count(*) filter (where p.status = 'rascunho' and p.atualizado_em < now() - interval '24 hours'),
     'com_alerta_agora', count(*) filter (where p.conferencia_status is not null and p.conferencia_status <> 'confirmado'))
     into v_resumo
-    from public.pre_agendamentos p where p.id in (select c.id from public.ia_coorte(v_ini) c);
+    from public.pre_agendamentos p where p.id = any(v_ids);
 
   select coalesce(jsonb_object_agg(x.para, x.n), '{}'::jsonb) into v_alertas
     from (select e.para, count(distinct e.pre_agendamento_id) as n from public.ia_evento e
-           where e.tipo = 'conferencia' and e.para <> 'confirmado' and e.pre_agendamento_id in (select c.id from public.ia_coorte(v_ini) c)
+           where e.tipo = 'conferencia' and e.para <> 'confirmado' and e.pre_agendamento_id = any(v_ids)
            group by e.para) x;
 
   select coalesce(jsonb_object_agg(x.etapa, x.n), '{}'::jsonb) into v_abandono
     from (select coalesce(p.etapa, 'pedido') as etapa, count(*) as n from public.pre_agendamentos p
-           where p.status = 'rascunho' and p.atualizado_em < now() - interval '24 hours' and p.id in (select c.id from public.ia_coorte(v_ini) c) group by 1) x;
+           where p.status = 'rascunho' and p.atualizado_em < now() - interval '24 hours' and p.id = any(v_ids) group by 1) x;
 
   -- uma amostra por pedido: da primeira vez em "pronto" até o primeiro "agendado" depois dela
   select round((percentile_cont(0.5) within group (order by x.minutos))::numeric, 1) into v_tempo
     from (select (extract(epoch from (a.t - p.t)) / 60)::double precision as minutos
             from (select e.pre_agendamento_id, min(e.criado_em) as t from public.ia_evento e
-                   where e.tipo = 'status' and e.para = 'pronto' and e.pre_agendamento_id in (select c.id from public.ia_coorte(v_ini) c)
+                   where e.tipo = 'status' and e.para = 'pronto' and e.pre_agendamento_id = any(v_ids)
                    group by e.pre_agendamento_id) p
             cross join lateral (select min(e2.criado_em) as t from public.ia_evento e2
                                  where e2.pre_agendamento_id = p.pre_agendamento_id and e2.tipo = 'status' and e2.para = 'agendado' and e2.criado_em >= p.t) a
@@ -224,7 +226,7 @@ begin
                  count(*) filter (where p.status = 'agendado') as agendados,
                  count(*) filter (where exists (select 1 from public.ia_evento e where e.pre_agendamento_id = p.id and e.tipo = 'conferencia' and e.para <> 'confirmado')) as com_alerta,
                  count(*) filter (where p.status = 'cancelado') as cancelados
-            from public.pre_agendamentos p where p.id in (select c.id from public.ia_coorte(v_ini) c) group by 1) s;
+            from public.pre_agendamentos p where p.id = any(v_ids) group by 1) s;
 
   -- Exames com mais problema (alerta da conferência ou cancelamento) sobre o total de pedidos do exame. As duas contagens vêm dos mesmos eventos,
   -- então "com problema" nunca passa de "pedidos do exame".
@@ -234,7 +236,7 @@ begin
                  count(distinct e.pre_agendamento_id) as total
             from public.ia_evento e
             cross join lateral jsonb_array_elements_text(coalesce(e.contexto -> 'exames', '[]'::jsonb)) x(exame)
-           where e.pre_agendamento_id in (select c.id from public.ia_coorte(v_ini) c)
+           where e.pre_agendamento_id = any(v_ids)
            group by x.exame
           having count(distinct e.pre_agendamento_id) filter (where (e.tipo = 'conferencia' and e.para <> 'confirmado') or (e.tipo = 'status' and e.para = 'cancelado')) > 0
            order by 2 desc, 1 limit 10) y;
@@ -244,7 +246,7 @@ begin
     'cancelou', count(*) filter (where e.tipo = 'status' and e.para = 'cancelado' and e.por = 'atendente'),
     'desfez_agendado', count(*) filter (where e.tipo = 'status' and e.de = 'agendado' and e.para in ('pronto', 'rascunho') and e.por = 'atendente'),
     'cancelou_com_motivo', count(*) filter (where e.tipo = 'status' and e.para = 'cancelado' and e.por = 'atendente' and e.detalhe is not null))
-    into v_atend from public.ia_evento e where e.pre_agendamento_id in (select c.id from public.ia_coorte(v_ini) c);
+    into v_atend from public.ia_evento e where e.pre_agendamento_id = any(v_ids);
 
   select jsonb_build_object('total', count(*), 'assumidas_por_atendente', count(*) filter (where not c.ia_ativa))
     into v_conv from public.conversas c where c.criado_em >= greatest(v_ini, coalesce(v_desde, now()));
@@ -256,7 +258,8 @@ end $$;
 revoke all on function public.ia_relatorio(integer) from public, anon;
 grant execute on function public.ia_relatorio(integer) to authenticated;
 
--- Preço previsto do catálogo x preço lançado no Klingo. Escolhe, para cada exame e operadora, a linha do catálogo mais próxima do que o Klingo mostra.
+-- Preço previsto do catálogo x preço lançado no Klingo (só leituras das últimas 24 h). Se o catálogo tem várias linhas para o mesmo exame e operadora
+-- (tabelas diferentes), compara com a mais próxima do Klingo: evita alarme falso, mas pode esconder diferença da linha que a IA usa.
 create or replace function public.ia_precos_divergentes(p_limite integer default 30, p_minimo_pct numeric default 10) returns jsonb
 language plpgsql stable security definer set search_path to '' as $$
 declare v_lim int := least(greatest(coalesce(p_limite, 30), 1), 200); v_min numeric := greatest(coalesce(p_minimo_pct, 10), 1); v_res jsonb;
@@ -270,20 +273,21 @@ begin
            c.valor as catalogo, c.fonte, c.confianca,
            round((o.valor_tipico - c.valor) / nullif(c.valor, 0) * 100, 1) as dif_pct
       from public.preco_observado o
-      join public.catalogo_procedimento p on public.norm_chave(p.nome) = o.procedimento_norm
+      join public.catalogo_procedimento p on p.ativo and public.norm_chave(p.nome) = o.procedimento_norm
       join public.catalogo_preco c on c.procedimento_id = p.id and c.status = 'ativo' and c.valor is not null and c.valor > 0
        and ((c.fonte = 'particular' and o.operadora_norm like '%PARTICULAR%')
          or (c.fonte = 'convenio' and public.norm_chave(c.operadora) = o.operadora_norm))
+     where o.atualizado_em > now() - interval '1 day'   -- só o que a última leitura confirmou: o que sumiu do Klingo ou usava chave antiga não conta
      order by o.procedimento_norm, o.operadora_norm, abs(o.valor_tipico - c.valor)
   )
   select jsonb_build_object(
       'comparados', (select count(*) from par),
-      'sem_referencia', (select count(*) from public.preco_observado) - (select count(*) from par),
+      'sem_referencia', (select count(*) from public.preco_observado where atualizado_em > now() - interval '1 day') - (select count(*) from par),
       'divergentes_total', (select count(*) from par where abs(dif_pct) >= v_min),
       'divergentes', coalesce((select jsonb_agg(jsonb_build_object('exame', d.procedimento, 'operadora', d.operadora, 'catalogo', d.catalogo,
               'klingo', d.valor_tipico, 'dif_pct', d.dif_pct, 'amostras', d.amostras, 'fonte', d.fonte, 'confianca', d.confianca) order by abs(d.dif_pct) desc)
           from (select * from par where abs(dif_pct) >= v_min order by abs(dif_pct) desc limit v_lim) d), '[]'::jsonb),
-      'atualizado_em', (select max(atualizado_em) from public.preco_observado))
+      'atualizado_em', (select max(atualizado_em) from public.preco_observado where atualizado_em > now() - interval '1 day'))
     into v_res;
   return v_res;
 end $$;
@@ -293,7 +297,8 @@ grant execute on function public.ia_precos_divergentes(integer, numeric) to auth
 -- Casos recentes com problema, sem dado de paciente, para o administrador melhorar o prompt do n8n.
 create or replace function public.ia_exemplos(p_dias integer default 28, p_limite integer default 40) returns jsonb
 language plpgsql stable security definer set search_path to '' as $$
-declare v_ini timestamptz := now() - make_interval(days => least(greatest(coalesce(p_dias, 28), 7), 365)); v_lim int := least(greatest(coalesce(p_limite, 40), 1), 200); v_res jsonb;
+declare v_dias int := least(greatest(coalesce(p_dias, 28), 7), 365); v_ids uuid[] := array(select c.id from public.ia_coorte(now() - make_interval(days => v_dias)) c);
+  v_lim int := least(greatest(coalesce(p_limite, 40), 1), 200); v_res jsonb;
 begin
   if coalesce((select public.papel_atual()), '') <> 'admin' then
     raise exception 'Somente o administrador vê o relatório de aprendizado.' using errcode = '42501';
@@ -304,7 +309,7 @@ begin
                    'exames', coalesce(e.contexto -> 'exames', '[]'::jsonb), 'plano', e.contexto ->> 'plano', 'unidade', e.contexto ->> 'unidade',
                    'etapa', e.contexto ->> 'etapa', 'detalhe', e.detalhe) as j
             from public.ia_evento e
-           where e.criado_em >= v_ini and ((e.tipo = 'conferencia' and e.para <> 'confirmado') or (e.tipo = 'status' and e.para = 'cancelado'))
+           where e.pre_agendamento_id = any(v_ids) and ((e.tipo = 'conferencia' and e.para <> 'confirmado') or (e.tipo = 'status' and e.para = 'cancelado'))
            order by e.criado_em desc limit v_lim) x;
   return v_res;
 end $$;

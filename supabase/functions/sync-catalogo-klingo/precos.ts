@@ -1,5 +1,5 @@
 // Preço lançado no Klingo (relatório #7, coluna Previsto), agregado por exame e operadora.
-// Das linhas do relatório só saem Procedimento, Operadora, Previsto e Quantidade: nome, telefone e prontuário nem são lidos aqui.
+// Das linhas do relatório só saem Procedimento, Operadora, Previsto, Quantidade e Status: nome, telefone e prontuário nem são lidos aqui.
 // A saída é só agregado (valor mais frequente, mínimo, máximo, amostras): serve para conferir o catalogo_preco.
 
 import type { Row } from "./conferencia.ts";
@@ -31,6 +31,8 @@ export class AgregadorPrecos {
     const procedimento = String(r.Procedimento ?? "").trim(), operadora = String(r.Operadora ?? "").trim();
     const valor = valorEmReais(r.Previsto);
     const qtd = Number(r.Quantidade ?? 1);
+    // O #7 não deve trazer cancelados, mas, se trouxer, a marcação cancelada não conta como preço lançado.
+    if (/cancel|falt/i.test(String(r.Status ?? ""))) return;
     if (!procedimento || !operadora || valor === null || (Number.isFinite(qtd) && qtd > 1)) return;
     const k = `${chave(procedimento)}|${chave(operadora)}`;
     if (k.startsWith("|") || k.endsWith("|")) return;

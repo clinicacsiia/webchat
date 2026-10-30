@@ -46,6 +46,12 @@ test("empate fica com o menor valor, qualquer que seja a ordem das linhas", () =
   assert.deepEqual(a, b);
 });
 
+test("marcação cancelada não conta como preço lançado", () => {
+  const r = agregarPrecos([l({ Status: "Cancelado", Previsto: "999" }), l({ Status: "CANCELADA" }), l({ Status: "Confirmado" }), l({ Status: "A Confirmar" }), l({ Status: "Sem Resposta" })], "a", "b");
+  assert.equal(r[0].amostras, 3);
+  assert.equal(r[0].valor_max, 260);
+});
+
 test("a saída não carrega nenhum campo de paciente", () => {
   const r = agregarPrecos([l({ Paciente: "ANA MARIA SOUZA", Telefone: "71988710544", Prontuario: "123", Obs: "x" })], "a", "b");
   assert.deepEqual(Object.keys(r[0]).sort(), ["amostras", "fim", "ini", "operadora", "procedimento", "valor_max", "valor_min", "valor_tipico"]);
