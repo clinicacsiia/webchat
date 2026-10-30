@@ -115,6 +115,7 @@ A IA consulta, a cada mensagem do paciente, um catálogo copiado de relatórios 
 - Antes de reaproveitar qualquer dado do cadastro a IA pede a **data de nascimento**; se não bater, segue como paciente novo e o cadastro novo fica marcado `revisar` quando o CPF se repete. A IA nunca revela o que está guardado.
 - `pacientes.validado` fica `true` quando a identidade é conferida num novo atendimento ou quando a atendente marca o pré-agendamento como agendado. O cartão do painel mostra a situação (`pre_agendamentos.identidade`).
 - SQL em `supabase/pacientes.sql`.
+- **Nome por conversa** (correção): `contatos` é único por telefone e o nome nunca era atualizado, então quem usava o telefone de outra pessoa era chamado pelo nome dela e herdava o cadastro dela. Agora `conversas.nome_informado`/`email_informado` guardam o que foi digitado em cada conversa, e IA, conferência de identidade e painel usam isso. SQL em `supabase/correcao-nome-por-conversa.sql`: já aplicado no projeto em 30/10/2026 (o painel lê as colunas novas). Mesmo telefone com nome diferente ainda cai em "parcial" (telefone bate, nome não): a IA continua pedindo a data de nascimento antes de reaproveitar qualquer dado.
 
 ### Fase 2: pedido por mapa do corpo, listas e calendário de horários
 

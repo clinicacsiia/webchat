@@ -543,7 +543,7 @@
   function aoNovaMensagem(m) {
     if (m.autor === 'cliente') {
       const c = S.conversas.find((x) => x.id === m.conversa_id);
-      if (m.conversa_id !== S.abertaId || document.hidden) avisar(c && c.contatos ? c.contatos.nome : 'Nova mensagem', String(m.texto).slice(0, 100));
+      if (m.conversa_id !== S.abertaId || document.hidden) avisar(c ? (c.nome_informado || (c.contatos && c.contatos.nome)) || 'Nova mensagem' : 'Nova mensagem', String(m.texto).slice(0, 100));
     }
     if (m.conversa_id === S.abertaId && !S.vistos.has(m.id)) {
       S.vistos.add(m.id); S.msgs.push(m); desenharMsgs(true);
@@ -564,7 +564,7 @@
   /* ---------- conversas ---------- */
   async function carregarConversas() {
     const { data, error } = await db.from('conversas')
-      .select('id,status,agente_id,ultima_mensagem,nao_lidas_agente,criado_em,atualizado_em,contato_id,ia_ativa,triagem_resumo,triagem_urgencia,alerta_agenda,contatos(id,nome,telefone,email)')
+      .select('id,status,agente_id,ultima_mensagem,nao_lidas_agente,criado_em,atualizado_em,contato_id,ia_ativa,triagem_resumo,triagem_urgencia,alerta_agenda,nome_informado,email_informado,contatos(id,nome,telefone,email)')
       .order('atualizado_em', { ascending: false }).limit(300);
     if (error) { toast(msgErro(error)); return; }
     S.conversas = data || [];
@@ -601,7 +601,7 @@
     it.replaceChildren(...lista.map((c) => {
       const ag = c.agente_id ? S.agentes.get(c.agente_id) : null;
       return h('button', { class: 'item', type: 'button', 'aria-current': String(c.id === S.abertaId), onclick: () => abrirConversa(c.id) },
-        h('div', { class: 'l1' }, h('span', {}, c.contatos ? c.contatos.nome : 'Contato'), h('span', { class: 'hora' }, fmtHoraLista(c.atualizado_em))),
+        h('div', { class: 'l1' }, h('span', {}, c.nome_informado || (c.contatos ? c.contatos.nome : 'Contato')), h('span', { class: 'hora' }, fmtHoraLista(c.atualizado_em))),
         h('div', { class: 'l2' }, h('span', { class: 'prev' }, c.ultima_mensagem || 'Sem mensagens'), c.nao_lidas_agente > 0 ? h('span', { class: 'nl' }, c.nao_lidas_agente) : null),
         h('div', { class: 'l3' }, h('span', { class: 'tag ' + c.status }, ROTULO_STATUS[c.status]), c.triagem_urgencia === 'alta' ? h('span', { class: 'urg alta' }, 'Urgente') : null, c.alerta_agenda ? h('span', { class: 'urg media', title: 'Conferência automática da agenda' }, c.alerta_agenda) : null, c.ia_ativa && c.status === 'aguardando' ? h('span', { style: 'color:var(--suave)' }, 'IA atendendo') : null, ag ? h('span', { style: 'color:var(--suave)' }, ag.nome) : null));
     }));
@@ -642,7 +642,7 @@
       c.triagem_resumo ? h('div', {}, c.triagem_resumo) : null)] : []));
     t.replaceChildren(
       h('button', { class: 'btn voltar', type: 'button', onclick: () => { S.abertaId = null; document.getElementById('inbox')?.classList.remove('aberta'); renderLista(); renderChat(); } }, 'Voltar'),
-      h('div', { class: 'quem' }, h('b', {}, ct.nome || 'Contato'),
+      h('div', { class: 'quem' }, h('b', {}, c.nome_informado || ct.nome || 'Contato'),
         h('span', {}, ct.telefone ? h('a', { href: 'https://wa.me/55' + soDigitos(ct.telefone), target: '_blank', rel: 'noopener noreferrer' }, fmtTel(ct.telefone)) : '', ct.email ? ' · ' + ct.email : '',
           ' · ', ROTULO_STATUS[c.status], ag ? ' com ' + ag.nome : '')),
       !minha && c.status !== 'encerrada' ? h('button', { class: 'btn prim', type: 'button', onclick: () => assumir(true) }, 'Assumir') : null,
