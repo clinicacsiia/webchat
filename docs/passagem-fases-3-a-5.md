@@ -10,15 +10,15 @@ Atualizado em 2026-10-30. Leia este arquivo inteiro antes de mexer em qualquer c
 | 1 | Memória do catálogo (histórico de mudanças, preços) | Concluída e no ar |
 | 2 | Pedido pelo mapa do corpo, calendário, reservas de horário | Concluída e no ar |
 | 3 | Conferência automática da marcação no Klingo | **~80%**: construída, testada no banco e em testes de código; **falta validar com uma marcação real** e 2 pendências pequenas (ver 4) |
-| 4 | Paciente que volta (histórico, atalhos, retomar pedido) | **Construída e no ar** (banco, Edge Function, n8n). Falta só o **painel e o chat novos irem ao ar (merge na `main`)** e validar com um paciente real |
+| 4 | Paciente que volta (histórico, atalhos, retomar pedido) | **Construída e no ar** (banco, Edge Function, n8n). Painel e chat novos estão na `main` (PR #12, `336f527`; Pages publicado com sucesso). Falta validar com um paciente real |
 | 5 | Aprendizado com as correções dos atendentes | **Não começada (0%)** |
 
-**Atenção, o que ainda NÃO está no ar:** o código de `painel/index.html` e `index.html` (faixa de alerta da agenda, histórico do paciente, correções do painel) só publica depois do **merge desta branch na `main`** (GitHub Pages). Banco, Edge Function e n8n já estão no ar e funcionando; o painel antigo continua funcionando, só não mostra os alertas novos. A branch é `ccr-d863ec45-y5li3s` e **não tem PR aberto**.
+**Situação do código:** o PR #12 (Fases 3 e 4) foi mergeado na `main` (commit `336f527`) e o deploy do GitHub Pages terminou com sucesso. Banco, Edge Function v10 e n8n já estavam no ar. O que falta é conferir o painel e o chat novos no navegador (item 4 da lista de pendências).
 
 ## 2. Para retomar em outra conta (checklist)
 
 Nada disto está no repositório; é preciso refazer nas conexões da conta nova:
-1. **GitHub**: acesso ao repositório `clinicacsiia/webchat` (branch `ccr-d863ec45-y5li3s`; abrir PR para `main`).
+1. **GitHub**: acesso ao repositório `clinicacsiia/webchat` (trabalhar em uma branch nova a partir da `main` e abrir PR para ela).
 2. **Supabase** (conector): projeto `webchat-atendimento`, id `nrvuynjwcgwpjdptkiay` (sa-east-1). É o MESMO projeto: não crie outro. A conta nova precisa de acesso a ele.
 3. **n8n** (conector): instância `clinicacsi.app.n8n.cloud`, workflow `wAbzjPqZNCztKriZ` "Triagem IA - Atendimento" (versão ativa `7bcf2009-34ff-4085-a17f-a931ff68188f`). Falta escolher/confirmar a credencial Anthropic no nó "Triagem com Claude" se a conta mudar.
 4. **Gmail** (opcional): o e-mail ao suporte do Klingo está só como rascunho (`docs/fase-0-email-suporte-klingo.md` tem o texto).
@@ -53,7 +53,7 @@ Ordem dos arquivos SQL (referência do que foi aplicado, nesta ordem): `00-base-
 - Reconhecimento: telefone (ou telefone + nome). Só pelo nome exige nome IGUAL e exame exato; nome parecido nunca confirma (homônimos).
 - Tudo bateu → `status = agendado` sozinho, `conferencia_status = confirmado` (+ `conferencia_via`) e mensagem de confirmação ao paciente no chat (exames, dia/hora/unidade, preparo do cadastro; sem preço), uma vez (`confirmacao_enviada_em`).
 - Só confirma quando **todos os horários que o pedido exige** (um por grupo de exame/sala, `agenda_grupos`) foram escolhidos e aparecem no Klingo.
-- Alertas (`pre_agendamentos.conferencia_status`, `conversas.alerta_agenda`; aparecem na lista e no cartão do painel depois do merge): `horario_tomado`, `divergente`, `nao_encontrado` (horário passou +1 h sem marcação), `sumiu` (confirmado que deixou de aparecer em 2 revisões seguidas), `remarcado`. O atendente que clica "Marcar como agendado" ou "Cancelar" limpa o alerta.
+- Alertas (`pre_agendamentos.conferencia_status`, `conversas.alerta_agenda`; aparecem na lista e no cartão do painel): `horario_tomado`, `divergente`, `nao_encontrado` (horário passou +1 h sem marcação), `sumiu` (confirmado que deixou de aparecer em 2 revisões seguidas), `remarcado`. O atendente que clica "Marcar como agendado" ou "Cancelar" limpa o alerta.
 - Ordem de chegada também é conferida (qualquer hora do dia, mesma sala/unidade/exame/paciente) e nunca vira "horário tomado".
 - Trocar o pedido de exames apaga o horário escolhido antes; pedido já concluído (agendado/cancelado) não pode ser trocado na mesma conversa (o paciente que volta abre conversa nova).
 - Falha de um dia no Klingo deixa sem veredito só quem depende daquele dia.
@@ -74,7 +74,7 @@ Ordem dos arquivos SQL (referência do que foi aplicado, nesta ordem): `00-base-
 3. (Opcional, negócio) E-mail ao suporte do Klingo (rascunho no Gmail): a pergunta 12 (aviso/webhook quando marcação é criada ou cancelada) dispensaria consultar o relatório a cada 15 s; também confirma que o #7 não traz cancelados.
 
 **Fase 4**
-4. Fazer o **merge na `main`** (painel e chat novos) e, no navegador, conferir: lista com selo de alerta, faixa no cartão, "Histórico do paciente".
+4. No navegador (o merge na `main` já foi feito), conferir: lista com selo de alerta, faixa no cartão, "Histórico do paciente".
 5. Validar com um paciente real que volta: data de nascimento → atalho "Repetir o último exame" → exames copiados → plano/unidade → calendário.
 
 **Geral**
