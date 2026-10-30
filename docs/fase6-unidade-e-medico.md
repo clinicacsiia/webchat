@@ -105,12 +105,13 @@ No projeto real, dentro de transações revertidas (nada gravado):
 - Médico de outra unidade recusado; catálogo restrito à Desenvoar; filtro de médico no calendário com volta para os demais.
 - Responsável adulta cadastrada = reconhecida; a mesma pessoa como responsável de um filho sem cadastro = novo; filho cadastrado = reconhecido; irmão com outro nome = novo; sem pedido pela metade cruzado.
 - Fila de filhos: responsável + 3 filhos, modo "juntos": primeira mensagem "Olá! Quero agendar para Lucas.", consulta de puericultura salva, calendário com 4 dias de horários da médica escolhida, horário 08:20 escolhido, conversa do Pedro criada com o pedido copiado (etapa data_hora, plano mantido), calendário do Pedro com sugestão 08:40 (mesma médica), clique repetido devolve a mesma conversa, o último filho encerra a fila, "outros filhos" para paciente próprio recusado, consulta inexistente recusada. No modo "um de cada vez" nada é copiado.
-- Formulário e chat, no navegador com servidor simulado: unidade e "quem será atendido", campos de irmãos e modo, faixa "Agendar para Pedro", troca de conversa, seletor de consulta, calendário com a sugestão marcada e o filtro de médico. **Não** foi testado contra o Supabase de verdade nem com o Klingo.
+- Formulário, chat e painel, no navegador com servidor simulado: unidade e "quem será atendido", campos de irmãos e modo, faixa "Agendar para Pedro", troca de conversa, seletor de consulta, calendário com a sugestão marcada e o filtro de médico. **Não** foi testado contra o Supabase de verdade nem com o Klingo.
 
 ## Limites conhecidos (para decidir depois)
 
 - **Dois filhos com o mesmo nome** do mesmo responsável seriam tratados como a mesma criança. A data de nascimento, pedida antes de reaproveitar qualquer dado, é a segunda trava.
-- **CPF da criança**: aceita-se o do responsável (avisado no resumo); o cadastro fica `revisar` se o CPF já existir (acontece com irmãos). O painel ainda não tem campo "responsável" nem mostra o nome da criança na lista de conversas (aparece no resumo da IA e no cartão do pré-agendamento).
+- **CPF da criança**: aceita-se o do responsável (avisado no resumo); o cadastro fica `revisar` se o CPF já existir (acontece com irmãos). O painel ainda não tem um campo "responsável".
+- **Painel**: a lista mostra "Maria · Lucas" (responsável · criança) e o topo da conversa mostra paciente, unidade e médico de preferência. Se o painel for publicado antes do SQL, ele volta sozinho para a lista antiga em vez de quebrar.
 - **Confirmação automática de consulta** (`agenda-conferir`): depende de o nome do procedimento no relatório #7 do Klingo ser o do cadastro; validar com a primeira consulta real da Desenvoar, como as demais fases.
 - O filtro de médico e a sugestão de horário olham só a grade do Klingo; o horário continua sendo previsão e quem confirma é o atendente.
 - "Juntos" é em sequência (horários seguidos), não no mesmo minuto, e só quando o irmão já escolheu o horário antes de o responsável avançar. Se o irmão ainda não escolheu horário, a sugestão não aparece.

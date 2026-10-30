@@ -69,7 +69,7 @@ comment on column public.conversas.paciente_nome is 'Nome da criança, informado
 --  irmao_de: conversa da criança anterior (de onde vem a cópia e o horário de referência).
 alter table public.conversas add column if not exists irmaos jsonb not null default '[]'::jsonb;
 alter table public.conversas add column if not exists irmaos_modo text check (irmaos_modo in ('um_de_cada_vez', 'juntos'));
-alter table public.conversas add column if not exists irmao_de uuid references public.conversas (id);
+alter table public.conversas add column if not exists irmao_de uuid references public.conversas (id) on delete set null;
 comment on column public.conversas.irmaos is 'Nomes dos outros filhos que ainda faltam agendar depois desta criança (máx. 5).';
 
 create table if not exists public.atendimento_tipo (

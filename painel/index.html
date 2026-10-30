@@ -563,13 +563,27 @@
 
   /* ---------- conversas ---------- */
   async function carregarConversas() {
-    const { data, error } = await db.from('conversas')
-      .select('id,status,agente_id,ultima_mensagem,nao_lidas_agente,criado_em,atualizado_em,contato_id,ia_ativa,triagem_resumo,triagem_urgencia,alerta_agenda,nome_informado,email_informado,contatos(id,nome,telefone,email)')
-      .order('atualizado_em', { ascending: false }).limit(300);
+    const base = 'id,status,agente_id,ultima_mensagem,nao_lidas_agente,criado_em,atualizado_em,contato_id,ia_ativa,triagem_resumo,triagem_urgencia,alerta_agenda,nome_informado,email_informado,contatos(id,nome,telefone,email)';
+    // Fase 6 (unidade, médico, criança): colunas novas; se o SQL ainda não foi aplicado, volta para a lista antiga em vez de quebrar o painel.
+    const consulta = (cols) => db.from('conversas').select(cols).order('atualizado_em', { ascending: false }).limit(300);
+    let { data, error } = await consulta(base.replace('email_informado,', 'email_informado,paciente_tipo,paciente_nome,unidade_inicial,medico_preferido,'));
+    if (error && /paciente_tipo|paciente_nome|unidade_inicial|medico_preferido/.test(error.message || '')) ({ data, error } = await consulta(base));
     if (error) { toast(msgErro(error)); return; }
     S.conversas = data || [];
   }
   const conversaAberta = () => S.conversas.find((c) => c.id === S.abertaId);
+  // Responsável falando pelo filho: a lista mostra "Maria · Lucas" (senão três filhos da mesma mãe parecem a mesma conversa).
+  const nomeLista = (c) => (c.nome_informado || (c.contatos ? c.contatos.nome : 'Contato')) + (c.paciente_tipo === 'filho' && c.paciente_nome ? ' · ' + c.paciente_nome : '');
+  const UNIDADES_ROTULO = { desenvoar: 'Desenvoar', csi: 'CSI', rmtc: 'CSI RM/TC' };
+  const PARTICULAS = new Set(['de', 'da', 'do', 'das', 'dos', 'e']);
+  const nomeBonito = (n) => String(n || '').toLowerCase().split(/\s+/).map((p, i) => (i && PARTICULAS.has(p) ? p : p.charAt(0).toUpperCase() + p.slice(1))).join(' ');
+  function detalheInicio(c) {
+    const partes = [];
+    if (c.paciente_tipo === 'filho') partes.push('Paciente: ' + (c.paciente_nome || 'criança') + ' (filho(a) do responsável)');
+    if (c.unidade_inicial) partes.push('Unidade: ' + (UNIDADES_ROTULO[c.unidade_inicial] || c.unidade_inicial));
+    if (c.medico_preferido) partes.push('Médico de preferência: ' + nomeBonito(c.medico_preferido));
+    return partes.length ? partes.join(' · ') : null;
+  }
   function filtradas() {
     return S.conversas.filter((c) => {
       if (S.filtro === 'aguardando') return c.status === 'aguardando';
@@ -601,7 +615,7 @@
     it.replaceChildren(...lista.map((c) => {
       const ag = c.agente_id ? S.agentes.get(c.agente_id) : null;
       return h('button', { class: 'item', type: 'button', 'aria-current': String(c.id === S.abertaId), onclick: () => abrirConversa(c.id) },
-        h('div', { class: 'l1' }, h('span', {}, c.nome_informado || (c.contatos ? c.contatos.nome : 'Contato')), h('span', { class: 'hora' }, fmtHoraLista(c.atualizado_em))),
+        h('div', { class: 'l1' }, h('span', {}, nomeLista(c)), h('span', { class: 'hora' }, fmtHoraLista(c.atualizado_em))),
         h('div', { class: 'l2' }, h('span', { class: 'prev' }, c.ultima_mensagem || 'Sem mensagens'), c.nao_lidas_agente > 0 ? h('span', { class: 'nl' }, c.nao_lidas_agente) : null),
         h('div', { class: 'l3' }, h('span', { class: 'tag ' + c.status }, ROTULO_STATUS[c.status]), c.triagem_urgencia === 'alta' ? h('span', { class: 'urg alta' }, 'Urgente') : null, c.alerta_agenda ? h('span', { class: 'urg media', title: 'Conferência automática da agenda' }, c.alerta_agenda) : null, c.ia_ativa && c.status === 'aguardando' ? h('span', { style: 'color:var(--suave)' }, 'IA atendendo') : null, ag ? h('span', { style: 'color:var(--suave)' }, ag.nome) : null));
     }));
@@ -642,9 +656,10 @@
       c.triagem_resumo ? h('div', {}, c.triagem_resumo) : null)] : []));
     t.replaceChildren(
       h('button', { class: 'btn voltar', type: 'button', onclick: () => { S.abertaId = null; document.getElementById('inbox')?.classList.remove('aberta'); renderLista(); renderChat(); } }, 'Voltar'),
-      h('div', { class: 'quem' }, h('b', {}, c.nome_informado || ct.nome || 'Contato'),
+      h('div', { class: 'quem' }, h('b', {}, nomeLista(c)),
         h('span', {}, ct.telefone ? h('a', { href: 'https://wa.me/55' + soDigitos(ct.telefone), target: '_blank', rel: 'noopener noreferrer' }, fmtTel(ct.telefone)) : '', ct.email ? ' · ' + ct.email : '',
-          ' · ', ROTULO_STATUS[c.status], ag ? ' com ' + ag.nome : '')),
+          ' · ', ROTULO_STATUS[c.status], ag ? ' com ' + ag.nome : ''),
+        detalheInicio(c) ? h('span', { style: 'display:block;font-weight:600' }, detalheInicio(c)) : null),
       !minha && c.status !== 'encerrada' ? h('button', { class: 'btn prim', type: 'button', onclick: () => assumir(true) }, 'Assumir') : null,
       c.status === 'encerrada' ? h('button', { class: 'btn', type: 'button', onclick: () => assumir(true) }, 'Reabrir') : null,
       sel,
