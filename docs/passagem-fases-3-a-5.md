@@ -1,6 +1,8 @@
 # Passagem de bastão — o que está feito, o que falta e como retomar em outra conta
 
-Atualizado em 2026-10-30. Leia este arquivo inteiro antes de mexer em qualquer coisa.
+Atualizado em 2026-10-30 (auditoria para produção). Leia este arquivo inteiro antes de mexer em qualquer coisa.
+
+**Auditoria de 30/10/2026:** evidências, achados e o que não foi provado estão em `docs/auditoria-2026-10-30.md`. Os testes repetíveis estão em `testes/` (`cd testes && npm install && npm test`; instruções em `testes/README.md`). Resultado: 27 + 27 + 46 + 5 + 6 verificações verdes; o sistema das Fases 1 a 5 está saudável em produção; o módulo **Fila + assinatura biométrica não está pronto** (ver linha "Fila" abaixo).
 
 ## 1. Resumo em uma tela
 
@@ -12,6 +14,7 @@ Atualizado em 2026-10-30. Leia este arquivo inteiro antes de mexer em qualquer c
 | 3 | Conferência automática da marcação no Klingo | **~80%**: construída, testada no banco e em testes de código; **falta validar com uma marcação real** e 2 pendências pequenas (ver 4) |
 | 4 | Paciente que volta (histórico, atalhos, retomar pedido) | **Construída e no ar** (banco, Edge Function, n8n). Painel e chat novos estão na `main` (PR #12, `336f527`; Pages publicado com sucesso). Falta validar com um paciente real |
 | 5 | Aprendizado com as correções dos atendentes | **Construída e no ar** (banco, Edge Function v14, aba Aprendizado no painel). Falta juntar dados reais: o registro começa no dia em que o SQL rodou |
+| Fila | Fila virtual em tempo real + assinatura biométrica dinâmica (`docs/fila-biometria.md`) | **Em construção, fora do ar para o público.** Banco na v1 (tabelas vazias), migração v2 escrita e testada mas **não aplicada**, algoritmo Python pronto (27 testes). Faltam: aplicar a v2, credenciais do n8n (Header Auth e SMTP), os dois workflows, `fila/fila.js` novo, aba da recepção, `config.fila_webhook_url`. PR #15 aberto como rascunho, **sem merge** |
 
 **Situação do código:** o PR #12 (Fases 3 e 4) foi mergeado na `main` (commit `336f527`) e o deploy do GitHub Pages terminou com sucesso. Banco, Edge Function v10 e n8n já estavam no ar (a Fase 5 trouxe a Edge Function v14). O que falta é conferir o painel e o chat novos no navegador (item 4 da lista de pendências).
 
@@ -35,7 +38,7 @@ select
   position('historico_paciente' in pg_get_functiondef('public.ia_contexto(text,uuid)'::regprocedure)) > 0 as ctx,
   position('pre_reaproveitar' in pg_get_functiondef('public.ia_pre_agendar(text,uuid,jsonb,boolean)'::regprocedure)) > 0 as reaproveitar;
 ```
-7. **Edge Function**: versão 14 de `sync-catalogo-klingo` (arquivos `index.ts`, `conferencia.ts` e `precos.ts` da pasta `supabase/functions/sync-catalogo-klingo/`). Testes locais: `node --experimental-strip-types --test supabase/functions/sync-catalogo-klingo/conferencia.test.ts` (17 devem passar).
+7. **Edge Function**: versão 14 de `sync-catalogo-klingo` (arquivos `index.ts`, `conferencia.ts` e `precos.ts` da pasta `supabase/functions/sync-catalogo-klingo/`). Testes locais: `cd testes && npm run test:edge` (27 devem passar: 17 da conferência e 10 dos preços). A comparação do código publicado com o do repositório **não foi feita** (ver auditoria, 2.5).
 8. **Se algum dia precisar recriar o banco do zero**: `supabase/00-base-snapshot.sql` tem as tabelas e funções base (chat, painel, login) e os demais `supabase/*.sql` vêm depois, mas os arquivos antigos contêm *correções por substituição* aplicadas na mão e não são uma receita completa. O caminho seguro é `supabase db dump --schema public` do projeto atual. Não rode `00-base-snapshot.sql` no projeto atual.
 
 Ordem dos arquivos SQL (referência do que foi aplicado, nesta ordem): `00-base-snapshot` (referência) → `pre-agendamentos` → `catalogo-klingo` → `catalogo-historico` → `catalogo-historico-parte2` → `catalogo-precos` → `pacientes` → `fase2-pedido-e-agenda` → `fase3-conferencia-automatica` → `fase4-paciente-que-volta`.
@@ -85,7 +88,13 @@ Ordem dos arquivos SQL (referência do que foi aplicado, nesta ordem): `00-base-
 **Geral**
 6. `admin_redefinir_senha` existia só no banco; agora está em `00-base-snapshot.sql`.
 7. Negócio: tempos por modalidade e folgas (15/60 min, 90 min, 48 h, 20 min) são estimativas; preços Particular com confiança média/baixa (validar com a recepção); pedir que as atendentes usem o painel normalmente (o "Agendado" agora é automático, o botão manual continua como reserva).
-8. Segurança: o segredo `ia_segredo` está digitado nos nós HTTP do n8n (aviso do n8n "hardcoded credentials"). Ideal: mover para credencial do n8n. Advisor Supabase: funções `security definer` chamáveis por `anon` são intencionais (token da conversa ou `ia_segredo`); "leaked password protection" no Auth é opcional.
+8. Segurança: o segredo `ia_segredo` está digitado nos nós HTTP do n8n (aviso do n8n "hardcoded credentials"). Ideal: mover para credencial *Header Auth* do n8n (o mesmo padrão da Fila). Advisor Supabase (conferido em 30/10/2026): as funções `security definer` chamáveis por `anon` e por `authenticated` são intencionais (token da conversa, `ia_segredo` ou `papel_atual()`), as 13 tabelas com RLS e sem policy são internas e negam tudo por desenho; **"leaked password protection" no Auth está desligada: ligue** (Supabase > Authentication > Passwords).
+
+**Achados da auditoria de 30/10/2026 (detalhe em `docs/auditoria-2026-10-30.md`, seção 2.4)**
+12. **Preços (risco de dado, alto):** 18 de 104 pares exame/operadora com valor do catálogo 10% ou mais diferente do `Previsto` do Klingo. A recepção deve revisar em Aprendizado > "Preço x Klingo" antes de divulgar mais a IA.
+13. **n8n (médio):** o nó de IA depende de créditos do *n8n Gateway* e não tem repetição nem workflow de erro. Usar credencial Anthropic própria, `retryOnFail` e um *Error Trigger* que avise a equipe.
+14. **`agenda-ocupacao` com 502 (baixo, esperado):** é a proteção contra relatório de agenda vazio, fora do horário de agenda. O cron fica verde mesmo assim, porque só prova que a chamada foi disparada. Ajustar o início do cron ou aceitar como ruído.
+15. **Fila:** o que falta para ir ao ar está em `docs/fila-biometria.md`, seção 5.
 
 ## 5. Fase 5 — aprendizado com o que corrigem depois da IA (construída)
 Arquivo: `supabase/fase5-aprendizado.sql` (aditivo, pode rodar de novo). Mostra no painel, aba **Aprendizado** (só administrador):

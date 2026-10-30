@@ -127,10 +127,20 @@ A IA consulta, a cada mensagem do paciente, um catálogo copiado de relatórios 
 
 ## Fila em tempo real + assinatura biométrica
 
-Página do paciente em `fila/` (link `?token=` enviado por e-mail pelo n8n), regras no banco em `supabase/fila-biometria.sql` e validação biométrica na API `api-biometria/`. Fluxo, workflow do n8n, checklist de publicação e riscos em `docs/fila-biometria.md`.
+**Em construção; ainda não está no ar para o público.** O banco real está na primeira versão do módulo; a atualização (`supabase/fila-biometria-v2-delta.sql`) está escrita e testada, mas ainda não foi aplicada. A página `fila/` do repositório é uma versão antiga e **não deve ser publicada** até ser reescrita.
+
+- Regras no banco: `supabase/fila-biometria.sql` (instalação do zero) e `supabase/fila-biometria-v2-delta.sql` (para quem já aplicou a primeira versão).
+- Algoritmo da assinatura: `biometria/avaliar_assinatura.py`, executado no nó Python do n8n (sem servidor próprio).
+- Fluxo, workflows do n8n, passo a passo para colocar no ar (o que é seu e o que é do Claude), riscos e LGPD: `docs/fila-biometria.md`.
+
+## Testes e auditoria
+
+`cd testes && npm install && npm test` repete a bateria (Edge Function, algoritmo Python, banco da Fila, atualização v1 para v2 e fumaça das páginas em navegador). Instruções e o que os testes **não** provam: `testes/README.md`. Evidências, achados e veredito de produção de 30/10/2026: `docs/auditoria-2026-10-30.md`.
 
 ## Estado do projeto e como retomar
 
 **Aba Aprendizado (administrador)**: relatório de onde a IA erra, preço do catálogo x Klingo e casos para melhorar o prompt (Fase 5; SQL em `supabase/fase5-aprendizado.sql`).
 
 Veja `docs/passagem-fases-3-a-5.md`: o que cada fase faz, o que falta, o checklist para continuar em outra conta e as regras que não podem ser quebradas. `supabase/00-base-snapshot.sql` é só referência do banco base (não rodar no projeto atual).
+
+Antes de divulgar a IA a mais pacientes, leia os achados de `docs/auditoria-2026-10-30.md` (seção 2.4): preços do catálogo divergentes do Klingo, nó de IA do n8n sem repetição, proteção contra senha vazada desligada.

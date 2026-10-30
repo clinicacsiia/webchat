@@ -1,106 +1,173 @@
-> **Status (30/10/2026): documento desatualizado em parte.** O desenho mudou depois desta primeira versão e este arquivo ainda não foi reescrito.
->
-> - **Valem:** `supabase/fila-biometria.sql` (token JWT assinado e verificado no banco, segredo no Vault, segredo do n8n no cabeçalho `x-fila-segredo`) e `biometria/avaliar_assinatura.py` (algoritmo em Python puro, executado no nó Python do n8n).
-> - **Não valem mais:** a API FastAPI, o nó Code que assina o JWT no n8n e o JWT assinado com a chave do projeto (seções 3, 4 e 5 abaixo).
-> - **Ainda pendentes:** `fila/fila.js` (ainda usa o cliente com JWT do projeto), a aba **Fila** do painel, os dois workflows do n8n, a aplicação da migração v2 no banco e o merge. Este PR segue como rascunho por isso.
-
 # Fila em tempo real + assinatura biométrica dinâmica
 
-Versão 1.0 — 30/10/2026 / Mudança: Implementação inicial
+Versão 2.0 — 30/10/2026 / Mudança: reescrito para o desenho atual (JWT assinado no banco, segredo do n8n por cabeçalho, Python no nó do n8n). Substitui a versão 1.0, que descrevia uma API FastAPI e um nó Code que assinava o JWT.
+
+> **Estado: NÃO está em produção e NÃO está completo.** O banco real está na v1; a migração v2 está escrita e testada, mas não aplicada. Faltam a tela do paciente (`fila/fila.js`), a aba da recepção, os dois workflows do n8n e o SMTP. A seção 5 diz a ordem exata para fechar. Provas e lacunas: `docs/auditoria-2026-10-30.md`.
 
 ## 1. Fluxo ponta a ponta
 
-1. **Recepção** chama `fila_inserir(paciente_id)` (painel, sessão de atendente). A linha nasce em `atendimentos` com `status = 'aguardando'`. A função devolve o `atendimento_id`.
-2. **Recepção** dispara o webhook do n8n `POST /fila-emitir-link` com `{nome, email_informado, paciente_id, atendimento_uuid}`.
-3. **n8n** valida, assina o JWT (`n8n/fila-emitir-link.js`) e envia o e-mail com `https://clinicacsiia.github.io/webchat/fila/?token=...`. A resposta do webhook não traz o token.
-4. **Paciente** abre o link. `fila/fila.js` tira o token da URL (`history.replaceState`), guarda só em `sessionStorage` e assina o Realtime com o próprio JWT.
-5. **Fila**: a posição vem de `fila_minha_posicao()` (só números). Um aviso `fila_mudou` no canal privado `fila:global` (sem dado pessoal) dispara o recálculo. Não há polling.
-6. **Recepção** chama o paciente e executa `fila_chamar_assinatura(atendimento_id, texto)`. O banco calcula o SHA-256 do texto e grava `status = 'assinatura_pendente'`.
-7. **Paciente** vê o documento, marca o consentimento, assina no Canvas. O navegador calcula o SHA-256 do texto exibido e envia para a API Python com o JWT, os pontos e o User-Agent.
-8. **API Python** (`api-biometria/app.py`) valida, compara, grava em `registro_assinaturas` ou `assinatura_tentativas`, e na aprovação muda o status para `em_atendimento`. Tudo numa única transação.
-9. **Recepção** conclui com `fila_concluir(atendimento_id)`.
+1. **Recepção** (aba Fila do painel, *a construir*) chama a RPC `fila_entrar(nome, email, telefone)`. O banco acha ou cria o paciente, cria o `atendimentos` com `status = 'aguardando'` e, se `config.fila_webhook_url` estiver preenchida, avisa o n8n. A resposta traz `{atendimento_id, paciente_id, link_agendado}`; `link_agendado = false` significa que o envio de e-mail ainda não está configurado.
+2. **n8n, workflow "Fila - emitir link"**: recebe o aviso, chama `fila_emitir_token(p_atendimento)` com o cabeçalho `x-fila-segredo` e envia o e-mail com `https://clinicacsiia.github.io/webchat/fila/?token=<jwt>`. O destinatário e o nome vêm da **resposta do banco**, nunca do corpo do aviso.
+3. **Paciente** abre o link. `fila/fila.js` (*a reescrever*) tira o token da URL (`history.replaceState`), guarda em `sessionStorage`, lê o estado por `fila_estado(p_token)` e assina o broadcast privado `fila:global` / `atendimento:<id>`. Não há polling.
+4. **Recepção** chama o paciente: `fila_chamar_assinatura(atendimento_id, texto)`. O banco calcula o SHA-256 do texto e passa para `assinatura_pendente`.
+5. **Paciente** vê o documento, marca o consentimento e assina no Canvas (PointerEvents: x, y, tempo, pressão, traço). O navegador calcula o SHA-256 do texto exibido e envia ao n8n.
+6. **n8n, workflow "Fila - validar assinatura"**: `assinatura_contexto` → nó Python (`biometria/avaliar_assinatura.py`) → `assinatura_registrar`. O banco **refaz as checagens com trava de linha** e é a autoridade final: limiar 0,30, 3 tentativas, estado, hash, e-mail do token. Na aprovação grava `registro_assinaturas` e muda o status para `em_atendimento`.
+7. **Recepção** conclui com `fila_concluir`.
 
-Máquina de estados (imposta por trigger, não só pela aplicação):
+Máquina de estados (imposta por *trigger*, não só pela aplicação):
 
 ```
-aguardando ──fila_chamar_assinatura──> assinatura_pendente ──API aprova──> em_atendimento ──fila_concluir──> concluido
+aguardando ──fila_chamar_assinatura──> assinatura_pendente ──aprovação──> em_atendimento ──fila_concluir──> concluido
      ^                                        │
-     └────────fila_cancelar_assinatura────────┘   (também desfaz o bloqueio de 3 tentativas)
+     └────────fila_cancelar_assinatura────────┘   (também desfaz o bloqueio das 3 tentativas)
 ```
 
 ## 2. Arquivos
 
-| Caminho | O que é |
-|---|---|
-| `supabase/fila-biometria.sql` | Tabelas, RLS, grants, triggers, funções `fila_*`, broadcast. Idempotente. |
-| `fila/index.html`, `fila/fila.css`, `fila/fila.js` | Página do paciente (GitHub Pages). |
-| `api-biometria/biometria.py` | Algoritmo puro: features, distância, score, EWMA e contador de tentativas. |
-| `api-biometria/app.py` | API FastAPI: JWT, transação com trava de linha, gravação do lastro. |
-| `api-biometria/test_biometria.py` | 22 testes (`cd api-biometria && python -m pytest -q`). |
-| `n8n/fila-emitir-link.js` | Nó Code do n8n que assina o JWT. |
+| Caminho | Estado | O que é |
+|---|---|---|
+| `supabase/fila-biometria.sql` | pronto, testado | Instalação do zero (v2): tabelas, RLS, JWT no banco, RPCs, triggers, broadcast, policy do Realtime. Idempotente. |
+| `supabase/fila-biometria-v2-delta.sql` | pronto, testado | Para o banco que já recebeu a v1 (é o caso do projeto real). Troca as RPCs do n8n e cria o segredo por cabeçalho. |
+| `biometria/avaliar_assinatura.py` | pronto, 27 testes | Algoritmo em Python puro. É o corpo do nó Code (Python nativo) do n8n e também um módulo testável. |
+| `biometria/test_avaliar_assinatura.py` | — | Testes, inclusive com os *builtins* restritos do n8n. |
+| `testes/` | pronto | Bateria completa; ver `testes/README.md`. |
+| `fila/index.html`, `fila/fila.css`, `fila/fila.js` | **versão antiga, incompatível** | Usam o cliente Supabase com JWT próprio e uma API que não existe mais. **Não publicar.** A reescrever. |
+| Aba "Fila" em `painel/index.html` | **não existe** | A construir. |
 
-## 3. Workflow n8n: "Fila - emitir link de assinatura"
+## 3. Banco
 
-Um único workflow. Ele não toca na biometria: a assinatura vai direto para a API Python.
+### 3.1 Tabelas
+
+- `atendimentos`: `id`, `paciente_id`, `email_informado`, `status`, `documento_texto`, `documento_hash`, `tentativas_falhas`, `bloqueado_em`, `links_enviados`, `created_at`, `atualizado_em`.
+- `registro_assinaturas` (**imutável**: UPDATE, DELETE e TRUNCATE são barrados por *trigger*): `atendimento_id`, `email_confirmado_transacao` (vem do token), `hash_documento`, `consentimento_biometrico`, `tipo_validacao` (`enrolamento` ou `comparacao`), `score_similaridade`, `vetor_traco_bruto`, `caracteristicas`, `ip_origem`, `user_agent`.
+- `assinatura_tentativas` (imutável): uma linha por reprovação, com o número da tentativa e o score.
+- `pacientes` ganha `email_cadastro` (coluna gerada), `perfil_biometrico_historico` e `assinatura_papel_path`. Os *grants* por coluna escondem o perfil biométrico da equipe e do `anon`.
+
+### 3.2 Quem chama o quê
+
+| Quem | RPC | Autenticação |
+|---|---|---|
+| Recepção (sessão do painel) | `fila_entrar`, `fila_reenviar_link`, `fila_chamar_assinatura`, `fila_cancelar_assinatura`, `fila_concluir`, `fila_listar` | `fila_exige_staff()` / `papel_atual()` por dentro |
+| Paciente (navegador, chave publicável) | `fila_estado(p_token)` | O próprio token JWT |
+| n8n (chave publicável + cabeçalho) | `fila_emitir_token(p_atendimento)`, `assinatura_contexto(p_token, p_hash)`, `assinatura_registrar(p_token, p_hash, p_resultado, p_pontos, p_ip, p_user_agent)` | Cabeçalho `x-fila-segredo` conferido por `fila_n8n_autorizado()` |
+
+O token é um JWT HS256 assinado e verificado **dentro do banco** (`fila_jwt_assinar` / `fila_jwt_validar`) com o segredo `fila_jwt_secret` do Vault. Claims: `aud = 'fila'`, `atendimento_id`, `email_informado`, `iat`, `exp` (4 h), `jti`. Funções internas (`fila_jwt_*`, `fila_segredo_*`, `fila_avisar_*`, funções de *trigger*) não são executáveis por `anon` nem `authenticated`.
+
+### 3.3 Regras que o banco impõe, qualquer que seja o cliente
+
+- Limiar: `aprovado` só é aceito se coerente com `score >= 0,30` (reprovada com 0,30 ou mais, ou aprovada com menos, é recusada como `resultado_invalido`).
+- 3 reprovações bloqueiam o atendimento (`bloqueado_em`); a quarta chamada é recusada. Série inválida e conflito de perfil **não** contam tentativa. Cancelar o envio desfaz o bloqueio e mantém a posição na fila.
+- Hash do documento: o do navegador tem de ser igual ao gravado pelo banco.
+- Máximo de 10 links por atendimento; atendimento concluído não recebe link.
+- Falha fechada: sem o segredo no Vault, ninguém passa.
+
+## 4. Algoritmo (Python)
+
+- Entrada por item do n8n: `consentimento`, `perfil`, `pontos` (`[{x, y, timestamp, pressao, traco}]`), `tentativas_falhas`.
+- Série válida: 20 a 5.000 pontos, valores finitos, tempo crescente, duração de 0,3 s a 60 s, até 200 traços, coordenadas normalizadas em [0, 1] com 5% de tolerância.
+- Sete características (`extract_dynamic_features`): `velocidade_media`, `jitter`, `duracao_ms`, `pressao_media`, `pressao_desvio`, `num_tracos`, `pausa_media_ms`.
+- Distância: raiz da média dos quadrados dos *z-scores* contra o perfil, com piso de desvio (10% da média do próprio paciente e um piso absoluto por característica). `score = 1 / (1 + d)`, arredondado em 4 casas; **a decisão usa o score já arredondado**, igual ao banco. Aprovado se `score >= 0,30` (distância de até 2,33).
+- A primeira assinatura é **enrolamento**: sem comparação, `score` nulo, `tipo_validacao = 'enrolamento'`.
+- O perfil só é atualizado quando aprovado (média móvel exponencial, janela 20). Reprovação nunca "ensina" o perfil.
+- O score **não** volta ao paciente (devolvê-lo permitiria ajustar a assinatura até passar).
+
+## 5. Colocar em produção (ordem)
+
+Quem faz cada passo está entre colchetes.
+
+1. **[Você] Aplicar a migração v2 no SQL Editor** do projeto `nrvuynjwcgwpjdptkiay`: colar `supabase/fila-biometria-v2-delta.sql` e executar. Ele tem três `drop function`, por isso o Supabase pede confirmação humana (foi o que travou a aplicação automática). Não apaga dado; as três funções removidas só existem na v1. Conferir:
+   ```sql
+   select p.oid::regprocedure::text from pg_proc p
+    where p.pronamespace = 'public'::regnamespace
+      and p.proname in ('fila_emitir_token','assinatura_contexto','assinatura_registrar','fila_n8n_autorizado');
+   -- deve listar fila_emitir_token(uuid), assinatura_contexto(text,text),
+   -- assinatura_registrar(text,text,jsonb,jsonb,text,text) e fila_n8n_autorizado();
+   -- NÃO pode listar as versões com p_segredo.
+   ```
+2. **[Você] Criar a credencial do n8n.** *Credentials > Create > Header Auth*, nome `Fila - segredo`, *Name* `x-fila-segredo`, *Value* = o segredo. Para ler o segredo, rode **só no SQL Editor** (nunca cole em conversa, issue ou arquivo):
+   ```sql
+   select decrypted_secret from vault.decrypted_secrets where name = 'fila_segredo';
+   ```
+   Se achar que o valor vazou, troque: `select vault.update_secret((select id from vault.secrets where name = 'fila_segredo'), '<novo valor>');` e atualize a credencial.
+3. **[Você] Criar a credencial SMTP** no n8n (a conta que enviará o e-mail do link).
+4. **[Claude, depois dos passos 2 e 3] Montar e publicar os dois workflows** (seção 6) e testá-los.
+5. **[Claude] Reescrever `fila/fila.js` e a aba "Fila" do painel**; testar no navegador com o Supabase simulado.
+6. **[Você] Preencher `config.fila_webhook_url`** com a URL de produção do webhook "emitir link":
+   ```sql
+   update public.config set valor = 'https://clinicacsi.app.n8n.cloud/webhook/<caminho-longo-e-aleatorio>' where chave = 'fila_webhook_url';
+   -- se a chave ainda não existir: insert into public.config (chave, valor) values ('fila_webhook_url', '<url>');
+   ```
+7. **[Você] Teste ponta a ponta com paciente de teste** (telefone `7190000xxxx`, e-mail seu): entrar na fila, receber o e-mail, abrir o link, ver a posição, a recepção chamar, assinar (enrolamento), assinar de novo com traço diferente, reprovar três vezes (deve bloquear), cancelar o envio (deve desbloquear). Conferir `registro_assinaturas` e `assinatura_tentativas` no SQL Editor.
+8. **[Você] Decidir sobre o merge do PR #15** só depois do passo 7. O merge publica `fila/` no GitHub Pages.
+9. **[Você, antes de usar com paciente real]** itens de LGPD da seção 8.
+
+Reverter: as três RPCs removidas pelo delta não têm uso nem dado associado; se precisar de volta, as definições estão na migração `fila_biometria_v1` (Supabase > Database > Migrations). Para tirar o módulo do ar sem apagar nada, esvazie `config.fila_webhook_url` e não mescle o PR.
+
+## 6. Workflows do n8n
+
+Ambos com **Save Execution Data = off** (sucesso, erro e progresso). Sem isso o token e o traço biométrico ficam no histórico de execuções.
+
+### 6.1 "Fila - emitir link"
 
 | # | Nó | Configuração |
 |---|---|---|
-| 1 | **Webhook** | `POST`, path `fila-emitir-link`, *Authentication*: Header Auth (header `x-fila-key`, valor só no credential). *Allowed origins*: a origem da equipe. *Response*: *Using 'Respond to Webhook' node*. |
-| 2 | **HTTP Request** (checar atendimento) | `GET https://nrvuynjwcgwpjdptkiay.supabase.co/rest/v1/atendimentos?id=eq.{{atendimento_uuid}}&select=id,status`, com credential de chave de serviço. Só segue se `status = aguardando`. Se a fila já andou, responde 409. |
-| 3 | **Code** | Conteúdo de `n8n/fila-emitir-link.js`. Lê `$env.FILA_JWT_SECRET`. Valida UUIDs e e-mail, assina HS256 com `role`/`aud` = `authenticated`, `sub` = `paciente_id`, `atendimento_id`, `email_informado`, `iat`, `exp` = 4 h, `jti`. |
-| 4 | **Send Email** (SMTP) | Para `email_informado`. Assunto: "Sua assinatura para o atendimento". Corpo em texto e HTML com o `link`. Sem nome de médico nem dado clínico. |
-| 5 | **Respond to Webhook** | JSON `{ok: true, expira_em}`. **Nunca** devolve `link` nem `token`. |
-| 6 | **Error Trigger** (workflow separado) | Avisa a equipe por e-mail se a emissão falhar. Não inclua o corpo da execução no aviso. |
+| 1 | **Webhook** | `POST`, caminho longo e aleatório, resposta imediata. É chamado pelo banco (`net.http_post`), que **não envia cabeçalho de autenticação**. Por isso o nó não confia no corpo, só no `atendimento_uuid`. |
+| 2 | **HTTP Request** | `POST https://nrvuynjwcgwpjdptkiay.supabase.co/rest/v1/rpc/fila_emitir_token`; cabeçalhos `apikey` e `Authorization: Bearer` com a chave publicável do projeto (está no `index.html`; é pública por desenho) e a credencial Header Auth `Fila - segredo`; corpo `{"p_atendimento": "{{ $json.body.atendimento_uuid }}"}`. |
+| 3 | **IF** | `ok = true`. Se não: fim, sem e-mail. |
+| 4 | **Send Email (SMTP)** | Para: `email` da **resposta do banco**. Assunto: "Sua assinatura para o atendimento". Corpo em texto e HTML com o link `https://clinicacsiia.github.io/webchat/fila/?token={{ token }}` e a validade (`expira_em`). Sem nome de médico nem dado clínico. |
+| 5 | **Error Trigger** (workflow à parte) | Avisa a equipe por e-mail se falhar. Não inclua o corpo da execução no aviso. |
 
-Configurações do workflow:
-- **Save Execution Data: off**. Sem isso o token fica no histórico de execuções do n8n.
-- Variável `FILA_JWT_SECRET` no ambiente do n8n (o mesmo segredo JWT do projeto Supabase). Se a instância bloquear `$env`, guarde o segredo em credential e passe-o ao nó Code por um nó anterior, sem log.
-- Reenvio: o mesmo workflow emite um token novo para o mesmo `atendimento_uuid`. O token anterior continua válido até o `exp`, o que é aceitável porque o acesso à fila é o mesmo.
+Risco residual: quem conhecer a URL do webhook pode disparar o envio de um link para um atendimento que já está na fila (limitado a 10 por atendimento, e o e-mail só vai para o endereço cadastrado). O caminho longo e aleatório mitiga. Para fechar de vez, o banco teria de enviar um segredo no aviso (guardado no Vault); não foi feito.
 
-## 4. Supabase: confirmar antes de publicar
+### 6.2 "Fila - validar assinatura"
 
-- **Assinatura do JWT.** O PostgREST e o Realtime aceitam tokens HS256 assinados com o segredo JWT **legado** do projeto. Se o projeto usa chaves de assinatura assimétricas, esse segredo não valida os tokens do n8n e o paciente recebe 401. Confira em *Project Settings > JWT Keys* e mantenha o modo HS256 ativo para este módulo.
-- **Realtime.** Canais privados (`config.private`) exigem as policies de `realtime.messages`, já criadas por `fila-biometria.sql`.
-- **Pacientes.** O `REVOKE`/`GRANT` de colunas de `pacientes` depende de nenhuma tela ler a tabela direto. Verificado nos HTML do repositório; se a equipe criar uma tela que faça `select *` em `pacientes`, ela passa a receber erro de permissão.
+| # | Nó | Configuração |
+|---|---|---|
+| 1 | **Webhook** | `POST`, caminho longo e aleatório, *Allowed Origins* `https://clinicacsiia.github.io`, resposta por nó "Respond to Webhook". Corpo: `{token, hash, pontos, consentimento}`. |
+| 2 | **IF** | Corpo tem `token`, `hash` (64 hex), `pontos` (lista) e `consentimento === true`. Senão: responde `{ok:false, erro:'pedido_invalido'}`. |
+| 3 | **HTTP Request** | `rpc/assinatura_contexto` com `{p_token, p_hash}` e a credencial Header Auth. |
+| 4 | **IF** | `ok = true`. Se não: responde o `erro` do banco (`token_invalido`, `bloqueado`, `fora_de_assinatura`, `documento_diferente`). |
+| 5 | **Edit Fields** | Monta `{consentimento, pontos, perfil, tentativas_falhas}` com o corpo do webhook e a resposta do contexto. |
+| 6 | **Code — Python (Native)** | Cole **todo** o conteúdo de `biometria/avaliar_assinatura.py`. Devolve `{resultado}`. |
+| 7 | **IF** | `resultado.ok = true`. Se não (série inválida): responde `{ok:false, erro:'serie_invalida'}`; **não conta tentativa**. |
+| 8 | **HTTP Request** | `rpc/assinatura_registrar` com `p_token`, `p_hash`, `p_resultado = resultado`, `p_pontos`, `p_ip` (primeiro valor de `x-forwarded-for`), `p_user_agent` (cabeçalho do webhook). |
+| 9 | **Respond to Webhook** | Só `{ok, aprovado, tentativas_restantes, bloqueado}` ou `{ok:false, erro}`. **Nunca** o score nem o perfil. |
 
-## 5. Publicação (ordem)
+A resposta `conflito` do banco (outro envio mudou o perfil entre o contexto e o registro) deve ser repetida uma vez pelo front, sem contar tentativa.
 
-1. Rodar `supabase/fila-biometria.sql` no SQL Editor do projeto `webchat-atendimento`. Ele não apaga dado.
-2. Confirmar que a `fila_minha_posicao` e as policies existem (`select proname from pg_proc where proname like 'fila_%';`).
-3. Subir a API: `pip install -r api-biometria/requirements.txt`, depois `uvicorn app:app --host 0.0.0.0 --port 8000 --proxy-headers`, com as variáveis:
-   - `SUPABASE_JWT_SECRET` (mesmo do n8n),
-   - `DATABASE_URL` (conexão Postgres do projeto; use o pooler de transação, a aplicação já desativa prepared statements),
-   - `ORIGENS_PERMITIDAS=https://clinicacsiia.github.io`,
-   - `CONFIAR_X_FORWARDED_FOR=1` só se o proxy à frente for seu.
-   Coloque HTTPS na frente da API.
-4. Trocar `SEU-SERVIDOR-BIOMETRIA` em `fila/fila.js` pela URL pública da API.
-5. Publicar a branch. GitHub Pages serve `https://clinicacsiia.github.io/webchat/fila/`.
-6. Teste com um paciente de teste (telefone `7190000xxxx`): emitir link, abrir, aparecer na fila, recepção chama, assinar, reprovar três vezes (deve bloquear), e depois conferir `registro_assinaturas` e `assinatura_tentativas` pelo SQL Editor.
+## 7. Decisões de desenho (e por quê)
 
-## 6. Decisões de desenho (e por quê)
+- **JWT no banco, não no n8n.** O segredo JWT do projeto Supabase não é acessível por MCP e entregá-lo ao n8n o espalha. O segredo `fila_jwt_secret` é só deste módulo, vive no Vault e nunca sai do banco.
+- **Segredo do n8n por cabeçalho (credencial Header Auth), não em parâmetro nem dentro do workflow.** Um segredo em parâmetro aparece no corpo da requisição, nos logs e no histórico do n8n. Gravar segredo dentro de um workflow foi barrado pelo controle de segurança do ambiente e o desenho foi refeito por isso.
+- **Python no nó do n8n, sem API própria.** Evita hospedar um servidor. O custo: o sandbox do n8n não aceita `import`, `class`, `type`, `getattr` nem `hasattr`, então o algoritmo foi escrito só com funções, dicts e listas, e o teste roda com esses mesmos limites.
+- **O banco é a autoridade, o Python é só o cálculo.** O n8n pode ser comprometido ou errar; o banco recusa resultado incoerente com o limiar, o tipo ou o perfil.
+- **Posição por RPC, não por `select count`.** Com RLS estrito o paciente só enxerga a própria linha; a função `security definer` devolve só números.
+- **Aviso por broadcast privado sem dado pessoal.** `fila:global` e `atendimento:<id>` levam apenas o status. O tópico `atendimento:<id>` é protegido pelo UUID não adivinhável, não por token.
+- **Contador de 3 tentativas no banco**, por atendimento (um token novo não zera), com trava de linha contra envios paralelos.
+- **E-mail do lastro vem do token**, não do corpo.
+- **Primeira assinatura é enrolamento.** O registro marca `enrolamento` e `score` nulo; a recepção deve conferir a identidade no balcão nesses casos.
 
-- **Posição por RPC, não por `GET` com contagem.** Com RLS estrito, o paciente só enxerga a própria linha. Uma contagem direta sempre daria "1º". A função `SECURITY DEFINER` lê a claim e devolve só números.
-- **Aviso por broadcast privado, não por `postgres_changes` na fila.** O Realtime só entrega linhas que o RLS libera. O broadcast entrega "a fila mudou" sem dado.
-- **Status próprio por `postgres_changes` com `filter id=eq.<atendimento>`.** Essa linha é liberada pelo RLS ao próprio paciente.
-- **Contador de 3 tentativas no banco, não no JWT.** O JWT é stateless e não pode ser revogado. A contagem é por atendimento, então um token novo não zera. A trava `for update` impede que duas requisições paralelas contem uma falha duas vezes.
-- **Hash do documento calculado no banco e no navegador, comparado no servidor.** Prova que o paciente viu exatamente o texto gravado pela recepção.
-- **E-mail do lastro vem do claim assinado**, não do corpo da requisição.
-- **Score nunca volta ao paciente.** Devolver o score permitiria ajustar a assinatura até passar.
-- **Série ruim (422) não conta como tentativa.** Só uma comparação reprovada conta.
-- **Primeira assinatura é enrolamento** (sem perfil, sem comparação). Ela registra `tipo_validacao = 'enrolamento'` e `score_similaridade` nulo. A recepção deve ver esses casos.
-- **API Python fala direto com o navegador**, sem passar pelo n8n. A série tem centenas de pontos e o n8n guarda o corpo de execuções.
+## 8. Riscos que precisam de decisão humana
 
-## 7. Riscos que precisam de decisão humana
+- **Limiar 0,30 é permissivo.** Aprova distância média de até 2,33 desvios: um impostor com traço parecido passa. A assinatura dinâmica é reforço, não prova de identidade; o lastro principal é o link no e-mail + o hash + o registro imutável. Recalibre com assinaturas reais antes de depender dele.
+- **LGPD, art. 11 (dado biométrico é sensível).** A coluna `vetor_traco_bruto` guarda a série completa. Antes de usar com paciente real: texto de consentimento revisado pelo jurídico, prazo de retenção definido (e rotina para apagar), RIPD registrado, e definir quem da equipe pode ler `registro_assinaturas`.
+- **Token no link.** O JWT vai na URL (exigido pelo desenho). Mitigações: `Referrer-Policy: no-referrer`, remoção da URL ao carregar, `sessionStorage`, expiração de 4 h, e nenhum registro do token no n8n (Save Execution Data off). Quem receber o e-mail pode abrir o link: a caixa de e-mail do paciente tem de ser dele.
+- **Enrolamento aceita qualquer traço legível** de quem abriu o link. Confira a identidade no balcão.
+- **Webhook "emitir link" sem autenticação** (6.1).
+- **Tópico `atendimento:<id>`** protegido só pela imprevisibilidade do UUID; o conteúdo é só o status.
 
-- **Limiar de 0,30.** Com `score = 1/(1+d)`, o limiar equivale a `d <= 2,33` desvios-padrão médios. É permissivo: um impostor com traço parecido passa. A assinatura dinâmica funciona aqui como reforço, não como prova de identidade. O lastro jurídico principal é o link no e-mail + o hash + o registro imutável. Recalibre o limiar com assinaturas reais antes de depender dele.
-- **Dado biométrico é sensível (LGPD, art. 11).** A coluna `vetor_traco_bruto` guarda a série completa, como especificado. Antes de produção: texto de consentimento revisado pelo jurídico, prazo de retenção definido, e um RIPD (relatório de impacto) registrado.
-- **Token no link.** O JWT vai na URL (exigido pelo desenho). Mitigado com `Referrer-Policy: no-referrer`, remoção da URL no carregamento, `sessionStorage` e expiração de 4 h. Quem recebe o e-mail pode abrir o link: o e-mail deve ser confidencial.
-- **Pilotagem da primeira assinatura.** O enrolamento aceita qualquer traço legível da pessoa que abriu o link. Por isso o registro marca `enrolamento` e a equipe deve conferir a identidade no balcão.
-- **Acesso ao banco pela API.** A API usa a conexão do dono do banco (bypassa RLS, por design). A chave fica só no ambiente do servidor. Próximo passo de endurecimento: um papel dedicado com grants mínimos.
+## 9. Pendências
 
-## 8. Pendências
+| # | Item | Quem |
+|---|---|---|
+| 1 | Aplicar a migração v2 (passo 1) | Você |
+| 2 | Credenciais Header Auth e SMTP no n8n (passos 2 e 3) | Você |
+| 3 | Workflows do n8n | Claude |
+| 4 | `fila/fila.js` + `index.html` + `fila.css` novos | Claude |
+| 5 | Aba "Fila" no painel | Claude |
+| 6 | `config.fila_webhook_url` | Você |
+| 7 | Teste ponta a ponta no ambiente real | Você |
+| 8 | Itens de LGPD e recalibração do limiar | Você / jurídico |
+| 9 | Merge do PR #15 | Você |
 
-- Botão na tela da recepção (painel) que chama `fila_inserir`, depois o webhook do n8n, e a tela de envio do documento que chama `fila_chamar_assinatura`. Não está neste PR.
-- Hospedagem da API Python (escolha da equipe).
-- Recalibração do limiar com dados reais.
-- Teste de integração contra o projeto Supabase real (o banco de teste usado aqui foi PGlite com stubs de `auth` e `realtime`; o comportamento do Realtime do Supabase não foi exercitado de ponta a ponta).
+Não provado até aqui (e por que): Realtime por WebSocket, CORS do webhook, entrega do e-mail, desempenho do nó Python com séries reais. A rede da sessão bloqueia o Supabase e o n8n fora dos conectores.
