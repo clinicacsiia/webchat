@@ -280,6 +280,8 @@
     ]);
     if (S.abertaId === id) { S.pre = data || null; S.preItens = itens || []; renderPre(); }
   }
+  // O status "Agendado" muda sozinho (conferência automática a cada 15 s): reler enquanto uma conversa está aberta.
+  setInterval(() => { if (S.abertaId && S.aba === 'atendimento' && !document.hidden) carregarPre(); }, 15000);
   async function statusPre(status) {
     if (!S.pre) return;
     const { error } = await db.from('pre_agendamentos').update({ status, atualizado_em: new Date().toISOString() }).eq('id', S.pre.id);
@@ -296,6 +298,7 @@
     box.replaceChildren(h('div', { class: 'pre' },
       h('b', {}, 'Pré-agendamento'), h('span', { class: 'urg ' + (p.status === 'pronto' ? '' : 'media') }, ROTULO_PRE[p.status] || p.status),
       p.identidade ? h('div', { class: 'urg ' + (p.identidade === 'conferida' ? '' : p.identidade === 'divergente' ? 'alta' : 'media'), style: 'display:inline-block;margin-top:4px' }, ROTULO_IDENT[p.identidade] || p.identidade) : null,
+      p.agendado_auto_em ? h('div', { class: 'dica' }, 'Marcação encontrada na agenda do Klingo (conferência automática).') : null,
       resumo ? h('div', {}, resumo) : null,
       (S.preItens || []).length ? h('div', { style: 'margin-top:6px' }, h('b', {}, 'Exames pedidos'), h('ul', { style: 'margin:4px 0 0;padding-left:18px' }, S.preItens.map((i) => h('li', {}, linhaItem(i))))) : null,
       (() => { const ds = (Array.isArray(p.escolha_horario) ? p.escolha_horario : []).map((e) => e.data); const mesmoDia = ds.some((d, i) => ds.indexOf(d) !== i);
@@ -307,7 +310,7 @@
         h('dl', {}, linhas.map(([k, r]) => [h('dt', {}, r), h('dd', {}, p.paciente[k])]))) : null,
       h('div', { class: 'acoes' },
         h('button', { class: 'btn', type: 'button', onclick: async () => { try { await navigator.clipboard.writeText(textoPre(p)); toast('Dados copiados.'); } catch { toast('Não consegui copiar.'); } } }, 'Copiar dados'),
-        aberto ? h('button', { class: 'btn prim', type: 'button', onclick: () => statusPre('agendado') }, 'Marcar como agendado') : null,
+        aberto ? h('button', { class: 'btn prim', type: 'button', onclick: () => statusPre('agendado') }, 'Marcar como agendado (se não mudar sozinho)') : null,
         aberto ? h('button', { class: 'btn', type: 'button', onclick: () => statusPre('cancelado') }, 'Cancelar pré-agendamento') : null)));
   }
   const podeAtender = () => S.me && (S.me.papel === 'admin' || S.me.papel === 'atendente');

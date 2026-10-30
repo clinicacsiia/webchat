@@ -25,7 +25,7 @@ Estado em 2026-10-30. Fases 0, 1 e 2 entregues, mergeadas na `main` (PRs #8 e #9
 5. Avisos do advisor Supabase: funções `security definer` chamáveis por `anon` são intencionais (protegidas por token da conversa ou `ia_segredo`); ativar "leaked password protection" no Auth é opcional.
 
 ## Próximas fases
-- **Fase 3 — conferência automática**: ler #7 para ver se a marcação feita pelo atendente apareceu na agenda e atualizar status da conversa/pré-agendamento (Agendado/não encontrado) sem expor paciente; alertar divergência.
+- **Fase 3 — conferência automática** (ADIANTADA em 30/10/2026, ver `supabase/fase3-conferencia-automatica.sql`): cron `agenda-conferir` a cada 15 s (só dispara se houver pré-agendamento esperando) → Edge Function v8 `{"agenda":"conferir"}` lê o #7 só dos dias esperados → `agenda_conferir_pre_agendamentos()` muda o status para `agendado` quando o horário escolhido (data+hora+médico+unidade) apareceu ocupado depois do início da conversa com o exame pedido. Horário por ordem de chegada não é conferido sozinho (o botão manual continua). Sem leitura de dados de paciente. Original: ler #7 para ver se a marcação feita pelo atendente apareceu na agenda e atualizar status da conversa/pré-agendamento (Agendado/não encontrado) sem expor paciente; alertar divergência.
 - **Fase 4 — paciente que volta**: histórico de agendamentos anteriores (já existe `pacientes` + `paciente_conferir`); sugerir mesmo exame/unidade/profissional, e retomar conversa.
 - **Fase 5 — aprendizado**: usar correções do atendente (preço/data/exame ajustados) para melhorar catálogo e prompt; relatório de erros da IA.
 - Antes de cada fase: rodar teste curto e2e no chat, conferir `get_advisors`, publicar n8n só após merge.

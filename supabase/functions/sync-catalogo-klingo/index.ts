@@ -187,6 +187,24 @@ async function precosParticular(supabase: Supa, token: string) {
   return { marcacoes_lidas: lidas, procedimentos_particular: linhas.length, confianca, banco: data };
 }
 
+// Lê o relatório #7 (marcações) de uma faixa de datas; se o Klingo cortar, divide a faixa ao meio.
+async function lerAgendaMarcada(token: string, de: string, ate: string, nivel = 0): Promise<Row[]> {
+  const params = new URLSearchParams({ id: "7", ":data_atendimento": "l", ":data_atendimento-from": de, ":data_atendimento-to": ate });
+  const res = await fetch(`${KLINGO_URL}?${params}`, { headers: { "X-APP-TOKEN": token }, signal: AbortSignal.timeout(90_000) });
+  if (!res.ok) throw new Error(`Klingo retornou HTTP ${res.status} na agenda marcada`);
+  const payload = await res.json();
+  if (payload?.error) throw new Error("Klingo retornou erro na agenda marcada");
+  if (payload?.limit) {
+    if (de >= ate || nivel >= 4) throw new Error("O Klingo cortou a agenda marcada mesmo em faixa curta");
+    const meio = dia(new Date((Date.parse(`${de}T00:00:00Z`) + Date.parse(`${ate}T00:00:00Z`)) / 2));
+    return [...await lerAgendaMarcada(token, de, meio, nivel + 1), ...await lerAgendaMarcada(token, dia(new Date(Date.parse(`${meio}T00:00:00Z`) + 86_400_000)), ate, nivel + 1)];
+  }
+  if (payload?.result === "") return [];
+  const dados = payload?.result?.data;
+  if (!Array.isArray(dados)) throw new Error("Formato inesperado na agenda marcada");
+  return dados as Row[];
+}
+
 // Agenda ocupada: relatório #7 (marcações) para os próximos 45 dias, SEM nenhum dado de paciente.
 // Só quando, quem atende, onde e qual exame (para estimar a duração). Linhas sem profissional ou unidade são ignoradas.
 // Só marca a atualização como completa se TODAS as faixas foram lidas; se uma falhar, os dados anteriores continuam valendo.
@@ -197,22 +215,7 @@ async function agendaOcupacao(supabase: Supa, token: string) {
   for (let i = 0; i < 46; i += 7) {
     faixas.push([dia(new Date(hoje.getTime() + i * 86_400_000)), dia(new Date(hoje.getTime() + Math.min(i + 6, 45) * 86_400_000))]);
   }
-  const lido = async (de: string, ate: string, nivel = 0): Promise<Row[]> => {
-    const params = new URLSearchParams({ id: "7", ":data_atendimento": "l", ":data_atendimento-from": de, ":data_atendimento-to": ate });
-    const res = await fetch(`${KLINGO_URL}?${params}`, { headers: { "X-APP-TOKEN": token }, signal: AbortSignal.timeout(90_000) });
-    if (!res.ok) throw new Error(`Klingo retornou HTTP ${res.status} na agenda marcada`);
-    const payload = await res.json();
-    if (payload?.error) throw new Error("Klingo retornou erro na agenda marcada");
-    if (payload?.limit) {
-      if (de >= ate || nivel >= 4) throw new Error("O Klingo cortou a agenda marcada mesmo em faixa curta");
-      const meio = dia(new Date((Date.parse(`${de}T00:00:00Z`) + Date.parse(`${ate}T00:00:00Z`)) / 2));
-      return [...await lido(de, meio, nivel + 1), ...await lido(dia(new Date(Date.parse(`${meio}T00:00:00Z`) + 86_400_000)), ate, nivel + 1)];
-    }
-    if (payload?.result === "") return [];
-    const dados = payload?.result?.data;
-    if (!Array.isArray(dados)) throw new Error("Formato inesperado na agenda marcada");
-    return dados as Row[];
-  };
+  const lido = (de: string, ate: string) => lerAgendaMarcada(token, de, ate);
   const agrupado = new Map<string, { inicio: string; profissional: string; unidade: string; procedimento: string; qtd: number }>();
   let lidas = 0;
   for (const [de, ate] of faixas) {
@@ -241,6 +244,40 @@ async function agendaOcupacao(supabase: Supa, token: string) {
   return { marcacoes_lidas: lidas, horarios_ocupados: linhas.length, gravadas, vigentes: (fim as Row)?.vigentes ?? null };
 }
 
+// Conferência automática (a cada 15 s): lê só os dias com pré-agendamento esperando, atualiza a ocupação e deixa o banco
+// marcar como "agendado" quem apareceu na agenda do Klingo. Nenhum dado de paciente é lido para isso nem gravado.
+async function agendaConferir(supabase: Supa, token: string) {
+  const { data: dias, error } = await supabase.rpc("agenda_conferencia_iniciar");
+  if (error) throw new Error(error.message);
+  const lista = ((dias as string[] | null) ?? []).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d));
+  if (!lista.length) return { esperando: 0, agendados: 0 };
+  try {
+    const agrupado = new Map<string, { inicio: string; profissional: string; unidade: string; procedimento: string; qtd: number }>();
+    for (const d of lista) {
+      for (const r of await lerAgendaMarcada(token, d, d)) {
+        const inicio = String(r.Data_Atendimento ?? "").slice(0, 19).replace("T", " ");
+        const profissional = String(r.Medico ?? "").trim(), unidade = String(r.Unidade ?? "").trim();
+        if (!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(inicio) || !profissional || !unidade) continue;
+        const chave = `${inicio}|${profissional}|${unidade}`;
+        const g = agrupado.get(chave);
+        if (g) g.qtd += 1;
+        else agrupado.set(chave, { inicio, profissional, unidade, procedimento: String(r.Procedimento ?? "").trim(), qtd: 1 });
+      }
+    }
+    const linhas = [...agrupado.values()];
+    for (let i = 0; i < linhas.length; i += 1500) {
+      const { error: e } = await supabase.rpc("agenda_ocupacao_atualizar", { p_linhas: linhas.slice(i, i + 1500), p_execucao: null, p_finalizar: false });
+      if (e) throw new Error(e.message);
+    }
+    const { data: n, error: e2 } = await supabase.rpc("agenda_conferir_pre_agendamentos");
+    if (e2) throw new Error(e2.message);
+    return { esperando: lista.length, horarios_lidos: linhas.length, agendados: n };
+  } catch (e) {
+    await supabase.from("agenda_ocupacao_meta").update({ conferindo_ate: null }).eq("id", 1);   // libera a próxima rodada
+    throw e;
+  }
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method !== "POST") return new Response("Method not allowed", { status: 405 });
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
@@ -263,6 +300,15 @@ Deno.serve(async (req: Request) => {
         return json({ error: "Coluna com dado de paciente não pode ser inspecionada" }, 400);
       }
       return json(await inspecionar(id, token, filtros, typeof corpo.agrupar === "string" ? corpo.agrupar : null, somente));
+    } catch (e) {
+      return json({ error: e instanceof Error ? e.message : "erro desconhecido" }, 502);
+    }
+  }
+
+  // Conferência automática dos pré-agendamentos: {"agenda":"conferir"}
+  if (corpo?.agenda === "conferir") {
+    try {
+      return json(await agendaConferir(supabase, token));
     } catch (e) {
       return json({ error: e instanceof Error ? e.message : "erro desconhecido" }, 502);
     }
