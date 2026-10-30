@@ -499,6 +499,10 @@ begin
 end $$;
 grant execute on function public.chat_irmao_iniciar(uuid, text) to anon, authenticated;
 
--- ===== 7. Limpeza (rodar depois, por pessoa: o Supabase pede confirmação em "drop") =====
--- A assinatura antiga de 6 parâmetros precisa sair, senão chamadas com 6 argumentos ficam ambíguas:
--- drop function public.chat_iniciar(text, text, text, text, boolean, text);
+-- ===== 7. Funções internas fechadas e limpeza =====
+-- Ajudantes que só as funções do chat usam (elas são security definer e continuam funcionando): ninguém de fora chama direto.
+revoke all on function public.unidade_medicos(text) from public, anon, authenticated;
+revoke all on function public.consultas_da_unidade(text) from public, anon, authenticated;
+-- A assinatura antiga de 6 parâmetros precisa sair, senão chamadas com 6 argumentos ficam ambíguas
+-- (a nova aceita as mesmas chamadas antigas, pelos valores padrão). Já foi removida no projeto em 30/10/2026:
+-- drop function if exists public.chat_iniciar(text, text, text, text, boolean, text);

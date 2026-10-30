@@ -6,15 +6,20 @@ Atualizado em 30/10/2026. Descrição da fase: `docs/fase6-unidade-e-medico.md`.
 
 | Item | Estado |
 |---|---|
-| Código (chat, painel, SQL, docs) | Pronto na branch `claude/bold-clarke-igv39k`, **sem PR aberto** |
-| SQL no banco | **Não aplicado** (conferido: `unidade_config` não existe) |
-| n8n | **Versão antiga publicada** (`7bcf2009-34ff-4085-a17f-a931ff68188f`) |
-| PR #15 (Fila + assinatura biométrica) | Rascunho, **não mesclar**. Independente da Fase 6. Só conflita em `LEIAME.md` (texto) |
-| PRs #1 a #14, #16, #17 | Todos mesclados |
+| Banco (Fase 6 e 6b) | **Aplicado e conferido** em 30/10/2026: migrações `fase6_unidade_filho_e_ia_contexto`, `fase6_remove_chat_iniciar_antiga`, `fase6_catalogo_horarios_identidade`, `fase6_consulta_e_irmaos`, `fase6_fecha_funcoes_internas` (e o `fase6b-alerta-preco.sql`, rodado no SQL Editor) |
+| Código (chat, painel, docs) | Mesclado na `main` pelo PR #18 |
+| n8n | **Pendente: versão antiga publicada** (`7bcf2009-34ff-4085-a17f-a931ff68188f`). Sem as mudanças a IA não segue as instruções novas, não abre o seletor de consulta e ainda pode falar preço |
+| Funções provisórias da Fase 3 | Já não existem no banco |
+| Dados de teste | 4 contatos de teste ainda no banco (ver "Antes de abrir") |
+| PR #15 (Fila + assinatura biométrica) | Rascunho, **não mesclar**. Independente da Fase 6 |
 
-## Passo a passo (nesta ordem)
+## Passo a passo que falta
 
-1. **Banco**: Supabase > SQL Editor > rodar `supabase/fase6-unidade-e-medico.sql` inteiro e depois `supabase/fase6b-alerta-preco.sql` (os dois podem rodar de novo sem estragar nada). Conferir com:
+1. **n8n** (fluxo `Triagem IA - Atendimento`): fazer as mudanças a), b), c) e d) de "Mudança no n8n" em `docs/fase6-unidade-e-medico.md` e **publicar**. Se algo der errado, restaure a versão `7bcf2009-34ff-4085-a17f-a931ff68188f`.
+2. **Testar** (próxima seção) com telefones `7190000xxxx` e um atendente com o painel aberto.
+3. **Limpar os dados de teste** e abrir ao público.
+
+Conferência do banco (deve dar tudo `true`; já deu em 30/10/2026):
 
 ```sql
 select to_regclass('public.unidade_config') is not null as unidades,
@@ -27,21 +32,9 @@ select to_regclass('public.unidade_config') is not null as unidades,
   position('paciente_tipo' in pg_get_functiondef('public.paciente_conferir(uuid)'::regprocedure)) > 0 as identidade,
   to_regclass('public.alerta_preco') is not null as alerta_preco,
   exists (select 1 from pg_trigger where tgname = 'mensagens_conferir_preco') as gatilho_preco,
-  position('''precos'', v_precos' in pg_get_functiondef('public.ia_catalogo(text,uuid)'::regprocedure)) = 0 as ia_sem_preco;
+  position('''precos'', v_precos' in pg_get_functiondef('public.ia_catalogo(text,uuid)'::regprocedure)) = 0 as ia_sem_preco,
+  (select count(*) = 1 from pg_proc where proname = 'chat_iniciar' and pronamespace = 'public'::regnamespace) as so_uma_chat_iniciar;
 ```
-Tudo `true`. Se o script parar com "Trecho não encontrado", alguém mudou uma dessas funções: não force, chame o Claude.
-
-2. **Limpeza da função antiga** (só depois do passo 1; o Supabase pede confirmação):
-```sql
-drop function public.chat_iniciar(text, text, text, text, boolean, text);
-```
-Sem isso o chat novo falha com "function is not unique".
-
-3. **n8n** (fluxo `Triagem IA - Atendimento`): fazer as mudanças a), b), c) e d) de "Mudança no n8n" em `docs/fase6-unidade-e-medico.md` (mensagem do usuário, prompt, nó "Ler resposta da IA") e **publicar**. A versão atual é a `7bcf2009-34ff-4085-a17f-a931ff68188f`: se algo der errado, restaure-a no histórico de versões.
-
-4. **Publicar o chat e o painel**: abrir o PR da branch `claude/bold-clarke-igv39k` para `main` e mesclar (o GitHub Pages publica sozinho em ~1 min). Se o PR #15 for mesclado depois, o único conflito é no `LEIAME.md`.
-
-5. **Testar** (próxima seção). 6. **Limpar os dados de teste** e abrir ao público.
 
 ## Roteiro de teste
 
@@ -76,7 +69,6 @@ Teste 12 e 13 são os mais importantes e os únicos sem prova em produção.
 - [ ] **n8n**: nó de IA sem repetição e sem aviso de erro, e dependente dos créditos do n8n. Recomendado: credencial Anthropic própria, `retryOnFail` e um workflow de erro que avise a equipe.
 - [ ] **Segredo `ia_segredo`** digitado nos nós HTTP do n8n: mover para credencial Header Auth.
 - [ ] **Supabase Auth**: ligar "Prevent use of leaked passwords"; conferir "Confirm email", "Allow new users to sign up" desligado depois de cadastrar a equipe, e as URLs de redirecionamento (`LEIAME.md`).
-- [ ] **Função provisória**: remover `agenda_conferir_pre_agendamentos()` e `agenda_conferencia_iniciar(boolean)` (comando no fim de `supabase/fase3-conferencia-automatica.sql`).
 - [ ] **Klingo**: enviar o e-mail ao suporte (`docs/fase-0-email-suporte-klingo.md`), principalmente a pergunta sobre aviso/webhook de marcação.
 - [ ] **Edge Function**: baixar a versão publicada e comparar com `supabase/functions/sync-catalogo-klingo/`.
 - [ ] **Treinar a recepção**: três filhos da mesma mãe aparecem como três conversas ("Maria · Lucas", "Maria · Pedro"...).
@@ -85,7 +77,7 @@ Teste 12 e 13 são os mais importantes e os únicos sem prova em produção.
 
 - **Chat/painel**: reverter o merge no GitHub (o Pages republica). O painel antigo funciona sem as colunas novas.
 - **n8n**: restaurar a versão `7bcf2009-34ff-4085-a17f-a931ff68188f`.
-- **Banco**: as colunas e tabelas novas são aditivas e não atrapalham a versão antiga; a única mudança incompatível é o `drop` da `chat_iniciar` antiga (a nova aceita as mesmas chamadas antigas, então o chat antigo continua funcionando).
+- **Banco**: as colunas e tabelas novas são aditivas e não atrapalham a versão antiga; a nova `chat_iniciar` aceita as mesmas chamadas antigas (testado com o chat antigo).
 
 ## Fora desta fase
 

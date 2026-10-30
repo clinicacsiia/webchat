@@ -115,6 +115,7 @@ begin
 end $$;
 create or replace trigger mensagens_conferir_preco after insert on public.mensagens
   for each row execute function public.mensagens_conferir_preco_trg();
+revoke all on function public.mensagens_conferir_preco_trg() from public, anon, authenticated;   -- função de gatilho: ninguém chama direto
 
 -- ===== 5. A equipe marca o alerta como conferido =====
 create or replace function public.alerta_preco_conferir(p_conversa uuid) returns integer

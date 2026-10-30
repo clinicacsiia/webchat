@@ -1,6 +1,6 @@
 # Fase 6: unidade, "quem será atendido", filhos e médico de preferência no início do chat
 
-Data: 30/10/2026. SQL: `supabase/fase6-unidade-e-medico.sql`. Chat: `index.html`. **Nada disto está aplicado no projeto ainda** (ver "Como aplicar").
+Data: 30/10/2026. SQL: `supabase/fase6-unidade-e-medico.sql`. Chat: `index.html`. **Banco aplicado no projeto em 30/10/2026** (migrações `fase6_*`). **Falta o n8n** (ver "Mudança no n8n").
 
 ## A ideia
 
