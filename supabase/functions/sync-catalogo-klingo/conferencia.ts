@@ -56,10 +56,12 @@ const dataBR = (ini: string) => `${ini.slice(8, 10)}/${ini.slice(5, 7)} ${ini.sl
 export function avaliar(alvo: Alvo, linhas: Linha[]): Resultado {
   const procBate = (l: Linha) => alvo.procs.length === 0 || alvo.procs.some((p) =>
     l.procNorm === p || (l.procNorm.length >= 8 && p.length >= 8 && (l.procNorm.includes(p) || p.includes(l.procNorm))));
+  const procExato = (l: Linha) => alvo.procs.includes(l.procNorm);
+  // Telefone reconhece o paciente. Só pelo nome é mais frágil (homônimos): exige o nome IGUAL (não só parecido) e exame definido.
   const paciente = (l: Linha): Via | null => {
-    const t = alvo.fones.some((f) => l.fones.includes(f));
-    const n = alvo.nomes.some((x) => nomeConfere(x, l.nome));
-    return t && n ? "ambos" : t ? "telefone" : n ? "nome" : null;
+    if (alvo.fones.some((f) => l.fones.includes(f))) return alvo.nomes.some((x) => nomeConfere(x, l.nome)) ? "ambos" : "telefone";
+    const nomeLinha = normNome(l.nome);
+    return nomeLinha && alvo.procs.length > 0 && alvo.nomes.some((x) => normNome(x) === nomeLinha) ? "nome" : null;
   };
   const naPosicao = (l: Linha, s: Slot) =>
     l.prof === s.prof && l.unidade === s.unidade && (s.chegada ? l.dia === s.data : l.ini === `${s.data} ${s.hora}`);
@@ -67,7 +69,7 @@ export function avaliar(alvo: Alvo, linhas: Linha[]): Resultado {
   let via: Via | null = null;
   const slots = alvo.slots.map((s) => {
     const candidatas = linhas.filter((l) => naPosicao(l, s));
-    const boa = candidatas.map((l) => ({ l, v: paciente(l) })).find((c) => c.v && procBate(c.l));
+    const boa = candidatas.map((l) => ({ l, v: paciente(l) })).find((c) => c.v && procBate(c.l) && (c.v !== "nome" || procExato(c.l)));
     if (boa && boa.v) {
       if (!via || FORCA[boa.v] < FORCA[via]) via = boa.v;
       return { idx: s.idx, r: "ok" as const };

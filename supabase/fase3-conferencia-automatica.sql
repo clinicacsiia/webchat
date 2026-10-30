@@ -11,7 +11,7 @@
 -- conferencia_status: null (aguardando) | confirmado | horario_tomado | divergente | nao_encontrado | sumiu | remarcado
 -- Sem comandos destrutivos (o drop das duas funções provisórias da primeira versão está comentado no fim, esperando confirmação).
 
-alter table public.agenda_ocupacao add column if not exists primeira_vez timestamptz;
+alter table public.agenda_ocupacao add column if not exists primeira_vez timestamptz;   -- sem uso (da primeira versão, que não identificava o paciente)
 alter table public.agenda_ocupacao_meta add column if not exists conferindo_ate timestamptz;
 alter table public.pre_agendamentos add column if not exists agendado_auto_em timestamptz;
 alter table public.pre_agendamentos add column if not exists conferencia_status text
@@ -24,7 +24,7 @@ alter table public.pre_agendamentos add column if not exists confirmacao_enviada
 alter table public.conversas add column if not exists alerta_agenda text;
 
 -- ===== Alvos: o que conferir agora =====
--- p_lento = false: só o que mudou há pouco (pronto: 72 h; rascunho: 3 h). p_lento = true: tudo que ainda importa
+-- p_lento = false: só o que mudou há pouco (pronto: 6 h; rascunho: 3 h). p_lento = true: tudo que ainda importa
 -- (pronto e rascunho de até 7 dias, e os já confirmados, para perceber cancelamento ou remarcação).
 -- p_so_ver = true não pega a trava (usado pelo cron para decidir se vale chamar a função).
 create or replace function public.agenda_conferencia_alvos(p_lento boolean default false, p_so_ver boolean default false) returns jsonb
@@ -52,7 +52,7 @@ begin
     join public.conversas c on c.id = pa.conversa_id
     join public.contatos ct on ct.id = c.contato_id
     where jsonb_typeof(pa.escolha_horario) = 'array' and jsonb_array_length(pa.escolha_horario) > 0
-      and (   (pa.status = 'pronto' and (p_lento or pa.atualizado_em > now() - interval '72 hours'))
+      and (   (pa.status = 'pronto' and (p_lento or pa.atualizado_em > now() - interval '6 hours'))
            or (pa.status = 'rascunho' and pa.atualizado_em > now() - case when p_lento then interval '7 days' else interval '3 hours' end)
            or (pa.status = 'agendado' and p_lento and pa.conferencia_status in ('confirmado','sumiu','remarcado')))
       and exists (select 1 from jsonb_array_elements(pa.escolha_horario) e where (e ->> 'data')::date >= v_hoje - 1)
@@ -124,7 +124,7 @@ declare
   v_total int; v_ok int; v_outro int; v_passou boolean; v_div text; v_via text; v_ini timestamp;
   v_conf text; v_det text; v_alerta text; v_falhas int;
   v_agora timestamp := now() at time zone 'America/Bahia';
-  v_confirmados int := 0; v_alertas int := 0;
+  v_confirmados int := 0; v_alertas int := 0; v_req int;
 begin
   if p_resultados is not null and jsonb_typeof(p_resultados) = 'array' then
     for e in select x from jsonb_array_elements(p_resultados) x loop
@@ -146,6 +146,17 @@ begin
           end if;
         end loop;
         if v_total = 0 then continue; end if;
+        -- só confirma quando todos os horários que o pedido exige (um por grupo de exame/sala) foram escolhidos
+        v_req := null;
+        begin
+          if not exists (select 1 from public.pre_agendamento_itens i where i.conversa_id = pa.conversa_id and i.ativo and i.procedimento_id is null) then
+            select jsonb_array_length(public.agenda_grupos(array_agg(i.procedimento_id order by i.id))) into v_req
+            from public.pre_agendamento_itens i, lateral generate_series(1, i.quantidade) g
+            where i.conversa_id = pa.conversa_id and i.ativo and i.procedimento_id is not null;
+          end if;
+        exception when others then v_req := null;
+        end;
+        if v_req is not null and v_total < v_req then continue; end if;
         v_div := left(nullif(btrim(coalesce(e ->> 'div', '')), ''), 300);
         v_via := case when e ->> 'via' in ('telefone','nome','ambos') then e ->> 'via' end;
         v_conf := null; v_det := null; v_alerta := null; v_falhas := 0;
@@ -210,8 +221,21 @@ grant execute on function public.agenda_conferencia_liberar() to service_role;
 --   drop function if exists public.agenda_conferir_pre_agendamentos();
 --   drop function if exists public.agenda_conferencia_iniciar(boolean);
 
+-- ===== chat_pedido_salvar: pedido concluído não é trocado; trocar o pedido apaga o horário escolhido antes =====
+do $$
+declare d text; d2 text;
+begin
+  d := pg_get_functiondef('public.chat_pedido_salvar(uuid,text,jsonb)'::regprocedure);
+  if position('Este pedido já foi concluído' in d) = 0 then
+    d2 := replace(d, 'update public.pre_agendamento_itens set ativo = false where conversa_id = p_conversa and ativo;',
+      E'if exists (select 1 from public.pre_agendamentos where conversa_id = p_conversa and status in (''agendado'',''cancelado'')) then\n    raise exception ''Este pedido já foi concluído. Inicie um novo atendimento para outro exame.'' using errcode = ''22023'';\n  end if;\n  update public.pre_agendamentos set escolha_horario = null, data_desejada = null, hora_desejada = null,\n    etapa = case when etapa in (''dados'',''confirmacao'') then ''data_hora'' else etapa end\n    where conversa_id = p_conversa and escolha_horario is not null;\n  update public.pre_agendamento_itens set ativo = false where conversa_id = p_conversa and ativo;');
+    if d2 = d then raise exception 'chat_pedido_salvar: substituição não aplicada'; end if;
+    execute d2;
+  end if;
+end $$;
+
 -- ===== Crons (UTC) =====
-select cron.unschedule('agenda-conferir');   -- só ao reaplicar; na primeira vez o job da versão anterior é substituído
+select cron.unschedule(jobid) from cron.job where jobname in ('agenda-conferir', 'agenda-revisar');   -- não falha se ainda não existirem
 select cron.schedule('agenda-conferir', '15 seconds', $job$
   select net.http_post(
     url := 'https://nrvuynjwcgwpjdptkiay.supabase.co/functions/v1/sync-catalogo-klingo',

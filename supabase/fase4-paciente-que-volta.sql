@@ -34,7 +34,7 @@ create or replace function public.pre_agendamento_historico_trg() returns trigge
 language plpgsql security definer set search_path to '' as $$
 declare v_pid uuid;
 begin
-  if new.status = 'cancelado' and old.status = 'agendado' then
+  if new.status in ('rascunho', 'pronto', 'cancelado') and old.status = 'agendado' then
     update public.paciente_historico set cancelado = true where pre_agendamento_id = new.id;
     return new;
   end if;
@@ -88,7 +88,7 @@ begin
   v_conf := public.paciente_conferir(p_conversa);
   v_pid := nullif(v_conf ->> 'paciente_id', '')::uuid;
   if v_pid is null then return jsonb_build_object('tem_historico', false); end if;
-  v_lib := (v_conf ->> 'dt_nasc_conferida') = 'true';
+  v_lib := coalesce((v_conf ->> 'dt_nasc_conferida') = 'true', false);   -- NULL (data ainda não informada) nunca libera
   select count(*) into v_n from public.paciente_historico where paciente_id = v_pid and not cancelado;
   v_pend := public.pre_pendencia_anterior(p_conversa);
   if v_n = 0 and v_pend is null then return jsonb_build_object('tem_historico', false); end if;
@@ -131,7 +131,8 @@ begin
   if exists (select 1 from public.pre_agendamento_itens where conversa_id = p_conversa and ativo) then return false; end if;
   if p_origem = 'ultimo' then
     select h.exames into v_ex from public.paciente_historico h
-      where h.paciente_id = v_pid and not h.cancelado and jsonb_array_length(h.exames) > 0 order by h.criado_em desc limit 1;
+      where h.paciente_id = v_pid and not h.cancelado and jsonb_array_length(h.exames) > 0
+      order by coalesce(h.ocorreu_em, h.criado_em at time zone 'America/Bahia') desc limit 1;   -- mesma ordem que a IA vê em ultimas[0]
   elsif p_origem = 'pendente' then
     v_orig := public.pre_pendencia_anterior(p_conversa);
     if v_orig is null then return false; end if;

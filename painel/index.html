@@ -282,7 +282,7 @@
   }
   async function carregarPre() {
     const id = S.abertaId;
-    if (!id) { S.pre = null; renderPre(); return; }
+    if (!id) { S.pre = null; S.preSig = null; renderPre(); return; }
     const [{ data }, { data: itens }] = await Promise.all([
       db.from('pre_agendamentos').select('*').eq('conversa_id', id).maybeSingle(),
       db.from('pre_agendamento_itens').select('modalidade,regiao_nome,lado,procedimento,quantidade').eq('conversa_id', id).eq('ativo', true).order('id')
@@ -293,15 +293,22 @@
         .eq('paciente_id', data.paciente_id).order('criado_em', { ascending: false }).limit(6);
       hist = r.data || [];
     }
-    if (S.abertaId === id) { S.pre = data || null; S.preItens = itens || []; S.preHist = hist; renderPre(); }
+    if (S.abertaId !== id) return;
+    // Só redesenha se algo mudou: a releitura a cada 15 s não pode fechar as seções abertas (Dados do paciente, Histórico).
+    const sig = JSON.stringify([data, itens, hist]);
+    if (sig === S.preSig) return;
+    S.preSig = sig; S.pre = data || null; S.preItens = itens || []; S.preHist = hist; renderPre();
   }
   // O status "Agendado" muda sozinho (conferência automática a cada 15 s): reler enquanto uma conversa está aberta.
   setInterval(() => { if (S.abertaId && S.aba === 'atendimento' && !document.hidden) carregarPre(); }, 15000);
   async function statusPre(status) {
     if (!S.pre) return;
-    const { error } = await db.from('pre_agendamentos').update({ status, atualizado_em: new Date().toISOString() }).eq('id', S.pre.id);
+    // O atendente resolveu: some o alerta da conferência automática (faixa do pré-agendamento e selo da lista).
+    const { error } = await db.from('pre_agendamentos').update({ status, conferencia_status: null, conferencia_detalhe: null, atualizado_em: new Date().toISOString() }).eq('id', S.pre.id);
     if (error) { toast(msgErro(error)); return; }
-    S.pre.status = status; renderPre();
+    await db.from('conversas').update({ alerta_agenda: null }).eq('id', S.pre.conversa_id);
+    S.pre.status = status; S.pre.conferencia_status = null; S.pre.conferencia_detalhe = null; S.preSig = null; renderPre();
+    const c = conversaAberta(); if (c) { c.alerta_agenda = null; renderLista(); }
   }
   function renderPre() {
     const box = document.getElementById('pre'); if (!box) return;
@@ -572,7 +579,7 @@
     }));
   }
   async function abrirConversa(id) {
-    S.abertaId = id; S.msgs = []; S.vistos = new Set(); S.pre = null;
+    S.abertaId = id; S.msgs = []; S.vistos = new Set(); S.pre = null; S.preSig = null;
     document.getElementById('inbox')?.classList.add('aberta');
     renderLista(); renderChat(); carregarPre();
     const { data, error } = await db.from('mensagens').select('id,conversa_id,autor,agente_id,texto,criado_em').eq('conversa_id', id).order('id').limit(1000);

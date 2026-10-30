@@ -45,9 +45,22 @@ test("ok: mesmo horário, sala, unidade, exame e telefone", () => {
   assert.equal(r.div, null);
 });
 
-test("ok só pelo telefone, ou só pelo nome", () => {
+test("ok só pelo telefone, ou só pelo nome IGUAL com exame igual", () => {
   assert.equal(avaliar(alvo(), [linha({ Paciente: "Fulana Outra" })]).via, "telefone");
   assert.equal(avaliar(alvo(), [linha({ Telefone: "" })]).via, "nome");
+});
+
+test("só pelo nome parecido (homônimo) não confirma", () => {
+  const r = avaliar(alvo({ nomes: ["MARIA SILVA"] }), [linha({ Paciente: "Maria Silva Santos", Telefone: "(71) 91111-2222" })]);
+  assert.equal(r.slots[0].r, "outro");
+  assert.equal(r.via, null);
+});
+
+test("só pelo nome, sem exame definido ou com exame só parecido, não confirma", () => {
+  assert.equal(avaliar(alvo({ procs: [] }), [linha({ Telefone: "" })]).slots[0].r, "outro");
+  const a = alvo({ procs: ["RESSONANCIA MAGNETICA DE JOELHO"] });
+  assert.equal(avaliar(a, [linha({ Telefone: "" })]).slots[0].r, "outro");
+  assert.equal(avaliar(a, [linha()]).slots[0].r, "ok"); // com telefone, exame parecido basta
 });
 
 test("horário ocupado por outra pessoa vira 'outro'", () => {

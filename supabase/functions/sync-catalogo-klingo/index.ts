@@ -258,26 +258,32 @@ async function agendaConferir(supabase: Supa, token: string, lento: boolean) {
     const dias = [...new Set(alvos.flatMap((a) => a.slots.map((s) => s.data)))].filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
     const linhas: Linha[] = [];
     const agrupado = new Map<string, { inicio: string; profissional: string; unidade: string; procedimento: string; qtd: number }>();
+    const falhou = new Set<string>();   // um dia que o Klingo não entregou só deixa sem veredito quem depende dele
     for (const d of dias) {
-      for (const r of await lerAgendaMarcada(token, d, d)) {
-        const l = linhaDe(r);
-        if (!l) continue;
-        linhas.push(l);
-        const chave = `${l.ini}|${l.profOrig}|${l.unidadeOrig}`;
-        const g = agrupado.get(chave);
-        if (g) g.qtd += 1;
-        else agrupado.set(chave, { inicio: l.ini, profissional: l.profOrig, unidade: l.unidadeOrig, procedimento: l.proc, qtd: 1 });
+      try {
+        for (const r of await lerAgendaMarcada(token, d, d)) {
+          const l = linhaDe(r);
+          if (!l) continue;
+          linhas.push(l);
+          const chave = `${l.ini}|${l.profOrig}|${l.unidadeOrig}`;
+          const g = agrupado.get(chave);
+          if (g) g.qtd += 1;
+          else agrupado.set(chave, { inicio: l.ini, profissional: l.profOrig, unidade: l.unidadeOrig, procedimento: l.proc, qtd: 1 });
+        }
+      } catch {
+        falhou.add(d);
       }
     }
+    if (dias.length > 0 && falhou.size === dias.length) throw new Error("O Klingo não entregou nenhum dia da agenda marcada");
     const ocupacao = [...agrupado.values()];
     for (let i = 0; i < ocupacao.length; i += 1500) {
       const { error: e } = await supabase.rpc("agenda_ocupacao_atualizar", { p_linhas: ocupacao.slice(i, i + 1500), p_execucao: null, p_finalizar: false });
       if (e) throw new Error(e.message);
     }
-    const resultados = alvos.map((a) => avaliar(a, linhas));
+    const resultados = alvos.filter((a) => a.slots.every((s) => !falhou.has(s.data))).map((a) => avaliar(a, linhas));
     const { data: aplicado, error: e2 } = await supabase.rpc("agenda_conferencia_aplicar", { p_resultados: resultados });
     if (e2) throw new Error(e2.message);
-    return { alvos: alvos.length, dias: dias.length, horarios_lidos: ocupacao.length, ...(aplicado as Row) };
+    return { alvos: alvos.length, avaliados: resultados.length, dias: dias.length, dias_com_erro: falhou.size, horarios_lidos: ocupacao.length, ...(aplicado as Row) };
   } catch (e) {
     await supabase.rpc("agenda_conferencia_liberar");   // libera a próxima rodada
     throw e;
