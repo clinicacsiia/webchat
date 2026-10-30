@@ -252,6 +252,9 @@
   };
   /* ---------- pré-agendamento montado pela IA ---------- */
   const ROTULO_PRE = { rascunho: 'Em coleta', pronto: 'Pronto para marcar', agendado: 'Agendado', cancelado: 'Cancelado' };
+  const ROTULO_IDENT = { nova: 'Paciente novo: validar no Klingo', aguardando: 'Parece já ser paciente: data de nascimento ainda não conferida',
+    conferida: 'Paciente conhecido: identidade conferida', atualizar: 'Paciente conhecido: alguns dados foram atualizados, conferir',
+    divergente: 'Dados não batem com o cadastro que temos: tratar como paciente novo e conferir' };
   const CAMPOS_PRE = [['nome', 'Nome'], ['nome_social', 'Nome social'], ['sexo', 'Sexo'], ['dt_nasc', 'Nascimento'], ['mae', 'Mãe'], ['cpf', 'CPF'], ['rg', 'RG'], ['cns', 'CNS'],
     ['celular', 'Celular'], ['telefone', 'Telefone'], ['email', 'E-mail'], ['cep', 'CEP'], ['endereco', 'Rua'], ['numero', 'Número'], ['complemento', 'Compl.'],
     ['bairro', 'Bairro'], ['cidade', 'Cidade'], ['uf', 'UF'], ['matricula', 'Carteirinha'], ['validade', 'Validade']];
@@ -280,6 +283,7 @@
     const aberto = p.status === 'rascunho' || p.status === 'pronto';
     box.replaceChildren(h('div', { class: 'pre' },
       h('b', {}, 'Pré-agendamento'), h('span', { class: 'urg ' + (p.status === 'pronto' ? '' : 'media') }, ROTULO_PRE[p.status] || p.status),
+      p.identidade ? h('div', { class: 'urg ' + (p.identidade === 'conferida' ? '' : p.identidade === 'divergente' ? 'alta' : 'media'), style: 'display:inline-block;margin-top:4px' }, ROTULO_IDENT[p.identidade] || p.identidade) : null,
       resumo ? h('div', {}, resumo) : null,
       linhas.length ? h('details', {}, h('summary', {}, 'Dados do paciente (' + linhas.length + ')'),
         h('dl', {}, linhas.map(([k, r]) => [h('dt', {}, r), h('dd', {}, p.paciente[k])]))) : null,
