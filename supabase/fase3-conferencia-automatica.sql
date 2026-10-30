@@ -1,72 +1,228 @@
--- Fase 3: o status "Agendado" muda sozinho.
--- A cada 15 s o pg_cron chama a Edge Function (só se houver pré-agendamento esperando), que lê o relatório #7 SÓ dos dias esperados
--- e a função agenda_conferir_pre_agendamentos() compara. Nenhum dado de paciente do Klingo é lido para isso nem gravado.
--- Regra do "é desta conversa": o horário (data+hora+médico+unidade) escolhido no chat apareceu OCUPADO depois que a conversa começou
--- e o exame lançado é um dos pedidos. Reserva por ordem de chegada (sem hora exata) não é conferida automaticamente.
+-- Fase 3: conferência automática da marcação no Klingo. JÁ APLICADO no projeto webchat-atendimento (30/10/2026).
+--
+-- Como funciona:
+--   * cron 'agenda-conferir' (a cada 15 s) e 'agenda-revisar' (a cada 10 min) só chamam a Edge Function sync-catalogo-klingo
+--     {"agenda":"conferir"} quando há pré-agendamento esperando (agenda_conferencia_ha_trabalho).
+--   * A Edge Function pede os alvos (agenda_conferencia_alvos), lê o relatório #7 só dos dias necessários, compara na MEMÓRIA
+--     (telefone e nome do paciente x linhas do Klingo) e devolve só o veredito por horário (ok / outro / livre) + um texto curto
+--     de divergência. Nome, telefone e prontuário do Klingo nunca são gravados nem escritos em log.
+--   * agenda_conferencia_aplicar grava o veredito: status 'agendado' sozinho, alertas, e a mensagem de confirmação ao paciente.
+--
+-- conferencia_status: null (aguardando) | confirmado | horario_tomado | divergente | nao_encontrado | sumiu | remarcado
+-- Sem comandos destrutivos (o drop das duas funções provisórias da primeira versão está comentado no fim, esperando confirmação).
 
-alter table public.agenda_ocupacao add column if not exists primeira_vez timestamptz;   -- linhas antigas ficam nulas (= já existiam)
-alter table public.agenda_ocupacao alter column primeira_vez set default now();
+alter table public.agenda_ocupacao add column if not exists primeira_vez timestamptz;
 alter table public.agenda_ocupacao_meta add column if not exists conferindo_ate timestamptz;
 alter table public.pre_agendamentos add column if not exists agendado_auto_em timestamptz;
+alter table public.pre_agendamentos add column if not exists conferencia_status text
+  check (conferencia_status in ('confirmado','horario_tomado','divergente','nao_encontrado','sumiu','remarcado'));
+alter table public.pre_agendamentos add column if not exists conferencia_detalhe text;
+alter table public.pre_agendamentos add column if not exists conferencia_via text check (conferencia_via in ('telefone','nome','ambos'));
+alter table public.pre_agendamentos add column if not exists conferencia_em timestamptz;
+alter table public.pre_agendamentos add column if not exists conferencia_falhas integer not null default 0;
+alter table public.pre_agendamentos add column if not exists confirmacao_enviada_em timestamptz;
+alter table public.conversas add column if not exists alerta_agenda text;
 
--- Dias que têm pré-agendamento esperando. Devolve vazio se outra conferência ainda está rodando.
-create or replace function public.agenda_conferencia_iniciar(p_so_ver boolean default false) returns date[]
+-- ===== Alvos: o que conferir agora =====
+-- p_lento = false: só o que mudou há pouco (pronto: 72 h; rascunho: 3 h). p_lento = true: tudo que ainda importa
+-- (pronto e rascunho de até 7 dias, e os já confirmados, para perceber cancelamento ou remarcação).
+-- p_so_ver = true não pega a trava (usado pelo cron para decidir se vale chamar a função).
+create or replace function public.agenda_conferencia_alvos(p_lento boolean default false, p_so_ver boolean default false) returns jsonb
 language plpgsql security definer set search_path to '' as $$
-declare v_dias date[];
+declare v_alvos jsonb; v_dias jsonb; v_hoje date := (now() at time zone 'America/Bahia')::date;
 begin
-  select array_agg(distinct (e ->> 'data')::date) into v_dias
-  from public.pre_agendamentos pa, jsonb_array_elements(coalesce(pa.escolha_horario, '[]'::jsonb)) e
-  where pa.status in ('rascunho','pronto') and coalesce((e ->> 'chegada')::boolean, false) = false
-    and (e ->> 'data')::date >= current_date - 1;
-  if v_dias is null then return '{}'; end if;
-  if p_so_ver then
-    return case when exists (select 1 from public.agenda_ocupacao_meta where id = 1 and coalesce(conferindo_ate, '-infinity') > now()) then '{}' else v_dias end;
-  end if;
-  update public.agenda_ocupacao_meta set conferindo_ate = now() + interval '45 seconds'
-    where id = 1 and coalesce(conferindo_ate, '-infinity') <= now();
-  if not found then return '{}'; end if;
-  return v_dias[1:8];
-end $$;
-revoke all on function public.agenda_conferencia_iniciar(boolean) from public, anon, authenticated;
-grant execute on function public.agenda_conferencia_iniciar(boolean) to service_role;
-
-create or replace function public.agenda_conferir_pre_agendamentos() returns integer
-language plpgsql security definer set search_path to '' as $$
-declare v_n integer;
-begin
-  with ok as (
-    select pa.id
+  select coalesce(jsonb_agg(t.alvo order by t.primeiro), '[]'::jsonb) into v_alvos from (
+    select jsonb_build_object(
+        'id', pa.id, 'status', pa.status, 'conf', pa.conferencia_status,
+        'fones', (select coalesce(jsonb_agg(distinct q.f), '[]'::jsonb) from (
+                    select right(regexp_replace(x, '\D', '', 'g'), 8) as f
+                    from unnest(array[pa.paciente ->> 'celular', pa.paciente ->> 'telefone', ct.telefone]) x
+                    where length(regexp_replace(coalesce(x, ''), '\D', '', 'g')) >= 8) q),
+        'nomes', (select coalesce(jsonb_agg(distinct q.n), '[]'::jsonb) from (
+                    select public.norm_nome(x) as n from unnest(array[pa.paciente ->> 'nome', ct.nome]) x) q where q.n is not null),
+        'procs', (select coalesce(jsonb_agg(distinct public.norm_nome(i.procedimento)), '[]'::jsonb)
+                  from public.pre_agendamento_itens i where i.conversa_id = pa.conversa_id and i.ativo and public.norm_nome(i.procedimento) is not null),
+        'slots', (select jsonb_agg(jsonb_build_object('idx', s.ord - 1, 'data', s.e ->> 'data', 'hora', s.e ->> 'hora',
+                         'prof', coalesce(public.norm_nome(s.e ->> 'profissional'), ''), 'unidade', coalesce(public.norm_nome(s.e ->> 'unidade'), ''),
+                         'chegada', coalesce((s.e ->> 'chegada')::boolean, false), 'min', coalesce((s.e ->> 'min')::int, 30)) order by s.ord)
+                  from jsonb_array_elements(pa.escolha_horario) with ordinality s(e, ord))
+      ) as alvo,
+      (select min((e ->> 'data')::date) from jsonb_array_elements(pa.escolha_horario) e) as primeiro
     from public.pre_agendamentos pa
-    where pa.status in ('rascunho','pronto')
-      and exists (select 1 from jsonb_array_elements(pa.escolha_horario) e where coalesce((e ->> 'chegada')::boolean, false) = false)
-      and not exists (            -- todo horário com hora exata precisa ter aparecido na agenda do Klingo
-        select 1 from jsonb_array_elements(pa.escolha_horario) e
-        where coalesce((e ->> 'chegada')::boolean, false) = false
-          and not exists (
-            select 1 from public.agenda_ocupacao o
-            where o.fonte = 'marcada'
-              and o.inicio = (e ->> 'data')::date + (e ->> 'hora')::time
-              and o.profissional = public.norm_nome(e ->> 'profissional')
-              and o.unidade = public.norm_nome(e ->> 'unidade')
-              and o.primeira_vez >= pa.criado_em
-              and (o.procedimento is null or exists (
-                    select 1 from public.pre_agendamento_itens i
-                    where i.conversa_id = pa.conversa_id and i.ativo and public.norm_nome(i.procedimento) = public.norm_nome(o.procedimento)))))
-  ), up as (
-    update public.pre_agendamentos pa set status = 'agendado', atualizado_em = now(), agendado_auto_em = now()
-    from ok where pa.id = ok.id returning 1)
-  select count(*) into v_n from up;
-  update public.agenda_ocupacao_meta set conferindo_ate = null where id = 1;
-  return v_n;
-end $$;
-revoke all on function public.agenda_conferir_pre_agendamentos() from public, anon, authenticated;
-grant execute on function public.agenda_conferir_pre_agendamentos() to service_role;
+    join public.conversas c on c.id = pa.conversa_id
+    join public.contatos ct on ct.id = c.contato_id
+    where jsonb_typeof(pa.escolha_horario) = 'array' and jsonb_array_length(pa.escolha_horario) > 0
+      and (   (pa.status = 'pronto' and (p_lento or pa.atualizado_em > now() - interval '72 hours'))
+           or (pa.status = 'rascunho' and pa.atualizado_em > now() - case when p_lento then interval '7 days' else interval '3 hours' end)
+           or (pa.status = 'agendado' and p_lento and pa.conferencia_status in ('confirmado','sumiu','remarcado')))
+      and exists (select 1 from jsonb_array_elements(pa.escolha_horario) e where (e ->> 'data')::date >= v_hoje - 1)
+  ) t;
 
--- Cron a cada 15 s, mas só dispara a Edge Function quando há pré-agendamento esperando.
+  select coalesce(jsonb_agg(d order by d), '[]'::jsonb) into v_dias from (
+    select distinct (s ->> 'data') as d from jsonb_array_elements(v_alvos) a, jsonb_array_elements(a -> 'slots') s) q;
+
+  if jsonb_array_length(v_alvos) = 0 then return jsonb_build_object('dias', '[]'::jsonb, 'alvos', '[]'::jsonb); end if;
+  if p_so_ver then
+    if exists (select 1 from public.agenda_ocupacao_meta where id = 1 and coalesce(conferindo_ate, '-infinity') > now()) then
+      return jsonb_build_object('dias', '[]'::jsonb, 'alvos', '[]'::jsonb);
+    end if;
+  else
+    update public.agenda_ocupacao_meta set conferindo_ate = now() + case when p_lento then interval '100 seconds' else interval '45 seconds' end
+      where id = 1 and coalesce(conferindo_ate, '-infinity') <= now();
+    if not found then return jsonb_build_object('dias', '[]'::jsonb, 'alvos', '[]'::jsonb); end if;
+  end if;
+  return jsonb_build_object('dias', v_dias, 'alvos', v_alvos);
+end $$;
+revoke all on function public.agenda_conferencia_alvos(boolean, boolean) from public, anon, authenticated;
+grant execute on function public.agenda_conferencia_alvos(boolean, boolean) to service_role;
+
+create or replace function public.agenda_conferencia_ha_trabalho(p_lento boolean default false) returns boolean
+language sql security definer set search_path to '' as $$
+  select jsonb_array_length(public.agenda_conferencia_alvos(p_lento, true) -> 'alvos') > 0
+$$;
+revoke all on function public.agenda_conferencia_ha_trabalho(boolean) from public, anon, authenticated;
+grant execute on function public.agenda_conferencia_ha_trabalho(boolean) to service_role;
+
+-- ===== Mensagem de confirmação ao paciente (uma vez por pré-agendamento) =====
+create or replace function public.pre_enviar_confirmacao(p_pre uuid) returns void
+language plpgsql security definer set search_path to '' as $$
+declare
+  pa public.pre_agendamentos; v_ex text; v_hr text; v_prep text; v_txt text;
+  v_dias text[] := array['domingo','segunda-feira','terça-feira','quarta-feira','quinta-feira','sexta-feira','sábado'];
+begin
+  select * into pa from public.pre_agendamentos where id = p_pre and confirmacao_enviada_em is null for update;
+  if not found then return; end if;
+  select string_agg('• ' || case i.modalidade when 'RM' then 'Ressonância magnética' when 'TC' then 'Tomografia' when 'US' then 'Ultrassom' when 'RX' then 'Raio-X'
+                                  when 'MAMO' then 'Mamografia' when 'DENSITO' then 'Densitometria óssea' else i.modalidade end
+        || coalesce(' — ' || i.regiao_nome, '')
+        || case i.lado when 'D' then ' (lado direito)' when 'E' then ' (lado esquerdo)' when 'A' then ' (os dois lados)' else '' end
+        || ': ' || coalesce(i.procedimento, 'exame a definir') || case when i.quantidade > 1 then ' ×' || i.quantidade else '' end, E'\n' order by i.id)
+    into v_ex from public.pre_agendamento_itens i where i.conversa_id = pa.conversa_id and i.ativo;
+  v_ex := coalesce(v_ex, '• ' || coalesce(pa.procedimento, pa.especialidade, 'Atendimento'));
+  select string_agg('• ' || v_dias[extract(dow from (e ->> 'data')::date)::int + 1] || ', ' || to_char((e ->> 'data')::date, 'DD/MM')
+        || case when coalesce((e ->> 'chegada')::boolean, false) then ', por ordem de chegada a partir das ' else ' às ' end || (e ->> 'hora')
+        || coalesce(' — ' || regexp_replace(e ->> 'unidade', '^CLÍNICA DE SAÚDE E IMAGEM - ', ''), ''), E'\n' order by (e ->> 'data'), (e ->> 'hora'))
+    into v_hr from jsonb_array_elements(pa.escolha_horario) e;
+  select string_agg('• ' || p.nome || ': ' || case when length(btrim(p.preparo)) > 1200 then left(btrim(p.preparo), 1200) || ' […] (a equipe passa o restante)' else btrim(p.preparo) end, E'\n' order by p.nome) into v_prep
+    from public.catalogo_procedimento p
+    where p.id in (select i.procedimento_id from public.pre_agendamento_itens i where i.conversa_id = pa.conversa_id and i.ativo and i.procedimento_id is not null)
+      and nullif(btrim(p.preparo), '') is not null;
+  v_txt := 'Boa notícia: sua marcação foi confirmada no sistema da clínica.' || E'\n\nExames:\n' || v_ex || E'\n\nQuando e onde:\n' || coalesce(v_hr, '—')
+    || case when v_prep is not null then E'\n\nPreparo (conforme o cadastro da clínica):\n' || v_prep else E'\n\nSe houver preparo, a equipe passa as orientações.' end
+    || E'\n\nSe precisar remarcar ou cancelar, é só responder aqui.';
+  insert into public.mensagens (conversa_id, autor, texto) values (pa.conversa_id, 'agente', left(v_txt, 4000));
+  update public.pre_agendamentos set confirmacao_enviada_em = now() where id = pa.id;
+end $$;
+revoke all on function public.pre_enviar_confirmacao(uuid) from public, anon, authenticated, service_role;
+
+-- ===== Aplica o veredito da Edge Function =====
+-- p_resultados: [{"id": uuid, "slots": [{"idx": 0, "r": "ok"|"outro"|"livre"}], "via": "telefone"|"nome"|"ambos"|null, "div": texto|null}]
+create or replace function public.agenda_conferencia_aplicar(p_resultados jsonb) returns jsonb
+language plpgsql security definer set search_path to '' as $$
+declare
+  e jsonb; s jsonb; it jsonb; pa public.pre_agendamentos;
+  v_total int; v_ok int; v_outro int; v_passou boolean; v_div text; v_via text; v_ini timestamp;
+  v_conf text; v_det text; v_alerta text; v_falhas int;
+  v_agora timestamp := now() at time zone 'America/Bahia';
+  v_confirmados int := 0; v_alertas int := 0;
+begin
+  if p_resultados is not null and jsonb_typeof(p_resultados) = 'array' then
+    for e in select x from jsonb_array_elements(p_resultados) x loop
+      begin
+        select * into pa from public.pre_agendamentos where id = nullif(e ->> 'id', '')::uuid for update skip locked;
+        if not found or jsonb_typeof(pa.escolha_horario) <> 'array' then continue; end if;
+        v_total := 0; v_ok := 0; v_outro := 0; v_passou := false;
+        for s in select x from jsonb_array_elements(case when jsonb_typeof(e -> 'slots') = 'array' then e -> 'slots' else '[]'::jsonb end) x loop
+          it := pa.escolha_horario -> (s ->> 'idx')::int;
+          if it is null then continue; end if;
+          v_total := v_total + 1;
+          if s ->> 'r' = 'ok' then
+            v_ok := v_ok + 1;
+          else
+            if s ->> 'r' = 'outro' then v_outro := v_outro + 1; end if;
+            v_ini := case when coalesce((it ->> 'chegada')::boolean, false) then ((it ->> 'data')::date + 1)::timestamp
+                          else (it ->> 'data')::date + (it ->> 'hora')::time + make_interval(mins => coalesce((it ->> 'min')::int, 30) + 60) end;
+            if v_ini < v_agora then v_passou := true; end if;
+          end if;
+        end loop;
+        if v_total = 0 then continue; end if;
+        v_div := left(nullif(btrim(coalesce(e ->> 'div', '')), ''), 300);
+        v_via := case when e ->> 'via' in ('telefone','nome','ambos') then e ->> 'via' end;
+        v_conf := null; v_det := null; v_alerta := null; v_falhas := 0;
+
+        if v_ok = v_total then
+          v_conf := 'confirmado';
+        elsif pa.status = 'agendado' then
+          if v_passou then continue; end if;
+          if v_div is not null then
+            v_conf := 'remarcado'; v_det := v_div; v_alerta := 'Marcação remarcada no Klingo';
+          elsif coalesce(pa.conferencia_falhas, 0) + 1 >= 2 then
+            v_conf := 'sumiu'; v_falhas := 2; v_alerta := 'Marcação sumiu do Klingo';
+            v_det := 'A marcação deixou de aparecer na agenda do Klingo (cancelada ou remarcada?). Confira com o paciente.';
+          else
+            update public.pre_agendamentos set conferencia_falhas = coalesce(conferencia_falhas, 0) + 1 where id = pa.id;
+            continue;
+          end if;
+        else
+          if v_div is not null then
+            v_conf := 'divergente'; v_det := v_div; v_alerta := 'Marcação diferente do que foi escolhido';
+          elsif v_outro > 0 then
+            v_conf := 'horario_tomado'; v_alerta := 'Horário ocupado no Klingo';
+            v_det := 'O horário escolhido foi ocupado no Klingo por uma marcação que não bate com este paciente (outro nome ou telefone?). Confira ou ofereça outro horário.';
+          elsif v_passou then
+            v_conf := 'nao_encontrado'; v_alerta := 'Marcação não apareceu no Klingo';
+            v_det := 'O horário escolhido já passou e nenhuma marcação deste paciente apareceu no Klingo.';
+          end if;
+        end if;
+
+        if v_conf = 'confirmado' then
+          if pa.status in ('rascunho','pronto') then
+            update public.pre_agendamentos set status = 'agendado', conferencia_status = 'confirmado', conferencia_detalhe = null, conferencia_via = v_via,
+              conferencia_em = now(), conferencia_falhas = 0, agendado_auto_em = now(), atualizado_em = now() where id = pa.id;
+            perform public.pre_enviar_confirmacao(pa.id);
+            v_confirmados := v_confirmados + 1;
+          elsif pa.conferencia_status is distinct from 'confirmado' or coalesce(pa.conferencia_falhas, 0) <> 0 then
+            update public.pre_agendamentos set conferencia_status = 'confirmado', conferencia_detalhe = null, conferencia_em = now(), conferencia_falhas = 0 where id = pa.id;
+          end if;
+        elsif pa.conferencia_status is distinct from v_conf or pa.conferencia_detalhe is distinct from v_det then
+          update public.pre_agendamentos set conferencia_status = v_conf, conferencia_detalhe = v_det, conferencia_em = now(), conferencia_falhas = v_falhas where id = pa.id;
+        end if;
+        if v_alerta is not null then v_alertas := v_alertas + 1; end if;
+        update public.conversas set alerta_agenda = v_alerta, atualizado_em = now() where id = pa.conversa_id and alerta_agenda is distinct from v_alerta;
+      exception when others then
+        raise warning 'agenda_conferencia_aplicar: % (%)', sqlerrm, e ->> 'id';
+      end;
+    end loop;
+  end if;
+  update public.agenda_ocupacao_meta set conferindo_ate = null where id = 1;
+  return jsonb_build_object('confirmados', v_confirmados, 'alertas', v_alertas);
+end $$;
+revoke all on function public.agenda_conferencia_aplicar(jsonb) from public, anon, authenticated;
+grant execute on function public.agenda_conferencia_aplicar(jsonb) to service_role;
+
+-- Libera a trava se a Edge Function falhar no meio.
+create or replace function public.agenda_conferencia_liberar() returns void
+language sql security definer set search_path to '' as $$ update public.agenda_ocupacao_meta set conferindo_ate = null where id = 1 $$;
+revoke all on function public.agenda_conferencia_liberar() from public, anon, authenticated;
+grant execute on function public.agenda_conferencia_liberar() to service_role;
+
+-- PENDENTE (precisa de confirmação humana, por ser um drop): remover as duas funções provisórias da primeira versão, hoje sem uso:
+--   drop function if exists public.agenda_conferir_pre_agendamentos();
+--   drop function if exists public.agenda_conferencia_iniciar(boolean);
+
+-- ===== Crons (UTC) =====
+select cron.unschedule('agenda-conferir');   -- só ao reaplicar; na primeira vez o job da versão anterior é substituído
 select cron.schedule('agenda-conferir', '15 seconds', $job$
   select net.http_post(
     url := 'https://nrvuynjwcgwpjdptkiay.supabase.co/functions/v1/sync-catalogo-klingo',
     headers := jsonb_build_object('Content-Type', 'application/json', 'x-sync-key', (select valor from public.config where chave = 'ia_segredo')),
     body := '{"agenda":"conferir"}'::jsonb, timeout_milliseconds := 40000)
-  where cardinality(public.agenda_conferencia_iniciar(true)) > 0;
+  where public.agenda_conferencia_ha_trabalho(false);
+$job$);
+select cron.schedule('agenda-revisar', '*/10 * * * *', $job$
+  select net.http_post(
+    url := 'https://nrvuynjwcgwpjdptkiay.supabase.co/functions/v1/sync-catalogo-klingo',
+    headers := jsonb_build_object('Content-Type', 'application/json', 'x-sync-key', (select valor from public.config where chave = 'ia_segredo')),
+    body := '{"agenda":"conferir","lento":true}'::jsonb, timeout_milliseconds := 100000)
+  where public.agenda_conferencia_ha_trabalho(true);
 $job$);

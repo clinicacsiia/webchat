@@ -264,6 +264,15 @@
   const dataBR = (d) => (d ? String(d).split('-').reverse().join('/') : '');
   const linhasHorario = (p) => (Array.isArray(p.escolha_horario) ? p.escolha_horario : []).map((e) =>
     `${dataBR(e.data)} ${e.chegada ? 'ordem de chegada a partir das ' : 'às '}${e.hora}${e.unidade ? ' — ' + String(e.unidade).replace(/^CLÍNICA DE SAÚDE E IMAGEM - /, '') : ''}${e.local ? ' (' + e.local + ')' : ''}`);
+  const CONF_ROTULO = { confirmado: 'Marcação encontrada no Klingo', horario_tomado: 'Horário ocupado no Klingo', divergente: 'Marcação diferente do escolhido',
+    nao_encontrado: 'Marcação não apareceu no Klingo', sumiu: 'Marcação sumiu do Klingo', remarcado: 'Marcação remarcada no Klingo' };
+  const CONF_VIA = { telefone: 'pelo telefone', nome: 'pelo nome', ambos: 'pelo nome e telefone' };
+  const curtaUnidade = (u) => String(u || '').replace(/^CLÍNICA DE SAÚDE E IMAGEM - /, '');
+  const quandoBR = (h) => { const d = h.ocorreu_em ? new Date(h.ocorreu_em) : new Date(h.criado_em); return isNaN(d) ? '' : d.toLocaleDateString('pt-BR') + (h.ocorreu_em ? ' ' + String(h.ocorreu_em).slice(11, 16) : ''); };
+  const linhaHist = (h) => {
+    const ex = (Array.isArray(h.exames) ? h.exames : []).map((e) => linhaItem({ modalidade: e.modalidade, regiao_nome: e.parte_do_corpo, lado: e.lado, procedimento: e.exame, quantidade: e.quantidade })).join('; ');
+    return [quandoBR(h), ex || 'exame a definir', curtaUnidade(h.unidade), h.plano && 'Plano: ' + h.plano].filter(Boolean).join(' · ') + (h.cancelado ? ' (cancelada)' : '');
+  };
   function textoPre(p) {
     const topo = [['Tipo', p.tipo], ['Especialidade', p.especialidade], ['Procedimento', p.procedimento], ['Plano', p.plano], ['Unidade', p.unidade], ['Profissional', p.profissional], ['Preferência', p.preferencia_horario]];
     const exames = (S.preItens || []).map(linhaItem);
@@ -278,7 +287,13 @@
       db.from('pre_agendamentos').select('*').eq('conversa_id', id).maybeSingle(),
       db.from('pre_agendamento_itens').select('modalidade,regiao_nome,lado,procedimento,quantidade').eq('conversa_id', id).eq('ativo', true).order('id')
     ]);
-    if (S.abertaId === id) { S.pre = data || null; S.preItens = itens || []; renderPre(); }
+    let hist = [];
+    if (data && data.paciente_id) {
+      const r = await db.from('paciente_historico').select('id,pre_agendamento_id,ocorreu_em,criado_em,unidade,profissional,plano,exames,origem,cancelado')
+        .eq('paciente_id', data.paciente_id).order('criado_em', { ascending: false }).limit(6);
+      hist = r.data || [];
+    }
+    if (S.abertaId === id) { S.pre = data || null; S.preItens = itens || []; S.preHist = hist; renderPre(); }
   }
   // O status "Agendado" muda sozinho (conferência automática a cada 15 s): reler enquanto uma conversa está aberta.
   setInterval(() => { if (S.abertaId && S.aba === 'atendimento' && !document.hidden) carregarPre(); }, 15000);
@@ -298,7 +313,11 @@
     box.replaceChildren(h('div', { class: 'pre' },
       h('b', {}, 'Pré-agendamento'), h('span', { class: 'urg ' + (p.status === 'pronto' ? '' : 'media') }, ROTULO_PRE[p.status] || p.status),
       p.identidade ? h('div', { class: 'urg ' + (p.identidade === 'conferida' ? '' : p.identidade === 'divergente' ? 'alta' : 'media'), style: 'display:inline-block;margin-top:4px' }, ROTULO_IDENT[p.identidade] || p.identidade) : null,
-      p.agendado_auto_em ? h('div', { class: 'dica' }, 'Marcação encontrada na agenda do Klingo (conferência automática).') : null,
+      p.conferencia_status ? h('div', { class: 'urg ' + (p.conferencia_status === 'confirmado' ? '' : 'alta'), style: 'display:block;margin-top:6px;border-radius:8px' },
+        CONF_ROTULO[p.conferencia_status] || p.conferencia_status,
+        p.conferencia_status === 'confirmado' && p.conferencia_via ? ' (' + (CONF_VIA[p.conferencia_via] || '') + ')' : '',
+        p.conferencia_detalhe ? h('div', { style: 'font-weight:400;margin-top:2px' }, p.conferencia_detalhe) : null)
+        : (['rascunho', 'pronto'].includes(p.status) && Array.isArray(p.escolha_horario) && p.escolha_horario.length ? h('div', { class: 'dica' }, 'Aguardando a marcação aparecer no Klingo: conferindo a cada 15 segundos.') : null),
       resumo ? h('div', {}, resumo) : null,
       (S.preItens || []).length ? h('div', { style: 'margin-top:6px' }, h('b', {}, 'Exames pedidos'), h('ul', { style: 'margin:4px 0 0;padding-left:18px' }, S.preItens.map((i) => h('li', {}, linhaItem(i))))) : null,
       (() => { const ds = (Array.isArray(p.escolha_horario) ? p.escolha_horario : []).map((e) => e.data); const mesmoDia = ds.some((d, i) => ds.indexOf(d) !== i);
@@ -306,6 +325,8 @@
           'Exames diferentes' + (mesmoDia ? ' no mesmo dia' : '') + ': confira a ordem, o preparo de cada um (jejum, bexiga cheia, contraste) e o deslocamento entre unidades antes de confirmar.') : null; })(),
       linhasHorario(p).length ? h('div', { style: 'margin-top:6px' }, h('b', {}, 'Horário escolhido (previsão)'), h('ul', { style: 'margin:4px 0 0;padding-left:18px' }, linhasHorario(p).map((x) => h('li', {}, x))),
         h('div', { class: 'dica' }, 'Confirme a disponibilidade e o valor no Klingo antes de responder ao paciente.')) : null,
+      (S.preHist || []).length ? h('details', {}, h('summary', {}, 'Histórico do paciente (' + S.preHist.length + ')'),
+        h('ul', { style: 'margin:4px 0 0;padding-left:18px' }, S.preHist.map((x) => h('li', {}, linhaHist(x))))) : null,
       linhas.length ? h('details', {}, h('summary', {}, 'Dados do paciente (' + linhas.length + ')'),
         h('dl', {}, linhas.map(([k, r]) => [h('dt', {}, r), h('dd', {}, p.paciente[k])]))) : null,
       h('div', { class: 'acoes' },
@@ -508,7 +529,7 @@
   /* ---------- conversas ---------- */
   async function carregarConversas() {
     const { data, error } = await db.from('conversas')
-      .select('id,status,agente_id,ultima_mensagem,nao_lidas_agente,criado_em,atualizado_em,contato_id,ia_ativa,triagem_resumo,triagem_urgencia,contatos(id,nome,telefone,email)')
+      .select('id,status,agente_id,ultima_mensagem,nao_lidas_agente,criado_em,atualizado_em,contato_id,ia_ativa,triagem_resumo,triagem_urgencia,alerta_agenda,contatos(id,nome,telefone,email)')
       .order('atualizado_em', { ascending: false }).limit(300);
     if (error) { toast(msgErro(error)); return; }
     S.conversas = data || [];
@@ -547,7 +568,7 @@
       return h('button', { class: 'item', type: 'button', 'aria-current': String(c.id === S.abertaId), onclick: () => abrirConversa(c.id) },
         h('div', { class: 'l1' }, h('span', {}, c.contatos ? c.contatos.nome : 'Contato'), h('span', { class: 'hora' }, fmtHoraLista(c.atualizado_em))),
         h('div', { class: 'l2' }, h('span', { class: 'prev' }, c.ultima_mensagem || 'Sem mensagens'), c.nao_lidas_agente > 0 ? h('span', { class: 'nl' }, c.nao_lidas_agente) : null),
-        h('div', { class: 'l3' }, h('span', { class: 'tag ' + c.status }, ROTULO_STATUS[c.status]), c.triagem_urgencia === 'alta' ? h('span', { class: 'urg alta' }, 'Urgente') : null, c.ia_ativa && c.status === 'aguardando' ? h('span', { style: 'color:var(--suave)' }, 'IA atendendo') : null, ag ? h('span', { style: 'color:var(--suave)' }, ag.nome) : null));
+        h('div', { class: 'l3' }, h('span', { class: 'tag ' + c.status }, ROTULO_STATUS[c.status]), c.triagem_urgencia === 'alta' ? h('span', { class: 'urg alta' }, 'Urgente') : null, c.alerta_agenda ? h('span', { class: 'urg media', title: 'Conferência automática da agenda' }, c.alerta_agenda) : null, c.ia_ativa && c.status === 'aguardando' ? h('span', { style: 'color:var(--suave)' }, 'IA atendendo') : null, ag ? h('span', { style: 'color:var(--suave)' }, ag.nome) : null));
     }));
   }
   async function abrirConversa(id) {
