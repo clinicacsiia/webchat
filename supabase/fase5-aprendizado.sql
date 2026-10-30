@@ -281,6 +281,7 @@ begin
     select distinct on (o.procedimento_norm, o.operadora_norm)
            o.procedimento, o.operadora, o.amostras, o.valor_tipico, o.valor_min, o.valor_max, o.atualizado_em,
            c.valor as catalogo, c.fonte, c.confianca,
+           count(*) over (partition by o.procedimento_norm, o.operadora_norm) as n_linhas,   -- linhas do catálogo para o mesmo exame e operadora
            round((o.valor_tipico - c.valor) / nullif(c.valor, 0) * 100, 1) as dif_pct
       from public.preco_observado o
       join public.catalogo_procedimento p on p.ativo and public.norm_chave(p.nome) = o.procedimento_norm
@@ -294,6 +295,7 @@ begin
       'comparados', (select count(*) from par),
       'sem_referencia', (select count(*) from public.preco_observado where atualizado_em > now() - interval '1 day') - (select count(*) from par),
       'divergentes_total', (select count(*) from par where abs(dif_pct) >= v_min),
+      'com_varias_linhas', (select count(*) from par where n_linhas > 1),
       'divergentes', coalesce((select jsonb_agg(jsonb_build_object('exame', d.procedimento, 'operadora', d.operadora, 'catalogo', d.catalogo,
               'klingo', d.valor_tipico, 'dif_pct', d.dif_pct, 'amostras', d.amostras, 'fonte', d.fonte, 'confianca', d.confianca) order by abs(d.dif_pct) desc)
           from (select * from par where abs(dif_pct) >= v_min order by abs(dif_pct) desc limit v_lim) d), '[]'::jsonb),
@@ -315,13 +317,16 @@ begin
   end if;
   v_ids := array(select c.id from public.ia_coorte(now() - make_interval(days => v_dias)) c);
   select coalesce(jsonb_agg(x.j order by x.criado_em desc), '[]'::jsonb) into v_res
-    from (select e.criado_em,
-                 jsonb_build_object('quando', e.criado_em, 'caso', case when e.tipo = 'conferencia' then e.para else 'cancelado' end, 'por', e.por,
-                   'exames', coalesce(e.contexto -> 'exames', '[]'::jsonb), 'plano', e.contexto ->> 'plano', 'unidade', e.contexto ->> 'unidade',
-                   'etapa', e.contexto ->> 'etapa', 'detalhe', e.detalhe) as j
-            from public.ia_evento e
-           where e.pre_agendamento_id = any(v_ids) and ((e.tipo = 'conferencia' and e.para <> 'confirmado') or (e.tipo = 'status' and e.para = 'cancelado'))
-           order by e.criado_em desc limit v_lim) x;
+    from (select d.criado_em, d.j
+            from (select distinct on (e.pre_agendamento_id, case when e.tipo = 'conferencia' then e.para else 'cancelado' end)   -- o mais recente de cada pedido e tipo de caso
+                         e.criado_em,
+                         jsonb_build_object('quando', e.criado_em, 'caso', case when e.tipo = 'conferencia' then e.para else 'cancelado' end, 'por', e.por,
+                           'exames', coalesce(e.contexto -> 'exames', '[]'::jsonb), 'plano', e.contexto ->> 'plano', 'unidade', e.contexto ->> 'unidade',
+                           'etapa', e.contexto ->> 'etapa', 'detalhe', e.detalhe) as j
+                    from public.ia_evento e
+                   where e.pre_agendamento_id = any(v_ids) and ((e.tipo = 'conferencia' and e.para <> 'confirmado') or (e.tipo = 'status' and e.para = 'cancelado'))
+                   order by e.pre_agendamento_id, case when e.tipo = 'conferencia' then e.para else 'cancelado' end, e.criado_em desc) d
+           order by d.criado_em desc limit v_lim) x;
   return v_res;
 end $$;
 revoke all on function public.ia_exemplos(integer, integer) from public, anon;

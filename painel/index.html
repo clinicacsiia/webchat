@@ -302,14 +302,29 @@
   // O status "Agendado" muda sozinho (conferência automática a cada 15 s): reler enquanto uma conversa está aberta.
   setInterval(() => { if (S.abertaId && S.aba === 'atendimento' && !document.hidden) carregarPre(); }, 15000);
   const MOTIVOS_CANCELAMENTO = ['Paciente desistiu', 'Horário indisponível', 'Exame errado ou faltando', 'Plano ou convênio', 'Preço', 'Duplicado ou teste', 'Outro motivo'];
+  // Janela de confirmação do cancelamento, com o motivo numa lista fixa. Devolve undefined (voltou), null (cancelar sem motivo) ou o motivo.
+  function pedirMotivo() {
+    return new Promise((resolve) => {
+      const sel = h('select', { id: 'motivoCancel' }, [h('option', { value: '' }, 'Sem informar o motivo'), ...MOTIVOS_CANCELAMENTO.map((m) => h('option', { value: m }, m))]);
+      let feito = false;
+      const fechar = (v) => { if (feito) return; feito = true; if (dlg.open) dlg.close(); resolve(v); };
+      dlg.addEventListener('close', () => fechar(undefined), { once: true });
+      dlg.replaceChildren(h('h3', {}, 'Cancelar este pré-agendamento?'),
+        h('p', { class: 'dica' }, 'O motivo é opcional e ajuda a melhorar a IA. A lista é fixa de propósito: nada de dado do paciente.'),
+        h('div', { class: 'campo' }, h('label', { class: 'rot', for: 'motivoCancel' }, 'Motivo'), sel),
+        h('div', { class: 'rodape' }, h('button', { class: 'btn', type: 'button', onclick: () => fechar(undefined) }, 'Voltar'),
+          h('button', { class: 'btn perigo', type: 'button', onclick: () => fechar(sel.value || null) }, 'Cancelar pedido')));
+      dlg.showModal();
+    });
+  }
   async function statusPre(status) {
     if (!S.pre) return;
     // Fase 5: ao cancelar, pergunta o motivo ANTES (opcional, de uma lista fixa, sem texto livre: nunca vira dado de paciente); ajuda a ver por que a IA errou.
     let motivo = null;
     if (status === 'cancelado') {
-      const resp = window.prompt('Por que cancelar? Digite o número do motivo e toque em OK (em branco = cancelar sem motivo). "Cancelar" volta sem cancelar o pedido.\n' + MOTIVOS_CANCELAMENTO.map((m, i) => (i + 1) + ' - ' + m).join('\n'));
-      if (resp === null) return;   // desistiu: não cancela
-      motivo = MOTIVOS_CANCELAMENTO[Number(String(resp).trim()) - 1] || null;
+      const r = await pedirMotivo();
+      if (r === undefined) return;   // "Voltar" ou Esc: não cancela
+      motivo = r;
     }
     // O atendente resolveu: some o alerta da conferência automática (faixa do pré-agendamento e selo da lista).
     const { error } = await db.from('pre_agendamentos').update({ status, conferencia_status: null, conferencia_detalhe: null, atualizado_em: new Date().toISOString() }).eq('id', S.pre.id);
@@ -1016,6 +1031,7 @@
       h('h3', {}, 'Onde o paciente desiste'),
       tabela(['Etapa em que parou', 'Pedidos'], etapas.map(([k, n]) => [ROTULO_ETAPA[k] || k, n]), 'Nenhum pedido abandonado no período.'),
       h('h3', {}, 'Exames com mais problema'),
+      h('p', { class: 'dica' }, 'Conta o pedido inteiro: se um pedido tem vários exames, todos entram na contagem do alerta.'),
       tabela(['Exame', 'Com problema', 'Pedidos do exame'], (R.exames_problema || []).map((x) => [x.exame, x.problemas, x.total]), 'Nenhum exame com alerta ou cancelamento.'),
       h('h3', {}, 'O que os atendentes fizeram'),
       tabela(['Ação', 'Quantidade'], [['Marcaram como agendado à mão', A.marcou_agendado ?? 0], ['Cancelaram o pedido', A.cancelou ?? 0], ['…com o motivo escrito', A.cancelou_com_motivo ?? 0],
@@ -1023,7 +1039,7 @@
       h('h3', {}, 'Por semana'),
       tabela(['Semana de', 'Criados', 'Agendados', 'Com alerta', 'Cancelados'], (R.semanas || []).map((s) => [semana(s.semana), s.criados, s.agendados, s.com_alerta, s.cancelados]), 'Sem dados ainda.'),
       h('h3', {}, 'Preço do catálogo x preço lançado no Klingo'),
-      h('p', { class: 'dica' }, P.atualizado_em ? `${P.comparados ?? 0} combinações de exame e operadora comparadas, ${P.sem_referencia ?? 0} sem referência no catálogo, ${P.divergentes_total ?? 0} com diferença de 10% ou mais (mostrando até 30). Atualizado em ${fmtDataHora(P.atualizado_em)}. A IA continua usando o preço do catálogo: corrija no Klingo ou no catálogo e confirme com a recepção.`
+      h('p', { class: 'dica' }, P.atualizado_em ? `${P.comparados ?? 0} combinações de exame e operadora comparadas${P.com_varias_linhas ? ` (${P.com_varias_linhas} têm mais de uma linha no catálogo: a comparação usa a mais próxima do Klingo)` : ''}, ${P.sem_referencia ?? 0} sem referência no catálogo, ${P.divergentes_total ?? 0} com diferença de 10% ou mais (mostrando até 30). Atualizado em ${fmtDataHora(P.atualizado_em)}. A IA continua usando o preço do catálogo: corrija no Klingo ou no catálogo e confirme com a recepção.`
         : 'Ainda não há preços lidos do Klingo: o primeiro cálculo acontece na próxima atualização da agenda (a cada 10 minutos).'),
       tabela(['Exame', 'Operadora', 'Catálogo', 'Klingo', 'Diferença', 'Amostras'], (P.divergentes || []).map((x) => [x.exame, x.operadora, brl(x.catalogo), brl(x.klingo), (x.dif_pct > 0 ? '+' : '') + x.dif_pct + '%', x.amostras]), 'Nenhuma diferença relevante.'),
       h('h3', {}, 'Casos para melhorar o prompt'),
