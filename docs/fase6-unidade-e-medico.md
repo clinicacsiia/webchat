@@ -60,9 +60,20 @@ Se a lista de unidades não carregar, o formulário volta ao comportamento antig
 
 No calendário: a unidade escolhida já vem selecionada; o médico filtra os horários (sem vaga, mostra os de outros médicos e avisa; com o filtro ativo há o botão **Ver outros médicos**).
 
+## Preço: a IA não fala; o sistema vigia o atendente (Fase 6b)
+
+- A IA **nunca** informa preço: `ia_catalogo` devolve a lista de preços vazia (ela nem recebe o valor) e o prompt manda dizer que o atendente informa o valor certo na hora de confirmar.
+- Os preços continuam no banco (`catalogo_preco`) só como **referência de conferência**.
+- Quando um **atendente** (mensagem com autor da equipe; não vale IA nem paciente) escreve um valor no chat ("R$ 1.200,00", "R$180", "300 reais"), o sistema compara com a referência do pedido e do plano. Fora da faixa de referência por **10% ou mais** (ajustável em `config.alerta_preco_tolerancia_pct`), grava um alerta.
+- Aceita o valor de um exame, o valor vezes a quantidade, ou a soma de todos os exames do pedido. Só julga quando **todos** os exames do pedido têm preço de confiança alta ou média para o plano informado; sem plano ou sem referência, não alerta (não há como julgar).
+- O alerta é **só da equipe**: fica na tabela `alerta_preco` (regra de acesso: administrador e atendente), nada é escrito em `mensagens`, então o paciente nunca vê, nem o marketing nem quem não está logado (testado: `anon` e usuário logado sem papel enxergam 0 linhas).
+- No painel: selo vermelho **Conferir valor** na lista e uma faixa na conversa: "Você informou R$ 1.200,00, que está ABAIXO do valor de referência (Particular). Referência: RM ...: R$ 2.350,00", com o botão **Conferi, está certo**.
+- Limites: "entrada de R$ 100", parcelas e descontos combinados também disparam o alerta (a atendente marca "Conferi"); o valor do catálogo pode estar defasado (a aba Aprendizado mostra onde diverge do Klingo, e hoje são 18 de 104 pares).
+- SQL: `supabase/fase6b-alerta-preco.sql` (independente do `fase6-unidade-e-medico.sql`; aditivo).
+
 ## Como aplicar (nesta ordem)
 
-1. **Banco**: rodar `supabase/fase6-unidade-e-medico.sql` inteiro no SQL Editor do projeto `webchat-atendimento`. É aditivo e pode rodar de novo. Foi testado no projeto em transações revertidas (nada ficou gravado), ver "Testes".
+1. **Banco**: rodar `supabase/fase6-unidade-e-medico.sql` e depois `supabase/fase6b-alerta-preco.sql`, inteiros no SQL Editor do projeto `webchat-atendimento`. É aditivo e pode rodar de novo. Foi testado no projeto em transações revertidas (nada ficou gravado), ver "Testes".
 2. **Limpeza** (depois do passo 1, uma vez): `drop function public.chat_iniciar(text, text, text, text, boolean, text);` Sem isso, chamadas com 6 argumentos ficam ambíguas com a versão nova. O Supabase pede confirmação humana para `drop`.
 3. **n8n**, fluxo `Triagem IA - Atendimento` (abaixo). Sem este passo o banco e o chat já guardam e filtram tudo, mas a IA não lê as instruções (e não sabe abrir o seletor de consulta).
 4. **Chat**: merge do PR (GitHub Pages publica o `index.html`). O banco tem de estar atualizado antes.
@@ -97,7 +108,15 @@ UNIDADE, QUEM SERÁ ATENDIDO E MÉDICO: em "Escolha feita no início do chat" vo
 `if (o.tipo === 'pedido_exames' || o.tipo === 'calendario') return { tipo: o.tipo };` por
 `if (o.tipo === 'pedido_exames' || o.tipo === 'pedido_consulta' || o.tipo === 'calendario') return { tipo: o.tipo };`
 
-**d)** Publicar a nova versão do fluxo (o rascunho não atende ninguém).
+**d)** Preço (a IA não fala valor). No prompt de sistema:
+1. Trocar o item "- Preço (sempre uma PREVISÃO): ..." (inteiro) por: `- Preço: NUNCA informe, estime ou comente valores, descontos ou formas de pagamento. Se o paciente perguntar, diga com simpatia que o atendente informa o valor certo na hora de confirmar o agendamento, e siga o roteiro. Você não recebe preços.`
+2. Na descrição do catálogo, tirar "precos (valores de referência)".
+3. Em REGRAS DE SEGURANÇA, trocar "Não invente preços: só cite valores que estejam em precos, seguindo a regra de Preço (sempre como previsão)." por "Nunca informe preços."
+4. Na etapa 6 ("confirmacao"), tirar "o valor de referência se foi informado,".
+5. No campo `resumo` do formato de resposta, trocar "valor e data citados ao paciente como previsão" por "data citada ao paciente como previsão".
+6. Em "PACIENTE QUE VOLTA", trocar "O histórico não traz preços: não cite valores antigos; preço segue a regra de Preço (sempre previsão)." por "O histórico não traz preços."
+
+**e)** Publicar a nova versão do fluxo (o rascunho não atende ninguém).
 
 ## Testes feitos
 
@@ -111,7 +130,7 @@ No projeto real, dentro de transações revertidas (nada gravado):
 
 - **Dois filhos com o mesmo nome** do mesmo responsável seriam tratados como a mesma criança. A data de nascimento, pedida antes de reaproveitar qualquer dado, é a segunda trava.
 - **CPF da criança**: aceita-se o do responsável (avisado no resumo); o cadastro fica `revisar` se o CPF já existir (acontece com irmãos). O painel ainda não tem um campo "responsável".
-- **Painel**: a lista mostra "Maria · Lucas" (responsável · criança) e o topo da conversa mostra paciente, unidade e médico de preferência. Se o painel for publicado antes do SQL, ele volta sozinho para a lista antiga em vez de quebrar.
+- **Painel**: a lista mostra "Maria · Lucas" (responsável · criança) e o topo da conversa mostra paciente, unidade e médico de preferência. Se o painel for publicado antes do SQL, ele volta sozinho para a lista antiga em vez de quebrar (o alerta de valor também some sem erro).
 - **Confirmação automática de consulta** (`agenda-conferir`): depende de o nome do procedimento no relatório #7 do Klingo ser o do cadastro; validar com a primeira consulta real da Desenvoar, como as demais fases.
 - O filtro de médico e a sugestão de horário olham só a grade do Klingo; o horário continua sendo previsão e quem confirma é o atendente.
 - "Juntos" é em sequência (horários seguidos), não no mesmo minuto, e só quando o irmão já escolheu o horário antes de o responsável avançar. Se o irmão ainda não escolheu horário, a sugestão não aparece.

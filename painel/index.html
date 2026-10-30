@@ -539,7 +539,7 @@
       });
   }
   function desligarTempoReal() { if (S.canal) { db.removeChannel(S.canal); S.canal = null; } }
-  function agendarRecarga() { clearTimeout(tRecarga); tRecarga = setTimeout(async () => { await carregarConversas(); if (S.aba === 'atendimento') { renderLista(); renderTopoChat(); carregarPre(); } atualizarSelo(); }, 250); }
+  function agendarRecarga() { clearTimeout(tRecarga); tRecarga = setTimeout(async () => { await carregarConversas(); if (S.aba === 'atendimento') { renderLista(); renderTopoChat(); renderAlertaPreco(); carregarPre(); } atualizarSelo(); }, 250); }
   function aoNovaMensagem(m) {
     if (m.autor === 'cliente') {
       const c = S.conversas.find((x) => x.id === m.conversa_id);
@@ -570,6 +570,33 @@
     if (error && /paciente_tipo|paciente_nome|unidade_inicial|medico_preferido/.test(error.message || '')) ({ data, error } = await consulta(base));
     if (error) { toast(msgErro(error)); return; }
     S.conversas = data || [];
+    await carregarAlertasPreco();
+  }
+  // Alertas de valor (só administrador e atendente leem: a regra de acesso do banco esconde dos demais e do paciente).
+  async function carregarAlertasPreco() {
+    try {
+      const { data, error } = await db.from('alerta_preco').select('id,conversa_id,tipo,valor_informado,referencia,criado_em').is('conferido_em', null).order('criado_em');
+      S.alertasPreco = error ? [] : (data || []);
+    } catch { S.alertasPreco = []; }
+  }
+  const alertasDe = (id) => (S.alertasPreco || []).filter((a) => a.conversa_id === id);
+  const reais = (n) => Number(n).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  function renderAlertaPreco() {
+    const box = document.getElementById('alertaPreco'); if (!box) return;
+    const lista = S.abertaId ? alertasDe(S.abertaId) : [];
+    box.replaceChildren(...lista.map((a) => {
+      const cands = ((a.referencia && a.referencia.candidatos) || []).map((c) => `${c.rotulo}: ${reais(c.de)}${Number(c.ate) !== Number(c.de) ? ' a ' + reais(c.ate) : ''}`);
+      return h('div', { class: 'triagem', style: 'border-color:#c0392b;background:#fdecea' },
+        h('b', {}, 'Atenção: confira o valor (só a equipe vê)'),
+        h('div', {}, `Você informou ${reais(a.valor_informado)}, que está ${a.tipo === 'abaixo' ? 'ABAIXO' : 'ACIMA'} do valor de referência${a.referencia && a.referencia.plano ? ' (' + a.referencia.plano + ')' : ''}.`),
+        cands.length ? h('div', { style: 'font-size:13px' }, 'Referência: ' + cands.join(' · ')) : null,
+        h('div', { style: 'font-size:12px;color:var(--suave)' }, 'O valor pode ter mudado no Klingo. Se estiver certo, marque como conferido.'),
+        h('button', { class: 'btn', type: 'button', style: 'margin-top:6px', onclick: async () => {
+          const { error } = await db.rpc('alerta_preco_conferir', { p_conversa: a.conversa_id });
+          if (error) { toast(msgErro(error)); return; }
+          S.alertasPreco = (S.alertasPreco || []).filter((x) => x.conversa_id !== a.conversa_id); renderAlertaPreco(); renderLista();
+        } }, 'Conferi, está certo'));
+    }));
   }
   const conversaAberta = () => S.conversas.find((c) => c.id === S.abertaId);
   // Responsável falando pelo filho: a lista mostra "Maria · Lucas" (senão três filhos da mesma mãe parecem a mesma conversa).
@@ -617,7 +644,7 @@
       return h('button', { class: 'item', type: 'button', 'aria-current': String(c.id === S.abertaId), onclick: () => abrirConversa(c.id) },
         h('div', { class: 'l1' }, h('span', {}, nomeLista(c)), h('span', { class: 'hora' }, fmtHoraLista(c.atualizado_em))),
         h('div', { class: 'l2' }, h('span', { class: 'prev' }, c.ultima_mensagem || 'Sem mensagens'), c.nao_lidas_agente > 0 ? h('span', { class: 'nl' }, c.nao_lidas_agente) : null),
-        h('div', { class: 'l3' }, h('span', { class: 'tag ' + c.status }, ROTULO_STATUS[c.status]), c.triagem_urgencia === 'alta' ? h('span', { class: 'urg alta' }, 'Urgente') : null, c.alerta_agenda ? h('span', { class: 'urg media', title: 'Conferência automática da agenda' }, c.alerta_agenda) : null, c.ia_ativa && c.status === 'aguardando' ? h('span', { style: 'color:var(--suave)' }, 'IA atendendo') : null, ag ? h('span', { style: 'color:var(--suave)' }, ag.nome) : null));
+        h('div', { class: 'l3' }, h('span', { class: 'tag ' + c.status }, ROTULO_STATUS[c.status]), c.triagem_urgencia === 'alta' ? h('span', { class: 'urg alta' }, 'Urgente') : null, c.alerta_agenda ? h('span', { class: 'urg media', title: 'Conferência automática da agenda' }, c.alerta_agenda) : null, alertasDe(c.id).length ? h('span', { class: 'urg alta', title: 'Valor informado fora da referência (só a equipe vê)' }, 'Conferir valor') : null, c.ia_ativa && c.status === 'aguardando' ? h('span', { style: 'color:var(--suave)' }, 'IA atendendo') : null, ag ? h('span', { style: 'color:var(--suave)' }, ag.nome) : null));
     }));
   }
   async function abrirConversa(id) {
@@ -639,8 +666,8 @@
     const enviar = h('button', { class: 'btn prim', type: 'button', id: 'btnEnviar', onclick: enviarMsg }, 'Enviar');
     area.addEventListener('input', () => { area.style.height = 'auto'; area.style.height = Math.min(area.scrollHeight, 140) + 'px'; });
     area.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); enviarMsg(); } });
-    box.replaceChildren(h('div', { class: 'chat-topo', id: 'chatTopo' }), h('div', { id: 'triagem' }), h('div', { id: 'pre' }), h('div', { class: 'msgs', id: 'msgs', 'aria-live': 'polite' }), h('div', { class: 'compor' }, area, enviar));
-    renderTopoChat(); desenharMsgs(true);
+    box.replaceChildren(h('div', { class: 'chat-topo', id: 'chatTopo' }), h('div', { id: 'triagem' }), h('div', { id: 'alertaPreco' }), h('div', { id: 'pre' }), h('div', { class: 'msgs', id: 'msgs', 'aria-live': 'polite' }), h('div', { class: 'compor' }, area, enviar));
+    renderTopoChat(); renderAlertaPreco(); desenharMsgs(true);
   }
   function renderTopoChat() {
     const t = document.getElementById('chatTopo'); const c = conversaAberta(); if (!t || !c) return;

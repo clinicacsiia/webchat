@@ -14,7 +14,7 @@ Atualizado em 30/10/2026. Descrição da fase: `docs/fase6-unidade-e-medico.md`.
 
 ## Passo a passo (nesta ordem)
 
-1. **Banco**: Supabase > SQL Editor > rodar `supabase/fase6-unidade-e-medico.sql` inteiro (pode rodar de novo sem estragar nada). Conferir com:
+1. **Banco**: Supabase > SQL Editor > rodar `supabase/fase6-unidade-e-medico.sql` inteiro e depois `supabase/fase6b-alerta-preco.sql` (os dois podem rodar de novo sem estragar nada). Conferir com:
 
 ```sql
 select to_regclass('public.unidade_config') is not null as unidades,
@@ -24,7 +24,10 @@ select to_regclass('public.unidade_config') is not null as unidades,
   to_regprocedure('public.chat_consulta_salvar(uuid,text,integer)') is not null as consulta,
   position('v_pref' in pg_get_functiondef('public.chat_horarios(uuid,text,integer,date,date,text,text,jsonb)'::regprocedure)) > 0 as horarios,
   position('v_uni' in pg_get_functiondef('public.ia_catalogo(text,uuid)'::regprocedure)) > 0 as catalogo,
-  position('paciente_tipo' in pg_get_functiondef('public.paciente_conferir(uuid)'::regprocedure)) > 0 as identidade;
+  position('paciente_tipo' in pg_get_functiondef('public.paciente_conferir(uuid)'::regprocedure)) > 0 as identidade,
+  to_regclass('public.alerta_preco') is not null as alerta_preco,
+  exists (select 1 from pg_trigger where tgname = 'mensagens_conferir_preco') as gatilho_preco,
+  position('''precos'', v_precos' in pg_get_functiondef('public.ia_catalogo(text,uuid)'::regprocedure)) = 0 as ia_sem_preco;
 ```
 Tudo `true`. Se o script parar com "Trecho não encontrado", alguém mudou uma dessas funções: não force, chame o Claude.
 
@@ -34,7 +37,7 @@ drop function public.chat_iniciar(text, text, text, text, boolean, text);
 ```
 Sem isso o chat novo falha com "function is not unique".
 
-3. **n8n** (fluxo `Triagem IA - Atendimento`): fazer as quatro mudanças de "Mudança no n8n" em `docs/fase6-unidade-e-medico.md` (mensagem do usuário, prompt, nó "Ler resposta da IA") e **publicar**. A versão atual é a `7bcf2009-34ff-4085-a17f-a931ff68188f`: se algo der errado, restaure-a no histórico de versões.
+3. **n8n** (fluxo `Triagem IA - Atendimento`): fazer as mudanças a), b), c) e d) de "Mudança no n8n" em `docs/fase6-unidade-e-medico.md` (mensagem do usuário, prompt, nó "Ler resposta da IA") e **publicar**. A versão atual é a `7bcf2009-34ff-4085-a17f-a931ff68188f`: se algo der errado, restaure-a no histórico de versões.
 
 4. **Publicar o chat e o painel**: abrir o PR da branch `claude/bold-clarke-igv39k` para `main` e mesclar (o GitHub Pages publica sozinho em ~1 min). Se o PR #15 for mesclado depois, o único conflito é no `LEIAME.md`.
 
@@ -60,12 +63,16 @@ Use telefones de teste `7190000xxxx` e deixe um atendente com o painel aberto. E
 | 12 | Uma mãe que já é paciente (nome + telefone iguais a um cadastro) falando pelo filho | A IA **não** reaproveita CPF/endereço dela no pedido do filho |
 | 13 | Atendente marca no Klingo a consulta do passo 5 | Em até ~15 s o status vira "Agendado" sozinho (Fase 3, ainda sem prova real) |
 
+| 14 | Atendente assume uma conversa com pedido de exame e plano Particular e escreve um valor **muito diferente** do catálogo (ex.: metade) | Só no painel: selo "Conferir valor" na lista e faixa vermelha na conversa com o valor de referência. O chat do paciente **não** mostra nada |
+| 15 | Na mesma conversa, escrever o valor certo (ou até 10% de diferença) | Nenhum alerta novo |
+| 16 | Perguntar ao chat "quanto custa?" | A IA **não** diz valor: diz que o atendente informa |
+
 Teste 12 e 13 são os mais importantes e os únicos sem prova em produção.
 
 ## Antes de abrir para pacientes de verdade
 
 - [ ] **Dados de teste**: hoje há 4 contatos (9 conversas, 90 mensagens) que parecem testes da equipe (`71992641845`, `71988710544`, `71999999999`, `71988780134`). Confirme quais apagar e peça: apagar o contato apaga conversas, mensagens e pedidos (cascata). O Supabase pede confirmação para `delete`.
-- [ ] **Preços**: a auditoria achou 18 de 104 preços do catálogo a 10% ou mais do Klingo (aba Aprendizado > "Preço x Klingo"). A recepção revisa antes de divulgar.
+- [ ] **Preços** (agora só referência para o alerta): a auditoria achou 18 de 104 preços do catálogo a 10% ou mais do Klingo (aba Aprendizado > "Preço x Klingo"). A recepção revisa antes de divulgar.
 - [ ] **n8n**: nó de IA sem repetição e sem aviso de erro, e dependente dos créditos do n8n. Recomendado: credencial Anthropic própria, `retryOnFail` e um workflow de erro que avise a equipe.
 - [ ] **Segredo `ia_segredo`** digitado nos nós HTTP do n8n: mover para credencial Header Auth.
 - [ ] **Supabase Auth**: ligar "Prevent use of leaked passwords"; conferir "Confirm email", "Allow new users to sign up" desligado depois de cadastrar a equipe, e as URLs de redirecionamento (`LEIAME.md`).

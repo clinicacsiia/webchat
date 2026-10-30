@@ -102,7 +102,7 @@ A IA consulta, a cada mensagem do paciente, um catálogo copiado de relatórios 
 
 ### Preços, demanda e lista de limpeza (Fase 1)
 
-- **Preços** (`catalogo_preco`): convênio vem do relatório #13983 pedido por operadora (03:10) e o Particular vem do valor das marcações abertas dos últimos 90 dias do #13825, só agregado, sem dado de paciente (03:25). A IA só usa preço com confiança alta ou média: tabelas CBHPM guardam coeficiente, não reais, e Particular com uma marcação só é baixa. **Todo valor é uma previsão**: a IA diz que o preço pode mudar e que o atendente avalia e confirma valor e data.
+- **Preços** (`catalogo_preco`): convênio vem do relatório #13983 pedido por operadora (03:10) e o Particular vem do valor das marcações abertas dos últimos 90 dias do #13825, só agregado, sem dado de paciente (03:25). A IA só usa preço com confiança alta ou média: tabelas CBHPM guardam coeficiente, não reais, e Particular com uma marcação só é baixa. **A IA não informa preço ao paciente** (desde a Fase 6b ela nem recebe o valor): quem informa é o atendente. O catálogo serve para vigiar o valor que o atendente escreve no chat: se estiver 10% ou mais fora da referência, aparece um alerta **só para a equipe** (ver `docs/fase6-unidade-e-medico.md`).
 - **Demanda** (`catalogo_procedimento.demanda_90d`): marcações abertas por procedimento nos últimos 90 dias; a IA prefere o exame que a clínica realmente faz.
 - **Foto de referência** (`catalogo_foto`, `referencia = true`): cópia do catálogo de 29/10/2026, antes da limpeza no Klingo. Não apagar.
 - **Aba Catálogo** do painel (só administrador): o que limpar no Klingo (sem agenda vigente, duplicados, agenda de teste, sem preço, mais pedidos sem preparo) e o histórico de mudanças.
