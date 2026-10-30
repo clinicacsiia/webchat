@@ -301,14 +301,19 @@
   }
   // O status "Agendado" muda sozinho (conferência automática a cada 15 s): reler enquanto uma conversa está aberta.
   setInterval(() => { if (S.abertaId && S.aba === 'atendimento' && !document.hidden) carregarPre(); }, 15000);
+  const MOTIVOS_CANCELAMENTO = ['Paciente desistiu', 'Horário indisponível', 'Exame errado ou faltando', 'Plano ou convênio', 'Preço', 'Duplicado ou teste', 'Outro motivo'];
   async function statusPre(status) {
     if (!S.pre) return;
     // O atendente resolveu: some o alerta da conferência automática (faixa do pré-agendamento e selo da lista).
     const { error } = await db.from('pre_agendamentos').update({ status, conferencia_status: null, conferencia_detalhe: null, atualizado_em: new Date().toISOString() }).eq('id', S.pre.id);
     if (error) { toast(msgErro(error)); return; }
-    if (status === 'cancelado') {   // Fase 5: o motivo é opcional e ajuda a ver por que a IA errou (aba Aprendizado)
-      const motivo = (window.prompt('Por que foi cancelado? (opcional — ajuda a melhorar a IA. Não escreva dados do paciente.)') || '').trim();
-      if (motivo) db.rpc('ia_evento_motivo', { p_pre: S.pre.id, p_motivo: motivo });
+    if (status === 'cancelado') {   // Fase 5: motivo opcional, de uma lista fixa (sem texto livre: nunca vira dado de paciente); ajuda a ver por que a IA errou
+      const resp = window.prompt('Por que foi cancelado? Digite o número (ou deixe em branco):\n' + MOTIVOS_CANCELAMENTO.map((m, i) => (i + 1) + ' - ' + m).join('\n'));
+      const motivo = MOTIVOS_CANCELAMENTO[Number(String(resp || '').trim()) - 1];
+      if (motivo) {
+        const { error: e2 } = await db.rpc('ia_evento_motivo', { p_pre: S.pre.id, p_motivo: motivo });
+        if (e2) toast('Cancelado, mas o motivo não foi registrado: ' + msgErro(e2));
+      }
     }
     await db.from('conversas').update({ alerta_agenda: null }).eq('id', S.pre.conversa_id);
     S.pre.status = status; S.pre.conferencia_status = null; S.pre.conferencia_detalhe = null; S.preSig = null; renderPre();
@@ -973,8 +978,9 @@
   const pct = (a, b) => (b ? Math.round((a / b) * 100) + '%' : '—');
   async function viewAprendizado(c, dias = 28) {
     c.replaceChildren(h('div', { class: 'pagina' }, h('h2', {}, 'Aprendizado da IA'), h('p', { class: 'sub' }, 'Carregando…')));
+    const minha = viewAprendizado.seq = (viewAprendizado.seq || 0) + 1;   // só a última escolha de período pinta a tela
     const [r, p, e] = await Promise.all([db.rpc('ia_relatorio', { p_dias: dias }), db.rpc('ia_precos_divergentes', { p_limite: 30 }), db.rpc('ia_exemplos', { p_dias: dias, p_limite: 40 })]);
-    if (S.aba !== 'aprendizado') return;
+    if (S.aba !== 'aprendizado' || minha !== viewAprendizado.seq) return;
     const falha = r.error || p.error || e.error;
     if (falha) { c.replaceChildren(h('div', { class: 'pagina' }, h('h2', {}, 'Aprendizado da IA'), h('p', { class: 'erro' }, msgErro(falha)),
       h('p', { class: 'dica' }, 'Se a mensagem fala de função inexistente, falta rodar o SQL da Fase 5 (supabase/fase5-aprendizado.sql).'))); return; }

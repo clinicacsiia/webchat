@@ -2,7 +2,7 @@
 // Só dados fictícios.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { agregarPrecos, valorEmReais } from "./precos.ts";
+import { AgregadorPrecos, agregarPrecos, valorEmReais } from "./precos.ts";
 
 test("valorEmReais entende os formatos do Klingo", () => {
   assert.equal(valorEmReais(250), 250);
@@ -35,7 +35,7 @@ test("acento, caixa e pontuação não separam o mesmo exame", () => {
 });
 
 test("ignora quantidade maior que 1, valor inválido e linha sem exame ou operadora", () => {
-  const r = agregarPrecos([l({ Quantidade: 2 }), l({ Previsto: "" }), l({ Previsto: 0 }), l({ Procedimento: "" }), l({ Operadora: "" }), l({ Operadora: "123" })], "a", "b");
+  const r = agregarPrecos([l({ Quantidade: 2 }), l({ Previsto: "" }), l({ Previsto: 0 }), l({ Procedimento: "" }), l({ Operadora: "" }), l({ Operadora: "---" })], "a", "b");
   assert.deepEqual(r, []);
 });
 
@@ -50,4 +50,17 @@ test("a saída não carrega nenhum campo de paciente", () => {
   const r = agregarPrecos([l({ Paciente: "ANA MARIA SOUZA", Telefone: "71988710544", Prontuario: "123", Obs: "x" })], "a", "b");
   assert.deepEqual(Object.keys(r[0]).sort(), ["amostras", "fim", "ini", "operadora", "procedimento", "valor_max", "valor_min", "valor_tipico"]);
   assert.ok(!JSON.stringify(r).match(/ANA|71988|123/));
+});
+
+test("exames que só diferem por número não se misturam", () => {
+  const r = agregarPrecos([l({ Procedimento: "RX COLUNA 2 INCIDENCIAS", Previsto: "100" }), l({ Procedimento: "RX COLUNA 3 INCIDENCIAS", Previsto: "150" })], "a", "b");
+  assert.equal(r.length, 2);
+  assert.deepEqual(r.map((x) => x.valor_tipico).sort(), [100, 150]);
+});
+
+test("agregar aos poucos dá o mesmo resultado que agregar de uma vez", () => {
+  const linhas = [l(), l({ Previsto: "240,00" }), l({ Operadora: "UNIMED", Previsto: "180" }), l()];
+  const a = new AgregadorPrecos();
+  for (const x of linhas) a.add(x);
+  assert.deepEqual(a.resultado("i", "f"), agregarPrecos(linhas, "i", "f"));
 });

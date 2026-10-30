@@ -2,7 +2,8 @@
 // Das linhas do relatório só saem Procedimento, Operadora, Previsto e Quantidade: nome, telefone e prontuário nem são lidos aqui.
 // A saída é só agregado (valor mais frequente, mínimo, máximo, amostras): serve para conferir o catalogo_preco.
 
-export type Row = Record<string, unknown>;
+import type { Row } from "./conferencia.ts";
+
 export type PrecoObservado = {
   procedimento: string; operadora: string; valor_tipico: number; valor_min: number; valor_max: number; amostras: number; ini: string; fim: string;
 };
@@ -18,28 +19,40 @@ export function valorEmReais(v: unknown): number | null {
   return Number.isFinite(n) && n > 0 && n < 100_000 ? Math.round(n * 100) / 100 : null;
 }
 
-const chave = (s: string) => s.normalize("NFKD").replace(/\p{M}/gu, "").toUpperCase().replace(/[^A-Z ]/g, " ").replace(/\s+/g, " ").trim();
+// Igual à public.norm_chave do banco: sem acento, maiúsculas, MANTÉM os números ("2 INCIDENCIAS" e "3 INCIDENCIAS" são exames e preços diferentes).
+const chave = (s: string) => s.normalize("NFKD").replace(/\p{M}/gu, "").toUpperCase().replace(/[^A-Z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
 
+// Agrega aos poucos (uma linha por vez), sem guardar as linhas do relatório: só o contador de cada valor por exame e operadora.
 // Linhas com quantidade maior que 1 são ignoradas: não dá para saber se o Previsto é o valor unitário ou o total.
-export function agregarPrecos(linhas: Row[], ini: string, fim: string): PrecoObservado[] {
-  const grupos = new Map<string, { procedimento: string; operadora: string; valores: Map<number, number> }>();
-  for (const r of linhas) {
+export class AgregadorPrecos {
+  private grupos = new Map<string, { procedimento: string; operadora: string; valores: Map<number, number> }>();
+
+  add(r: Row): void {
     const procedimento = String(r.Procedimento ?? "").trim(), operadora = String(r.Operadora ?? "").trim();
     const valor = valorEmReais(r.Previsto);
     const qtd = Number(r.Quantidade ?? 1);
-    if (!procedimento || !operadora || valor === null || (Number.isFinite(qtd) && qtd > 1)) continue;
+    if (!procedimento || !operadora || valor === null || (Number.isFinite(qtd) && qtd > 1)) return;
     const k = `${chave(procedimento)}|${chave(operadora)}`;
-    if (k.startsWith("|") || k.endsWith("|")) continue;
-    const g = grupos.get(k) ?? { procedimento, operadora, valores: new Map<number, number>() };
+    if (k.startsWith("|") || k.endsWith("|")) return;
+    const g = this.grupos.get(k) ?? { procedimento, operadora, valores: new Map<number, number>() };
     g.valores.set(valor, (g.valores.get(valor) ?? 0) + 1);
-    grupos.set(k, g);
+    this.grupos.set(k, g);
   }
-  return [...grupos.values()].map((g) => {
-    const vals = [...g.valores.entries()];
-    const amostras = vals.reduce((s, [, n]) => s + n, 0);
-    // o valor mais repetido; empate fica com o menor, para o resultado não depender da ordem das linhas
-    const tipico = vals.sort((a, b) => b[1] - a[1] || a[0] - b[0])[0][0];
-    const todos = vals.map(([x]) => x);
-    return { procedimento: g.procedimento, operadora: g.operadora, valor_tipico: tipico, valor_min: Math.min(...todos), valor_max: Math.max(...todos), amostras, ini, fim };
-  });
+
+  resultado(ini: string, fim: string): PrecoObservado[] {
+    return [...this.grupos.values()].map((g) => {
+      const vals = [...g.valores.entries()];
+      const amostras = vals.reduce((s, [, n]) => s + n, 0);
+      // o valor mais repetido; empate fica com o menor, para o resultado não depender da ordem das linhas
+      const tipico = vals.sort((a, b) => b[1] - a[1] || a[0] - b[0])[0][0];
+      const todos = vals.map(([x]) => x);
+      return { procedimento: g.procedimento, operadora: g.operadora, valor_tipico: tipico, valor_min: Math.min(...todos), valor_max: Math.max(...todos), amostras, ini, fim };
+    });
+  }
+}
+
+export function agregarPrecos(linhas: Row[], ini: string, fim: string): PrecoObservado[] {
+  const a = new AgregadorPrecos();
+  for (const r of linhas) a.add(r);
+  return a.resultado(ini, fim);
 }
