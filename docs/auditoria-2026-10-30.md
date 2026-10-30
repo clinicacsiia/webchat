@@ -25,7 +25,7 @@ Limite do ambiente: a rede desta sessão bloqueia `*.supabase.co`, o n8n e o Kli
 | Deploy do site | GitHub Actions: 15 de 15 publicações do Pages com sucesso; a última é a `main` em `223d1d3` (PR #14). |
 | Crons (6 jobs ativos) | Últimas 24 h: `agenda-conferir` 2.346 de 2.346 execuções com sucesso (a cada 15 s); `agenda-ocupacao` 27 de 27; `agenda-revisar` 59 de 59; `sync-catalogo-klingo`, `catalogo-precos-convenio` e `catalogo-precos-particular` 1 de 1 cada. Zero falhas. |
 | Objetos das Fases 1 a 5 | O checklist da seção 2 de `docs/passagem-fases-3-a-5.md` deu `true` em todos os itens (6 crons, `paciente_historico`, conferência da Fase 3, `historico_paciente` em `ia_contexto`, reaproveitamento em `ia_pre_agendar`), mais `ia_evento` e `preco_observado` presentes, com 148 leituras de preço gravadas. |
-| Migrações | 24 registradas (`webchat_schema_inicial` até `fila_biometria_revogar_gatilhos`). Pacientes, preços, Fase 2 e Fase 4 não aparecem com nome próprio na lista, embora os objetos existam: o histórico de migrações **não** serve como receita para recriar o banco (já avisado na passagem de bastão). |
+| Migrações | 24 registradas na medição (`webchat_schema_inicial` até `fila_biometria_revogar_gatilhos`); hoje são 27, com as 3 correções de identidade da seção 2.6. Pacientes, preços, Fase 2 e Fase 4 não aparecem com nome próprio na lista, embora os objetos existam: o histórico de migrações **não** serve como receita para recriar o banco (já avisado na passagem de bastão). |
 | Edge Function | `sync-catalogo-klingo` publicada e chamada pelos crons. |
 | n8n | Workflow `Triagem IA - Atendimento` (`wAbzjPqZNCztKriZ`) ativo. |
 | Advisors de segurança | Sem erro (ERROR). Quatro grupos de aviso, todos explicados em 2.3. |
@@ -67,6 +67,18 @@ Do mais para o menos importante.
 - **Configurações do painel do Supabase**: "Allow new users to sign up", "Confirm email", URL de redirecionamento. Não aparecem por MCP. Conferir à mão (`LEIAME.md`, seção "Primeiro acesso").
 - **Código publicado da Edge Function x repositório.** Não foi feita a comparação byte a byte. Baixe a versão publicada (Supabase > Edge Functions) e compare com `supabase/functions/sync-catalogo-klingo/` antes de confiar que são iguais.
 - **Chat e painel contra o Supabase real em navegador.** A rede da sessão bloqueia; o teste usou Supabase simulado.
+
+### 2.6 Mudanças que entraram depois das medições acima
+
+As medições das seções 2.1 a 2.5 foram feitas por volta das 11:00 UTC. Depois disso, outra sessão mesclou na `main` os PRs #16 e #17 e aplicou no banco real três migrações (`correcao_nome_por_conversa` às 11:27, `correcao_login_nome_telefone_email` às 11:31 e `correcao_login_email_sem_fallback` às 11:32 UTC).
+
+| Item | Situação |
+|---|---|
+| O que mudou | Colunas `conversas.nome_informado` e `email_informado`; `chat_iniciar`, `ia_contexto`, `paciente_conferir`, `pre_pendencia_anterior`, gatilho do histórico, `ia_pre_agendar` e a conferência da agenda passam a usar o nome desta conversa; reaproveitar cadastro exige nome E telefone (e e-mail, se o cadastro tem); o painel mostra o nome informado. |
+| Conferido depois das mudanças | As colunas e as funções novas existem no banco real; `paciente_conferir` só devolve `completo` ou `novo`; os 6 crons seguem ativos; o módulo Fila não foi tocado (21 funções, 0 atendimentos). A bateria completa de `testes/` passa sobre a `main` já mesclada: 27 + 27 + 46 + 5 + 6. |
+| **Não reauditado** | Avisos do advisor de segurança e de performance; o comportamento real da IA com a regra nova de login (exige conversa de teste com o n8n e o Claude); o painel novo contra o Supabase real. |
+| Atenção | A terceira migração (`correcao_login_email_sem_fallback`) está descrita só como comentário em `supabase/correcao-login-nome-telefone-email.sql` ("aplicado como patch"). O arquivo diz que já reflete o patch, mas não comparei com o banco linha a linha. Antes de recriar o banco a partir desses arquivos, confira com `pg_get_functiondef('public.paciente_conferir(uuid)'::regprocedure)`. |
+| Documento corrigido | O `LEIAME.md` ainda descrevia o status "parcial" em duas frases; foi corrigido com base no banco real. |
 
 ## 3. Módulo novo: Fila + assinatura biométrica
 
