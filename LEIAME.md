@@ -125,6 +125,10 @@ A IA consulta, a cada mensagem do paciente, um catálogo copiado de relatórios 
 - SQL em `supabase/fase2-pedido-e-agenda.sql`.
 - **Ativar**: o chat novo só aparece depois do merge deste PR (GitHub Pages). O fluxo do n8n com o prompt novo (versão "Prompt por etapas...") já está salvo, mas a versão **publicada** continua a anterior até o merge; depois do merge, publique a versão mais recente do fluxo `Triagem IA - Atendimento`.
 
+## Fila em tempo real + assinatura biométrica
+
+Página do paciente em `fila/` (link `?token=` enviado por e-mail pelo n8n), regras no banco em `supabase/fila-biometria.sql` e validação biométrica na API `api-biometria/`. Fluxo, workflow do n8n, checklist de publicação e riscos em `docs/fila-biometria.md`.
+
 ## Estado do projeto e como retomar
 
 **Aba Aprendizado (administrador)**: relatório de onde a IA erra, preço do catálogo x Klingo e casos para melhorar o prompt (Fase 5; SQL em `supabase/fase5-aprendizado.sql`).

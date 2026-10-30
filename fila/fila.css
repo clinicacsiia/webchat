@@ -1,0 +1,191 @@
+/* FLUXOGRAMA: entrada (estado da tela definido pelo JS) -> validação (um estado visível por vez, via atributo hidden) -> lógica (tokens de cor com modo escuro automático; canvas com touch-action none) -> saída (layout em coluna única, 16px de margem lateral, sem rolagem horizontal)
+   Versão 1.0 — 30/10/2026 / Mudança: Implementação inicial */
+
+:root {
+  --cor-fundo: #f4f7f6;
+  --cor-cartao: #ffffff;
+  --cor-texto: #15201d;
+  --cor-texto-suave: #4b5b57;
+  --cor-primaria: #10302b;
+  --cor-primaria-texto: #ffffff;
+  --cor-secundaria: #e7efec;
+  --cor-borda: #d5dfdb;
+  --cor-alerta: #9a3412;
+  --cor-tinta: #10302b;
+  --raio: 14px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --cor-fundo: #0e1715;
+    --cor-cartao: #16221f;
+    --cor-texto: #e8f0ed;
+    --cor-texto-suave: #a6b8b2;
+    --cor-primaria: #7fd1b9;
+    --cor-primaria-texto: #0e1715;
+    --cor-secundaria: #213430;
+    --cor-borda: #2a3c37;
+    --cor-alerta: #fdba74;
+    --cor-tinta: #e8f0ed;
+  }
+}
+
+:root[data-theme="dark"] {
+  --cor-fundo: #0e1715;
+  --cor-cartao: #16221f;
+  --cor-texto: #e8f0ed;
+  --cor-texto-suave: #a6b8b2;
+  --cor-primaria: #7fd1b9;
+  --cor-primaria-texto: #0e1715;
+  --cor-secundaria: #213430;
+  --cor-borda: #2a3c37;
+  --cor-alerta: #fdba74;
+  --cor-tinta: #e8f0ed;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+[hidden] { display: none !important; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--cor-fundo);
+  color: var(--cor-texto);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  overflow-x: hidden;
+}
+
+.cartao {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 24px 16px 40px;
+}
+
+.topo h1 {
+  font-size: 1.1rem;
+  margin: 0 0 16px;
+  color: var(--cor-texto-suave);
+  font-weight: 600;
+}
+
+.estado {
+  background: var(--cor-cartao);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  padding: 20px 16px;
+}
+
+.estado h2 {
+  font-size: 1.35rem;
+  margin: 0 0 8px;
+  line-height: 1.25;
+}
+
+.estado p { margin: 0 0 10px; }
+
+.destaque {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--cor-primaria);
+  margin: 8px 0 4px;
+}
+
+.ajuda {
+  color: var(--cor-texto-suave);
+  font-size: 0.95rem;
+}
+
+.documento {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 40vh;
+  overflow-y: auto;
+  background: var(--cor-fundo);
+  border: 1px solid var(--cor-borda);
+  border-radius: 10px;
+  padding: 12px;
+  margin: 12px 0;
+  font-size: 0.95rem;
+}
+
+.consentimento {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin: 12px 0;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.consentimento input {
+  width: 22px;
+  height: 22px;
+  margin: 2px 0 0;
+  flex: 0 0 auto;
+  accent-color: var(--cor-primaria);
+}
+
+#assinatura {
+  display: block;
+  width: 100%;
+  height: 220px;
+  background: var(--cor-cartao);
+  border: 1px dashed var(--cor-borda);
+  border-radius: var(--raio);
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: opacity 0.2s;
+}
+
+#assinatura.desabilitado {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.acoes {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+button {
+  flex: 1 1 0;
+  min-height: 48px;
+  border-radius: 12px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+button.principal {
+  background: var(--cor-primaria);
+  color: var(--cor-primaria-texto);
+}
+
+button.secundario {
+  background: var(--cor-secundaria);
+  color: var(--cor-texto);
+  border-color: var(--cor-borda);
+}
+
+.msg {
+  min-height: 1.5em;
+  margin: 12px 0 0;
+  color: var(--cor-alerta);
+  font-weight: 600;
+}
+
+:focus-visible {
+  outline: 3px solid var(--cor-primaria);
+  outline-offset: 2px;
+}

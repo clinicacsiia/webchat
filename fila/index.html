@@ -1,0 +1,71 @@
+<!doctype html>
+<!-- FLUXOGRAMA: entrada (link com ?token= enviado por e-mail) -> validação (token presente, claims legíveis, exp; o servidor revalida tudo) -> lógica (Realtime com o JWT do paciente, posição pela RPC, Canvas com Pointer Events, POST à API de biometria) -> saída (uma das telas: fila, assinatura, concluído, bloqueado, expirado ou erro)
+     Versão 1.0 — 30/10/2026 / Mudança: Implementação inicial -->
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#10302B">
+<title>Fila de atendimento</title>
+<link rel="stylesheet" href="fila.css">
+</head>
+<body>
+<main class="cartao">
+  <header class="topo">
+    <h1>Atendimento</h1>
+  </header>
+
+  <section id="estado-carregando" class="estado" aria-live="polite">
+    <p>Carregando sua fila…</p>
+  </section>
+
+  <section id="estado-fila" class="estado" hidden aria-live="polite">
+    <h2>Você está na fila</h2>
+    <p class="destaque" id="posicao-texto">—</p>
+    <p class="ajuda" id="total-texto"></p>
+    <p class="ajuda">Esta tela se atualiza sozinha. Não precisa recarregar.</p>
+  </section>
+
+  <section id="estado-assinatura" class="estado" hidden>
+    <h2>Sua vez de assinar</h2>
+    <p>Leia o documento e assine no campo abaixo.</p>
+    <article class="documento" id="documento" tabindex="0"></article>
+    <label class="consentimento">
+      <input type="checkbox" id="consentimento">
+      <span>Concordo com a coleta do traço da minha assinatura para validar este documento. Os dados desta assinatura são dados biométricos.</span>
+    </label>
+    <canvas id="assinatura" class="desabilitado" role="img" aria-label="Campo para assinar com o dedo ou a caneta"></canvas>
+    <div class="acoes">
+      <button type="button" id="limpar" class="secundario">Limpar</button>
+      <button type="button" id="enviar" class="principal" disabled>Enviar assinatura</button>
+    </div>
+    <p id="assinatura-msg" class="msg" role="status"></p>
+  </section>
+
+  <section id="estado-concluido" class="estado" hidden>
+    <h2>Assinatura registrada</h2>
+    <p>Obrigado. Aguarde ser chamado pela equipe.</p>
+  </section>
+
+  <section id="estado-bloqueado" class="estado" hidden>
+    <h2>Assinatura não confirmada</h2>
+    <p>Não conseguimos confirmar a assinatura após 3 tentativas. Volte à recepção para continuar.</p>
+  </section>
+
+  <section id="estado-expirado" class="estado" hidden>
+    <h2>Link expirado ou inválido</h2>
+    <p>Peça à recepção um novo link.</p>
+  </section>
+
+  <section id="estado-erro" class="estado" hidden>
+    <h2>Não foi possível carregar</h2>
+    <p>Tente de novo em alguns instantes ou avise a recepção.</p>
+  </section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.js"></script>
+<script src="fila.js"></script>
+</body>
+</html>

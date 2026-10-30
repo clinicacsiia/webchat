@@ -18,7 +18,8 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   const r = e.request;
   const url = new URL(r.url);
-  if (r.method !== 'GET' || url.origin !== location.origin || url.pathname.includes('/painel/')) return;
+  // /fila/ fica fora do cache: a URL leva o token de assinatura e não pode ser guardada no dispositivo.
+  if (r.method !== 'GET' || url.origin !== location.origin || url.pathname.includes('/painel/') || url.pathname.includes('/fila/')) return;
   e.respondWith(
     fetch(r)
       .then((res) => {
