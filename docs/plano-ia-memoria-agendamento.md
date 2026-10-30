@@ -26,16 +26,20 @@ São quatro camadas:
 
 Nada disso fica ligado à API de marcação o tempo todo. A memória é atualizada por cópias periódicas de relatórios do Klingo, que já funcionam hoje com o `X-APP-TOKEN`.
 
-## Fase 0: confirmar no Klingo antes de programar (sem código)
+## Fase 0: confirmar no Klingo antes de programar (concluída em 29/10/2026)
 
-O resto depende destas respostas.
+Resultado completo em `docs/fase-0-verificacao.md`; texto para o suporte em `docs/fase-0-email-suporte-klingo.md`.
 
-- [ ] **Relatório de marcações.** Criar no editor de relatórios um "CALL CENTER - Marcações (IA)" (área Agendas/Marcações). Colunas: id da marcação, data e hora, procedimento id, profissional, unidade, operadora/plano, status da marcação, data em que foi criada, usuário que marcou, paciente CPF, nome e data de nascimento. Filtro: marcações criadas hoje (ou data do atendimento ≥ hoje). Testar se ele sai pela mesma API dos relatórios (`/api/info/relatorio?id=`). **É a peça que permite a conferência automática.** Se não sair, a conferência fica manual (ver Fase 3).
-- [ ] **Filtro pela API.** Ver se a API de relatórios aceita filtro (operadora, data). O 13983 sem filtro dá "Excesso de registros"; precisamos rodar uma vez por operadora (36).
-- [ ] **Preço Particular.** Descobrir em qual tabela de preço o Particular está cadastrado e incluí-la no 13983.
-- [ ] **Bloqueio.** Ver como o Klingo marca procedimento/plano bloqueado ou inativo (coluna "Faturamento Ativo" no 13981? vigência da tabela no 13983?) e incluir a coluna nos relatórios.
+- [x] **Relatório de marcações:** não precisa criar. Os relatórios #7 (Agendas Marcadas), #13825 (Visão Consolidada por Marcação) e #47 (Bloqueadas e Canceladas) já saem pela API com filtro de data. Nenhum traz CPF; a conferência casa por nome + celular + procedimento + data/hora + operadora + unidade.
+- [x] **Preço Particular:** vem do valor das marcações do #13825 (184 procedimentos com valor; 63 com mais de um valor, que exigem regra de confiança). Convênio continua no #13983.
+- [x] **Bloqueio:** existe para procedimento (Faturamento Ativo), marcação (Status) e agenda (vigência). Para plano, perguntar ao suporte.
+- [ ] **Filtros do #13983 pela API:** descobrir os ids na Fase 1 (a resposta da API lista os filtros).
+- [x] **Teste real do #7:** feito em 29/10/2026 (ver `docs/fase-0-verificacao.md`).
+- [ ] **Perguntas ao suporte:** e-mail pronto como rascunho no Gmail; falta enviar (pessoa).
 
-## Fase 1: base de conhecimento com histórico (antes de limpar o cadastro)
+## Fase 1: base de conhecimento com histórico (antes de limpar o cadastro) — CONCLUÍDA em 29/10/2026
+
+Entregue: foto de referência, comparação noturna com histórico, preços (convênio e Particular com confiança), demanda, lista de limpeza, aba Catálogo, IA citando preço como previsão. Diferenças do plano: não há foto diária (a foto de referência + `catalogo_mudanca` bastam); o Particular vem do #13825, não do #13983.
 
 **Objetivo:** guardar uma foto de tudo que existe hoje, passar a enxergar mudanças, e só então limpar o cadastro no Klingo.
 
@@ -136,7 +140,7 @@ LGPD: o relatório de marcações traz dados de pacientes. A função processa e
 
 Se a Fase 0 mostrar que o relatório de marcações não sai pela API, a conferência vira semiautomática: o atendente cola o nº da marcação e a data/hora marcadas, e o sistema confronta com o pedido do paciente.
 
-## Fase 4: paciente que volta
+## Fase 4 (conferência de identidade e cadastro reaproveitado: CONCLUÍDA em 30/10/2026; falta o histórico de agendamentos anteriores): paciente que volta
 
 - Nova tabela `pacientes`, com chave CPF: cadastro confirmado, `klingo_paciente_id`, ligação com os `contatos` (telefones) e histórico de agendamentos conferidos.
 - Quando uma conversa nova começa por um telefone conhecido, a IA **primeiro confirma a identidade** (data de nascimento ou 3 últimos dígitos do CPF). O telefone sozinho não prova quem é, e o histórico é dado de saúde.
