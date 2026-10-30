@@ -108,3 +108,11 @@ A IA consulta, a cada mensagem do paciente, um catálogo copiado de relatórios 
 - **Aba Catálogo** do painel (só administrador): o que limpar no Klingo (sem agenda vigente, duplicados, agenda de teste, sem preço, mais pedidos sem preparo) e o histórico de mudanças.
 - SQL em `supabase/catalogo-historico*.sql` e `supabase/catalogo-precos.sql`. Plano completo e fases em `docs/`.
 - **n8n**: o fluxo `Triagem IA - Atendimento` precisa estar **publicado** para valer (o rascunho não atende ninguém). O nó "Ler resposta da IA" lê `merged_response` ou o bloco de texto, e o nó do Claude usa `maxTokens` 4000 (com 1200 o JSON vinha cortado e caía na resposta de emergência).
+
+### Paciente que volta (conferência de identidade)
+
+- Ao abrir o chat o paciente informa nome, telefone e e-mail. `paciente_conferir` compara isso com `pacientes` (nome aproximado, telefone sem DDI/nono dígito, e-mail): **tudo bate = completo** (reaproveita o cadastro), **2 ou 3 batem e algum difere = parcial** (a IA pede para atualizar só o que diferiu), **menos de 2 = novo**.
+- Antes de reaproveitar qualquer dado do cadastro a IA pede a **data de nascimento**; se não bater, segue como paciente novo e o cadastro novo fica marcado `revisar` quando o CPF se repete. A IA nunca revela o que está guardado.
+- `pacientes.validado` fica `true` quando a identidade é conferida num novo atendimento ou quando a atendente marca o pré-agendamento como agendado. O cartão do painel mostra a situação (`pre_agendamentos.identidade`).
+- SQL em `supabase/pacientes.sql`.
+

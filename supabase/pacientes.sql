@@ -1,4 +1,5 @@
--- Fase 4 antecipada: conferência de identidade de quem já é paciente. NÃO aplicado ainda no banco (aguardando confirmação do Supabase).
+-- Fase 4 antecipada: conferência de identidade de quem já é paciente. JÁ APLICADO no projeto webchat-atendimento (30/10/2026).
+-- Os blocos 2 e 3 (patches de ia_contexto e ia_pre_agendar) foram colados no SQL Editor; o resto, pelo MCP, em partes.
 -- Regra (compara o que o paciente digitou ao iniciar o chat: nome, telefone e e-mail):
 --   completo: todos os campos comparáveis batem (mínimo 2)  -> segue como paciente conhecido
 --   parcial : 2 ou 3 batem, algum difere                    -> a IA pede para atualizar o que diferiu

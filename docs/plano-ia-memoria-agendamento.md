@@ -140,7 +140,7 @@ LGPD: o relatório de marcações traz dados de pacientes. A função processa e
 
 Se a Fase 0 mostrar que o relatório de marcações não sai pela API, a conferência vira semiautomática: o atendente cola o nº da marcação e a data/hora marcadas, e o sistema confronta com o pedido do paciente.
 
-## Fase 4: paciente que volta
+## Fase 4 (conferência de identidade e cadastro reaproveitado: CONCLUÍDA em 30/10/2026; falta o histórico de agendamentos anteriores): paciente que volta
 
 - Nova tabela `pacientes`, com chave CPF: cadastro confirmado, `klingo_paciente_id`, ligação com os `contatos` (telefones) e histórico de agendamentos conferidos.
 - Quando uma conversa nova começa por um telefone conhecido, a IA **primeiro confirma a identidade** (data de nascimento ou 3 últimos dígitos do CPF). O telefone sozinho não prova quem é, e o histórico é dado de saúde.
