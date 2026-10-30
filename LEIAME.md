@@ -127,6 +127,10 @@ A IA consulta, a cada mensagem do paciente, um catálogo copiado de relatórios 
 - SQL em `supabase/fase2-pedido-e-agenda.sql`.
 - **Ativar**: o chat novo só aparece depois do merge deste PR (GitHub Pages). O fluxo do n8n com o prompt novo (versão "Prompt por etapas...") já está salvo, mas a versão **publicada** continua a anterior até o merge; depois do merge, publique a versão mais recente do fluxo `Triagem IA - Atendimento`.
 
+### Unidade e médico de preferência no início do chat (Fase 6)
+
+O formulário pergunta primeiro a unidade (Desenvoar = atendimento pediátrico; CSI = exames e consultas; CSI RM/TC = ressonância e tomografia; "Ainda não sei") e, quando houver, o médico de preferência. A IA já nasce no caminho certo (pediatria x exame/consulta) e o calendário filtra por unidade e médico. Passo a passo, texto do n8n e limites em `docs/fase6-unidade-e-medico.md`; SQL em `supabase/fase6-unidade-e-medico.sql` (**ainda não aplicado no projeto**).
+
 ## Estado do projeto e como retomar
 
 **Aba Aprendizado (administrador)**: relatório de onde a IA erra, preço do catálogo x Klingo e casos para melhorar o prompt (Fase 5; SQL em `supabase/fase5-aprendizado.sql`).

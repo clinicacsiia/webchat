@@ -75,6 +75,13 @@
   }
   .campo input:focus, .campo textarea:focus { border-color: var(--verde); outline: none; box-shadow: 0 0 0 3px rgba(20,107,80,.18); }
   .campo textarea { min-height: 92px; resize: vertical; }
+  .campo select { width: 100%; padding: 12px 12px; font: inherit; border: 1.5px solid var(--linha); border-radius: 12px; background: var(--papel); color: inherit; }
+  .campo select:focus { border-color: var(--verde); outline: none; box-shadow: 0 0 0 3px rgba(20,107,80,.18); }
+  .unidades { display: grid; gap: 8px; }
+  .unidade { text-align: left; border: 1.5px solid var(--linha); background: var(--papel); border-radius: 12px; padding: 11px 14px; cursor: pointer; font: inherit; color: inherit; }
+  .unidade strong { display: block; font-size: 15px; }
+  .unidade span { display: block; font-size: 13px; color: var(--texto-suave); margin-top: 1px; }
+  .unidade[aria-checked="true"] { border-color: var(--verde); background: var(--verde-claro); box-shadow: 0 0 0 2px rgba(20,107,80,.18); }
   .aceite { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; color: var(--texto-suave); margin: 4px 0 18px; }
   .aceite input { width: 20px; height: 20px; margin-top: 1px; accent-color: var(--verde); flex: none; }
   .btn-primario {
@@ -224,6 +231,14 @@
     <h1>Como podemos ajudar?</h1>
     <p class="sub" id="boasVindasForm">Preencha seus dados e conte o que você precisa. Respondemos aqui mesmo, na hora.</p>
     <form id="formInicio" novalidate>
+      <div class="campo" id="blocoUnidade" hidden>
+        <label id="lUnidade">Em qual unidade você quer ser atendido?</label>
+        <div class="unidades" id="fUnidades" role="radiogroup" aria-labelledby="lUnidade"></div>
+      </div>
+      <div class="campo" id="blocoMedico" hidden>
+        <label for="fMedico">Tem médico de preferência? <span class="opc">(opcional)</span></label>
+        <select id="fMedico"></select>
+      </div>
       <div class="campo">
         <label for="fNome">Seu nome</label>
         <input type="text" id="fNome" autocomplete="name" maxlength="120" required>
@@ -287,6 +302,7 @@
     telaInicio: $('#telaInicio'), telaChat: $('#telaChat'), boasForm: $('#boasVindasForm'),
     form: $('#formInicio'), fNome: $('#fNome'), fTel: $('#fTel'), fEmail: $('#fEmail'), fMsg: $('#fMsg'),
     fAceite: $('#fAceite'), erroForm: $('#erroForm'), btnIniciar: $('#btnIniciar'),
+    blocoUnidade: $('#blocoUnidade'), fUnidades: $('#fUnidades'), blocoMedico: $('#blocoMedico'), fMedico: $('#fMedico'),
     msgs: $('#msgs'), aviso: $('#avisoEncerrado'), formEnviar: $('#formEnviar'), texto: $('#texto'),
     btnEnviar: $('#btnEnviar'), toast: $('#toast')
   };
@@ -352,7 +368,50 @@
     const p = lerLocal(CHAVE_PERFIL) || {};
     el.fNome.value = p.nome || ''; el.fTel.value = p.telefone || ''; el.fEmail.value = p.email || '';
     el.fMsg.value = ''; el.fAceite.checked = false; el.erroForm.textContent = '';
+    escolha = null; carregarOpcoesInicio();
   }
+
+  /* ---------- unidade e médico de preferência (início do formulário) ---------- */
+  // escolha = null (ainda não escolheu) | { unidade: '' (não sei) ou chave, medico: '' (sem preferência) ou nome }
+  let opcoesInicio = null, escolha = null;
+  const PARTICULAS = new Set(['de', 'da', 'do', 'das', 'dos', 'e']);
+  function nomeBonito(s) {
+    return String(s || '').toLowerCase().split(/\s+/).map((p, i) => (i && PARTICULAS.has(p) ? p : p.charAt(0).toUpperCase() + p.slice(1))).join(' ');
+  }
+  async function carregarOpcoesInicio() {
+    if (!opcoesInicio) {
+      try {
+        const { data, error } = await db.rpc('chat_opcoes_inicio');
+        if (!error && Array.isArray(data) && data.length) opcoesInicio = data;
+      } catch { /* sem a lista, o formulário segue sem a pergunta e a IA pergunta a unidade no chat */ }
+    }
+    desenharUnidades();
+  }
+  function desenharUnidades() {
+    el.blocoUnidade.hidden = !opcoesInicio;
+    if (!opcoesInicio) { el.blocoMedico.hidden = true; return; }
+    const itens = [...opcoesInicio.map((u) => ({ chave: u.chave, titulo: u.rotulo, texto: u.descricao })),
+      { chave: '', titulo: 'Ainda não sei', texto: 'A gente ajuda você a escolher no chat' }];
+    el.fUnidades.replaceChildren(...itens.map((u) => {
+      const marcado = !!escolha && escolha.unidade === u.chave;
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'unidade'; b.setAttribute('role', 'radio'); b.setAttribute('aria-checked', String(marcado));
+      const t = document.createElement('strong'); t.textContent = u.titulo;
+      const d = document.createElement('span'); d.textContent = u.texto;
+      b.append(t, d);
+      b.addEventListener('click', () => { escolha = { unidade: u.chave, medico: '' }; el.erroForm.textContent = ''; desenharUnidades(); });
+      return b;
+    }));
+    const un = escolha && opcoesInicio.find((u) => u.chave === escolha.unidade);
+    const medicos = un ? un.medicos || [] : [];
+    el.blocoMedico.hidden = !medicos.length;
+    if (medicos.length) {
+      const sem = new Option('Sem preferência', '');
+      el.fMedico.replaceChildren(sem, ...medicos.map((m) => new Option(nomeBonito(m.nome) + (m.especialidade ? ' — ' + m.especialidade : ''), m.nome)));
+      el.fMedico.value = escolha.medico || '';
+    }
+  }
+  el.fMedico.addEventListener('change', () => { if (escolha) escolha.medico = el.fMedico.value; });
   function mostrarChat() {
     el.telaInicio.hidden = true;
     el.telaChat.hidden = false; el.telaChat.style.display = 'contents';
@@ -452,6 +511,7 @@
     ev.preventDefault();
     el.erroForm.textContent = '';
     const nome = el.fNome.value.trim(), tel = el.fTel.value.replace(/\D/g, '');
+    if (opcoesInicio && !escolha) { el.erroForm.textContent = 'Escolha a unidade (ou "Ainda não sei").'; el.blocoUnidade.scrollIntoView({ block: 'center' }); return; }
     if (nome.length < 2) { el.erroForm.textContent = 'Informe seu nome.'; el.fNome.focus(); return; }
     if (tel.length < 10) { el.erroForm.textContent = 'Informe o telefone com DDD.'; el.fTel.focus(); return; }
     if (!el.fAceite.checked) { el.erroForm.textContent = 'Marque a caixa de concordância para continuar.'; el.fAceite.focus(); return; }
@@ -460,10 +520,12 @@
       const origem = new URLSearchParams(location.search).get('origem');
       const { data, error } = await db.rpc('chat_iniciar', {
         p_nome: nome, p_telefone: el.fTel.value, p_email: el.fEmail.value.trim() || null,
-        p_mensagem: el.fMsg.value.trim() || null, p_aceite: true, p_origem: origem
+        p_mensagem: el.fMsg.value.trim() || null, p_aceite: true, p_origem: origem,
+        ...(escolha && escolha.unidade ? { p_unidade: escolha.unidade, p_medico: escolha.medico || null } : {})
       });
       if (error) throw error;
-      conv = { id: data.conversa_id, token: data.token };
+      const un = escolha && opcoesInicio && opcoesInicio.find((u) => u.chave === escolha.unidade);
+      conv = { id: data.conversa_id, token: data.token, unidade: un ? un.catalogo : '' };
       gravarLocal(CHAVE_CONVERSA, conv);
       gravarLocal(CHAVE_PERFIL, { nome, telefone: el.fTel.value, email: el.fEmail.value.trim() });
       await abrirChat();
@@ -833,7 +895,7 @@
     if (!conv) return;
     abrirFolha('Escolher data e horário');
     $('#folhaCorpo').replaceChildren(h('p', { class: 'carregando' }, 'Buscando horários…'));
-    C = { grupo, res: null, unidade: '', periodo: '', mes: null, dia: null, slot: null };
+    C = { grupo, res: null, unidade: (conv && conv.unidade) || '', periodo: '', mes: null, dia: null, slot: null };
     await carregarHorarios(true);
   }
   async function carregarHorarios(primeira) {
@@ -865,6 +927,12 @@
     }
     if (g && g.nomes) corpo.append(h('p', { class: 'p-dica' }, 'Exames deste horário: ' + g.nomes.join(' + ')));
     corpo.append(h('p', { class: 'aviso-cal' }, 'Os horários abaixo são uma previsão. Um atendente confere tudo e confirma o dia e o horário.' + (r.aviso ? ' ' + r.aviso : '')));
+    if (r.medico_filtrando) {
+      corpo.append(h('p', { class: 'p-dica' }, `Mostrando só os horários de ${nomeBonito(r.medico_preferido)}, seu médico de preferência. `,
+        h('button', { class: 'chip', type: 'button', onclick: trocarMedico }, 'Ver outros médicos')));
+    } else if (r.medico_sem_horario) {
+      corpo.append(h('p', { class: 'p-dica' }, `${nomeBonito(r.medico_preferido)} não tem horário para este pedido nos próximos dias. Mostramos os horários de outros médicos; o atendente confere se é possível com ${nomeBonito(r.medico_preferido)}.`));
+    }
     if ((r.unidades || []).length > 1) {
       corpo.append(h('div', { class: 'chips', role: 'group', 'aria-label': 'Unidade' }, [['', 'Qualquer unidade'], ...r.unidades.map((u) => [u, u.replace(/^CLÍNICA DE SAÚDE E IMAGEM - /, '')])]
         .map(([v, t]) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(C.unidade === v), onclick: () => { C.unidade = v; carregarHorarios(false); } }, t))));
@@ -919,6 +987,13 @@
     rodape.append(h('button', { class: 'btn-w', type: 'button', disabled: !C.slot, onclick: confirmarHorario },
       C.slot ? `Escolher ${DIAS_SEMANA[dt.getDay()]}, ${dt.getDate()}/${String(dt.getMonth() + 1).padStart(2, '0')} às ${C.slot.hora}` : 'Escolha um horário'));
     corpo.scrollTop = rolagem;
+  }
+  async function trocarMedico() {
+    try {
+      const { error } = await db.rpc('chat_medico_limpar', { p_conversa: conv.id, p_token: conv.token });
+      if (error) throw error;
+      await carregarHorarios(false);
+    } catch (e) { toast(mensagemErro(e)); }
   }
   async function confirmarHorario() {
     if (!C || !C.slot || !C.dia) return;
