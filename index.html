@@ -269,8 +269,8 @@
         <input type="tel" id="fTel" inputmode="tel" autocomplete="tel-national" placeholder="(71) 99999-9999" maxlength="16" required>
       </div>
       <div class="campo">
-        <label for="fEmail">E-mail <span class="opc">(opcional)</span></label>
-        <input type="email" id="fEmail" autocomplete="email" maxlength="200">
+        <label for="fEmail">E-mail</label>
+        <input type="email" id="fEmail" autocomplete="email" maxlength="200" placeholder="nome@exemplo.com" required>
       </div>
       <div class="campo" id="blocoMedico" hidden>
         <label for="fMedico">Tem médico de preferência? <span class="opc">(opcional)</span></label>
@@ -599,12 +599,14 @@
     const irmaos = filho ? irmaosForm.map((x) => x.trim()).filter((x) => x.length >= 2) : [];
     if (filho && irmaosForm.some((x) => x.trim() && x.trim().length < 2)) { el.erroForm.textContent = 'Confira o nome dos outros filhos.'; return; }
     if (tel.length < 10) { el.erroForm.textContent = 'Informe o telefone com DDD.'; el.fTel.focus(); return; }
+    const email = el.fEmail.value.trim();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { el.erroForm.textContent = email ? 'Confira o e-mail: ele parece incompleto.' : 'Informe seu e-mail.'; el.fEmail.focus(); return; }
     if (!el.fAceite.checked) { el.erroForm.textContent = 'Marque a caixa de concordância para continuar.'; el.fAceite.focus(); return; }
     el.btnIniciar.disabled = true; el.btnIniciar.textContent = 'Iniciando…';
     try {
       const origem = new URLSearchParams(location.search).get('origem');
       const { data, error } = await db.rpc('chat_iniciar', {
-        p_nome: nome, p_telefone: el.fTel.value, p_email: el.fEmail.value.trim() || null,
+        p_nome: nome, p_telefone: el.fTel.value, p_email: email,
         p_mensagem: el.fMsg.value.trim() || null, p_aceite: true, p_origem: origem,
         ...(escolha ? { p_paciente_tipo: escolha.tipo, p_paciente_nome: filho ? nomeFilho : null } : {}),
         ...(irmaos.length ? { p_irmaos: irmaos, p_irmaos_modo: modoIrmaos } : {}),
@@ -614,7 +616,7 @@
       const un = escolha && opcoesInicio && opcoesInicio.find((u) => u.chave === escolha.unidade);
       conv = { id: data.conversa_id, token: data.token, unidade: un ? un.catalogo : '', unidadeChave: un ? un.chave : '', tipo: filho ? 'filho' : 'proprio', nomeCrianca: filho ? nomeFilho : '', irmaos, irmaosModo: irmaos.length ? modoIrmaos : '' };
       gravarLocal(CHAVE_CONVERSA, conv);
-      gravarLocal(CHAVE_PERFIL, { nome, telefone: el.fTel.value, email: el.fEmail.value.trim() });
+      gravarLocal(CHAVE_PERFIL, { nome, telefone: el.fTel.value, email });
       await abrirChat();
     } catch (e) {
       el.erroForm.textContent = mensagemErro(e);
