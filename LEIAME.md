@@ -102,7 +102,7 @@ A IA consulta, a cada mensagem do paciente, um catálogo copiado de relatórios 
 
 ### Preços, demanda e lista de limpeza (Fase 1)
 
-- **Preços** (`catalogo_preco`): convênio vem do relatório #13983 pedido por operadora (03:10) e o Particular vem do valor das marcações abertas dos últimos 90 dias do #13825, só agregado, sem dado de paciente (03:25). A IA só usa preço com confiança alta ou média: tabelas CBHPM guardam coeficiente, não reais, e Particular com uma marcação só é baixa. **Todo valor é uma previsão**: a IA diz que o preço pode mudar e que o atendente avalia e confirma valor e data.
+- **Preços** (`catalogo_preco`): convênio vem do relatório #13983 pedido por operadora (03:10) e o Particular vem do valor das marcações abertas dos últimos 90 dias do #13825, só agregado, sem dado de paciente (03:25). A IA só usa preço com confiança alta ou média: tabelas CBHPM guardam coeficiente, não reais, e Particular com uma marcação só é baixa. **A IA não informa preço ao paciente** (desde a Fase 6b ela nem recebe o valor): quem informa é o atendente. O catálogo serve para vigiar o valor que o atendente escreve no chat: se estiver 10% ou mais fora da referência, aparece um alerta **só para a equipe** (ver `docs/fase6-unidade-e-medico.md`).
 - **Demanda** (`catalogo_procedimento.demanda_90d`): marcações abertas por procedimento nos últimos 90 dias; a IA prefere o exame que a clínica realmente faz.
 - **Foto de referência** (`catalogo_foto`, `referencia = true`): cópia do catálogo de 29/10/2026, antes da limpeza no Klingo. Não apagar.
 - **Aba Catálogo** do painel (só administrador): o que limpar no Klingo (sem agenda vigente, duplicados, agenda de teste, sem preço, mais pedidos sem preparo) e o histórico de mudanças.
@@ -126,6 +126,10 @@ A IA consulta, a cada mensagem do paciente, um catálogo copiado de relatórios 
 - **Etapas** (`pre_agendamentos.etapa`): pedido, plano, preferências, data e hora, dados, confirmação, pronto. O contexto que a IA recebe encolhe nas etapas finais.
 - SQL em `supabase/fase2-pedido-e-agenda.sql`.
 - **Ativar**: o chat novo só aparece depois do merge deste PR (GitHub Pages). O fluxo do n8n com o prompt novo (versão "Prompt por etapas...") já está salvo, mas a versão **publicada** continua a anterior até o merge; depois do merge, publique a versão mais recente do fluxo `Triagem IA - Atendimento`.
+
+### Unidade e médico de preferência no início do chat (Fase 6)
+
+O formulário pergunta primeiro a unidade (Desenvoar = atendimento pediátrico; CSI = exames e consultas; CSI RM/TC = ressonância e tomografia; "Ainda não sei") e **quem será atendido** (o próprio ou um filho(a), com o responsável falando pelo filho; uma conversa por criança e "Agendar para outro filho(a)" no menu). O médico de preferência vem depois do e-mail. A IA já nasce no caminho certo e o calendário filtra por unidade e médico. Passo a passo, texto do n8n e limites em `docs/fase6-unidade-e-medico.md`; SQL em `supabase/fase6-unidade-e-medico.sql` e `supabase/fase6b-alerta-preco.sql` (**aplicados no projeto em 30/10/2026**). Falta só o n8n (ver `docs/fase6-roteiro-de-teste-e-producao.md`).
 
 ## Estado do projeto e como retomar
 

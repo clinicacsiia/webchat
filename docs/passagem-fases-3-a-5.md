@@ -103,7 +103,7 @@ Arquivo: `supabase/fase5-aprendizado.sql` (aditivo, pode rodar de novo). Mostra 
 
 ## 6. Regras que não podem ser quebradas
 - Dados de paciente do Klingo só passam pela **memória** da Edge Function para identificar a conversa; **nunca** são gravados, devolvidos ou logados. `agenda_ocupacao` guarda só início, médico, unidade, procedimento, quantidade.
-- Preço é sempre **previsão**; um atendente humano confirma preço e data. A mensagem de confirmação ao paciente não traz preço.
+- **A IA não informa preço** (Fase 6b: `ia_catalogo` devolve `precos` vazio); o atendente informa e confirma valor e data. O valor que o atendente escreve no chat é conferido contra `catalogo_preco`; fora de 10% gera alerta em `alerta_preco`, que só administrador e atendente leem. A mensagem de confirmação ao paciente não traz preço.
 - Detalhes do histórico só depois da data de nascimento conferida. Ao testar `liberado`, use `coalesce(..., false)`: um NULL já virou "verdadeiro" uma vez.
 - Lado D/E: na frente o L do desenho é o Direito, nas costas é o Esquerdo; bilateral com lado único é recusado.
 - Horários: reserva provisória + advisory lock por dia; folga 15 min (mesma unidade) / 60 min (outra unidade) entre exames do mesmo paciente; antecedência de 120 min. Fuso: `America/Bahia`.
