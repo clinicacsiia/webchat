@@ -116,3 +116,12 @@ A IA consulta, a cada mensagem do paciente, um catálogo copiado de relatórios 
 - `pacientes.validado` fica `true` quando a identidade é conferida num novo atendimento ou quando a atendente marca o pré-agendamento como agendado. O cartão do painel mostra a situação (`pre_agendamentos.identidade`).
 - SQL em `supabase/pacientes.sql`.
 
+### Fase 2: pedido por mapa do corpo, listas e calendário de horários
+
+- **Chat do paciente** (`index.html`): a mensagem da IA pode trazer um componente: **lista** (caixas ou uma escolha, com "Outro"), **mapa do corpo** e **calendário**. O texto da pergunta sempre vai junto, então quem não vê o componente consegue responder digitando.
+- **Mapa do corpo**: tipo de exame (ressonância, tomografia, ultrassom, raio-X; mamografia e densitometria por lista), vista de frente e de costas, várias partes e **vários exames** no mesmo pedido. De frente, o lado direito do paciente fica à esquerda do desenho (letra **D** nas bordas e legenda); de costas, o contrário. O lado fica no item do pedido (D, E ou ambos): "ambos" vira o exame bilateral ou 2 unidades do unilateral, e exame bilateral com um lado só é recusado pelo servidor. Partes sem exame cadastrado ficam tracejadas.
+- **Calendário** (`chat_horarios`): só horários livres, de 20 ou 30 em 30 min, em "sala de cinema" (ocupados em cinza). Usa a grade de cada profissional, a duração reservada por modalidade (`agenda_regra_duracao`: RM 30 min, TC e US 20 min, RX 10 min; ajustável), exige blocos seguidos, exige a sala certa da modalidade (`agenda_modalidade_local`), respeita antecedência de 2 h e não deixa o mesmo paciente em dois lugares ao mesmo tempo. O que já está marcado vem do relatório #7 do Klingo (sem dado de paciente) a cada 10 minutos (cron `agenda-ocupacao`). Na hora de gravar, o servidor confere de novo se o horário ainda está livre.
+- **Etapas** (`pre_agendamentos.etapa`): pedido, plano, preferências, data e hora, dados, confirmação, pronto. O contexto que a IA recebe encolhe nas etapas finais.
+- SQL em `supabase/fase2-pedido-e-agenda.sql`.
+- **Ativar**: o chat novo só aparece depois do merge deste PR (GitHub Pages). O fluxo do n8n com o prompt novo (versão "Prompt por etapas...") já está salvo, mas a versão **publicada** continua a anterior até o merge; depois do merge, publique a versão mais recente do fluxo `Triagem IA - Atendimento`.
+

@@ -114,6 +114,94 @@
     position: fixed; left: 50%; bottom: calc(86px + env(safe-area-inset-bottom)); transform: translateX(-50%); background: #2b2f2e; color: #fff;
     padding: 10px 16px; border-radius: 10px; font-size: 14px; z-index: 30; max-width: calc(100% - 32px); text-align: center;
   }
+
+  /* Widgets dentro das mensagens */
+  .widget { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--linha); white-space: normal; }
+  .widget .w-titulo { font-weight: 650; font-size: 14px; margin: 0 0 6px; }
+  .widget fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+  .widget .w-op { display: flex; gap: 10px; align-items: center; padding: 9px 4px; border-radius: 8px; cursor: pointer; }
+  .widget .w-op:hover { background: #f1f6f3; }
+  .widget .w-op input { width: 20px; height: 20px; accent-color: var(--verde); flex: none; }
+  .widget .w-outro { width: 100%; margin: 4px 0 8px; padding: 10px 12px; border: 1.5px solid var(--linha); border-radius: 10px; background: var(--papel); }
+  .widget .w-outro:focus { border-color: var(--verde); outline: none; }
+  .btn-w { background: var(--verde); color: #fff; border: 0; border-radius: 10px; padding: 11px 16px; font-weight: 650; cursor: pointer; }
+  .btn-w:hover { background: #0f5a42; }
+  .btn-w:disabled { opacity: .5; cursor: default; }
+  .btn-w.sec { background: var(--papel); color: var(--verde); border: 1.5px solid var(--verde); }
+  .widget.respondido { opacity: .6; }
+  .widget .w-nota { font-size: 12.5px; color: var(--texto-suave); margin: 6px 0 0; }
+
+  /* Folha (modal em tela cheia no celular) */
+  .folha { position: fixed; inset: 0; background: rgba(16,48,43,.55); z-index: 40; display: flex; align-items: flex-end; justify-content: center; }
+  .folha-caixa { background: var(--fundo); width: 100%; max-width: 760px; height: min(100dvh, 880px); display: flex; flex-direction: column; border-radius: 16px 16px 0 0; overflow: hidden; }
+  @media (min-width: 800px) { .folha { align-items: center; } .folha-caixa { height: min(92dvh, 860px); border-radius: 16px; } }
+  .folha-topo { display: flex; align-items: center; gap: 8px; padding: 12px 14px; background: var(--verde-escuro); color: #fff; flex: none; }
+  .folha-topo h2 { flex: 1; margin: 0; font-size: 17px; line-height: 1.25; }
+  .folha-fechar { background: transparent; border: 0; color: #fff; width: 40px; height: 40px; border-radius: 50%; font-size: 26px; line-height: 1; cursor: pointer; }
+  .folha-fechar:hover { background: rgba(255,255,255,.14); }
+  .folha-corpo { flex: 1; overflow-y: auto; padding: 14px; overscroll-behavior: contain; }
+  .folha-rodape { flex: none; padding: 10px 14px calc(10px + env(safe-area-inset-bottom)); background: #f4f8f5; border-top: 1px solid var(--linha); display: flex; flex-direction: column; gap: 8px; }
+  .folha-rodape .linha { display: flex; gap: 8px; flex-wrap: wrap; }
+  .folha-rodape .linha > * { flex: 1; min-width: 130px; }
+  .p-dica { font-size: 13.5px; color: var(--texto-suave); margin: 0 0 10px; }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 12px; }
+  .chip { border: 1.5px solid var(--linha); background: var(--papel); border-radius: 999px; padding: 8px 14px; cursor: pointer; font-weight: 600; font-size: 14px; }
+  .chip[aria-pressed="true"], .chip.ativo { background: var(--verde); border-color: var(--verde); color: #fff; }
+  .chip:disabled { opacity: .45; cursor: default; }
+
+  /* Mapa do corpo */
+  .corpo-wrap { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .corpo-svg { width: min(100%, 300px); height: auto; touch-action: manipulation; }
+  .corpo-svg .parte { fill: #dfe9e3; stroke: #7d9a8e; stroke-width: 1.4; cursor: pointer; transition: fill .12s; }
+  .corpo-svg .parte:hover { fill: #bfe3cf; }
+  .corpo-svg .parte:focus-visible { outline: none; stroke: #0b5cad; stroke-width: 3; }
+  .corpo-svg .parte.sel { fill: var(--verde); stroke: #0f5a42; }
+  .corpo-svg .parte.off { fill: #eef1ef; stroke: #c6cfca; cursor: not-allowed; stroke-dasharray: 3 2; }
+  .corpo-svg text { font-size: 11px; fill: #3b4b45; pointer-events: none; font-weight: 700; }
+  .corpo-svg text.letra { fill: #fff; font-size: 12px; }
+  .corpo-cap { font-size: 12.5px; color: var(--texto-suave); text-align: center; max-width: 320px; margin: 0; }
+  .sel-lista { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0; }
+  .tag { display: inline-flex; align-items: center; gap: 6px; background: var(--verde-claro); border-radius: 999px; padding: 5px 6px 5px 12px; font-size: 14px; }
+  .tag button { border: 0; background: rgba(16,48,43,.12); border-radius: 50%; width: 24px; height: 24px; cursor: pointer; line-height: 1; }
+  .alt-lista { border: 1px solid var(--linha); border-radius: 12px; background: var(--papel); padding: 8px 12px; margin: 10px 0; }
+  .alt-lista summary { cursor: pointer; font-weight: 600; font-size: 14px; }
+  .alt-grid { display: grid; grid-template-columns: 1fr auto auto; gap: 6px 8px; align-items: center; margin-top: 8px; }
+  .alt-grid .nome { font-size: 14px; }
+  .bloco { background: var(--papel); border: 1px solid var(--linha); border-radius: 12px; padding: 10px 12px; margin: 0 0 10px; }
+  .bloco h3 { margin: 0 0 6px; font-size: 15px; }
+  .bloco .w-op { padding: 8px 2px; }
+  .carrinho { background: #fff7e5; border: 1px solid #f0dfb8; border-radius: 12px; padding: 8px 12px; margin: 0 0 12px; }
+  .carrinho h3 { margin: 0 0 6px; font-size: 14px; color: var(--aviso); }
+  .carrinho li { display: flex; gap: 8px; align-items: flex-start; padding: 3px 0; font-size: 14px; }
+  .carrinho ul { list-style: none; margin: 0; padding: 0; }
+  .carrinho li span { flex: 1; }
+  .carrinho button { border: 0; background: rgba(16,48,43,.12); border-radius: 50%; width: 24px; height: 24px; cursor: pointer; flex: none; }
+
+  /* Calendário */
+  .cal-nav { display: flex; align-items: center; justify-content: space-between; margin: 4px 0 8px; }
+  .cal-nav strong { font-size: 16px; }
+  .cal-nav button { border: 1.5px solid var(--linha); background: var(--papel); border-radius: 10px; width: 42px; height: 38px; font-size: 20px; cursor: pointer; }
+  .cal-nav button:disabled { opacity: .4; cursor: default; }
+  .cal-grade { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+  .cal-grade .sem { text-align: center; font-size: 12px; color: var(--texto-suave); padding: 2px 0; font-weight: 700; }
+  .cal-dia { aspect-ratio: 1 / 1; min-height: 40px; border: 1.5px solid transparent; border-radius: 10px; background: transparent; cursor: pointer; font-size: 15px; position: relative; padding: 0; }
+  .cal-dia.livre { background: var(--papel); border-color: var(--linha); font-weight: 650; }
+  .cal-dia.livre::after { content: ""; position: absolute; left: 50%; bottom: 5px; width: 6px; height: 6px; margin-left: -3px; border-radius: 50%; background: var(--verde); }
+  .cal-dia.lotado { color: #a5b0ab; text-decoration: line-through; cursor: not-allowed; }
+  .cal-dia.fechado { color: #c2cac6; cursor: not-allowed; }
+  .cal-dia.hoje { box-shadow: inset 0 0 0 2px #2f9e78; }
+  .cal-dia.sel { background: var(--verde); color: #fff; border-color: var(--verde); }
+  .cal-dia.sel::after { background: #fff; }
+  .slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 6px; margin-top: 8px; }
+  .slot { border: 1.5px solid var(--verde); background: var(--papel); color: var(--verde); border-radius: 10px; padding: 9px 4px; font-weight: 650; cursor: pointer; }
+  .slot:hover { background: #eef8f2; }
+  .slot.sel { background: var(--verde); color: #fff; }
+  .slot.off { border-color: var(--linha); color: #aeb8b3; background: #f1f4f2; text-decoration: line-through; cursor: not-allowed; }
+  .slot.chegada { grid-column: 1 / -1; }
+  .legenda { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12.5px; color: var(--texto-suave); margin: 10px 0 0; }
+  .legenda i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; margin-right: 4px; }
+  .aviso-cal { background: #fff7e5; border: 1px solid #f0dfb8; color: var(--aviso); border-radius: 10px; padding: 8px 10px; font-size: 13px; margin: 0 0 10px; }
+  .carregando { padding: 28px 8px; text-align: center; color: var(--texto-suave); }
   @media (prefers-reduced-motion: no-preference) { .msg { animation: entra .16s ease-out; } @keyframes entra { from { opacity: 0; transform: translateY(4px); } } }
 </style>
 </head>
@@ -172,6 +260,13 @@
       </button>
     </form>
   </section>
+</div>
+<div class="folha" id="folha" hidden>
+  <div class="folha-caixa" role="dialog" aria-modal="true" aria-labelledby="folhaTitulo">
+    <header class="folha-topo"><h2 id="folhaTitulo"></h2><button type="button" class="folha-fechar" id="folhaFechar" aria-label="Fechar">&times;</button></header>
+    <div class="folha-corpo" id="folhaCorpo"></div>
+    <footer class="folha-rodape" id="folhaRodape"></footer>
+  </div>
 </div>
 <div class="toast" id="toast" role="status" hidden></div>
 
@@ -283,6 +378,7 @@
       const q = document.createElement('span'); q.className = 'quem'; q.textContent = m.agente; n.appendChild(q);
     }
     const t = document.createElement('span'); linkificar(t, m.texto); n.appendChild(t);
+    if (m.opcoes) renderWidget(n, m);
     const h = document.createElement('span'); h.className = 'hora'; h.textContent = hora(m.criado_em); n.appendChild(h);
     ultimoAutor = m.autor === 'agente' ? 'agente:' + (m.agente || '') : m.autor;
     el.msgs.appendChild(n);
@@ -293,6 +389,7 @@
     vistos.add(m.id);
     if (m.id > ultimoId) ultimoId = m.id;
     desenhar(m, false);
+    atualizarWidgets();
     rolarFim(m.autor === 'cliente');
     if (m.autor !== 'cliente' && document.hidden && !dePolling) {
       naoLidas++; document.title = `(${naoLidas}) ${config.nome_empresa}`;
@@ -381,8 +478,13 @@
     const texto = el.texto.value.trim();
     if (!texto || !conv) return;
     el.texto.value = ''; autoAltura();
+    await enviarTexto(texto, true);
+  }
+  async function enviarTexto(texto, devolverAoCampo) {
+    if (!texto || !conv) return;
     const temp = desenhar({ autor: 'cliente', texto, criado_em: new Date().toISOString() }, true);
     temp.dataset.temp = String(++tempId);
+    atualizarWidgets();
     rolarFim(true); el.btnEnviar.disabled = true;
     try {
       const { data, error } = await db.rpc('chat_enviar', { p_conversa: conv.id, p_token: conv.token, p_texto: texto });
@@ -391,10 +493,10 @@
       if (!vistos.has(data.id)) { ultimoDia = ''; adicionarLocal(data.id, texto); }
       carregar();
     } catch (e) {
-      temp.remove();
-      el.texto.value = texto; autoAltura();
+      temp.remove(); atualizarWidgets();
+      if (devolverAoCampo) { el.texto.value = texto; autoAltura(); }
       toast(mensagemErro(e));
-    } finally { el.btnEnviar.disabled = false; el.texto.focus(); }
+    } finally { el.btnEnviar.disabled = false; if (devolverAoCampo) el.texto.focus(); }
   }
   function adicionarLocal(id, texto) {
     // Reconstrói só se a mensagem ainda não chegou por broadcast: busca o estado oficial.
@@ -408,6 +510,428 @@
     apagarLocal(CHAVE_CONVERSA); conv = null; mostrarForm();
   }
   function autoAltura() { el.texto.style.height = 'auto'; el.texto.style.height = Math.min(el.texto.scrollHeight, 140) + 'px'; }
+
+  /* ---------- widgets (lista, mapa do corpo, calendário) ---------- */
+  const NS_SVG = 'http://www.w3.org/2000/svg';
+  function h(tag, props, ...kids) {
+    const e = document.createElement(tag);
+    for (const [k, v] of Object.entries(props || {})) {
+      if (v == null || v === false) continue;
+      if (k === 'class') e.className = v;
+      else if (k === 'checked' || k === 'disabled' || k === 'value') e[k] = v;
+      else if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
+      else e.setAttribute(k, v === true ? '' : v);
+    }
+    for (const c of kids.flat(Infinity)) { if (c == null || c === false) continue; e.append(c.nodeType ? c : document.createTextNode(String(c))); }
+    return e;
+  }
+  function hs(tag, attrs, ...kids) {
+    const e = document.createElementNS(NS_SVG, tag);
+    for (const [k, v] of Object.entries(attrs || {})) { if (v != null && v !== false) e.setAttribute(k, v); }
+    for (const c of kids.flat(Infinity)) { if (c != null && c !== false) e.append(c.nodeType ? c : document.createTextNode(String(c))); }
+    return e;
+  }
+  const MOD_NOME = { RM: 'Ressonância', TC: 'Tomografia', US: 'Ultrassom', RX: 'Raio-X', MAMO: 'Mamografia', DENSITO: 'Densitometria' };
+  const LADO_TXT = { D: 'lado direito', E: 'lado esquerdo', A: 'os dois lados', N: '' };
+  const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+  const DIAS_SEMANA = ['domingo', 'segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado'];
+  const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const dataLocal = (s) => { const [a, m, d] = s.split('-').map(Number); return new Date(a, m - 1, d); };
+  const minutos = (hhmm) => { const [a, b] = hhmm.split(':').map(Number); return a * 60 + b; };
+  const hhmm = (min) => `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
+
+  /* folha (janela por cima do chat) */
+  let folhaFoco = null;
+  function abrirFolha(titulo) {
+    folhaFoco = document.activeElement;
+    $('#folhaTitulo').textContent = titulo;
+    $('#folha').hidden = false;
+    document.body.style.overflow = 'hidden';
+    return { corpo: $('#folhaCorpo'), rodape: $('#folhaRodape') };
+  }
+  function fecharFolha() {
+    $('#folha').hidden = true; document.body.style.overflow = '';
+    $('#folhaCorpo').replaceChildren(); $('#folhaRodape').replaceChildren();
+    P = null; C = null;
+    if (folhaFoco && folhaFoco.focus) { try { folhaFoco.focus(); } catch { /* ignora */ } }
+  }
+
+  /* widget dentro da mensagem */
+  function renderWidget(pai, m) {
+    const o = m.opcoes;
+    if (!o || typeof o !== 'object') return;
+    const w = h('div', { class: 'widget', 'data-tipo': String(o.tipo) });
+    if (o.tipo === 'lista') widgetLista(w, o);
+    else if (o.tipo === 'pedido_exames') {
+      w.append(h('button', { class: 'btn-w', type: 'button', onclick: abrirPedido }, o.rotulo || 'Escolher exames no mapa do corpo'),
+        h('p', { class: 'w-nota' }, 'Você pode marcar várias partes do corpo e vários exames.'));
+    } else if (o.tipo === 'calendario') {
+      w.append(h('button', { class: 'btn-w', type: 'button', onclick: () => abrirCalendario(1) }, o.rotulo || 'Escolher data e horário'),
+        h('p', { class: 'w-nota' }, 'Os horários são uma previsão; o atendente confirma o dia e o horário.'));
+    } else return;
+    pai.append(w);
+  }
+  function widgetLista(w, o) {
+    const itens = (Array.isArray(o.itens) ? o.itens : []).slice(0, 16).filter((i) => i && i.rotulo);
+    const multipla = !!o.multipla, nome = 'w' + Math.random().toString(36).slice(2);
+    const fs = h('fieldset', {}, h('legend', { class: 'w-titulo' }, o.titulo || 'Escolha uma opção'));
+    for (const i of itens) fs.append(h('label', { class: 'w-op' }, h('input', { type: multipla ? 'checkbox' : 'radio', name: nome, value: String(i.rotulo) }), h('span', {}, i.rotulo)));
+    const outro = o.outro !== false ? h('input', { type: 'text', class: 'w-outro', placeholder: 'Outro (digite aqui)', maxlength: '200', 'aria-label': 'Outra resposta' }) : null;
+    const btn = h('button', { class: 'btn-w', type: 'button' }, 'Enviar');
+    btn.addEventListener('click', () => {
+      const sel = [...fs.querySelectorAll('input:checked')].map((x) => x.value);
+      const t = outro && outro.value.trim();
+      if (t) sel.push(t);
+      if (!sel.length) { toast('Escolha uma opção ou digite a sua.'); return; }
+      enviarTexto((o.titulo ? String(o.titulo).replace(/[?:\s]+$/, '') + ': ' : '') + sel.join('; '));
+    });
+    w.append(fs);
+    if (outro) w.append(outro);
+    w.append(btn);
+  }
+  // Só a lista da última pergunta fica ativa; as respondidas ficam esmaecidas.
+  function atualizarWidgets() {
+    const msgs = [...el.msgs.querySelectorAll('.msg')];
+    let ultimoCliente = -1;
+    msgs.forEach((m, i) => { if (m.classList.contains('cliente')) ultimoCliente = i; });
+    msgs.forEach((m, i) => {
+      m.querySelectorAll('.widget[data-tipo="lista"]').forEach((w) => {
+        const ativo = i > ultimoCliente;
+        w.classList.toggle('respondido', !ativo);
+        w.querySelectorAll('input,button').forEach((x) => { x.disabled = !ativo; });
+      });
+    });
+  }
+
+  /* ---------- pedido de exames: mapa do corpo ---------- */
+  // Geometria do desenho (vista de frente). "L" = lado esquerdo do DESENHO, "R" = lado direito do desenho.
+  // De frente, o lado DIREITO do paciente fica no lado ESQUERDO do desenho; de costas, é o contrário.
+  const FORMAS_FRENTE = [
+    ['cranio', null, 'path', { d: 'M78 36 A22 25 0 0 1 122 36 Z' }],
+    ['face', null, 'path', { d: 'M78 36 L122 36 Q122 58 100 62 Q78 58 78 36 Z' }],
+    ['pescoco', null, 'rect', { x: 91, y: 63, width: 18, height: 16, rx: 5 }],
+    ['ombro', 'L', 'ellipse', { cx: 52, cy: 92, rx: 13, ry: 11 }], ['ombro', 'R', 'ellipse', { cx: 148, cy: 92, rx: 13, ry: 11 }],
+    ['torax', null, 'path', { d: 'M64 82 Q100 74 136 82 L134 130 Q100 136 66 130 Z' }],
+    ['mama', 'L', 'circle', { cx: 83, cy: 108, r: 12 }], ['mama', 'R', 'circle', { cx: 117, cy: 108, r: 12 }],
+    ['abdome', null, 'path', { d: 'M66 133 Q100 139 134 133 L132 178 Q100 184 68 178 Z' }],
+    ['pelve', null, 'path', { d: 'M68 181 Q100 187 132 181 L134 205 Q100 224 66 205 Z' }],
+    ['quadril', 'L', 'ellipse', { cx: 60, cy: 200, rx: 8, ry: 12 }], ['quadril', 'R', 'ellipse', { cx: 140, cy: 200, rx: 8, ry: 12 }],
+    ['braco', 'L', 'rect', { x: 38, y: 106, width: 17, height: 44, rx: 8 }], ['braco', 'R', 'rect', { x: 145, y: 106, width: 17, height: 44, rx: 8 }],
+    ['cotovelo', 'L', 'ellipse', { cx: 46, cy: 156, rx: 10, ry: 8 }], ['cotovelo', 'R', 'ellipse', { cx: 154, cy: 156, rx: 10, ry: 8 }],
+    ['antebraco', 'L', 'rect', { x: 34, y: 166, width: 16, height: 46, rx: 8 }], ['antebraco', 'R', 'rect', { x: 150, y: 166, width: 16, height: 46, rx: 8 }],
+    ['punho_mao', 'L', 'ellipse', { cx: 41, cy: 232, rx: 9, ry: 17 }], ['punho_mao', 'R', 'ellipse', { cx: 159, cy: 232, rx: 9, ry: 17 }],
+    ['coxa', 'L', 'rect', { x: 64, y: 226, width: 33, height: 80, rx: 14 }], ['coxa', 'R', 'rect', { x: 103, y: 226, width: 33, height: 80, rx: 14 }],
+    ['joelho', 'L', 'ellipse', { cx: 80, cy: 316, rx: 15, ry: 11 }], ['joelho', 'R', 'ellipse', { cx: 120, cy: 316, rx: 15, ry: 11 }],
+    ['perna', 'L', 'rect', { x: 67, y: 329, width: 27, height: 78, rx: 12 }], ['perna', 'R', 'rect', { x: 106, y: 329, width: 27, height: 78, rx: 12 }],
+    ['tornozelo_pe', 'L', 'ellipse', { cx: 80, cy: 430, rx: 15, ry: 14 }], ['tornozelo_pe', 'R', 'ellipse', { cx: 120, cy: 430, rx: 15, ry: 14 }]
+  ];
+  const FORMAS_COSTAS = FORMAS_FRENTE.filter(([c]) => !['face', 'pescoco', 'torax', 'mama', 'abdome', 'pelve', 'cranio'].includes(c)).concat([
+    ['cranio', null, 'ellipse', { cx: 100, cy: 38, rx: 22, ry: 26 }],
+    ['coluna_cervical', null, 'rect', { x: 88, y: 64, width: 24, height: 18, rx: 6 }],
+    ['coluna_toracica', null, 'path', { d: 'M64 84 Q100 78 136 84 L134 136 Q100 140 66 136 Z' }],
+    ['coluna_lombar', null, 'path', { d: 'M66 139 Q100 143 134 139 L134 188 Q100 198 66 188 Z' }]
+  ]).map(([c, lado, t, a]) => (c === 'quadril' ? [c, lado, 'ellipse', { cx: lado === 'L' ? 72 : 128, cy: 206, rx: 15, ry: 15 }] : [c, lado, t, a]));
+  let P = null;
+
+  const ladoDaForma = (ladoVisual, vista) => (ladoVisual == null ? 'N' : (vista === 'frente' ? (ladoVisual === 'L' ? 'D' : 'E') : (ladoVisual === 'L' ? 'E' : 'D')));
+  const regiaoPorCodigo = (cod) => (P.cfg.regioes.find((r) => r.codigo === cod) || { codigo: cod, nome: cod, tem_lado: false });
+
+  async function abrirPedido() {
+    if (!conv) return;
+    const f = abrirFolha('Montar pedido de exames');
+    f.corpo.replaceChildren(h('p', { class: 'carregando' }, 'Carregando…'));
+    P = { cfg: null, mod: null, partes: new Map(), vista: 'frente', carrinho: [], passo: 'mapa', exames: new Map(), escolhas: new Map(), lista: [], simples: null, simplesLado: 'A' };
+    try {
+      const { data, error } = await db.rpc('chat_corpo', { p_conversa: conv.id, p_token: conv.token });
+      if (error) throw error;
+      P.cfg = data;
+      P.mod = (data.modalidades.find((m) => m.total > 0) || data.modalidades[0]).codigo;
+    } catch (e) { f.corpo.replaceChildren(h('p', { class: 'erro-form' }, mensagemErro(e))); return; }
+    desenharPedido();
+  }
+  const modAtual = () => P.cfg.modalidades.find((m) => m.codigo === P.mod);
+  function desenharPedido() {
+    if (!P) return;
+    const corpo = $('#folhaCorpo'), rodape = $('#folhaRodape');
+    const rolagem = corpo.scrollTop;
+    corpo.replaceChildren(); rodape.replaceChildren();
+    if (P.carrinho.length) corpo.append(blocoCarrinho());
+    if (P.passo === 'exames') passoExames(corpo); else passoMapa(corpo);
+    rodape.append(h('button', { class: 'btn-w', type: 'button', disabled: !P.carrinho.length, onclick: enviarPedido }, `Enviar pedido (${P.carrinho.length} ${P.carrinho.length === 1 ? 'exame' : 'exames'})`),
+      h('p', { class: 'w-nota' }, 'Depois do envio um atendente confere tudo e confirma valor, data e horário.'));
+    corpo.scrollTop = rolagem;
+  }
+  function rotuloItem(i) {
+    const lado = LADO_TXT[i.lado] ? ` (${LADO_TXT[i.lado]})` : '';
+    return `${MOD_NOME[i.modalidade] || i.modalidade}${i.regiao_nome ? ' — ' + i.regiao_nome : ''}${lado}: ${i.procedimento || 'o atendente escolhe o exame'}${i.lado === 'A' && i.procedimento && !/bilateral/i.test(i.procedimento) ? ' (2 unidades)' : ''}`;
+  }
+  function blocoCarrinho() {
+    return h('div', { class: 'carrinho' }, h('h3', {}, 'Seu pedido até agora'),
+      h('ul', {}, P.carrinho.map((i, k) => h('li', {}, h('span', {}, rotuloItem(i)),
+        h('button', { type: 'button', 'aria-label': 'Remover ' + rotuloItem(i), onclick: () => { P.carrinho.splice(k, 1); desenharPedido(); } }, '×')))));
+  }
+  function passoMapa(corpo) {
+    corpo.append(h('p', { class: 'p-dica' }, '1) Escolha o tipo de exame. 2) Toque na parte do corpo. 3) Adicione ao pedido. Pode repetir para outros exames e outras partes.'));
+    corpo.append(h('div', { class: 'chips', role: 'group', 'aria-label': 'Tipo de exame' },
+      P.cfg.modalidades.filter((m) => m.total > 0).map((m) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(m.codigo === P.mod),
+        onclick: () => { P.mod = m.codigo; P.partes.clear(); P.simples = null; desenharPedido(); } }, MOD_NOME[m.codigo] || m.nome))));
+    const m = modAtual();
+    if (!m.mapa) { passoListaSimples(corpo, m); return; }
+    corpo.append(mapaCorpo(m), selecionadas(),
+      h('button', { class: 'btn-w', type: 'button', disabled: !P.partes.size, onclick: irParaExames }, 'Ver exames para essas partes do corpo'));
+  }
+  function alternar(cod, lado) {
+    const k = `${cod}:${lado}`;
+    if (P.partes.has(k)) P.partes.delete(k); else P.partes.set(k, { regiao: cod, lado });
+    desenharPedido();
+  }
+  function mapaCorpo(m) {
+    const frente = P.vista === 'frente';
+    const ativas = new Set(m.regioes);
+    const svg = hs('svg', { viewBox: '0 0 200 460', class: 'corpo-svg', role: 'group', 'aria-label': `Mapa do corpo, vista ${frente ? 'de frente' : 'de costas'}` });
+    for (const [cod, ladoV, tipo, attrs] of (frente ? FORMAS_FRENTE : FORMAS_COSTAS)) {
+      const lado = ladoDaForma(ladoV, P.vista), reg = regiaoPorCodigo(cod);
+      const on = ativas.has(cod), sel = P.partes.has(`${cod}:${lado}`);
+      const nome = reg.tem_lado ? `${reg.nome}, ${lado === 'D' ? 'direito' : 'esquerdo'}` : reg.nome;
+      const forma = hs(tipo, Object.assign({ class: 'parte' + (sel ? ' sel' : '') + (on ? '' : ' off'), role: 'button', tabindex: on ? '0' : '-1',
+        'aria-pressed': String(sel), 'aria-disabled': String(!on), 'aria-label': on ? nome : `${nome} (sem exame disponível)` }, attrs), hs('title', {}, nome));
+      if (on) {
+        forma.addEventListener('click', () => alternar(cod, lado));
+        forma.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); alternar(cod, lado); } });
+      }
+      svg.append(forma);
+      if (sel && reg.tem_lado) {
+        const cx = attrs.cx ?? (attrs.x + attrs.width / 2), cy = attrs.cy ?? (attrs.y + attrs.height / 2);
+        svg.append(hs('text', { x: cx, y: cy + 4, 'text-anchor': 'middle', class: 'letra' }, lado));
+      }
+    }
+    // Letras de orientação nas bordas do desenho: D = direito do paciente, E = esquerdo do paciente.
+    svg.append(hs('text', { x: 4, y: 14 }, frente ? 'D' : 'E'), hs('text', { x: 190, y: 14 }, frente ? 'E' : 'D'));
+    const cap = frente ? 'De frente: o lado DIREITO do paciente fica à ESQUERDA do desenho (letra D).' : 'De costas: o lado DIREITO do paciente fica à DIREITA do desenho (letra D).';
+    const vistas = h('div', { class: 'chips', role: 'group', 'aria-label': 'Vista do corpo' },
+      ['frente', 'costas'].map((v) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(P.vista === v), onclick: () => { P.vista = v; desenharPedido(); } }, v === 'frente' ? 'Vista de frente' : 'Vista de costas')));
+    // Alternativa à lista: mesma escolha sem precisar acertar o desenho (acessibilidade).
+    const alt = h('details', { class: 'alt-lista' }, h('summary', {}, 'Prefiro escolher por uma lista'),
+      h('div', { class: 'alt-grid' }, P.cfg.regioes.filter((r) => ativas.has(r.codigo)).map((r) => [
+        h('span', { class: 'nome' }, r.nome),
+        ...(r.tem_lado ? ['D', 'E'] : ['N']).map((lado) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(P.partes.has(`${r.codigo}:${lado}`)),
+          'aria-label': `${r.nome}${lado === 'D' ? ', direito' : lado === 'E' ? ', esquerdo' : ''}`, onclick: () => alternar(r.codigo, lado) }, lado === 'N' ? 'Escolher' : lado === 'D' ? 'Direito' : 'Esquerdo')),
+        ...(r.tem_lado ? [] : [h('span', {})])
+      ]).flat()));
+    if (ativas.has('outros')) alt.querySelector('.alt-grid').append(h('span', { class: 'nome' }, 'Outros exames (pele, vasos, procedimentos…)'),
+      h('button', { class: 'chip', type: 'button', 'aria-pressed': String(P.partes.has('outros:N')), onclick: () => alternar('outros', 'N') }, 'Escolher'), h('span', {}));
+    return h('div', { class: 'corpo-wrap' }, vistas, svg, h('p', { class: 'corpo-cap' }, cap), alt);
+  }
+  function agruparPartes() {
+    const porRegiao = new Map();
+    for (const { regiao, lado } of P.partes.values()) { const s = porRegiao.get(regiao) || new Set(); s.add(lado); porRegiao.set(regiao, s); }
+    return [...porRegiao.entries()].map(([cod, lados]) => {
+      const reg = cod === 'outros' ? { codigo: 'outros', nome: 'Outros exames', tem_lado: false } : regiaoPorCodigo(cod);
+      const lado = !reg.tem_lado ? 'N' : (lados.has('D') && lados.has('E') ? 'A' : (lados.has('D') ? 'D' : 'E'));
+      return { regiao: cod, regiao_nome: reg.nome, tem_lado: reg.tem_lado, lado };
+    });
+  }
+  function selecionadas() {
+    const partes = agruparPartes();
+    if (!partes.length) return h('p', { class: 'p-dica' }, 'Nenhuma parte escolhida ainda.');
+    return h('div', { class: 'sel-lista' }, partes.map((p) => h('span', { class: 'tag' }, `${p.regiao_nome}${LADO_TXT[p.lado] ? ' — ' + LADO_TXT[p.lado] : ''}`,
+      h('button', { type: 'button', 'aria-label': 'Tirar ' + p.regiao_nome, onclick: () => { for (const k of [...P.partes.keys()]) if (k.startsWith(p.regiao + ':')) P.partes.delete(k); desenharPedido(); } }, '×'))));
+  }
+  async function examesDe(mod, regiao) {
+    const k = `${mod}|${regiao}`;
+    if (!P.exames.has(k)) {
+      const { data, error } = await db.rpc('chat_exames', { p_conversa: conv.id, p_token: conv.token, p_modalidade: mod, p_regiao: regiao });
+      if (error) throw error;
+      P.exames.set(k, data || []);
+    }
+    return P.exames.get(k);
+  }
+  async function irParaExames() {
+    P.lista = agruparPartes(); P.escolhas = new Map();
+    $('#folhaCorpo').replaceChildren(h('p', { class: 'carregando' }, 'Buscando os exames…'));
+    try { await Promise.all(P.lista.map((p) => examesDe(P.mod, p.regiao))); } catch (e) { toast(mensagemErro(e)); P.passo = 'mapa'; desenharPedido(); return; }
+    P.lista.forEach((p) => {
+      const ops = opcoesDaParte(p);
+      if (ops.length === 1) P.escolhas.set(chaveParte(p), ops[0].id);
+    });
+    P.passo = 'exames'; desenharPedido();
+  }
+  const chaveParte = (p) => `${p.regiao}:${p.lado}`;
+  // Lado único (D/E) não combina com exame "bilateral"; "ambos" prefere o exame bilateral, senão repete o unilateral.
+  function opcoesDaParte(p) {
+    const todos = P.exames.get(`${P.mod}|${p.regiao}`) || [];
+    if (p.lado === 'D' || p.lado === 'E') return todos.filter((e) => !e.bilateral);
+    if (p.lado === 'A') return todos.slice().sort((a, b) => Number(b.bilateral) - Number(a.bilateral));
+    return todos;
+  }
+  function passoExames(corpo) {
+    corpo.append(h('p', { class: 'p-dica' }, 'Escolha o exame de cada parte. Se não tiver certeza, deixe o atendente escolher.'));
+    for (const p of P.lista) {
+      const ops = opcoesDaParte(p), nome = 'ex' + p.regiao + p.lado, atual = P.escolhas.get(chaveParte(p));
+      const bloco = h('div', { class: 'bloco' }, h('h3', {}, `${MOD_NOME[P.mod]} — ${p.regiao_nome}${LADO_TXT[p.lado] ? ' (' + LADO_TXT[p.lado] + ')' : ''}`));
+      const add = (id, rotulo) => bloco.append(h('label', { class: 'w-op' }, h('input', { type: 'radio', name: nome, checked: atual === id,
+        onchange: () => { P.escolhas.set(chaveParte(p), id); desenharPedido(); } }), h('span', {}, rotulo)));
+      for (const e of ops) add(e.id, e.nome + (p.lado === 'A' && !e.bilateral ? ' — 2 unidades, uma de cada lado' : ''));
+      add(0, 'Não sei: o atendente escolhe o exame');
+      corpo.append(bloco);
+    }
+    const tudo = P.lista.every((p) => P.escolhas.has(chaveParte(p)));
+    corpo.append(h('div', { class: 'folha-rodape', style: 'border:0;padding:0;background:none' },
+      h('button', { class: 'btn-w sec', type: 'button', onclick: () => { P.passo = 'mapa'; desenharPedido(); } }, 'Voltar ao mapa'),
+      h('button', { class: 'btn-w', type: 'button', disabled: !tudo, onclick: adicionarAoPedido }, 'Adicionar ao pedido')));
+  }
+  function empilhar(item) {
+    P.carrinho = P.carrinho.filter((i) => !(i.modalidade === item.modalidade && i.regiao === item.regiao && i.lado === item.lado && i.procedimento_id === item.procedimento_id));
+    P.carrinho.push(item);
+  }
+  function adicionarAoPedido() {
+    for (const p of P.lista) {
+      const id = P.escolhas.get(chaveParte(p)), ex = (P.exames.get(`${P.mod}|${p.regiao}`) || []).find((e) => e.id === id);
+      empilhar({ modalidade: P.mod, regiao: p.regiao, regiao_nome: p.regiao_nome, lado: p.lado, procedimento_id: ex ? ex.id : null, procedimento: ex ? ex.nome : null });
+    }
+    P.partes.clear(); P.passo = 'mapa'; desenharPedido();
+    toast('Adicionado ao pedido. Escolha outro exame ou envie o pedido.');
+  }
+  // Mamografia e densitometria: lista direta, sem mapa.
+  async function passoListaSimples(corpo, m) {
+    corpo.append(h('p', { class: 'carregando' }, 'Buscando os exames…'));
+    try { await examesDe(m.codigo, 'todos'); } catch (e) { toast(mensagemErro(e)); return; }
+    if (!P || P.mod !== m.codigo || P.passo !== 'mapa') return;
+    const lista = P.exames.get(`${m.codigo}|todos`) || [];
+    const caixa = corpo.querySelector('.carregando'); if (!caixa) return;
+    const bloco = h('div', { class: 'bloco' }, h('h3', {}, MOD_NOME[m.codigo]));
+    for (const e of lista) bloco.append(h('label', { class: 'w-op' }, h('input', { type: 'radio', name: 'simples', checked: P.simples === e.id, onchange: () => { P.simples = e.id; P.simplesLado = e.unilateral ? 'A' : 'N'; desenharPedido(); } }), h('span', {}, e.nome)));
+    const ex = lista.find((e) => e.id === P.simples);
+    const extra = [];
+    if (ex && ex.unilateral && m.codigo === 'MAMO') {
+      extra.push(h('p', { class: 'p-dica' }, 'De qual lado?'), h('div', { class: 'chips' }, ['D', 'E', 'A'].map((l) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(P.simplesLado === l),
+        onclick: () => { P.simplesLado = l; desenharPedido(); } }, l === 'D' ? 'Direito' : l === 'E' ? 'Esquerdo' : 'Os dois lados'))));
+    }
+    extra.push(h('button', { class: 'btn-w', type: 'button', disabled: !ex, onclick: () => {
+      const mama = m.codigo === 'MAMO';
+      empilhar({ modalidade: m.codigo, regiao: mama ? 'mama' : null, regiao_nome: mama ? 'Mama' : null, lado: mama ? (ex.bilateral ? 'A' : P.simplesLado) : 'N', procedimento_id: ex.id, procedimento: ex.nome });
+      P.simples = null; desenharPedido(); toast('Adicionado ao pedido.');
+    } }, 'Adicionar ao pedido'));
+    caixa.replaceWith(bloco, ...extra);
+  }
+  async function enviarPedido() {
+    if (!P || !P.carrinho.length) return;
+    const itens = P.carrinho.map((i) => ({ modalidade: i.modalidade, regiao: i.regiao, lado: i.lado, procedimento_id: i.procedimento_id }));
+    $('#folhaRodape button').disabled = true;
+    try {
+      const { error } = await db.rpc('chat_pedido_salvar', { p_conversa: conv.id, p_token: conv.token, p_itens: itens });
+      if (error) throw error;
+      fecharFolha(); toast('Pedido enviado.'); carregar();
+    } catch (e) { toast(mensagemErro(e)); desenharPedido(); }
+  }
+
+  /* ---------- calendário de horários ---------- */
+  let C = null;
+  async function abrirCalendario(grupo) {
+    if (!conv) return;
+    abrirFolha('Escolher data e horário');
+    $('#folhaCorpo').replaceChildren(h('p', { class: 'carregando' }, 'Buscando horários…'));
+    C = { grupo, res: null, unidade: '', periodo: '', mes: null, dia: null, slot: null };
+    await carregarHorarios(true);
+  }
+  async function carregarHorarios(primeira) {
+    if (!C) return;
+    const hoje = new Date();
+    try {
+      const { data, error } = await db.rpc('chat_horarios', { p_conversa: conv.id, p_token: conv.token, p_grupo: C.grupo, p_de: ymd(hoje),
+        p_ate: ymd(new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() + 45)), p_unidade: C.unidade || null, p_periodo: C.periodo || null });
+      if (error) throw error;
+      if (!C) return;
+      C.res = data; C.slot = null;
+      const primeiro = (data.dias || []).find((d) => d.slots && d.slots.length);
+      if (primeira || !C.mes) { const base = primeiro ? dataLocal(primeiro.data) : hoje; C.mes = new Date(base.getFullYear(), base.getMonth(), 1); C.dia = primeiro ? primeiro.data : null; }
+      else if (C.dia && !(data.dias || []).some((d) => d.data === C.dia && d.slots.length)) C.dia = null;
+    } catch (e) { $('#folhaCorpo').replaceChildren(h('p', { class: 'erro-form' }, mensagemErro(e))); return; }
+    desenharCalendario();
+  }
+  function desenharCalendario() {
+    if (!C || !C.res) return;
+    const r = C.res, corpo = $('#folhaCorpo'), rodape = $('#folhaRodape');
+    const rolagem = corpo.scrollTop;
+    corpo.replaceChildren(); rodape.replaceChildren();
+    const grupos = r.grupos || [], g = grupos[(C.grupo || 1) - 1];
+    $('#folhaTitulo').textContent = grupos.length > 1 ? `Horário ${C.grupo} de ${grupos.length}` : 'Escolher data e horário';
+    if (!grupos.length) {
+      corpo.append(h('p', { class: 'p-dica' }, r.aviso || 'Escolha os exames primeiro para ver os horários.'),
+        h('button', { class: 'btn-w', type: 'button', onclick: () => { fecharFolha(); abrirPedido(); } }, 'Escolher exames no mapa do corpo'));
+      return;
+    }
+    if (g && g.nomes) corpo.append(h('p', { class: 'p-dica' }, 'Exames deste horário: ' + g.nomes.join(' + ')));
+    corpo.append(h('p', { class: 'aviso-cal' }, 'Os horários abaixo são uma previsão. Um atendente confere tudo e confirma o dia e o horário.' + (r.aviso ? ' ' + r.aviso : '')));
+    if ((r.unidades || []).length > 1) {
+      corpo.append(h('div', { class: 'chips', role: 'group', 'aria-label': 'Unidade' }, [['', 'Qualquer unidade'], ...r.unidades.map((u) => [u, u.replace(/^CLÍNICA DE SAÚDE E IMAGEM - /, '')])]
+        .map(([v, t]) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(C.unidade === v), onclick: () => { C.unidade = v; carregarHorarios(false); } }, t))));
+    }
+    corpo.append(h('div', { class: 'chips', role: 'group', 'aria-label': 'Período do dia' }, [['', 'Qualquer horário'], ['manha', 'Manhã'], ['tarde', 'Tarde'], ['noite', 'Noite']]
+      .map(([v, t]) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(C.periodo === v), onclick: () => { C.periodo = v; carregarHorarios(false); } }, t))));
+
+    const dias = new Map((r.dias || []).map((d) => [d.data, d.slots || []]));
+    const hoje = new Date(); const hojeS = ymd(hoje), limite = ymd(new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() + 45));
+    const mes = C.mes, primeiroDow = mes.getDay(), qtd = new Date(mes.getFullYear(), mes.getMonth() + 1, 0).getDate();
+    const prox = new Date(mes.getFullYear(), mes.getMonth() + 1, 1), ant = new Date(mes.getFullYear(), mes.getMonth() - 1, 1);
+    corpo.append(h('div', { class: 'cal-nav' },
+      h('button', { type: 'button', 'aria-label': 'Mês anterior', disabled: ant < new Date(hoje.getFullYear(), hoje.getMonth(), 1), onclick: () => { C.mes = ant; desenharCalendario(); } }, '‹'),
+      h('strong', {}, `${MESES[mes.getMonth()][0].toUpperCase()}${MESES[mes.getMonth()].slice(1)} de ${mes.getFullYear()}`),
+      h('button', { type: 'button', 'aria-label': 'Próximo mês', disabled: ymd(prox) > limite, onclick: () => { C.mes = prox; desenharCalendario(); } }, '›')));
+    const grade = h('div', { class: 'cal-grade', role: 'grid' }, ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((x) => h('div', { class: 'sem', 'aria-hidden': 'true' }, x)));
+    for (let i = 0; i < primeiroDow; i++) grade.append(h('div', {}));
+    for (let d = 1; d <= qtd; d++) {
+      const dt = new Date(mes.getFullYear(), mes.getMonth(), d), s = ymd(dt), slots = dias.get(s) || [];
+      const dentro = s >= hojeS && s <= limite, temJanela = dentro && r.janelas && r.janelas[String(dt.getDay())];
+      const estado = slots.length ? 'livre' : (temJanela ? 'lotado' : 'fechado');
+      const rotulo = `${d} de ${MESES[dt.getMonth()]}, ${DIAS_SEMANA[dt.getDay()]}: ` + (slots.length ? `${slots.length} horários` : (temJanela ? 'sem horários livres' : 'sem atendimento'));
+      grade.append(h('button', { type: 'button', class: `cal-dia ${estado}${s === hojeS ? ' hoje' : ''}${C.dia === s ? ' sel' : ''}`, disabled: !slots.length,
+        'aria-label': rotulo, 'aria-pressed': String(C.dia === s), onclick: () => { C.dia = s; C.slot = null; desenharCalendario(); } }, String(d)));
+    }
+    corpo.append(grade);
+    corpo.append(h('div', { class: 'legenda' }, h('span', {}, h('i', { style: 'background:var(--verde)' }), 'Com horário livre'), h('span', {}, h('i', { style: 'background:#c2cac6' }), 'Lotado ou sem atendimento')));
+
+    if (C.dia) {
+      const dt = dataLocal(C.dia), slots = dias.get(C.dia) || [];
+      corpo.append(h('h3', { style: 'margin:14px 0 4px;font-size:15px' }, `${DIAS_SEMANA[dt.getDay()]}, ${dt.getDate()} de ${MESES[dt.getMonth()]}`));
+      const janela = r.janelas && r.janelas[String(dt.getDay())];
+      const grid = h('div', { class: 'slots' });
+      const normais = slots.filter((x) => !x.chegada), chegada = slots.filter((x) => x.chegada);
+      const botao = (x) => h('button', { type: 'button', class: 'slot' + (C.slot && C.slot.hora === x.hora ? ' sel' : ''), 'aria-pressed': String(!!C.slot && C.slot.hora === x.hora),
+        onclick: () => { C.slot = x; desenharCalendario(); } }, x.hora);
+      if (janela && normais.length) {
+        const ini = minutos(janela.ini), fim = minutos(janela.fim);
+        for (let t = Math.floor(ini / 30) * 30; t < fim; t += 30) {
+          const doBloco = normais.filter((x) => minutos(x.hora) >= t && minutos(x.hora) < t + 30);
+          if (doBloco.length) doBloco.forEach((x) => grid.append(botao(x)));
+          else if (t + 30 > ini) grid.append(h('button', { type: 'button', class: 'slot off', disabled: true, 'aria-label': hhmm(Math.max(t, ini)) + ' indisponível' }, hhmm(Math.max(t, ini))));
+        }
+      } else normais.forEach((x) => grid.append(botao(x)));
+      chegada.forEach((x) => grid.append(h('button', { type: 'button', class: 'slot chegada' + (C.slot && C.slot.hora === x.hora ? ' sel' : ''),
+        onclick: () => { C.slot = x; desenharCalendario(); } }, `Ordem de chegada, a partir das ${x.hora}`)));
+      corpo.append(grid, h('div', { class: 'legenda' }, h('span', {}, h('i', { style: 'background:var(--verde)' }), 'Livre'), h('span', {}, h('i', { style: 'background:#dfe4e1' }), 'Ocupado ou indisponível')));
+    } else if (![...dias.values()].some((x) => x.length)) {
+      corpo.append(h('p', { class: 'p-dica', style: 'margin-top:12px' }, 'Não há horários livres nos próximos dias com esses filtros. Tente outro período ou unidade, ou envie sua preferência por mensagem que o atendente procura para você.'));
+    }
+    const dt = C.dia ? dataLocal(C.dia) : null;
+    rodape.append(h('button', { class: 'btn-w', type: 'button', disabled: !C.slot, onclick: confirmarHorario },
+      C.slot ? `Escolher ${DIAS_SEMANA[dt.getDay()]}, ${dt.getDate()}/${String(dt.getMonth() + 1).padStart(2, '0')} às ${C.slot.hora}` : 'Escolha um horário'));
+    corpo.scrollTop = rolagem;
+  }
+  async function confirmarHorario() {
+    if (!C || !C.slot || !C.dia) return;
+    $('#folhaRodape button').disabled = true;
+    try {
+      const { data, error } = await db.rpc('chat_horario_escolher', { p_conversa: conv.id, p_token: conv.token, p_grupo: C.grupo, p_data: C.dia, p_hora: C.slot.hora, p_unidade: C.slot.unidade || null });
+      if (error) throw error;
+      if (data && data.restantes > 0) { C.grupo += 1; C.mes = null; C.dia = null; toast('Horário guardado. Agora escolha o próximo.'); await carregarHorarios(true); }
+      else { fecharFolha(); toast('Horário escolhido.'); carregar(); }
+    } catch (e) { toast(mensagemErro(e)); await carregarHorarios(false); }
+  }
+  $('#folhaFechar').addEventListener('click', fecharFolha);
+  $('#folha').addEventListener('click', (e) => { if (e.target.id === 'folha') fecharFolha(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('#folha').hidden) fecharFolha(); });
+
 
   /* ---------- eventos ---------- */
   el.form.addEventListener('submit', iniciar);
