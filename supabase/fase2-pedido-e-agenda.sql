@@ -501,3 +501,29 @@ grant execute on function public.ia_responder_v2(text, uuid, text, text, text, b
 --  ia_pre_agendar:    grava a 'etapa' enviada pela IA (p_dados->>'etapa') e a conferência de identidade (ver pacientes.sql)
 --  ia_catalogo:       nas etapas dados/confirmacao/pronto devolve só unidades (sem procedimentos, agenda, planos e preços)
 -- Agendamento automático: cron 'agenda-ocupacao' */10 8-23,0,1 * * *  ->  {"agenda":"ocupacao"} na Edge Function sync-catalogo-klingo.
+
+-- ===== 6. Vários pacientes no mesmo dia e vários exames do mesmo paciente (30/10/2026) =====
+-- Reservas provisórias: o horário escolhido no chat por OUTRO paciente segura o horário até a atendente lançar no Klingo
+-- (pronto: 48 h; rascunho: 90 min sem atividade; agendado: mais 20 min, até o relatório do Klingo mostrar a marcação).
+create or replace function public.agenda_reservas_provisorias(p_ignorar uuid default null)
+returns table (inicio timestamp, fim timestamp, profissional text, unidade text, local text)
+language sql stable security definer set search_path to '' as $$
+  select (e ->> 'data')::date + (e ->> 'hora')::time,
+         (e ->> 'data')::date + (e ->> 'hora')::time + make_interval(mins => coalesce((e ->> 'min')::int, 30)),
+         public.norm_nome(e ->> 'profissional'), public.norm_nome(e ->> 'unidade'), e ->> 'local'
+  from public.pre_agendamentos pa, jsonb_array_elements(coalesce(pa.escolha_horario, '[]'::jsonb)) e
+  where pa.conversa_id is distinct from p_ignorar
+    and ((pa.status = 'pronto' and pa.atualizado_em > now() - interval '48 hours')
+      or (pa.status = 'rascunho' and pa.atualizado_em > now() - interval '90 minutes')
+      or (pa.status = 'agendado' and pa.atualizado_em > now() - interval '20 minutes'))
+    and coalesce((e ->> 'chegada')::boolean, false) = false
+$$;
+revoke all on function public.agenda_reservas_provisorias(uuid) from public, anon, authenticated;
+grant execute on function public.agenda_reservas_provisorias(uuid) to service_role;
+-- Ajustes por substituição (já aplicados):
+--  agenda_horarios:        CTE "reservas" (agenda_reservas_provisorias da conversa em app.conversa) bloqueia profissional e sala;
+--                          exames do MESMO paciente precisam de folga: 15 min na mesma unidade, 60 min em outra unidade
+--                          (p_excluir passa a levar 'unidade').
+--  chat_horarios:          VOLATILE; define app.conversa; repassa a unidade das outras escolhas.
+--  chat_horario_escolher:  define app.conversa; trava por dia (pg_advisory_xact_lock) para duas pessoas não escolherem o mesmo horário juntas.
+

@@ -298,6 +298,9 @@
       p.identidade ? h('div', { class: 'urg ' + (p.identidade === 'conferida' ? '' : p.identidade === 'divergente' ? 'alta' : 'media'), style: 'display:inline-block;margin-top:4px' }, ROTULO_IDENT[p.identidade] || p.identidade) : null,
       resumo ? h('div', {}, resumo) : null,
       (S.preItens || []).length ? h('div', { style: 'margin-top:6px' }, h('b', {}, 'Exames pedidos'), h('ul', { style: 'margin:4px 0 0;padding-left:18px' }, S.preItens.map((i) => h('li', {}, linhaItem(i))))) : null,
+      (() => { const ds = (Array.isArray(p.escolha_horario) ? p.escolha_horario : []).map((e) => e.data); const mesmoDia = ds.some((d, i) => ds.indexOf(d) !== i);
+        const mods = new Set((S.preItens || []).map((i) => i.modalidade)); return (mesmoDia || mods.size > 1) ? h('div', { class: 'urg media', style: 'display:block;margin-top:6px;border-radius:8px' },
+          'Exames diferentes' + (mesmoDia ? ' no mesmo dia' : '') + ': confira a ordem, o preparo de cada um (jejum, bexiga cheia, contraste) e o deslocamento entre unidades antes de confirmar.') : null; })(),
       linhasHorario(p).length ? h('div', { style: 'margin-top:6px' }, h('b', {}, 'Horário escolhido (previsão)'), h('ul', { style: 'margin:4px 0 0;padding-left:18px' }, linhasHorario(p).map((x) => h('li', {}, x))),
         h('div', { class: 'dica' }, 'Confirme a disponibilidade e o valor no Klingo antes de responder ao paciente.')) : null,
       linhas.length ? h('details', {}, h('summary', {}, 'Dados do paciente (' + linhas.length + ')'),
