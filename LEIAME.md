@@ -129,7 +129,7 @@ A IA consulta, a cada mensagem do paciente, um catálogo copiado de relatórios 
 
 ### Unidade e médico de preferência no início do chat (Fase 6)
 
-O formulário pergunta primeiro a unidade (Desenvoar = atendimento pediátrico; CSI = exames e consultas; CSI RM/TC = ressonância e tomografia; "Ainda não sei") e, quando houver, o médico de preferência. A IA já nasce no caminho certo (pediatria x exame/consulta) e o calendário filtra por unidade e médico. Passo a passo, texto do n8n e limites em `docs/fase6-unidade-e-medico.md`; SQL em `supabase/fase6-unidade-e-medico.sql` (**ainda não aplicado no projeto**).
+O formulário pergunta primeiro a unidade (Desenvoar = atendimento pediátrico; CSI = exames e consultas; CSI RM/TC = ressonância e tomografia; "Ainda não sei") e **quem será atendido** (o próprio ou um filho(a), com o responsável falando pelo filho; uma conversa por criança e "Agendar para outro filho(a)" no menu). O médico de preferência vem depois do e-mail. A IA já nasce no caminho certo e o calendário filtra por unidade e médico. Passo a passo, texto do n8n e limites em `docs/fase6-unidade-e-medico.md`; SQL em `supabase/fase6-unidade-e-medico.sql` (**ainda não aplicado no projeto**).
 
 ## Estado do projeto e como retomar
 

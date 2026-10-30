@@ -32,12 +32,10 @@ comment on table public.unidade_config is 'Unidades escolhidas no início do cha
 
 insert into public.unidade_config (chave, catalogo, rotulo, descricao, fluxo, ordem, instrucao) values
 ('desenvoar', 'DESENVOAR', 'Desenvoar', 'Atendimento pediátrico (crianças e adolescentes)', 'pediatria', 1,
- 'O paciente escolheu a DESENVOAR: atendimento PEDIÁTRICO. Quem será atendido é uma criança ou adolescente, e quem conversa costuma ser o responsável.'
+ 'O paciente escolheu a DESENVOAR: atendimento PEDIÁTRICO (crianças e adolescentes).'
  || ' PEDIDO: não use o mapa do corpo. Pergunte o motivo em UMA lista de escolha única, usando só o que existir em procedimentos/especialidades_com_agenda da DESENVOAR: consulta de pediatria (rotina, puericultura, retorno, dúvida), consulta com especialista (neuropediatria, endocrinologia, gastroenterologia, ortopedia) ou exame (por exemplo eletroencefalograma), mais "Outro". Se descrever sintoma, ajude só a escolher o tipo de consulta, sem diagnosticar; na dúvida, pediatria.'
  || ' MÉDICO: se inicio.medico_preferido vier preenchido, registre em profissional e NÃO pergunte de novo; se o médico dele não faz o que foi pedido (confira em agenda), avise com delicadeza e ofereça outro da mesma especialidade. Se vier vazio, não pergunte médico (o paciente já disse que tanto faz).'
- || ' UNIDADE: já é a DESENVOAR; registre unidade "DESENVOAR" e pule a pergunta de unidade na etapa preferencias (pergunte só o período do dia).'
- || ' DADOS: o paciente é a CRIANÇA. Na identificação peça nome completo e data de nascimento DA CRIANÇA, sexo e nome da mãe; depois o nome e o celular do responsável. Se a criança não tiver CPF, aceite o CPF do responsável e diga no resumo que o CPF é do responsável. Carteirinha do convênio é a da criança.'
- || ' Emergência pediátrica (febre alta em bebê pequeno, falta de ar, convulsão, desidratação, sangue nas fezes ou vômitos, qualquer sinal grave): oriente ligar 192 (SAMU) ou ir ao pronto-socorro, urgencia "alta" e transferir true.'),
+ || ' UNIDADE: já é a DESENVOAR; registre unidade "DESENVOAR" e pule a pergunta de unidade na etapa preferencias (pergunte só o período do dia).'),
 ('csi', 'CLÍNICA DE SAÚDE E IMAGEM - CSI', 'CSI', 'Exames e consultas', 'exame_consulta', 2,
  'O paciente escolheu a unidade CSI: EXAMES e CONSULTAS. Se a primeira mensagem não deixar claro, pergunte em UMA lista de escolha única: "Consulta", "Exame de imagem (ressonância, tomografia, ultrassom, raio-X, mamografia, densitometria)" ou "Outro exame".'
  || ' Exame de imagem: use o MAPA DO CORPO. Consulta: use lista com as especialidades de especialidades_com_agenda da CSI. Registre unidade "CLÍNICA DE SAÚDE E IMAGEM - CSI" e não pergunte a unidade de novo.'
@@ -54,6 +52,29 @@ alter table public.conversas add column if not exists unidade_inicial text refer
 alter table public.conversas add column if not exists medico_preferido text;
 comment on column public.conversas.unidade_inicial is 'Unidade escolhida no formulário inicial (null = "não sei"). Chave de unidade_config.';
 comment on column public.conversas.medico_preferido is 'Médico de preferência escolhido no formulário (nome exato da agenda do Klingo). null = sem preferência.';
+
+-- Quem será atendido: o próprio paciente ou um filho(a) (quem conversa é o responsável).
+-- Um responsável com vários filhos abre UMA conversa por criança: cada uma tem seu pré-agendamento, seus horários
+-- (a regra "mesmo paciente em dois lugares" vale por criança) e seu cadastro.
+alter table public.conversas add column if not exists paciente_tipo text not null default 'proprio' check (paciente_tipo in ('proprio', 'filho'));
+alter table public.conversas add column if not exists paciente_nome text;
+comment on column public.conversas.paciente_tipo is 'proprio = quem conversa é o paciente; filho = quem conversa é o responsável e o paciente é a criança/adolescente (nome em paciente_nome).';
+comment on column public.conversas.paciente_nome is 'Nome da criança, informado no formulário quando paciente_tipo = filho. Nome, telefone e e-mail do formulário continuam sendo os do responsável.';
+
+create table if not exists public.atendimento_tipo (
+  chave text primary key check (chave in ('proprio', 'filho')),
+  instrucao text not null
+);
+alter table public.atendimento_tipo enable row level security;
+comment on table public.atendimento_tipo is 'Instrução da IA conforme quem será atendido (próprio ou filho). Vai em ia_contexto().inicio.instrucao_paciente. Sem policy: só funções security definer.';
+insert into public.atendimento_tipo (chave, instrucao) values
+('proprio', 'Quem conversa é o próprio paciente.'),
+('filho', 'ATENÇÃO: quem conversa é o RESPONSÁVEL e o paciente é o FILHO(A) (criança ou adolescente). Fale com o responsável ("seu filho", "sua filha", ou pelo nome da criança se inicio.paciente_nome vier preenchido).'
+ || ' O nome, o telefone e o e-mail do formulário são do RESPONSÁVEL. No campo paciente registre os dados da CRIANÇA: nome (use inicio.paciente_nome se vier; senão pergunte), data de nascimento, sexo e nome da mãe. O celular do responsável vai em celular. Peça também o nome do responsável se ainda não souber; não invente parentesco.'
+ || ' CPF: peça o da criança; se ela não tiver, aceite o do responsável e escreva no resumo que o CPF é do responsável. Carteirinha do convênio: a da criança. Idade: confira idade_min/idade_max do procedimento com a idade da CRIANÇA.'
+ || ' Cada conversa atende UMA criança. Se o responsável falar de mais de um filho, atenda um de cada vez: ao final (etapa pronto), diga que, para agendar outro filho(a), basta tocar nos três pontinhos do chat e escolher "Agendar para outro filho(a)", que os dados dele já vêm preenchidos. Nunca misture os dados de duas crianças na mesma conversa.'
+ || ' Emergência pediátrica (febre alta em bebê pequeno, falta de ar, convulsão, desidratação, sangue nas fezes ou no vômito, qualquer sinal grave): oriente ligar 192 (SAMU) ou ir ao pronto-socorro, urgencia "alta" e transferir true.')
+on conflict (chave) do update set instrucao = excluded.instrucao;
 
 -- ===== 3. Médicos de cada unidade =====
 -- Só quem tem consulta na agenda vigente; fora recursos que não são médico para o paciente escolher
@@ -98,12 +119,16 @@ grant execute on function public.chat_medico_limpar(uuid, text) to anon, authent
 -- ===== 4. chat_iniciar com unidade e médico =====
 create or replace function public.chat_iniciar(p_nome text, p_telefone text, p_email text default null, p_mensagem text default null,
                                                p_aceite boolean default false, p_origem text default null,
-                                               p_unidade text default null, p_medico text default null)
+                                               p_unidade text default null, p_medico text default null,
+                                               p_paciente_tipo text default 'proprio', p_paciente_nome text default null)
 returns jsonb language plpgsql security definer set search_path to '' as $function$
 declare
   v_tel text; v_contato uuid; v_conv uuid; v_token text; v_url text;
-  v_nome text; v_msg text; v_recentes int; v_uni text; v_med text;
+  v_nome text; v_msg text; v_recentes int; v_uni text; v_med text; v_tipo text; v_pnome text;
 begin
+  v_tipo := coalesce(nullif(btrim(p_paciente_tipo), ''), 'proprio');
+  if v_tipo not in ('proprio', 'filho') then raise exception 'Tipo de paciente inválido.' using errcode = '22023'; end if;
+  v_pnome := case when v_tipo = 'filho' then nullif(left(btrim(coalesce(p_paciente_nome, '')), 120), '') end;
   if not coalesce(p_aceite, false) then
     raise exception 'Aceite a política de privacidade para continuar.' using errcode = '22023';
   end if;
@@ -150,8 +175,8 @@ begin
     aceitou_lgpd_em = coalesce(public.contatos.aceitou_lgpd_em, now())
   returning id into v_contato;
 
-  insert into public.conversas (contato_id, nome_informado, email_informado, unidade_inicial, medico_preferido)
-  values (v_contato, left(v_nome, 120), nullif(left(btrim(coalesce(p_email, '')), 200), ''), v_uni, v_med)
+  insert into public.conversas (contato_id, nome_informado, email_informado, unidade_inicial, medico_preferido, paciente_tipo, paciente_nome)
+  values (v_contato, left(v_nome, 120), nullif(left(btrim(coalesce(p_email, '')), 200), ''), v_uni, v_med, v_tipo, v_pnome)
   returning id into v_conv;
   insert into public.conversa_segredo (conversa_id) values (v_conv) returning token into v_token;
 
@@ -175,7 +200,7 @@ begin
 
   return jsonb_build_object('conversa_id', v_conv, 'token', v_token);
 end $function$;
-grant execute on function public.chat_iniciar(text, text, text, text, boolean, text, text, text) to anon, authenticated;
+grant execute on function public.chat_iniciar(text, text, text, text, boolean, text, text, text, text, text) to anon, authenticated;
 
 -- ===== 5. ia_contexto: devolve 'inicio' =====
 create or replace function public.ia_contexto(p_segredo text, p_conversa uuid)
@@ -191,7 +216,9 @@ begin
                 and coalesce((select valor from public.config where chave = 'ia_ativa'), 'sim') = 'sim',
     'status', c.status,
     'nome', coalesce(c.nome_informado, ct.nome), 'telefone', ct.telefone, 'origem', ct.origem,
-    'inicio', coalesce(
+    'inicio', jsonb_build_object('paciente_tipo', c.paciente_tipo, 'paciente_nome', c.paciente_nome,
+      'instrucao_paciente', (select t.instrucao from public.atendimento_tipo t where t.chave = c.paciente_tipo)) ||
+      coalesce(
       (select jsonb_build_object('unidade', u.rotulo, 'unidade_catalogo', u.catalogo, 'fluxo', u.fluxo,
                                  'medico_preferido', c.medico_preferido, 'instrucao', u.instrucao)
        from public.unidade_config u where u.chave = c.unidade_inicial),
@@ -253,6 +280,50 @@ begin
     execute v_new;
   end if;
 end $do$;
+
+-- ===== 6b. Filho(a): a identidade é da CRIANÇA, não de quem conversa =====
+-- Sem isto, o responsável que já é paciente na clínica casaria com o PRÓPRIO cadastro (nome + telefone + e-mail) e a
+-- IA reaproveitaria CPF, endereço e data de nascimento dele no pedido da criança. Com paciente_tipo = 'filho':
+--  * paciente_conferir compara o nome da CRIANÇA (o que a IA registrou, ou o digitado no formulário) com o telefone do
+--    responsável; sem nome da criança ainda, é paciente novo. Criança que volta (mesmo nome + telefone) é reconhecida
+--    e passa pela data de nascimento como qualquer paciente;
+--  * pre_pendencia_anterior só oferece "pedido pela metade" de uma conversa do mesmo tipo e, para filho, da MESMA criança
+--    (senão o pedido do irmão seria oferecido).
+do $do$
+declare v_def text; v_new text;
+begin
+  v_def := pg_get_functiondef('public.paciente_conferir(uuid)'::regprocedure);
+  if position('paciente_tipo' in v_def) = 0 then
+    v_new := pg_temp.sub(v_def, E'  if not found then return jsonb_build_object(''situacao'', ''novo''); end if;\n\n  select q.* into b from (',
+      E'  if not found then return jsonb_build_object(''situacao'', ''novo''); end if;\n'
+      || E'  if (select c.paciente_tipo from public.conversas c where c.id = p_conversa) = ''filho'' then\n'
+      || E'    v_ct.nome := (select coalesce(nullif(btrim(pa.paciente ->> ''nome''), ''''), c.paciente_nome) from public.conversas c\n'
+      || E'                  left join public.pre_agendamentos pa on pa.conversa_id = c.id where c.id = p_conversa);\n'
+      || E'    if v_ct.nome is null then return jsonb_build_object(''situacao'', ''novo''); end if;\n'
+      || E'  end if;\n\n  select q.* into b from (');
+    execute v_new;
+  end if;
+end $do$;
+
+create or replace function public.pre_pendencia_anterior(p_conversa uuid)
+returns uuid language sql stable security definer set search_path to '' as $function$
+  select pa.conversa_id
+  from public.conversas atual
+  join public.contatos ca on ca.id = atual.contato_id
+  join public.conversas c2 on c2.contato_id = atual.contato_id and c2.id <> atual.id
+  join public.contatos cb on cb.id = c2.contato_id
+  join public.pre_agendamentos pa on pa.conversa_id = c2.id
+  where atual.id = p_conversa and pa.status in ('rascunho','pronto') and pa.atualizado_em > now() - interval '7 days'
+    and public.nome_confere(coalesce(atual.nome_informado, ca.nome), coalesce(c2.nome_informado, cb.nome))
+    and lower(coalesce(nullif(btrim(case when atual.nome_informado is not null then atual.email_informado else ca.email end), ''), ''))
+      = lower(coalesce(nullif(btrim(case when c2.nome_informado is not null then c2.email_informado else cb.email end), ''), ''))
+    and c2.paciente_tipo = atual.paciente_tipo
+    and (atual.paciente_tipo <> 'filho' or public.nome_confere(
+          coalesce((select nullif(btrim(x.paciente ->> 'nome'), '') from public.pre_agendamentos x where x.conversa_id = atual.id), atual.paciente_nome),
+          coalesce(nullif(btrim(pa.paciente ->> 'nome'), ''), c2.paciente_nome)))
+    and exists (select 1 from public.pre_agendamento_itens i where i.conversa_id = pa.conversa_id and i.ativo and i.procedimento_id is not null)
+  order by pa.atualizado_em desc limit 1
+$function$;
 
 -- ===== 7. Limpeza (rodar depois, por pessoa: o Supabase pede confirmação em "drop") =====
 -- A assinatura antiga de 6 parâmetros precisa sair, senão chamadas com 6 argumentos ficam ambíguas:
