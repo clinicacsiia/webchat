@@ -1,31 +1,99 @@
-# Passagem de bastão — Fases 3 a 5
+# Passagem de bastão — o que está feito, o que falta e como retomar em outra conta
 
-Estado em 2026-10-30. Fases 0, 1 e 2 entregues, mergeadas na `main` (PRs #8 e #9) e ativas.
+Atualizado em 2026-10-30. Leia este arquivo inteiro antes de mexer em qualquer coisa.
 
-## Onde está cada peça
-- **Repo** `clinicacsiia/webchat`: `index.html` (chat do paciente), `painel/index.html` (painel do atendente), `supabase/*.sql` (estado final das funções), `supabase/functions/sync-catalogo-klingo/index.ts` (Edge Function v7), `docs/`.
-- **Supabase** projeto `webchat-atendimento` (`nrvuynjwcgwpjdptkiay`). Crons (UTC): `sync-catalogo-klingo` 0 6; `catalogo-precos-convenio` 10 6; `catalogo-precos-particular` 25 6; `agenda-ocupacao` a cada 10 min das 8h às 1h.
-- **n8n** workflow `wAbzjPqZNCztKriZ` "Triagem IA - Atendimento", versão ativa `83ae7956-e2b7-4c27-b595-4f5b4599b2cf` (prompt por etapas + `ia_responder_v2`). Para republicar: `publish_workflow` sem versionId publica o rascunho atual.
-- **Klingo**: relatórios via `https://api-externa.klingo.app/api/info/relatorio?id=…`, header `X-APP-TOKEN` (secret `KLINGO_APP_TOKEN`, só na Edge Function). Relatórios: #13981 procedimentos, #13984 agenda, #12301 planos, #13983 preços convênio, #13825 marcações (Particular), #7 agendas marcadas (ocupação), #47 bloqueado por conter paciente.
-- Edge Function: header `x-sync-key` = `config.ia_segredo`; modos `{}` (catálogo), `{"inspecionar":id}`, `{"precos":"convenio"|"particular"}`, `{"agenda":"ocupacao"}`.
+## 1. Resumo em uma tela
 
-## Regras que não podem ser quebradas
-- Nenhum dado de paciente do Klingo é gravado (colunas Paciente/Telefone/Prontuário/Obs bloqueadas). `agenda_ocupacao` só guarda início, médico, unidade, procedimento, quantidade.
-- Preço sempre é **previsão**; atendente humano confirma preço e data. Toda marcação passa por conferência humana final.
-- Lado D/E: frente L→D, costas L→E; bilateral com lado único é recusado.
-- Horários: reserva provisória + advisory lock por dia; folga 15/60 min entre exames; antecedência 120 min.
-- Dicas Supabase MCP: `execute_sql` trava pedindo confirmação se o texto tiver `delete`/`drop`; testar em `DO $$ … raise exception … $$`; patch de função via `pg_get_functiondef` + `replace`.
-- Dados de teste: telefones `7190000xxxx`; apagar após testar. Hoje: 7 conversas reais, 0 pacientes.
+| Fase | O que é | Situação |
+|---|---|---|
+| 0 | Verificação no Klingo (relatórios, token) | Concluída |
+| 1 | Memória do catálogo (histórico de mudanças, preços) | Concluída e no ar |
+| 2 | Pedido pelo mapa do corpo, calendário, reservas de horário | Concluída e no ar |
+| 3 | Conferência automática da marcação no Klingo | **~80%**: construída, testada no banco e em testes de código; **falta validar com uma marcação real** e 2 pendências pequenas (ver 4) |
+| 4 | Paciente que volta (histórico, atalhos, retomar pedido) | **Construída e no ar** (banco, Edge Function, n8n). Falta só o **painel e o chat novos irem ao ar (merge na `main`)** e validar com um paciente real |
+| 5 | Aprendizado com as correções dos atendentes | **Não começada (0%)** |
 
-## Pendências de negócio (precisam da clínica)
-1. Confirmar tempos por modalidade e folgas (15/60 min, 90 min, 48 h, 20 min) — hoje são estimativas.
-2. Confiança dos preços Particular é média/baixa; validar com a recepção.
-3. Atendente deve marcar "Agendado" no painel (libera/consolida a reserva).
-4. E-mail ao suporte do Klingo está só como **rascunho no Gmail** (não enviado): pedir endpoint oficial de agenda sem dados de paciente e confirmação do #7 (pode incluir cancelados; só esconde horário, sem risco).
-5. Avisos do advisor Supabase: funções `security definer` chamáveis por `anon` são intencionais (protegidas por token da conversa ou `ia_segredo`); ativar "leaked password protection" no Auth é opcional.
+**Atenção, o que ainda NÃO está no ar:** o código de `painel/index.html` e `index.html` (faixa de alerta da agenda, histórico do paciente, correções do painel) só publica depois do **merge desta branch na `main`** (GitHub Pages). Banco, Edge Function e n8n já estão no ar e funcionando; o painel antigo continua funcionando, só não mostra os alertas novos. A branch é `ccr-d863ec45-y5li3s` e **não tem PR aberto**.
 
-## Próximas fases
-- **Fase 3 — conferência automática** (ADIANTADA em 30/10/2026, ver `supabase/fase3-conferencia-automatica.sql`): cron `agenda-conferir` a cada 15 s (só dispara se houver pré-agendamento esperando) → Edge Function v8 `{"agenda":"conferir"}` lê o #7 só dos dias esperados → `agenda_conferir_pre_agendamentos()` muda o status para `agendado` quando o horário escolhido (data+hora+médico+unidade) apareceu ocupado depois do início da conversa com o exame pedido. Horário por ordem de chegada não é conferido sozinho (o botão manual continua). Sem leitura de dados de paciente. Original: ler #7 para ver se a marcação feita pelo atendente apareceu na agenda e atualizar status da conversa/pré-agendamento (Agendado/não encontrado) sem expor paciente; alertar divergência.
-- **Fase 4 — paciente que volta**: histórico de agendamentos anteriores (já existe `pacientes` + `paciente_conferir`); sugerir mesmo exame/unidade/profissional, e retomar conversa.
-- **Fase 5 — aprendizado**: usar correções do atendente (preço/data/exame ajustados) para melhorar catálogo e prompt; relatório de erros da IA.
-- Antes de cada fase: rodar teste curto e2e no chat, conferir `get_advisors`, publicar n8n só após merge.
+## 2. Para retomar em outra conta (checklist)
+
+Nada disto está no repositório; é preciso refazer nas conexões da conta nova:
+1. **GitHub**: acesso ao repositório `clinicacsiia/webchat` (branch `ccr-d863ec45-y5li3s`; abrir PR para `main`).
+2. **Supabase** (conector): projeto `webchat-atendimento`, id `nrvuynjwcgwpjdptkiay` (sa-east-1). É o MESMO projeto: não crie outro. A conta nova precisa de acesso a ele.
+3. **n8n** (conector): instância `clinicacsi.app.n8n.cloud`, workflow `wAbzjPqZNCztKriZ` "Triagem IA - Atendimento" (versão ativa `7bcf2009-34ff-4085-a17f-a931ff68188f`). Falta escolher/confirmar a credencial Anthropic no nó "Triagem com Claude" se a conta mudar.
+4. **Gmail** (opcional): o e-mail ao suporte do Klingo está só como rascunho (`docs/fase-0-email-suporte-klingo.md` tem o texto).
+5. **Segredos (não estão no repositório, e não devem estar):**
+   - `KLINGO_APP_TOKEN`: secret da Edge Function `sync-catalogo-klingo` (Supabase > Edge Functions > Secrets).
+   - `config.ia_segredo`: valor na tabela `config`; o mesmo valor está digitado nos nós HTTP do n8n (`p_segredo`) e no cron. Para trocar, mude nos dois lados.
+   - A chave "publishable" do Supabase está no `index.html` e no `painel/index.html` (é pública por desenho).
+6. **Conferir que tudo está no lugar** (rode no SQL do projeto, deve dar `true` em todas):
+```sql
+select
+  (select count(*) = 6 from cron.job where jobname in ('sync-catalogo-klingo','catalogo-precos-convenio','catalogo-precos-particular','agenda-ocupacao','agenda-conferir','agenda-revisar')) as crons,
+  to_regclass('public.paciente_historico') is not null as historico,
+  exists (select 1 from pg_proc where proname = 'agenda_conferencia_aplicar') as fase3,
+  position('historico_paciente' in pg_get_functiondef('public.ia_contexto(text,uuid)'::regprocedure)) > 0 as ctx,
+  position('pre_reaproveitar' in pg_get_functiondef('public.ia_pre_agendar(text,uuid,jsonb,boolean)'::regprocedure)) > 0 as reaproveitar;
+```
+7. **Edge Function**: versão 10 de `sync-catalogo-klingo` (arquivos `index.ts` e `conferencia.ts` da pasta `supabase/functions/sync-catalogo-klingo/`). Testes locais: `node --experimental-strip-types --test supabase/functions/sync-catalogo-klingo/conferencia.test.ts` (17 devem passar).
+8. **Se algum dia precisar recriar o banco do zero**: `supabase/00-base-snapshot.sql` tem as tabelas e funções base (chat, painel, login) e os demais `supabase/*.sql` vêm depois, mas os arquivos antigos contêm *correções por substituição* aplicadas na mão e não são uma receita completa. O caminho seguro é `supabase db dump --schema public` do projeto atual. Não rode `00-base-snapshot.sql` no projeto atual.
+
+Ordem dos arquivos SQL (referência do que foi aplicado, nesta ordem): `00-base-snapshot` (referência) → `pre-agendamentos` → `catalogo-klingo` → `catalogo-historico` → `catalogo-historico-parte2` → `catalogo-precos` → `pacientes` → `fase2-pedido-e-agenda` → `fase3-conferencia-automatica` → `fase4-paciente-que-volta`.
+
+## 3. O que cada fase faz hoje
+
+### Onde está cada peça
+- **Repo** `clinicacsiia/webchat`: `index.html` (chat do paciente), `painel/index.html` (painel), `supabase/*.sql`, `supabase/functions/sync-catalogo-klingo/`, `n8n/novo-atendimento.json` (workflow antigo, só referência), `docs/`, `LEIAME.md` (publicação e papéis).
+- **Crons (UTC)**: `sync-catalogo-klingo` 0 6; `catalogo-precos-convenio` 10 6; `catalogo-precos-particular` 25 6; `agenda-ocupacao` a cada 10 min das 8h à 1h; **`agenda-conferir` a cada 15 s** (só chama o Klingo se houver pedido esperando; cobre as primeiras 6 h de cada pedido); **`agenda-revisar` a cada 10 min** (todos os pedidos esperando e os já confirmados).
+- **Edge Function** `sync-catalogo-klingo` (header `x-sync-key` = `config.ia_segredo`): modos `{}` catálogo, `{"inspecionar":id}`, `{"precos":"convenio"|"particular"}`, `{"agenda":"ocupacao"}`, `{"agenda":"conferir"}` (+ `"lento":true`).
+- **Klingo**: relatórios via `https://api-externa.klingo.app/api/info/relatorio?id=…`, header `X-APP-TOKEN`. #13981 procedimentos, #13984 agenda, #12301 planos, #13983 preços convênio, #13825 marcações (Particular), #7 agendas marcadas, #47 bloqueado. Colunas do #7: Unidade, Marcacao, Data_Atendimento, Medico, Paciente, Operadora, Prontuario, Telefone, Procedimento, Previsto, Obs, Status (A Confirmar / Confirmado / Sem Resposta: não aparecem cancelados), Data_Agendamento, Usuario, Origem, Quantidade.
+
+### Fase 3 — conferência automática (`supabase/fase3-conferencia-automatica.sql`)
+- A Edge Function lê o #7 só dos dias com pedido esperando e compara **na memória** (últimos 8 dígitos do telefone; nome) com o paciente da conversa. Só o veredito por horário (ok / outro / livre) vai ao banco (`agenda_conferencia_aplicar`). Nome, telefone e prontuário do Klingo não são gravados nem logados.
+- Reconhecimento: telefone (ou telefone + nome). Só pelo nome exige nome IGUAL e exame exato; nome parecido nunca confirma (homônimos).
+- Tudo bateu → `status = agendado` sozinho, `conferencia_status = confirmado` (+ `conferencia_via`) e mensagem de confirmação ao paciente no chat (exames, dia/hora/unidade, preparo do cadastro; sem preço), uma vez (`confirmacao_enviada_em`).
+- Só confirma quando **todos os horários que o pedido exige** (um por grupo de exame/sala, `agenda_grupos`) foram escolhidos e aparecem no Klingo.
+- Alertas (`pre_agendamentos.conferencia_status`, `conversas.alerta_agenda`; aparecem na lista e no cartão do painel depois do merge): `horario_tomado`, `divergente`, `nao_encontrado` (horário passou +1 h sem marcação), `sumiu` (confirmado que deixou de aparecer em 2 revisões seguidas), `remarcado`. O atendente que clica "Marcar como agendado" ou "Cancelar" limpa o alerta.
+- Ordem de chegada também é conferida (qualquer hora do dia, mesma sala/unidade/exame/paciente) e nunca vira "horário tomado".
+- Trocar o pedido de exames apaga o horário escolhido antes; pedido já concluído (agendado/cancelado) não pode ser trocado na mesma conversa (o paciente que volta abre conversa nova).
+- Falha de um dia no Klingo deixa sem veredito só quem depende daquele dia.
+
+### Fase 4 — paciente que volta (`supabase/fase4-paciente-que-volta.sql`)
+- Cada visita abre uma **conversa nova** (`chat_iniciar`); o contato é o mesmo (telefone). O paciente conhecido é achado por `paciente_conferir` (nome/telefone/e-mail).
+- `paciente_historico`: uma linha por marcação concluída (gatilho em `pre_agendamentos.status`); cancelada ou revertida só é marcada, nunca apagada.
+- `ia_contexto` devolve `historico_paciente`. **Os detalhes só saem com a data de nascimento conferida** (`liberado`). Antes, a IA só sabe que existe histórico e pede a data já na primeira resposta.
+- `ia_pre_agendar` aceita `reaproveitar = ultimo | pendente`: copia exames (inclusive o lado) para a conversa nova; `pendente` também copia plano e unidade. Só com data de nascimento conferida e só se a conversa ainda não tem exames.
+- n8n: o prompt tem a seção "PACIENTE QUE VOLTA" (atalho em lista: repetir o último exame / continuar o pedido pela metade / outro exame; sugerir manter plano e unidade; nunca revelar antes da data de nascimento).
+- Painel: "Histórico do paciente" no cartão do pré-agendamento.
+
+## 4. Pendências (tudo o que falta, em ordem)
+
+**Fase 3 (o que falta para 100%)**
+1. **Validar com uma marcação real** (o que mais importa). Faça: abra o chat como paciente de teste (telefone `7190000xxxx`), monte o pedido, escolha o horário, deixe a atendente lançar no Klingo e veja o status virar "Agendado" em até ~15 s. Se não virar: `select net._http_response` da chamada, logs da Edge Function (Supabase > Edge Functions > Logs) e `cron.job_run_details` do job `agenda-conferir`. Se o telefone do Klingo vier em formato diferente, ajuste `fonesDaLinha` em `conferencia.ts` (há testes).
+2. **Remover duas funções provisórias** sem uso: `agenda_conferir_pre_agendamentos()` e `agenda_conferencia_iniciar(boolean)`. O `drop` pede confirmação humana no Supabase e a pergunta ficou sem resposta; o comando está comentado no fim de `fase3-conferencia-automatica.sql`. Rode no SQL Editor e confirme.
+3. (Opcional, negócio) E-mail ao suporte do Klingo (rascunho no Gmail): a pergunta 12 (aviso/webhook quando marcação é criada ou cancelada) dispensaria consultar o relatório a cada 15 s; também confirma que o #7 não traz cancelados.
+
+**Fase 4**
+4. Fazer o **merge na `main`** (painel e chat novos) e, no navegador, conferir: lista com selo de alerta, faixa no cartão, "Histórico do paciente".
+5. Validar com um paciente real que volta: data de nascimento → atalho "Repetir o último exame" → exames copiados → plano/unidade → calendário.
+
+**Geral**
+6. `admin_redefinir_senha` existia só no banco; agora está em `00-base-snapshot.sql`.
+7. Negócio: tempos por modalidade e folgas (15/60 min, 90 min, 48 h, 20 min) são estimativas; preços Particular com confiança média/baixa (validar com a recepção); pedir que as atendentes usem o painel normalmente (o "Agendado" agora é automático, o botão manual continua como reserva).
+8. Segurança: o segredo `ia_segredo` está digitado nos nós HTTP do n8n (aviso do n8n "hardcoded credentials"). Ideal: mover para credencial do n8n. Advisor Supabase: funções `security definer` chamáveis por `anon` são intencionais (token da conversa ou `ia_segredo`); "leaked password protection" no Auth é opcional.
+
+## 5. Fase 5 — aprendizado (próxima, 0%)
+Usar o que os atendentes corrigem para melhorar o sistema:
+- Medir onde a IA erra: pré-agendamentos com `conferencia_status` diferente de `confirmado` (divergente, horário tomado, não encontrado, sumiu, remarcado), exame/lado trocado pelo atendente, preço ou data ajustados.
+- Comparar o preço previsto com a coluna `Previsto` do #7 (valor lançado no Klingo) para corrigir `catalogo_preco`.
+- Relatório de erros da IA no painel (por semana: o que foi corrigido e por quê) e lista de exemplos para melhorar o prompt do n8n.
+- Antes de começar: teste curto e2e no chat, `get_advisors` e releitura de `docs/plano-ia-memoria-agendamento.md`.
+
+## 6. Regras que não podem ser quebradas
+- Dados de paciente do Klingo só passam pela **memória** da Edge Function para identificar a conversa; **nunca** são gravados, devolvidos ou logados. `agenda_ocupacao` guarda só início, médico, unidade, procedimento, quantidade.
+- Preço é sempre **previsão**; um atendente humano confirma preço e data. A mensagem de confirmação ao paciente não traz preço.
+- Detalhes do histórico só depois da data de nascimento conferida. Ao testar `liberado`, use `coalesce(..., false)`: um NULL já virou "verdadeiro" uma vez.
+- Lado D/E: na frente o L do desenho é o Direito, nas costas é o Esquerdo; bilateral com lado único é recusado.
+- Horários: reserva provisória + advisory lock por dia; folga 15 min (mesma unidade) / 60 min (outra unidade) entre exames do mesmo paciente; antecedência de 120 min. Fuso: `America/Bahia`.
+- Dicas do Supabase MCP: `execute_sql` e `apply_migration` pedem confirmação humana se o texto tiver `delete from` ou `drop`; testar em `DO $$ … raise exception … $$` (reverte tudo); alterar função existente via `pg_get_functiondef` + `replace`; um `NULL` em `if not x` não entra no `then`.
+- Dados de teste: telefones `7190000xxxx`; os testes das fases 3 e 4 rodaram em transação revertida (não ficou nada no banco).

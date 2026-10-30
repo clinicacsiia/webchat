@@ -738,18 +738,20 @@
       h('button', { type: 'button', 'aria-label': 'Tirar ' + p.regiao_nome, onclick: () => { for (const k of [...P.partes.keys()]) if (k.startsWith(p.regiao + ':')) P.partes.delete(k); desenharPedido(); } }, '×'))));
   }
   async function examesDe(mod, regiao) {
-    const k = `${mod}|${regiao}`;
-    if (!P.exames.has(k)) {
+    const k = `${mod}|${regiao}`, estado = P;   // a folha pode ser fechada (P = null) enquanto a consulta roda
+    if (!estado.exames.has(k)) {
       const { data, error } = await db.rpc('chat_exames', { p_conversa: conv.id, p_token: conv.token, p_modalidade: mod, p_regiao: regiao });
       if (error) throw error;
-      P.exames.set(k, data || []);
+      estado.exames.set(k, data || []);
     }
-    return P.exames.get(k);
+    return estado.exames.get(k);
   }
   async function irParaExames() {
+    const estado = P;
     P.lista = agruparPartes(); P.escolhas = new Map();
     $('#folhaCorpo').replaceChildren(h('p', { class: 'carregando' }, 'Buscando os exames…'));
-    try { await Promise.all(P.lista.map((p) => examesDe(P.mod, p.regiao))); } catch (e) { toast(mensagemErro(e)); P.passo = 'mapa'; desenharPedido(); return; }
+    try { await Promise.all(P.lista.map((p) => examesDe(P.mod, p.regiao))); } catch (e) { if (P !== estado) return; toast(mensagemErro(e)); P.passo = 'mapa'; desenharPedido(); return; }
+    if (P !== estado) return;
     P.lista.forEach((p) => {
       const ops = opcoesDaParte(p);
       if (ops.length === 1) P.escolhas.set(chaveParte(p), ops[0].id);

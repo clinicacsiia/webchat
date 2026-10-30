@@ -1,4 +1,5 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { avaliar, escolherAlvos, linhaDe, type Alvo, type Linha } from "./conferencia.ts";
 
 // Atualiza o catálogo que a IA consulta (procedimentos, agenda e planos) a partir de relatórios do Klingo.
 // Só relatórios de cadastro, sem dado de paciente. O token fica no secret KLINGO_APP_TOKEN.
@@ -244,36 +245,47 @@ async function agendaOcupacao(supabase: Supa, token: string) {
   return { marcacoes_lidas: lidas, horarios_ocupados: linhas.length, gravadas, vigentes: (fim as Row)?.vigentes ?? null };
 }
 
-// Conferência automática (a cada 15 s): lê só os dias com pré-agendamento esperando, atualiza a ocupação e deixa o banco
-// marcar como "agendado" quem apareceu na agenda do Klingo. Nenhum dado de paciente é lido para isso nem gravado.
-async function agendaConferir(supabase: Supa, token: string) {
-  const { data: dias, error } = await supabase.rpc("agenda_conferencia_iniciar");
+// Conferência automática (cron a cada 15 s; revisão geral a cada 10 min com {"lento":true}).
+// Lê o relatório #7 só dos dias que têm pré-agendamento esperando, atualiza a ocupação e compara com o paciente da conversa
+// (telefone e nome) NA MEMÓRIA: só o veredito por horário vai para o banco (agenda_conferencia_aplicar). Nada do paciente do Klingo é gravado.
+async function agendaConferir(supabase: Supa, token: string, lento: boolean) {
+  const { data: pedido, error } = await supabase.rpc("agenda_conferencia_alvos", { p_lento: lento });
   if (error) throw new Error(error.message);
-  const lista = ((dias as string[] | null) ?? []).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d));
-  if (!lista.length) return { esperando: 0, agendados: 0 };
+  const todos = ((pedido as { alvos?: Alvo[] } | null)?.alvos ?? []) as Alvo[];
+  if (!todos.length) return { alvos: 0 };
   try {
+    const alvos = escolherAlvos(todos, 8);
+    const dias = [...new Set(alvos.flatMap((a) => a.slots.map((s) => s.data)))].filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
+    const linhas: Linha[] = [];
     const agrupado = new Map<string, { inicio: string; profissional: string; unidade: string; procedimento: string; qtd: number }>();
-    for (const d of lista) {
-      for (const r of await lerAgendaMarcada(token, d, d)) {
-        const inicio = String(r.Data_Atendimento ?? "").slice(0, 19).replace("T", " ");
-        const profissional = String(r.Medico ?? "").trim(), unidade = String(r.Unidade ?? "").trim();
-        if (!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(inicio) || !profissional || !unidade) continue;
-        const chave = `${inicio}|${profissional}|${unidade}`;
-        const g = agrupado.get(chave);
-        if (g) g.qtd += 1;
-        else agrupado.set(chave, { inicio, profissional, unidade, procedimento: String(r.Procedimento ?? "").trim(), qtd: 1 });
+    const falhou = new Set<string>();   // um dia que o Klingo não entregou só deixa sem veredito quem depende dele
+    for (const d of dias) {
+      try {
+        for (const r of await lerAgendaMarcada(token, d, d)) {
+          const l = linhaDe(r);
+          if (!l) continue;
+          linhas.push(l);
+          const chave = `${l.ini}|${l.profOrig}|${l.unidadeOrig}`;
+          const g = agrupado.get(chave);
+          if (g) g.qtd += 1;
+          else agrupado.set(chave, { inicio: l.ini, profissional: l.profOrig, unidade: l.unidadeOrig, procedimento: l.proc, qtd: 1 });
+        }
+      } catch {
+        falhou.add(d);
       }
     }
-    const linhas = [...agrupado.values()];
-    for (let i = 0; i < linhas.length; i += 1500) {
-      const { error: e } = await supabase.rpc("agenda_ocupacao_atualizar", { p_linhas: linhas.slice(i, i + 1500), p_execucao: null, p_finalizar: false });
+    if (dias.length > 0 && falhou.size === dias.length) throw new Error("O Klingo não entregou nenhum dia da agenda marcada");
+    const ocupacao = [...agrupado.values()];
+    for (let i = 0; i < ocupacao.length; i += 1500) {
+      const { error: e } = await supabase.rpc("agenda_ocupacao_atualizar", { p_linhas: ocupacao.slice(i, i + 1500), p_execucao: null, p_finalizar: false });
       if (e) throw new Error(e.message);
     }
-    const { data: n, error: e2 } = await supabase.rpc("agenda_conferir_pre_agendamentos");
+    const resultados = alvos.filter((a) => a.slots.every((s) => !falhou.has(s.data))).map((a) => avaliar(a, linhas));
+    const { data: aplicado, error: e2 } = await supabase.rpc("agenda_conferencia_aplicar", { p_resultados: resultados });
     if (e2) throw new Error(e2.message);
-    return { esperando: lista.length, horarios_lidos: linhas.length, agendados: n };
+    return { alvos: alvos.length, avaliados: resultados.length, dias: dias.length, dias_com_erro: falhou.size, horarios_lidos: ocupacao.length, ...(aplicado as Row) };
   } catch (e) {
-    await supabase.from("agenda_ocupacao_meta").update({ conferindo_ate: null }).eq("id", 1);   // libera a próxima rodada
+    await supabase.rpc("agenda_conferencia_liberar");   // libera a próxima rodada
     throw e;
   }
 }
@@ -308,7 +320,7 @@ Deno.serve(async (req: Request) => {
   // Conferência automática dos pré-agendamentos: {"agenda":"conferir"}
   if (corpo?.agenda === "conferir") {
     try {
-      return json(await agendaConferir(supabase, token));
+      return json(await agendaConferir(supabase, token, corpo?.lento === true));
     } catch (e) {
       return json({ error: e instanceof Error ? e.message : "erro desconhecido" }, 502);
     }
