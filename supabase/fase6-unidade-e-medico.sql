@@ -33,12 +33,12 @@ comment on table public.unidade_config is 'Unidades escolhidas no início do cha
 insert into public.unidade_config (chave, catalogo, rotulo, descricao, fluxo, ordem, instrucao) values
 ('desenvoar', 'DESENVOAR', 'Desenvoar', 'Atendimento pediátrico (crianças e adolescentes)', 'pediatria', 1,
  'O paciente escolheu a DESENVOAR: atendimento PEDIÁTRICO (crianças e adolescentes).'
- || ' PEDIDO: não use o mapa do corpo. Pergunte o motivo em UMA lista de escolha única, usando só o que existir em procedimentos/especialidades_com_agenda da DESENVOAR: consulta de pediatria (rotina, puericultura, retorno, dúvida), consulta com especialista (neuropediatria, endocrinologia, gastroenterologia, ortopedia) ou exame (por exemplo eletroencefalograma), mais "Outro". Se descrever sintoma, ajude só a escolher o tipo de consulta, sem diagnosticar; na dúvida, pediatria.'
+ || ' PEDIDO: não use o mapa do corpo. Pergunte o motivo em UMA lista de escolha única: "Consulta" (pediatria, puericultura, retorno ou especialista), "Exame (por exemplo eletroencefalograma)" e "Outro". Se for consulta, envie opcoes {"tipo":"pedido_consulta"}: o paciente escolhe o tipo de consulta (pediatria, puericultura, teleconsulta, neuropediatria, endocrinologia, gastroenterologia, ortopedia) com os dados do cadastro; é isso que libera o calendário. Exame (EEG): registre o pedido pelas palavras dele e diga que o atendente agenda (o calendário ainda não cobre esse exame). Se descrever sintoma, ajude só a escolher o tipo de consulta, sem diagnosticar; na dúvida, pediatria.'
  || ' MÉDICO: se inicio.medico_preferido vier preenchido, registre em profissional e NÃO pergunte de novo; se o médico dele não faz o que foi pedido (confira em agenda), avise com delicadeza e ofereça outro da mesma especialidade. Se vier vazio, não pergunte médico (o paciente já disse que tanto faz).'
  || ' UNIDADE: já é a DESENVOAR; registre unidade "DESENVOAR" e pule a pergunta de unidade na etapa preferencias (pergunte só o período do dia).'),
 ('csi', 'CLÍNICA DE SAÚDE E IMAGEM - CSI', 'CSI', 'Exames e consultas', 'exame_consulta', 2,
  'O paciente escolheu a unidade CSI: EXAMES e CONSULTAS. Se a primeira mensagem não deixar claro, pergunte em UMA lista de escolha única: "Consulta", "Exame de imagem (ressonância, tomografia, ultrassom, raio-X, mamografia, densitometria)" ou "Outro exame".'
- || ' Exame de imagem: use o MAPA DO CORPO. Consulta: use lista com as especialidades de especialidades_com_agenda da CSI. Registre unidade "CLÍNICA DE SAÚDE E IMAGEM - CSI" e não pergunte a unidade de novo.'
+ || ' Exame de imagem: use o MAPA DO CORPO. Consulta: envie opcoes {"tipo":"pedido_consulta"} (o paciente escolhe o tipo de consulta; é isso que libera o calendário). Registre unidade "CLÍNICA DE SAÚDE E IMAGEM - CSI" e não pergunte a unidade de novo.'
  || ' MÉDICO: em consulta, se inicio.medico_preferido vier preenchido, registre em profissional e não pergunte de novo (confira em agenda se ele atende a especialidade; se não, avise e ofereça outro). Em exame de imagem o profissional não é escolhido pelo paciente.'),
 ('rmtc', 'CLÍNICA DE SAÚDE E IMAGEM - RM/TC', 'CSI RM/TC', 'Ressonância e tomografia', 'exame_consulta', 3,
  'O paciente escolheu a unidade CSI RM/TC: ressonância magnética e tomografia (e exames desse tipo). Vá direto ao MAPA DO CORPO, sem perguntar se é consulta. Se pedir consulta ou outro tipo de exame, explique com delicadeza que nesta unidade o atendimento é de ressonância e tomografia, e ofereça a unidade CSI ou deixe o atendente orientar.'
@@ -61,6 +61,17 @@ alter table public.conversas add column if not exists paciente_nome text;
 comment on column public.conversas.paciente_tipo is 'proprio = quem conversa é o paciente; filho = quem conversa é o responsável e o paciente é a criança/adolescente (nome em paciente_nome).';
 comment on column public.conversas.paciente_nome is 'Nome da criança, informado no formulário quando paciente_tipo = filho. Nome, telefone e e-mail do formulário continuam sendo os do responsável.';
 
+-- Mais de um filho: uma conversa por criança, ligadas em fila.
+--  irmaos: nomes dos filhos que AINDA faltam depois desta criança; irmaos_modo: como o responsável quer agendar:
+--    'um_de_cada_vez' = cada criança com o seu pedido, do zero;
+--    'juntos'         = o pedido (consulta/exames, plano, unidade, médico) é copiado para a criança seguinte e o calendário
+--                       sugere o horário logo depois do da anterior.
+--  irmao_de: conversa da criança anterior (de onde vem a cópia e o horário de referência).
+alter table public.conversas add column if not exists irmaos jsonb not null default '[]'::jsonb;
+alter table public.conversas add column if not exists irmaos_modo text check (irmaos_modo in ('um_de_cada_vez', 'juntos'));
+alter table public.conversas add column if not exists irmao_de uuid references public.conversas (id);
+comment on column public.conversas.irmaos is 'Nomes dos outros filhos que ainda faltam agendar depois desta criança (máx. 5).';
+
 create table if not exists public.atendimento_tipo (
   chave text primary key check (chave in ('proprio', 'filho')),
   instrucao text not null
@@ -68,11 +79,14 @@ create table if not exists public.atendimento_tipo (
 alter table public.atendimento_tipo enable row level security;
 comment on table public.atendimento_tipo is 'Instrução da IA conforme quem será atendido (próprio ou filho). Vai em ia_contexto().inicio.instrucao_paciente. Sem policy: só funções security definer.';
 insert into public.atendimento_tipo (chave, instrucao) values
-('proprio', 'Quem conversa é o próprio paciente.'),
-('filho', 'ATENÇÃO: quem conversa é o RESPONSÁVEL e o paciente é o FILHO(A) (criança ou adolescente). Fale com o responsável ("seu filho", "sua filha", ou pelo nome da criança se inicio.paciente_nome vier preenchido).'
- || ' O nome, o telefone e o e-mail do formulário são do RESPONSÁVEL. No campo paciente registre os dados da CRIANÇA: nome (use inicio.paciente_nome se vier; senão pergunte), data de nascimento, sexo e nome da mãe. O celular do responsável vai em celular. Peça também o nome do responsável se ainda não souber; não invente parentesco.'
+('proprio', 'Quem conversa é o próprio paciente. Chame-o pelo primeiro nome (campo nome) já na primeira resposta.'),
+('filho', 'ATENÇÃO: quem conversa é o RESPONSÁVEL e o paciente é o FILHO(A) (criança ou adolescente).'
+ || ' TRATAMENTO: chame o responsável pelo primeiro nome (campo nome) e a criança pelo primeiro nome dela (inicio.paciente_nome) o tempo todo. Já na primeira resposta cumprimente os dois, por exemplo: "Olá, Maria! Vamos agendar para o Lucas." (sem presumir o gênero da criança: se não souber, escreva "para Lucas"). Se paciente_nome vier vazio, pergunte o nome da criança antes de qualquer outra coisa.'
+ || ' DADOS: o nome, o telefone e o e-mail do formulário são do RESPONSÁVEL. No campo paciente registre os dados da CRIANÇA: nome (use inicio.paciente_nome; se o responsável der o nome completo, use o completo), data de nascimento, sexo e nome da mãe. O celular do responsável vai em celular. Peça também o nome do responsável se ainda não souber; não invente parentesco.'
  || ' CPF: peça o da criança; se ela não tiver, aceite o do responsável e escreva no resumo que o CPF é do responsável. Carteirinha do convênio: a da criança. Idade: confira idade_min/idade_max do procedimento com a idade da CRIANÇA.'
- || ' Cada conversa atende UMA criança. Se o responsável falar de mais de um filho, atenda um de cada vez: ao final (etapa pronto), diga que, para agendar outro filho(a), basta tocar nos três pontinhos do chat e escolher "Agendar para outro filho(a)", que os dados dele já vêm preenchidos. Nunca misture os dados de duas crianças na mesma conversa.'
+ || ' UMA CRIANÇA POR CONVERSA: nunca misture dados de duas crianças.'
+ || ' OUTROS FILHOS: se inicio.irmaos_que_faltam não for vazio, o responsável já informou que também vai agendar para os outros (irmaos_modo "um_de_cada_vez": cada criança com o seu pedido; "juntos": o mesmo pedido para todas, com horários em sequência). Atenda a criança desta conversa e, ao final (etapa pronto), avise pelo nome: "Agora vamos para o Pedro. É só tocar em "Agendar para Pedro" aqui embaixo." No modo "juntos", diga que o pedido (consulta, plano e unidade) será copiado e que o calendário vai sugerir o horário logo depois do de Lucas. Se irmaos_que_faltam for vazio e o responsável falar de outro filho, diga que dá para tocar nos três pontinhos e escolher "Agendar para outro filho(a)".'
+ || ' ESTA CONVERSA VEIO DE UM IRMÃO (inicio.irmao_anterior preenchido): se pedido_copiado_do_irmao for true, o pedido já está em pre_agendamento e pedido_itens: confirme em uma frase ("Copiei o pedido de Lucas para Pedro") e siga direto para o calendário (etapa data_hora) e depois os dados da criança; não refaça o pedido. Se for false, comece o pedido do zero.'
  || ' Emergência pediátrica (febre alta em bebê pequeno, falta de ar, convulsão, desidratação, sangue nas fezes ou no vômito, qualquer sinal grave): oriente ligar 192 (SAMU) ou ir ao pronto-socorro, urgencia "alta" e transferir true.')
 on conflict (chave) do update set instrucao = excluded.instrucao;
 
@@ -120,15 +134,26 @@ grant execute on function public.chat_medico_limpar(uuid, text) to anon, authent
 create or replace function public.chat_iniciar(p_nome text, p_telefone text, p_email text default null, p_mensagem text default null,
                                                p_aceite boolean default false, p_origem text default null,
                                                p_unidade text default null, p_medico text default null,
-                                               p_paciente_tipo text default 'proprio', p_paciente_nome text default null)
+                                               p_paciente_tipo text default 'proprio', p_paciente_nome text default null,
+                                               p_irmaos jsonb default null, p_irmaos_modo text default null)
 returns jsonb language plpgsql security definer set search_path to '' as $function$
 declare
   v_tel text; v_contato uuid; v_conv uuid; v_token text; v_url text;
-  v_nome text; v_msg text; v_recentes int; v_uni text; v_med text; v_tipo text; v_pnome text;
+  v_nome text; v_msg text; v_recentes int; v_uni text; v_med text; v_tipo text; v_pnome text; v_irm jsonb := '[]'::jsonb; v_modo text;
 begin
   v_tipo := coalesce(nullif(btrim(p_paciente_tipo), ''), 'proprio');
   if v_tipo not in ('proprio', 'filho') then raise exception 'Tipo de paciente inválido.' using errcode = '22023'; end if;
   v_pnome := case when v_tipo = 'filho' then nullif(left(btrim(coalesce(p_paciente_nome, '')), 120), '') end;
+  if p_irmaos is not null then
+    if jsonb_typeof(p_irmaos) <> 'array' then raise exception 'Lista de filhos inválida.' using errcode = '22023'; end if;
+    select coalesce(jsonb_agg(t.n), '[]'::jsonb) into v_irm
+    from (select left(btrim(x), 120) as n from jsonb_array_elements_text(p_irmaos) x where btrim(x) <> '' limit 5) t;
+  end if;
+  if jsonb_array_length(v_irm) > 0 then
+    if v_tipo <> 'filho' then raise exception 'Outros filhos só valem quando o atendimento é para um filho(a).' using errcode = '22023'; end if;
+    v_modo := coalesce(nullif(btrim(coalesce(p_irmaos_modo, '')), ''), 'um_de_cada_vez');
+    if v_modo not in ('um_de_cada_vez', 'juntos') then raise exception 'Modo de agendamento inválido.' using errcode = '22023'; end if;
+  end if;
   if not coalesce(p_aceite, false) then
     raise exception 'Aceite a política de privacidade para continuar.' using errcode = '22023';
   end if;
@@ -145,6 +170,8 @@ begin
   if char_length(v_msg) > 4000 then
     raise exception 'Mensagem muito longa.' using errcode = '22023';
   end if;
+  -- Responsável sem mensagem: a conversa já começa com o nome da criança, e a IA cumprimenta pelos nomes.
+  if v_msg = '' and v_tipo = 'filho' and v_pnome is not null then v_msg := 'Olá! Quero agendar para ' || v_pnome || '.'; end if;
 
   -- Unidade e médico: só valores que existem (o formulário nunca manda texto livre).
   if nullif(btrim(coalesce(p_unidade, '')), '') is not null then
@@ -175,8 +202,8 @@ begin
     aceitou_lgpd_em = coalesce(public.contatos.aceitou_lgpd_em, now())
   returning id into v_contato;
 
-  insert into public.conversas (contato_id, nome_informado, email_informado, unidade_inicial, medico_preferido, paciente_tipo, paciente_nome)
-  values (v_contato, left(v_nome, 120), nullif(left(btrim(coalesce(p_email, '')), 200), ''), v_uni, v_med, v_tipo, v_pnome)
+  insert into public.conversas (contato_id, nome_informado, email_informado, unidade_inicial, medico_preferido, paciente_tipo, paciente_nome, irmaos, irmaos_modo)
+  values (v_contato, left(v_nome, 120), nullif(left(btrim(coalesce(p_email, '')), 200), ''), v_uni, v_med, v_tipo, v_pnome, v_irm, v_modo)
   returning id into v_conv;
   insert into public.conversa_segredo (conversa_id) values (v_conv) returning token into v_token;
 
@@ -200,7 +227,7 @@ begin
 
   return jsonb_build_object('conversa_id', v_conv, 'token', v_token);
 end $function$;
-grant execute on function public.chat_iniciar(text, text, text, text, boolean, text, text, text, text, text) to anon, authenticated;
+grant execute on function public.chat_iniciar(text, text, text, text, boolean, text, text, text, text, text, jsonb, text) to anon, authenticated;
 
 -- ===== 5. ia_contexto: devolve 'inicio' =====
 create or replace function public.ia_contexto(p_segredo text, p_conversa uuid)
@@ -217,6 +244,10 @@ begin
     'status', c.status,
     'nome', coalesce(c.nome_informado, ct.nome), 'telefone', ct.telefone, 'origem', ct.origem,
     'inicio', jsonb_build_object('paciente_tipo', c.paciente_tipo, 'paciente_nome', c.paciente_nome,
+      'irmaos_que_faltam', c.irmaos, 'irmaos_modo', c.irmaos_modo,
+      'irmao_anterior', (select pc.paciente_nome from public.conversas pc where pc.id = c.irmao_de),
+      'pedido_copiado_do_irmao', (c.irmaos_modo = 'juntos' or exists (select 1 from public.conversas o where o.id = c.irmao_de and o.irmaos_modo = 'juntos'))
+                                 and c.irmao_de is not null and exists (select 1 from public.pre_agendamento_itens i where i.conversa_id = c.id and i.ativo),
       'instrucao_paciente', (select t.instrucao from public.atendimento_tipo t where t.chave = c.paciente_tipo)) ||
       coalesce(
       (select jsonb_build_object('unidade', u.rotulo, 'unidade_catalogo', u.catalogo, 'fluxo', u.fluxo,
@@ -267,7 +298,7 @@ begin
   -- chat_horarios: médico de preferência filtra o calendário, com volta para "qualquer médico".
   v_def := pg_get_functiondef('public.chat_horarios(uuid,text,integer,date,date,text,text,jsonb)'::regprocedure);
   if position('v_pref' in v_def) = 0 then
-    v_new := pg_temp.sub(v_def, 'v_titulo text; v_jan jsonb;', 'v_titulo text; v_jan jsonb; v_pref text; v_med text; v_med_sem boolean := false;');
+    v_new := pg_temp.sub(v_def, 'v_titulo text; v_jan jsonb;', 'v_titulo text; v_jan jsonb; v_pref text; v_med text; v_med_sem boolean := false; v_sug jsonb;');
     v_new := pg_temp.sub(v_new, 'with h as (select * from public.agenda_horarios(v_procs, v_de, v_ate, p_unidade, null, p_periodo,',
       E'select c.medico_preferido into v_pref from public.conversas c where c.id = p_conversa;\n'
       || E'  v_med := v_pref;\n'
@@ -275,8 +306,21 @@ begin
       || E'    v_med := null; v_med_sem := true;\n'
       || E'  end if;\n'
       || E'  with h as (select * from public.agenda_horarios(v_procs, v_de, v_ate, p_unidade, v_med, p_periodo,');
+    -- "Os dois juntos": sugere, no mesmo dia, o primeiro horário livre logo depois do que o irmão anterior escolheu.
+    v_new := pg_temp.sub(v_new, 'select coalesce(jsonb_agg(distinct a.unidade), ''[]''::jsonb) into v_unid',
+      E'select jsonb_build_object(''data'', s.data, ''hora'', s.hora, ''unidade'', s.unidade, ''profissional'', s.profissional, ''apos'', pc.paciente_nome) into v_sug\n'
+      || E'  from public.conversas c join public.conversas pc on pc.id = c.irmao_de\n'
+      || E'  join public.pre_agendamentos pp on pp.conversa_id = pc.id and jsonb_typeof(pp.escolha_horario) = ''array''\n'
+      || E'  cross join lateral (select e from jsonb_array_elements(pp.escolha_horario) e where (e ->> ''grupo'')::int = greatest(p_grupo, 1) limit 1) pe\n'
+      || E'  cross join lateral (select d.data, sl ->> ''hora'' as hora, sl ->> ''unidade'' as unidade, sl ->> ''profissional'' as profissional\n'
+      || E'      from jsonb_to_recordset(v_dias) as d(data date, slots jsonb), jsonb_array_elements(d.slots) sl\n'
+      || E'      where d.data = (pe.e ->> ''data'')::date\n'
+      || E'        and (sl ->> ''hora'')::time >= (pe.e ->> ''hora'')::time + make_interval(mins => coalesce((pe.e ->> ''min'')::int, 30))\n'
+      || E'      order by ((sl ->> ''profissional'') = (pe.e ->> ''profissional'')) desc, sl ->> ''hora'' limit 1) s\n'
+      || E'  where c.id = p_conversa and c.irmaos_modo = ''juntos'';\n'
+      || E'  select coalesce(jsonb_agg(distinct a.unidade), ''[]''::jsonb) into v_unid');
     v_new := pg_temp.sub(v_new, '''sem_exame'', v_sem, ''atualizado_em'', v_meta,',
-      '''sem_exame'', v_sem, ''medico_preferido'', v_pref, ''medico_filtrando'', v_med is not null, ''medico_sem_horario'', v_med_sem, ''atualizado_em'', v_meta,');
+      '''sem_exame'', v_sem, ''medico_preferido'', v_pref, ''medico_filtrando'', v_med is not null, ''medico_sem_horario'', v_med_sem, ''sugerido'', v_sug, ''atualizado_em'', v_meta,');
     execute v_new;
   end if;
 end $do$;
@@ -324,6 +368,136 @@ returns uuid language sql stable security definer set search_path to '' as $func
     and exists (select 1 from public.pre_agendamento_itens i where i.conversa_id = pa.conversa_id and i.ativo and i.procedimento_id is not null)
   order by pa.atualizado_em desc limit 1
 $function$;
+
+-- ===== 6c. Consulta no chat (libera o calendário para consultas) e próximo filho =====
+-- Até aqui o pedido só aceitava exames de imagem (RM, TC, US, RX, mamografia, densitometria); sem item no pedido o calendário
+-- não abre. Consulta passa a ser um item com modalidade 'CONSULTA'. O paciente vê o tipo de consulta ("Consulta de Pediatria",
+-- "Puericultura", "Neuropediatria"...), e o pedido guarda o nome exato do cadastro do Klingo (a conferência automática usa esse nome).
+create or replace function public.consultas_da_unidade(p_catalogo text)
+returns table (id integer, rotulo text, profissionais integer, medicos text[])
+language sql stable security definer set search_path to '' as $$
+  with base as (
+    select p.id, p.nome, string_agg(distinct initcap(lower(a.especialidade)), ' / ') as esp, array_agg(distinct a.profissional) as meds
+    from public.catalogo_procedimento p join public.catalogo_agenda a on a.procedimento_id = p.id
+    where p.ativo and p.classe = 'CONSULTAS' and a.vig_fim >= current_date
+      and a.profissional !~* '(teste|^eletro)' and coalesce(a.especialidade, '') !~* 'anestesi'
+      and (p_catalogo is null or a.unidade = p_catalogo)
+    group by p.id, p.nome),
+  rot as (
+    select b.*, (b.nome ~* '^consulta( medica| médica)?$') as generica, case
+      when b.nome ~* '^consulta( medica| médica)?$' then 'Consulta de ' || coalesce(b.esp, 'clínica médica')
+      when b.nome ~* 'teleconsulta' then 'Teleconsulta de ' || coalesce(b.esp, 'clínica médica')
+      when b.nome ~* '^atendimento ambulatorial em ' then initcap(lower(regexp_replace(b.nome, '^atendimento ambulatorial em ', '', 'i')))
+      else initcap(lower(b.nome)) end as rotulo
+    from base b)
+  -- A consulta genérica ("CONSULTA") some quando uma consulta específica já cobre os mesmos médicos
+  -- (ex.: "Consulta de Ortopedia" x "Consulta Ortopediatra"); assim o responsável não vê duas opções iguais.
+  select distinct on (r.rotulo) r.id, r.rotulo, cardinality(r.meds), r.meds
+  from rot r
+  where not (r.generica and exists (select 1 from rot s where not s.generica and r.meds <@ s.meds))
+  order by r.rotulo, cardinality(r.meds) desc, r.id;
+$$;
+
+create or replace function public.chat_consultas(p_conversa uuid, p_token text) returns jsonb
+language plpgsql stable security definer set search_path to '' as $$
+declare v_cat text; v_med text;
+begin
+  perform public.chat_valida(p_conversa, p_token);
+  select u.catalogo, c.medico_preferido into v_cat, v_med
+  from public.conversas c left join public.unidade_config u on u.chave = c.unidade_inicial where c.id = p_conversa;
+  return jsonb_build_object('medico_preferido', v_med, 'consultas', coalesce((
+    select jsonb_agg(jsonb_build_object('id', x.id, 'rotulo', x.rotulo, 'do_medico', coalesce(v_med = any(x.medicos), false))
+                     order by coalesce(v_med = any(x.medicos), false) desc, x.profissionais desc, x.rotulo)
+    from (select * from public.consultas_da_unidade(v_cat) limit 24) x), '[]'::jsonb));
+end $$;
+grant execute on function public.chat_consultas(uuid, text) to anon, authenticated;
+
+create or replace function public.chat_consulta_salvar(p_conversa uuid, p_token text, p_procedimento_id integer) returns jsonb
+language plpgsql security definer set search_path to '' as $$
+declare v_cat text; v_med text; v_c record; v_proc text; v_msg bigint; v_txt text;
+begin
+  perform public.chat_valida(p_conversa, p_token);
+  if (select count(*) from public.mensagens where conversa_id = p_conversa and autor = 'cliente' and criado_em > now() - interval '1 minute') >= 20 then
+    raise exception 'Muitas mensagens em pouco tempo. Aguarde um instante.' using errcode = '54000';
+  end if;
+  if exists (select 1 from public.pre_agendamentos where conversa_id = p_conversa and status in ('agendado','cancelado')) then
+    raise exception 'Este pedido já foi concluído. Inicie um novo atendimento.' using errcode = '22023';
+  end if;
+  select u.catalogo, c.medico_preferido into v_cat, v_med
+  from public.conversas c left join public.unidade_config u on u.chave = c.unidade_inicial where c.id = p_conversa;
+  select x.id, x.rotulo into v_c from public.consultas_da_unidade(v_cat) x where x.id = p_procedimento_id;
+  if v_c.id is null then raise exception 'Consulta não encontrada para esta unidade.' using errcode = '22023'; end if;
+  select p.nome into v_proc from public.catalogo_procedimento p where p.id = v_c.id;
+
+  update public.pre_agendamentos set escolha_horario = null, data_desejada = null, hora_desejada = null,
+    etapa = case when etapa in ('dados','confirmacao') then 'data_hora' else etapa end
+    where conversa_id = p_conversa and escolha_horario is not null;
+  update public.pre_agendamento_itens set ativo = false where conversa_id = p_conversa and ativo;
+  insert into public.pre_agendamento_itens (conversa_id, modalidade, regiao, regiao_nome, lado, procedimento_id, procedimento, quantidade)
+  values (p_conversa, 'CONSULTA', null, null, 'N', v_c.id, v_proc, 1);
+
+  insert into public.pre_agendamentos as pa (conversa_id, tipo, procedimento, etapa, paciente, status)
+  values (p_conversa, 'consulta', left(v_proc, 160), 'plano', '{}'::jsonb, 'rascunho')
+  on conflict (conversa_id) do update set tipo = 'consulta', procedimento = excluded.procedimento,
+    etapa = case when pa.etapa is null or pa.etapa = 'pedido' then 'plano' else pa.etapa end, atualizado_em = now()
+  where pa.status not in ('agendado','cancelado');
+
+  v_txt := 'Pedido de consulta:' || E'\n' || '• ' || v_c.rotulo || case when v_med is not null then E'\nMédico de preferência: ' || initcap(lower(v_med)) else '' end;
+  update public.conversas set status = case when status = 'encerrada' then 'aguardando' else status end,
+    agente_id = case when status = 'encerrada' then null else agente_id end where id = p_conversa;
+  insert into public.mensagens (conversa_id, autor, texto) values (p_conversa, 'cliente', v_txt) returning id into v_msg;
+  return jsonb_build_object('ok', true, 'mensagem_id', v_msg);
+end $$;
+grant execute on function public.chat_consulta_salvar(uuid, text, integer) to anon, authenticated;
+
+-- Próximo filho: abre a conversa da criança seguinte (mesmo responsável, unidade e médico). No modo "juntos" copia o pedido.
+-- Idempotente: um segundo clique devolve a mesma conversa.
+create or replace function public.chat_irmao_iniciar(p_origem uuid, p_token text) returns jsonb
+language plpgsql security definer set search_path to '' as $$
+declare
+  o public.conversas; src public.pre_agendamentos; v_prox text; v_resto jsonb; v_recentes int; v_conv uuid; v_token text;
+  v_copia boolean := false; v_msg text;
+begin
+  perform public.chat_valida(p_origem, p_token);
+  select * into o from public.conversas where id = p_origem;
+  if o.paciente_tipo <> 'filho' or jsonb_array_length(o.irmaos) = 0 then
+    raise exception 'Não há outro filho(a) para agendar.' using errcode = '22023';
+  end if;
+  v_prox := o.irmaos ->> 0;
+  v_resto := o.irmaos - 0;
+
+  select c.id, s.token into v_conv, v_token from public.conversas c join public.conversa_segredo s on s.conversa_id = c.id
+  where c.irmao_de = p_origem and c.paciente_nome = v_prox order by c.criado_em limit 1;
+
+  if v_conv is null then
+    select count(*) into v_recentes from public.conversas where contato_id = o.contato_id and criado_em > now() - interval '1 hour';
+    if v_recentes >= 5 then raise exception 'Muitas tentativas. Tente novamente em alguns minutos.' using errcode = '54000'; end if;
+
+    insert into public.conversas (contato_id, nome_informado, email_informado, unidade_inicial, medico_preferido, paciente_tipo, paciente_nome, irmaos, irmaos_modo, irmao_de)
+    values (o.contato_id, o.nome_informado, o.email_informado, o.unidade_inicial, o.medico_preferido, 'filho', v_prox, v_resto, o.irmaos_modo, o.id)
+    returning id into v_conv;
+    insert into public.conversa_segredo (conversa_id) values (v_conv) returning token into v_token;
+
+    select * into src from public.pre_agendamentos where conversa_id = p_origem;
+    if o.irmaos_modo = 'juntos' and src.id is not null
+       and exists (select 1 from public.pre_agendamento_itens i where i.conversa_id = p_origem and i.ativo) then
+      insert into public.pre_agendamentos (conversa_id, tipo, especialidade, procedimento, plano, unidade, profissional, preferencia_horario, paciente, status, etapa)
+      values (v_conv, src.tipo, src.especialidade, src.procedimento, src.plano, src.unidade, src.profissional, src.preferencia_horario, '{}'::jsonb, 'rascunho',
+              case when src.plano is null then 'plano' else 'data_hora' end);
+      insert into public.pre_agendamento_itens (conversa_id, modalidade, regiao, regiao_nome, lado, procedimento_id, procedimento, quantidade)
+      select v_conv, i.modalidade, i.regiao, i.regiao_nome, i.lado, i.procedimento_id, i.procedimento, i.quantidade
+      from public.pre_agendamento_itens i where i.conversa_id = p_origem and i.ativo;
+      v_copia := true;
+    end if;
+
+    v_msg := 'Agora vamos agendar para ' || v_prox
+          || case when v_copia then ', com o mesmo pedido de ' || coalesce(o.paciente_nome, 'seu filho(a)') else '' end || '.';
+    insert into public.mensagens (conversa_id, autor, texto) values (v_conv, 'cliente', v_msg);
+  end if;
+
+  return jsonb_build_object('conversa_id', v_conv, 'token', v_token, 'paciente_nome', v_prox, 'irmaos', v_resto, 'irmaos_modo', o.irmaos_modo);
+end $$;
+grant execute on function public.chat_irmao_iniciar(uuid, text) to anon, authenticated;
 
 -- ===== 7. Limpeza (rodar depois, por pessoa: o Supabase pede confirmação em "drop") =====
 -- A assinatura antiga de 6 parâmetros precisa sair, senão chamadas com 6 argumentos ficam ambíguas:
