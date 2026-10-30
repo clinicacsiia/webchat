@@ -32,7 +32,7 @@ export class AgregadorPrecos {
     const valor = valorEmReais(r.Previsto);
     const qtd = Number(r.Quantidade ?? 1);
     // O #7 não deve trazer cancelados, mas, se trouxer, a marcação cancelada não conta como preço lançado.
-    if (/cancel|falt/i.test(String(r.Status ?? ""))) return;
+    if (/cancel/i.test(String(r.Status ?? ""))) return;
     if (!procedimento || !operadora || valor === null || (Number.isFinite(qtd) && qtd > 1)) return;
     const k = `${chave(procedimento)}|${chave(operadora)}`;
     if (k.startsWith("|") || k.endsWith("|")) return;

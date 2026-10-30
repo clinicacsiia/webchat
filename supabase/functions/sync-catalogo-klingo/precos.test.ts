@@ -47,8 +47,8 @@ test("empate fica com o menor valor, qualquer que seja a ordem das linhas", () =
 });
 
 test("marcação cancelada não conta como preço lançado", () => {
-  const r = agregarPrecos([l({ Status: "Cancelado", Previsto: "999" }), l({ Status: "CANCELADA" }), l({ Status: "Confirmado" }), l({ Status: "A Confirmar" }), l({ Status: "Sem Resposta" })], "a", "b");
-  assert.equal(r[0].amostras, 3);
+  const r = agregarPrecos([l({ Status: "Cancelado", Previsto: "999" }), l({ Status: "CANCELADA" }), l({ Status: "Confirmado" }), l({ Status: "A Confirmar" }), l({ Status: "Sem Resposta" }), l({ Status: "Faltou" })], "a", "b");
+  assert.equal(r[0].amostras, 4);   // faltou teve o preço lançado: conta
   assert.equal(r[0].valor_max, 260);
 });
 

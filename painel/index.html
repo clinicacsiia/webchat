@@ -307,8 +307,9 @@
     // Fase 5: ao cancelar, pergunta o motivo ANTES (opcional, de uma lista fixa, sem texto livre: nunca vira dado de paciente); ajuda a ver por que a IA errou.
     let motivo = null;
     if (status === 'cancelado') {
-      const resp = window.prompt('Por que cancelar? Digite o número (ou deixe em branco):\n' + MOTIVOS_CANCELAMENTO.map((m, i) => (i + 1) + ' - ' + m).join('\n'));
-      motivo = MOTIVOS_CANCELAMENTO[Number(String(resp || '').trim()) - 1] || null;
+      const resp = window.prompt('Por que cancelar? Digite o número do motivo e toque em OK (em branco = cancelar sem motivo). "Cancelar" volta sem cancelar o pedido.\n' + MOTIVOS_CANCELAMENTO.map((m, i) => (i + 1) + ' - ' + m).join('\n'));
+      if (resp === null) return;   // desistiu: não cancela
+      motivo = MOTIVOS_CANCELAMENTO[Number(String(resp).trim()) - 1] || null;
     }
     // O atendente resolveu: some o alerta da conferência automática (faixa do pré-agendamento e selo da lista).
     const { error } = await db.from('pre_agendamentos').update({ status, conferencia_status: null, conferencia_detalhe: null, atualizado_em: new Date().toISOString() }).eq('id', S.pre.id);
@@ -1009,6 +1010,7 @@
         h('div', { class: 'num' }, h('b', {}, R.tempo_mediano_pronto_agendado_min == null ? '—' : Math.round(R.tempo_mediano_pronto_agendado_min) + ' min'), h('span', {}, 'do "pronto" até agendado (mediana)')),
         h('div', { class: 'num' }, h('b', {}, X.com_alerta_agora ?? 0), h('span', {}, 'com alerta agora')),
         h('div', { class: 'num' }, h('b', {}, X.abandonados ?? 0), h('span', {}, 'abandonados (sem mexer há 24 h)'))),
+      R.pedidos_sem_registro > 0 ? h('p', { class: 'erro' }, `Atenção: ${R.pedidos_sem_registro} pedido(s) criado(s) depois do início do registro não aparecem na linha do tempo. O gatilho da Fase 5 pode estar falhando: veja os avisos do banco (logs do Postgres) por ia_evento_trg.`) : null,
       h('h3', {}, 'Alertas da conferência com o Klingo'),
       tabela(['Tipo', 'Pedidos'], alertas.map(([k, n]) => [CONF_ROTULO[k] || k, n]), 'Nenhum alerta no período.'),
       h('h3', {}, 'Onde o paciente desiste'),

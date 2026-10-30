@@ -178,27 +178,33 @@ language plpgsql stable security definer set search_path to '' as $$
 declare
   v_dias int := least(greatest(coalesce(p_dias, 28), 7), 365);
   v_ini timestamptz := now() - make_interval(days => v_dias);
-  v_ids uuid[] := array(select c.id from public.ia_coorte(now() - make_interval(days => v_dias)) c);   -- pedidos acompanhados, calculados uma vez
+  v_ids uuid[];   -- pedidos acompanhados, calculados uma vez (depois da checagem de permissão)
   v_desde timestamptz := (select min(e.criado_em) from public.ia_evento e);
+  v_sem_registro int;
   v_resumo jsonb; v_alertas jsonb; v_abandono jsonb; v_semanas jsonb; v_exames jsonb; v_atend jsonb; v_conv jsonb; v_tempo numeric;
 begin
   if coalesce((select public.papel_atual()), '') <> 'admin' then
     raise exception 'Somente o administrador vê o relatório de aprendizado.' using errcode = '42501';
   end if;
 
+  v_ids := array(select c.id from public.ia_coorte(v_ini) c);
+
   select jsonb_build_object(
     'criados', count(*),
-    'agendados_auto', count(*) filter (where p.status = 'agendado' and (select e2.detalhe from public.ia_evento e2 where e2.pre_agendamento_id = p.id and e2.tipo = 'status' and e2.para = 'agendado' order by e2.criado_em desc limit 1) is not distinct from 'automatico'),
-    'agendados_auto_sem_alerta', count(*) filter (where p.status = 'agendado' and (select e2.detalhe from public.ia_evento e2 where e2.pre_agendamento_id = p.id and e2.tipo = 'status' and e2.para = 'agendado' order by e2.criado_em desc limit 1) is not distinct from 'automatico'
+    'agendados_auto', count(*) filter (where p.status = 'agendado' and u.detalhe = 'automatico'),
+    'agendados_auto_sem_alerta', count(*) filter (where p.status = 'agendado' and u.detalhe = 'automatico'
         and not exists (select 1 from public.ia_evento e where e.pre_agendamento_id = p.id and e.tipo = 'conferencia' and e.para <> 'confirmado')),
-    'agendados_manual', count(*) filter (where p.status = 'agendado' and not ((select e2.detalhe from public.ia_evento e2 where e2.pre_agendamento_id = p.id and e2.tipo = 'status' and e2.para = 'agendado' order by e2.criado_em desc limit 1) is not distinct from 'automatico')),
+    'agendados_manual', count(*) filter (where p.status = 'agendado' and u.detalhe is distinct from 'automatico'),
     'cancelados', count(*) filter (where p.status = 'cancelado'),
     'prontos_esperando', count(*) filter (where p.status = 'pronto'),
     'em_andamento', count(*) filter (where p.status = 'rascunho' and p.atualizado_em >= now() - interval '24 hours'),
     'abandonados', count(*) filter (where p.status = 'rascunho' and p.atualizado_em < now() - interval '24 hours'),
     'com_alerta_agora', count(*) filter (where p.conferencia_status is not null and p.conferencia_status <> 'confirmado'))
     into v_resumo
-    from public.pre_agendamentos p where p.id = any(v_ids);
+    from public.pre_agendamentos p
+    left join lateral (select e2.detalhe from public.ia_evento e2   -- como o pedido foi agendado da última vez: 'automatico' ou à mão
+                        where e2.pre_agendamento_id = p.id and e2.tipo = 'status' and e2.para = 'agendado' order by e2.criado_em desc limit 1) u on true
+    where p.id = any(v_ids);
 
   select coalesce(jsonb_object_agg(x.para, x.n), '{}'::jsonb) into v_alertas
     from (select e.para, count(distinct e.pre_agendamento_id) as n from public.ia_evento e
@@ -248,10 +254,14 @@ begin
     'cancelou_com_motivo', count(*) filter (where e.tipo = 'status' and e.para = 'cancelado' and e.por = 'atendente' and e.detalhe is not null))
     into v_atend from public.ia_evento e where e.pre_agendamento_id = any(v_ids);
 
+  -- aviso se o gatilho falhar em silêncio: pedidos criados depois do início do registro que não têm o evento "criado"
+  select count(*) into v_sem_registro from public.pre_agendamentos p
+   where p.criado_em >= greatest(v_ini, coalesce(v_desde, now())) and not exists (select 1 from public.ia_evento c where c.pre_agendamento_id = p.id and c.tipo = 'criado');
+
   select jsonb_build_object('total', count(*), 'assumidas_por_atendente', count(*) filter (where not c.ia_ativa))
     into v_conv from public.conversas c where c.criado_em >= greatest(v_ini, coalesce(v_desde, now()));
 
-  return jsonb_build_object('dias', v_dias, 'desde', v_ini, 'registro_desde', v_desde, 'resumo', v_resumo, 'alertas', v_alertas, 'abandono_por_etapa', v_abandono,
+  return jsonb_build_object('dias', v_dias, 'desde', v_ini, 'registro_desde', v_desde, 'pedidos_sem_registro', v_sem_registro, 'resumo', v_resumo, 'alertas', v_alertas, 'abandono_por_etapa', v_abandono,
     'tempo_mediano_pronto_agendado_min', v_tempo, 'semanas', v_semanas, 'exames_problema', v_exames, 'atendentes', v_atend, 'conversas', v_conv,
     'observacao', 'Conta só os pedidos criados depois que o registro da Fase 5 começou; pedidos anteriores não entram.');
 end $$;
@@ -274,8 +284,8 @@ begin
            round((o.valor_tipico - c.valor) / nullif(c.valor, 0) * 100, 1) as dif_pct
       from public.preco_observado o
       join public.catalogo_procedimento p on p.ativo and public.norm_chave(p.nome) = o.procedimento_norm
-      join public.catalogo_preco c on c.procedimento_id = p.id and c.status = 'ativo' and c.valor is not null and c.valor > 0
-       and ((c.fonte = 'particular' and o.operadora_norm like '%PARTICULAR%')
+      join public.catalogo_preco c on c.procedimento_id = p.id and c.status = 'ativo' and c.valor is not null and c.valor > 0 and c.confianca in ('alta', 'media')   -- só o que a IA usa
+       and ((c.fonte = 'particular' and o.operadora_norm = 'PARTICULAR')
          or (c.fonte = 'convenio' and public.norm_chave(c.operadora) = o.operadora_norm))
      where o.atualizado_em > now() - interval '1 day'   -- só o que a última leitura confirmou: o que sumiu do Klingo ou usava chave antiga não conta
      order by o.procedimento_norm, o.operadora_norm, abs(o.valor_tipico - c.valor)
@@ -297,12 +307,13 @@ grant execute on function public.ia_precos_divergentes(integer, numeric) to auth
 -- Casos recentes com problema, sem dado de paciente, para o administrador melhorar o prompt do n8n.
 create or replace function public.ia_exemplos(p_dias integer default 28, p_limite integer default 40) returns jsonb
 language plpgsql stable security definer set search_path to '' as $$
-declare v_dias int := least(greatest(coalesce(p_dias, 28), 7), 365); v_ids uuid[] := array(select c.id from public.ia_coorte(now() - make_interval(days => v_dias)) c);
+declare v_dias int := least(greatest(coalesce(p_dias, 28), 7), 365); v_ids uuid[];
   v_lim int := least(greatest(coalesce(p_limite, 40), 1), 200); v_res jsonb;
 begin
   if coalesce((select public.papel_atual()), '') <> 'admin' then
     raise exception 'Somente o administrador vê o relatório de aprendizado.' using errcode = '42501';
   end if;
+  v_ids := array(select c.id from public.ia_coorte(now() - make_interval(days => v_dias)) c);
   select coalesce(jsonb_agg(x.j order by x.criado_em desc), '[]'::jsonb) into v_res
     from (select e.criado_em,
                  jsonb_build_object('quando', e.criado_em, 'caso', case when e.tipo = 'conferencia' then e.para else 'cancelado' end, 'por', e.por,
