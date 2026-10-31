@@ -191,6 +191,89 @@ await caso('Link de nova senha com o interruptor desligado: nada abre', async ()
   return { ok: !aberta };
 });
 
+// ---- Meus dados (cópia e exclusão da conta) ----
+const baixar = async (x, seletor) => { const [dl] = await Promise.all([x.page.waitForEvent('download', { timeout: 5000 }), x.page.click(seletor)]); const stream = await dl.createReadStream(); let t = ''; for await (const c of stream) t += c; return { nome: dl.suggestedFilename(), texto: t }; };
+const abrirDados = async (x) => { await x.page.click('#btnContaDados'); await x.page.waitForSelector('#btnBaixarTxt'); };
+
+await caso('Meus dados: o botão só aparece para quem tem conta (e não existe com o interruptor desligado)', async () => {
+  const sem = await abrir({ contaDoBanco: null }), com = await abrir({ contaDoBanco: conta(), sessaoGuardada: true }), off = await abrir({ ativo: false });
+  const r = { sem: await visivel(sem.page, '#btnContaDados'), com: await visivel(com.page, '#btnContaDados'), off: await visivel(off.page, '#btnContaDados') };
+  await sem.ctx.close(); await com.ctx.close(); await off.ctx.close();
+  return { ok: !r.sem && r.com && !r.off, detalhe: JSON.stringify(r) };
+});
+
+await caso('Meus dados: abrir a janela mostra o e-mail e o cadastro, sem pedir a cópia (nada é registrado só por olhar)', async () => {
+  const x = await abrir({ contaDoBanco: conta({ cadastro_salvo: true }), sessaoGuardada: true });
+  await abrirDados(x);
+  const t = await texto(x.page, '#folhaCorpo');
+  const r = { email: /ana@teste\.local/.test(t), cadastro: /Cadastro de paciente ligado à conta\s*Sim/.test(t), pediuCopia: chamou(x.mundo, 'conta_paciente_meus_dados').length };
+  await x.ctx.close();
+  return { ok: r.email && r.cadastro && r.pediuCopia === 0, detalhe: JSON.stringify(r) };
+});
+
+await caso('Meus dados: "Baixar uma cópia" entrega um arquivo de texto legível com cadastro, pedidos e conversas', async () => {
+  const x = await abrir({ contaDoBanco: conta({ cadastro_salvo: true }), sessaoGuardada: true });
+  await abrirDados(x);
+  const f = await baixar(x, '#btnBaixarTxt');
+  const pediu = chamou(x.mundo, 'conta_paciente_meus_dados').length;
+  await x.ctx.close();
+  const ok = /^meus-dados-\d{4}-\d{2}-\d{2}\.txt$/.test(f.nome) && /MEUS DADOS NA CLÍNICA/.test(f.texto) && /Ana Souza/.test(f.texto) && /CPF: 11144477735/.test(f.texto)
+    && /RESSONANCIA DO JOELHO \(D\)/.test(f.texto) && /você: Quero uma ressonância do joelho/.test(f.texto) && /clínica: Claro/.test(f.texto) && /RX TORAX/.test(f.texto) && !/undefined|\[object/.test(f.texto);
+  return { ok: ok && pediu === 1, detalhe: `${f.nome}, ${f.texto.length} caracteres, pedidos de cópia=${pediu}` };
+});
+
+await caso('Meus dados: "formato de computador" entrega um JSON válido com os mesmos dados', async () => {
+  const x = await abrir({ contaDoBanco: conta({ cadastro_salvo: true }), sessaoGuardada: true });
+  await abrirDados(x);
+  const f = await baixar(x, '#btnBaixarJson');
+  await x.ctx.close();
+  let j = null; try { j = JSON.parse(f.texto.replace(/^﻿/, '')); } catch { /* inválido */ }
+  return { ok: /\.json$/.test(f.nome) && j && j.cadastro.nome === 'Ana Souza' && j.mensagens.length === 2, detalhe: f.nome };
+});
+
+await caso('Meus dados: se a cópia falha, aparece um aviso e o botão volta (sem arquivo vazio)', async () => {
+  const x = await abrir({ contaDoBanco: conta(), sessaoGuardada: true });
+  x.mundo.falhas.conta_paciente_meus_dados = { status: 500, corpo: { message: 'Failed to fetch' } };
+  await abrirDados(x);
+  let baixou = false; x.page.on('download', () => { baixou = true; });
+  await x.page.click('#btnBaixarTxt'); await espera(600);
+  const r = { erro: await texto(x.page, '#folhaCorpo .erro-form'), botao: await texto(x.page, '#btnBaixarTxt'), baixou };
+  await x.ctx.close();
+  return { ok: /Sem conexão/.test(r.erro) && /Baixar uma cópia/.test(r.botao) && !r.baixou, detalhe: JSON.stringify(r) };
+});
+
+await caso('Apagar a conta: o primeiro toque só pede confirmação (diz o que é apagado e o que continua guardado); "Não, voltar" cancela sem chamar nada', async () => {
+  const x = await abrir({ contaDoBanco: conta(), sessaoGuardada: true });
+  await abrirDados(x); await x.page.click('#btnApagarConta'); await x.page.waitForSelector('#btnApagarSim');
+  const t = await texto(x.page, '#folhaCorpo');
+  const foco = await x.page.evaluate(() => document.activeElement && document.activeElement.id);
+  await x.page.click('#btnApagarNao'); await x.page.waitForSelector('#btnBaixarTxt');
+  const r = { avisa: /não pode ser desfeito/i.test(t) && /continua guardado pela clínica/i.test(t) && /cadastro de paciente/i.test(t), foco, excluiu: chamou(x.mundo, 'conta_paciente_excluir').length, aindaConta: await visivel(x.page, '#btnContaSair') };
+  await x.ctx.close();
+  return { ok: r.avisa && r.foco === 'btnApagarNao' && r.excluiu === 0 && r.aindaConta, detalhe: JSON.stringify(r) };
+});
+
+await caso('Apagar a conta: confirmar chama o banco com a palavra de confirmação, sai da conta e limpa o aparelho', async () => {
+  const x = await abrir({ contaDoBanco: conta(), sessaoGuardada: true });
+  await x.page.waitForFunction(() => /Olá de novo/.test(document.querySelector('#tituloInicio')?.textContent || ''), null, { timeout: 5000 });
+  await abrirDados(x); await x.page.click('#btnApagarConta'); await x.page.waitForSelector('#btnApagarSim'); await x.page.click('#btnApagarSim');
+  await x.page.waitForFunction(() => document.querySelector('#folha').hidden, null, { timeout: 5000 }); await espera(300);
+  const c = chamou(x.mundo, 'conta_paciente_excluir');
+  const r = { chamadas: c.length, conf: c[0] && c[0].corpo.p_confirmacao, apagada: x.mundo.contaApagada === true, titulo: await texto(x.page, '#tituloInicio'),
+    entrar: await visivel(x.page, '#btnContaEntrar'), dados: await visivel(x.page, '#btnContaDados'), logout: x.auth.chamadas.some((y) => y.caminho === '/auth/v1/logout'), aviso: await texto(x.page, '#toast') };
+  await x.ctx.close();
+  return { ok: r.chamadas === 1 && r.conf === 'EXCLUIR' && r.apagada && r.titulo === 'Vamos agendar?' && r.entrar && !r.dados && r.logout && /continuam guardados pela clínica/.test(r.aviso || ''), detalhe: JSON.stringify(r) };
+});
+
+await caso('Apagar a conta: se o banco falha, a conta continua, a janela fica aberta e o aviso aparece', async () => {
+  const x = await abrir({ contaDoBanco: conta(), sessaoGuardada: true });
+  x.mundo.falhas.conta_paciente_excluir = { status: 500, corpo: { message: 'Failed to fetch' } };
+  await abrirDados(x); await x.page.click('#btnApagarConta'); await x.page.waitForSelector('#btnApagarSim'); await x.page.click('#btnApagarSim'); await espera(600);
+  const r = { erro: await texto(x.page, '#folhaCorpo .erro-form'), aberta: await x.page.evaluate(() => !document.querySelector('#folha').hidden), conta: await visivel(x.page, '#btnContaSair'), botao: await texto(x.page, '#btnApagarSim') };
+  await x.ctx.close();
+  return { ok: /Sem conexão/.test(r.erro) && r.aberta && r.conta && /Sim, apagar/.test(r.botao), detalhe: JSON.stringify(r) };
+});
+
 await caso('nenhuma exceção de JavaScript em toda a tela de login (ligada e desligada)', async () => {
   const a = await abrir(), b = await abrir({ ativo: false });
   await a.page.click('#btnContaCriar'); await a.page.waitForSelector('#cNome'); await a.page.click('text=Já tenho conta'); await a.page.waitForSelector('#cEmail');

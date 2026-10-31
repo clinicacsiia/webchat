@@ -115,6 +115,23 @@ export function criarMundo(opcoes = {}) {
         m.conta = { ...m.conta, nome: String(corpo.p_nome || '').trim(), telefone: String(corpo.p_telefone || '').replace(/\D/g, '') };
         return { body: m.conta };
       }
+      case 'conta_paciente_meus_dados': {
+        if (!m.conta) return { status: 400, body: { code: '42501', message: 'Entre na sua conta para ver os seus dados.' } };
+        return { body: m.meusDados || {
+          gerado_em: '2026-10-31T15:00:00Z',
+          conta: { email: m.conta.email, nome: m.conta.nome, telefone: m.conta.telefone, criada_em: '2026-10-01T10:00:00Z', aceitou_lgpd_em: '2026-10-01T10:00:00Z' },
+          cadastro: { nome: 'Ana Souza', data_nascimento: '1950-03-25', cpf: '11144477735', email: m.conta.email, telefones: ['71999998888'], outros_dados: { mae: 'Maria Souza' }, criado_em: '2026-10-01T10:00:00Z', ultima_visita_em: '2026-10-20T10:00:00Z' },
+          historico: [{ quando: '2026-09-10T08:00:00Z', exames: [{ exame: 'RX TORAX' }], horarios: [], convenio: 'UNIMED', unidade: 'CSI', profissional: null, cancelado: false }],
+          pedidos: [{ iniciado_em: '2026-10-20T09:00:00Z', para: 'a própria pessoa', tipo: 'exame', situacao: 'pronto', exames: ['RESSONANCIA DO JOELHO (D)'], convenio: 'UNIMED', unidade: 'CSI', profissional: null, horarios: null, dados_informados: {} }],
+          mensagens: [{ quando: '2026-10-20T09:00:00Z', quem: 'você', texto: 'Quero uma ressonância do joelho' }, { quando: '2026-10-20T09:00:05Z', quem: 'clínica', texto: 'Claro! Escolha o exame.' }],
+          fotos_de_pedido_guardadas: 1, observacao: 'As fotos de pedido médico não vão neste arquivo.' } };
+      }
+      case 'conta_paciente_excluir': {
+        if (!m.conta) return { status: 400, body: { code: '42501', message: 'Entre na sua conta para apagá-la.' } };
+        if (corpo.p_confirmacao !== 'EXCLUIR') return { status: 400, body: { code: '22023', message: 'Confirmação ausente: a conta não foi apagada.' } };
+        m.conta = null; m.contaApagada = true;
+        return { body: { ok: true, continua_guardado: ['cadastro', 'pedidos', 'conversas', 'historico'] } };
+      }
       default: return { body: {} };
     }
   };
