@@ -15,7 +15,7 @@ export CHROMIUM_PATH=/caminho/do/chromium   # ou: npx playwright install chromiu
 npm test
 ```
 
-`npm test` roda as dez suítes na ordem abaixo e para na primeira que falhar. Cada uma também roda sozinha.
+`npm test` roda as onze suítes na ordem abaixo e para na primeira que falhar. Cada uma também roda sozinha.
 
 | Comando | O que prova | Resultado em 30/10/2026 |
 |---|---|---|
@@ -26,9 +26,10 @@ npm test
 | `npm run test:sw` | O `sw.js` não serve `/fila/` (nem `/painel/`) pelo cache do chat; a URL da fila leva o token e a chave única `./` serviria o chat no lugar da fila | 10 de 10 |
 | `npm run test:navegador` | Chat, painel (deslogado e admin) e fila abrem e montam a tela sem exceção de JavaScript | 6 de 6 |
 | `npm run test:sentinela` | Funções puras da Sentinela (`sentinela.js`): código de rastreio, limiares aprendidos, ordem, classificação de erro, privacidade | 14 de 14 |
+| `npm run test:nomes` | `nomes-exame.js` com nomes reais do catálogo de produção: prefixo, `(UNILATERAL)`, parênteses, nome cortado, ordem e repetidos | 23 de 23 |
 | `npm run test:sql9` | `supabase/fase9-sentinela.sql` num Postgres embutido: incidentes, token, limite, painel, textos só trocados se forem os originais | 14 de 14 |
 | `npm run test:corrida` | Chat no navegador com o Supabase simulado e atrasos controlados: resposta que chega antes da mensagem do paciente, cursor de consulta, cópia de outra versão | 4 de 4 |
-| `npm run test:sentinela-navegador` | Cada regra da Sentinela no navegador, aviso de IA, mensagem de previsão, letra maior e lista do corpo alinhada | 14 de 14 |
+| `npm run test:sentinela-navegador` | Cada regra da Sentinela no navegador, aviso de IA, mensagem de previsão, letra maior, lista do corpo alinhada e nomes de exame legíveis | 16 de 16 |
 
 ## O que estes testes NÃO provam
 

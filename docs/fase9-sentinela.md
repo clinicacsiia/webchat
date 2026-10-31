@@ -11,6 +11,7 @@ Versão 1.0 — 31/10/2026 / Mudança: Implementação inicial
 | A lista do desenho do corpo estava "feia" | Grade `1fr auto auto` sem agrupamento: botões de tamanhos diferentes e colunas que não alinhavam | Lista agrupada (Cabeça e pescoço, Tronco, Braços e mãos, Pernas e pés, Coluna), nome à esquerda e dois botões do mesmo tamanho (Direito, Esquerdo) à direita |
 | Opções do pedido de exames sem padrão | Chips, checkboxes e rádios pequenos misturados | Três passos numerados (Tipo, Parte, Exame); tipo de exame em botões grandes iguais; parte do corpo por **Desenho** ou **Lista** (alternância no topo); exames em cartões grandes iguais |
 | No final não ficou claro que é previsão, que um atendente atende e que a confirmação vem depois | Texto `pronto_online` dizia só "Recebemos tudo" | Mensagem final, cartão de acompanhamento e textos do assistente dizem: é uma **previsão**, **ainda não está confirmada**, **uma pessoa da equipe** envia a confirmação de data, horário e valor neste chat, e dá para escrever a qualquer momento |
+| Nomes dos exames feios e difíceis de escolher (31/10, depois da publicação) | São nomes de tabela do Klingo, feitos para faturar: CAIXA ALTA, prefixo técnico (`RM`, `USG`, `PCT`), `(UNILATERAL)` mesmo com o lado já escolhido, texto **cortado pelo banco** (`(FÍGADO, PÂNCREAS, BAÇO, RINS, SUPRA-RENAIS, RETRO`), variantes quase iguais (`RM DE CRÂNIO`, `RM DO CRANIO`) e exames comuns misturados com raros | `nomes-exame.js` apresenta cada nome em frase normal com o detalhe em letra menor (`RM MÃO (NÃO INCLUI PUNHO)` vira **Mão** · Não inclui punho), põe os comuns primeiro, mostra 5 e esconde o resto em "Ver outros N exames", e junta o que ficaria igual na tela. O código do exame (`id`) não muda, só o texto mostrado. Se o arquivo não carregar, o chat usa o nome simples |
 | Letra pequena | Muitos textos de 11 a 14 px | Todos os tamanhos subiram (mínimo 13,5 px; texto corrido 17 px) e o menu (⋮) tem "Letra maior", em três níveis, guardado no aparelho |
 | Faltava avisar que é uma IA e que um humano acompanha | Nada dizia isso | Aviso na tela inicial, aviso fixo no topo da conversa, status "Assistente virtual (IA) · equipe acompanhando" e botão "Falar com um atendente" sempre à vista |
 
@@ -59,8 +60,13 @@ Cada erro vira um incidente enviado ao Supabase (`public.incidente_chat`) com: t
 | `npm run test:sentinela-navegador` | Cada regra no navegador (travada, erro 500, 22023, lenta, fora de ordem, parada), código na tela igual ao gravado no servidor, aviso de IA, mensagem final, letra e lista do corpo alinhada |
 | `npm run test:sql9` | `fase9-sentinela.sql` num Postgres embutido: grava, recusa código inválido, liga à conversa só com o token certo, limita volume, painel só para a equipe, textos trocados só se forem os originais (lidos de `fase7-motor.sql`) |
 | `npm run test:sw` | Inclui o aviso de versão nova pelo ETag |
+| `npm run test:nomes` | `nomes-exame.js` com os nomes reais do catálogo de produção: prefixo, `(UNILATERAL)`, parênteses, nome cortado, ordem dos comuns, repetidos |
 
 O teste da corrida **falhava antes da correção** (`ordem=AAC`, pergunta nova desativada) e passa depois.
+
+## Por que a paciente pode ver a versão antiga depois de publicar
+
+O chat abre pela cópia guardada no aparelho e atualiza a cópia por trás (isso é o que faz abrir na hora pelo link do WhatsApp). Com o service worker **antigo** (v2), a primeira abertura depois de uma publicação ainda mostra a versão anterior; a seguinte já mostra a nova. A partir do service worker v3/v4 a página é avisada e se atualiza sozinha no formulário vazio, ou oferece "Atualizar agora" no meio da conversa. Para testar logo depois de publicar: feche a aba e abra duas vezes.
 
 ## O que não foi provado
 

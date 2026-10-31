@@ -14,7 +14,8 @@
     "test:sql9": "node sql-fase9.test.mjs",
     "test:corrida": "node chat-corrida.navegador.mjs",
     "test:sentinela-navegador": "node sentinela.navegador.mjs",
-    "test": "npm run test:edge && npm run test:python && npm run test:sql && npm run test:delta && npm run test:sw && npm run test:sentinela && npm run test:sql9 && npm run test:navegador && npm run test:corrida && npm run test:sentinela-navegador"
+    "test:nomes": "node nomes-exame.test.mjs",
+    "test": "npm run test:edge && npm run test:python && npm run test:sql && npm run test:delta && npm run test:sw && npm run test:sentinela && npm run test:nomes && npm run test:sql9 && npm run test:navegador && npm run test:corrida && npm run test:sentinela-navegador"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.2.17",

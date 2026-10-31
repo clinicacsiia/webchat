@@ -317,6 +317,12 @@
   .opcao-ex input { width: 24px; height: 24px; accent-color: var(--verde); flex: none; }
   .opcao-ex.marcada { border-color: var(--verde); background: var(--verde-claro); box-shadow: 0 0 0 2px rgba(20,107,80,.18); }
   .opcao-ex.neutra { border-style: dashed; color: var(--texto-suave); }
+  .ex-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .ex-titulo { font-weight: 650; overflow-wrap: anywhere; }
+  .ex-detalhe { font-size: calc(14.5px * var(--esc)); line-height: 1.3; color: var(--texto-suave); overflow-wrap: anywhere; }
+  .opcao-ex.marcada .ex-detalhe { color: var(--texto); }
+  .ex-mais { margin: 0 0 8px; }
+  .ex-mais summary { cursor: pointer; font-weight: 650; color: var(--verde); padding: 12px 4px; min-height: 48px; display: flex; align-items: center; font-size: calc(16px * var(--esc)); }
   .bloco-parte { margin: 0 0 16px; }
   .bloco-parte h3 { margin: 0 0 8px; font-size: calc(17px * var(--esc)); }
   .btn-w { min-height: 48px; }
@@ -421,6 +427,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="sentinela.js"></script>
+<script src="nomes-exame.js"></script>
 <script>
 (() => {
   'use strict';
@@ -431,7 +438,7 @@
   const CHAVE_MSGS = 'webchat.msgs.v1';   // últimas mensagens da conversa: a tela abre na hora, antes da rede
   const CHAVE_LETRA = 'webchat.letra.v1';
   // Muda a cada alteração do chat. Cópia de mensagens guardada por outra versão é descartada (era isso que mostrava conversa velha e travada).
-  const VERSAO_APP = '2026.10.31-9';
+  const VERSAO_APP = '2026.10.31-10';
   const ESCALAS = [1, 1.18, 1.36], ROTULO_LETRA = ['Letra maior', 'Letra muito maior', 'Letra normal'];
 
   const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
@@ -554,6 +561,16 @@
   const PARTICULAS = new Set(['de', 'da', 'do', 'das', 'dos', 'e']);
   function nomeBonito(s) {
     return String(s || '').toLowerCase().split(/\s+/).map((p, i) => (i && PARTICULAS.has(p) ? p : p.charAt(0).toUpperCase() + p.slice(1))).join(' ');
+  }
+  // Nome de exame como o Klingo grava (caixa alta, prefixo técnico, texto cortado) -> título e detalhe legíveis (nomes-exame.js).
+  function exameBonito(nome, opcoes) {
+    try { if (window.NomesExame) return window.NomesExame.apresentar(nome, opcoes); } catch { /* cai no nome simples */ }
+    return { titulo: nomeBonito(nome), detalhe: '' };
+  }
+  const exameTexto = (nome) => { const a = exameBonito(nome); return a.titulo + (a.detalhe ? ' (' + a.detalhe.charAt(0).toLowerCase() + a.detalhe.slice(1) + ')' : ''); };
+  function organizarExames(lista) {
+    try { if (window.NomesExame) return window.NomesExame.organizar(lista, { semPrefixo: true }); } catch { /* sem o arquivo: lista como veio */ }
+    return { principais: lista.map((e) => ({ ...e, titulo: nomeBonito(e.nome), detalhe: '' })), outros: [] };
   }
   function cartao(titulo, texto, marcado, aoClicar) {
     const b = document.createElement('button');
@@ -1305,11 +1322,11 @@
     if (g.recorte) caixa.append(h('img', { class: 'g-recorte', src: g.recorte, alt: 'Trecho do pedido: ' + g.linha }));
     else if (g.linha) caixa.append(h('p', { class: 'g-escrito' }, 'No papel está escrito: ', h('q', {}, g.linha)));
     if (g.explicacao) caixa.append(h('p', { class: 'g-entendi' }, 'Entendi: ', h('strong', {}, g.explicacao)));
-    const rotulo = (op) => op.rotulo || nomeBonito(op.exame.nome);
+    const rotulo = (op) => op.rotulo || exameTexto(op.exame.nome);
     const opcao = (op) => {
       const cb = h('input', { type: 'checkbox', checked: !!(marcado && marcado.id === op.exame.id),
         onchange: () => { marcarExame(op.exame, cb.checked, g.chave, false); if (cb.checked) e.recusados.delete(op.exame.id); else e.recusados.add(op.exame.id); desenharResultados(); } });
-      return h('label', { class: 'res-item grande' }, cb, h('span', {}, rotulo(op), op.rotulo ? h('small', {}, nomeBonito(op.exame.nome)) : null));
+      return h('label', { class: 'res-item grande' }, cb, h('span', {}, rotulo(op), op.rotulo ? h('small', {}, exameTexto(op.exame.nome)) : null));
     };
     const naoSei = () => {
       const cb = h('input', { type: 'checkbox', checked: !!(marcado && marcado.texto),
@@ -1360,7 +1377,7 @@
     const avulsos = [...e.itens.entries()].filter(([, x]) => !x.grupo);
     if (avulsos.length) {
       filhos.push(h('div', { class: 'carrinho' }, h('h3', {}, e.leituras.length ? 'Outros exames que você marcou' : 'Seu pedido'), h('ul', {}, avulsos.map(([k, x]) => h('li', {},
-        h('span', {}, x.texto ? x.texto + ' (o atendente confere)' : nomeBonito(x.nome), precisaLado(x) ? escolhaLado(x) : null),
+        h('span', {}, x.texto ? x.texto + ' (o atendente confere)' : exameTexto(x.nome), precisaLado(x) ? escolhaLado(x) : null),
         h('button', { type: 'button', 'aria-label': 'Tirar do pedido', onclick: () => { e.itens.delete(k); if (!x.texto) e.recusados.add(x.id); desenharResultados(); } }, '×'))))));
     }
     // Com o pedido lido, a lista de "mais pedidos" só aparece quando o paciente digita.
@@ -1369,7 +1386,7 @@
       if (!e.res.length) filhos.push(h('p', { class: 'p-dica' }, 'Nenhum exame encontrado com esse nome. Tente outra palavra ou toque em "Não encontrei meu exame".'));
       for (const x of e.res) {
         const cb = h('input', { type: 'checkbox', checked: e.itens.has(x.id), onchange: () => { marcarExame(x, cb.checked); if (cb.checked) e.recusados.delete(x.id); else e.recusados.add(x.id); desenharResultados(); } });
-        filhos.push(h('label', { class: 'res-item' }, cb, h('span', {}, nomeBonito(x.nome), x.linha ? h('small', {}, 'No pedido: ' + x.linha) : null)));
+        filhos.push(h('label', { class: 'res-item' }, cb, h('span', {}, exameTexto(x.nome), x.linha ? h('small', {}, 'No pedido: ' + x.linha) : null)));
       }
     }
     e.lista.replaceChildren(...filhos);
@@ -1647,12 +1664,12 @@
     if (P.carrinho.length) corpo.append(blocoCarrinho());
     if (P.passo === 'exames') passoExames(corpo); else if (P.passo === 'mapa' && modAtual()) passoMapa(corpo); else passoTipo(corpo);
     rodape.append(h('button', { class: 'btn-w', type: 'button', disabled: !P.carrinho.length, onclick: enviarPedido }, `Enviar pedido (${P.carrinho.length} ${P.carrinho.length === 1 ? 'exame' : 'exames'})`),
-      h('p', { class: 'w-nota' }, 'Envia uma previsão. Um atendente (uma pessoa) confere e confirma valor, data e horário.'));
+      h('p', { class: 'w-nota' }, 'Vira uma previsão: um atendente confirma depois.'));
     corpo.scrollTop = rolagem;
   }
   function rotuloItem(i) {
     const lado = LADO_TXT[i.lado] ? ` (${LADO_TXT[i.lado]})` : '';
-    return `${MOD_NOME[i.modalidade] || i.modalidade}${i.regiao_nome ? ' — ' + i.regiao_nome : ''}${lado}: ${i.procedimento || 'o atendente escolhe o exame'}${i.lado === 'A' && i.procedimento && !/bilateral/i.test(i.procedimento) ? ' (2 unidades)' : ''}`;
+    return `${MOD_NOME[i.modalidade] || i.modalidade}${i.regiao_nome ? ' — ' + i.regiao_nome : ''}${lado}: ${i.procedimento ? exameTexto(i.procedimento) : 'o atendente escolhe o exame'}${i.lado === 'A' && i.procedimento && !/bilateral/i.test(i.procedimento) ? ' (2 unidades)' : ''}`;
   }
   function blocoCarrinho() {
     return h('div', { class: 'carrinho' }, h('h3', {}, 'Seu pedido até agora'),
@@ -1770,8 +1787,8 @@
     try { await Promise.all(P.lista.map((p) => examesDe(P.mod, p.regiao))); } catch (e) { if (P !== estado) return; toast(mensagemErro(e)); P.passo = 'mapa'; desenharPedido(); return; }
     if (P !== estado) return;
     P.lista.forEach((p) => {
-      const ops = opcoesDaParte(p);
-      if (ops.length === 1) P.escolhas.set(chaveParte(p), ops[0].id);
+      const o = organizarExames(opcoesDaParte(p)), todos = [...o.principais, ...o.outros];
+      if (todos.length === 1) P.escolhas.set(chaveParte(p), todos[0].id);   // só uma opção diferente na tela: já vem marcada
     });
     P.passo = 'exames'; desenharPedido();
   }
@@ -1784,14 +1801,20 @@
     return todos;
   }
   function passoExames(corpo) {
-    corpo.append(passosTopo(3, 3), h('h2', { class: 'passo-titulo' }, 'Qual exame?'), h('p', { class: 'passo-sub' }, 'Toque no exame de cada parte. Se não tiver certeza, deixe o atendente escolher.'));
+    corpo.append(passosTopo(3, 3), h('h2', { class: 'passo-titulo' }, 'Qual exame?'), h('p', { class: 'passo-sub' }, 'Toque no exame que está no seu pedido. Se não tiver certeza, deixe o atendente escolher.'));
     for (const p of P.lista) {
-      const ops = opcoesDaParte(p), nome = 'ex' + p.regiao + p.lado, atual = P.escolhas.get(chaveParte(p));
+      const o = organizarExames(opcoesDaParte(p)), nome = 'ex' + p.regiao + p.lado, atual = P.escolhas.get(chaveParte(p));
       const bloco = h('section', { class: 'bloco-parte' }, h('h3', {}, `${MOD_NOME[P.mod]} — ${p.regiao_nome}${LADO_TXT[p.lado] ? ' (' + LADO_TXT[p.lado] + ')' : ''}`));
-      const add = (id, rotulo, neutra) => bloco.append(h('label', { class: 'opcao-ex' + (atual === id ? ' marcada' : '') + (neutra ? ' neutra' : '') },
-        h('input', { type: 'radio', name: nome, checked: atual === id, onchange: () => { P.escolhas.set(chaveParte(p), id); desenharPedido(); } }), h('span', {}, rotulo)));
-      for (const e of ops) add(e.id, e.nome + (p.lado === 'A' && !e.bilateral ? ' — 2 unidades, uma de cada lado' : ''));
-      add(0, 'Não sei: o atendente escolhe o exame', true);
+      const linha = (id, titulo, detalhe, neutra) => h('label', { class: 'opcao-ex' + (atual === id ? ' marcada' : '') + (neutra ? ' neutra' : '') },
+        h('input', { type: 'radio', name: nome, checked: atual === id, onchange: () => { P.escolhas.set(chaveParte(p), id); desenharPedido(); } }),
+        h('span', { class: 'ex-txt' }, h('strong', { class: 'ex-titulo' }, titulo), detalhe ? h('small', { class: 'ex-detalhe' }, detalhe) : null));
+      const de = (e) => linha(e.id, e.titulo, [e.detalhe, p.lado === 'A' && !e.bilateral ? '2 unidades, uma de cada lado' : ''].filter(Boolean).join(' · '));
+      o.principais.forEach((e) => bloco.append(de(e)));
+      if (o.outros.length) {
+        bloco.append(h('details', { class: 'ex-mais', open: o.outros.some((e) => e.id === atual) },
+          h('summary', {}, `Ver outros ${o.outros.length} exames`), ...o.outros.map(de)));
+      }
+      bloco.append(linha(0, 'Não sei: o atendente escolhe o exame', '', true));
       corpo.append(bloco);
     }
     const tudo = P.lista.every((p) => P.escolhas.has(chaveParte(p)));
@@ -1819,7 +1842,11 @@
     const lista = P.exames.get(`${m.codigo}|todos`) || [];
     const caixa = corpo.querySelector('.carregando'); if (!caixa) return;
     const bloco = h('div', { class: 'bloco-parte' });
-    for (const e of lista) bloco.append(h('label', { class: 'opcao-ex' + (P.simples === e.id ? ' marcada' : '') }, h('input', { type: 'radio', name: 'simples', checked: P.simples === e.id, onchange: () => { P.simples = e.id; P.simplesLado = e.unilateral ? 'A' : 'N'; desenharPedido(); } }), h('span', {}, e.nome)));
+    const o = organizarExames(lista);
+    const linha = (e) => h('label', { class: 'opcao-ex' + (P.simples === e.id ? ' marcada' : '') }, h('input', { type: 'radio', name: 'simples', checked: P.simples === e.id, onchange: () => { P.simples = e.id; P.simplesLado = e.unilateral ? 'A' : 'N'; desenharPedido(); } }),
+      h('span', { class: 'ex-txt' }, h('strong', { class: 'ex-titulo' }, e.titulo), e.detalhe ? h('small', { class: 'ex-detalhe' }, e.detalhe) : null));
+    o.principais.forEach((e) => bloco.append(linha(e)));
+    if (o.outros.length) bloco.append(h('details', { class: 'ex-mais', open: o.outros.some((e) => e.id === P.simples) }, h('summary', {}, `Ver outros ${o.outros.length} exames`), ...o.outros.map(linha)));
     const ex = lista.find((e) => e.id === P.simples);
     const extra = [];
     if (ex && ex.unilateral && m.codigo === 'MAMO') {

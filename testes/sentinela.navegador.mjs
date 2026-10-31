@@ -172,6 +172,46 @@ await caso('pedido de exames: escolher Joelho direito pela lista leva ao passo d
   return { ok: /Direito/.test(marcado) && /✓/.test(marcado), detalhe: `botão marcado: "${marcado}"` };
 });
 
+await caso('pedido de exames: os nomes do Klingo aparecem legíveis (frase normal, detalhe em letra menor), os comuns primeiro e os especiais em "Ver outros"', async () => {
+  const mundo = criarMundo(); const { page, ctx } = await novaPaginaChat(browser, mundo, { init: RAPIDO });
+  await comecarConversa(page, base);
+  mundo.perguntaPedido(); await page.evaluate(() => dispatchEvent(new Event('online')));
+  await page.click('#msgs .btn-w >> text=Escolher exames no mapa do corpo'); await page.click('.op-grade .op >> text=Ressonância'); await page.click('.seg button >> text=Lista');
+  await page.click('.parte-linha:has(.nome:text("Punho")) button >> text=Esquerdo');
+  await page.click('.btn-w >> text=Ver exames para essas partes do corpo');
+  await page.waitForSelector('.opcao-ex .ex-titulo', { timeout: 6000 });
+  const m = await page.evaluate(() => {
+    const op = [...document.querySelectorAll('.opcao-ex:not(.neutra)')].map((l) => ({ t: l.querySelector('.ex-titulo').textContent, d: (l.querySelector('.ex-detalhe') || {}).textContent || '' }));
+    const l = document.querySelector('.opcao-ex'), i = l.querySelector('input').getBoundingClientRect(), t = l.querySelector('.ex-titulo').getBoundingClientRect();
+    const det = document.querySelector('.ex-detalhe');
+    return { op, textoNaMesmaLinhaDaBolinha: Math.abs((i.top + i.height / 2) - (t.top + t.height / 2)) < 30 || t.top >= i.top - 4, tituloPx: parseFloat(getComputedStyle(document.querySelector('.ex-titulo')).fontSize), detalhePx: det ? parseFloat(getComputedStyle(det).fontSize) : 0,
+      tudoMaiusculo: [...document.querySelectorAll('.ex-titulo')].some((e) => e.textContent.length > 4 && e.textContent === e.textContent.toUpperCase()), neutra: !!document.querySelector('.opcao-ex.neutra'), semRolagemLateral: document.querySelector('#folhaCorpo').scrollWidth <= document.querySelector('#folhaCorpo').clientWidth + 1 };
+  });
+  await page.click('.opcao-ex >> text=Mão e punho'); await page.waitForTimeout(150);
+  const marcada = await page.$eval('.opcao-ex.marcada .ex-titulo', (n) => n.textContent);
+  await ctx.close();
+  const titulos = m.op.map((x) => x.t);
+  return { ok: titulos.includes('Mão') && titulos.includes('Mão e punho') && titulos.includes('Punho') && m.op.find((x) => x.t === 'Mão').d === 'Não inclui punho' && !m.tudoMaiusculo && m.tituloPx >= 17 && m.detalhePx >= 14 && m.neutra && m.semRolagemLateral && marcada === 'Mão e punho',
+    detalhe: `${m.op.map((x) => x.t + (x.d ? ' [' + x.d + ']' : '')).join(' / ')}; título ${m.tituloPx}px, detalhe ${m.detalhePx}px; marcada=${marcada}` };
+});
+
+await caso('pedido de exames: lista longa (crânio) mostra poucos exames comuns e esconde o resto em "Ver outros", sem repetir o que fica igual na tela', async () => {
+  const mundo = criarMundo(); const { page, ctx } = await novaPaginaChat(browser, mundo, { init: RAPIDO });
+  await comecarConversa(page, base);
+  mundo.perguntaPedido(); await page.evaluate(() => dispatchEvent(new Event('online')));
+  await page.click('#msgs .btn-w >> text=Escolher exames no mapa do corpo'); await page.click('.op-grade .op >> text=Ressonância'); await page.click('.seg button >> text=Lista');
+  await page.click('.parte-linha:has(.nome:text("Crânio")) button'); await page.click('.btn-w >> text=Ver exames para essas partes do corpo');
+  await page.waitForSelector('.ex-mais summary', { timeout: 6000 });
+  const m = await page.evaluate(() => {
+    const visiveis = [...document.querySelectorAll('.bloco-parte > .opcao-ex:not(.neutra)')].length, dentro = document.querySelectorAll('.ex-mais .opcao-ex').length;
+    const todos = [...document.querySelectorAll('.bloco-parte .opcao-ex:not(.neutra) .ex-txt')].map((e) => e.textContent), resumo = document.querySelector('.ex-mais summary').textContent;
+    return { visiveis, dentro, repetidos: todos.length - new Set(todos).size, resumo, fechado: !document.querySelector('.ex-mais').open };
+  });
+  await page.click('.ex-mais summary'); await page.click('.ex-mais .opcao-ex >> nth=0'); await page.waitForTimeout(150);
+  const abertoDepois = await page.$eval('.ex-mais', (n) => n.open); await ctx.close();
+  return { ok: m.visiveis === 5 && m.dentro >= 5 && m.repetidos === 0 && m.fechado && /Ver outros \d+ exames/.test(m.resumo) && abertoDepois, detalhe: `na tela=${m.visiveis}, em "ver outros"=${m.dentro}, repetidos=${m.repetidos}, "${m.resumo}"` };
+});
+
 await browser.close(); srv.close();
 const falhas = resultados.filter((r) => !r).length;
 console.log(`\n${resultados.length - falhas}/${resultados.length} verificações passaram`);
