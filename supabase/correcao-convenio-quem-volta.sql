@@ -1,4 +1,4 @@
--- Correção: o convênio de quem volta nunca é copiado em silêncio. NÃO APLICADO ainda no projeto webchat-atendimento.
+-- Correção: o convênio de quem volta nunca é copiado em silêncio. Aplicado no projeto webchat-atendimento em 31/10/2026.
 -- Antes:
 --   * "Continuar o pedido que ficou pela metade" copiava o convênio da conversa antiga (pre_reaproveitar) e o motor pulava a pergunta do plano;
 --     quem trocou de convênio seguia com o antigo e só percebia lendo o resumo final.

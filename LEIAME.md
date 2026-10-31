@@ -10,11 +10,13 @@ painel/index.html     painel da equipe       -> https://SEU-USUARIO.github.io/SE
 n8n/novo-atendimento.json   workflow para importar no n8n
 ```
 
-Fase 9 (31/10/2026): correções do teste da paciente, Sentinela e mensagens empáticas. Veja `docs/fase9-sentinela.md`. Falta rodar `supabase/fase9-sentinela.sql` no Supabase.
+Fase 9 (31/10/2026): correções do teste da paciente, Sentinela e mensagens empáticas. Veja `docs/fase9-sentinela.md`. SQL aplicado no Supabase em 31/10/2026.
 
-Convênio de quem volta (31/10/2026): o chat deixa de copiar o convênio da vez anterior e pergunta ("É assim também agora?"); corrigir o plano tira a carteirinha antiga. Veja `docs/lembrete-mudar-escolhas-e-convenio.md`, seção 0. Falta rodar `supabase/correcao-convenio-quem-volta.sql` no Supabase (depois de `fase4` e `fase7`).
+Convênio de quem volta (31/10/2026): o chat deixa de copiar o convênio da vez anterior e pergunta ("É assim também agora?"); corrigir o plano tira a carteirinha antiga. Veja `docs/lembrete-mudar-escolhas-e-convenio.md`, seção 0. SQL `supabase/correcao-convenio-quem-volta.sql` aplicado no Supabase em 31/10/2026.
 
-Meus dados (31/10/2026): quem tem conta pode ver o que a clínica guarda, baixar uma cópia e apagar a conta (só o login; cadastro e pedidos continuam com a clínica). Veja `docs/login-paciente-passo-a-passo.md`. Falta rodar `supabase/meus-dados.sql` no Supabase (depois do instalador do login) e o jurídico revisar o texto.
+Meus dados (31/10/2026): quem tem conta pode ver o que a clínica guarda, baixar uma cópia e apagar a conta (só o login; cadastro e pedidos continuam com a clínica). Veja `docs/login-paciente-passo-a-passo.md`. SQL `supabase/meus-dados.sql` aplicado no Supabase em 31/10/2026; falta o jurídico revisar o texto antes de abrir o login ao público.
+
+Login do paciente (31/10/2026): o instalador `supabase/aplicar-login-paciente.sql` está aplicado no Supabase e o login está **desligado** (`config.login_paciente = nao`; `cadastro_equipe_sem_convite = sim`, valor de transição). Para ligar, siga `docs/login-paciente-passo-a-passo.md`.
 
 Banco: projeto Supabase `webchat-atendimento` (sa-east-1), já com tabelas, regras de segurança e tempo real.
 
@@ -166,9 +168,9 @@ O paciente vê um cartão por exame, com o recorte da linha da foto. Quando a le
 As fotos e as leituras ficam guardadas. No painel, "Conferir a leitura (ensina o sistema)" grava a escrita do médico e o exame certo, e da próxima vez a mesma escrita já vem certa.
 
 - Detalhes, pesquisa, custos e testes: `docs/fase8-leitura-do-pedido.md`.
-- SQL: `supabase/fase8-leitura-pedido.sql` (**ainda não aplicado**).
-- Função: `supabase/functions/ler-pedido`. Publicar sem JWT e criar o secret `ANTHROPIC_API_KEY`. Sem a chave, o chat usa só a leitura do celular.
-- **Para depois**: mudar escolhas ao vivo e o convênio de quem volta, em `docs/lembrete-mudar-escolhas-e-convenio.md`. Hoje o "Repetir o último exame" copia o convênio antigo sem perguntar.
+- SQL: `supabase/fase8-leitura-pedido.sql` (aplicado no Supabase em 31/10/2026).
+- Função: `supabase/functions/ler-pedido` (**ainda não publicada**). Publicar sem JWT e criar o secret `ANTHROPIC_API_KEY`. Sem a chave, o chat usa só a leitura do celular.
+- **Para depois**: mudar escolhas ao vivo e o convênio de quem volta, em `docs/lembrete-mudar-escolhas-e-convenio.md`. O convênio de quem volta já é perguntado (ver acima).
 
 ## Fila em tempo real + assinatura biométrica
 
