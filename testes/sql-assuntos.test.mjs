@@ -11,6 +11,7 @@ const caso = async (nome, fn) => { try { const r = await fn(); registrar(nome, r
 const fase7 = readFileSync(`${REPO}/supabase/fase7-motor.sql`, 'utf8');
 const convenio = readFileSync(`${REPO}/supabase/correcao-convenio-quem-volta.sql`, 'utf8');
 const assuntos = readFileSync(`${REPO}/supabase/assuntos-resolvidos.sql`, 'utf8');
+const remarcar = readFileSync(`${REPO}/supabase/remarcar-qualquer-horario.sql`, 'utf8');
 const seed = fase7.match(/insert into public\.fluxo_texto \(chave, texto, descricao\) values[\s\S]*?on conflict \(chave\) do nothing;/)[0];
 
 const db = new PGlite();
@@ -49,11 +50,14 @@ await db.exec(`
   ${['fluxo_t', 'fluxo_norm', 'fluxo_set', 'fluxo_nota', 'fluxo_dizer', 'fluxo_escolha', 'fluxo_proximo', 'fluxo_perguntar', 'fluxo_aplicar', 'fluxo_ler_texto', 'fluxo_avancar'].map((n) => funcao('fase7-motor.sql', n)).join('\n')}
 `);
 await db.exec(convenio);
+await db.exec(assuntos);
+await db.exec(remarcar); await db.exec(remarcar);   // aplicado duas vezes: sem efeito na segunda
 // Daqui em diante pre_reaproveitar é um stub controlável (a cópia real do pedido já é testada em test:convenio).
 const STUB = `
   drop function public.pre_reaproveitar(uuid, text);
   create function public.pre_reaproveitar(p uuid, o text) returns boolean language plpgsql as $$
   begin
+    insert into public.teste_cfg values ('origem', o) on conflict (chave) do update set valor = excluded.valor;
     if coalesce((select valor from public.teste_cfg where chave = 'reaproveita'), 'true') <> 'true' then return false; end if;
     insert into public.pre_agendamento_itens (conversa_id, modalidade, regiao, regiao_nome, lado, quantidade) values (p, 'RM', 'JOELHO', 'Joelho', 'D', 1);
     return true;
@@ -92,7 +96,7 @@ await caso('recusa mexer numa função diferente do esperado (nada é alterado)'
   let erro = '';
   try { await db.exec(assuntos); } catch (e) { erro = e.message; }
   await db.exec(funcao('fase7-motor.sql', 'fluxo_proximo'));
-  await db.exec(`drop function public.pre_reaproveitar(uuid, text);\n${funcao('fase4-paciente-que-volta.sql', 'pre_reaproveitar')}`); await db.exec(convenio); await db.exec(assuntos); await db.exec(STUB);
+  await db.exec(`drop function public.pre_reaproveitar(uuid, text);\n${funcao('fase4-paciente-que-volta.sql', 'pre_reaproveitar')}`); await db.exec(convenio); await db.exec(assuntos); await db.exec(remarcar); await db.exec(STUB);
   return { ok: /nada foi alterado/.test(erro), detalhe: erro.split('\n')[0] };
 });
 
@@ -142,10 +146,11 @@ await caso('Remarcar o horário mais recente: copia o exame, deixa a pergunta do
            detalhe: `próximo=${await proximo(c)} notas=${JSON.stringify(d.notas)}` };
 });
 
-await caso('Remarcar outro horário da lista (não o mais recente): vai para a equipe dizendo qual', async () => {
+await caso('Remarcar outro horário da lista (não o primeiro): copia o exame DELE e segue sozinho, sem transferir', async () => {
   const c = await nova({ assunto: 'Remarcar' });
   const r = await aplicar(c, 'assunto_qual', 'i1'); const d = await dados(c);
-  return { ok: r.transferir === true && d.assunto_texto === 'Remarcar Ultrassom (ambos) de 20/11/2026', detalhe: d.assunto_texto };
+  const origem = (await db.query(`select valor from public.teste_cfg where chave = 'origem'`)).rows[0].valor;
+  return { ok: r.ok === true && !r.transferir && origem === 'ultimo:1' && /REMARCAÇÃO de .*20\/11\/2026/.test((d.notas || [])[0] || '') && (await proximo(c)) === 'plano_confirma', detalhe: `origem=${origem} notas=${JSON.stringify(d.notas)}` };
 });
 
 await caso('Remarcar: se o exame não puder ser copiado, vai para a equipe (não trava)', async () => {
