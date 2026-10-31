@@ -8,7 +8,7 @@ Atualizado em 30/10/2026. Descrição da fase: `docs/fase6-unidade-e-medico.md`.
 |---|---|
 | Banco (Fase 6 e 6b) | **Aplicado e conferido** em 30/10/2026: migrações `fase6_unidade_filho_e_ia_contexto`, `fase6_remove_chat_iniciar_antiga`, `fase6_catalogo_horarios_identidade`, `fase6_consulta_e_irmaos`, `fase6_fecha_funcoes_internas` (e o `fase6b-alerta-preco.sql`, rodado no SQL Editor) |
 | Código (chat, painel, docs) | Mesclado na `main` pelo PR #18 |
-| n8n | **Pendente: versão antiga publicada** (`7bcf2009-34ff-4085-a17f-a931ff68188f`). Sem as mudanças a IA não segue as instruções novas, não abre o seletor de consulta e ainda pode falar preço |
+| n8n | Fase 6 publicada; correção de 31/10 publicada na versão `1ada4ac8-6cd6-44b8-84a9-5037e2da1de3` (ver `docs/n8n-correcao-2026-10-31.md`) |
 | Funções provisórias da Fase 3 | Já não existem no banco |
 | Dados de teste | 4 contatos de teste ainda no banco (ver "Antes de abrir") |
 | PR #15 (Fila + assinatura biométrica) | Rascunho, **não mesclar**. Independente da Fase 6 |
@@ -66,7 +66,7 @@ Teste 12 e 13 são os mais importantes e os únicos sem prova em produção.
 
 - [ ] **Dados de teste**: hoje há 4 contatos (9 conversas, 90 mensagens) que parecem testes da equipe (`71992641845`, `71988710544`, `71999999999`, `71988780134`). Confirme quais apagar e peça: apagar o contato apaga conversas, mensagens e pedidos (cascata). O Supabase pede confirmação para `delete`.
 - [ ] **Preços** (agora só referência para o alerta): a auditoria achou 18 de 104 preços do catálogo a 10% ou mais do Klingo (aba Aprendizado > "Preço x Klingo"). A recepção revisa antes de divulgar.
-- [ ] **n8n**: nó de IA sem repetição e sem aviso de erro, e dependente dos créditos do n8n. Recomendado: credencial Anthropic própria, `retryOnFail` e um workflow de erro que avise a equipe.
+- [ ] **n8n**: o nó de IA já repete em caso de erro e a falha não encerra mais o atendimento (31/10). Falta: credencial Anthropic própria (hoje usa créditos do n8n) e avisar a equipe quando a conversa é transferida (`docs/n8n-correcao-2026-10-31.md`).
 - [ ] **Segredo `ia_segredo`** digitado nos nós HTTP do n8n: mover para credencial Header Auth.
 - [ ] **Supabase Auth**: ligar "Prevent use of leaked passwords"; conferir "Confirm email", "Allow new users to sign up" desligado depois de cadastrar a equipe, e as URLs de redirecionamento (`LEIAME.md`).
 - [ ] **Klingo**: enviar o e-mail ao suporte (`docs/fase-0-email-suporte-klingo.md`), principalmente a pergunta sobre aviso/webhook de marcação.
@@ -76,7 +76,7 @@ Teste 12 e 13 são os mais importantes e os únicos sem prova em produção.
 ## Como desfazer
 
 - **Chat/painel**: reverter o merge no GitHub (o Pages republica). O painel antigo funciona sem as colunas novas.
-- **n8n**: restaurar a versão `7bcf2009-34ff-4085-a17f-a931ff68188f`.
+- **n8n**: restaurar a versão `dc18938d-a897-4984-9dc1-daa03bf0b2bb` (Fase 6 sem a correção de 31/10; tem o defeito que desliga a IA depois da primeira resposta) ou `7bcf2009-34ff-4085-a17f-a931ff68188f` (antes da Fase 6).
 - **Banco**: as colunas e tabelas novas são aditivas e não atrapalham a versão antiga; a nova `chat_iniciar` aceita as mesmas chamadas antigas (testado com o chat antigo).
 
 ## Fora desta fase
