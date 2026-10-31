@@ -2,7 +2,7 @@
 -- Versão 1.0 — 31/10/2026 / Mudança: Implementação inicial
 --
 -- POR QUE: o gatilho original (novo_usuario) criava uma linha em public.agentes para QUALQUER cadastro novo. Com o login do paciente
--- (cadastro público por código no e-mail), cada paciente apareceria como "atendente aguardando liberação" no painel, e um clique errado
+-- (cadastro público por e-mail e senha), cada paciente apareceria como "atendente aguardando liberação" no painel, e um clique errado
 -- do administrador daria acesso de equipe a um paciente. Agora:
 --   1. primeiro usuário do banco -> administrador ativo (igual ao anterior; só vale para um banco vazio);
 --   2. e-mail convidado por um administrador (equipe_convidar) -> agente INATIVO com o papel do convite (o painel libera em seguida);
@@ -29,11 +29,11 @@
 create table if not exists public.contas_paciente (
   id uuid primary key references auth.users(id) on delete cascade,
   email text,
-  paciente_id uuid references public.pacientes(id) on delete set null,   -- vínculo feito pela equipe, nunca automático
+  paciente_id uuid references public.pacientes(id) on delete set null,   -- só o cadastro criado pela própria conversa logada (login-paciente.sql) ou a equipe vinculam
   criado_em timestamptz not null default now(),
   ultimo_acesso_em timestamptz
 );
-comment on table public.contas_paciente is 'Conta de login do paciente (Supabase Auth). Criada pelo gatilho novo_usuario. paciente_id só é preenchido pela equipe depois de validar a identidade: e-mail digitado antes sem verificação não vincula histórico sozinho.';
+comment on table public.contas_paciente is 'Conta de login do paciente (Supabase Auth). Criada pelo gatilho novo_usuario. paciente_id é preenchido quando a PRÓPRIA conversa logada cria o cadastro (ver login-paciente.sql) ou pela equipe depois de validar a identidade. Cadastro que já existia (e-mail digitado antes, sem verificação) nunca é vinculado sozinho.';
 create index if not exists contas_paciente_paciente on public.contas_paciente (paciente_id);
 alter table public.contas_paciente enable row level security;
 revoke all on table public.contas_paciente from anon, authenticated;
