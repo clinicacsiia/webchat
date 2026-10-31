@@ -79,8 +79,8 @@ export function criarMundo(opcoes = {}) {
   m.seguinte = () => (m.passo === 'motivo' ? m.perguntaPlano() : m.passo === 'plano' ? m.final() : m.inserir('agente', 'Certo.', null));
   m.lista = (apos) => m.msgs.filter((x) => x.id > apos && !m.ocultos.has(x.id));
 
-  m.tratar = async (nome, corpo) => {
-    m.chamadas.push({ nome, corpo, t: Date.now() });
+  m.tratar = async (nome, corpo, cabecalhos = {}) => {
+    m.chamadas.push({ nome, corpo, t: Date.now(), autorizacao: cabecalhos.authorization || null });
     if (m.atraso[nome]) await espera(m.atraso[nome]);
     const falha = m.falhas[nome];
     if (falha && (falha.vezes == null || falha.vezes > 0)) { if (falha.vezes != null) falha.vezes--; return { status: falha.status ?? 400, body: falha.corpo ?? { code: 'XX000', message: 'falha simulada' } }; }
@@ -107,13 +107,21 @@ export function criarMundo(opcoes = {}) {
       case 'chat_pedido_salvar': return { body: { ok: true, itens: (corpo.p_itens || []).length, mensagem_id: 999 } };
       case 'chat_exames': return { body: EXAMES[corpo.p_regiao] || [] };
       case 'chat_incidente': m.incidentes.push(corpo); return { body: { ok: true } };
+      // login do paciente (opcional)
+      case 'login_paciente_ativo': return { body: m.loginAtivo === true };
+      case 'conta_paciente_resumo': return { body: m.conta || { conta: false } };
+      case 'conta_paciente_perfil': {
+        if (!m.conta) return { status: 400, body: { code: '42501', message: 'Entre na sua conta para salvar os dados.' } };
+        m.conta = { ...m.conta, nome: String(corpo.p_nome || '').trim(), telefone: String(corpo.p_telefone || '').replace(/\D/g, '') };
+        return { body: m.conta };
+      }
       default: return { body: {} };
     }
   };
   return m;
 }
 
-export async function novaPaginaChat(browser, mundo, { init = [] } = {}) {
+export async function novaPaginaChat(browser, mundo, { init = [], auth = null } = {}) {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 780 } });
   for (const [fn, arg] of init) await ctx.addInitScript(fn, arg);
   const erros = { excecoes: [] };
@@ -125,10 +133,15 @@ export async function novaPaginaChat(browser, mundo, { init = [] } = {}) {
     const req = rota.request();
     if (req.method() === 'OPTIONS') return rota.fulfill({ status: 204, headers: CORS });
     const url = new URL(req.url());
+    if (auth && url.pathname.startsWith('/auth/v1/')) {   // endpoints de login simulados pelo teste
+      let corpoAuth = {}; try { corpoAuth = JSON.parse(req.postData() || '{}'); } catch { /* sem corpo */ }
+      const r = await auth({ metodo: req.method(), caminho: url.pathname, busca: url.searchParams, corpo: corpoAuth, cabecalhos: req.headers() });
+      return rota.fulfill({ status: r.status ?? 200, headers: CORS, contentType: 'application/json', body: r.body === undefined ? '' : JSON.stringify(r.body) });
+    }
     const nome = (/\/rest\/v1\/rpc\/([a-z0-9_]+)/.exec(url.pathname) || [])[1];
     if (!nome) return rota.fulfill({ status: 200, headers: CORS, contentType: 'application/json', body: '[]' });
     let corpo = {}; try { corpo = JSON.parse(req.postData() || '{}'); } catch { /* sem corpo */ }
-    const r = await mundo.tratar(nome, corpo);
+    const r = await mundo.tratar(nome, corpo, req.headers());
     return rota.fulfill({ status: r.status ?? 200, headers: CORS, contentType: 'application/json', body: JSON.stringify(r.body) });
   });
   if (typeof page.routeWebSocket === 'function') await page.routeWebSocket(/supabase\.co/, (ws) => ws.close());

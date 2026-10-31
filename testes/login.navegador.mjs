@@ -1,0 +1,205 @@
+// FLUXOGRAMA: entrada (chat do paciente + Supabase simulado, com os endpoints de login) -> validação (interruptor do banco ligado/desligado; senha fraca e aceite ausente nem chegam à rede) -> lógica (criar conta, entrar, esqueci a senha, link de nova senha, sair; conta logada pré-preenche e começa a conversa sem redigitar; conta sem perfil salva nome e telefone; sessão que não é de paciente segue como convidado) -> saída (PASS/FAIL por caso e código de saída)
+// Versão 1.0 — 31/10/2026 / Mudança: Implementação inicial
+//
+// Requer um Chromium (CHROMIUM_PATH). Não fala com o Supabase real: prova o comportamento da tela, não o do banco (esse está em sql-login.test.mjs).
+import { chromium, servidor, criarMundo, novaPaginaChat } from './mock-chat.mjs';
+
+const resultados = [];
+const registrar = (nome, ok, detalhe = '') => { resultados.push(ok); console.log(`${ok ? 'PASS' : 'FAIL'}  ${nome}${detalhe ? '  -- ' + detalhe : ''}`); };
+async function caso(nome, fn) { try { const r = await fn(); registrar(nome, r.ok, r.detalhe); } catch (e) { registrar(nome, false, `exceção: ${e.message.split('\n')[0]}`); } }
+const espera = (ms) => new Promise((r) => setTimeout(r, ms));
+
+const srv = await servidor();
+const base = `http://127.0.0.1:${srv.address().port}`;
+const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH, args: ['--no-sandbox'] } : {});
+
+// ---- um "Supabase Auth" de mentira ----
+const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
+const USER_ID = '11111111-1111-4111-8111-111111111111';
+const jwt = () => `${b64({ alg: 'HS256', typ: 'JWT' })}.${b64({ sub: USER_ID, role: 'authenticated', aud: 'authenticated', exp: Math.floor(Date.now() / 1000) + 3600 })}.assinatura`;
+const TOKEN = jwt();
+const usuario = (email = 'ana@teste.local', meta = {}) => ({ id: USER_ID, aud: 'authenticated', role: 'authenticated', email, email_confirmed_at: '2026-10-31T10:00:00Z', app_metadata: { provider: 'email' }, user_metadata: meta, identities: [{ id: USER_ID }], created_at: '2026-10-31T10:00:00Z' });
+const sessao = (email, meta) => ({ access_token: TOKEN, token_type: 'bearer', expires_in: 3600, expires_at: Math.floor(Date.now() / 1000) + 3600, refresh_token: 'refresh-de-teste', user: usuario(email, meta) });
+
+function criarAuth({ senhaCerta = 'Senha1234', email = 'ana@teste.local', meta = {}, confirmarEmail = true } = {}) {
+  const a = { chamadas: [], email, meta };
+  a.tratar = async ({ metodo, caminho, busca, corpo, cabecalhos }) => {
+    a.chamadas.push({ metodo, caminho, busca: Object.fromEntries(busca), corpo, cabecalhos });
+    if (caminho === '/auth/v1/token' && busca.get('grant_type') === 'password') {
+      if (corpo.password !== senhaCerta) return { status: 400, body: { code: 'invalid_credentials', error_code: 'invalid_credentials', msg: 'Invalid login credentials', message: 'Invalid login credentials' } };
+      return { body: sessao(corpo.email, a.meta) };
+    }
+    if (caminho === '/auth/v1/signup') return confirmarEmail ? { body: { ...usuario(corpo.email, corpo.data), email_confirmed_at: null } } : { body: sessao(corpo.email, corpo.data) };
+    if (caminho === '/auth/v1/recover') return { body: {} };
+    if (caminho === '/auth/v1/user') return { body: usuario(a.email, a.meta) };
+    if (caminho === '/auth/v1/logout') return { status: 204 };
+    return { status: 404, body: { message: 'não simulado: ' + caminho } };
+  };
+  return a;
+}
+const conta = (extra = {}) => ({ conta: true, email: 'ana@teste.local', nome: 'Ana Souza', telefone: '71999998888', cadastro_salvo: false, aceitou_lgpd: true, ...extra });
+
+async function abrir({ ativo = true, contaDoBanco = null, auth = criarAuth(), sessaoGuardada = false, hash = '' } = {}) {
+  const mundo = criarMundo({ loginAtivo: ativo, conta: contaDoBanco });
+  const init = sessaoGuardada ? [[(s) => localStorage.setItem('csi-paciente-auth', s), JSON.stringify(sessao('ana@teste.local', {}))]] : [];
+  const p = await novaPaginaChat(browser, mundo, { init, auth: auth.tratar });
+  await p.page.goto(`${base}/index.html${hash}`);
+  await p.page.waitForSelector('#formInicio', { state: 'visible', timeout: 8000 });
+  await espera(500);   // a conta chega depois do formulário
+  return { ...p, mundo, auth };
+}
+const visivel = (page, sel) => page.$eval(sel, (e) => !e.hidden && getComputedStyle(e).display !== 'none').catch(() => false);
+const texto = (page, sel) => page.$eval(sel, (e) => e.textContent.trim()).catch(() => null);
+const chamou = (mundo, nome) => mundo.chamadas.filter((c) => c.nome === nome);
+
+// ---------------------------------------------------------------------------------------------------------------------------------
+await caso('interruptor DESLIGADO (padrão): a tela de login não aparece e nada é chamado em /auth', async () => {
+  const x = await abrir({ ativo: false });
+  const r = { faixa: await visivel(x.page, '#faixaConta'), nAuth: x.auth.chamadas.length, resumo: chamou(x.mundo, 'conta_paciente_resumo').length };
+  await x.ctx.close();
+  return { ok: !r.faixa && r.nAuth === 0 && r.resumo === 0, detalhe: JSON.stringify(r) };
+});
+
+await caso('interruptor desligado COM sessão guardada: a sessão local é descartada (a conversa não pode ficar ligada a uma conta escondida)', async () => {
+  const x = await abrir({ ativo: false, sessaoGuardada: true });
+  const guardada = await x.page.evaluate(() => localStorage.getItem('csi-paciente-auth'));
+  await x.ctx.close();
+  return { ok: !guardada, detalhe: guardada ? 'sessão continuou guardada' : 'sessão removida' };
+});
+
+await caso('interruptor LIGADO: aparece "Tem conta?" com Entrar e Criar conta; o formulário segue igual para o convidado', async () => {
+  const x = await abrir();
+  const r = { faixa: await visivel(x.page, '#faixaConta'), entrar: await visivel(x.page, '#btnContaEntrar'), criar: await visivel(x.page, '#btnContaCriar'), sair: await visivel(x.page, '#btnContaSair'), nome: await visivel(x.page, '#blocoNome'), titulo: await texto(x.page, '#tituloInicio') };
+  await x.ctx.close();
+  return { ok: r.faixa && r.entrar && r.criar && !r.sair && r.nome && r.titulo === 'Vamos agendar?', detalhe: JSON.stringify(r) };
+});
+
+await caso('Criar conta: senha fraca, nome curto e falta do aceite são barrados na tela, SEM chamar a rede', async () => {
+  const x = await abrir();
+  await x.page.click('#btnContaCriar'); await x.page.waitForSelector('#cNome');
+  const tentar = async () => { await x.page.click('.conta-form button[type=submit]'); await espera(150); return texto(x.page, '.conta-form .erro-form'); };
+  const e1 = await tentar();
+  await x.page.fill('#cNome', 'Ana Souza'); await x.page.fill('#cTel', '71999998888'); await x.page.fill('#cEmail', 'ana@teste.local');
+  await x.page.fill('#cSenha', 'curta1'); const e2 = await tentar();
+  await x.page.fill('#cSenha', 'somenteletras'); const e3 = await tentar();
+  await x.page.fill('#cSenha', 'Senha1234'); const e4 = await tentar();
+  const r = { e1, e2, e3, e4, chamadasAuth: x.auth.chamadas.length };
+  await x.ctx.close();
+  return { ok: /nome/i.test(e1) && /8 caracteres/.test(e2) && /8 caracteres/.test(e3) && /concord/i.test(e4) && r.chamadasAuth === 0, detalhe: JSON.stringify(r) };
+});
+
+await caso('Criar conta: envia e-mail, nome e telefone (só números) e o endereço de volta; mostra "Enquanto não confirmar, nada de login"', async () => {
+  const x = await abrir();
+  await x.page.click('#btnContaCriar'); await x.page.waitForSelector('#cNome');
+  await x.page.fill('#cNome', 'Ana Souza'); await x.page.fill('#cTel', '71999998888'); await x.page.fill('#cEmail', 'ana@teste.local'); await x.page.fill('#cSenha', 'Senha1234');
+  await x.page.check('#cAceite'); await x.page.click('.conta-form button[type=submit]');
+  await x.page.waitForSelector('.conta-ok', { timeout: 5000 });
+  const msg = await texto(x.page, '.conta-ok'); const s = x.auth.chamadas.find((c) => c.caminho === '/auth/v1/signup');
+  const logado = await visivel(x.page, '#btnContaSair');
+  await x.ctx.close();
+  return { ok: !!s && s.corpo.email === 'ana@teste.local' && s.corpo.data.nome === 'Ana Souza' && s.corpo.data.telefone === '71999998888' && /\/index\.html$|\/$/.test(s.busca.redirect_to || '') && /ana@teste\.local/.test(msg) && !logado,
+           detalhe: `redirect_to=${s?.busca.redirect_to}; logado=${logado}` };
+});
+
+await caso('Entrar com senha errada: mensagem clara e continua como convidado', async () => {
+  const x = await abrir();
+  await x.page.click('#btnContaEntrar'); await x.page.waitForSelector('#cEmail');
+  await x.page.fill('#cEmail', 'ana@teste.local'); await x.page.fill('#cSenha', 'errada123'); await x.page.click('.conta-form button[type=submit]');
+  await x.page.waitForFunction(() => /incorretos/.test(document.querySelector('.conta-form .erro-form')?.textContent || ''), null, { timeout: 5000 });
+  const sair = await visivel(x.page, '#btnContaSair');
+  await x.ctx.close();
+  return { ok: !sair };
+});
+
+await caso('Entrar certo: mostra "Conta: e-mail", "Olá de novo, Ana!" com os dados da conta, sem "Não sou eu"; o telefone vem formatado', async () => {
+  const x = await abrir({ contaDoBanco: conta() });
+  await x.page.click('#btnContaEntrar'); await x.page.waitForSelector('#cEmail');
+  await x.page.fill('#cEmail', 'ana@teste.local'); await x.page.fill('#cSenha', 'Senha1234'); await x.page.click('.conta-form button[type=submit]');
+  await x.page.waitForFunction(() => /Olá de novo, Ana/.test(document.querySelector('#tituloInicio')?.textContent || ''), null, { timeout: 5000 });
+  const r = { faixa: await texto(x.page, '#faixaContaTxt'), dados: await texto(x.page, '#voltaDados'), naoSouEu: await visivel(x.page, '#btnNaoSouEu'), sair: await visivel(x.page, '#btnContaSair'), menu: await texto(x.page, '#btnSair') };
+  await x.ctx.close();
+  return { ok: r.faixa === 'Conta: ana@teste.local' && /Ana Souza · \(71\) 99999-8888 · ana@teste\.local/.test(r.dados) && !r.naoSouEu && r.sair && r.menu === 'Sair da conta', detalhe: JSON.stringify(r) };
+});
+
+await caso('Conta logada começa a conversa SEM redigitar nada e as chamadas seguem com o token da conta', async () => {
+  const x = await abrir({ contaDoBanco: conta(), sessaoGuardada: true });
+  await x.page.waitForFunction(() => /Olá de novo/.test(document.querySelector('#tituloInicio')?.textContent || ''), null, { timeout: 5000 });
+  await x.page.click('#fQuem .unidade >> nth=0'); await x.page.click('#btnIniciar');
+  await x.page.waitForSelector('#msgs .msg.agente .op', { timeout: 8000 });
+  const ini = chamou(x.mundo, 'chat_iniciar')[0];
+  await x.ctx.close();
+  return { ok: ini && ini.corpo.p_nome === 'Ana Souza' && ini.corpo.p_telefone === '(71) 99999-8888' && ini.corpo.p_email === 'ana@teste.local' && ini.corpo.p_paciente_tipo === 'proprio' && ini.autorizacao === `Bearer ${TOKEN}`,
+           detalhe: ini ? `${ini.corpo.p_nome} / ${ini.corpo.p_telefone}; autorização=${ini.autorizacao === `Bearer ${TOKEN}`}` : 'chat_iniciar não foi chamado' };
+});
+
+await caso('Conta SEM perfil salvo: e-mail travado no da conta; depois de começar, nome e telefone digitados são guardados na conta (cadastro uma vez só)', async () => {
+  const x = await abrir({ contaDoBanco: conta({ nome: null, telefone: null }), sessaoGuardada: true });
+  await x.page.waitForFunction(() => document.querySelector('#fEmail')?.readOnly === true, null, { timeout: 5000 });
+  const email = await x.page.inputValue('#fEmail');
+  await x.page.click('#fQuem .unidade >> nth=0'); await x.page.fill('#fNome', 'Ana Souza'); await x.page.fill('#fTel', '71999998888'); await x.page.check('#fAceite'); await x.page.click('#btnIniciar');
+  await x.page.waitForSelector('#msgs .msg.agente .op', { timeout: 8000 }); await espera(300);
+  const perfil = chamou(x.mundo, 'conta_paciente_perfil');
+  await x.ctx.close();
+  return { ok: email === 'ana@teste.local' && perfil.length >= 1 && perfil.at(-1).corpo.p_nome === 'Ana Souza' && /71999998888/.test(String(perfil.at(-1).corpo.p_telefone).replace(/\D/g, '')), detalhe: `e-mail=${email}; chamadas de perfil=${perfil.length}` };
+});
+
+await caso('Sessão que NÃO é de paciente (ex.: equipe): segue como convidado, sem mostrar o e-mail dela', async () => {
+  const x = await abrir({ contaDoBanco: null, sessaoGuardada: true });   // conta_paciente_resumo devolve {conta:false}
+  const r = { sair: await visivel(x.page, '#btnContaSair'), entrar: await visivel(x.page, '#btnContaEntrar'), faixa: await texto(x.page, '#faixaContaTxt') };
+  await x.ctx.close();
+  return { ok: !r.sair && r.entrar && !/ana@/.test(r.faixa), detalhe: JSON.stringify(r) };
+});
+
+await caso('Sair da conta: faz logout, limpa os dados do aparelho e volta ao formulário de convidado', async () => {
+  const x = await abrir({ contaDoBanco: conta(), sessaoGuardada: true });
+  await x.page.waitForFunction(() => /Olá de novo/.test(document.querySelector('#tituloInicio')?.textContent || ''), null, { timeout: 5000 });
+  x.page.once('dialog', (d) => d.accept());
+  await x.page.click('#btnContaSair'); await espera(600);
+  const r = { titulo: await texto(x.page, '#tituloInicio'), entrar: await visivel(x.page, '#btnContaEntrar'), logout: x.auth.chamadas.some((c) => c.caminho === '/auth/v1/logout'), sessao: await x.page.evaluate(() => localStorage.getItem('csi-paciente-auth')) };
+  await x.ctx.close();
+  return { ok: r.titulo === 'Vamos agendar?' && r.entrar && r.logout && !r.sessao, detalhe: JSON.stringify({ ...r, sessao: !!r.sessao }) };
+});
+
+await caso('Esqueci a senha: pede o e-mail, envia o pedido com o endereço de volta e responde sem revelar se a conta existe', async () => {
+  const x = await abrir();
+  await x.page.click('#btnContaEntrar'); await x.page.waitForSelector('#cEmail'); await x.page.click('text=Esqueci a senha'); await x.page.waitForSelector('#cEmail');
+  await x.page.fill('#cEmail', 'alguem@teste.local'); await x.page.click('.conta-form button[type=submit]');
+  await x.page.waitForSelector('.conta-ok', { timeout: 5000 });
+  const msg = await texto(x.page, '.conta-ok'); const c = x.auth.chamadas.find((y) => y.caminho === '/auth/v1/recover');
+  await x.ctx.close();
+  return { ok: !!c && c.corpo.email === 'alguem@teste.local' && /redirect_to/.test(JSON.stringify(c.busca)) && /Se existir uma conta/.test(msg), detalhe: msg.slice(0, 60) };
+});
+
+await caso('Link do e-mail (nova senha): abre a janela "Escolha uma nova senha"; senha fraca é barrada; a boa é enviada ao Supabase', async () => {
+  const hash = `#access_token=${TOKEN}&expires_in=3600&refresh_token=refresh-de-teste&token_type=bearer&type=recovery`;
+  const x = await abrir({ contaDoBanco: conta(), hash });
+  await x.page.waitForSelector('#folhaTitulo:text("Escolha uma nova senha")', { timeout: 6000 });
+  await x.page.fill('#cSenha', 'fraca'); await x.page.click('.conta-form button[type=submit]'); await espera(200);
+  const e1 = await texto(x.page, '.conta-form .erro-form');
+  await x.page.fill('#cSenha', 'NovaSenha99'); await x.page.click('.conta-form button[type=submit]');
+  await x.page.waitForFunction(() => document.querySelector('#folha').hidden, null, { timeout: 5000 });
+  const put = x.auth.chamadas.find((c) => c.metodo === 'PUT' && c.caminho === '/auth/v1/user');
+  await x.ctx.close();
+  return { ok: /8 caracteres/.test(e1) && !!put && put.corpo.password === 'NovaSenha99', detalhe: `fraca=${e1.slice(0, 30)}; PUT=${!!put}` };
+});
+
+await caso('Link de nova senha com o interruptor desligado: nada abre', async () => {
+  const hash = `#access_token=${TOKEN}&expires_in=3600&refresh_token=refresh-de-teste&token_type=bearer&type=recovery`;
+  const x = await abrir({ ativo: false, hash });
+  const aberta = await x.page.evaluate(() => !document.querySelector('#folha').hidden);
+  await x.ctx.close();
+  return { ok: !aberta };
+});
+
+await caso('nenhuma exceção de JavaScript em toda a tela de login (ligada e desligada)', async () => {
+  const a = await abrir(), b = await abrir({ ativo: false });
+  await a.page.click('#btnContaCriar'); await a.page.waitForSelector('#cNome'); await a.page.click('text=Já tenho conta'); await a.page.waitForSelector('#cEmail');
+  const erros = [...a.erros.excecoes, ...b.erros.excecoes];
+  await a.ctx.close(); await b.ctx.close();
+  return { ok: erros.length === 0, detalhe: erros.join(' | ') || 'sem exceções' };
+});
+
+await browser.close(); srv.close();
+const falhas = resultados.filter((r) => !r).length;
+console.log(`\n${resultados.length - falhas} de ${resultados.length} casos passaram.`);
+process.exit(falhas ? 1 : 0);

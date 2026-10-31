@@ -73,7 +73,7 @@
   .campo { margin-bottom: 14px; }
   .campo label { display: block; font-weight: 600; font-size: calc(15.5px * var(--esc)); margin-bottom: 5px; }
   .campo .opc { font-weight: 400; color: var(--texto-suave); }
-  .campo input[type=text], .campo input[type=tel], .campo input[type=email], .campo textarea {
+  .campo input[type=text], .campo input[type=tel], .campo input[type=email], .campo input[type=password], .campo textarea {
     width: 100%; padding: 12px 13px; border: 1.5px solid var(--linha); border-radius: 10px; background: var(--papel);
   }
   .campo input:focus, .campo textarea:focus { border-color: var(--verde); outline: none; box-shadow: 0 0 0 3px rgba(20,107,80,.18); }
@@ -102,6 +102,17 @@
   .btn-primario:hover { background: #0f5a42; }
   .btn-primario:disabled { opacity: .6; cursor: default; }
   .erro-form { color: var(--erro); font-size: calc(15.5px * var(--esc)); margin: 0 0 12px; min-height: 0; }
+  /* conta do paciente (login opcional) */
+  .conta-faixa { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; justify-content: space-between; background: #f1f6f3; border-radius: 12px; padding: 8px 14px; margin: 0 0 14px; font-size: calc(15.5px * var(--esc)); }
+  .conta-faixa[hidden] { display: none; }
+  .conta-faixa .txt { word-break: break-word; }
+  .conta-faixa .acoes { display: flex; gap: 14px; }
+  .conta-faixa .link-add { margin: 0; padding: 4px 0; }
+  .conta-form .sub { margin: 0 0 14px; color: var(--texto-suave); }
+  .conta-form .mostrar { display: flex; gap: 8px; align-items: center; font-size: calc(15.5px * var(--esc)); color: var(--texto-suave); margin: -6px 0 14px; }
+  .conta-form .mostrar input { width: 18px; height: 18px; accent-color: var(--verde); }
+  .conta-form .rodape-links { display: flex; flex-wrap: wrap; gap: 4px 18px; justify-content: center; margin-top: 12px; }
+  .conta-ok { background: var(--verde-claro); border-radius: 12px; padding: 14px; margin: 0 0 14px; }
 
   /* Conversa */
   .msgs { flex: 1; overflow-y: auto; padding: 14px 12px 8px; display: flex; flex-direction: column; gap: 4px; overscroll-behavior: contain; }
@@ -371,6 +382,14 @@
       <p><b>Olá! Eu sou o assistente virtual da clínica (uma inteligência artificial).</b> Estou aqui para deixar o seu atendimento mais rápido e tranquilo.</p>
       <p>Uma pessoa da nossa equipe acompanha as conversas e pode falar com você a qualquer momento. O que fazemos aqui é montar uma <b>previsão de agendamento</b>; quem confirma data, horário e valor é um atendente.</p>
     </div>
+    <div class="conta-faixa" id="faixaConta" hidden>
+      <span class="txt" id="faixaContaTxt"></span>
+      <span class="acoes">
+        <button type="button" class="link-add" id="btnContaEntrar">Entrar</button>
+        <button type="button" class="link-add" id="btnContaCriar">Criar conta</button>
+        <button type="button" class="link-add" id="btnContaSair" hidden>Sair da conta</button>
+      </span>
+    </div>
     <form id="formInicio" novalidate>
       <div class="volta" id="blocoVolta" hidden>
         <p class="volta-dados" id="voltaDados"></p>
@@ -456,16 +475,20 @@
   const CHAVE_HIST = 'webchat.historico.v1';   // as últimas conversas deste aparelho (cada uma com o seu token): dá para voltar a elas
   const MAX_HIST = 5;                          // mínimo pedido: 3
   // Muda a cada alteração do chat. Cópia de mensagens guardada por outra versão é descartada (era isso que mostrava conversa velha e travada).
-  const VERSAO_APP = '2026.10.31-12';
+  const VERSAO_APP = '2026.10.31-13';
   const ESCALAS = [1, 1.18, 1.36], ROTULO_LETRA = ['Letra maior', 'Letra muito maior', 'Letra normal'];
 
-  const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
+  // Chegou pelo link "esqueci a senha"? O supabase-js limpa o endereço ao ler o link, então a pergunta é feita antes de criá-lo.
+  let veioDoLinkDeSenha = /[#&?]type=recovery(&|$)/.test(location.hash + location.search);
+  // Login do paciente (opcional): a sessão fica numa chave própria, separada da do painel da equipe (mesmo endereço, mesmo projeto).
+  const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, storageKey: 'csi-paciente-auth' } });
   const $ = (s) => document.querySelector(s);
   const el = {
     empresa: $('#empresa'), avatar: $('#avatar'), ponto: $('#ponto'), status: $('#status'),
     btnMenu: $('#btnMenu'), menu: $('#menu'), btnNova: $('#btnNova'), btnHistorico: $('#btnHistorico'), btnHistoricoForm: $('#btnHistoricoForm'), btnAtendente: $('#btnAtendente'), btnSair: $('#btnSair'),
     btnLetra: $('#btnLetra'), btnSuporte: $('#btnSuporte'), apoio: $('#apoio'), barraHumano: $('#barraHumano'), btnHumano: $('#btnHumano'),
     telaInicio: $('#telaInicio'), telaChat: $('#telaChat'), boasForm: $('#boasVindasForm'), tituloInicio: $('#tituloInicio'),
+    faixaConta: $('#faixaConta'), faixaContaTxt: $('#faixaContaTxt'), btnContaEntrar: $('#btnContaEntrar'), btnContaCriar: $('#btnContaCriar'), btnContaSair: $('#btnContaSair'),
     form: $('#formInicio'), fNome: $('#fNome'), fTel: $('#fTel'), fEmail: $('#fEmail'),
     fAceite: $('#fAceite'), erroForm: $('#erroForm'), btnIniciar: $('#btnIniciar'),
     blocoVolta: $('#blocoVolta'), voltaDados: $('#voltaDados'), btnNaoSouEu: $('#btnNaoSouEu'), blocoNome: $('#blocoNome'), blocoContato: $('#blocoContato'),
@@ -545,6 +568,7 @@
   /* ---------- telas ---------- */
   // Quem já usou o chat neste aparelho não preenche nada de novo: nome, telefone e e-mail vêm do cache.
   function perfilSalvo() {
+    if (conta && conta.nome && conta.telefone) return { nome: conta.nome, telefone: mascaraTel(conta.telefone), email: conta.email, aceite: true, conta: true };
     const p = lerLocal(CHAVE_PERFIL);
     return p && p.nome && p.telefone && p.email && p.aceite ? p : null;
   }
@@ -557,6 +581,9 @@
     el.fNome.value = p.nome || ''; el.fTel.value = p.telefone || ''; el.fEmail.value = p.email || '';
     el.fAceite.checked = !!salvo; el.erroForm.textContent = ''; el.fFilho.value = '';
     el.blocoVolta.hidden = !salvo; el.blocoNome.hidden = !!salvo; el.blocoContato.hidden = !!salvo;
+    el.btnNaoSouEu.hidden = !!(salvo && salvo.conta);   // conta logada: quem sai é a conta ("Sair da conta")
+    el.fEmail.readOnly = !!(conta && !salvo);           // conta logada sem perfil salvo: o e-mail é o da conta
+    if (conta && !salvo) el.fEmail.value = conta.email;
     el.tituloInicio.textContent = salvo ? `Olá de novo, ${primeiroNome(salvo.nome)}!` : 'Vamos agendar?';
     if (salvo) el.voltaDados.textContent = `${salvo.nome} · ${salvo.telefone} · ${salvo.email}`;
     atualizarAcessoHistorico();
@@ -927,6 +954,7 @@
       conv = { id: data.conversa_id, token: data.token, tipo: filho ? 'filho' : 'proprio', nomeCrianca: filho ? nomeFilho : '', irmaos, irmaosModo: irmaos.length ? modoIrmaos : '' };
       gravarLocal(CHAVE_CONVERSA, conv); registrarHistorico(conv);
       gravarLocal(CHAVE_PERFIL, { nome, telefone: telTxt, email, aceite: true });
+      salvarPerfilNaConta(nome, telTxt);
       apagarLocal(CHAVE_MSGS);
       motorAtivo = data.motor === 'fluxo'; passoAtual = null;
       mostrarChat(); limparConversa();
@@ -1007,9 +1035,10 @@
     if (semPerguntar !== true && !confirm('Fazer um novo pedido? Este continua em "Conversas anteriores" e fica guardado com a equipe.')) return;
     apagarLocal(CHAVE_CONVERSA); apagarLocal(CHAVE_MSGS); conv = null; mostrarForm();
   }
-  function sair() {
+  async function sair() {
     fecharMenu();
-    if (!confirm('Sair deste aparelho? Seus dados deixam de aparecer aqui; a conversa fica guardada com a equipe.')) return;
+    if (!confirm(conta ? 'Sair da sua conta neste aparelho? Seus dados continuam salvos na conta; é só entrar de novo.' : 'Sair deste aparelho? Seus dados deixam de aparecer aqui; a conversa fica guardada com a equipe.')) return;
+    if (conta) { try { await db.auth.signOut(); } catch { /* sem rede: o aparelho é limpo mesmo assim */ } conta = null; atualizarContaUI(true); }
     naoSouEu();
   }
   function pedirAtendente() {
@@ -2128,6 +2157,9 @@
   });
   el.btnSair.addEventListener('click', sair);
   el.btnNaoSouEu.addEventListener('click', naoSouEu);
+  el.btnContaEntrar.addEventListener('click', () => abrirContaFolha('entrar'));
+  el.btnContaCriar.addEventListener('click', () => abrirContaFolha('criar'));
+  el.btnContaSair.addEventListener('click', sair);
   el.btnOutroFilho.addEventListener('click', outroFilho);
   el.btnProximo.addEventListener('click', proximoFilho);
   document.addEventListener('visibilitychange', () => {
@@ -2170,6 +2202,172 @@
     if (window.Sentinela) window.Sentinela.oferecerAtualizacao();
   }
 
+  /* ---------- conta do paciente (login opcional: e-mail e senha) ---------- */
+  // Sem login o paciente agenda do mesmo jeito, sempre como paciente novo. Com login, nome, telefone e cadastro ficam salvos e não se repetem.
+  // Só aparece quando o banco liga o interruptor (login_paciente_ativo). O e-mail serve só para confirmar a conta e redefinir a senha.
+  const PAGINA_URL = location.origin + location.pathname;
+  const TURNSTILE_SITEKEY = '';   // CAPTCHA (Cloudflare Turnstile, grátis). Se ligar "CAPTCHA protection" no Supabase, cole aqui a chave do site.
+  let loginAtivo = false, conta = null;   // conta = resumo devolvido por conta_paciente_resumo (conta:true, email, nome, telefone) ou null
+  const senhaValida = (s) => s.length >= 8 && /[A-Za-z]/.test(s) && /\d/.test(s);
+  const SENHA_REGRA = 'A senha precisa ter pelo menos 8 caracteres, com letras e números.';
+  function erroConta(e) {
+    const m = String((e && e.message) || ''), c = String((e && (e.code || e.error_code)) || '');
+    if (/invalid login|invalid_credentials/i.test(m + c)) return 'E-mail ou senha incorretos.';
+    if (/not confirmed|email_not_confirmed/i.test(m + c)) return 'Falta confirmar o e-mail: abra a mensagem que enviamos e toque no link.';
+    if (/rate limit|too many|over_.*_rate_limit|429/i.test(m + c)) return 'Muitos pedidos agora. Aguarde alguns minutos e tente de novo.';
+    if (/already registered|user_already_exists/i.test(m + c)) return 'Este e-mail já tem conta. Use "Entrar" ou "Esqueci a senha".';
+    if (/weak_password|password should/i.test(m + c)) return SENHA_REGRA;
+    if (/signups? not allowed|signup_disabled/i.test(m + c)) return 'Não dá para criar conta agora. Você pode agendar sem conta.';
+    if (/captcha/i.test(m + c)) return 'Não foi possível confirmar que você não é um robô. Tente de novo.';
+    if (/same password|same_password/i.test(m + c)) return 'Escolha uma senha diferente da anterior.';
+    return mensagemErro(e);
+  }
+  function carregarTurnstile() {
+    return new Promise((ok, no) => {
+      if (window.turnstile) return ok();
+      const s = document.createElement('script'); s.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'; s.async = true; s.onload = ok; s.onerror = no; document.head.append(s);
+    });
+  }
+  // CAPTCHA opcional: sem chave configurada não aparece e não é enviado.
+  function blocoCaptcha() {
+    if (!TURNSTILE_SITEKEY) return { el: null, token: async () => undefined, reset() {} };
+    const caixa = h('div', { class: 'cap' }); let id = null;
+    carregarTurnstile().then(() => { id = window.turnstile.render(caixa, { sitekey: TURNSTILE_SITEKEY }); }).catch(() => {});
+    return {
+      el: caixa,
+      token: async () => { const t = id != null ? window.turnstile.getResponse(id) : ''; if (!t) throw new Error('Marque a caixa "Não sou um robô" antes de continuar.'); return t; },
+      reset() { if (id != null) { try { window.turnstile.reset(id); } catch { /* ignora */ } } }
+    };
+  }
+  function campoSenha(id, rotulo, auto) {
+    const inp = h('input', { type: 'password', id, autocomplete: auto, maxlength: 72, required: true });
+    const ver = h('input', { type: 'checkbox', id: id + 'Ver', onchange: (e) => { inp.type = e.target.checked ? 'text' : 'password'; } });
+    return { campo: h('div', { class: 'campo' }, h('label', { for: id }, rotulo), inp), mostrar: h('label', { class: 'mostrar', for: id + 'Ver' }, ver, 'Mostrar a senha'), inp };
+  }
+  const campoTxt = (id, rotulo, props) => { const inp = h('input', { id, maxlength: 200, ...props }); return { campo: h('div', { class: 'campo' }, h('label', { for: id }, rotulo), inp), inp }; };
+
+  function atualizarContaUI(semForm) {
+    el.faixaConta.hidden = !loginAtivo;
+    el.btnContaEntrar.hidden = el.btnContaCriar.hidden = !!conta; el.btnContaSair.hidden = !conta;
+    el.faixaContaTxt.textContent = conta ? 'Conta: ' + conta.email : 'Tem conta? Seus dados ficam salvos para a próxima vez.';
+    el.btnSair.textContent = conta ? 'Sair da conta' : 'Sair (não sou eu)';
+    if (!semForm && !el.telaInicio.hidden) mostrarForm(!!escolha);   // refaz o formulário já com (ou sem) os dados da conta
+  }
+  async function carregarConta() {
+    const { data: { session } } = await db.auth.getSession();
+    if (!session) { conta = null; atualizarContaUI(); return; }
+    const { data, error } = await db.rpc('conta_paciente_resumo');
+    if (error || !data || !data.conta) { conta = null; atualizarContaUI(); return; }   // sessão que não é de paciente: segue como convidado
+    conta = data;
+    const meta = session.user.user_metadata || {};
+    if ((!conta.nome || !conta.telefone) && meta.nome && meta.telefone) {   // primeira entrada depois de criar a conta: guarda o perfil digitado no cadastro
+      try { const r = await db.rpc('conta_paciente_perfil', { p_nome: String(meta.nome), p_telefone: String(meta.telefone), p_aceite: true }); if (!r.error && r.data && r.data.conta) conta = r.data; } catch { /* tenta de novo na próxima vez */ }
+    }
+    atualizarContaUI();
+  }
+  function salvarPerfilNaConta(nome, telefone) {
+    if (!conta) return;
+    const tel = String(telefone).replace(/\D/g, '');
+    if (conta.nome === nome && conta.telefone === tel) return;
+    db.rpc('conta_paciente_perfil', { p_nome: nome, p_telefone: telefone, p_aceite: true })
+      .then((r) => { if (!r.error && r.data && r.data.conta) conta = r.data; }).catch(() => { /* o perfil local continua valendo */ });
+  }
+  async function abrirNovaSenha() {
+    veioDoLinkDeSenha = false;
+    await carregarConta();
+    if (!conta) return;   // o link não era de uma conta de paciente
+    if (!$('#folha').hidden && $('#folhaTitulo').textContent === 'Escolha uma nova senha') return;   // já está aberta
+    abrirContaFolha('nova');
+  }
+  async function aoMudarSessao(evento) {
+    if (!loginAtivo) return;
+    try {
+      if (evento === 'PASSWORD_RECOVERY') { await abrirNovaSenha(); return; }
+      if (evento === 'SIGNED_OUT') { conta = null; atualizarContaUI(); return; }
+      if (evento === 'SIGNED_IN' || evento === 'USER_UPDATED') await carregarConta();
+    } catch { /* sem rede: o chat segue como convidado */ }
+  }
+  async function iniciarConta() {
+    try { const { data, error } = await db.rpc('login_paciente_ativo'); loginAtivo = !error && data === true; } catch { loginAtivo = false; }
+    if (!loginAtivo) {   // recurso desligado: nenhuma sessão guardada pode valer (a conversa seria ligada à conta sem a tela mostrar)
+      try { const { data: { session } } = await db.auth.getSession(); if (session) await db.auth.signOut({ scope: 'local' }); } catch { /* ignora */ }
+      atualizarContaUI(); return;
+    }
+    db.auth.onAuthStateChange((evento) => { setTimeout(() => aoMudarSessao(evento), 0); });   // fora do callback: chamadas ao Supabase aqui dentro travariam
+    try { await carregarConta(); } catch { /* sem rede: segue como convidado */ }
+    atualizarContaUI();
+    if (veioDoLinkDeSenha) await abrirNovaSenha();
+  }
+
+  // Janela de entrar, criar conta, esqueci a senha e nova senha (depois do link do e-mail).
+  function abrirContaFolha(modo) {
+    const titulos = { entrar: 'Entrar na conta', criar: 'Criar conta', esqueci: 'Esqueci a senha', nova: 'Escolha uma nova senha' };
+    const { corpo } = abrirFolha(titulos[modo] || 'Conta');
+    const erro = h('p', { class: 'erro-form', role: 'alert' });
+    const cap = blocoCaptcha(), emailAtual = (el.fEmail && el.fEmail.value) || '';
+    const rodape = (...links) => h('div', { class: 'rodape-links' }, ...links.map(([txt, alvo]) => h('button', { type: 'button', class: 'link-add', onclick: () => { fecharFolha(); abrirContaFolha(alvo); } }, txt)));
+    const enviar = (btn, rotulo, acao) => async (ev) => {
+      ev.preventDefault(); erro.textContent = ''; btn.disabled = true; btn.textContent = 'Aguarde…';
+      try { await acao(); } catch (e) { erro.textContent = erroConta(e); cap.reset(); } finally { btn.disabled = false; btn.textContent = rotulo; }
+    };
+    const avisoEnviado = (titulo, texto) => corpo.replaceChildren(h('div', { class: 'conta-form' }, h('div', { class: 'conta-ok' }, h('b', {}, titulo), h('p', {}, texto)),
+      h('button', { type: 'button', class: 'btn-primario', onclick: fecharFolha }, 'Entendi')));
+
+    if (modo === 'entrar') {
+      const e = campoTxt('cEmail', 'E-mail', { type: 'email', autocomplete: 'email', value: emailAtual }), s = campoSenha('cSenha', 'Senha', 'current-password');
+      const btn = h('button', { class: 'btn-primario', type: 'submit' }, 'Entrar');
+      corpo.replaceChildren(h('form', { class: 'conta-form', novalidate: true, onsubmit: enviar(btn, 'Entrar', async () => {
+        const email = e.inp.value.trim();
+        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) || !s.inp.value) throw new Error('Informe o e-mail e a senha.');
+        const { error } = await db.auth.signInWithPassword({ email, password: s.inp.value, options: { captchaToken: await cap.token() } });
+        if (error) throw error;
+        fecharFolha(); toast('Você entrou na sua conta.');
+      }) }, e.campo, s.campo, s.mostrar, cap.el, erro, btn, rodape(['Esqueci a senha', 'esqueci'], ['Criar conta', 'criar'])));
+    } else if (modo === 'criar') {
+      const n = campoTxt('cNome', 'Seu nome', { type: 'text', autocomplete: 'name', maxlength: 120 }), t = campoTxt('cTel', 'Telefone com DDD (de preferência o WhatsApp)', { type: 'tel', inputmode: 'tel', autocomplete: 'tel-national', placeholder: '(71) 99999-9999', maxlength: 16 });
+      t.inp.addEventListener('input', () => { t.inp.value = mascaraTel(t.inp.value); });
+      const e = campoTxt('cEmail', 'E-mail', { type: 'email', autocomplete: 'email', value: emailAtual }), s = campoSenha('cSenha', 'Crie uma senha', 'new-password');
+      const aceite = h('input', { type: 'checkbox', id: 'cAceite' });
+      const btn = h('button', { class: 'btn-primario', type: 'submit' }, 'Criar conta');
+      corpo.replaceChildren(h('form', { class: 'conta-form', novalidate: true, onsubmit: enviar(btn, 'Criar conta', async () => {
+        const nome = n.inp.value.trim(), tel = t.inp.value.replace(/\D/g, ''), email = e.inp.value.trim();
+        if (nome.length < 2) throw new Error('Informe o seu nome.');
+        if (tel.length < 10) throw new Error('Informe o telefone com DDD.');
+        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error('Informe um e-mail válido.');
+        if (!senhaValida(s.inp.value)) throw new Error(SENHA_REGRA);
+        if (!aceite.checked) throw new Error('Marque a caixa de concordância para criar a conta.');
+        const { data, error } = await db.auth.signUp({ email, password: s.inp.value, options: { emailRedirectTo: PAGINA_URL, data: { nome, telefone: tel }, captchaToken: await cap.token() } });
+        if (error) throw error;
+        if (data.session) { fecharFolha(); toast('Conta criada. Seus dados ficam salvos.'); return; }
+        avisoEnviado('Quase pronto!', `Enviamos uma mensagem para ${email}. Abra o e-mail e toque no link para confirmar a conta. Se a mensagem não aparecer, olhe a caixa de spam. Quem já tem conta pode usar "Entrar".`);
+      }) }, h('p', { class: 'sub' }, 'Com a conta, seus dados ficam salvos e você não precisa repetir tudo no próximo agendamento. O e-mail serve só para confirmar a conta e redefinir a senha.'),
+      n.campo, t.campo, e.campo, s.campo, s.mostrar,
+      h('label', { class: 'aceite' }, aceite, h('span', {}, 'Concordo que a clínica guarde meu nome, telefone, e-mail e os pedidos que eu fizer para me atender e para eu não precisar repetir as informações (LGPD).')),
+      cap.el, erro, btn, rodape(['Já tenho conta', 'entrar'])));
+    } else if (modo === 'esqueci') {
+      const e = campoTxt('cEmail', 'E-mail da conta', { type: 'email', autocomplete: 'email', value: emailAtual });
+      const btn = h('button', { class: 'btn-primario', type: 'submit' }, 'Enviar link');
+      corpo.replaceChildren(h('form', { class: 'conta-form', novalidate: true, onsubmit: enviar(btn, 'Enviar link', async () => {
+        const email = e.inp.value.trim();
+        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error('Informe um e-mail válido.');
+        const { error } = await db.auth.resetPasswordForEmail(email, { redirectTo: PAGINA_URL, captchaToken: await cap.token() });
+        if (error) throw error;
+        avisoEnviado('Confira o seu e-mail', `Se existir uma conta com ${email}, enviamos um link para escolher uma nova senha. Se não aparecer, olhe a caixa de spam.`);
+      }) }, h('p', { class: 'sub' }, 'Informe o e-mail da conta. Enviaremos um link para você escolher uma nova senha.'), e.campo, cap.el, erro, btn, rodape(['Voltar para Entrar', 'entrar'])));
+    } else {   // 'nova': chegou pelo link do e-mail
+      const s = campoSenha('cSenha', 'Nova senha', 'new-password');
+      const btn = h('button', { class: 'btn-primario', type: 'submit' }, 'Salvar a nova senha');
+      corpo.replaceChildren(h('form', { class: 'conta-form', novalidate: true, onsubmit: enviar(btn, 'Salvar a nova senha', async () => {
+        if (!senhaValida(s.inp.value)) throw new Error(SENHA_REGRA);
+        const { error } = await db.auth.updateUser({ password: s.inp.value });
+        if (error) throw error;
+        try { history.replaceState(null, '', location.pathname + location.search); } catch { /* ignora */ }
+        fecharFolha(); toast('Senha alterada. Você já está na sua conta.');
+      }) }, s.campo, s.mostrar, erro, btn));
+    }
+    const primeiro = corpo.querySelector('input'); if (primeiro) setTimeout(() => primeiro.focus(), 50);
+  }
+
   /* ---------- início ---------- */
   async function init() {
     try {
@@ -2182,6 +2380,7 @@
     if (config.boas_vindas) el.boasForm.textContent = config.boas_vindas;
     iniciarSentinela();
     if (conv && conv.id && conv.token) { registrarHistorico(conv); abrirChat(); } else mostrarForm();   // registrar: conversa de antes desta versão entra na lista
+    iniciarConta();   // sem esperar: o formulário já está na tela; a conta (se existir) refaz o formulário quando chegar
   }
   init();
   if (window.__WEBCHAT_TESTE__) window.__WEBCHAT_TESTE__.adicionar = adicionar;   // gancho dos testes de navegador (não existe em produção)
