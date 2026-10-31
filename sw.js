@@ -19,7 +19,9 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   const r = e.request;
   const url = new URL(r.url);
-  if (r.method !== 'GET' || url.origin !== location.origin || url.pathname.includes('/painel/')) return;
+  // /painel/ e /fila/ ficam fora do cache. A URL da fila leva o token de assinatura (não pode ser guardada no dispositivo)
+  // e a chave única './' abaixo serviria a página do chat no lugar da fila.
+  if (r.method !== 'GET' || url.origin !== location.origin || url.pathname.includes('/painel/') || url.pathname.includes('/fila/')) return;
   const pagina = r.mode === 'navigate';
   const chave = pagina ? new Request(new URL('./', self.registration.scope)) : r;
   e.respondWith(caches.open(VERSAO).then(async (c) => {

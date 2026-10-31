@@ -110,6 +110,10 @@ A ordem não quebra nada:
 - O recorte só existe para linhas que o celular leu. Linhas que só a IA leu aparecem como texto.
 - A leitura pela IA não foi testada com uma chave real neste ambiente, que não alcança o Supabase nem a API. O formato do pedido à API foi conferido contra o SDK oficial com um servidor de teste local.
 
+- **Teto de gasto**: `ler-pedido` é pública (sem JWT) e o limite é de 6 fotos por conversa, não global. Antes de divulgar o chat a muita gente, vale um limite diário ou por origem.
+- **Modelo**: o padrão é `claude-opus-5-5`; `OCR_MODELO` troca. Comparar o acerto com a view `ocr_treino` antes de mudar.
+- **Relação com a Fase 7**: a IA não volta a conversar com o paciente nem entra no motor de fluxo. Ela só devolve opções para o paciente marcar, sem bloquear o chat. O custo em créditos da API é o único item que a Fase 7 havia eliminado e que volta.
+
 ## 6. Testes feitos
 
 1. **Banco real, em transações desfeitas** (nada ficou gravado; antes, uma sonda confirmou que o erro proposital no final desfaz tudo):

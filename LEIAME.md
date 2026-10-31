@@ -45,7 +45,7 @@ Supabase > Authentication > Email Templates > "Confirm signup": cole o conteúdo
 3. No painel: Configurações > Webhook do n8n > cole a URL > Salvar.
 4. Troque o último nó por Telegram, E-mail ou WhatsApp. O texto pronto está no campo `texto`.
 
-Com a triagem por IA ligada, **cada mensagem do paciente** gera uma execução no n8n (e mais uma a cada conversa nova): confira se a cota do plano do n8n aguenta o volume do mês.
+Com o motor `ia` ligado (`config.motor = 'ia'`, o plano B da Fase 7), **cada mensagem do paciente** gera uma execução no n8n (e mais uma a cada conversa nova): confira se a cota do plano do n8n aguenta o volume do mês. Com o motor `fluxo` (o padrão desde a Fase 7), nenhuma mensagem passa pelo n8n.
 
 ## Como cada pessoa usa
 
@@ -111,12 +111,12 @@ A IA consulta, a cada mensagem do paciente, um catálogo copiado de relatórios 
 
 ### Paciente que volta (conferência de identidade)
 
-- Ao abrir o chat o paciente informa nome, telefone e e-mail. `paciente_conferir` compara isso com `pacientes` (nome aproximado, telefone sem DDI/nono dígito, e-mail): **tudo bate = completo** (reaproveita o cadastro), **2 ou 3 batem e algum difere = parcial** (a IA pede para atualizar só o que diferiu), **menos de 2 = novo**.
+- Ao abrir o chat o paciente informa nome, telefone e e-mail. `paciente_conferir` compara isso com `pacientes` (nome aproximado, telefone sem DDI/nono dígito, e-mail): **nome e telefone batem (e o e-mail, se o cadastro tem) = completo** (reaproveita o cadastro), **qualquer outra combinação = novo**. O antigo "parcial" (2 de 3 campos) foi removido; ver a regra do "login" logo abaixo.
 - Antes de reaproveitar qualquer dado do cadastro a IA pede a **data de nascimento**; se não bater, segue como paciente novo e o cadastro novo fica marcado `revisar` quando o CPF se repete. A IA nunca revela o que está guardado.
 - `pacientes.validado` fica `true` quando a identidade é conferida num novo atendimento ou quando a atendente marca o pré-agendamento como agendado. O cartão do painel mostra a situação (`pre_agendamentos.identidade`).
 - SQL em `supabase/pacientes.sql`.
 - **Nome + telefone + e-mail são o "login"** (`supabase/correcao-login-nome-telefone-email.sql`, aplicado em 30/10/2026): só reaproveita cadastro, histórico ou pedido pela metade quem bate nome E telefone e, se o cadastro tem e-mail, o e-mail também. Qualquer outra combinação (mesmo telefone com outro nome, mesmo nome com outro e-mail, e-mail em branco) é paciente novo e não vê nada do outro; o "parcial" deixou de existir. A data de nascimento continua sendo o segundo fator antes de a IA usar qualquer dado.
-- **Nome por conversa** (correção): `contatos` é único por telefone e o nome nunca era atualizado, então quem usava o telefone de outra pessoa era chamado pelo nome dela e herdava o cadastro dela. Agora `conversas.nome_informado`/`email_informado` guardam o que foi digitado em cada conversa, e IA, conferência de identidade e painel usam isso. SQL em `supabase/correcao-nome-por-conversa.sql`: já aplicado no projeto em 30/10/2026 (o painel lê as colunas novas). Mesmo telefone com nome diferente ainda cai em "parcial" (telefone bate, nome não): a IA continua pedindo a data de nascimento antes de reaproveitar qualquer dado.
+- **Nome por conversa** (correção): `contatos` é único por telefone e o nome nunca era atualizado, então quem usava o telefone de outra pessoa era chamado pelo nome dela e herdava o cadastro dela. Agora `conversas.nome_informado`/`email_informado` guardam o que foi digitado em cada conversa, e IA, conferência de identidade e painel usam isso. SQL em `supabase/correcao-nome-por-conversa.sql`: já aplicado no projeto em 30/10/2026 (o painel lê as colunas novas). Mesmo telefone com nome diferente é paciente novo (o "parcial" não existe mais; conferido no banco em 30/10/2026: `paciente_conferir` só devolve `completo` ou `novo`). A IA continua pedindo a data de nascimento antes de reaproveitar qualquer dado.
 
 ### Fase 2: pedido por mapa do corpo, listas e calendário de horários
 
@@ -163,8 +163,22 @@ As fotos e as leituras ficam guardadas. No painel, "Conferir a leitura (ensina o
 - Função: `supabase/functions/ler-pedido`. Publicar sem JWT e criar o secret `ANTHROPIC_API_KEY`. Sem a chave, o chat usa só a leitura do celular.
 - **Para depois**: mudar escolhas ao vivo e o convênio de quem volta, em `docs/lembrete-mudar-escolhas-e-convenio.md`. Hoje o "Repetir o último exame" copia o convênio antigo sem perguntar.
 
+## Fila em tempo real + assinatura biométrica
+
+**Em construção; ainda não está no ar para o público.** O banco real está na primeira versão do módulo; a atualização (`supabase/fila-biometria-v2-delta.sql`) está escrita e testada, mas ainda não foi aplicada. A tela do paciente (`fila/`) ainda não existe no repositório: a versão antiga, incompatível, foi retirada para não ser publicada no GitHub Pages (continua no histórico do git, na branch `ccr-37cc4eeb-fi5p2l`).
+
+- Regras no banco: `supabase/fila-biometria.sql` (instalação do zero) e `supabase/fila-biometria-v2-delta.sql` (para quem já aplicou a primeira versão).
+- Algoritmo da assinatura: `biometria/avaliar_assinatura.py`, executado no nó Python do n8n (sem servidor próprio).
+- Fluxo, workflows do n8n, passo a passo para colocar no ar (o que é seu e o que é do Claude), riscos e LGPD: `docs/fila-biometria.md`.
+
+## Testes e auditoria
+
+`cd testes && npm install && npm test` repete a bateria (Edge Function, algoritmo Python, banco da Fila, atualização v1 para v2 e fumaça das páginas em navegador). Instruções e o que os testes **não** provam: `testes/README.md`. Evidências, achados e veredito de produção de 30/10/2026: `docs/auditoria-2026-10-30.md`.
+
 ## Estado do projeto e como retomar
 
 **Aba Aprendizado (administrador)**: relatório de onde a IA erra, preço do catálogo x Klingo e casos para melhorar o prompt (Fase 5; SQL em `supabase/fase5-aprendizado.sql`).
 
 Veja `docs/passagem-fases-3-a-5.md`: o que cada fase faz, o que falta, o checklist para continuar em outra conta e as regras que não podem ser quebradas. `supabase/00-base-snapshot.sql` é só referência do banco base (não rodar no projeto atual).
+
+Antes de divulgar a IA a mais pacientes, leia os achados de `docs/auditoria-2026-10-30.md` (seções 2.4 e 2.6): as Fases 6 e 7 entraram depois da auditoria e não foram auditadas; falta aviso à equipe fora do painel; preços do catálogo divergentes do Klingo (agora só referência para o alerta da equipe); nó de IA do n8n sem repetição (só importa se `config.motor` voltar para `ia`); e proteção contra senha vazada desligada.
