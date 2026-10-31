@@ -1,7 +1,7 @@
 // Service worker do chat do cliente: abre na hora com a cópia guardada e busca a versão nova por trás (vale na próxima abertura).
 // O link pode vir do WhatsApp, do e-mail ou da bio com ?origem=...: a cópia é a mesma para todos.
-const VERSAO = 'webchat-cliente-v2';
-const BASE = ['./', 'index.html', 'icon-192.png', 'manifest.webmanifest'];
+const VERSAO = 'webchat-cliente-v3';
+const BASE = ['./', 'index.html', 'sentinela.js', 'icon-192.png', 'manifest.webmanifest'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(VERSAO).then((c) => c.addAll(BASE)));
@@ -26,7 +26,17 @@ self.addEventListener('fetch', (e) => {
   const chave = pagina ? new Request(new URL('./', self.registration.scope)) : r;
   e.respondWith(caches.open(VERSAO).then(async (c) => {
     const guardada = await c.match(chave, { ignoreSearch: true });
-    const daRede = fetch(r).then((res) => { if (res.ok) c.put(chave, res.clone()); return res; });
+    const daRede = fetch(r).then((res) => {
+      if (res.ok) {
+        // Abre-se na hora com a cópia guardada; se a da rede for outra versão, avisa a página (ela atualiza no momento certo).
+        const velha = guardada && guardada.headers && guardada.headers.get && guardada.headers.get('etag'), nova = res.headers && res.headers.get && res.headers.get('etag');
+        if (velha && nova && velha !== nova && self.clients && self.clients.matchAll) {
+          self.clients.matchAll({ type: 'window' }).then((cs) => cs.forEach((cl) => cl.postMessage({ tipo: 'nova_versao' }))).catch(() => {});
+        }
+        c.put(chave, res.clone());
+      }
+      return res;
+    });
     if (guardada) { e.waitUntil(daRede.catch(() => {})); return guardada; }
     return daRede.catch(() => c.match('index.html'));
   }));

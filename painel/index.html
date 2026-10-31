@@ -1189,7 +1189,38 @@
       h('h3', {}, 'Casos para melhorar o prompt'),
       h('p', { class: 'dica' }, 'Alertas e cancelamentos recentes, sem dado de paciente. Copie e use para ajustar as instruções da IA no n8n.'),
       h('div', { class: 'acoes' }, h('button', { class: 'btn', type: 'button', disabled: !EX.length, onclick: async () => { try { await navigator.clipboard.writeText(textoExemplos); toast('Casos copiados.'); } catch { toast('Não consegui copiar.'); } } }, 'Copiar casos')),
-      tabela(['Quando', 'Caso', 'Exames', 'Plano', 'Etapa', 'Detalhe'], EX.map((x) => [fmtDataHora(x.quando), rotuloCaso(x.caso), (x.exames || []).join('; ') || '—', x.plano || '—', ROTULO_ETAPA[x.etapa] || x.etapa || '—', x.detalhe || '']), 'Nenhum caso no período.')));
+      tabela(['Quando', 'Caso', 'Exames', 'Plano', 'Etapa', 'Detalhe'], EX.map((x) => [fmtDataHora(x.quando), rotuloCaso(x.caso), (x.exames || []).join('; ') || '—', x.plano || '—', ROTULO_ETAPA[x.etapa] || x.etapa || '—', x.detalhe || '']), 'Nenhum caso no período.'),
+      blocoIncidentes()));
+  }
+
+  /* ---------- problemas técnicos do chat (Fase 9): o paciente passa o código CSI-... e a equipe acha o caso ---------- */
+  const ROTULO_INC = { ORD: 'Mensagens fora de ordem', LNT: 'Resposta demorou', TRV: 'Tela travada', RPC: 'Falha ao falar com o servidor', DES: 'Conversa dessincronizada', JS: 'Erro no aplicativo', DIA: 'Diagnóstico pedido pelo paciente' };
+  function blocoIncidentes() {
+    const campo = h('input', { type: 'search', placeholder: 'Código do paciente (ex.: CSI-261031-1432-RPC-AB23) ou só o final', 'aria-label': 'Código do incidente', style: 'width:100%;max-width:440px' });
+    const saida = h('div', { 'aria-live': 'polite' });
+    const buscar = async () => {
+      saida.replaceChildren(h('p', { class: 'dica' }, 'Buscando…'));
+      const { data, error } = await db.rpc('painel_incidentes', { p_codigo: campo.value.trim() || null, p_dias: 14, p_limite: 50 });
+      if (error) { saida.replaceChildren(h('p', { class: 'erro' }, msgErro(error)), h('p', { class: 'dica' }, 'Se a mensagem fala de função inexistente, falta rodar o SQL da Fase 9 (supabase/fase9-sentinela.sql).')); return; }
+      const lista = Array.isArray(data) ? data : [];
+      if (!lista.length) { saida.replaceChildren(h('p', { class: 'dica' }, campo.value.trim() ? 'Nenhum caso com esse código.' : 'Nenhum problema técnico nos últimos 14 dias.')); return; }
+      saida.replaceChildren(...lista.map((x) => {
+        const d = x.detalhe || {};
+        const resumo = [['Quando', fmtDataHora(x.criado_em)], ['Tipo', ROTULO_INC[x.tipo] || x.rotulo || x.tipo], ['Etapa', x.passo || '—'], ['Versão do chat', x.versao || '—'], ['Conversa', x.conversa_id || '—'],
+          ['Chamada', d.detalhe && d.detalhe.chamada ? `${d.detalhe.chamada} (status ${d.detalhe.status ?? '—'}${d.detalhe.erro ? ', ' + d.detalhe.erro : ''})` : '—'], ['Curado sozinho', d.detalhe && d.detalhe.curado === true ? 'sim' : d.detalhe && d.detalhe.curado === false ? 'não' : '—'],
+          ['Tela', d.janela || '—'], ['Aparelho', d.ua || '—']];
+        return h('details', { class: 'bloco-inc', style: 'border:1px solid var(--linha);border-radius:10px;padding:8px 12px;margin:0 0 8px;background:var(--papel)' },
+          h('summary', { style: 'cursor:pointer;font-weight:650' }, `${x.codigo} · ${ROTULO_INC[x.tipo] || x.tipo} · ${fmtDataHora(x.criado_em)}`),
+          h('dl', { style: 'display:grid;grid-template-columns:max-content 1fr;gap:4px 12px;margin:8px 0' }, resumo.map(([k, v]) => [h('dt', { style: 'color:var(--suave)' }, k), h('dd', { style: 'margin:0;overflow-wrap:anywhere' }, String(v))]).flat()),
+          h('p', { class: 'dica' }, 'Últimos eventos e chamadas, do mais antigo ao mais novo (sem texto de mensagens):'),
+          h('pre', { style: 'white-space:pre-wrap;font-size:12px;margin:0;max-height:260px;overflow:auto' }, JSON.stringify({ eventos: d.eventos, chamadas: d.chamadas, dom: d.dom, aprendizado: d.aprendizado }, null, 1)));
+      }));
+    };
+    campo.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); buscar(); } });
+    setTimeout(buscar, 0);
+    return h('div', {}, h('h3', {}, 'Problemas técnicos do chat'),
+      h('p', { class: 'dica' }, 'Quando o chat do paciente trava ou erra, ele mostra um código (CSI-...). Digite o código para ver o que aconteceu, ou deixe em branco para ver os últimos 14 dias.'),
+      h('div', { class: 'acoes' }, campo, h('button', { class: 'btn', type: 'button', onclick: buscar }, 'Buscar')), saida);
   }
 
   /* ---------- início ---------- */
