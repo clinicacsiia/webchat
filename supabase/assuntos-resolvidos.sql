@@ -9,7 +9,7 @@
 --     equipe já dizendo qual.
 --   * Resultado de exame: mostra a orientação cadastrada em fluxo_texto.resultado_orientacao (link do portal, por exemplo) com dois botões:
 --     "Resolveu, obrigado" (encerra) e "Preciso de um atendente". ENQUANTO O TEXTO ESTIVER VAZIO, tudo continua como antes (vai para a equipe).
---     Para ligar: update public.fluxo_texto set texto = 'Seu resultado fica em ... Acesse: https://... ' where chave = 'resultado_orientacao';
+--     Já vem preenchido com os dois portais (até 31/08/2026: Mezzow; a partir de 01/09/2026: Klingo). Para trocar: update public.fluxo_texto set texto = '...' where chave = 'resultado_orientacao';
 --   * Dúvida, Reclamação, Outro assunto e quem não foi identificado ou não tem horário marcado: continuam indo para a equipe, como antes.
 -- Cada trecho trocado nas funções do motor tem de aparecer UMA vez; se não aparecer, o arquivo para sem alterar nada. Pode ser aplicado de novo sem efeito.
 -- Ordem de aplicação: depois de fase7-motor.sql, fase4-paciente-que-volta.sql e correcao-convenio-quem-volta.sql.
@@ -39,7 +39,13 @@ insert into public.fluxo_texto (chave, texto, descricao) values
  ('assunto_qual_cancelar', 'Encontrei estes horários marcados. Qual você quer cancelar?', 'Cancelar: lista dos exames marcados para o futuro'),
  ('assunto_confirma', 'Você quer cancelar {item}? Um atendente faz o cancelamento no sistema e confirma com você.', 'Cancelar: pede o "sim" antes de avisar a equipe'),
  ('assunto_remarcar_ok', 'Certo! Vamos escolher o novo horário para {item}. O atendente cancela o horário antigo e confirma o novo com você.', 'Remarcar: antes de abrir o convênio e o calendário'),
- ('resultado_orientacao', '', 'Resultado de exame: o que dizer ao paciente (por exemplo o link do portal). VAZIO = o resultado vai direto para o atendente.'),
+ ('resultado_orientacao', $r$Seus resultados ficam no portal, conforme a data do exame:
+
+• Exames até 31/08/2026: https://resultados.mezzow.com/#/login/5dc9fdc4220c300e43c07cc9
+
+• Exames a partir de 01/09/2026: https://portal-clinicacsi.klingo.app/#/
+
+Se não conseguir acessar, toque em "Preciso de um atendente".$r$, 'Resultado de exame: o que dizer ao paciente (links dos portais). VAZIO = o resultado vai direto para o atendente.'),
  ('assunto_fim', 'Que bom que deu certo! Se precisar de mais alguma coisa, é só chamar.', 'Resultado de exame: depois de "Resolveu, obrigado"')
 on conflict (chave) do nothing;
 

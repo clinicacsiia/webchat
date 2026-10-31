@@ -172,16 +172,18 @@ await caso('paciente não identificado (data de nascimento não conferida): nada
   return { ok, detalhe: '' };
 });
 
-await caso('Resultado de exame com o texto VAZIO (como vem do instalador): continua indo para a equipe', async () => {
+const textoPadrao = (await db.query(`select texto from public.fluxo_texto where chave = 'resultado_orientacao'`)).rows[0].texto;
+await caso('Resultado de exame com o texto VAZIO (esvaziado pela clínica): continua indo para a equipe', async () => {
+  await db.query(`update public.fluxo_texto set texto = '' where chave = 'resultado_orientacao'`);
   const c = await nova({ assunto: 'Resultado de exame' });
   return { ok: (await proximo(c)) === 'assunto_texto', detalhe: '' };
 });
 
-await caso('Resultado de exame com orientação cadastrada: mostra o texto e dois botões', async () => {
-  await db.query(`update public.fluxo_texto set texto = 'Seu resultado está no portal: https://exemplo.invalid/resultados' where chave = 'resultado_orientacao'`);
+await caso('Resultado de exame com o texto padrão: mostra os dois portais e dois botões', async () => {
+  await db.query(`update public.fluxo_texto set texto = $1 where chave = 'resultado_orientacao'`, [textoPadrao]);
   const c = await nova({ assunto: 'Resultado de exame' });
   const p = await proximo(c); const m = await perguntar(c, p);
-  return { ok: p === 'assunto_resultado' && /portal/.test(m.texto) && m.opcoes.itens.map((i) => i.valor).join() === 'resolvido,atendente', detalhe: m.texto };
+  return { ok: p === 'assunto_resultado' && /mezzow\.com/.test(m.texto) && /klingo\.app/.test(m.texto) && m.opcoes.itens.map((i) => i.valor).join() === 'resolvido,atendente', detalhe: m.texto };
 });
 
 await caso('Resultado: "Resolveu, obrigado" encerra com agradecimento e botão de novo pedido', async () => {
