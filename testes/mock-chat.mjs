@@ -113,7 +113,7 @@ export function criarMundo(opcoes = {}) {
       case 'conta_paciente_vincular': {
         if (!m.conta) return { status: 400, body: { code: '42501', message: 'Entre na sua conta para ligar o cadastro.' } };
         const resultado = m.vinculo || 'nada_pendente';
-        if (resultado === 'vinculado') m.conta = { ...m.conta, cadastro_salvo: true };
+        if (resultado === 'vinculado' || resultado === 'vinculado_conferir') m.conta = { ...m.conta, cadastro_salvo: true };
         return { body: { resultado } };
       }
       case 'conta_paciente_perfil': {

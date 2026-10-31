@@ -67,16 +67,34 @@ Arquivo `supabase/meus-dados.sql` (rodar **depois** do instalador do login; pode
 - **Voltar atrás:** `drop function public.conta_paciente_meus_dados(), public.conta_paciente_excluir(text);` (o botão passa a dar erro; para escondê-lo é preciso publicar o chat sem a tela).
 - Teste: `npm run test:meus-dados` (banco) e `npm run test:login` (tela). Não foi testado contra o Supabase real: a exclusão apaga de `auth.users`, e o primeiro teste de ponta a ponta com uma conta de verdade continua pendente (passo 6).
 
-## Cadastro ligado ao paciente que já existe (31/10/2026)
+## Cadastro ligado ao paciente que já existe (31/10/2026, versão 1.1)
 
 Arquivo `supabase/vincular-cadastro.sql` (rodar **depois** do instalador do login; pode rodar de novo sem problema). Quem já é paciente da clínica não precisa que a equipe ligue a conta à mão.
 
-- **Na tela:** "Criar conta" pede nome, telefone, e-mail, data de nascimento e senha. Use os mesmos dados do cadastro na clínica.
-- **Depois de confirmar o e-mail,** o chat chama `conta_paciente_vincular()`. O banco liga a conta ao cadastro **somente se** estas quatro coisas batem **no mesmo cadastro**: e-mail da conta (já confirmado) = e-mail do cadastro, telefone, nome e data de nascimento. Cadastro sem e-mail ou sem data de nascimento nunca é ligado sozinho (a equipe liga).
-- **Fica de fora:** cadastro em revisão (`revisar`), cadastro já ligado a outra conta e caso ambíguo (dois cadastros iguais).
-- **Segurança:** o e-mail confirmado é a prova principal (só quem abre aquele e-mail chega ao link). A data de nascimento é conferida no banco, no máximo 5 tentativas por hora por conta, e é apagada do login depois da tentativa. A resposta ao paciente só diz "ligou" ou "não achamos"; nenhum dado do cadastro volta.
-- **Se não achar:** a conta fica criada e o paciente agenda normalmente; a equipe pode ligar depois. Quem ligou aparece em `contas_paciente` (`vinculado_em`, `vinculo_metodo`, `vinculo_tentativas`).
-- **Voltar atrás:** `drop function public.conta_paciente_vincular();` (as colunas novas podem ficar). Sem a função, a tela só mostra o aviso de "não achamos".
+- **Na tela:** "Criar conta" pede **nome completo** (nome e sobrenome), telefone, e-mail, **data de nascimento** e senha. Use os mesmos dados do cadastro na clínica.
+- **Depois de confirmar o e-mail,** o chat chama `conta_paciente_vincular()`. Nome completo e data de nascimento são **obrigatórios** e precisam bater com o **mesmo** cadastro. Depois o banco conta os acertos (nome, nascimento, telefone, e-mail):
+
+| Acertos | O que acontece | Aviso ao atendente |
+|---|---|---|
+| 4 (tudo) | Liga sozinho | Nenhum |
+| 3 (nome + nascimento + telefone **ou** e-mail) | Liga sozinho | Aba **Vínculos**, tipo "Ligada sozinha: conferir": o atendente atualiza o cadastro, diz "está certo" ou desfaz o vínculo |
+| 2 (só nome + nascimento) | **Não liga** | Aba **Vínculos**, tipo "Decidir se vincula": o atendente escolhe Vincular, Vincular e atualizar, ou Não vincular |
+| Nome ou nascimento não bate, nome de uma palavra só | Não liga | Nenhum (a conta fica criada e o paciente agenda normalmente) |
+
+- **Fica de fora sempre:** cadastro em revisão (`revisar`), cadastro já ligado a outra conta e caso ambíguo (dois cadastros com o mesmo nome e nascimento).
+- **Painel (atendente e administrador):** aba **Vínculos**, com selo de quantos esperam. Mostra o que o paciente digitou ao lado do cadastro da clínica e destaca o que difere. "Atualizar" muda só o cadastro do chat (e-mail novo; telefone novo entra junto com o antigo): **corrija também no Klingo**.
+- **Segurança:** o e-mail da conta precisa estar confirmado. O limite é de 5 tentativas por hora por conta, e a data digitada é apagada do login depois da tentativa. A resposta ao paciente só diz "ligou", "em análise" ou "não achamos"; nenhum dado do cadastro volta.
+- **Cuidado (decisão de 31/10/2026):** com 3 acertos, quem sabe nome, nascimento e **telefone** de um paciente consegue ligar a conta mesmo com e-mail diferente, e passa a ver o cadastro e o histórico dele em "Meus dados". É por isso que o aviso ao atendente existe e o vínculo pode ser desfeito. Para só ligar sozinho quando o **e-mail** confirmado bate, troque `if v_t or v_e then` por `if v_e then` em `vincular-cadastro.sql` (quem bater só telefone passa a cair em "Decidir se vincula").
+- **Registro:** `contas_paciente.vinculo_metodo` ('4 acertos', '3 acertos' ou 'atendente'), `vinculado_em` e a tabela `vinculo_solicitacoes` (quem decidiu e quando).
+- **Voltar atrás:** `drop function public.conta_paciente_vincular(), public.vinculo_listar(), public.vinculo_decidir(bigint, text); drop table public.vinculo_solicitacoes;` (a aba Vínculos fica vazia e a tela só mostra "não achamos").
+- Teste: `npm run test:vincular` (banco), `npm run test:login` (tela do paciente) e `npm run test:navegador` (aba Vínculos do painel).
+
+## Textos dos e-mails (Supabase > Authentication > Emails > Templates)
+
+Cole o conteúdo destes arquivos (o mesmo texto serve para paciente e para equipe):
+
+- "Confirm signup": `supabase-emails/confirmar-cadastro.html`, assunto "Confirme seu e-mail".
+- "Reset password": `supabase-emails/redefinir-senha.html`, assunto "Escolha uma nova senha".
 
 ## Ainda não existe (próximas etapas)
 

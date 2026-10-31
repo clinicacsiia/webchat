@@ -1,5 +1,5 @@
-// FLUXOGRAMA: entrada (contas-paciente + protecao-identidade + login-paciente + vincular-cadastro.sql num Postgres embutido com stubs mínimos do Auth) -> validação (aplica duas vezes; só conta de paciente logada chama; e-mail precisa estar confirmado; limite de 5 tentativas por hora) -> lógica (liga a conta ao cadastro SÓ quando e-mail confirmado, telefone, nome e data de nascimento batem juntos com UM cadastro livre e fora de revisão; qualquer divergência não liga) -> saída (PASS/FAIL por caso e código de saída)
-// Versão 1.0 — 31/10/2026 / Mudança: Implementação inicial
+// FLUXOGRAMA: entrada (contas-paciente + protecao-identidade + login-paciente + vincular-cadastro.sql num Postgres embutido com stubs mínimos do Auth) -> validação (aplica duas vezes; só conta de paciente logada chama; e-mail confirmado; limite de 5 tentativas por hora; só a equipe lista e decide) -> lógica (nome completo + nascimento obrigatórios; 4 acertos liga sozinho, 3 acertos liga e avisa o atendente, só nome + nascimento vai para o atendente decidir; o atendente vincula, atualiza ou recusa) -> saída (PASS/FAIL por caso e código de saída)
+// Versão 1.1 — 31/10/2026 / Mudança: regra de 3 acertos e fila do atendente
 import { PGlite } from '@electric-sql/pglite';
 import { readFileSync } from 'node:fs';
 import { REPO, funcao } from './stubs-supabase.mjs';
@@ -66,8 +66,9 @@ await q(`update public.config set valor = 'sim' where chave = 'cadastro_equipe_s
 const EQUIPE = (await q(`insert into auth.users (email) values ('equipe@clinica.test') returning id`))[0].id;   // vira agente (inativo) pelo caminho de transição
 await q(`update public.config set valor = 'nao' where chave = 'cadastro_equipe_sem_convite'`);
 
+// cada caso começa sem cadastros de paciente (todos usam o mesmo nome e a mesma data; sem isso um atrapalharia o outro)
+const casoL = (nome, fn) => caso(nome, async () => { await q('delete from public.pacientes'); return fn(); });
 let n = 0;
-// conta de paciente como o chat cria: e-mail confirmado ou não, com os dados digitados no cadastro em user_metadata
 const conta = async ({ email, nome = 'Maria da Silva', tel = '71988710544', nasc = '1980-03-25', confirmado = true } = {}) => {
   email = email ?? `maria${++n}@exemplo.com`;
   const meta = JSON.stringify({ nome, telefone: tel, ...(nasc ? { dt_nasc: nasc } : {}) });
@@ -79,17 +80,25 @@ const paciente = async ({ nome = 'Maria da Silva', tels = ['7188710544'], email 
 const vincular = (uid) => como('authenticated', uid, async () => (await q(`select public.conta_paciente_vincular() r`))[0].r.resultado);
 const ligado = async (uid) => (await q(`select paciente_id from public.contas_paciente where id = $1`, [uid]))[0].paciente_id;
 const nascNoLogin = async (uid) => (await q(`select raw_user_meta_data ->> 'dt_nasc' v from auth.users where id = $1`, [uid]))[0].v;
+const aviso = async (uid) => (await q(`select tipo, status, batem, diferem from public.vinculo_solicitacoes where conta_id = $1`, [uid]))[0] ?? null;
+const idAviso = async (uid) => (await q(`select id from public.vinculo_solicitacoes where conta_id = $1`, [uid]))[0].id;
+// atendente ativo (EQUIPE vira agente inativo pelo caminho de transição; aqui é liberado)
+await q(`update public.agentes set ativo = true, papel = 'atendente' where id = $1`, [EQUIPE]);
+const PACIENTE_X = (await q(`insert into auth.users (email) values ('paciente.x@exemplo.com') returning id`))[0].id;
+const listar = (uid) => como('authenticated', uid, async () => (await q(`select public.vinculo_listar() r`))[0].r);
+const decidir = (uid, id, acao) => como('authenticated', uid, async () => (await q(`select public.vinculo_decidir($1, $2) r`, [id, acao]))[0].r);
 
-await caso('liga a conta ao cadastro quando e-mail confirmado, telefone, nome e nascimento batem; apaga a data digitada', async () => {
+// ---- 4 acertos: nome, nascimento, telefone, e-mail ----
+await casoL('4 acertos: liga sozinho, sem aviso para o atendente; apaga a data digitada', async () => {
   const c = await conta(), p = await paciente({ email: c.email });
-  const r = await vincular(c.id), lin = (await q(`select vinculado_em, vinculo_metodo from public.contas_paciente where id = $1`, [c.id]))[0];
-  return { ok: r === 'vinculado' && (await ligado(c.id)) === p && !!lin.vinculado_em && /nascimento/.test(lin.vinculo_metodo) && (await nascNoLogin(c.id)) === null, detalhe: r };
+  const r = await vincular(c.id);
+  return { ok: r === 'vinculado' && (await ligado(c.id)) === p && (await aviso(c.id)) === null && (await nascNoLogin(c.id)) === null, detalhe: r };
 });
-await caso('aceita variações reais: telefone com 9º dígito e 55, nome mais curto, e-mail em outra caixa', async () => {
+await casoL('aceita variações reais: telefone com 9º dígito e 55, nome mais curto, e-mail em outra caixa', async () => {
   const c = await conta({ email: 'Joana.Lima@Exemplo.com', nome: 'Joana Lima', tel: '5571988710544' }), p = await paciente({ nome: 'Joana Souza de Lima', email: 'joana.lima@exemplo.com', tels: ['7188710544'] });
   return { ok: (await vincular(c.id)) === 'vinculado' && (await ligado(c.id)) === p };
 });
-await caso('depois de ligada, a conversa da conta é reconhecida como paciente conhecido (paciente_conferir)', async () => {
+await casoL('depois de ligada, a conversa da conta é reconhecida como paciente conhecido (paciente_conferir)', async () => {
   const c = await conta(), p = await paciente({ email: c.email });
   await vincular(c.id);
   const cv = await como('authenticated', c.id, async () => {
@@ -100,75 +109,162 @@ await caso('depois de ligada, a conversa da conta é reconhecida como paciente c
   return { ok: r.situacao === 'completo' && r.conta === true && r.paciente_id === p, detalhe: JSON.stringify(r.batem) };
 });
 
-await caso('NÃO liga: e-mail ainda não confirmado (e a data digitada é mantida para quando confirmar)', async () => {
+// ---- 3 acertos: liga sozinho e avisa o atendente ----
+await casoL('3 acertos (e-mail diferente): liga sozinho e abre aviso "atualizar" dizendo que o e-mail difere', async () => {
+  const c = await conta(), p = await paciente({ email: 'email.antigo@exemplo.com' });
+  const r = await vincular(c.id), a = await aviso(c.id);
+  return { ok: r === 'vinculado_conferir' && (await ligado(c.id)) === p && a.tipo === 'atualizar' && a.status === 'aberta' && a.diferem.join() === 'email' && a.batem.join() === 'nome,nascimento,telefone', detalhe: JSON.stringify(a) };
+});
+await casoL('3 acertos (telefone diferente): liga sozinho e o aviso diz que o telefone difere', async () => {
+  const c = await conta({ tel: '71977776666' }), p = await paciente({ email: 'tel.diferente@exemplo.com' });
+  await q(`update public.pacientes set email = $1 where id = $2`, [c.email, p]);
+  const r = await vincular(c.id), a = await aviso(c.id);
+  return { ok: r === 'vinculado_conferir' && (await ligado(c.id)) === p && a.diferem.join() === 'telefone' && a.batem.join() === 'nome,nascimento,email', detalhe: JSON.stringify(a) };
+});
+await casoL('3 acertos com cadastro SEM e-mail: liga (nome, nascimento, telefone) e avisa para preencher o e-mail', async () => {
+  const c = await conta(), p = await paciente({ email: null });
+  const r = await vincular(c.id), a = await aviso(c.id);
+  return { ok: r === 'vinculado_conferir' && (await ligado(c.id)) === p && a.diferem.join() === 'email', detalhe: JSON.stringify(a) };
+});
+
+// ---- só nome + nascimento: o atendente decide ----
+await casoL('só nome + nascimento (telefone e e-mail diferem): NÃO liga; abre pedido "verificar" para o atendente', async () => {
+  const c = await conta({ tel: '71977776666' }), p = await paciente({ email: 'outro@exemplo.com' });
+  const r = await vincular(c.id), a = await aviso(c.id);
+  return { ok: r === 'em_analise' && (await ligado(c.id)) === null && a.tipo === 'verificar' && a.status === 'aberta' && a.diferem.join() === 'telefone,email', detalhe: JSON.stringify(a) };
+});
+
+// ---- obrigatórios: nome completo e nascimento ----
+const naoLiga = async (nome, conta_, cad) => casoL(nome, async () => {
+  const c = await conta(conta_); await paciente({ email: c.email, ...cad });
+  const r = await vincular(c.id);
+  return { ok: r === 'nao_encontrado' && (await ligado(c.id)) === null && (await aviso(c.id)) === null && (await nascNoLogin(c.id)) === null, detalhe: r };
+});
+await naoLiga('NÃO liga nem avisa: data de nascimento diferente (mesmo com telefone e e-mail iguais)', { nasc: '1980-03-26' }, {});
+await naoLiga('NÃO liga nem avisa: nome diferente (mesmo com data, telefone e e-mail iguais)', { nome: 'Carla Pereira' }, {});
+await naoLiga('NÃO liga nem avisa: nome incompleto (uma palavra só)', { nome: 'Maria' }, {});
+await naoLiga('NÃO liga nem avisa: cadastro marcado para revisão', {}, { revisar: true });
+await naoLiga('NÃO liga nem avisa: cadastro sem data de nascimento', {}, { nasc: null });
+await casoL('NÃO liga nem avisa: telefone e e-mail iguais mas nome e nascimento não (ninguém passa só com contato)', async () => {
+  const c = await conta({ nome: 'Pedro Alves', nasc: '1990-01-01' }); await paciente({ email: c.email });
+  const r = await vincular(c.id);
+  return { ok: r === 'nao_encontrado' && (await ligado(c.id)) === null && (await aviso(c.id)) === null, detalhe: r };
+});
+await casoL('NÃO liga nem avisa: cadastro já ligado a outra conta', async () => {
+  const dono = await conta(), p = await paciente({ email: dono.email });
+  await vincular(dono.id);
+  const outro = await conta({ email: 'outro.' + dono.email });
+  const r = await vincular(outro.id);
+  return { ok: r === 'nao_encontrado' && (await ligado(outro.id)) === null && (await ligado(dono.id)) === p && (await aviso(outro.id)) === null, detalhe: r };
+});
+await casoL('NÃO liga: dois cadastros iguais (ambíguo)', async () => {
+  const c = await conta(); await paciente({ email: c.email }); await paciente({ email: c.email });
+  const r = await vincular(c.id);
+  return { ok: r === 'nao_encontrado' && (await ligado(c.id)) === null && (await aviso(c.id)) === null, detalhe: r };
+});
+await casoL('a resposta traz só o resultado (nenhum dado do cadastro)', async () => {
+  const c = await conta(); await paciente({ email: c.email });
+  const r = await como('authenticated', c.id, async () => (await q(`select public.conta_paciente_vincular() r`))[0].r);
+  return { ok: JSON.stringify(Object.keys(r)) === '["resultado"]', detalhe: JSON.stringify(r) };
+});
+await casoL('e-mail ainda não confirmado: não faz nada e guarda a data para quando confirmar', async () => {
   const c = await conta({ confirmado: false }), p = await paciente({ email: c.email });
   const r1 = await vincular(c.id), guardada = await nascNoLogin(c.id);
   await q(`update auth.users set email_confirmed_at = now() where id = $1`, [c.id]);
   const r2 = await vincular(c.id);
   return { ok: r1 === 'email_nao_confirmado' && guardada === '1980-03-25' && r2 === 'vinculado' && (await ligado(c.id)) === p, detalhe: `${r1} -> ${r2}` };
 });
-const naoLiga = async (nome, conta_, cad) => caso(nome, async () => {
-  const c = await conta(conta_), p = await paciente({ email: c.email, ...cad });
-  const r = await vincular(c.id);
-  return { ok: r === 'nao_encontrado' && (await ligado(c.id)) === null && (await nascNoLogin(c.id)) === null, detalhe: r };
-});
-await naoLiga('NÃO liga: data de nascimento diferente', { nasc: '1980-03-26' }, {});
-await naoLiga('NÃO liga: telefone diferente', { tel: '71977776666' }, {});
-await naoLiga('NÃO liga: nome diferente', { nome: 'Carla Pereira' }, {});
-await naoLiga('NÃO liga: cadastro marcado para revisão', {}, { revisar: true });
-await naoLiga('NÃO liga: cadastro sem data de nascimento', {}, { nasc: null });
-await caso('NÃO liga: e-mail da conta diferente do e-mail do cadastro, ou cadastro sem e-mail', async () => {
-  const c1 = await conta(), c2 = await conta();
-  await paciente({ email: 'outra.pessoa@exemplo.com' }); await paciente({ email: null });
-  const r1 = await vincular(c1.id), r2 = await vincular(c2.id);
-  return { ok: r1 === 'nao_encontrado' && r2 === 'nao_encontrado' && (await ligado(c1.id)) === null && (await ligado(c2.id)) === null, detalhe: `${r1}, ${r2}` };
-});
-await caso('NÃO liga: cadastro já ligado a outra conta (a segunda conta não toma o cadastro)', async () => {
-  const dono = await conta(), p = await paciente({ email: dono.email });
-  await vincular(dono.id);
-  const intruso = await conta({ email: dono.email.toUpperCase() + '.x' });   // outro e-mail confirmado qualquer
-  await q(`update public.pacientes set email = $1 where id = $2`, [intruso.email, p]);   // mesmo se o e-mail do cadastro fosse trocado, o cadastro já tem dono
-  const r = await vincular(intruso.id);
-  return { ok: r === 'nao_encontrado' && (await ligado(intruso.id)) === null && (await ligado(dono.id)) === p, detalhe: r };
-});
-await caso('NÃO liga: dois cadastros iguais (ambíguo) — a equipe decide', async () => {
-  const c = await conta(); await paciente({ email: c.email }); await paciente({ email: c.email });
-  const r = await vincular(c.id);
-  return { ok: r === 'nao_encontrado' && (await ligado(c.id)) === null, detalhe: r };
-});
-await caso('NÃO revela nem muda nada do cadastro: a resposta traz só o resultado', async () => {
-  const c = await conta(), p = await paciente({ email: c.email, nome: 'Maria da Silva' });
-  const r = await como('authenticated', c.id, async () => (await q(`select public.conta_paciente_vincular() r`))[0].r);
-  const dep = (await q(`select nome, email, dt_nasc::text from public.pacientes where id = $1`, [p]))[0];
-  return { ok: JSON.stringify(Object.keys(r)) === '["resultado"]' && dep.nome === 'Maria da Silva' && dep.dt_nasc === '1980-03-25', detalhe: JSON.stringify(r) };
-});
-
-await caso('sem data pendente: "nada_pendente"; já ligada: "ja_vinculado" e nada muda', async () => {
+await casoL('sem data pendente: "nada_pendente"; já ligada: "ja_vinculado"', async () => {
   const c = await conta({ nasc: null }), a = await vincular(c.id);
   const d = await conta(), p = await paciente({ email: d.email }); await vincular(d.id);
   await q(`update auth.users set raw_user_meta_data = raw_user_meta_data || '{"dt_nasc":"1990-01-01"}'::jsonb where id = $1`, [d.id]);
   const b = await vincular(d.id);
   return { ok: a === 'nada_pendente' && b === 'ja_vinculado' && (await ligado(d.id)) === p, detalhe: `${a}, ${b}` };
 });
-await caso('limite: depois de 5 tentativas na hora a 6ª é "bloqueado" (não dá para adivinhar a data)', async () => {
-  const c = await conta({ nasc: '1999-01-01' }); await paciente({ email: c.email });
+await casoL('limite: depois de 5 tentativas na hora a 6ª é "bloqueado"; passada 1 hora volta a permitir', async () => {
+  const c = await conta({ nasc: '1999-01-01' }); const p = await paciente({ email: c.email });
   const rs = [];
   for (let i = 0; i < 6; i++) {
-    await q(`update auth.users set raw_user_meta_data = raw_user_meta_data || jsonb_build_object('dt_nasc', $2::text) where id = $1`, [c.id, `1980-03-${String(20 + i).padStart(2, '0')}`]);
+    await q(`update auth.users set raw_user_meta_data = raw_user_meta_data || jsonb_build_object('dt_nasc', $2::text) where id = $1`, [c.id, `1970-03-${String(20 + i).padStart(2, '0')}`]);
     rs.push(await vincular(c.id));
   }
-  return { ok: rs.slice(0, 5).every((x) => x === 'nao_encontrado') && rs[5] === 'bloqueado' && (await ligado(c.id)) === null, detalhe: rs.join(',') };
-});
-await caso('limite: passada 1 hora volta a permitir', async () => {
-  const c = await conta({ nasc: '1980-03-25' }); const p = await paciente({ email: c.email });
-  await q(`update public.contas_paciente set vinculo_tentativas = 5, vinculo_ultima_em = now() - interval '2 hours' where id = $1`, [c.id]);
-  return { ok: (await vincular(c.id)) === 'vinculado' && (await ligado(c.id)) === p };
+  await q(`update public.contas_paciente set vinculo_ultima_em = now() - interval '2 hours' where id = $1`, [c.id]);
+  await q(`update auth.users set raw_user_meta_data = raw_user_meta_data || '{"dt_nasc":"1980-03-25"}'::jsonb where id = $1`, [c.id]);
+  const depois = await vincular(c.id);
+  return { ok: rs.slice(0, 5).every((x) => x === 'nao_encontrado') && rs[5] === 'bloqueado' && depois === 'vinculado' && (await ligado(c.id)) === p, detalhe: rs.join(',') + ' -> ' + depois };
 });
 
-await caso('equipe e anônimo não conseguem chamar (só conta de paciente)', async () => {
+// ---- fila do atendente ----
+await casoL('só a equipe lista e decide; paciente e anônimo são recusados e a tabela é fechada', async () => {
   const falhas = [];
-  for (const [papel, uid] of [['authenticated', EQUIPE], ['authenticated', ADM], ['anon', null]]) await como(papel, uid, async () => { try { await q(`select public.conta_paciente_vincular()`); falhas.push(papel); } catch { /* esperado */ } });
-  return { ok: falhas.length === 0, detalhe: falhas.join(', ') || '3 recusas' };
+  for (const [papel, uid] of [['authenticated', PACIENTE_X], ['anon', null]]) await como(papel, uid, async () => {
+    try { await q(`select public.vinculo_listar()`); falhas.push('listar ' + papel); } catch { /* esperado */ }
+    try { await q(`select public.vinculo_decidir(1, 'recusar')`); falhas.push('decidir ' + papel); } catch { /* esperado */ }
+  });
+  await como('authenticated', PACIENTE_X, async () => { try { await q(`select * from public.vinculo_solicitacoes`); falhas.push('tabela aberta'); } catch { /* esperado */ } });
+  return { ok: falhas.length === 0, detalhe: falhas.join(', ') || '5 recusas' };
+});
+await casoL('vinculo_listar traz o aviso com conta e cadastro lado a lado', async () => {
+  const c = await conta({ tel: '71977776666' }); await paciente({ email: 'antigo@exemplo.com' });
+  await vincular(c.id);
+  const lista = await listar(EQUIPE), x = lista.find((i) => i.conta.email === c.email);
+  return { ok: !!x && x.tipo === 'verificar' && x.cadastro.email === 'antigo@exemplo.com' && x.conta.telefone === '71977776666' && x.diferem.includes('telefone'), detalhe: x ? x.tipo : 'não achou' };
+});
+await casoL('pedido "verificar": atendente VINCULA (liga a conta, sem mexer no cadastro) e fica registrado quem decidiu', async () => {
+  const c = await conta({ tel: '71977776666' }), p = await paciente({ email: 'antigo2@exemplo.com' });
+  await vincular(c.id);
+  const id = await idAviso(c.id);
+  const r = await decidir(EQUIPE, id, 'vincular'), a = await aviso(c.id);
+  const reg = (await q(`select decidido_por from public.vinculo_solicitacoes where id = $1`, [id]))[0];
+  const cad = (await q(`select email, telefones from public.pacientes where id = $1`, [p]))[0];
+  return { ok: r.status === 'vinculada' && (await ligado(c.id)) === p && a.status === 'vinculada' && reg.decidido_por === EQUIPE && cad.email === 'antigo2@exemplo.com' && cad.telefones.length === 1, detalhe: JSON.stringify(a) };
+});
+await casoL('pedido "verificar": atendente VINCULA E ATUALIZA (e-mail novo e telefone novo entram no cadastro)', async () => {
+  const c = await conta({ tel: '71977776666' }), p = await paciente({ email: 'antigo3@exemplo.com' });
+  await vincular(c.id);
+  await decidir(EQUIPE, await idAviso(c.id), 'vincular_atualizar');
+  const cad = (await q(`select email, telefones from public.pacientes where id = $1`, [p]))[0];
+  return { ok: (await ligado(c.id)) === p && cad.email === c.email && cad.telefones.includes('7188710544') && cad.telefones.includes('7177776666'), detalhe: JSON.stringify(cad) };
+});
+await casoL('pedido "verificar": atendente RECUSA e a conta continua sem cadastro', async () => {
+  const c = await conta({ tel: '71977776666' }); await paciente({ email: 'antigo4@exemplo.com' });
+  await vincular(c.id);
+  const r = await decidir(EQUIPE, await idAviso(c.id), 'recusar');
+  return { ok: r.status === 'recusada' && (await ligado(c.id)) === null };
+});
+await casoL('aviso "atualizar" (3 acertos): ATUALIZAR corrige o cadastro e a conta continua ligada', async () => {
+  const c = await conta(), p = await paciente({ email: 'velho@exemplo.com' });
+  await vincular(c.id);
+  const r = await decidir(EQUIPE, await idAviso(c.id), 'atualizar');
+  const cad = (await q(`select email from public.pacientes where id = $1`, [p]))[0];
+  return { ok: r.status === 'atualizada' && cad.email === c.email && (await ligado(c.id)) === p, detalhe: cad.email };
+});
+await casoL('aviso "atualizar": CONFERIDO só fecha o aviso (cadastro intacto); DESFAZER solta o vínculo', async () => {
+  const c1 = await conta(), p1 = await paciente({ email: 'v1@exemplo.com' }), c2 = await conta({ nome: 'Ana Beatriz Lima', nasc: '1991-02-02' }); await paciente({ nome: 'Ana Beatriz Lima', nasc: '1991-02-02', email: 'v2@exemplo.com' });
+  await vincular(c1.id); await vincular(c2.id);
+  await decidir(EQUIPE, await idAviso(c1.id), 'conferido'); await decidir(EQUIPE, await idAviso(c2.id), 'desfazer');
+  const e1 = (await q(`select email from public.pacientes where id = $1`, [p1]))[0].email;
+  return { ok: (await ligado(c1.id)) === p1 && e1 === 'v1@exemplo.com' && (await ligado(c2.id)) === null && (await aviso(c2.id)).status === 'desfeita', detalhe: e1 };
+});
+await casoL('decisões inválidas: ação trocada de tipo, pedido já resolvido, ação desconhecida e cadastro tomado por outra conta', async () => {
+  const erros = [];
+  const tenta = async (id, acao) => { try { await decidir(EQUIPE, id, acao); return 'aceitou'; } catch { return 'recusou'; } };
+  const c = await conta(); await paciente({ email: 'v5@exemplo.com' }); await vincular(c.id);   // aviso "atualizar"
+  const id = await idAviso(c.id);
+  erros.push(await tenta(id, 'vincular'));          // ação de "verificar" em aviso "atualizar"
+  await decidir(EQUIPE, id, 'conferido');
+  erros.push(await tenta(id, 'conferido'));         // já resolvido
+  const c2 = await conta({ tel: '71977776666' }), p2 = await paciente({ email: 'v6@exemplo.com' }); await vincular(c2.id);
+  const id2 = await idAviso(c2.id);
+  erros.push(await tenta(id2, 'apagar-tudo'));      // desconhecida
+  await q(`update public.contas_paciente set paciente_id = $1 where id = $2`, [p2, PACIENTE_X]);   // outra conta pegou o cadastro enquanto o pedido esperava
+  erros.push(await tenta(id2, 'vincular'));
+  return { ok: erros.every((e) => e === 'recusou'), detalhe: erros.join(',') };
+});
+await casoL('excluir a conta apaga o aviso junto (sem sobra de dado)', async () => {
+  const c = await conta({ tel: '71977776666' }); await paciente({ email: 'v7@exemplo.com' }); await vincular(c.id);
+  await q(`delete from auth.users where id = $1`, [c.id]);
+  return { ok: (await aviso(c.id)) === null };
 });
 
 const ok = resultados.filter(Boolean).length;

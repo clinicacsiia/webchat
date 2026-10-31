@@ -2291,10 +2291,13 @@
     try {
       const r = await db.rpc('conta_paciente_vincular');
       const res = r.data && r.data.resultado;
-      if (res === 'vinculado') {
+      if (res === 'vinculado' || res === 'vinculado_conferir') {
         const rr = await db.rpc('conta_paciente_resumo');
         if (!rr.error && rr.data && rr.data.conta) conta = rr.data;
-        toast('Sua conta foi ligada ao seu cadastro na clínica.');
+        toast(res === 'vinculado' ? 'Sua conta foi ligada ao seu cadastro na clínica.'
+          : 'Sua conta foi ligada ao seu cadastro. A equipe vai conferir o telefone ou o e-mail e atualizar, se for preciso.', res === 'vinculado' ? 4200 : 9000);
+      } else if (res === 'em_analise') {
+        toast('Recebemos seu pedido. Um atendente vai conferir seus dados e liberar a ligação com o seu cadastro. Enquanto isso você já pode agendar.', 9000);
       } else if (res === 'nao_encontrado' || res === 'bloqueado') {
         toast('Conta criada. Não achamos seu cadastro com esses dados; você pode agendar normalmente e a equipe confere depois.', 9000);
       }
@@ -2359,7 +2362,7 @@
         fecharFolha(); toast('Você entrou na sua conta.');
       }) }, e.campo, s.campo, s.mostrar, cap.el, erro, btn, rodape(['Esqueci a senha', 'esqueci'], ['Criar conta', 'criar'])));
     } else if (modo === 'criar') {
-      const n = campoTxt('cNome', 'Seu nome', { type: 'text', autocomplete: 'name', maxlength: 120 }), t = campoTxt('cTel', 'Telefone com DDD (de preferência o WhatsApp)', { type: 'tel', inputmode: 'tel', autocomplete: 'tel-national', placeholder: '(71) 99999-9999', maxlength: 16 });
+      const n = campoTxt('cNome', 'Nome completo', { type: 'text', autocomplete: 'name', maxlength: 120 }), t = campoTxt('cTel', 'Telefone com DDD (de preferência o WhatsApp)', { type: 'tel', inputmode: 'tel', autocomplete: 'tel-national', placeholder: '(71) 99999-9999', maxlength: 16 });
       t.inp.addEventListener('input', () => { t.inp.value = mascaraTel(t.inp.value); });
       const d = campoTxt('cNasc', 'Data de nascimento', { type: 'text', inputmode: 'numeric', autocomplete: 'bday', placeholder: 'dd/mm/aaaa', maxlength: 10 });
       d.inp.addEventListener('input', () => { d.inp.value = mascaraData(d.inp.value); });
@@ -2368,7 +2371,7 @@
       const btn = h('button', { class: 'btn-primario', type: 'submit' }, 'Criar conta');
       corpo.replaceChildren(h('form', { class: 'conta-form', novalidate: true, onsubmit: enviar(btn, 'Criar conta', async () => {
         const nome = n.inp.value.trim(), tel = t.inp.value.replace(/\D/g, ''), email = e.inp.value.trim();
-        if (nome.length < 2) throw new Error('Informe o seu nome.');
+        if (nome.split(/\s+/).filter(Boolean).length < 2) throw new Error('Informe o nome completo, com nome e sobrenome.');
         if (tel.length < 10) throw new Error('Informe o telefone com DDD.');
         if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error('Informe um e-mail válido.');
         const nasc = dataNascimentoISO(d.inp.value);

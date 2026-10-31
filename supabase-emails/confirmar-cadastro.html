@@ -1,10 +1,12 @@
-<!-- Supabase > Authentication > Email Templates > "Confirm signup"
-     Assunto sugerido: Confirme seu e-mail - Painel de atendimento -->
-<div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;color:#1f2933">
-  <h2>Confirme seu e-mail</h2>
-  <p>Olá! Recebemos um pedido de cadastro no painel de atendimento com este e-mail.</p>
-  <p>Para ativar sua conta, clique no botão abaixo:</p>
-  <p><a href="{{ .ConfirmationURL }}" style="display:inline-block;background:#128c7e;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none">Confirmar e-mail</a></p>
+<!-- Supabase > Authentication > Emails > Templates > "Confirm signup" (serve para paciente e para equipe)
+     Assunto sugerido: Confirme seu e-mail -->
+<div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;color:#1f2933;line-height:1.5">
+  <h2 style="margin:0 0 12px">Confirme seu e-mail</h2>
+  <p>Olá! Recebemos um pedido para criar uma conta com este e-mail.</p>
+  <p>Para ativar a conta, toque no botão abaixo:</p>
+  <p><a href="{{ .ConfirmationURL }}" style="display:inline-block;background:#128c7e;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none">Confirmar meu e-mail</a></p>
   <p style="font-size:13px;color:#667">Se o botão não funcionar, copie e cole este endereço no navegador:<br>{{ .ConfirmationURL }}</p>
-  <p style="font-size:13px;color:#667">Se você não fez este cadastro, ignore esta mensagem.</p>
+  <p style="font-size:13px;color:#667">Se você não pediu esta conta, pode ignorar esta mensagem: nada será criado sem a sua confirmação.</p>
+  <hr style="border:none;border-top:1px solid #dde3e0;margin:20px 0">
+  <p style="font-size:12px;color:#889">Esta é uma mensagem automática. Não responda a este e-mail.</p>
 </div>

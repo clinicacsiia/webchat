@@ -303,6 +303,30 @@ await caso('Cadastro não encontrado: avisa com calma, continua logada e pode ag
   return { ok: /N[ãa]o achamos seu cadastro/.test(aviso || '') && logada, detalhe: `aviso=${aviso}; logada=${logada}; nome=${nome}` };
 });
 
+await caso('3 acertos (liga e avisa a equipe): a paciente fica ligada e o aviso diz que a equipe vai conferir telefone ou e-mail', async () => {
+  const x = await abrir({ contaDoBanco: conta(), auth: criarAuth({ meta: { nome: 'Ana Souza', telefone: '71999998888', dt_nasc: '1980-03-25' } }), sessaoGuardada: true, vinculo: 'vinculado_conferir' });
+  const aviso = await texto(x.page, '#toast'), ligado = x.mundo.conta && x.mundo.conta.cadastro_salvo === true;
+  await x.ctx.close();
+  return { ok: /equipe vai conferir/.test(aviso || '') && ligado, detalhe: `aviso=${aviso}; ligado=${ligado}` };
+});
+
+await caso('Só nome e nascimento batem: NÃO fica ligada; diz que um atendente vai conferir e que já pode agendar', async () => {
+  const x = await abrir({ contaDoBanco: conta(), auth: criarAuth({ meta: { nome: 'Ana Souza', telefone: '71999998888', dt_nasc: '1980-03-25' } }), sessaoGuardada: true, vinculo: 'em_analise' });
+  const aviso = await texto(x.page, '#toast'), ligado = x.mundo.conta && x.mundo.conta.cadastro_salvo === true, logada = await visivel(x.page, '#btnContaSair');
+  await x.ctx.close();
+  return { ok: /atendente vai conferir/.test(aviso || '') && /já pode agendar/.test(aviso || '') && !ligado && logada, detalhe: `aviso=${aviso}; ligado=${ligado}` };
+});
+
+await caso('Criar conta: nome com uma palavra só é barrado ("nome completo")', async () => {
+  const x = await abrir();
+  await x.page.click('#btnContaCriar'); await x.page.waitForSelector('#cNome');
+  await x.page.fill('#cNome', 'Ana'); await x.page.fill('#cTel', '71999998888'); await x.page.fill('#cNasc', '25/03/1980'); await x.page.fill('#cEmail', 'ana@teste.local'); await x.page.fill('#cSenha', 'Senha1234'); await x.page.check('#cAceite');
+  await x.page.click('.conta-form button[type=submit]'); await espera(200);
+  const erro = await texto(x.page, '.conta-form .erro-form'), rotulo = await texto(x.page, 'label[for=cNome]'), rede = x.auth.chamadas.length;
+  await x.ctx.close();
+  return { ok: /nome completo/i.test(erro || '') && /Nome completo/.test(rotulo || '') && rede === 0, detalhe: `erro=${erro}; rotulo=${rotulo}; rede=${rede}` };
+});
+
 await caso('Sem data de nascimento pendente (conta antiga ou já ligada): nem chama o vínculo', async () => {
   const a = await abrir({ contaDoBanco: conta(), sessaoGuardada: true });
   const b = await abrir({ contaDoBanco: conta({ cadastro_salvo: true }), auth: criarAuth({ meta: { dt_nasc: '1980-03-25' } }), sessaoGuardada: true });

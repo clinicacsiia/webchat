@@ -46,8 +46,9 @@ const RELATORIO = { dias: 28, desde: '2026-10-02T10:58:04+00:00', resumo: { cria
 
 const CORS = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' };
 
-async function novaPagina(browser, { logado = false } = {}) {
+async function novaPagina(browser, { logado = false, vinculos = [] } = {}) {
   const ctx = await browser.newContext();
+  const decisoes = [];
   if (logado) {
     await ctx.addInitScript(([id, jwt, email]) => {
       localStorage.setItem('sb-nrvuynjwcgwpjdptkiay-auth-token', JSON.stringify({
@@ -71,7 +72,9 @@ async function novaPagina(browser, { logado = false } = {}) {
     const url = new URL(req.url());
     const objeto = (req.headers()['accept'] ?? '').includes('vnd.pgrst.object');
     let corpo;
-    if (url.pathname.endsWith('/rpc/chat_config')) corpo = { nome_empresa: 'Clínica de Teste', boas_vindas: 'Olá! Como podemos ajudar?' };
+    if (url.pathname.endsWith('/rpc/vinculo_listar')) corpo = vinculos;
+    else if (url.pathname.endsWith('/rpc/vinculo_decidir')) { decisoes.push(JSON.parse(req.postData() || '{}')); corpo = { ok: true }; }
+    else if (url.pathname.endsWith('/rpc/chat_config')) corpo = { nome_empresa: 'Clínica de Teste', boas_vindas: 'Olá! Como podemos ajudar?' };
     else if (url.pathname.startsWith('/auth/v1/user')) corpo = { id: ADMIN.id, aud: 'authenticated', role: 'authenticated', email: ADMIN.email };
     else if (url.pathname.startsWith('/rest/v1/agentes')) corpo = objeto ? ADMIN : [ADMIN];
     else if (url.pathname.endsWith('/rpc/catalogo_mudancas') || url.pathname.endsWith('/rpc/ia_exemplos')) corpo = [];
@@ -83,7 +86,7 @@ async function novaPagina(browser, { logado = false } = {}) {
     return rota.fulfill({ status: 200, headers: CORS, contentType: 'application/json', body: JSON.stringify(corpo) });
   });
   if (typeof page.routeWebSocket === 'function') await page.routeWebSocket(/supabase\.co/, (ws) => ws.close());
-  return { page, ctx, erros };
+  return { page, ctx, erros, decisoes };
 }
 
 const resultados = [];
@@ -115,13 +118,13 @@ await caso('painel (deslogado): mostra a tela de login sem exceção de JS', asy
   return { ok: erros.excecoes.length === 0 && campos === 2, detalhe: erros.excecoes[0] ?? `campos de login=${campos}` };
 });
 
-await caso('painel (admin logado): monta o menu com as 6 seções do administrador', async () => {
+await caso('painel (admin logado): monta o menu com as 7 seções do administrador', async () => {
   const { page, ctx, erros } = await novaPagina(browser, { logado: true });
   await page.goto(`${base}/painel/`);
   await page.waitForSelector('nav.nav button', { timeout: 10000 });
   const abas = await page.locator('nav.nav button').evaluateAll((bs) => bs.map((b) => b.dataset.aba));
   await ctx.close();
-  const esperado = ['atendimento', 'contatos', 'equipe', 'catalogo', 'aprendizado', 'config'];
+  const esperado = ['atendimento', 'contatos', 'vinculos', 'equipe', 'catalogo', 'aprendizado', 'config'];
   return { ok: erros.excecoes.length === 0 && esperado.every((a) => abas.includes(a)), detalhe: erros.excecoes[0] ?? abas.join(',') };
 });
 
@@ -129,12 +132,52 @@ await caso('painel (admin logado): cada aba abre sem exceção de JS', async () 
   const { page, ctx, erros } = await novaPagina(browser, { logado: true });
   await page.goto(`${base}/painel/`);
   await page.waitForSelector('nav.nav button', { timeout: 10000 });
-  for (const aba of ['contatos', 'equipe', 'catalogo', 'aprendizado', 'config', 'atendimento']) {
+  for (const aba of ['contatos', 'vinculos', 'equipe', 'catalogo', 'aprendizado', 'config', 'atendimento']) {
     await page.click(`nav.nav button[data-aba="${aba}"]`);
     await page.waitForTimeout(350);
   }
   await ctx.close();
   return { ok: erros.excecoes.length === 0, detalhe: erros.excecoes[0] ?? 'sem exceções' };
+});
+
+const AVISO_ATUALIZAR = { id: 7, tipo: 'atualizar', criado_em: '2026-10-31T15:00:00Z', batem: ['nome', 'nascimento', 'telefone'], diferem: ['email'],
+  conta: { email: 'maria.nova@exemplo.com', nome: 'Maria da Silva', telefone: '71988710544' },
+  cadastro: { nome: 'Maria da Silva', email: 'maria.antiga@exemplo.com', telefones: ['7188710544'], dt_nasc: '1980-03-25', ultima_visita_em: '2026-09-01T10:00:00Z' } };
+const PEDIDO_VERIFICAR = { id: 8, tipo: 'verificar', criado_em: '2026-10-31T16:00:00Z', batem: ['nome', 'nascimento'], diferem: ['telefone', 'email'],
+  conta: { email: 'joao.novo@exemplo.com', nome: 'João Pereira Lima', telefone: '71977776666' },
+  cadastro: { nome: 'João Pereira Lima', email: 'joao.velho@exemplo.com', telefones: ['7133334444'], dt_nasc: '1975-07-10', ultima_visita_em: '2026-08-01T10:00:00Z' } };
+
+await caso('painel (atendente): aba Vínculos mostra o selo, compara conta x cadastro, destaca o que difere e manda a decisão certa', async () => {
+  const { page, ctx, erros, decisoes } = await novaPagina(browser, { logado: true, vinculos: [AVISO_ATUALIZAR, PEDIDO_VERIFICAR] });
+  await page.goto(`${base}/painel/`);
+  await page.waitForSelector('nav.nav button[data-aba="vinculos"]', { timeout: 10000 });
+  await page.waitForTimeout(500);
+  const selo = await page.locator('#seloVinculos').evaluate((e) => ({ txt: e.textContent, oculto: e.hidden }));
+  await page.click('nav.nav button[data-aba="vinculos"]');
+  await page.waitForSelector('.cartao-vinculo', { timeout: 5000 });
+  const cartoes = await page.locator('.cartao-vinculo').count();
+  const difere = await page.locator('.cartao-vinculo').first().locator('tr.difere th').allTextContents();
+  const botoes1 = await page.locator('.cartao-vinculo').first().locator('.acoes-vinculo button').allTextContents();
+  const botoes2 = await page.locator('.cartao-vinculo').nth(1).locator('.acoes-vinculo button').allTextContents();
+  await page.locator('.cartao-vinculo').first().locator('button', { hasText: 'Atualizar o cadastro' }).click();
+  await page.waitForTimeout(400);
+  await ctx.close();
+  const ok = selo.txt === '2' && !selo.oculto && cartoes === 2 && difere.join() === 'E-mail'
+    && botoes1.includes('Atualizar o cadastro com os dados novos') && botoes1.includes('Desfazer o vínculo')
+    && botoes2.includes('Vincular') && botoes2.includes('Não vincular') && botoes2.includes('Vincular e atualizar o cadastro')
+    && decisoes.length === 1 && decisoes[0].p_id === 7 && decisoes[0].p_acao === 'atualizar' && erros.excecoes.length === 0;
+  return { ok, detalhe: erros.excecoes[0] ?? JSON.stringify({ selo, cartoes, difere, botoes1, botoes2, decisoes }) };
+});
+
+await caso('painel: sem nada para conferir mostra a mensagem vazia e esconde o selo', async () => {
+  const { page, ctx, erros } = await novaPagina(browser, { logado: true, vinculos: [] });
+  await page.goto(`${base}/painel/`);
+  await page.waitForSelector('nav.nav button[data-aba="vinculos"]', { timeout: 10000 });
+  await page.click('nav.nav button[data-aba="vinculos"]');
+  await page.waitForSelector('.vazio', { timeout: 5000 });
+  const txt = await page.locator('.vazio').textContent(), oculto = await page.locator('#seloVinculos').evaluate((e) => e.hidden);
+  await ctx.close();
+  return { ok: /Nada para conferir/.test(txt) && oculto && erros.excecoes.length === 0, detalhe: erros.excecoes[0] ?? txt };
 });
 
 // A tela da Fila foi retirada do repositório (a antiga era incompatível). Os casos voltam sozinhos quando a pasta fila/ voltar.
