@@ -202,13 +202,45 @@ A Fase 5 (Aprendizado) mede hoje os erros da IA. Ela passa a medir os do motor: 
 - Sugestões da IA para aprovar ou recusar.
 - Textos de cada passo, editáveis.
 
+### Entrada única: WhatsApp e e-mail abrem a mesma página e o cache faz o login
+
+**Decisão da equipe (31/10/2026):** os avisos vão por WhatsApp **e** por e-mail, e os dois levam para a mesma página. O paciente vai para o chat (`index.html`) e a equipe para o painel. A página usa o que já está guardado no aparelho para reconhecer a pessoa e entrar sem formulário.
+
+**Paciente**
+
+| Ao abrir a página | O que acontece |
+|---|---|
+| O aparelho tem a conversa em andamento | Abre direto nela, como já acontece hoje. Muda uma coisa: as últimas mensagens também ficam guardadas no aparelho e aparecem na hora, e as novas chegam logo depois |
+| O aparelho tem o perfil (nome, telefone, e-mail), mas a conversa acabou | No lugar do formulário: "Olá de novo, {nome}!" com os botões **Continuar como {nome}** e **Não sou eu**. "Continuar" abre a conversa com os dados guardados; unidade e quem será atendido viram o primeiro passo do motor |
+| O aparelho não tem nada (outro celular, cache apagado ou navegador interno do app) | O link da mensagem traz um **código pessoal** (`?c=...`). A página troca o código pela conversa, guarda no aparelho e tira o código do endereço. Sem código, aparece o formulário normal |
+
+O código existe porque o cache nem sempre está lá. Em alguns aparelhos, principalmente no iPhone, o link tocado dentro do WhatsApp ou do app de e-mail abre num navegador interno, que não enxerga o que o Safari guardou. Sem o código, o paciente teria de preencher o formulário de novo.
+
+Regras:
+
+- **O cache só preenche o login, não libera dados.** A regra de login continua valendo (nome, telefone e e-mail batendo), e a data de nascimento continua obrigatória antes de usar qualquer dado do cadastro.
+- **Código do link:** aleatório, abre só aquela conversa, vale 7 dias depois do encerramento e fica guardado no banco só como hash. Não dá acesso ao cadastro do paciente.
+- **"Não sou eu" e "Sair"** (no menu) apagam do aparelho a conversa e o perfil. Isso cobre o celular emprestado ou da família.
+- O `?origem=whatsapp` / `?origem=email` continua marcando de onde a pessoa veio (relatório do marketing).
+
+**Página abrindo na hora:** o `sw.js` hoje busca a página na rede primeiro. Ele passa a abrir a cópia guardada na hora e a baixar a versão nova por trás, para a próxima abertura. A busca no cache ignora o que vem depois do `?` (`?origem`, `?c`), para não guardar uma cópia por link.
+
+**Equipe:** o aviso de transferência traz o link `painel/?conversa=<id>`. O painel já guarda o login no navegador (sessão do Supabase), então abre direto na conversa. Se não houver sessão, pede o login e depois vai para a conversa. O WhatsApp e o e-mail da equipe levam só o primeiro nome, o motivo ("pré-agendamento pronto", "pediu atendente", "emergência") e o link. Nenhum dado de saúde nem do cadastro vai na mensagem.
+
+**Dependências:**
+
+- **WhatsApp:** precisa do número da clínica ligado à API oficial do WhatsApp Business (Meta) e de modelos de mensagem aprovados por ela, enviados pelo n8n.
+- **E-mail:** precisa de uma credencial de envio no n8n (Gmail ou SMTP).
+- **Aviso ao paciente:** vale para quando o atendente responde e ele não está com o chat aberto, e para a confirmação da marcação (Fase 3). Antes de ligar, conferir se o texto de aceite do formulário cobre receber esses avisos por WhatsApp e e-mail.
+
 ## 8. Ordem de trabalho
 
 | Etapa | Entrega | Pronta quando |
 |---|---|---|
 | **7.0** | Este plano e o mapa do processo | A equipe revisou o mapa da seção 4 e respondeu as decisões da seção 9 |
 | **7.1** | Motor no banco com `config.motor = 'ia'` (nada muda para o paciente) + testes automáticos de cada passo e interceptador (Postgres embutido, como os testes do PR #15) | Todos os passos e interceptadores com teste passando; `fluxo_avancar` abaixo de 50 ms nos testes |
-| **7.2** | Chat: formulário de dados, leitura de volta, escolha estruturada, resposta direta, botão de atendente, medição de tempo | Funciona no celular com `motor = 'fluxo'` numa conversa de teste |
+| **7.2** | Chat: formulário de dados, leitura de volta, escolha estruturada, resposta direta, botão de atendente, medição de tempo. Entrada única: "Continuar como {nome}", código pessoal no link, "Não sou eu"/"Sair", `sw.js` abrindo do cache | Funciona no celular com `motor = 'fluxo'` numa conversa de teste, aberta pelo link do WhatsApp e pelo do e-mail, com e sem cache |
+| **7.2b** | Avisos por WhatsApp e e-mail no n8n: à equipe a cada transferência (link do painel) e ao paciente quando o atendente responde ou a marcação é conferida (link do chat com código) | O link do aviso abre a conversa certa, já logado, no celular da equipe e no do paciente |
 | **7.3** | Pacientes simulados pela IA + roteiro de teste manual (no formato de `docs/fase6-roteiro-de-teste-e-producao.md`) | Nenhuma conversa simulada trava sem ir para o atendente; emergência sempre detectada nos testes |
 | **7.4** | Ligar por unidade: primeiro **CSI RM/TC** (fluxo mais curto: só mapa do corpo), depois **CSI**, depois **Desenvoar** | Alguns dias por unidade com 95% das respostas abaixo de 1 s e transferências por "não entendido" sob controle |
 | **7.5** | Despublicar o fluxo `Triagem IA - Atendimento` do n8n. O n8n passa a ter só o aviso à equipe a cada transferência e a revisão diária | Uma semana sem nenhuma resposta da IA ao paciente |
@@ -218,7 +250,7 @@ Voltar atrás em qualquer etapa: `config.motor = 'ia'` (enquanto o fluxo do n8n 
 
 ## 9. Decisões que são da equipe
 
-1. **Canal do aviso de transferência**: Telegram, WhatsApp ou e-mail? Sem ele, à noite o paciente fica esperando sem ninguém saber (o mesmo problema que já existe hoje).
+1. ~~Canal do aviso de transferência~~ **Decidido em 31/10/2026:** WhatsApp e e-mail, os dois levando à mesma página, com login pelo cache (ver "Entrada única" na seção 7). Falta: o número da clínica na API oficial do WhatsApp e a credencial de e-mail no n8n.
 2. **Horário de atendimento**: qual é, por unidade, e o texto que o paciente recebe fora dele.
 3. **Quem aprova as sugestões da IA** na aba Fluxo.
 4. **Texto livre no início**: manter o campo de texto aberto desde a primeira mensagem (o motor tenta entender e confirma) ou começar só com botões e liberar o texto depois? Recomendação: manter aberto, porque é como o paciente está acostumado no WhatsApp, e a seção 5 cobre os casos comuns.
