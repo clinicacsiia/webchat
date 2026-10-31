@@ -24,6 +24,6 @@ Os outros textos novos (`assunto_qual_remarcar`, `assunto_qual_cancelar`, `assun
 ## Limites conhecidos
 
 - O site só conhece os horários que o Klingo já sincronizou no histórico (`paciente_historico`, campo `futuro`); consultas ainda não aparecem nessa lista.
-- Remarcar copia o exame só do horário mais recente (é o que `pre_reaproveitar` faz hoje).
+- Remarcar copia o exame do horário escolhido (`pre_reaproveitar(..., 'ultimo:N')`), exige `supabase/remarcar-qualquer-horario.sql` (aplicado no Supabase em 31/10/2026). Sem esse arquivo, só o primeiro item da lista segue sozinho; os outros vão para o atendente.
 - Cancelar e remarcar continuam sendo confirmados por um atendente no Klingo; o chat só tira o trabalho de perguntar.
 - Aplicado no Supabase real e conferido (as 5 funções do motor e os textos novos), mas ainda sem teste de ponta a ponta com uma conversa de verdade. `npm run test:assuntos` (21 verificações) usa o Postgres embutido com as funções reais do motor.
