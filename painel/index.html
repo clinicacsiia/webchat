@@ -605,7 +605,7 @@
     if (S.aba !== 'vinculos') return;
     renderVinculos(c);
   }
-  const ROTULO_ACERTO = { nome: 'nome', nascimento: 'data de nascimento', telefone: 'telefone', email: 'e-mail' };
+  const ROTULO_ACERTO = { nome: 'nome', nascimento: 'data de nascimento', telefone: 'telefone', email: 'e-mail', cpf: 'CPF' };
   function renderVinculos(c) {
     if (!c || S.aba !== 'vinculos') return;
     const lista = S.vinculos;
@@ -621,22 +621,27 @@
         if (error) { erro.textContent = msgErro(error); b.disabled = false; return; }
         toast('Pronto.'); await carregarVinculos(); renderVinculos(document.getElementById('conteudo'));
       } }, rotulo);
-      const verificar = v.tipo === 'verificar';
+      const verificar = v.tipo === 'verificar', alterar = v.tipo === 'alterar';
+      const novo = v.novo || {};
       const tels = (v.cadastro.telefones || []).map(fmtTel).join(', ');
       return h('div', { class: 'cartao-vinculo' },
-        h('div', { class: 'topo' }, h('b', {}, v.conta.nome || v.conta.email), h('span', { class: 'tag ' + (verificar ? 'aguardando' : '') }, verificar ? 'Decidir se vincula' : 'Ligada sozinha: conferir'), h('span', { class: 'dica' }, fmtDataHora(v.criado_em))),
-        h('p', { class: 'dica' }, verificar
+        h('div', { class: 'topo' }, h('b', {}, v.conta.nome || v.conta.email), h('span', { class: 'tag ' + (verificar ? 'aguardando' : '') }, verificar ? 'Decidir se vincula' : alterar ? 'Pedido de mudança (CPF conferido)' : 'Ligada: conferir'), h('span', { class: 'dica' }, fmtDataHora(v.criado_em))),
+        h('p', { class: 'dica' }, alterar
+          ? 'O paciente pediu para mudar o ' + (v.diferem || []).map((k) => ROTULO_ACERTO[k] || k).join(' e ') + ' do cadastro e informou o CPF correto. Aplicar muda o cadastro do chat; corrija também no Klingo.'
+          : verificar
           ? 'Só o nome e a data de nascimento batem com um cadastro. A conta NÃO foi ligada. Confira com o paciente (por exemplo pelo WhatsApp) se o telefone e o e-mail mudaram.'
           : 'Bateram ' + (v.batem || []).map((k) => ROTULO_ACERTO[k] || k).join(', ') + '. A conta já foi ligada ao cadastro. Confira se o ' + (v.diferem || []).map((k) => ROTULO_ACERTO[k] || k).join(' e ') + ' do cadastro está desatualizado.'),
         h('table', { class: 'comparacao' },
-          h('thead', {}, h('tr', {}, ['', 'Digitado na conta', 'Cadastro da clínica', ''].map((t) => h('th', {}, t)))),
-          h('tbody', {},
-            dado('Nome', v.conta.nome, v.cadastro.nome, false),
-            dado('Nascimento', 'confere', v.cadastro.dt_nasc ? new Date(v.cadastro.dt_nasc + 'T12:00:00').toLocaleDateString('pt-BR') : '', false),
-            dado('Telefone', v.conta.telefone ? fmtTel(v.conta.telefone) : '', tels, dif('telefone')),
-            dado('E-mail', v.conta.email, v.cadastro.email, dif('email')))),
+          h('thead', {}, h('tr', {}, ['', alterar ? 'Pedido do paciente' : 'Digitado na conta', 'Cadastro da clínica', ''].map((t) => h('th', {}, t)))),
+          h('tbody', {}, alterar
+            ? [dif('email') ? dado('E-mail', novo.email, v.cadastro.email, true) : null, dif('telefone') ? dado('Telefone', novo.telefone ? fmtTel(novo.telefone) : '', tels, true) : null]
+            : [dado('Nome', v.conta.nome, v.cadastro.nome, false),
+               dado('Nascimento', 'confere', v.cadastro.dt_nasc ? new Date(v.cadastro.dt_nasc + 'T12:00:00').toLocaleDateString('pt-BR') : '', false),
+               dado('Telefone', v.conta.telefone ? fmtTel(v.conta.telefone) : '', tels, dif('telefone')),
+               dado('E-mail', v.conta.email, v.cadastro.email, dif('email'))])),
         h('div', { class: 'acoes-vinculo' },
-          verificar ? [acao('Vincular', 'vincular', 'prim'), acao('Vincular e atualizar o cadastro', 'vincular_atualizar'), acao('Não vincular', 'recusar', 'perigo', 'Não vincular esta conta ao cadastro?')]
+          alterar ? [acao('Aplicar no cadastro', 'aplicar', 'prim'), acao('Recusar', 'recusar', 'perigo', 'Recusar este pedido de mudança?')]
+          : verificar ? [acao('Vincular', 'vincular', 'prim'), acao('Vincular e atualizar o cadastro', 'vincular_atualizar'), acao('Não vincular', 'recusar', 'perigo', 'Não vincular esta conta ao cadastro?')]
                     : [acao('Atualizar o cadastro com os dados novos', 'atualizar', 'prim'), acao('Está certo, só conferi', 'conferido'), acao('Desfazer o vínculo', 'desfazer', 'perigo', 'Soltar esta conta do cadastro? O paciente perde o reconhecimento automático.')]),
         erro);
     };

@@ -267,6 +267,126 @@ await casoL('excluir a conta apaga o aviso junto (sem sobra de dado)', async () 
   return { ok: (await aviso(c.id)) === null };
 });
 
+// ---- CPF ----
+const CPF = '52998224725', CPF_FMT = '529.982.247-25', OUTRO_CPF = '11144477735';
+const paciCpf = (extra = {}) => paciente(extra).then(async (id) => { await q(`update public.pacientes set cpf = $2 where id = $1`, [id, extra.cpf === undefined ? CPF_FMT : extra.cpf]); return id; });
+const comoConta = (uid, sql, params = []) => como('authenticated', uid, async () => (await q(sql, params))[0].r);
+const confirmarCpf = (uid, cpf) => comoConta(uid, `select public.conta_paciente_confirmar_cpf($1) r`, [cpf]);
+const pedirAlteracao = (uid, cpf, email = null, tel = null) => comoConta(uid, `select public.conta_paciente_pedir_alteracao($1, $2, $3) r`, [cpf, email, tel]);
+const estado = (uid) => comoConta(uid, `select public.conta_paciente_vinculo_estado() r`);
+const quando = async (fn) => { try { return { ok: await fn() }; } catch (e) { return { erro: e.message }; } };
+
+await casoL('cpf_valido: aceita CPF certo (com ou sem pontuação) e recusa dígito errado, repetido, curto e vazio', async () => {
+  const v = async (t) => (await q(`select public.cpf_valido($1) r`, [t]))[0].r;
+  const r = [await v('529.982.247-25'), await v('52998224725'), await v('52998224726'), await v('11111111111'), await v('1234'), await v(''), await v(null)];
+  return { ok: JSON.stringify(r) === '[true,true,false,false,false,false,false]', detalhe: JSON.stringify(r) };
+});
+
+await casoL('CPF certo (só nome + nascimento batiam): liga a conta, vira aviso "atualizar" com CPF entre os acertos e o atendente atualiza', async () => {
+  const c = await conta({ tel: '71977776666' }), p = await paciCpf({ email: 'velho@exemplo.com' });
+  const r0 = await vincular(c.id), antes = await estado(c.id);
+  const r = await confirmarCpf(c.id, '529.982.247-25'), a = await aviso(c.id), depois = await estado(c.id);
+  const lin = (await q(`select vinculo_metodo from public.contas_paciente where id = $1`, [c.id]))[0];
+  await decidir(EQUIPE, await idAviso(c.id), 'atualizar');
+  const cad = (await q(`select email, telefones from public.pacientes where id = $1`, [p]))[0];
+  return { ok: r0 === 'em_analise' && antes.verificar_aberto === true && antes.ligada === false && r.resultado === 'vinculado_conferir' && (await ligado(c.id)) === p && a.tipo === 'atualizar' && a.batem.includes('cpf') && depois.ligada === true && depois.verificar_aberto === false && lin.vinculo_metodo === 'cpf' && cad.email === c.email && cad.telefones.includes('7177776666'), detalhe: JSON.stringify({ r0, r, a }) };
+});
+await casoL('CPF errado: NÃO liga, o pedido continua com o atendente; o CPF não aparece em lugar nenhum', async () => {
+  const c = await conta({ tel: '71977776666' }), p = await paciCpf({ email: 'velho2@exemplo.com' });
+  await vincular(c.id);
+  const r = await confirmarCpf(c.id, OUTRO_CPF), a = await aviso(c.id);
+  const vazou = (await q(`select count(*)::int n from public.vinculo_solicitacoes where to_jsonb(vinculo_solicitacoes)::text like '%52998224725%' or to_jsonb(vinculo_solicitacoes)::text like '%11144477735%'`))[0].n;
+  return { ok: r.resultado === 'cpf_nao_confere' && (await ligado(c.id)) === null && a.tipo === 'verificar' && a.status === 'aberta' && vazou === 0 && JSON.stringify(Object.keys(r)) === '["resultado"]', detalhe: JSON.stringify(r) };
+});
+await casoL('CPF: cadastro sem CPF registrado → "cadastro_sem_cpf" e continua com o atendente; CPF inválido é recusado antes de contar tentativa', async () => {
+  const c = await conta({ tel: '71977776666' }); await paciCpf({ email: 'velho3@exemplo.com', cpf: null });
+  await vincular(c.id);
+  const r = await confirmarCpf(c.id, CPF);
+  const inval = await quando(() => confirmarCpf(c.id, '123.456.789-00'));
+  const tent = (await q(`select vinculo_tentativas n from public.contas_paciente where id = $1`, [c.id]))[0].n;
+  return { ok: r.resultado === 'cadastro_sem_cpf' && (await ligado(c.id)) === null && !!inval.erro && tent === 2, detalhe: `${r.resultado}; tentativas=${tent}` };
+});
+await casoL('CPF: sem pedido aberto (não achou nome/nascimento) nada acontece — CPF sozinho não liga ninguém', async () => {
+  const c = await conta({ nome: 'Pedro Alves', nasc: '1990-01-01' }); await paciCpf({ email: c.email });
+  const r0 = await vincular(c.id), r = await confirmarCpf(c.id, CPF);
+  return { ok: r0 === 'nao_encontrado' && r.resultado === 'sem_pedido' && (await ligado(c.id)) === null, detalhe: `${r0}, ${r.resultado}` };
+});
+await casoL('CPF: respeita o limite de 5 tentativas por hora, contando a do vínculo (não dá para adivinhar CPF)', async () => {
+  const c = await conta({ tel: '71977776666' }); const p = await paciCpf({ email: 'velho4@exemplo.com' });
+  await vincular(c.id);
+  const rs = []; for (let i = 0; i < 6; i++) rs.push((await confirmarCpf(c.id, i % 2 ? OUTRO_CPF : '39053344705')).resultado);
+  const certo = (await confirmarCpf(c.id, CPF)).resultado;
+  return { ok: rs.slice(0, 4).every((x) => x === 'cpf_nao_confere') && rs.slice(4).every((x) => x === 'bloqueado') && certo === 'bloqueado' && (await ligado(c.id)) === null, detalhe: rs.join(',') + ' / certo=' + certo };
+});
+await casoL('CPF: cadastro que outra conta já pegou não é tomado pelo CPF', async () => {
+  const c = await conta({ tel: '71977776666' }), p = await paciCpf({ email: 'velho5@exemplo.com' });
+  await vincular(c.id);
+  await q(`update public.contas_paciente set paciente_id = $1 where id = $2`, [p, PACIENTE_X]);
+  const r = await confirmarCpf(c.id, CPF);
+  return { ok: r.resultado === 'sem_pedido' && (await ligado(c.id)) === null, detalhe: r.resultado };
+});
+await casoL('equipe e anônimo não usam as funções do paciente (CPF, alteração, estado)', async () => {
+  const f = [];
+  for (const [papel, uid] of [['authenticated', EQUIPE], ['anon', null]]) await como(papel, uid, async () => {
+    for (const sql of [`select public.conta_paciente_confirmar_cpf('52998224725')`, `select public.conta_paciente_pedir_alteracao('52998224725', 'a@b.co', null)`]) { try { await q(sql); f.push(papel + ' ' + sql.slice(30, 60)); } catch { /* esperado */ } }
+  });
+  const est = await como('authenticated', EQUIPE, async () => (await q(`select public.conta_paciente_vinculo_estado() r`))[0].r);
+  return { ok: f.length === 0 && est.ligada === false && est.verificar_aberto === false, detalhe: f.join('; ') || 'recusado' };
+});
+
+// ---- pedido de mudança de e-mail / telefone ----
+const ligada = async (extra = {}) => { const c = await conta(extra.conta), p = await paciCpf({ email: c.email, ...extra.paciente }); await vincular(c.id); return { c, p }; };
+await casoL('alteração: conta ligada + CPF certo + e-mail novo → abre pedido "alterar"; NADA muda no cadastro até o atendente aplicar', async () => {
+  const { c, p } = await ligada();
+  const r = await pedirAlteracao(c.id, CPF_FMT, 'Novo.Email@Exemplo.com'), a = await aviso(c.id);
+  const cad = (await q(`select email from public.pacientes where id = $1`, [p]))[0].email;
+  const lista = (await listar(EQUIPE)).find((x) => x.tipo === 'alterar');
+  const est = await estado(c.id);
+  return { ok: r.resultado === 'pedido_enviado' && a.tipo === 'alterar' && a.batem.join() === 'cpf' && a.diferem.join() === 'email' && cad === c.email && lista.novo.email === 'novo.email@exemplo.com' && est.alteracao_aberta === true, detalhe: JSON.stringify(a) };
+});
+await casoL('alteração: o atendente APLICA (e-mail troca, telefone novo entra junto com o antigo) e fica registrado', async () => {
+  const { c, p } = await ligada();
+  await pedirAlteracao(c.id, CPF, 'novo@exemplo.com', '(71) 97777-6666');
+  const id = await idAviso(c.id), r = await decidir(EQUIPE, id, 'aplicar');
+  const cad = (await q(`select email, telefones from public.pacientes where id = $1`, [p]))[0], reg = (await q(`select status, decidido_por from public.vinculo_solicitacoes where id = $1`, [id]))[0];
+  return { ok: r.status === 'aplicada' && cad.email === 'novo@exemplo.com' && cad.telefones.includes('7188710544') && cad.telefones.includes('7177776666') && reg.decidido_por === EQUIPE && (await ligado(c.id)) === p, detalhe: JSON.stringify(cad) };
+});
+await casoL('alteração: o atendente RECUSA e o cadastro fica como estava; ações trocadas de tipo são recusadas', async () => {
+  const { c, p } = await ligada();
+  await pedirAlteracao(c.id, CPF, 'outro@exemplo.com');
+  const id = await idAviso(c.id);
+  const errada = await quando(() => decidir(EQUIPE, id, 'desfazer'));
+  const r = await decidir(EQUIPE, id, 'recusar');
+  const cad = (await q(`select email from public.pacientes where id = $1`, [p]))[0].email;
+  return { ok: !!errada.erro && r.status === 'recusada' && cad === c.email && (await ligado(c.id)) === p, detalhe: cad };
+});
+await casoL('alteração: CPF errado, cadastro sem CPF e conta sem cadastro NÃO abrem pedido', async () => {
+  const { c } = await ligada();
+  const errado = await pedirAlteracao(c.id, OUTRO_CPF, 'x@exemplo.com');
+  const d = await conta(), p2 = await paciCpf({ nome: 'Joana Souza Lima', email: d.email, cpf: null }); await q(`update auth.users set raw_user_meta_data = raw_user_meta_data || '{"nome":"Joana Souza Lima"}'::jsonb where id = $1`, [d.id]);
+  await vincular(d.id);
+  const semCpf = await pedirAlteracao(d.id, CPF, 'y@exemplo.com');
+  const e = await conta({ nome: 'Pedro Alves', nasc: '1990-01-01' }); await vincular(e.id);
+  const semCad = await pedirAlteracao(e.id, CPF, 'z@exemplo.com');
+  const n = (await q(`select count(*)::int n from public.vinculo_solicitacoes where tipo = 'alterar'`))[0].n;
+  return { ok: errado.resultado === 'cpf_nao_confere' && semCpf.resultado === 'cadastro_sem_cpf' && semCad.resultado === 'sem_cadastro' && n === 0, detalhe: `${errado.resultado}, ${semCpf.resultado}, ${semCad.resultado}` };
+});
+await casoL('alteração: mesmo e-mail/telefone que já está no cadastro → "sem_mudanca"; vazio, e-mail ou telefone inválidos e CPF inválido são recusados', async () => {
+  const { c } = await ligada({ paciente: { tels: ['7188710544'] } });
+  const igual = await pedirAlteracao(c.id, CPF, c.email.toUpperCase(), '71988710544');
+  const erros = [];
+  for (const args of [[CPF, null, null], [CPF, 'sem-arroba', null], [CPF, null, '123'], ['123.456.789-00', 'a@b.co', null]]) { const r = await quando(() => pedirAlteracao(c.id, ...args)); if (!r.erro) erros.push(args.join('|')); }
+  return { ok: igual.resultado === 'sem_mudanca' && erros.length === 0, detalhe: igual.resultado + (erros.length ? ' aceitou: ' + erros.join(' ; ') : '') };
+});
+await casoL('alteração: respeita o limite de tentativas e um segundo pedido aberto substitui o primeiro (uma linha aberta por tipo)', async () => {
+  const { c } = await ligada();
+  await pedirAlteracao(c.id, CPF, 'a1@exemplo.com'); await pedirAlteracao(c.id, CPF, 'a2@exemplo.com');
+  const abertas = (await q(`select count(*)::int n, max(novo_email) e from public.vinculo_solicitacoes where conta_id = $1 and tipo = 'alterar' and status = 'aberta'`, [c.id]))[0];
+  const rs = []; for (let i = 0; i < 4; i++) rs.push((await pedirAlteracao(c.id, OUTRO_CPF, 'b@exemplo.com')).resultado);
+  const fim = (await pedirAlteracao(c.id, CPF, 'a3@exemplo.com')).resultado;
+  return { ok: abertas.n === 1 && abertas.e === 'a2@exemplo.com' && fim === 'bloqueado', detalhe: `${abertas.n} aberta; ${rs.join(',')}; depois=${fim}` };
+});
+
 const ok = resultados.filter(Boolean).length;
 console.log(`\n${ok}/${resultados.length} casos passaram.`);
 process.exit(ok === resultados.length ? 0 : 1);

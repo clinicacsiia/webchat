@@ -147,6 +147,27 @@ const PEDIDO_VERIFICAR = { id: 8, tipo: 'verificar', criado_em: '2026-10-31T16:0
   conta: { email: 'joao.novo@exemplo.com', nome: 'João Pereira Lima', telefone: '71977776666' },
   cadastro: { nome: 'João Pereira Lima', email: 'joao.velho@exemplo.com', telefones: ['7133334444'], dt_nasc: '1975-07-10', ultima_visita_em: '2026-08-01T10:00:00Z' } };
 
+const PEDIDO_ALTERAR = { id: 9, tipo: 'alterar', criado_em: '2026-10-31T17:00:00Z', batem: ['cpf'], diferem: ['email', 'telefone'],
+  conta: { email: 'ana@login.exemplo.com', nome: 'Ana Souza', telefone: '71999998888' }, novo: { email: 'ana.nova@exemplo.com', telefone: '71955554444' },
+  cadastro: { nome: 'Ana Souza', email: 'ana.velha@exemplo.com', telefones: ['7133334444'], dt_nasc: '1990-02-02', ultima_visita_em: '2026-08-01T10:00:00Z' } };
+
+await caso('painel (atendente): pedido de mudança com CPF mostra o que o paciente quer trocar lado a lado e manda "aplicar" ou "recusar"', async () => {
+  const { page, ctx, erros, decisoes } = await novaPagina(browser, { logado: true, vinculos: [PEDIDO_ALTERAR] });
+  await page.goto(`${base}/painel/`);
+  await page.waitForSelector('nav.nav button[data-aba="vinculos"]', { timeout: 10000 });
+  await page.click('nav.nav button[data-aba="vinculos"]');
+  await page.waitForSelector('.cartao-vinculo', { timeout: 5000 });
+  const tag = await page.locator('.cartao-vinculo .tag').first().textContent();
+  const linhas = await page.locator('.cartao-vinculo tbody tr').evaluateAll((rs) => rs.map((r) => r.innerText.replace(/\s+/g, ' ').trim()));
+  const botoes = await page.locator('.acoes-vinculo button').allTextContents();
+  await page.locator('.acoes-vinculo button', { hasText: 'Aplicar no cadastro' }).click();
+  await page.waitForTimeout(400);
+  await ctx.close();
+  const ok = /CPF conferido/.test(tag) && linhas.length === 2 && /ana\.nova@exemplo\.com/.test(linhas[0]) && /ana\.velha@exemplo\.com/.test(linhas[0]) && /\(71\) 95555-4444/.test(linhas[1])
+    && botoes.join() === 'Aplicar no cadastro,Recusar' && decisoes.length === 1 && decisoes[0].p_id === 9 && decisoes[0].p_acao === 'aplicar' && erros.excecoes.length === 0;
+  return { ok, detalhe: erros.excecoes[0] ?? JSON.stringify({ tag, linhas, botoes, decisoes }) };
+});
+
 await caso('painel (atendente): aba Vínculos mostra o selo, compara conta x cadastro, destaca o que difere e manda a decisão certa', async () => {
   const { page, ctx, erros, decisoes } = await novaPagina(browser, { logado: true, vinculos: [AVISO_ATUALIZAR, PEDIDO_VERIFICAR] });
   await page.goto(`${base}/painel/`);

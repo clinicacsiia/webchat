@@ -2297,11 +2297,83 @@
         toast(res === 'vinculado' ? 'Sua conta foi ligada ao seu cadastro na clínica.'
           : 'Sua conta foi ligada ao seu cadastro. A equipe vai conferir o telefone ou o e-mail e atualizar, se for preciso.', res === 'vinculado' ? 4200 : 9000);
       } else if (res === 'em_analise') {
-        toast('Recebemos seu pedido. Um atendente vai conferir seus dados e liberar a ligação com o seu cadastro. Enquanto isso você já pode agendar.', 9000);
+        abrirConfirmarCpf();   // só nome e nascimento bateram: o CPF pode ligar na hora; "Agora não" deixa com o atendente
       } else if (res === 'nao_encontrado' || res === 'bloqueado') {
         toast('Conta criada. Não achamos seu cadastro com esses dados; você pode agendar normalmente e a equipe confere depois.', 9000);
       }
     } catch { /* tenta de novo no próximo acesso */ }
+  }
+
+  // CPF: conferido no banco contra o cadastro e nunca guardado. Serve para (a) ligar a conta quando telefone e e-mail não batem
+  // e (b) pedir a mudança do e-mail/telefone do cadastro. Em ambos o atendente continua no final.
+  function campoCpf(id) {
+    const c = campoTxt(id, 'CPF', { type: 'text', inputmode: 'numeric', autocomplete: 'off', placeholder: '000.000.000-00', maxlength: 14 });
+    c.inp.addEventListener('input', () => { c.inp.value = mascaraCpf(c.inp.value); });
+    return c;
+  }
+  async function atualizarResumoConta() {
+    try { const rr = await db.rpc('conta_paciente_resumo'); if (!rr.error && rr.data && rr.data.conta) { conta = rr.data; atualizarContaUI(); } } catch { /* a próxima abertura atualiza */ }
+  }
+  function abrirConfirmarCpf() {
+    const { corpo } = abrirFolha('Confirmar com o CPF');
+    const cpf = campoCpf('cCpf'), erro = h('p', { class: 'erro-form', role: 'alert' });
+    const btn = h('button', { class: 'btn-primario', type: 'submit', id: 'btnCpfConfirmar' }, 'Confirmar');
+    const MSG = {
+      cpf_nao_confere: 'O CPF não confere com o cadastro. Confira os números ou toque em "Agora não" para um atendente conferir.',
+      cadastro_sem_cpf: 'O cadastro da clínica não tem CPF registrado. Toque em "Agora não": um atendente vai conferir.',
+      bloqueado: 'Muitas tentativas. Aguarde um pouco ou toque em "Agora não" para um atendente conferir.'
+    };
+    corpo.replaceChildren(h('form', { class: 'conta-form', novalidate: true, onsubmit: async (ev) => {
+      ev.preventDefault(); erro.textContent = '';
+      if (!cpfOk(cpf.inp.value)) { erro.textContent = 'Os números do CPF não conferem. Confira, por favor.'; return; }
+      btn.disabled = true; btn.textContent = 'Aguarde…';
+      try {
+        const { data, error } = await db.rpc('conta_paciente_confirmar_cpf', { p_cpf: cpf.inp.value });
+        if (error) throw error;
+        const res = data && data.resultado;
+        if (res === 'vinculado_conferir') { fecharFolha(); await atualizarResumoConta(); toast('Sua conta foi ligada ao seu cadastro. A equipe vai conferir o telefone e o e-mail e atualizar, se for preciso.', 9000); }
+        else if (res === 'sem_pedido' || res === 'ja_vinculado') { fecharFolha(); await atualizarResumoConta(); }
+        else erro.textContent = MSG[res] || 'Não foi possível confirmar agora. Um atendente vai conferir.';
+      } catch (e) { erro.textContent = erroConta(e); } finally { btn.disabled = false; btn.textContent = 'Confirmar'; }
+    } },
+    h('p', { class: 'sub' }, 'Seu nome e sua data de nascimento batem com um cadastro da clínica, mas o telefone e o e-mail são diferentes. Para ligar a sua conta a esse cadastro, confirme com o seu CPF. O CPF só é conferido; não fica guardado.'),
+    cpf.campo, erro, btn,
+    h('button', { type: 'button', class: 'link-add', id: 'btnCpfDepois', onclick: () => { fecharFolha(); toast('Tudo bem. Um atendente vai conferir seus dados e liberar a ligação com o seu cadastro. Enquanto isso você já pode agendar.', 9000); } }, 'Agora não')));
+    setTimeout(() => cpf.inp.focus(), 50);
+  }
+  function abrirAlterarDados() {
+    const { corpo } = abrirFolha('Mudar e-mail ou telefone');
+    const cpf = campoCpf('cCpf'), erro = h('p', { class: 'erro-form', role: 'alert' });
+    const e = campoTxt('cNovoEmail', 'Novo e-mail (se quiser mudar)', { type: 'email', autocomplete: 'off' });
+    const t = campoTxt('cNovoTel', 'Novo telefone com DDD (se quiser mudar)', { type: 'tel', inputmode: 'tel', autocomplete: 'off', placeholder: '(71) 99999-9999', maxlength: 16 });
+    t.inp.addEventListener('input', () => { t.inp.value = mascaraTel(t.inp.value); });
+    const btn = h('button', { class: 'btn-primario', type: 'submit', id: 'btnAlterarEnviar' }, 'Enviar pedido');
+    const MSG = {
+      cpf_nao_confere: 'O CPF não confere com o cadastro. Confira os números.',
+      cadastro_sem_cpf: 'O cadastro da clínica não tem CPF registrado. Fale com a clínica para atualizar os dados.',
+      sem_mudanca: 'Esses dados já estão no seu cadastro.',
+      sem_cadastro: 'Sua conta ainda não está ligada a um cadastro.',
+      bloqueado: 'Muitas tentativas. Aguarde um pouco e tente de novo.'
+    };
+    corpo.replaceChildren(h('form', { class: 'conta-form', novalidate: true, onsubmit: async (ev) => {
+      ev.preventDefault(); erro.textContent = '';
+      const email = e.inp.value.trim(), tel = t.inp.value.replace(/\D/g, '');
+      if (!email && !tel) { erro.textContent = 'Informe o novo e-mail ou o novo telefone.'; return; }
+      if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { erro.textContent = 'Informe um e-mail válido.'; return; }
+      if (tel && tel.length < 10) { erro.textContent = 'Informe o telefone com DDD.'; return; }
+      if (!cpfOk(cpf.inp.value)) { erro.textContent = 'Os números do CPF não conferem. Confira, por favor.'; return; }
+      btn.disabled = true; btn.textContent = 'Aguarde…';
+      try {
+        const { data, error } = await db.rpc('conta_paciente_pedir_alteracao', { p_cpf: cpf.inp.value, p_email: email || null, p_telefone: tel || null });
+        if (error) throw error;
+        const res = data && data.resultado;
+        if (res === 'pedido_enviado') { fecharFolha(); toast('Pedido enviado. A equipe vai conferir e atualizar o seu cadastro.', 9000); }
+        else erro.textContent = MSG[res] || 'Não foi possível enviar agora. Tente de novo.';
+      } catch (er) { erro.textContent = erroConta(er); } finally { btn.disabled = false; btn.textContent = 'Enviar pedido'; }
+    } },
+    h('p', { class: 'sub' }, 'Isto muda o e-mail ou o telefone do seu cadastro na clínica (não o e-mail que você usa para entrar). Por segurança pedimos o seu CPF, e uma pessoa da equipe confere antes de atualizar. O CPF só é conferido; não fica guardado.'),
+    e.campo, t.campo, cpf.campo, erro, btn));
+    setTimeout(() => e.inp.focus(), 50);
   }
   function salvarPerfilNaConta(nome, telefone) {
     if (!conta) return;
@@ -2459,7 +2531,16 @@
     const { corpo } = abrirFolha('Meus dados');
     const erro = h('p', { class: 'erro-form', role: 'alert' });
     const tem = (v) => (v ? 'Sim' : 'Ainda não');
+    let estado = {};
+    try { const r = await db.rpc('conta_paciente_vinculo_estado'); if (!r.error && r.data) estado = r.data; } catch { /* sem os botões extras */ }
     function tela() {
+      const dadosCadastro = [];
+      if (estado.verificar_aberto && !conta.cadastro_salvo) dadosCadastro.push(
+        h('p', { class: 'sub' }, 'Sua conta ainda não está ligada ao cadastro da clínica. Se você já é paciente, confirme com o seu CPF.'),
+        h('button', { type: 'button', class: 'btn-sec', id: 'btnConfirmarCpf', onclick: abrirConfirmarCpf }, 'Confirmar com o meu CPF'));
+      if (conta.cadastro_salvo) dadosCadastro.push(estado.alteracao_aberta
+        ? h('p', { class: 'sub', id: 'avisoAlteracao' }, 'Seu pedido para mudar o e-mail ou o telefone do cadastro está com a equipe.')
+        : h('button', { type: 'button', class: 'btn-sec', id: 'btnAlterarDados', onclick: abrirAlterarDados }, 'Mudar e-mail ou telefone do cadastro'));
       const btnTxt = h('button', { type: 'button', class: 'btn-primario', id: 'btnBaixarTxt' }, 'Baixar uma cópia dos meus dados');
       const btnJson = h('button', { type: 'button', class: 'btn-sec', id: 'btnBaixarJson' }, 'Baixar em formato de computador (JSON)');
       const baixar = (btn, rotulo, tipo) => async () => {
@@ -2480,6 +2561,7 @@
           h('dt', {}, 'E-mail da conta'), h('dd', {}, conta.email || '—'),
           h('dt', {}, 'Nome e telefone da conta'), h('dd', {}, [conta.nome, conta.telefone].filter(Boolean).join(' · ') || '—'),
           h('dt', {}, 'Cadastro de paciente ligado à conta'), h('dd', {}, tem(conta.cadastro_salvo))),
+        ...dadosCadastro,
         btnTxt, btnJson, erro,
         h('h3', {}, 'Apagar a minha conta'),
         h('p', { class: 'sub' }, 'Você deixa de poder entrar e o seu e-mail sai da conta. Mas o cadastro, os pedidos e as conversas que você já fez continuam guardados pela clínica, porque ela precisa manter esses registros do atendimento. Para pedir algo além disso, fale com a clínica.'),

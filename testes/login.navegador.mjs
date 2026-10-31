@@ -39,8 +39,8 @@ function criarAuth({ senhaCerta = 'Senha1234', email = 'ana@teste.local', meta =
 }
 const conta = (extra = {}) => ({ conta: true, email: 'ana@teste.local', nome: 'Ana Souza', telefone: '71999998888', cadastro_salvo: false, aceitou_lgpd: true, ...extra });
 
-async function abrir({ ativo = true, contaDoBanco = null, auth = criarAuth(), sessaoGuardada = false, hash = '', vinculo = null } = {}) {
-  const mundo = criarMundo({ loginAtivo: ativo, conta: contaDoBanco, vinculo });
+async function abrir({ ativo = true, contaDoBanco = null, auth = criarAuth(), sessaoGuardada = false, hash = '', vinculo = null, mundoExtra = {} } = {}) {
+  const mundo = criarMundo({ loginAtivo: ativo, conta: contaDoBanco, vinculo, ...mundoExtra });
   const init = sessaoGuardada ? [[(s) => localStorage.setItem('csi-paciente-auth', s), JSON.stringify(sessao('ana@teste.local', auth.meta || {}))]] : [];
   const p = await novaPaginaChat(browser, mundo, { init, auth: auth.tratar });
   await p.page.goto(`${base}/index.html${hash}`);
@@ -310,11 +310,74 @@ await caso('3 acertos (liga e avisa a equipe): a paciente fica ligada e o aviso 
   return { ok: /equipe vai conferir/.test(aviso || '') && ligado, detalhe: `aviso=${aviso}; ligado=${ligado}` };
 });
 
-await caso('Só nome e nascimento batem: NÃO fica ligada; diz que um atendente vai conferir e que já pode agendar', async () => {
-  const x = await abrir({ contaDoBanco: conta(), auth: criarAuth({ meta: { nome: 'Ana Souza', telefone: '71999998888', dt_nasc: '1980-03-25' } }), sessaoGuardada: true, vinculo: 'em_analise' });
-  const aviso = await texto(x.page, '#toast'), ligado = x.mundo.conta && x.mundo.conta.cadastro_salvo === true, logada = await visivel(x.page, '#btnContaSair');
+const metaNasc = { nome: 'Ana Souza', telefone: '71999998888', dt_nasc: '1980-03-25' };
+await caso('Só nome e nascimento batem: NÃO fica ligada; abre a janela do CPF explicando o que falta; "Agora não" deixa com o atendente e ela já pode agendar', async () => {
+  const x = await abrir({ contaDoBanco: conta(), auth: criarAuth({ meta: metaNasc }), sessaoGuardada: true, vinculo: 'em_analise' });
+  await x.page.waitForSelector('#btnCpfConfirmar', { timeout: 4000 });
+  const titulo = await texto(x.page, '#folhaTitulo'), explica = await texto(x.page, '#folhaCorpo .sub');
+  await x.page.click('#btnCpfDepois'); await espera(200);
+  const aviso = await texto(x.page, '#toast'), ligado = x.mundo.conta && x.mundo.conta.cadastro_salvo === true, logada = await visivel(x.page, '#btnContaSair'), aberta = await x.page.evaluate(() => !document.querySelector('#folha').hidden);
   await x.ctx.close();
-  return { ok: /atendente vai conferir/.test(aviso || '') && /já pode agendar/.test(aviso || '') && !ligado && logada, detalhe: `aviso=${aviso}; ligado=${ligado}` };
+  return { ok: /CPF/.test(titulo) && /telefone e o e-mail são diferentes/.test(explica) && /atendente vai conferir/.test(aviso || '') && /já pode agendar/.test(aviso || '') && !ligado && logada && !aberta, detalhe: `titulo=${titulo}; aviso=${aviso}; ligado=${ligado}` };
+});
+
+await caso('Janela do CPF: CPF com dígito errado nem chega à rede; CPF que não confere mostra aviso e deixa tentar de novo; CPF certo liga e fecha', async () => {
+  const x = await abrir({ contaDoBanco: conta(), auth: criarAuth({ meta: metaNasc }), sessaoGuardada: true, vinculo: 'em_analise', mundoExtra: { cpfResultado: 'cpf_nao_confere' } });
+  await x.page.waitForSelector('#cCpf'); await espera(150);
+  await x.page.type('#cCpf', '12345678900'); const mascara = await x.page.$eval('#cCpf', (e) => e.value);
+  await x.page.click('#btnCpfConfirmar'); await espera(150);
+  const e1 = await texto(x.page, '#folhaCorpo .erro-form'), n1 = chamou(x.mundo, 'conta_paciente_confirmar_cpf').length;
+  await x.page.fill('#cCpf', ''); await x.page.type('#cCpf', '52998224725'); await x.page.click('#btnCpfConfirmar'); await espera(250);
+  const e2 = await texto(x.page, '#folhaCorpo .erro-form'), n2 = chamou(x.mundo, 'conta_paciente_confirmar_cpf').length, aindaAberta = await visivel(x.page, '#cCpf');
+  x.mundo.cpfResultado = 'vinculado_conferir';
+  await x.page.click('#btnCpfConfirmar'); await espera(500);
+  const fechou = !(await visivel(x.page, '#cCpf')), aviso = await texto(x.page, '#toast'), corpo = chamou(x.mundo, 'conta_paciente_confirmar_cpf').pop().corpo, ligado = x.mundo.conta.cadastro_salvo === true;
+  await x.ctx.close();
+  return { ok: mascara === '123.456.789-00' && /não conferem/.test(e1) && n1 === 0 && /CPF não confere/.test(e2) && n2 === 1 && aindaAberta && fechou && /ligada ao seu cadastro/.test(aviso || '') && corpo.p_cpf === '529.982.247-25' && ligado, detalhe: JSON.stringify({ mascara, e1, n1, e2, n2, fechou, aviso, ligado }) };
+});
+
+await caso('Meus dados: conta ligada vê "Mudar e-mail ou telefone"; o pedido exige CPF válido e e-mail/telefone válidos e envia só o que mudou', async () => {
+  const x = await abrir({ contaDoBanco: conta({ cadastro_salvo: true }), sessaoGuardada: true });
+  await abrirDados(x);
+  const temBotao = await visivel(x.page, '#btnAlterarDados'), semConfirmar = !(await visivel(x.page, '#btnConfirmarCpf'));
+  await x.page.click('#btnAlterarDados'); await x.page.waitForSelector('#cNovoEmail'); await espera(150);
+  const erros = [];
+  const tentar = async () => { await x.page.click('#btnAlterarEnviar'); await espera(120); return texto(x.page, '#folhaCorpo .erro-form'); };
+  erros.push(await tentar());                                                  // nada informado
+  await x.page.fill('#cNovoEmail', 'sem-arroba'); erros.push(await tentar());  // e-mail inválido
+  await x.page.fill('#cNovoEmail', 'novo@exemplo.com'); erros.push(await tentar());   // falta o CPF
+  await x.page.type('#cCpf', '52998224725');
+  const antes = chamou(x.mundo, 'conta_paciente_pedir_alteracao').length;
+  await x.page.click('#btnAlterarEnviar'); await espera(500);
+  const c = chamou(x.mundo, 'conta_paciente_pedir_alteracao'), fechou = !(await visivel(x.page, '#cNovoEmail')), aviso = await texto(x.page, '#toast');
+  await x.ctx.close();
+  return { ok: temBotao && semConfirmar && /novo e-mail ou o novo telefone/i.test(erros[0]) && /e-mail válido/.test(erros[1]) && /CPF não confere|números do CPF/.test(erros[2]) && antes === 0 && c.length === 1 && c[0].corpo.p_email === 'novo@exemplo.com' && c[0].corpo.p_telefone === null && c[0].corpo.p_cpf === '529.982.247-25' && fechou && /Pedido enviado/.test(aviso || ''), detalhe: JSON.stringify({ erros, chamadas: c.length, aviso }) };
+});
+
+await caso('Meus dados: pedido de mudança já aberto mostra o aviso no lugar do botão; CPF que não confere ou cadastro sem CPF mostram mensagem clara', async () => {
+  const a = await abrir({ contaDoBanco: conta({ cadastro_salvo: true }), sessaoGuardada: true, mundoExtra: { estado: { ligada: true, verificar_aberto: false, alteracao_aberta: true } } });
+  await abrirDados(a);
+  const aviso = await texto(a.page, '#avisoAlteracao'), botao = await visivel(a.page, '#btnAlterarDados');
+  await a.ctx.close();
+  const msgs = [];
+  for (const res of ['cpf_nao_confere', 'cadastro_sem_cpf', 'sem_mudanca']) {
+    const x = await abrir({ contaDoBanco: conta({ cadastro_salvo: true }), sessaoGuardada: true, mundoExtra: { alteracaoResultado: res } });
+    await abrirDados(x); await x.page.click('#btnAlterarDados'); await x.page.waitForSelector('#cNovoEmail'); await espera(150);
+    await x.page.fill('#cNovoEmail', 'novo@exemplo.com'); await x.page.type('#cCpf', '52998224725'); await x.page.click('#btnAlterarEnviar'); await espera(300);
+    msgs.push(await texto(x.page, '#folhaCorpo .erro-form')); await x.ctx.close();
+  }
+  return { ok: /está com a equipe/.test(aviso || '') && !botao && /CPF não confere/.test(msgs[0]) && /não tem CPF registrado/.test(msgs[1]) && /já estão no seu cadastro/.test(msgs[2]), detalhe: JSON.stringify({ aviso, botao, msgs }) };
+});
+
+await caso('Meus dados: conta ainda não ligada com pedido aberto mostra "Confirmar com o meu CPF" (e conta sem pedido não mostra nada extra)', async () => {
+  const a = await abrir({ contaDoBanco: conta(), sessaoGuardada: true, mundoExtra: { estado: { ligada: false, verificar_aberto: true, alteracao_aberta: false } } });
+  await abrirDados(a); const comPedido = await visivel(a.page, '#btnConfirmarCpf'), semAlterar = !(await visivel(a.page, '#btnAlterarDados'));
+  await a.page.click('#btnConfirmarCpf'); await a.page.waitForSelector('#cCpf'); await espera(150); const abriu = await visivel(a.page, '#btnCpfConfirmar');
+  await a.ctx.close();
+  const b = await abrir({ contaDoBanco: conta(), sessaoGuardada: true }); await abrirDados(b);
+  const nada = !(await visivel(b.page, '#btnConfirmarCpf')) && !(await visivel(b.page, '#btnAlterarDados'));
+  await b.ctx.close();
+  return { ok: comPedido && semAlterar && abriu && nada, detalhe: JSON.stringify({ comPedido, semAlterar, abriu, nada }) };
 });
 
 await caso('Criar conta: nome com uma palavra só é barrado ("nome completo")', async () => {

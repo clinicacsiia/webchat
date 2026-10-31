@@ -89,6 +89,17 @@ Arquivo `supabase/vincular-cadastro.sql` (rodar **depois** do instalador do logi
 - **Voltar atrás:** `drop function public.conta_paciente_vincular(), public.vinculo_listar(), public.vinculo_decidir(bigint, text); drop table public.vinculo_solicitacoes;` (a aba Vínculos fica vazia e a tela só mostra "não achamos").
 - Teste: `npm run test:vincular` (banco), `npm run test:login` (tela do paciente) e `npm run test:navegador` (aba Vínculos do painel).
 
+### CPF: confirmar a ligação e pedir mudança de e-mail ou telefone (versão 1.2)
+
+O CPF entra em dois pontos e **nunca é guardado nem devolvido**: o banco só compara com o CPF do cadastro (só os dígitos; o CPF informado precisa ter os dígitos verificadores certos).
+
+1. **Quando telefone e e-mail não batem** (só nome + nascimento): ao confirmar o e-mail, o chat abre a janela "Confirmar com o CPF". Se o CPF bate com o do **mesmo** cadastro, vira o 3º acerto: a conta é ligada e o aviso "Ligada: conferir" abre para o atendente atualizar telefone e e-mail. Se o paciente tocar em "Agora não", o pedido continua com o atendente, e o botão "Confirmar com o meu CPF" fica em **Meus dados**.
+2. **Mudar o e-mail ou o telefone do cadastro** (conta já ligada): em **Meus dados** > "Mudar e-mail ou telefone do cadastro", com o CPF. Isto muda o cadastro na clínica, não o e-mail usado para entrar. **Nada muda sozinho:** abre um "Pedido de mudança (CPF conferido)" na aba **Vínculos**, e o atendente escolhe **Aplicar no cadastro** (o e-mail novo troca o antigo; o telefone novo entra junto com o antigo) ou **Recusar**.
+- **Cadastro sem CPF:** não dá para conferir; o paciente recebe a orientação de falar com a clínica, e o caso fica com o atendente.
+- **Limite:** as tentativas de vínculo, de CPF e de pedido de mudança contam juntas: 5 por hora por conta.
+- **Registro:** `contas_paciente.vinculo_metodo` = 'cpf' e a tabela `vinculo_solicitacoes` (tipo, quem decidiu, quando; sem CPF).
+- **Voltar atrás:** `drop function public.conta_paciente_confirmar_cpf(text), public.conta_paciente_pedir_alteracao(text, text, text), public.conta_paciente_vinculo_estado(), public.cpf_digitos(text), public.cpf_valido(text);` (a janela mostra um erro e o caso continua com o atendente).
+
 ## Textos dos e-mails (Supabase > Authentication > Emails > Templates)
 
 Cole o conteúdo destes arquivos (o mesmo texto serve para paciente e para equipe):
