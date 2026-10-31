@@ -22,10 +22,12 @@
   // "RM", "TC", "US"... no começo repete o tipo de exame que o paciente já escolheu.
   const PREFIXO = /^(?:(?:RM|RNM|TC|USG|US)\s+|ULTRA-SONOGRAFIA(?:\s+DE)?\s+)(?:(?:DE|DO|DA|DOS|DAS)\s+)?/i;
 
-  // apresentar(nome, { semPrefixo }) -> { titulo, detalhe, chave }
+  // apresentar(nome, { semPrefixo, regiao }) -> { titulo, detalhe, chave, unilateral }
+  // "regiao" é o nome da parte do corpo escolhida (ex.: "Punho / mão"): o exame genérico "por articulação" vale para ela.
   function apresentar(bruto, opcoes) {
     const o = opcoes || {};
     let t = String(bruto || '').replace(/\s+/g, ' ').trim();
+    const unilateral = /\bUNILATERAL\b/i.test(t);
     const cortado = (t.match(/\(/g) || []).length > (t.match(/\)/g) || []).length;   // o banco guarda só os primeiros caracteres de alguns nomes
     // O lado o paciente escolhe à parte: "(UNILATERAL)" só atrapalha.
     t = t.replace(/\(\s*UNILATERAL\s*\)/gi, ' ').replace(/\bUNILATERAL\b/gi, ' ').replace(/\s+/g, ' ').trim();
@@ -38,7 +40,13 @@
     titulo = frase(titulo.replace(/[\s,;:-]+$/, ''));
     detalhe = frase(detalhe.replace(/[\s,;:-]+$/, ''));
     if (cortado) { if (detalhe) detalhe += '…'; else titulo += '…'; }
-    return { titulo: titulo || frase(bruto), detalhe, chave: semAcento(titulo + '|' + detalhe).replace(/[^a-z0-9|]/g, '') };
+    // "Articular (por articulação)" não diz qual articulação: vale a parte do corpo que o paciente escolheu.
+    const articulacao = /^articula(?:r|cao|coes)…?$/.test(semAcento(titulo));
+    if (articulacao) { titulo = o.regiao ? `Articulação (${o.regiao})` : 'Articulação'; detalhe = 'Exame de uma articulação só'; }
+    // Palavras técnicas explicadas em linguagem simples.
+    if (/artro-ressonância/i.test(detalhe) && !/contraste/i.test(detalhe)) detalhe = detalhe.replace(/artro-ressonância/i, 'artro-ressonância (contraste injetado na articulação)');
+    if (/\bANGIO/i.test(bruto) && !/vasos/i.test(detalhe)) detalhe = [detalhe, 'Estuda os vasos sanguíneos'].filter(Boolean).join(' · ');
+    return { titulo: titulo || frase(bruto), detalhe, unilateral, articulacao, chave: semAcento(titulo + '|' + detalhe).replace(/[^a-z0-9|]/g, '') };
   }
 
   // Exames de uso comum primeiro (nome simples), os especiais (angio, estresse, PCT, contraste...) depois, e por fim os com muita explicação.
@@ -49,7 +57,7 @@
     const max = limite || 5, vistos = new Set(), ok = [];
     const ordenados = (lista || []).map((e, i) => ({ e, i, a: apresentar(e.nome, opcoes) }))
       .sort((x, y) => peso(x.e.nome) - peso(y.e.nome) || x.a.titulo.length - y.a.titulo.length || x.i - y.i);
-    for (const x of ordenados) { if (vistos.has(x.a.chave)) continue; vistos.add(x.a.chave); ok.push({ ...x.e, titulo: x.a.titulo, detalhe: x.a.detalhe }); }
+    for (const x of ordenados) { if (vistos.has(x.a.chave)) continue; vistos.add(x.a.chave); ok.push({ ...x.e, titulo: x.a.titulo, detalhe: x.a.detalhe, unilateral: !!(x.e.unilateral || x.a.unilateral) }); }
     return ok.length <= max + 1 ? { principais: ok, outros: [] } : { principais: ok.slice(0, max), outros: ok.slice(max) };
   }
   return { apresentar, organizar, frase };
