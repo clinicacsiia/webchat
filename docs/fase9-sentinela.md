@@ -74,6 +74,6 @@ O chat abre pela cópia guardada no aparelho e atualiza a cópia por trás (isso
 - Os exames "unilateral" escondidos das partes sem lado continuam alcançáveis pela parte da articulação (ombro, joelho, punho...) e pela opção "Não sei: o atendente escolhe o exame". O fluxo de **busca por nome e foto do pedido** usa outra função (`chat_exames_salvar`) e **não foi alterado**: lá o lado continua sendo perguntado só para exames de parte com lado. O banco não tem campo para "qual articulação": o exame genérico depende da parte do corpo enviada junto.
 
 - O aviso instantâneo (Realtime por WebSocket) é simulado: o teste reproduz o efeito (resposta antes da mensagem) por outro caminho, mas o WebSocket real não foi exercitado.
-- O SQL foi testado em Postgres embutido com *stubs*, **não foi aplicado no Supabase de produção**.
+- O SQL foi testado em Postgres embutido com *stubs*, foi aplicado no Supabase de produção em 31/10/2026.
 - O fluxo antigo do n8n (motor `ia`) tem texto próprio no prompt do n8n e **não foi alterado**. O texto "inteligência artificial (IA)" vale para o motor `fluxo` e para o aviso na tela.
 - Os limites (6 h de conversa antiga, 60 a 180 s de parado, 8 a 30 s de lento) são ponto de partida; ajuste depois de ver os incidentes reais.

@@ -2,7 +2,7 @@
 -- Versão 1.0 — 31/10/2026 / Mudança: Implementação inicial
 --
 -- POR QUE: a LGPD (art. 18) dá ao paciente o direito de ver e levar uma cópia dos próprios dados e de pedir a exclusão. Antes, isso era feito
--- pela equipe, à mão. NÃO APLICADO ainda no projeto webchat-atendimento.
+-- pela equipe, à mão. Aplicado no projeto webchat-atendimento em 31/10/2026.
 --
 -- DEPENDE de supabase/contas-paciente.sql e supabase/login-paciente.sql (contas_paciente, conversas.conta_id) e de fase7-motor.sql (conversa_anexo).
 --

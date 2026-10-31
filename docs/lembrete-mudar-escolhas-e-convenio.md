@@ -4,7 +4,7 @@ Registrado em 31/10/2026, a pedido da equipe, **para fazer depois**. Público: p
 
 ## 0. Andamento (31/10/2026)
 
-**Feito: convênio de quem volta (itens 4.3 e 3.1 a 3.3), no arquivo `supabase/correcao-convenio-quem-volta.sql` (ainda NÃO aplicado no Supabase).**
+**Feito: convênio de quem volta (itens 4.3 e 3.1 a 3.3), no arquivo `supabase/correcao-convenio-quem-volta.sql` (aplicado no Supabase em 31/10/2026).**
 Teste: `npm run test:convenio` (20 de 20, usa as funções reais do motor num Postgres embutido).
 
 - "Repetir o último exame" e "Continuar o pedido que ficou pela metade" não copiam mais o convênio. O chat pergunta, com dois botões grandes: "Da última vez o atendimento foi pelo convênio X. É assim também agora?" (**Sim, é o mesmo** / **Não, mudou**). "Não, mudou" abre a lista de convênios de sempre. A pessoa também pode digitar ("sim", "mudou", "continua").

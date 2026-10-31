@@ -1,6 +1,6 @@
 # Fase 8: leitura do pedido médico (letra de médico, dúvida explicada ao paciente e memória que aprende)
 
-Data: 31/10/2026. SQL em `supabase/fase8-leitura-pedido.sql` (**ainda não aplicado no projeto**). Função nova: `supabase/functions/ler-pedido` (**ainda não publicada**). Chat: `index.html`. Painel: `painel/index.html`.
+Data: 31/10/2026. SQL em `supabase/fase8-leitura-pedido.sql` (aplicado no projeto em 31/10/2026). Função nova: `supabase/functions/ler-pedido` (**ainda não publicada**). Chat: `index.html`. Painel: `painel/index.html`.
 
 ## 1. O que mudou para o paciente
 
