@@ -33,6 +33,7 @@ aguardando ──fila_chamar_assinatura──> assinatura_pendente ──aprova�
 | `testes/` | pronto | Bateria completa; ver `testes/README.md`. |
 | `fila/index.html`, `fila/fila.css`, `fila/fila.js` | **versão antiga, incompatível** | Usam o cliente Supabase com JWT próprio e uma API que não existe mais. **Não publicar.** A reescrever. |
 | Aba "Fila" em `painel/index.html` | **não existe** | A construir. |
+| `sw.js` | pronto, testado (`testes/sw.test.mjs`) | O cache do chat usa uma chave única (`./`) para toda navegação. `/fila/` está **excluído** dele; sem isso o paciente receberia a página do chat no lugar da fila e a URL com o token seria tratada como cache. Quem editar o `sw.js` precisa manter a regra e rodar `npm run test:sw`. |
 
 ## 3. Banco
 

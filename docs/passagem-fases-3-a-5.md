@@ -2,7 +2,7 @@
 
 Atualizado em 2026-10-30 (auditoria para produção). Leia este arquivo inteiro antes de mexer em qualquer coisa.
 
-**Auditoria de 30/10/2026:** evidências, achados e o que não foi provado estão em `docs/auditoria-2026-10-30.md`. Os testes repetíveis estão em `testes/` (`cd testes && npm install && npm test`; instruções em `testes/README.md`). Resultado: 27 + 27 + 46 + 5 + 6 verificações verdes; o sistema das Fases 1 a 5 está saudável em produção; o módulo **Fila + assinatura biométrica não está pronto** (ver linha "Fila" abaixo).
+**Auditoria de 30/10/2026:** evidências, achados e o que não foi provado estão em `docs/auditoria-2026-10-30.md`. Os testes repetíveis estão em `testes/` (`cd testes && npm install && npm test`; instruções em `testes/README.md`). Resultado: 27 + 27 + 46 + 5 + 10 + 6 verificações verdes; o sistema das Fases 1 a 5 estava saudável em produção na medição; o módulo **Fila + assinatura biométrica não está pronto** (ver linha "Fila" abaixo). As Fases 6 e 7 (`docs/fase6-*.md`, `docs/fase7-motor-implementado.md`) entraram depois e **não foram auditadas**; a Fase 7 está ligada (`config.motor = 'fluxo'`: o motor de regras responde o paciente e a IA não fala).
 
 ## 1. Resumo em uma tela
 
@@ -92,7 +92,7 @@ Ordem dos arquivos SQL (referência do que foi aplicado, nesta ordem): `00-base-
 
 **Achados da auditoria de 30/10/2026 (detalhe em `docs/auditoria-2026-10-30.md`, seção 2.4)**
 12. **Preços (médio; era alto antes da Fase 6b):** 18 de 104 pares exame/operadora com valor do catálogo 10% ou mais diferente do `Previsto` do Klingo (medido antes da Fase 6b, não remedido). A IA já não recebe preço, então o risco agora é o alerta "Conferir valor" da equipe usar uma referência errada. Falta publicar o prompt novo no n8n (`docs/fase6-roteiro-de-teste-e-producao.md`). A recepção deve revisar em Aprendizado > "Preço x Klingo".
-13. **n8n (médio):** o nó de IA depende de créditos do *n8n Gateway* e não tem repetição nem workflow de erro. Usar credencial Anthropic própria, `retryOnFail` e um *Error Trigger* que avise a equipe.
+13. **n8n (era médio):** o nó de IA depende de créditos do *n8n Gateway* e não tem repetição nem workflow de erro. Com a Fase 7 ligada (`config.motor = 'fluxo'`) a IA não responde o paciente e isso só vale se voltarem para `ia`; nesse caso use credencial Anthropic própria, `retryOnFail` e um *Error Trigger*. **Risco novo:** os avisos por WhatsApp e e-mail à equipe ainda não existem; quem pede atendente só é visto com o painel aberto.
 14. **`agenda-ocupacao` com 502 (baixo, esperado):** é a proteção contra relatório de agenda vazio, fora do horário de agenda. O cron fica verde mesmo assim, porque só prova que a chamada foi disparada. Ajustar o início do cron ou aceitar como ruído.
 15. **Fila:** o que falta para ir ao ar está em `docs/fila-biometria.md`, seção 5.
 

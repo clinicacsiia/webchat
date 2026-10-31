@@ -15,7 +15,7 @@ export CHROMIUM_PATH=/caminho/do/chromium   # ou: npx playwright install chromiu
 npm test
 ```
 
-`npm test` roda as cinco suítes na ordem abaixo e para na primeira que falhar. Cada uma também roda sozinha.
+`npm test` roda as seis suítes na ordem abaixo e para na primeira que falhar. Cada uma também roda sozinha.
 
 | Comando | O que prova | Resultado em 30/10/2026 |
 |---|---|---|
@@ -23,6 +23,7 @@ npm test
 | `npm run test:python` | Algoritmo biométrico (`biometria/avaliar_assinatura.py`), inclusive executado com os *builtins* restritos do nó Python do n8n | 27 de 27 |
 | `npm run test:sql` | `supabase/fila-biometria.sql` num Postgres embutido (PGlite): RLS, JWT, máquina de estados, 3 tentativas, imutabilidade, broadcast | 46 de 46 |
 | `npm run test:delta` | `supabase/fila-biometria-v2-delta.sql` aplicado sobre o estado v1 dá o mesmo banco da instalação nova (corpo, *definer* e privilégio de execução das 23 funções) | 5 de 5 |
+| `npm run test:sw` | O `sw.js` não serve `/fila/` (nem `/painel/`) pelo cache do chat; a URL da fila leva o token e a chave única `./` serviria o chat no lugar da fila | 10 de 10 |
 | `npm run test:navegador` | Chat, painel (deslogado e admin) e fila abrem e montam a tela sem exceção de JavaScript | 6 de 6 |
 
 ## O que estes testes NÃO provam
@@ -41,6 +42,7 @@ Leia isto antes de tratar "tudo verde" como "pronto para produção".
 | `stubs-supabase.mjs` | Monta o banco de teste: papéis, `auth`, `vault`, `net`, `realtime`, HMAC-SHA256 sobre `sha256`. Extrai do SQL real as funções auxiliares pelo nome, para o teste exercitar o código de produção e não uma cópia. |
 | `sql-fila.test.mjs` | As 46 verificações do módulo Fila. |
 | `sql-delta.test.mjs` | As 5 verificações do delta v1 → v2. |
+| `sw.test.mjs` | Roda o `fetch` do `sw.js` num contexto isolado e confere o que entra ou não no cache. |
 | `navegador.smoke.mjs` | Servidor local + Playwright + Supabase simulado. `CHROMIUM_PATH` aponta para um Chromium já instalado. |
 
 Os testes do Python ficam em `biometria/test_avaliar_assinatura.py` e os da Edge Function em `supabase/functions/sync-catalogo-klingo/*.test.ts`, junto do código que testam.

@@ -131,6 +131,22 @@ A IA consulta, a cada mensagem do paciente, um catálogo copiado de relatórios 
 
 O formulário pergunta primeiro a unidade (Desenvoar = atendimento pediátrico; CSI = exames e consultas; CSI RM/TC = ressonância e tomografia; "Ainda não sei") e **quem será atendido** (o próprio ou um filho(a), com o responsável falando pelo filho; uma conversa por criança e "Agendar para outro filho(a)" no menu). O médico de preferência vem depois do e-mail. A IA já nasce no caminho certo e o calendário filtra por unidade e médico. Passo a passo, texto do n8n e limites em `docs/fase6-unidade-e-medico.md`; SQL em `supabase/fase6-unidade-e-medico.sql` e `supabase/fase6b-alerta-preco.sql` (**aplicados no projeto em 30/10/2026**). Falta só o n8n (ver `docs/fase6-roteiro-de-teste-e-producao.md`).
 
+### Atendimento sem IA: motor de regras no Supabase (Fase 7)
+
+Quem responde o paciente é um motor de regras no banco, na mesma chamada que grava a mensagem. No servidor, cada passo leva de 3 a 27 ms; antes, a IA levava 7 s na mediana.
+
+- O formulário pergunta só se o atendimento é para o próprio paciente ou para um filho(a). A unidade sai da escolha: consulta de criança vai para a Desenvoar e de adulto para a CSI.
+- O chat é só de botões e listas com filtro. Os dados do cadastro são pedidos um grupo por mensagem.
+- O paciente pode tirar foto do pedido médico: o celular lê o texto (OCR) e a foto vai para o atendente.
+- Depois de enviar, o paciente vê um contador ao vivo até a confirmação.
+- Quem volta pelo link do WhatsApp ou do e-mail entra direto, pelo cache do aparelho.
+
+A IA não fala com o paciente. Liga e desliga em `config.motor` (`fluxo` | `ia`).
+
+- Detalhes, testes e como voltar atrás: `docs/fase7-motor-implementado.md`.
+- Plano e mapa do processo: `docs/plano-fase7-fluxo-sem-ia.md`.
+- SQL: `supabase/fase7-motor.sql`, aplicado em 31/10/2026.
+
 ## Fila em tempo real + assinatura biométrica
 
 **Em construção; ainda não está no ar para o público.** O banco real está na primeira versão do módulo; a atualização (`supabase/fila-biometria-v2-delta.sql`) está escrita e testada, mas ainda não foi aplicada. A página `fila/` do repositório é uma versão antiga e **não deve ser publicada** até ser reescrita.
@@ -149,4 +165,4 @@ O formulário pergunta primeiro a unidade (Desenvoar = atendimento pediátrico; 
 
 Veja `docs/passagem-fases-3-a-5.md`: o que cada fase faz, o que falta, o checklist para continuar em outra conta e as regras que não podem ser quebradas. `supabase/00-base-snapshot.sql` é só referência do banco base (não rodar no projeto atual).
 
-Antes de divulgar a IA a mais pacientes, leia os achados de `docs/auditoria-2026-10-30.md` (seções 2.4 e 2.6): nó de IA do n8n sem repetição, prompt novo da Fase 6 ainda não publicado no n8n, preços do catálogo divergentes do Klingo (agora só referência para o alerta da equipe) e proteção contra senha vazada desligada.
+Antes de divulgar a IA a mais pacientes, leia os achados de `docs/auditoria-2026-10-30.md` (seções 2.4 e 2.6): as Fases 6 e 7 entraram depois da auditoria e não foram auditadas; falta aviso à equipe fora do painel; preços do catálogo divergentes do Klingo (agora só referência para o alerta da equipe); nó de IA do n8n sem repetição (só importa se `config.motor` voltar para `ia`); e proteção contra senha vazada desligada.
