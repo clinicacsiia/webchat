@@ -35,16 +35,24 @@ export function servidor() {
 
 const espera = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// Nomes REAIS do catálogo do Klingo (lidos da produção em 31/10/2026), com a caixa alta, o "(UNILATERAL)" e os parênteses cortados.
+const nomes = (lista, uni) => lista.map((nome, i) => ({ id: 1000 + i, nome, unilateral: uni && /UNILATERAL/.test(nome), bilateral: /BILATERAL/.test(nome) }));
+export const EXAMES = {
+  punho_mao: nomes(['RM ARTICULAR (POR ARTICULAÇÃO)', 'RM DE MÃO E PUNHO - INCLUI ARTRO-RESSONÂNCIA (UNILATERAL)', 'RM MÃO (NÃO INCLUI PUNHO)', 'RM PUNHO (INCLUI ARTRO-RESSONÂNCIA) UNILATERAL'], true),
+  torax: nomes(['RM DE TÓRAX', 'TC ARTICULAÇÃO (ESTERNOCLAVICULAR OU OMBRO OU COTOVELO OU PUNHO OU SACROILÍACA OU COXOFEMORAL OU JOELHO OU TORNOZELO) UNILATERAL', 'RM MAMA BILATERAL'], true),
+  cranio: nomes(['ANGIO RM ARTERIAL CRANIO', 'ANGIO-RM ARTERIAL DE CRÂNIO', 'ANGIO-RM VENOSA DE CRÂNIO', 'PCT ANGIO-RM CRÂNIO', 'PERFUSÃO CEREBRAL POR RM', 'RM BASE DO CRÂNIO', 'RM CRÂNIO (ENCÉFALO)',
+    'RM DE CRÂNIO', 'RM DE FACE / ATM / SELA TÚRCICA', 'RM DO CRANIO', 'RM NEURONAVEGADOR', 'RM OSSOS TEMPORAIS BILATERAL', 'RM SELA TÚRCICA (HIPÓFISE)', 'RM TRACTOGRAFIA'], false),
+};
 export const CONFIG_CORPO = {
   modalidades: [
-    { codigo: 'RM', nome: 'Ressonância', total: 40, mapa: true, regioes: ['cranio', 'ombro', 'torax', 'coluna_lombar', 'joelho'] },
+    { codigo: 'RM', nome: 'Ressonância', total: 40, mapa: true, regioes: ['cranio', 'ombro', 'torax', 'coluna_lombar', 'joelho', 'punho_mao'] },
     { codigo: 'US', nome: 'Ultrassom', total: 60, mapa: true, regioes: ['abdome', 'joelho'] },
     { codigo: 'MAMO', nome: 'Mamografia', total: 5, mapa: false, regioes: [] },
   ],
   regioes: [
     { codigo: 'cranio', nome: 'Crânio', tem_lado: false }, { codigo: 'ombro', nome: 'Ombro', tem_lado: true },
     { codigo: 'torax', nome: 'Tórax', tem_lado: false }, { codigo: 'coluna_lombar', nome: 'Coluna lombar', tem_lado: false },
-    { codigo: 'joelho', nome: 'Joelho', tem_lado: true }, { codigo: 'abdome', nome: 'Abdome', tem_lado: false },
+    { codigo: 'joelho', nome: 'Joelho', tem_lado: true }, { codigo: 'abdome', nome: 'Abdome', tem_lado: false }, { codigo: 'punho_mao', nome: 'Punho / mão', tem_lado: true },
   ],
 };
 
@@ -96,6 +104,8 @@ export function criarMundo(opcoes = {}) {
       }
       case 'chat_acompanhar': return { body: { agora: agora(), conversa: m.status, agente: null, equipe_online: true, pedido: 'pronto', tipo: 'exame', conferencia: null, enviado_em: agora(), confirmado: false, horarios: [] } };
       case 'chat_corpo': return { body: CONFIG_CORPO };
+      case 'chat_pedido_salvar': return { body: { ok: true, itens: (corpo.p_itens || []).length, mensagem_id: 999 } };
+      case 'chat_exames': return { body: EXAMES[corpo.p_regiao] || [] };
       case 'chat_incidente': m.incidentes.push(corpo); return { body: { ok: true } };
       default: return { body: {} };
     }
