@@ -13,6 +13,7 @@
     "test:sentinela": "node sentinela.test.mjs",
     "test:sql9": "node sql-fase9.test.mjs",
     "test:convenio": "node sql-convenio.test.mjs",
+    "test:assuntos": "node sql-assuntos.test.mjs",
     "test:contas": "node sql-contas.test.mjs",
     "test:protecao": "node sql-protecao.test.mjs",
     "test:login-sql": "node sql-login.test.mjs",
@@ -23,7 +24,7 @@
     "test:historico": "node historico.navegador.mjs",
     "test:sentinela-navegador": "node sentinela.navegador.mjs",
     "test:nomes": "node nomes-exame.test.mjs",
-    "test": "npm run test:edge && npm run test:python && npm run test:sql && npm run test:delta && npm run test:sw && npm run test:sentinela && npm run test:nomes && npm run test:sql9 && npm run test:convenio && npm run test:contas && npm run test:protecao && npm run test:login-sql && npm run test:meus-dados && npm run test:navegador && npm run test:corrida && npm run test:historico && npm run test:sentinela-navegador && npm run test:login"
+    "test": "npm run test:edge && npm run test:python && npm run test:sql && npm run test:delta && npm run test:sw && npm run test:sentinela && npm run test:nomes && npm run test:sql9 && npm run test:convenio && npm run test:assuntos && npm run test:contas && npm run test:protecao && npm run test:login-sql && npm run test:meus-dados && npm run test:navegador && npm run test:corrida && npm run test:historico && npm run test:sentinela-navegador && npm run test:login"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.2.17",
