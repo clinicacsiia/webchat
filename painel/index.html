@@ -1023,7 +1023,8 @@
     const outro = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
     /* o cadastro só vira equipe se o e-mail foi convidado antes por um administrador (senão vira conta de paciente) */
     const { error: eConvite } = await db.rpc('equipe_convidar', { p_email: email, p_papel: papel });
-    if (eConvite) throw eConvite;
+    /* banco ainda sem a função (migração não aplicada): segue como antes; com a função, qualquer outro erro interrompe */
+    if (eConvite && !/could not find the function|PGRST202|schema cache/i.test(msgErro(eConvite) + ' ' + (eConvite.code || ''))) throw eConvite;
     const { data, error } = await outro.auth.signUp({ email, password: senha, options: { emailRedirectTo: PAINEL_URL, data: { nome, trocar_senha: true } } });
     if (error) throw error;
     if (!data.user || (data.user.identities && !data.user.identities.length)) throw new Error('Este e-mail já está cadastrado.');
