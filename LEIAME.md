@@ -131,9 +131,21 @@ A IA consulta, a cada mensagem do paciente, um catálogo copiado de relatórios 
 
 O formulário pergunta primeiro a unidade (Desenvoar = atendimento pediátrico; CSI = exames e consultas; CSI RM/TC = ressonância e tomografia; "Ainda não sei") e **quem será atendido** (o próprio ou um filho(a), com o responsável falando pelo filho; uma conversa por criança e "Agendar para outro filho(a)" no menu). O médico de preferência vem depois do e-mail. A IA já nasce no caminho certo e o calendário filtra por unidade e médico. Passo a passo, texto do n8n e limites em `docs/fase6-unidade-e-medico.md`; SQL em `supabase/fase6-unidade-e-medico.sql` e `supabase/fase6b-alerta-preco.sql` (**aplicados no projeto em 30/10/2026**). Falta só o n8n (ver `docs/fase6-roteiro-de-teste-e-producao.md`).
 
-### Próximo passo: resposta em menos de 1 segundo, sem a IA responder o paciente (Fase 7, em planejamento)
+### Atendimento sem IA: motor de regras no Supabase (Fase 7)
 
-Hoje a resposta da IA leva 7 s na mediana (medido em 31/10/2026). O plano troca a IA no caminho do paciente por um motor de fluxo dentro do Supabase e deixa a IA nos bastidores: mapear o processo, testar com pacientes simulados e propor melhorias que a equipe aprova. Mapa completo do processo, ordem de trabalho e decisões pendentes em `docs/plano-fase7-fluxo-sem-ia.md`.
+Quem responde o paciente é um motor de regras no banco, na mesma chamada que grava a mensagem. No servidor, cada passo leva de 3 a 27 ms; antes, a IA levava 7 s na mediana.
+
+- O formulário pergunta só se o atendimento é para o próprio paciente ou para um filho(a). A unidade sai da escolha: consulta de criança vai para a Desenvoar e de adulto para a CSI.
+- O chat é só de botões e listas com filtro. Os dados do cadastro são pedidos um grupo por mensagem.
+- O paciente pode tirar foto do pedido médico: o celular lê o texto (OCR) e a foto vai para o atendente.
+- Depois de enviar, o paciente vê um contador ao vivo até a confirmação.
+- Quem volta pelo link do WhatsApp ou do e-mail entra direto, pelo cache do aparelho.
+
+A IA não fala com o paciente. Liga e desliga em `config.motor` (`fluxo` | `ia`).
+
+- Detalhes, testes e como voltar atrás: `docs/fase7-motor-implementado.md`.
+- Plano e mapa do processo: `docs/plano-fase7-fluxo-sem-ia.md`.
+- SQL: `supabase/fase7-motor.sql`, aplicado em 31/10/2026.
 
 ## Estado do projeto e como retomar
 

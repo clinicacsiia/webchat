@@ -463,7 +463,7 @@
     S.aba = podeAtender() ? 'atendimento' : 'contatos';
     await carregarAgentes();
     montarApp();
-    if (podeAtender()) { await carregarConversas(); ligarTempoReal(); }
+    if (podeAtender()) { await carregarConversas(); ligarTempoReal(); marcarPresenca(); }
     renderAba();
   }
   async function carregarAgentes() {
@@ -538,6 +538,14 @@
         if (S.ao_vivo) agendarRecarga();
       });
   }
+  // Painel aberto = equipe online: o chat avisa o paciente se não houver ninguém (e o contador mostra isso).
+  let tPresenca = null;
+  function marcarPresenca() {
+    clearInterval(tPresenca);
+    const ping = () => { if (S.me && !document.hidden) db.rpc('painel_presenca').then(() => {}); };
+    ping(); tPresenca = setInterval(ping, 60000);
+    if (!marcarPresenca.ligado) { marcarPresenca.ligado = true; document.addEventListener('visibilitychange', () => { if (S.me && !document.hidden) db.rpc('painel_presenca').then(() => {}); }); }
+  }
   function desligarTempoReal() { if (S.canal) { db.removeChannel(S.canal); S.canal = null; } }
   function agendarRecarga() { clearTimeout(tRecarga); tRecarga = setTimeout(async () => { await carregarConversas(); if (S.aba === 'atendimento') { renderLista(); renderTopoChat(); renderAlertaPreco(); carregarPre(); } atualizarSelo(); }, 250); }
   function aoNovaMensagem(m) {
@@ -563,7 +571,7 @@
 
   /* ---------- conversas ---------- */
   async function carregarConversas() {
-    const base = 'id,status,agente_id,ultima_mensagem,nao_lidas_agente,criado_em,atualizado_em,contato_id,ia_ativa,triagem_resumo,triagem_urgencia,alerta_agenda,nome_informado,email_informado,contatos(id,nome,telefone,email)';
+    const base = 'id,status,agente_id,ultima_mensagem,nao_lidas_agente,criado_em,atualizado_em,contato_id,ia_ativa,motor,triagem_resumo,triagem_urgencia,alerta_agenda,nome_informado,email_informado,contatos(id,nome,telefone,email)';
     // Fase 6 (unidade, médico, criança): colunas novas; se o SQL ainda não foi aplicado, volta para a lista antiga em vez de quebrar o painel.
     const consulta = (cols) => db.from('conversas').select(cols).order('atualizado_em', { ascending: false }).limit(300);
     let { data, error } = await consulta(base.replace('email_informado,', 'email_informado,paciente_tipo,paciente_nome,unidade_inicial,medico_preferido,'));
@@ -644,14 +652,14 @@
       return h('button', { class: 'item', type: 'button', 'aria-current': String(c.id === S.abertaId), onclick: () => abrirConversa(c.id) },
         h('div', { class: 'l1' }, h('span', {}, nomeLista(c)), h('span', { class: 'hora' }, fmtHoraLista(c.atualizado_em))),
         h('div', { class: 'l2' }, h('span', { class: 'prev' }, c.ultima_mensagem || 'Sem mensagens'), c.nao_lidas_agente > 0 ? h('span', { class: 'nl' }, c.nao_lidas_agente) : null),
-        h('div', { class: 'l3' }, h('span', { class: 'tag ' + c.status }, ROTULO_STATUS[c.status]), c.triagem_urgencia === 'alta' ? h('span', { class: 'urg alta' }, 'Urgente') : null, c.alerta_agenda ? h('span', { class: 'urg media', title: 'Conferência automática da agenda' }, c.alerta_agenda) : null, alertasDe(c.id).length ? h('span', { class: 'urg alta', title: 'Valor informado fora da referência (só a equipe vê)' }, 'Conferir valor') : null, c.ia_ativa && c.status === 'aguardando' ? h('span', { style: 'color:var(--suave)' }, 'IA atendendo') : null, ag ? h('span', { style: 'color:var(--suave)' }, ag.nome) : null));
+        h('div', { class: 'l3' }, h('span', { class: 'tag ' + c.status }, ROTULO_STATUS[c.status]), c.triagem_urgencia === 'alta' ? h('span', { class: 'urg alta' }, 'Urgente') : null, c.alerta_agenda ? h('span', { class: 'urg media', title: 'Conferência automática da agenda' }, c.alerta_agenda) : null, alertasDe(c.id).length ? h('span', { class: 'urg alta', title: 'Valor informado fora da referência (só a equipe vê)' }, 'Conferir valor') : null, c.ia_ativa && c.status === 'aguardando' ? h('span', { style: 'color:var(--suave)' }, c.motor === 'fluxo' ? 'Assistente automático' : 'IA atendendo') : null, ag ? h('span', { style: 'color:var(--suave)' }, ag.nome) : null));
     }));
   }
   async function abrirConversa(id) {
     S.abertaId = id; S.msgs = []; S.vistos = new Set(); S.pre = null; S.preSig = null;
     document.getElementById('inbox')?.classList.add('aberta');
     renderLista(); renderChat(); carregarPre();
-    const { data, error } = await db.from('mensagens').select('id,conversa_id,autor,agente_id,texto,criado_em').eq('conversa_id', id).order('id').limit(1000);
+    const { data, error } = await db.from('mensagens').select('id,conversa_id,autor,agente_id,texto,criado_em,opcoes').eq('conversa_id', id).order('id').limit(1000);
     if (S.abertaId !== id) return;
     if (error) { toast(msgErro(error)); return; }
     S.msgs = data || []; S.vistos = new Set(S.msgs.map((m) => m.id));
@@ -678,7 +686,8 @@
       h('option', { value: '' }, 'Transferir…'), atendentes.map((a) => h('option', { value: a.id }, a.nome))) : null;
     const tri = document.getElementById('triagem');
     if (tri) tri.replaceChildren(...(c.triagem_resumo || (c.ia_ativa && c.status === 'aguardando') ? [h('div', { class: 'triagem' },
-      h('b', {}, c.ia_ativa && c.status === 'aguardando' ? 'Assistente virtual atendendo' : 'Triagem da assistente virtual'),
+      h('b', {}, c.ia_ativa && c.status === 'aguardando' ? (c.motor === 'fluxo' ? 'Assistente automático atendendo' : 'Assistente virtual atendendo')
+        : (c.motor === 'fluxo' ? 'Resumo do assistente automático' : 'Triagem da assistente virtual')),
       c.triagem_urgencia ? h('span', { class: 'urg ' + c.triagem_urgencia }, 'Urgência ' + ({ baixa: 'baixa', media: 'média', alta: 'alta' })[c.triagem_urgencia]) : null,
       c.triagem_resumo ? h('div', {}, c.triagem_resumo) : null)] : []));
     t.replaceChildren(
@@ -703,11 +712,24 @@
       const quem = m.autor === 'agente' ? (ag ? ag.nome : 'Assistente virtual') : '';
       out.push(h('div', { class: 'msg ' + m.autor },
         m.autor === 'agente' && quem !== ultimoQuem ? h('span', { class: 'quem' }, quem) : null,
-        h('span', {}, linkificar(m.texto)), h('span', { class: 'hora' }, fmtHora(m.criado_em))));
+        h('span', {}, linkificar(m.texto)),
+        m.opcoes && m.opcoes.tipo === 'anexo' ? h('div', {}, h('button', { class: 'btn', type: 'button', style: 'margin-top:6px', onclick: (ev) => verAnexo(m.opcoes.id, ev.currentTarget) }, 'Ver foto do pedido médico')) : null,
+        h('span', { class: 'hora' }, fmtHora(m.criado_em))));
       ultimoQuem = m.autor === 'agente' ? quem : '';
     });
     box.replaceChildren(...out);
     if (rolar || perto) box.scrollTop = box.scrollHeight;
+  }
+  // Foto do pedido médico enviada pelo paciente (com o texto que o celular leu, para conferir).
+  async function verAnexo(id, botao) {
+    botao.disabled = true;
+    try {
+      const { data, error } = await db.rpc('painel_anexo', { p_id: id });
+      if (error) throw error;
+      if (!data) { toast('Foto não encontrada.'); return; }
+      const img = h('img', { src: `data:${data.mime};base64,${data.base64}`, alt: 'Foto do pedido médico', style: 'display:block;max-width:100%;margin-top:6px;border-radius:8px' });
+      botao.replaceWith(h('a', { href: img.src, target: '_blank', rel: 'noopener' }, img), data.ocr ? h('details', {}, h('summary', {}, 'Texto lido do pedido'), h('pre', { style: 'white-space:pre-wrap;font-size:12px' }, data.ocr)) : null);
+    } catch (e) { toast(msgErro(e)); botao.disabled = false; }
   }
   async function atualizarConversa(campos) {
     const { error } = await db.from('conversas').update(campos).eq('id', S.abertaId);
@@ -733,7 +755,7 @@
     try {
       if (c.status !== 'em_atendimento' || !c.agente_id) { if (!(await assumir())) return; }
       const { data, error } = await db.from('mensagens').insert({ conversa_id: c.id, autor: 'agente', agente_id: S.me.id, texto })
-        .select('id,conversa_id,autor,agente_id,texto,criado_em').single();
+        .select('id,conversa_id,autor,agente_id,texto,criado_em,opcoes').single();
       if (error) throw error;
       caixa.value = ''; caixa.style.height = 'auto';
       if (!S.vistos.has(data.id)) { S.vistos.add(data.id); S.msgs.push(data); desenharMsgs(true); }

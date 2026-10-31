@@ -1,5 +1,7 @@
 # Fase 7: o paciente recebe a resposta em menos de 1 segundo, sem a IA responder
 
+> **Estado (31/10/2026): implementado.** O que foi feito, as decisões da equipe, os testes e como ligar ou voltar atrás estão em `docs/fase7-motor-implementado.md`. Com as decisões, mudaram em relação a este plano: a unidade saiu do formulário, o chat é só de botões, os dados são pedidos um grupo por mensagem, entraram a foto do pedido com OCR e o contador ao vivo, e "equipe online" passou a ser quem está com o painel aberto.
+
 Data: 31/10/2026. Base: a correção do n8n de 31/10 (`docs/n8n-correcao-2026-10-31.md`, PR #20), o prompt publicado no nó "Triagem com Claude" (versão `1ada4ac8`) e medições feitas no banco `webchat-atendimento` nesse dia.
 
 ## 1. Por que mudar
@@ -166,7 +168,7 @@ Custo: de uma chamada à IA por mensagem para algumas chamadas por dia.
 
 ## 7. O que muda no banco, no chat e no painel
 
-### Banco (arquivo novo `supabase/fase7-fluxo.sql`)
+### Banco (arquivo novo `supabase/fase7-motor.sql`)
 
 | Peça | Para quê |
 |---|---|
