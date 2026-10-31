@@ -22,12 +22,13 @@
     --erro: #b3261e;
     --aviso: #8a5a00;
     --raio: 14px;
+    --esc: 1;   /* escala da letra: 1 = normal; o menu (⋮) troca para grande e muito grande */
   }
   * { box-sizing: border-box; }
   html, body { height: 100%; margin: 0; }
   body {
     font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    font-size: 16px; line-height: 1.4; color: var(--texto); background: var(--fundo);
+    font-size: calc(17px * var(--esc)); line-height: 1.4; color: var(--texto); background: var(--fundo);
     -webkit-text-size-adjust: 100%;
   }
   button, input, textarea { font: inherit; color: inherit; }
@@ -44,16 +45,17 @@
   }
   .avatar {
     width: 42px; height: 42px; border-radius: 50%; background: var(--verde); display: grid; place-items: center;
-    font-weight: 700; font-size: 18px; flex: none;
+    font-weight: 700; font-size: calc(19px * var(--esc)); flex: none;
   }
   .topo-info { flex: 1; min-width: 0; }
-  .topo-nome { font-weight: 650; font-size: 17px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .topo-status { font-size: 13px; opacity: .85; display: flex; align-items: center; gap: 6px; }
+  .topo-nome { font-weight: 650; font-size: calc(18px * var(--esc)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .topo-status { font-size: calc(15.5px * var(--esc)); opacity: .9; display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .topo-status #status { line-height: 1.25; }
   .ponto { width: 8px; height: 8px; border-radius: 50%; background: #9aa9a3; flex: none; }
   .ponto.aguardando { background: #f2b84b; }
   .ponto.atendendo { background: #4ade80; }
   .btn-menu {
-    background: transparent; border: 0; color: #fff; width: 44px; height: 44px; border-radius: 50%; cursor: pointer; font-size: 22px; line-height: 1;
+    background: transparent; border: 0; color: #fff; width: 44px; height: 44px; border-radius: 50%; cursor: pointer; font-size: calc(23px * var(--esc)); line-height: 1;
   }
   .btn-menu:hover { background: rgba(255,255,255,.12); }
   .menu {
@@ -66,10 +68,10 @@
 
   /* Formulário inicial */
   .inicio { flex: 1; overflow-y: auto; padding: 20px 18px calc(24px + env(safe-area-inset-bottom)); }
-  .inicio h1 { font-size: 24px; line-height: 1.2; margin: 6px 0 6px; }
+  .inicio h1 { font-size: calc(25px * var(--esc)); line-height: 1.2; margin: 6px 0 6px; }
   .inicio p.sub { margin: 0 0 18px; color: var(--texto-suave); }
   .campo { margin-bottom: 14px; }
-  .campo label { display: block; font-weight: 600; font-size: 14px; margin-bottom: 5px; }
+  .campo label { display: block; font-weight: 600; font-size: calc(15.5px * var(--esc)); margin-bottom: 5px; }
   .campo .opc { font-weight: 400; color: var(--texto-suave); }
   .campo input[type=text], .campo input[type=tel], .campo input[type=email], .campo textarea {
     width: 100%; padding: 12px 13px; border: 1.5px solid var(--linha); border-radius: 10px; background: var(--papel);
@@ -80,40 +82,40 @@
   .campo select:focus { border-color: var(--verde); outline: none; box-shadow: 0 0 0 3px rgba(20,107,80,.18); }
   .unidades { display: grid; gap: 8px; }
   .unidades.dois { grid-template-columns: 1fr 1fr; }
-  .dica-campo { margin: 5px 0 0; font-size: 13px; color: var(--texto-suave); }
+  .dica-campo { margin: 5px 0 0; font-size: calc(15.5px * var(--esc)); color: var(--texto-suave); }
   .irmao-linha { display: flex; gap: 6px; margin-top: 8px; }
   .irmao-linha input { flex: 1; min-width: 0; padding: 12px; font: inherit; border: 1.5px solid var(--linha); border-radius: 12px; background: var(--papel); color: inherit; }
   .irmao-linha input:focus { border-color: var(--verde); outline: none; box-shadow: 0 0 0 3px rgba(20,107,80,.18); }
-  .irmao-linha button { border: 0; background: none; color: var(--texto-suave); font-size: 22px; cursor: pointer; padding: 0 8px; }
+  .irmao-linha button { border: 0; background: none; color: var(--texto-suave); font-size: calc(23px * var(--esc)); cursor: pointer; padding: 0 8px; }
   .link-add { margin-top: 8px; background: none; border: 0; color: var(--verde); font: inherit; font-weight: 650; cursor: pointer; padding: 6px 0; }
-  .proximo { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 12px; background: var(--verde-claro); border-top: 1px solid var(--linha); font-size: 14px; }
+  .proximo { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 12px; background: var(--verde-claro); border-top: 1px solid var(--linha); font-size: calc(15.5px * var(--esc)); }
   .proximo[hidden] { display: none; }
   .unidade { text-align: left; border: 1.5px solid var(--linha); background: var(--papel); border-radius: 12px; padding: 11px 14px; cursor: pointer; font: inherit; color: inherit; }
-  .unidade strong { display: block; font-size: 15px; }
-  .unidade span { display: block; font-size: 13px; color: var(--texto-suave); margin-top: 1px; }
+  .unidade strong { display: block; font-size: calc(16.5px * var(--esc)); }
+  .unidade span { display: block; font-size: calc(15.5px * var(--esc)); color: var(--texto-suave); margin-top: 1px; }
   .unidade[aria-checked="true"] { border-color: var(--verde); background: var(--verde-claro); box-shadow: 0 0 0 2px rgba(20,107,80,.18); }
-  .aceite { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; color: var(--texto-suave); margin: 4px 0 18px; }
+  .aceite { display: flex; gap: 10px; align-items: flex-start; font-size: calc(15.5px * var(--esc)); color: var(--texto-suave); margin: 4px 0 18px; }
   .aceite input { width: 20px; height: 20px; margin-top: 1px; accent-color: var(--verde); flex: none; }
   .btn-primario {
-    width: 100%; background: var(--verde); color: #fff; border: 0; border-radius: 12px; padding: 14px 16px; font-weight: 650; font-size: 16px; cursor: pointer;
+    width: 100%; background: var(--verde); color: #fff; border: 0; border-radius: 12px; padding: 14px 16px; font-weight: 650; font-size: calc(17px * var(--esc)); cursor: pointer;
   }
   .btn-primario:hover { background: #0f5a42; }
   .btn-primario:disabled { opacity: .6; cursor: default; }
-  .erro-form { color: var(--erro); font-size: 14px; margin: 0 0 12px; min-height: 0; }
+  .erro-form { color: var(--erro); font-size: calc(15.5px * var(--esc)); margin: 0 0 12px; min-height: 0; }
 
   /* Conversa */
   .msgs { flex: 1; overflow-y: auto; padding: 14px 12px 8px; display: flex; flex-direction: column; gap: 4px; overscroll-behavior: contain; }
-  .dia { align-self: center; background: rgba(16,48,43,.1); color: var(--texto-suave); font-size: 12px; padding: 3px 11px; border-radius: 999px; margin: 10px 0 6px; }
+  .dia { align-self: center; background: rgba(16,48,43,.1); color: var(--texto-suave); font-size: calc(13.5px * var(--esc)); padding: 3px 11px; border-radius: 999px; margin: 10px 0 6px; }
   .msg { max-width: 82%; padding: 8px 11px 6px; border-radius: var(--raio); background: var(--papel); box-shadow: 0 1px 1px rgba(16,48,43,.08); word-wrap: break-word; overflow-wrap: anywhere; white-space: pre-wrap; }
   .msg.agente { align-self: flex-start; border-top-left-radius: 4px; }
   .msg.cliente { align-self: flex-end; background: var(--verde-claro); border-top-right-radius: 4px; }
   .msg.pendente { opacity: .6; }
-  .msg .quem { display: block; font-size: 12.5px; font-weight: 650; color: var(--verde); margin-bottom: 2px; }
-  .msg .hora { display: block; text-align: right; font-size: 11px; color: var(--texto-suave); margin-top: 2px; white-space: normal; }
+  .msg .quem { display: block; font-size: calc(13.5px * var(--esc)); font-weight: 650; color: var(--verde); margin-bottom: 2px; }
+  .msg .hora { display: block; text-align: right; font-size: calc(13.5px * var(--esc)); color: var(--texto-suave); margin-top: 2px; white-space: normal; }
   .msg a { color: #0b5cad; }
-  .msg.sistema { align-self: center; background: rgba(16,48,43,.08); box-shadow: none; color: var(--texto-suave); font-size: 13px; text-align: center; max-width: 90%; padding: 5px 12px; }
+  .msg.sistema { align-self: center; background: rgba(16,48,43,.08); box-shadow: none; color: var(--texto-suave); font-size: calc(15.5px * var(--esc)); text-align: center; max-width: 90%; padding: 5px 12px; }
   .msg.sistema .hora { display: none; }
-  .boas-vindas { align-self: center; max-width: 88%; text-align: center; color: var(--texto-suave); font-size: 14px; margin: 6px 0 10px; }
+  .boas-vindas { align-self: center; max-width: 88%; text-align: center; color: var(--texto-suave); font-size: calc(15.5px * var(--esc)); margin: 6px 0 10px; }
 
   .compor { flex: none; display: flex; gap: 8px; align-items: flex-end; padding: 8px 10px calc(8px + env(safe-area-inset-bottom)); background: #f4f8f5; border-top: 1px solid var(--linha); }
   .compor textarea {
@@ -125,16 +127,16 @@
   .btn-enviar:disabled { opacity: .5; cursor: default; }
   .btn-enviar svg { width: 22px; height: 22px; fill: currentColor; }
 
-  .aviso-encerrado { background: #fff7e5; color: var(--aviso); text-align: center; font-size: 13.5px; padding: 8px 12px; border-top: 1px solid #f0dfb8; flex: none; }
+  .aviso-encerrado { background: #fff7e5; color: var(--aviso); text-align: center; font-size: calc(15.5px * var(--esc)); padding: 8px 12px; border-top: 1px solid #f0dfb8; flex: none; }
 
   .toast {
     position: fixed; left: 50%; bottom: calc(86px + env(safe-area-inset-bottom)); transform: translateX(-50%); background: #2b2f2e; color: #fff;
-    padding: 10px 16px; border-radius: 10px; font-size: 14px; z-index: 30; max-width: calc(100% - 32px); text-align: center;
+    padding: 10px 16px; border-radius: 10px; font-size: calc(15.5px * var(--esc)); z-index: 30; max-width: calc(100% - 32px); text-align: center;
   }
 
   /* Widgets dentro das mensagens */
   .widget { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--linha); white-space: normal; }
-  .widget .w-titulo { font-weight: 650; font-size: 14px; margin: 0 0 6px; }
+  .widget .w-titulo { font-weight: 650; font-size: calc(15.5px * var(--esc)); margin: 0 0 6px; }
   .widget fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
   .widget .w-op { display: flex; gap: 10px; align-items: center; padding: 9px 4px; border-radius: 8px; cursor: pointer; }
   .widget .w-op:hover { background: #f1f6f3; }
@@ -146,23 +148,23 @@
   .btn-w:disabled { opacity: .5; cursor: default; }
   .btn-w.sec { background: var(--papel); color: var(--verde); border: 1.5px solid var(--verde); }
   .widget.respondido { opacity: .6; }
-  .widget .w-nota { font-size: 12.5px; color: var(--texto-suave); margin: 6px 0 0; }
+  .widget .w-nota { font-size: calc(13.5px * var(--esc)); color: var(--texto-suave); margin: 6px 0 0; }
 
   /* Folha (modal em tela cheia no celular) */
   .folha { position: fixed; inset: 0; background: rgba(16,48,43,.55); z-index: 40; display: flex; align-items: flex-end; justify-content: center; }
   .folha-caixa { background: var(--fundo); width: 100%; max-width: 760px; height: min(100dvh, 880px); display: flex; flex-direction: column; border-radius: 16px 16px 0 0; overflow: hidden; }
   @media (min-width: 800px) { .folha { align-items: center; } .folha-caixa { height: min(92dvh, 860px); border-radius: 16px; } }
   .folha-topo { display: flex; align-items: center; gap: 8px; padding: 12px 14px; background: var(--verde-escuro); color: #fff; flex: none; }
-  .folha-topo h2 { flex: 1; margin: 0; font-size: 17px; line-height: 1.25; }
-  .folha-fechar { background: transparent; border: 0; color: #fff; width: 40px; height: 40px; border-radius: 50%; font-size: 26px; line-height: 1; cursor: pointer; }
+  .folha-topo h2 { flex: 1; margin: 0; font-size: calc(18px * var(--esc)); line-height: 1.25; }
+  .folha-fechar { background: transparent; border: 0; color: #fff; width: 40px; height: 40px; border-radius: 50%; font-size: calc(27px * var(--esc)); line-height: 1; cursor: pointer; }
   .folha-fechar:hover { background: rgba(255,255,255,.14); }
   .folha-corpo { flex: 1; overflow-y: auto; padding: 14px; overscroll-behavior: contain; }
   .folha-rodape { flex: none; padding: 10px 14px calc(10px + env(safe-area-inset-bottom)); background: #f4f8f5; border-top: 1px solid var(--linha); display: flex; flex-direction: column; gap: 8px; }
   .folha-rodape .linha { display: flex; gap: 8px; flex-wrap: wrap; }
   .folha-rodape .linha > * { flex: 1; min-width: 130px; }
-  .p-dica { font-size: 13.5px; color: var(--texto-suave); margin: 0 0 10px; }
+  .p-dica { font-size: calc(15.5px * var(--esc)); color: var(--texto-suave); margin: 0 0 10px; }
   .chips { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 12px; }
-  .chip { border: 1.5px solid var(--linha); background: var(--papel); border-radius: 999px; padding: 8px 14px; cursor: pointer; font-weight: 600; font-size: 14px; }
+  .chip { border: 1.5px solid var(--linha); background: var(--papel); border-radius: 999px; padding: 8px 14px; cursor: pointer; font-weight: 600; font-size: calc(15.5px * var(--esc)); }
   .chip[aria-pressed="true"], .chip.ativo { background: var(--verde); border-color: var(--verde); color: #fff; }
   .chip:disabled { opacity: .45; cursor: default; }
 
@@ -176,32 +178,32 @@
   .corpo-svg .parte.off { fill: #eef1ef; stroke: #c6cfca; cursor: not-allowed; stroke-dasharray: 3 2; }
   .corpo-svg text { font-size: 11px; fill: #3b4b45; pointer-events: none; font-weight: 700; }
   .corpo-svg text.letra { fill: #fff; font-size: 12px; }
-  .corpo-cap { font-size: 12.5px; color: var(--texto-suave); text-align: center; max-width: 320px; margin: 0; }
+  .corpo-cap { font-size: calc(13.5px * var(--esc)); color: var(--texto-suave); text-align: center; max-width: 320px; margin: 0; }
   .sel-lista { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0; }
-  .tag { display: inline-flex; align-items: center; gap: 6px; background: var(--verde-claro); border-radius: 999px; padding: 5px 6px 5px 12px; font-size: 14px; }
+  .tag { display: inline-flex; align-items: center; gap: 6px; background: var(--verde-claro); border-radius: 999px; padding: 5px 6px 5px 12px; font-size: calc(15.5px * var(--esc)); }
   .tag button { border: 0; background: rgba(16,48,43,.12); border-radius: 50%; width: 24px; height: 24px; cursor: pointer; line-height: 1; }
   .alt-lista { border: 1px solid var(--linha); border-radius: 12px; background: var(--papel); padding: 8px 12px; margin: 10px 0; }
-  .alt-lista summary { cursor: pointer; font-weight: 600; font-size: 14px; }
+  .alt-lista summary { cursor: pointer; font-weight: 600; font-size: calc(15.5px * var(--esc)); }
   .alt-grid { display: grid; grid-template-columns: 1fr auto auto; gap: 6px 8px; align-items: center; margin-top: 8px; }
-  .alt-grid .nome { font-size: 14px; }
+  .alt-grid .nome { font-size: calc(15.5px * var(--esc)); }
   .bloco { background: var(--papel); border: 1px solid var(--linha); border-radius: 12px; padding: 10px 12px; margin: 0 0 10px; }
-  .bloco h3 { margin: 0 0 6px; font-size: 15px; }
+  .bloco h3 { margin: 0 0 6px; font-size: calc(16.5px * var(--esc)); }
   .bloco .w-op { padding: 8px 2px; }
   .carrinho { background: #fff7e5; border: 1px solid #f0dfb8; border-radius: 12px; padding: 8px 12px; margin: 0 0 12px; }
-  .carrinho h3 { margin: 0 0 6px; font-size: 14px; color: var(--aviso); }
-  .carrinho li { display: flex; gap: 8px; align-items: flex-start; padding: 3px 0; font-size: 14px; }
+  .carrinho h3 { margin: 0 0 6px; font-size: calc(15.5px * var(--esc)); color: var(--aviso); }
+  .carrinho li { display: flex; gap: 8px; align-items: flex-start; padding: 3px 0; font-size: calc(15.5px * var(--esc)); }
   .carrinho ul { list-style: none; margin: 0; padding: 0; }
   .carrinho li span { flex: 1; }
   .carrinho button { border: 0; background: rgba(16,48,43,.12); border-radius: 50%; width: 24px; height: 24px; cursor: pointer; flex: none; }
 
   /* Calendário */
   .cal-nav { display: flex; align-items: center; justify-content: space-between; margin: 4px 0 8px; }
-  .cal-nav strong { font-size: 16px; }
-  .cal-nav button { border: 1.5px solid var(--linha); background: var(--papel); border-radius: 10px; width: 42px; height: 38px; font-size: 20px; cursor: pointer; }
+  .cal-nav strong { font-size: calc(17px * var(--esc)); }
+  .cal-nav button { border: 1.5px solid var(--linha); background: var(--papel); border-radius: 10px; width: 42px; height: 38px; font-size: calc(21px * var(--esc)); cursor: pointer; }
   .cal-nav button:disabled { opacity: .4; cursor: default; }
   .cal-grade { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
-  .cal-grade .sem { text-align: center; font-size: 12px; color: var(--texto-suave); padding: 2px 0; font-weight: 700; }
-  .cal-dia { aspect-ratio: 1 / 1; min-height: 40px; border: 1.5px solid transparent; border-radius: 10px; background: transparent; cursor: pointer; font-size: 15px; position: relative; padding: 0; }
+  .cal-grade .sem { text-align: center; font-size: calc(13.5px * var(--esc)); color: var(--texto-suave); padding: 2px 0; font-weight: 700; }
+  .cal-dia { aspect-ratio: 1 / 1; min-height: 40px; border: 1.5px solid transparent; border-radius: 10px; background: transparent; cursor: pointer; font-size: calc(16.5px * var(--esc)); position: relative; padding: 0; }
   .cal-dia.livre { background: var(--papel); border-color: var(--linha); font-weight: 650; }
   .cal-dia.livre::after { content: ""; position: absolute; left: 50%; bottom: 5px; width: 6px; height: 6px; margin-left: -3px; border-radius: 50%; background: var(--verde); }
   .cal-dia.lotado { color: #a5b0ab; text-decoration: line-through; cursor: not-allowed; }
@@ -215,61 +217,110 @@
   .slot.sel { background: var(--verde); color: #fff; }
   .slot.off { border-color: var(--linha); color: #aeb8b3; background: #f1f4f2; text-decoration: line-through; cursor: not-allowed; }
   .slot.chegada { grid-column: 1 / -1; }
-  .legenda { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12.5px; color: var(--texto-suave); margin: 10px 0 0; }
+  .legenda { display: flex; gap: 12px; flex-wrap: wrap; font-size: calc(13.5px * var(--esc)); color: var(--texto-suave); margin: 10px 0 0; }
   .legenda i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; margin-right: 4px; }
-  .aviso-cal { background: #fff7e5; border: 1px solid #f0dfb8; color: var(--aviso); border-radius: 10px; padding: 8px 10px; font-size: 13px; margin: 0 0 10px; }
+  .aviso-cal { background: #fff7e5; border: 1px solid #f0dfb8; color: var(--aviso); border-radius: 10px; padding: 8px 10px; font-size: calc(15.5px * var(--esc)); margin: 0 0 10px; }
   .carregando { padding: 28px 8px; text-align: center; color: var(--texto-suave); }
 
   /* Início: quem volta pelo cache */
   .volta { background: var(--verde-claro); border-radius: 12px; padding: 12px 14px; margin: 0 0 16px; }
-  .volta-dados { margin: 0 0 2px; font-size: 15px; }
+  .volta-dados { margin: 0 0 2px; font-size: calc(16.5px * var(--esc)); }
   .volta .link-add { margin: 0; padding: 4px 0; }
   .unidades.dois .unidade { min-height: 66px; }
-  .unidades.dois .unidade strong { font-size: 17px; }
+  .unidades.dois .unidade strong { font-size: calc(18px * var(--esc)); }
 
   /* Motor de atendimento: opções grandes, filtro, campos e acompanhamento */
   .msg.com-widget { width: 94%; max-width: 94%; }
   .op-lista { display: grid; gap: 8px; margin-top: 4px; }
   .op-lista.rolar { max-height: 340px; overflow-y: auto; padding: 2px; }
-  .op { text-align: left; width: 100%; border: 1.5px solid var(--verde); background: var(--papel); color: var(--texto); border-radius: 12px; padding: 12px 14px; font-size: 16px; cursor: pointer; }
+  .op { text-align: left; width: 100%; border: 1.5px solid var(--verde); background: var(--papel); color: var(--texto); border-radius: 12px; padding: 12px 14px; font-size: calc(17px * var(--esc)); cursor: pointer; }
   .op strong { display: block; font-weight: 650; color: var(--verde); }
-  .op span { display: block; font-size: 13.5px; color: var(--texto-suave); margin-top: 2px; }
+  .op span { display: block; font-size: calc(15.5px * var(--esc)); color: var(--texto-suave); margin-top: 2px; }
   .op:hover { background: #eef8f2; }
   .op.unico { box-shadow: 0 0 0 3px rgba(20,107,80,.3); background: #eef8f2; }
   .op:disabled { opacity: .55; cursor: default; }
-  .filtro { width: 100%; padding: 12px 14px; border: 1.5px solid var(--linha); border-radius: 12px; background: var(--papel); font-size: 16px; margin: 2px 0 8px; }
+  .filtro { width: 100%; padding: 12px 14px; border: 1.5px solid var(--linha); border-radius: 12px; background: var(--papel); font-size: calc(17px * var(--esc)); margin: 2px 0 8px; }
   .filtro:focus { outline: none; border-color: var(--verde); box-shadow: 0 0 0 3px rgba(20,107,80,.18); }
   .cp { margin-bottom: 10px; }
-  .cp > label { display: block; font-weight: 600; font-size: 14px; margin-bottom: 4px; }
-  .cp input, .cp select { width: 100%; padding: 12px 13px; border: 1.5px solid var(--linha); border-radius: 10px; background: var(--papel); font-size: 16px; }
+  .cp > label { display: block; font-weight: 600; font-size: calc(15.5px * var(--esc)); margin-bottom: 4px; }
+  .cp input, .cp select { width: 100%; padding: 12px 13px; border: 1.5px solid var(--linha); border-radius: 10px; background: var(--papel); font-size: calc(17px * var(--esc)); }
   .cp input:focus, .cp select:focus { outline: none; border-color: var(--verde); box-shadow: 0 0 0 3px rgba(20,107,80,.18); }
   .cp input.ruim { border-color: var(--erro); }
-  .cp .erro-campo { color: var(--erro); font-size: 13px; margin: 3px 0 0; }
+  .cp .erro-campo { color: var(--erro); font-size: calc(15.5px * var(--esc)); margin: 3px 0 0; }
   .sexo { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .acoes-w { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
   .acomp { background: #fff7e5; border: 1px solid #f0dfb8; border-radius: 12px; padding: 12px 14px; }
   .acomp.ok { background: var(--verde-claro); border-color: #a9d8bd; }
-  .acomp b { display: block; font-size: 16px; }
-  .acomp .relogio { font-variant-numeric: tabular-nums; font-size: 24px; font-weight: 700; margin: 4px 0; }
-  .acomp p { margin: 2px 0; font-size: 14px; color: var(--texto-suave); }
+  .acomp b { display: block; font-size: calc(17px * var(--esc)); }
+  .acomp .relogio { font-variant-numeric: tabular-nums; font-size: calc(25px * var(--esc)); font-weight: 700; margin: 4px 0; }
+  .acomp p { margin: 2px 0; font-size: calc(15.5px * var(--esc)); color: var(--texto-suave); }
   .res-item { display: flex; gap: 10px; align-items: flex-start; padding: 11px 6px; border-bottom: 1px solid var(--linha); cursor: pointer; }
   .res-item input { width: 22px; height: 22px; accent-color: var(--verde); flex: none; margin-top: 1px; }
   .res-item small { display: block; color: var(--texto-suave); }
-  .foto-status { font-size: 15px; color: var(--texto); background: var(--verde-claro); border-radius: 10px; padding: 10px 12px; margin: 8px 0 10px; }
+  .foto-status { font-size: calc(16.5px * var(--esc)); color: var(--texto); background: var(--verde-claro); border-radius: 10px; padding: 10px 12px; margin: 8px 0 10px; }
   .girando { display: inline-block; width: 14px; height: 14px; margin-right: 8px; vertical-align: -2px; border: 2px solid var(--verde); border-right-color: transparent; border-radius: 50%; }
   @media (prefers-reduced-motion: no-preference) { .girando { animation: gira .9s linear infinite; } @keyframes gira { to { transform: rotate(360deg); } } }
   /* Exames lidos do pedido: um cartão por exame */
-  .g-resumo p { margin: 4px 0 10px; font-size: 16px; }
+  .g-resumo p { margin: 4px 0 10px; font-size: calc(17px * var(--esc)); }
   .grupo { border: 1.5px solid var(--linha); border-radius: 12px; padding: 10px 12px; margin: 0 0 12px; background: var(--papel); }
   .grupo.duvida, .grupo.nenhum { border-color: #e2c27a; background: #fffaf0; }
-  .g-titulo { margin: 0 0 6px; font-size: 13px; font-weight: 700; color: var(--texto-suave); text-transform: uppercase; letter-spacing: .03em; }
+  .g-titulo { margin: 0 0 6px; font-size: calc(15.5px * var(--esc)); font-weight: 700; color: var(--texto-suave); text-transform: uppercase; letter-spacing: .03em; }
   .g-recorte { display: block; max-width: 100%; max-height: 90px; border: 1px solid var(--linha); border-radius: 6px; margin: 0 0 8px; background: #fff; }
-  .g-escrito, .g-entendi { margin: 0 0 6px; font-size: 15px; }
-  .g-pergunta { margin: 8px 0 4px; font-size: 16px; font-weight: 650; }
-  .g-aviso { margin: 4px 0; font-size: 15px; color: var(--aviso); }
-  .res-item.grande { font-size: 17px; padding: 13px 6px; }
+  .g-escrito, .g-entendi { margin: 0 0 6px; font-size: calc(16.5px * var(--esc)); }
+  .g-pergunta { margin: 8px 0 4px; font-size: calc(17px * var(--esc)); font-weight: 650; }
+  .g-aviso { margin: 4px 0; font-size: calc(16.5px * var(--esc)); color: var(--aviso); }
+  .res-item.grande { font-size: calc(18px * var(--esc)); padding: 13px 6px; }
   .res-item.grande input { width: 26px; height: 26px; }
   @media (prefers-reduced-motion: no-preference) { .msg { animation: entra .16s ease-out; } @keyframes entra { from { opacity: 0; transform: translateY(4px); } } }
+
+  /* Fase 9: aviso de que é uma IA, previsão de agendamento e humano sempre à mão */
+  .aviso-ia { align-self: center; max-width: 94%; margin: 4px 0 12px; padding: 12px 14px; border-radius: 14px; background: #fff; border: 1.5px solid #a9d8bd; box-shadow: 0 1px 2px rgba(16,48,43,.08); font-size: calc(16px * var(--esc)); line-height: 1.45; }
+  .aviso-ia b { color: var(--verde); }
+  .aviso-ia p { margin: 0 0 6px; }
+  .aviso-ia p:last-child { margin-bottom: 0; }
+  .aviso-ia.compacto { align-self: stretch; max-width: none; margin: 0 0 16px; box-shadow: none; background: #f4faf6; }
+  .barra-humano { flex: none; display: flex; justify-content: center; padding: 6px 10px 8px; background: #f4f8f5; border-top: 1px solid var(--linha); }
+  .barra-humano button { background: var(--papel); color: var(--verde); border: 1.5px solid var(--verde); border-radius: 999px; padding: 10px 18px; min-height: 46px; font-weight: 650; font-size: calc(16px * var(--esc)); cursor: pointer; }
+  .barra-humano button:hover { background: #eef8f2; }
+  .barra-humano[hidden] { display: none; }
+  .nota-previsao { margin: 8px 0 0; padding: 9px 11px; border-radius: 10px; background: #fff; border: 1.5px dashed #c9a24a; color: var(--texto); font-size: calc(15.5px * var(--esc)); }
+
+  /* Pedido de exames: mesmas opções grandes em todos os passos */
+  .passos { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; padding: 0; list-style: none; }
+  .passos li { display: flex; align-items: center; gap: 6px; flex: 1; font-size: calc(14.5px * var(--esc)); font-weight: 650; color: var(--texto-suave); min-width: 0; }
+  .passos li span.n { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--linha); display: grid; place-items: center; flex: none; background: var(--papel); }
+  .passos li.ativo { color: var(--verde); }
+  .passos li.ativo span.n { background: var(--verde); border-color: var(--verde); color: #fff; }
+  .passos li.feito span.n { background: var(--verde-claro); border-color: var(--verde); color: var(--verde); }
+  .passos li .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .passo-titulo { margin: 0 0 4px; font-size: calc(19px * var(--esc)); line-height: 1.25; }
+  .passo-sub { margin: 0 0 12px; font-size: calc(16px * var(--esc)); color: var(--texto-suave); }
+  .op-grade { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 0 0 14px; }
+  .op-grade .op { min-height: 72px; display: flex; flex-direction: column; justify-content: center; }
+  .op-grade .op[aria-pressed="true"] { background: var(--verde); border-color: var(--verde); color: #fff; }
+  .op-grade .op[aria-pressed="true"] strong, .op-grade .op[aria-pressed="true"] span { color: #fff; }
+  .seg { display: grid; grid-template-columns: 1fr 1fr; gap: 0; margin: 0 0 12px; border: 1.5px solid var(--verde); border-radius: 12px; overflow: hidden; }
+  .seg button { border: 0; background: var(--papel); color: var(--verde); padding: 12px 8px; min-height: 48px; font-weight: 650; font-size: calc(16px * var(--esc)); cursor: pointer; }
+  .seg button + button { border-left: 1.5px solid var(--verde); }
+  .seg button[aria-pressed="true"] { background: var(--verde); color: #fff; }
+  .partes-lista { margin: 0 0 12px; }
+  .partes-grupo { margin: 0 0 14px; }
+  .partes-grupo h3 { margin: 0 0 6px; font-size: calc(14px * var(--esc)); text-transform: uppercase; letter-spacing: .04em; color: var(--texto-suave); }
+  .parte-linha { display: grid; grid-template-columns: minmax(0, 1fr) 118px 118px; gap: 8px; align-items: center; padding: 8px 0; border-top: 1px solid var(--linha); }
+  .parte-linha:first-of-type { border-top: 0; }
+  .parte-linha .nome { font-size: calc(17px * var(--esc)); font-weight: 600; overflow-wrap: anywhere; }
+  .parte-linha button { min-height: 48px; border: 1.5px solid var(--linha); background: var(--papel); border-radius: 12px; font-size: calc(16px * var(--esc)); font-weight: 650; cursor: pointer; padding: 6px 4px; }
+  .parte-linha button[aria-pressed="true"] { background: var(--verde); border-color: var(--verde); color: #fff; }
+  .parte-linha button.so { grid-column: span 2; }
+  @media (max-width: 380px) { .parte-linha { grid-template-columns: minmax(0, 1fr) 96px 96px; } }
+  .opcao-ex { display: flex; gap: 12px; align-items: center; padding: 12px 14px; margin: 0 0 8px; border: 1.5px solid var(--linha); border-radius: 12px; background: var(--papel); cursor: pointer; font-size: calc(17px * var(--esc)); min-height: 54px; }
+  .opcao-ex input { width: 24px; height: 24px; accent-color: var(--verde); flex: none; }
+  .opcao-ex.marcada { border-color: var(--verde); background: var(--verde-claro); box-shadow: 0 0 0 2px rgba(20,107,80,.18); }
+  .opcao-ex.neutra { border-style: dashed; color: var(--texto-suave); }
+  .bloco-parte { margin: 0 0 16px; }
+  .bloco-parte h3 { margin: 0 0 8px; font-size: calc(17px * var(--esc)); }
+  .btn-w { min-height: 48px; }
+  .w-op { min-height: 48px; font-size: calc(17px * var(--esc)); }
 </style>
 </head>
 <body>
@@ -285,6 +336,8 @@
   <div class="menu" id="menu" hidden>
     <button type="button" id="btnAtendente" hidden>Falar com um atendente</button>
     <button type="button" id="btnOutroFilho" hidden>Agendar para outro filho(a)</button>
+    <button type="button" id="btnLetra">Letra maior</button>
+    <button type="button" id="btnSuporte">Código de suporte</button>
     <button type="button" id="btnNova">Fazer um novo pedido</button>
     <button type="button" id="btnSair">Sair (não sou eu)</button>
   </div>
@@ -293,6 +346,10 @@
   <section class="inicio" id="telaInicio" hidden>
     <h1 id="tituloInicio">Vamos agendar?</h1>
     <p class="sub" id="boasVindasForm">É só tocar nas opções. A resposta chega na hora.</p>
+    <div class="aviso-ia compacto" id="avisoForm">
+      <p><b>Olá! Eu sou o assistente virtual da clínica (uma inteligência artificial).</b> Estou aqui para deixar o seu atendimento mais rápido e tranquilo.</p>
+      <p>Uma pessoa da nossa equipe acompanha as conversas e pode falar com você a qualquer momento. O que fazemos aqui é montar uma <b>previsão de agendamento</b>; quem confirma data, horário e valor é um atendente.</p>
+    </div>
     <form id="formInicio" novalidate>
       <div class="volta" id="blocoVolta" hidden>
         <p class="volta-dados" id="voltaDados"></p>
@@ -338,6 +395,8 @@
   <!-- Tela 2: conversa -->
   <section id="telaChat" style="display:contents" hidden>
     <main class="msgs" id="msgs" aria-live="polite" aria-label="Mensagens"></main>
+    <div class="apoio" id="apoio" hidden></div>
+    <div class="barra-humano" id="barraHumano" hidden><button type="button" id="btnHumano">&#128100; Falar com um atendente</button></div>
     <div class="proximo" id="proximo" hidden>
       <span id="proximoTxt"></span>
       <button type="button" class="btn-w" id="btnProximo">Agendar</button>
@@ -361,6 +420,7 @@
 <div class="toast" id="toast" role="status" hidden></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="sentinela.js"></script>
 <script>
 (() => {
   'use strict';
@@ -369,12 +429,17 @@
   const CHAVE_CONVERSA = 'webchat.conversa.v1';
   const CHAVE_PERFIL = 'webchat.perfil.v1';
   const CHAVE_MSGS = 'webchat.msgs.v1';   // últimas mensagens da conversa: a tela abre na hora, antes da rede
+  const CHAVE_LETRA = 'webchat.letra.v1';
+  // Muda a cada alteração do chat. Cópia de mensagens guardada por outra versão é descartada (era isso que mostrava conversa velha e travada).
+  const VERSAO_APP = '2026.10.31-9';
+  const ESCALAS = [1, 1.18, 1.36], ROTULO_LETRA = ['Letra maior', 'Letra muito maior', 'Letra normal'];
 
   const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
   const $ = (s) => document.querySelector(s);
   const el = {
     empresa: $('#empresa'), avatar: $('#avatar'), ponto: $('#ponto'), status: $('#status'),
     btnMenu: $('#btnMenu'), menu: $('#menu'), btnNova: $('#btnNova'), btnAtendente: $('#btnAtendente'), btnSair: $('#btnSair'),
+    btnLetra: $('#btnLetra'), btnSuporte: $('#btnSuporte'), apoio: $('#apoio'), barraHumano: $('#barraHumano'), btnHumano: $('#btnHumano'),
     telaInicio: $('#telaInicio'), telaChat: $('#telaChat'), boasForm: $('#boasVindasForm'), tituloInicio: $('#tituloInicio'),
     form: $('#formInicio'), fNome: $('#fNome'), fTel: $('#fTel'), fEmail: $('#fEmail'),
     fAceite: $('#fAceite'), erroForm: $('#erroForm'), btnIniciar: $('#btnIniciar'),
@@ -388,13 +453,19 @@
 
   let config = { nome_empresa: 'Atendimento', boas_vindas: '' };
   let conv = lerLocal(CHAVE_CONVERSA);
-  let ultimoId = 0, canal = null, timerPoll = null, ultimoDia = '', ultimoAutor = '', naoLidas = 0, tempId = 0;
+  // ultimoId = a maior mensagem já vista (por qualquer caminho). baseServidor = até onde a CONSULTA ao servidor já trouxe tudo:
+  // só ela vira o p_apos. Se o aviso instantâneo trouxer a resposta (id 301) antes da mensagem do paciente (id 300),
+  // o cursor não pode pular a 300.
+  let ultimoId = 0, baseServidor = 0, maiorDesenhado = 0, canal = null, timerPoll = null, ultimoDia = '', ultimoAutor = '', naoLidas = 0, tempId = 0;
+  const provisorias = [];   // bolhas do paciente ainda sem número no servidor: { n: elemento, texto }
   let canalOk = false, carregando = false, statusAtual = '', recebeuBroadcast = false;
   // Motor de atendimento (Fase 7): quem responde é o banco, na mesma chamada. passoAtual = pergunta em aberto.
   let motorAtivo = false, passoAtual = null, ultimoMs = null;
   const vistos = new Set();
 
   /* ---------- utilidades ---------- */
+  // A Sentinela (sentinela.js) observa o chat. Se o arquivo não carregar, o chat funciona igual: tudo passa por aqui.
+  const mon = (tipo, dados) => { try { if (window.Sentinela) window.Sentinela.evento(tipo, dados); } catch { /* o monitor nunca derruba o chat */ } };
   function lerLocal(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } }
   function gravarLocal(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
   function apagarLocal(k) { try { localStorage.removeItem(k); } catch {} }
@@ -538,13 +609,33 @@
   const WIDGET_LARGO = new Set(['escolha', 'campos', 'acompanhar']);
   function guardarMsgs() {
     clearTimeout(tGuardar);
-    tGuardar = setTimeout(() => { if (conv) gravarLocal(CHAVE_MSGS, { conversa: conv.id, msgs: cacheMsgs.slice(-80), motor: motorAtivo, passo: passoAtual, status: statusAtual }); }, 300);
+    tGuardar = setTimeout(() => { if (conv) gravarLocal(CHAVE_MSGS, { v: VERSAO_APP, salvo_em: Date.now(), conversa: conv.id, msgs: cacheMsgs.slice(-80), motor: motorAtivo, passo: passoAtual, status: statusAtual }); }, 300);
   }
-  function limparConversa() {
-    el.msgs.textContent = ''; vistos.clear(); ultimoId = 0; ultimoDia = ''; ultimoAutor = ''; statusAtual = ''; cacheMsgs = [];
+  // Aviso fixo no começo da conversa: quem fala (uma IA), que uma pessoa acompanha e que o resultado é uma PREVISÃO.
+  function preencherAvisoIA(caixa) {
+    caixa = caixa || document.getElementById('avisoIA'); if (!caixa) return;
+    if (statusAtual === 'em_atendimento') {
+      caixa.replaceChildren(h('p', {}, h('b', {}, 'Agora você está falando com uma pessoa da nossa equipe.'), ' Pode escrever à vontade, no campo aqui embaixo.'));
+    } else if (motorAtivo) {
+      caixa.replaceChildren(
+        h('p', {}, h('b', {}, 'Olá! Eu sou o assistente virtual da clínica, uma inteligência artificial (IA).'), ' Vou te ajudar com calma, um passo de cada vez.'),
+        h('p', {}, 'Uma pessoa da equipe acompanha esta conversa e pode falar com você a qualquer momento: é só tocar em “Falar com um atendente”.'),
+        h('p', {}, 'O que fazemos aqui é montar uma ', h('b', {}, 'previsão de agendamento'), ' para o atendimento ser mais rápido. ', h('b', {}, 'Quem confirma é um atendente.')));
+    } else {
+      caixa.replaceChildren(h('p', {}, h('b', {}, 'Recebemos o seu pedido.'), ' Uma pessoa da equipe vai responder aqui. O que você já escolheu fica registrado como ', h('b', {}, 'previsão'), ' de agendamento, e o atendente confirma com você.'));
+    }
+  }
+  function montarTopo() {
+    const caixa = h('div', { class: 'aviso-ia', id: 'avisoIA' });
+    preencherAvisoIA(caixa); el.msgs.appendChild(caixa);
     if (config.boas_vindas && !motorAtivo) {
       const b = document.createElement('div'); b.className = 'boas-vindas'; b.textContent = config.boas_vindas; el.msgs.appendChild(b);
     }
+  }
+  function limparConversa() {
+    el.msgs.textContent = ''; vistos.clear(); ultimoId = 0; baseServidor = 0; maiorDesenhado = 0; ultimoDia = ''; ultimoAutor = ''; statusAtual = ''; cacheMsgs = [];
+    provisorias.length = 0;
+    montarTopo();
   }
   function desenhar(m, pendente) {
     const dia = rotuloDia(m.criado_em);
@@ -554,6 +645,7 @@
     }
     const n = document.createElement('div');
     n.className = 'msg ' + m.autor + (pendente ? ' pendente' : '') + (m.opcoes && WIDGET_LARGO.has(m.opcoes.tipo) ? ' com-widget' : '');
+    if (m.id != null) { n.dataset.id = String(m.id); if (m.id > maiorDesenhado) maiorDesenhado = m.id; }
     if (m.opcoes && m.opcoes.tipo === 'anexo') n.dataset.anexo = '1';
     if (m.autor === 'agente' && m.agente && ultimoAutor !== 'agente:' + m.agente) {
       const q = document.createElement('span'); q.className = 'quem'; q.textContent = m.agente; n.appendChild(q);
@@ -565,18 +657,60 @@
     el.msgs.appendChild(n);
     return n;
   }
+  // Refaz a conversa na ordem do banco (pelo número da mensagem). Só acontece quando uma mensagem chega DEPOIS de outra mais nova.
+  function redesenhar() {
+    const topo = el.msgs.scrollTop, bolhas = provisorias.map((p) => p.n);
+    el.msgs.textContent = ''; ultimoDia = ''; ultimoAutor = ''; maiorDesenhado = 0;
+    montarTopo();
+    cacheMsgs.forEach((x) => desenhar(x, false));
+    bolhas.forEach((b) => el.msgs.appendChild(b));
+    el.msgs.scrollTop = topo;
+    atualizarWidgets(); atualizarCompor();
+  }
+  function inserirNoCache(m) {
+    const reg = { id: m.id, autor: m.autor, texto: m.texto, opcoes: m.opcoes || null, criado_em: m.criado_em, agente: m.agente || null };
+    let i = cacheMsgs.length;
+    while (i > 0 && cacheMsgs[i - 1].id > reg.id) i--;
+    cacheMsgs.splice(i, 0, reg);
+  }
+  // Bolha do paciente mostrada na hora, antes de o servidor responder. Quando a mensagem oficial chega (pela resposta da
+  // chamada ou pelo aviso instantâneo) ela assume o lugar da bolha: a ordem na tela nunca depende de quem chegou primeiro.
+  function bolhaProvisoria(texto) {
+    const n = desenhar({ autor: 'cliente', texto, criado_em: new Date().toISOString() }, true);
+    n.dataset.temp = String(++tempId);
+    provisorias.push({ n, texto: String(texto).trim() });
+    return n;
+  }
+  // Só solta a bolha que ainda é provisória. Se a mensagem oficial já assumiu o lugar dela, ela agora é a mensagem de verdade: fica.
+  function soltarBolha(n) {
+    const i = provisorias.findIndex((p) => p.n === n);
+    if (i < 0) return;
+    provisorias.splice(i, 1);
+    if (n.parentNode) n.remove();
+  }
+  function promover(n, m) {
+    n.classList.remove('pendente'); n.dataset.id = String(m.id); delete n.dataset.temp;
+    const hr = n.querySelector('.hora'); if (hr && m.criado_em) hr.textContent = hora(m.criado_em);
+    if (m.id > maiorDesenhado) maiorDesenhado = m.id;
+  }
   function adicionar(m, dePolling) {
     if (m.id == null || vistos.has(m.id)) return false;
     vistos.add(m.id);
     if (m.id > ultimoId) ultimoId = m.id;
-    cacheMsgs.push({ id: m.id, autor: m.autor, texto: m.texto, opcoes: m.opcoes || null, criado_em: m.criado_em, agente: m.agente || null });
     if (m.autor === 'agente' && m.opcoes && m.opcoes.passo) passoAtual = m.opcoes.passo;
-    const n = desenhar(m, false);
-    atualizarWidgets(); atualizarCompor();
-    if (m.autor === 'agente') mostrarNova(n); else rolarFim(m.autor === 'cliente');
+    inserirNoCache(m);
+    const t = m.autor === 'cliente' ? String(m.texto || '').trim() : null;
+    const ib = t == null ? -1 : provisorias.findIndex((p) => p.n.isConnected && p.texto === t);
+    let n;
+    if (ib >= 0) { n = provisorias[ib].n; provisorias.splice(ib, 1); promover(n, m); }
+    else if (m.id < maiorDesenhado) { redesenhar(); n = el.msgs.querySelector(`.msg[data-id="${m.id}"]`); mon('reordenou', { id: m.id }); }
+    else { n = desenhar(m, false); atualizarWidgets(); atualizarCompor(); }
+    if (ib >= 0) { atualizarWidgets(); atualizarCompor(); }
+    if (n) { if (m.autor === 'agente') mostrarNova(n); else rolarFim(m.autor === 'cliente'); }
     if (m.autor !== 'cliente' && document.hidden && !dePolling) {
       naoLidas++; document.title = `(${naoLidas}) ${config.nome_empresa}`;
     }
+    mon('msg', { id: m.id, autor: m.autor, passo: m.opcoes && m.opcoes.passo ? m.opcoes.passo : null, tipo: m.opcoes ? m.opcoes.tipo : null, via: dePolling ? 'consulta' : 'aviso' });
     guardarMsgs();
     return true;
   }
@@ -589,10 +723,13 @@
     } else if (status === 'encerrada') {
       el.ponto.className = 'ponto'; el.status.textContent = 'Atendimento encerrado';
     } else if (motorAtivo) {
-      el.ponto.className = 'ponto atendendo'; el.status.textContent = 'Assistente automático · responde na hora';
+      el.ponto.className = 'ponto atendendo'; el.status.textContent = 'Assistente virtual (IA) · equipe acompanhando';
     } else {
       el.ponto.className = 'ponto aguardando'; el.status.textContent = 'Aguardando um atendente';
     }
+    // Uma pessoa está sempre a um toque: o botão fica à vista enquanto o assistente automático conduz a conversa.
+    el.barraHumano.hidden = !(motorAtivo && status !== 'encerrada' && status !== 'em_atendimento');
+    preencherAvisoIA();
     atualizarCompor();
   }
   // Com o assistente automático o paciente só toca nas opções; o campo de texto aparece quando a pergunta pede texto
@@ -615,19 +752,24 @@
     if (!conv) return;
     if (carregando) { carregarDeNovo = true; return; }
     carregando = true;
+    const minha = conv.id;
     try {
-      const { data, error } = await db.rpc('chat_listar', { p_conversa: conv.id, p_token: conv.token, p_apos: ultimoId });
+      const { data, error } = await db.rpc('chat_listar', { p_conversa: conv.id, p_token: conv.token, p_apos: baseServidor });
+      if (!conv || conv.id !== minha) return;   // trocou de conversa durante a espera
       if (error) {
         if (error.code === '28000') { apagarLocal(CHAVE_CONVERSA); apagarLocal(CHAVE_MSGS); conv = null; mostrarForm(); }
+        else mon('erro', { onde: 'carregar', codigo: error.code || null });
         return;
       }
       motorAtivo = !!data.motor_ativo; passoAtual = data.passo || passoAtual;
       // Mensagem da equipe que só apareceu pela consulta = o aviso instantâneo não chegou; volta a consultar rápido.
-      const novasDaEquipe = (data.mensagens || []).filter((m) => adicionar(m, true) && m.autor !== 'cliente').length;
+      const lista = data.mensagens || [];
+      const novasDaEquipe = lista.filter((m) => adicionar(m, true) && m.autor !== 'cliente').length;
+      for (const m of lista) if (m.id > baseServidor) baseServidor = m.id;   // o cursor só anda pelo que o servidor entregou
       if (novasDaEquipe) recebeuBroadcast = false;
       atualizarStatus(data.status, data.agente);
       guardarMsgs();
-    } catch { /* sem rede: o próximo ciclo tenta de novo */ }
+    } catch { /* sem rede: o próximo ciclo tenta de novo (a Sentinela registra a falha) */ }
     finally { carregando = false; if (carregarDeNovo) { carregarDeNovo = false; carregar(); } }
   }
   function fecharCanal() {
@@ -647,7 +789,9 @@
     timerPoll = setInterval(() => { ciclos++; if (!canalOk || !recebeuBroadcast || ciclos % 5 === 0) carregar(); }, 4000);
   }
   async function abrirChat() {
-    const c = lerLocal(CHAVE_MSGS), doCache = c && c.conversa === conv.id && Array.isArray(c.msgs);
+    const c = lerLocal(CHAVE_MSGS), doCache = !!(c && c.conversa === conv.id && c.v === VERSAO_APP && Array.isArray(c.msgs));
+    if (c && !doCache) apagarLocal(CHAVE_MSGS);   // cópia de outra versão do chat ou de outra conversa: busca tudo do servidor
+    mon('abriu', { cache: doCache });
     motorAtivo = doCache ? !!c.motor : false; passoAtual = doCache ? c.passo || null : null;
     mostrarChat(); limparConversa();
     if (doCache) c.msgs.forEach((m) => adicionar(m, true));
@@ -715,20 +859,20 @@
   }
   async function enviarTexto(texto, devolverAoCampo) {
     if (!texto || !conv) return;
-    const temp = desenhar({ autor: 'cliente', texto, criado_em: new Date().toISOString() }, true);
-    temp.dataset.temp = String(++tempId);
+    const temp = bolhaProvisoria(texto);
     atualizarWidgets();
     rolarFim(true); el.btnEnviar.disabled = true;
     const t0 = performance.now();
+    mon('enviou', { via: 'texto', passo: passoAtual });
     try {
       const { data, error } = await db.rpc('chat_enviar', { p_conversa: conv.id, p_token: conv.token, p_texto: texto });
       if (error) throw error;
-      temp.remove();
       if (Array.isArray(data.respostas) && data.respostas.length) mostrarRespostas(data.respostas, t0);
-      else if (!vistos.has(data.id)) { ultimoDia = ''; adicionarLocal(data.id, texto); }
+      else if (data.id != null && !vistos.has(data.id)) adotarBolha(temp, data.id);   // banco sem o motor: só o número da mensagem volta
+      soltarBolha(temp);   // se a oficial já assumiu o lugar dela, não sobra nada; se não casou, não fica uma cópia solta
       carregar();
     } catch (e) {
-      temp.remove(); atualizarWidgets();
+      soltarBolha(temp); atualizarWidgets();
       if (devolverAoCampo) { el.texto.value = texto; autoAltura(); }
       toast(mensagemErro(e));
     } finally { el.btnEnviar.disabled = false; if (devolverAoCampo && !el.formEnviar.hidden) el.texto.focus(); }
@@ -736,20 +880,22 @@
   // Toque numa opção ou formulário enviado: vai estruturado para o motor, que responde na mesma chamada.
   async function responder(passo, valor, texto, botao) {
     if (!conv) return false;
-    const temp = texto ? desenhar({ autor: 'cliente', texto, criado_em: new Date().toISOString() }, true) : null;
+    const temp = texto ? bolhaProvisoria(texto) : null;
     if (temp) atualizarWidgets();
     if (botao) botao.disabled = true;
     rolarFim(true);
     const t0 = performance.now();
+    mon('enviou', { via: 'opcao', passo: passo || passoAtual });
     try {
       const { data, error } = await db.rpc('chat_responder', { p_conversa: conv.id, p_token: conv.token, p_passo: passo || null, p_valor: valor, p_texto: texto || null, p_ms: ultimoMs });
       if (error) throw error;
-      if (temp) temp.remove();
       mostrarRespostas(data.respostas, t0);
+      if (temp) soltarBolha(temp);
+      mon('respondeu', { passo: passo || passoAtual, ms: ultimoMs });
       carregar();
       return true;
     } catch (e) {
-      if (temp) temp.remove();
+      if (temp) soltarBolha(temp);
       atualizarWidgets();
       if (botao) botao.disabled = false;
       toast(mensagemErro(e));
@@ -757,11 +903,12 @@
       return false;
     }
   }
-  function adicionarLocal(id, texto) {
-    // Reconstrói só se a mensagem ainda não chegou por broadcast: busca o estado oficial.
+  // Banco antigo, sem a lista de respostas: a bolha do paciente só ganha o número oficial.
+  function adotarBolha(n, id) {
     vistos.add(id); if (id > ultimoId) ultimoId = id;
-    desenhar({ id, autor: 'cliente', texto, criado_em: new Date().toISOString() }, false);
-    rolarFim(true);
+    promover(n, { id, criado_em: new Date().toISOString() });
+    const i = provisorias.findIndex((p) => p.n === n);
+    if (i >= 0) provisorias.splice(i, 1);
   }
   function fecharMenu() { el.menu.hidden = true; el.btnMenu.setAttribute('aria-expanded', 'false'); }
   function novaConversa(semPerguntar) {
@@ -1041,17 +1188,21 @@
     const filhos = [];
     if (d.confirmado) {
       b.className = 'acomp ok';
-      filhos.push(h('b', {}, '✓ Agendamento confirmado'), ...horarios.map((x) => h('p', {}, x)), h('p', {}, 'O atendente confirmou com você. Qualquer dúvida, é só escrever aqui.'));
+      filhos.push(h('b', {}, '✓ Agendamento confirmado por um atendente'), ...horarios.map((x) => h('p', {}, x)), h('p', {}, 'Uma pessoa da equipe conferiu e confirmou com você. Qualquer dúvida, é só escrever aqui.'));
     } else if (d.conversa === 'em_atendimento') {
       b.className = 'acomp ok';
-      filhos.push(h('b', {}, `${d.agente || 'Um atendente'} está atendendo você`), h('p', {}, 'Responda aqui mesmo, no campo de mensagem.'));
+      filhos.push(h('b', {}, `${d.agente || 'Um atendente'} (da nossa equipe) está atendendo você`), h('p', {}, 'Responda aqui mesmo, no campo de mensagem. Sua previsão de agendamento já está com ele.'));
     } else {
       b.className = 'acomp';
-      filhos.push(h('b', {}, d.pedido === 'pronto' ? 'Aguardando a confirmação do atendente' : 'Aguardando um atendente'),
+      filhos.push(h('b', {}, d.pedido === 'pronto' ? 'Previsão enviada · aguardando a confirmação do atendente' : 'Aguardando um atendente'),
+        h('p', { class: 'nota-previsao' }, d.pedido === 'pronto'
+          ? 'Isto é uma previsão de agendamento e ainda NÃO está confirmado. Um atendente (uma pessoa da equipe) vai conferir tudo e enviar a confirmação de data, horário e valor aqui neste chat.'
+          : 'Um atendente (uma pessoa da equipe) vai continuar com você aqui neste chat.'),
         h('div', { class: 'relogio', 'aria-label': 'Tempo desde o envio' }, relogio),
-        ...(horarios.length ? [h('p', {}, 'Horário escolhido (previsão): ' + horarios.join('; '))] : []),
-        h('p', {}, d.equipe_online ? 'A equipe está online e já recebeu a sua solicitação.'
-          : 'No momento não estamos online, mas a sua solicitação está registrada. Um atendente vai responder assim que possível, já sabendo de tudo.'));
+        ...(horarios.length ? [h('p', {}, 'Horário escolhido (previsão, a confirmar): ' + horarios.join('; '))] : []),
+        h('p', {}, d.equipe_online ? 'A equipe está online, acompanhando esta conversa e já recebeu a sua solicitação.'
+          : 'No momento não estamos online, mas a sua solicitação está registrada. Um atendente vai responder assim que possível, já sabendo de tudo.'),
+        h('p', {}, 'Se quiser falar com a equipe agora, escreva no campo de mensagem aqui embaixo, a qualquer momento.'));
     }
     b.replaceChildren(...filhos);
   }
@@ -1479,12 +1630,11 @@
     if (!conv) return;
     const f = abrirFolha('Montar pedido de exames');
     f.corpo.replaceChildren(h('p', { class: 'carregando' }, 'Carregando…'));
-    P = { cfg: null, mod: null, partes: new Map(), vista: 'frente', carrinho: [], passo: 'mapa', exames: new Map(), escolhas: new Map(), lista: [], simples: null, simplesLado: 'A' };
+    P = { cfg: null, mod: null, partes: new Map(), vista: 'frente', modo: 'desenho', carrinho: [], passo: 'tipo', exames: new Map(), escolhas: new Map(), lista: [], simples: null, simplesLado: 'A' };
     try {
       const { data, error } = await db.rpc('chat_corpo', { p_conversa: conv.id, p_token: conv.token });
       if (error) throw error;
       P.cfg = data;
-      P.mod = (data.modalidades.find((m) => m.total > 0) || data.modalidades[0]).codigo;
     } catch (e) { f.corpo.replaceChildren(h('p', { class: 'erro-form' }, mensagemErro(e))); return; }
     desenharPedido();
   }
@@ -1495,9 +1645,9 @@
     const rolagem = corpo.scrollTop;
     corpo.replaceChildren(); rodape.replaceChildren();
     if (P.carrinho.length) corpo.append(blocoCarrinho());
-    if (P.passo === 'exames') passoExames(corpo); else passoMapa(corpo);
+    if (P.passo === 'exames') passoExames(corpo); else if (P.passo === 'mapa' && modAtual()) passoMapa(corpo); else passoTipo(corpo);
     rodape.append(h('button', { class: 'btn-w', type: 'button', disabled: !P.carrinho.length, onclick: enviarPedido }, `Enviar pedido (${P.carrinho.length} ${P.carrinho.length === 1 ? 'exame' : 'exames'})`),
-      h('p', { class: 'w-nota' }, 'Depois do envio um atendente confere tudo e confirma valor, data e horário.'));
+      h('p', { class: 'w-nota' }, 'Envia uma previsão. Um atendente (uma pessoa) confere e confirma valor, data e horário.'));
     corpo.scrollTop = rolagem;
   }
   function rotuloItem(i) {
@@ -1509,15 +1659,53 @@
       h('ul', {}, P.carrinho.map((i, k) => h('li', {}, h('span', {}, rotuloItem(i)),
         h('button', { type: 'button', 'aria-label': 'Remover ' + rotuloItem(i), onclick: () => { P.carrinho.splice(k, 1); desenharPedido(); } }, '×')))));
   }
+  function passosTopo(atual, total) {
+    const rot = total === 3 ? ['Tipo', 'Parte', 'Exame'] : ['Tipo', 'Exame'];
+    return h('ol', { class: 'passos', 'aria-label': `Passo ${atual} de ${total}` }, rot.map((t, k) => h('li', { class: k + 1 === atual ? 'ativo' : k + 1 < atual ? 'feito' : '', 'aria-current': k + 1 === atual ? 'step' : null },
+      h('span', { class: 'n' }, k + 1 < atual ? '✓' : String(k + 1)), h('span', { class: 't' }, t))));
+  }
+  // Passo 1: o tipo de exame, em botões grandes iguais (um toque escolhe e avança).
+  function passoTipo(corpo) {
+    corpo.append(passosTopo(1, 3), h('h2', { class: 'passo-titulo' }, 'Que tipo de exame?'),
+      h('p', { class: 'passo-sub' }, 'Toque em um. Depois você escolhe a parte do corpo e o exame.'),
+      h('div', { class: 'op-grade', role: 'group', 'aria-label': 'Tipo de exame' }, P.cfg.modalidades.filter((m) => m.total > 0).map((m) =>
+        h('button', { class: 'op', type: 'button', 'aria-pressed': String(m.codigo === P.mod),
+          onclick: () => { P.mod = m.codigo; P.partes.clear(); P.simples = null; P.passo = 'mapa'; desenharPedido(); } },
+          h('strong', {}, MOD_NOME[m.codigo] || m.nome), h('span', {}, `${m.total} ${m.total === 1 ? 'exame' : 'exames'}`)))));
+  }
+  // Passo 2: a parte do corpo, pelo desenho ou por uma lista organizada.
   function passoMapa(corpo) {
-    corpo.append(h('p', { class: 'p-dica' }, '1) Escolha o tipo de exame. 2) Toque na parte do corpo. 3) Adicione ao pedido. Pode repetir para outros exames e outras partes.'));
-    corpo.append(h('div', { class: 'chips', role: 'group', 'aria-label': 'Tipo de exame' },
-      P.cfg.modalidades.filter((m) => m.total > 0).map((m) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(m.codigo === P.mod),
-        onclick: () => { P.mod = m.codigo; P.partes.clear(); P.simples = null; desenharPedido(); } }, MOD_NOME[m.codigo] || m.nome))));
     const m = modAtual();
-    if (!m.mapa) { passoListaSimples(corpo, m); return; }
-    corpo.append(mapaCorpo(m), selecionadas(),
-      h('button', { class: 'btn-w', type: 'button', disabled: !P.partes.size, onclick: irParaExames }, 'Ver exames para essas partes do corpo'));
+    if (!m.mapa) { corpo.append(passosTopo(2, 2), h('h2', { class: 'passo-titulo' }, MOD_NOME[m.codigo] || m.nome), h('p', { class: 'passo-sub' }, 'Toque no exame que está no seu pedido.')); passoListaSimples(corpo, m); return; }
+    corpo.append(passosTopo(2, 3), h('h2', { class: 'passo-titulo' }, 'Qual parte do corpo?'),
+      h('p', { class: 'passo-sub' }, `${MOD_NOME[m.codigo] || m.nome}: toque na parte do corpo. Pode marcar mais de uma.`),
+      h('div', { class: 'seg', role: 'group', 'aria-label': 'Como escolher a parte do corpo' },
+        [['desenho', 'Desenho do corpo'], ['lista', 'Lista']].map(([v, t]) => h('button', { type: 'button', 'aria-pressed': String(P.modo === v), onclick: () => { P.modo = v; desenharPedido(); } }, t))));
+    corpo.append(P.modo === 'lista' ? listaPartes(m) : mapaCorpo(m), selecionadas(),
+      h('div', { class: 'acoes-w' },
+        h('button', { class: 'btn-w', type: 'button', disabled: !P.partes.size, onclick: irParaExames }, 'Ver exames para essas partes do corpo'),
+        h('button', { class: 'btn-w sec', type: 'button', onclick: () => { P.passo = 'tipo'; desenharPedido(); } }, 'Trocar o tipo de exame')));
+  }
+  // Lista alinhada: um grupo por região do corpo; nome à esquerda e dois botões do mesmo tamanho (Direito, Esquerdo) à direita.
+  const GRUPOS_CORPO = [['Cabeça e pescoço', ['cranio', 'face', 'pescoco']], ['Tronco', ['ombro', 'torax', 'mama', 'abdome', 'pelve', 'quadril']],
+    ['Braços e mãos', ['braco', 'cotovelo', 'antebraco', 'punho_mao']], ['Pernas e pés', ['coxa', 'joelho', 'perna', 'tornozelo_pe']],
+    ['Coluna', ['coluna_cervical', 'coluna_toracica', 'coluna_lombar']]];
+  function listaPartes(m) {
+    const ativas = new Set(m.regioes), regs = P.cfg.regioes.filter((r) => ativas.has(r.codigo) && r.codigo !== 'outros');
+    const usados = new Set(GRUPOS_CORPO.flatMap((g) => g[1]));
+    const grupos = GRUPOS_CORPO.map(([t, cods]) => [t, regs.filter((r) => cods.includes(r.codigo))]);
+    const resto = regs.filter((r) => !usados.has(r.codigo));
+    if (resto.length) grupos.push(['Outras partes', resto]);
+    if (ativas.has('outros')) grupos.push(['Outros', [{ codigo: 'outros', nome: 'Pele, vasos e procedimentos', tem_lado: false }]]);
+    const botao = (r, lado, so) => {
+      const marcado = P.partes.has(`${r.codigo}:${lado}`);
+      return h('button', { type: 'button', class: so ? 'so' : null, 'aria-pressed': String(marcado),
+        'aria-label': `${r.nome}${lado === 'D' ? ', direito' : lado === 'E' ? ', esquerdo' : ''}`, onclick: () => alternar(r.codigo, lado) },
+        (marcado ? '✓ ' : '') + (lado === 'D' ? 'Direito' : lado === 'E' ? 'Esquerdo' : 'Escolher'));
+    };
+    return h('div', { class: 'partes-lista' }, grupos.filter(([, rs]) => rs.length).map(([titulo, rs]) =>
+      h('section', { class: 'partes-grupo' }, h('h3', {}, titulo),
+        rs.map((r) => h('div', { class: 'parte-linha' }, h('span', { class: 'nome' }, r.nome), ...(r.tem_lado ? [botao(r, 'D'), botao(r, 'E')] : [botao(r, 'N', true)]))))));
   }
   function alternar(cod, lado) {
     const k = `${cod}:${lado}`;
@@ -1549,17 +1737,7 @@
     const cap = frente ? 'De frente: o lado DIREITO do paciente fica à ESQUERDA do desenho (letra D).' : 'De costas: o lado DIREITO do paciente fica à DIREITA do desenho (letra D).';
     const vistas = h('div', { class: 'chips', role: 'group', 'aria-label': 'Vista do corpo' },
       ['frente', 'costas'].map((v) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(P.vista === v), onclick: () => { P.vista = v; desenharPedido(); } }, v === 'frente' ? 'Vista de frente' : 'Vista de costas')));
-    // Alternativa à lista: mesma escolha sem precisar acertar o desenho (acessibilidade).
-    const alt = h('details', { class: 'alt-lista' }, h('summary', {}, 'Prefiro escolher por uma lista'),
-      h('div', { class: 'alt-grid' }, P.cfg.regioes.filter((r) => ativas.has(r.codigo)).map((r) => [
-        h('span', { class: 'nome' }, r.nome),
-        ...(r.tem_lado ? ['D', 'E'] : ['N']).map((lado) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(P.partes.has(`${r.codigo}:${lado}`)),
-          'aria-label': `${r.nome}${lado === 'D' ? ', direito' : lado === 'E' ? ', esquerdo' : ''}`, onclick: () => alternar(r.codigo, lado) }, lado === 'N' ? 'Escolher' : lado === 'D' ? 'Direito' : 'Esquerdo')),
-        ...(r.tem_lado ? [] : [h('span', {})])
-      ]).flat()));
-    if (ativas.has('outros')) alt.querySelector('.alt-grid').append(h('span', { class: 'nome' }, 'Outros exames (pele, vasos, procedimentos…)'),
-      h('button', { class: 'chip', type: 'button', 'aria-pressed': String(P.partes.has('outros:N')), onclick: () => alternar('outros', 'N') }, 'Escolher'), h('span', {}));
-    return h('div', { class: 'corpo-wrap' }, vistas, svg, h('p', { class: 'corpo-cap' }, cap), alt);
+    return h('div', { class: 'corpo-wrap' }, vistas, svg, h('p', { class: 'corpo-cap' }, cap));
   }
   function agruparPartes() {
     const porRegiao = new Map();
@@ -1606,20 +1784,20 @@
     return todos;
   }
   function passoExames(corpo) {
-    corpo.append(h('p', { class: 'p-dica' }, 'Escolha o exame de cada parte. Se não tiver certeza, deixe o atendente escolher.'));
+    corpo.append(passosTopo(3, 3), h('h2', { class: 'passo-titulo' }, 'Qual exame?'), h('p', { class: 'passo-sub' }, 'Toque no exame de cada parte. Se não tiver certeza, deixe o atendente escolher.'));
     for (const p of P.lista) {
       const ops = opcoesDaParte(p), nome = 'ex' + p.regiao + p.lado, atual = P.escolhas.get(chaveParte(p));
-      const bloco = h('div', { class: 'bloco' }, h('h3', {}, `${MOD_NOME[P.mod]} — ${p.regiao_nome}${LADO_TXT[p.lado] ? ' (' + LADO_TXT[p.lado] + ')' : ''}`));
-      const add = (id, rotulo) => bloco.append(h('label', { class: 'w-op' }, h('input', { type: 'radio', name: nome, checked: atual === id,
-        onchange: () => { P.escolhas.set(chaveParte(p), id); desenharPedido(); } }), h('span', {}, rotulo)));
+      const bloco = h('section', { class: 'bloco-parte' }, h('h3', {}, `${MOD_NOME[P.mod]} — ${p.regiao_nome}${LADO_TXT[p.lado] ? ' (' + LADO_TXT[p.lado] + ')' : ''}`));
+      const add = (id, rotulo, neutra) => bloco.append(h('label', { class: 'opcao-ex' + (atual === id ? ' marcada' : '') + (neutra ? ' neutra' : '') },
+        h('input', { type: 'radio', name: nome, checked: atual === id, onchange: () => { P.escolhas.set(chaveParte(p), id); desenharPedido(); } }), h('span', {}, rotulo)));
       for (const e of ops) add(e.id, e.nome + (p.lado === 'A' && !e.bilateral ? ' — 2 unidades, uma de cada lado' : ''));
-      add(0, 'Não sei: o atendente escolhe o exame');
+      add(0, 'Não sei: o atendente escolhe o exame', true);
       corpo.append(bloco);
     }
     const tudo = P.lista.every((p) => P.escolhas.has(chaveParte(p)));
-    corpo.append(h('div', { class: 'folha-rodape', style: 'border:0;padding:0;background:none' },
-      h('button', { class: 'btn-w sec', type: 'button', onclick: () => { P.passo = 'mapa'; desenharPedido(); } }, 'Voltar ao mapa'),
-      h('button', { class: 'btn-w', type: 'button', disabled: !tudo, onclick: adicionarAoPedido }, 'Adicionar ao pedido')));
+    corpo.append(h('div', { class: 'acoes-w' },
+      h('button', { class: 'btn-w', type: 'button', disabled: !tudo, onclick: adicionarAoPedido }, 'Adicionar ao pedido'),
+      h('button', { class: 'btn-w sec', type: 'button', onclick: () => { P.passo = 'mapa'; desenharPedido(); } }, 'Voltar')));
   }
   function empilhar(item) {
     P.carrinho = P.carrinho.filter((i) => !(i.modalidade === item.modalidade && i.regiao === item.regiao && i.lado === item.lado && i.procedimento_id === item.procedimento_id));
@@ -1630,7 +1808,7 @@
       const id = P.escolhas.get(chaveParte(p)), ex = (P.exames.get(`${P.mod}|${p.regiao}`) || []).find((e) => e.id === id);
       empilhar({ modalidade: P.mod, regiao: p.regiao, regiao_nome: p.regiao_nome, lado: p.lado, procedimento_id: ex ? ex.id : null, procedimento: ex ? ex.nome : null });
     }
-    P.partes.clear(); P.passo = 'mapa'; desenharPedido();
+    P.partes.clear(); P.passo = 'tipo'; P.mod = null; desenharPedido();
     toast('Adicionado ao pedido. Escolha outro exame ou envie o pedido.');
   }
   // Mamografia e densitometria: lista direta, sem mapa.
@@ -1640,8 +1818,8 @@
     if (!P || P.mod !== m.codigo || P.passo !== 'mapa') return;
     const lista = P.exames.get(`${m.codigo}|todos`) || [];
     const caixa = corpo.querySelector('.carregando'); if (!caixa) return;
-    const bloco = h('div', { class: 'bloco' }, h('h3', {}, MOD_NOME[m.codigo]));
-    for (const e of lista) bloco.append(h('label', { class: 'w-op' }, h('input', { type: 'radio', name: 'simples', checked: P.simples === e.id, onchange: () => { P.simples = e.id; P.simplesLado = e.unilateral ? 'A' : 'N'; desenharPedido(); } }), h('span', {}, e.nome)));
+    const bloco = h('div', { class: 'bloco-parte' });
+    for (const e of lista) bloco.append(h('label', { class: 'opcao-ex' + (P.simples === e.id ? ' marcada' : '') }, h('input', { type: 'radio', name: 'simples', checked: P.simples === e.id, onchange: () => { P.simples = e.id; P.simplesLado = e.unilateral ? 'A' : 'N'; desenharPedido(); } }), h('span', {}, e.nome)));
     const ex = lista.find((e) => e.id === P.simples);
     const extra = [];
     if (ex && ex.unilateral && m.codigo === 'MAMO') {
@@ -1651,7 +1829,7 @@
     extra.push(h('button', { class: 'btn-w', type: 'button', disabled: !ex, onclick: () => {
       const mama = m.codigo === 'MAMO';
       empilhar({ modalidade: m.codigo, regiao: mama ? 'mama' : null, regiao_nome: mama ? 'Mama' : null, lado: mama ? (ex.bilateral ? 'A' : P.simplesLado) : 'N', procedimento_id: ex.id, procedimento: ex.nome });
-      P.simples = null; desenharPedido(); toast('Adicionado ao pedido.');
+      P.simples = null; P.passo = 'tipo'; P.mod = null; desenharPedido(); toast('Adicionado ao pedido.');
     } }, 'Adicionar ao pedido'));
     caixa.replaceWith(bloco, ...extra);
   }
@@ -1809,6 +1987,23 @@
   document.addEventListener('click', (e) => { if (!el.menu.hidden && !el.menu.contains(e.target) && e.target !== el.btnMenu) el.menu.hidden = true; });
   el.btnNova.addEventListener('click', novaConversa);
   el.btnAtendente.addEventListener('click', pedirAtendente);
+  el.btnHumano.addEventListener('click', pedirAtendente);
+  // Letra: três tamanhos, guardados neste aparelho.
+  let letra = 0;
+  function aplicarLetra(n, gravar) {
+    letra = Math.max(0, Math.min(2, Number(n) || 0));
+    document.documentElement.style.setProperty('--esc', String(ESCALAS[letra]));
+    el.btnLetra.textContent = ROTULO_LETRA[letra];
+    if (gravar) gravarLocal(CHAVE_LETRA, letra);
+  }
+  aplicarLetra(lerLocal(CHAVE_LETRA), false);
+  el.btnLetra.addEventListener('click', () => { aplicarLetra((letra + 1) % 3, true); fecharMenu(); toast(letra === 0 ? 'Letra normal.' : letra === 1 ? 'Letra grande.' : 'Letra muito grande.'); });
+  el.btnSuporte.hidden = !window.Sentinela;
+  el.btnSuporte.addEventListener('click', async () => {
+    fecharMenu();
+    const ok = window.Sentinela ? await window.Sentinela.copiarCodigo(true) : false;
+    toast(ok ? 'Código copiado. Se precisar de ajuda, envie para a equipe.' : 'Não consegui copiar. O código aparece na faixa acima do campo de mensagem.');
+  });
   el.btnSair.addEventListener('click', sair);
   el.btnNaoSouEu.addEventListener('click', naoSouEu);
   el.btnOutroFilho.addEventListener('click', outroFilho);
@@ -1817,6 +2012,41 @@
     if (!document.hidden) { naoLidas = 0; document.title = config.nome_empresa; carregar(); }
   });
   addEventListener('online', carregar);
+
+  /* ---------- Sentinela: o que ela pode ver e fazer no chat ---------- */
+  function iniciarSentinela() {
+    if (!window.Sentinela) return;
+    window.Sentinela.iniciar({
+      apoio: el.apoio,
+      contexto: () => {
+        const u = ultimaDoAssistente(), ult = cacheMsgs.length ? cacheMsgs[cacheMsgs.length - 1] : null;
+        return {
+          versao: VERSAO_APP, conversa: conv ? conv.id : null, passo: passoAtual, status: statusAtual, motor: motorAtivo,
+          perguntaAberta: !!(motorAtivo && u && u.opcoes && u.opcoes.tipo !== 'acompanhar' && u.opcoes.tipo !== 'nova'),
+          ultimaMsgEm: ult ? ult.criado_em : null, tela: el.telaChat.hidden ? 'formulario' : 'conversa', folhaAberta: !$('#folha').hidden, mensagens: cacheMsgs.length
+        };
+      },
+      acoes: {
+        recarregar: () => carregar(),
+        reordenar: () => redesenhar(),
+        destravar: () => atualizarWidgets(),
+        novoPedido: () => novaConversa(true),
+        atendente: () => pedirAtendente(),
+        atualizarPagina: () => location.reload(),
+        // O código vai para o Supabase para a equipe achar o caso. O token só vai se for o da própria conversa do incidente.
+        enviarIncidente: async (inc) => {
+          const c = lerLocal(CHAVE_CONVERSA), token = c && c.id === inc.conversa ? c.token : null;
+          const { error } = await db.rpc('chat_incidente', { p_conversa: inc.conversa || null, p_token: token, p_codigo: inc.codigo, p_tipo: inc.tipo, p_detalhe: inc });
+          if (error) throw error;
+        }
+      }
+    });
+  }
+  // O service worker avisa quando acha uma versão nova do chat: no formulário vazio atualiza na hora; no meio da conversa só oferece.
+  function versaoNova() {
+    if (!el.telaInicio.hidden && !el.fNome.value && !el.fTel.value && !el.fEmail.value) { location.reload(); return; }
+    if (window.Sentinela) window.Sentinela.oferecerAtualizacao();
+  }
 
   /* ---------- início ---------- */
   async function init() {
@@ -1828,11 +2058,16 @@
     el.empresa.textContent = config.nome_empresa;
     el.avatar.textContent = (config.nome_empresa.trim()[0] || 'A').toUpperCase();
     if (config.boas_vindas) el.boasForm.textContent = config.boas_vindas;
+    iniciarSentinela();
     if (conv && conv.id && conv.token) abrirChat(); else mostrarForm();
   }
   init();
+  if (window.__WEBCHAT_TESTE__) window.__WEBCHAT_TESTE__.adicionar = adicionar;   // gancho dos testes de navegador (não existe em produção)
 
-  if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.addEventListener('message', (ev) => { if (ev.data && ev.data.tipo === 'nova_versao') versaoNova(); });
+    addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+  }
 })();
 </script>
 </body>

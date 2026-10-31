@@ -5,9 +5,12 @@ Tudo em HTML/CSS/JS puro (PWA), com Supabase no servidor e n8n para automações
 
 ```
 index.html            chat do cliente        -> https://SEU-USUARIO.github.io/SEU-REPO/
+sentinela.js          monitor do chat: ajuda quem trava e gera o código de rastreio (CSI-...)
 painel/index.html     painel da equipe       -> https://SEU-USUARIO.github.io/SEU-REPO/painel/
 n8n/novo-atendimento.json   workflow para importar no n8n
 ```
+
+Fase 9 (31/10/2026): correções do teste da paciente, Sentinela e mensagens empáticas. Veja `docs/fase9-sentinela.md`. Falta rodar `supabase/fase9-sentinela.sql` no Supabase.
 
 Banco: projeto Supabase `webchat-atendimento` (sa-east-1), já com tabelas, regras de segurança e tempo real.
 

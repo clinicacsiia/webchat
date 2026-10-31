@@ -63,6 +63,30 @@ for (const [nome, pedido, esperado] of casos) {
   registrar(nome, respondeu === esperado, `respondeu=${respondeu}, esperado=${esperado}`);
 }
 
+// Versão nova: abre pela cópia guardada (instantâneo) e, se a da rede for outra (ETag diferente), avisa a página para atualizar.
+async function versaoNova(etagGuardado, etagRede) {
+  const enviados = [], ouvintes = {};
+  const resp = (etag) => ({ ok: true, headers: { get: (k) => (k.toLowerCase() === 'etag' ? etag : null) }, clone() { return this; } });
+  const cache = { match: async () => (etagGuardado ? resp(etagGuardado) : undefined), put: async () => {}, addAll: async () => {} };
+  const ctx = {
+    URL, Request, Promise, console, location: { origin: BASE },
+    self: { registration: { scope: ESCOPO }, skipWaiting: () => {}, addEventListener: (t, fn) => { ouvintes[t] = fn; },
+      clients: { claim: async () => {}, matchAll: async () => [{ postMessage: (m) => enviados.push(m) }] } },
+    caches: { open: async () => cache, keys: async () => [], delete: async () => true, match: async () => undefined },
+    fetch: async () => resp(etagRede),
+  };
+  vm.runInNewContext(codigo, ctx);
+  let resposta = null; const esperas = [];
+  ouvintes.fetch({ request: { method: 'GET', url: ESCOPO, mode: 'navigate' }, respondWith: (p) => { resposta = p; }, waitUntil: (p) => esperas.push(p) });
+  await resposta; await Promise.all(esperas); await new Promise((ok) => setTimeout(ok, 20));
+  return enviados;
+}
+const igual = await versaoNova('"aaa"', '"aaa"'), outra = await versaoNova('"aaa"', '"bbb"'), primeira = await versaoNova(null, '"bbb"');
+registrar('cópia igual à da rede: não avisa a página', igual.length === 0, JSON.stringify(igual));
+registrar('cópia diferente da rede (ETag): avisa a página que há versão nova', outra.length === 1 && outra[0].tipo === 'nova_versao', JSON.stringify(outra));
+registrar('primeira visita (sem cópia): não avisa', primeira.length === 0, JSON.stringify(primeira));
+registrar('o cache da versão nova inclui o sentinela.js', /BASE = \[[^\]]*'sentinela\.js'/.test(codigo));
+
 // Nada da fila pode ter sido gravado no cache, nem a URL com o token.
 await new Promise((ok) => setTimeout(ok, 50));
 registrar('nenhuma URL da fila foi gravada no cache', !gravados.some((u) => u.includes('/fila/') || u.includes('token=')), gravados.join(' | '));
