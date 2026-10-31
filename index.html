@@ -219,6 +219,43 @@
   .legenda i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; margin-right: 4px; }
   .aviso-cal { background: #fff7e5; border: 1px solid #f0dfb8; color: var(--aviso); border-radius: 10px; padding: 8px 10px; font-size: 13px; margin: 0 0 10px; }
   .carregando { padding: 28px 8px; text-align: center; color: var(--texto-suave); }
+
+  /* Início: quem volta pelo cache */
+  .volta { background: var(--verde-claro); border-radius: 12px; padding: 12px 14px; margin: 0 0 16px; }
+  .volta-dados { margin: 0 0 2px; font-size: 15px; }
+  .volta .link-add { margin: 0; padding: 4px 0; }
+  .unidades.dois .unidade { min-height: 66px; }
+  .unidades.dois .unidade strong { font-size: 17px; }
+
+  /* Motor de atendimento: opções grandes, filtro, campos e acompanhamento */
+  .msg.com-widget { width: 94%; max-width: 94%; }
+  .op-lista { display: grid; gap: 8px; margin-top: 4px; }
+  .op-lista.rolar { max-height: 340px; overflow-y: auto; padding: 2px; }
+  .op { text-align: left; width: 100%; border: 1.5px solid var(--verde); background: var(--papel); color: var(--texto); border-radius: 12px; padding: 12px 14px; font-size: 16px; cursor: pointer; }
+  .op strong { display: block; font-weight: 650; color: var(--verde); }
+  .op span { display: block; font-size: 13.5px; color: var(--texto-suave); margin-top: 2px; }
+  .op:hover { background: #eef8f2; }
+  .op.unico { box-shadow: 0 0 0 3px rgba(20,107,80,.3); background: #eef8f2; }
+  .op:disabled { opacity: .55; cursor: default; }
+  .filtro { width: 100%; padding: 12px 14px; border: 1.5px solid var(--linha); border-radius: 12px; background: var(--papel); font-size: 16px; margin: 2px 0 8px; }
+  .filtro:focus { outline: none; border-color: var(--verde); box-shadow: 0 0 0 3px rgba(20,107,80,.18); }
+  .cp { margin-bottom: 10px; }
+  .cp > label { display: block; font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+  .cp input, .cp select { width: 100%; padding: 12px 13px; border: 1.5px solid var(--linha); border-radius: 10px; background: var(--papel); font-size: 16px; }
+  .cp input:focus, .cp select:focus { outline: none; border-color: var(--verde); box-shadow: 0 0 0 3px rgba(20,107,80,.18); }
+  .cp input.ruim { border-color: var(--erro); }
+  .cp .erro-campo { color: var(--erro); font-size: 13px; margin: 3px 0 0; }
+  .sexo { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .acoes-w { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+  .acomp { background: #fff7e5; border: 1px solid #f0dfb8; border-radius: 12px; padding: 12px 14px; }
+  .acomp.ok { background: var(--verde-claro); border-color: #a9d8bd; }
+  .acomp b { display: block; font-size: 16px; }
+  .acomp .relogio { font-variant-numeric: tabular-nums; font-size: 24px; font-weight: 700; margin: 4px 0; }
+  .acomp p { margin: 2px 0; font-size: 14px; color: var(--texto-suave); }
+  .res-item { display: flex; gap: 10px; align-items: flex-start; padding: 11px 6px; border-bottom: 1px solid var(--linha); cursor: pointer; }
+  .res-item input { width: 22px; height: 22px; accent-color: var(--verde); flex: none; margin-top: 1px; }
+  .res-item small { display: block; color: var(--texto-suave); }
+  .foto-status { font-size: 14px; color: var(--texto-suave); margin: 6px 0 10px; }
   @media (prefers-reduced-motion: no-preference) { .msg { animation: entra .16s ease-out; } @keyframes entra { from { opacity: 0; transform: translateY(4px); } } }
 </style>
 </head>
@@ -233,24 +270,26 @@
     <button class="btn-menu" id="btnMenu" aria-label="Menu" aria-haspopup="true" aria-expanded="false" hidden>&#8942;</button>
   </header>
   <div class="menu" id="menu" hidden>
+    <button type="button" id="btnAtendente" hidden>Falar com um atendente</button>
     <button type="button" id="btnOutroFilho" hidden>Agendar para outro filho(a)</button>
-    <button type="button" id="btnNova">Iniciar nova conversa</button>
+    <button type="button" id="btnNova">Fazer um novo pedido</button>
+    <button type="button" id="btnSair">Sair (não sou eu)</button>
   </div>
 
   <!-- Tela 1: dados iniciais -->
   <section class="inicio" id="telaInicio" hidden>
-    <h1>Como podemos ajudar?</h1>
-    <p class="sub" id="boasVindasForm">Preencha seus dados e conte o que você precisa. Respondemos aqui mesmo, na hora.</p>
+    <h1 id="tituloInicio">Vamos agendar?</h1>
+    <p class="sub" id="boasVindasForm">É só tocar nas opções. A resposta chega na hora.</p>
     <form id="formInicio" novalidate>
-      <div class="campo" id="blocoUnidade" hidden>
-        <label id="lUnidade">Em qual unidade você quer ser atendido?</label>
-        <div class="unidades" id="fUnidades" role="radiogroup" aria-labelledby="lUnidade"></div>
+      <div class="volta" id="blocoVolta" hidden>
+        <p class="volta-dados" id="voltaDados"></p>
+        <button type="button" class="link-add" id="btnNaoSouEu">Não sou eu</button>
       </div>
-      <div class="campo" id="blocoQuem" hidden>
-        <label id="lQuem">Quem será atendido?</label>
+      <div class="campo" id="blocoQuem">
+        <label id="lQuem">Para quem é o atendimento?</label>
         <div class="unidades dois" id="fQuem" role="radiogroup" aria-labelledby="lQuem"></div>
       </div>
-      <div class="campo">
+      <div class="campo" id="blocoNome">
         <label for="fNome" id="lNome">Seu nome</label>
         <input type="text" id="fNome" autocomplete="name" maxlength="120" required>
       </div>
@@ -264,28 +303,22 @@
           <div class="unidades dois" id="fModoIrmaos" role="radiogroup" aria-labelledby="lModoIrmaos"></div>
         </div>
       </div>
-      <div class="campo">
-        <label for="fTel">Telefone com DDD</label>
-        <input type="tel" id="fTel" inputmode="tel" autocomplete="tel-national" placeholder="(71) 99999-9999" maxlength="16" required>
+      <div id="blocoContato">
+        <div class="campo">
+          <label for="fTel">Telefone com DDD (de preferência o WhatsApp)</label>
+          <input type="tel" id="fTel" inputmode="tel" autocomplete="tel-national" placeholder="(71) 99999-9999" maxlength="16" required>
+        </div>
+        <div class="campo">
+          <label for="fEmail">E-mail</label>
+          <input type="email" id="fEmail" autocomplete="email" maxlength="200" required>
+        </div>
+        <label class="aceite">
+          <input type="checkbox" id="fAceite">
+          <span>Concordo que a empresa guarde meu nome, telefone e a conversa para me atender e entrar em contato (LGPD).</span>
+        </label>
       </div>
-      <div class="campo">
-        <label for="fEmail">E-mail <span class="opc">(opcional)</span></label>
-        <input type="email" id="fEmail" autocomplete="email" maxlength="200">
-      </div>
-      <div class="campo" id="blocoMedico" hidden>
-        <label for="fMedico">Tem médico de preferência? <span class="opc">(opcional)</span></label>
-        <select id="fMedico"></select>
-      </div>
-      <div class="campo">
-        <label for="fMsg">Sua mensagem</label>
-        <textarea id="fMsg" maxlength="4000" placeholder="Escreva aqui sua dúvida ou o que você precisa"></textarea>
-      </div>
-      <label class="aceite">
-        <input type="checkbox" id="fAceite">
-        <span>Concordo que a empresa guarde meu nome, telefone e a conversa para me atender e entrar em contato (LGPD).</span>
-      </label>
       <p class="erro-form" id="erroForm" role="alert"></p>
-      <button class="btn-primario" id="btnIniciar" type="submit">Iniciar conversa</button>
+      <button class="btn-primario" id="btnIniciar" type="submit">Começar</button>
     </form>
   </section>
 
@@ -322,16 +355,17 @@
   const SUPABASE_KEY = 'sb_publishable_e2GK1YGEj06STa_ESCevow_nvtATB-y';
   const CHAVE_CONVERSA = 'webchat.conversa.v1';
   const CHAVE_PERFIL = 'webchat.perfil.v1';
+  const CHAVE_MSGS = 'webchat.msgs.v1';   // últimas mensagens da conversa: a tela abre na hora, antes da rede
 
   const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
   const $ = (s) => document.querySelector(s);
   const el = {
     empresa: $('#empresa'), avatar: $('#avatar'), ponto: $('#ponto'), status: $('#status'),
-    btnMenu: $('#btnMenu'), menu: $('#menu'), btnNova: $('#btnNova'),
-    telaInicio: $('#telaInicio'), telaChat: $('#telaChat'), boasForm: $('#boasVindasForm'),
-    form: $('#formInicio'), fNome: $('#fNome'), fTel: $('#fTel'), fEmail: $('#fEmail'), fMsg: $('#fMsg'),
+    btnMenu: $('#btnMenu'), menu: $('#menu'), btnNova: $('#btnNova'), btnAtendente: $('#btnAtendente'), btnSair: $('#btnSair'),
+    telaInicio: $('#telaInicio'), telaChat: $('#telaChat'), boasForm: $('#boasVindasForm'), tituloInicio: $('#tituloInicio'),
+    form: $('#formInicio'), fNome: $('#fNome'), fTel: $('#fTel'), fEmail: $('#fEmail'),
     fAceite: $('#fAceite'), erroForm: $('#erroForm'), btnIniciar: $('#btnIniciar'),
-    blocoUnidade: $('#blocoUnidade'), fUnidades: $('#fUnidades'), blocoMedico: $('#blocoMedico'), fMedico: $('#fMedico'),
+    blocoVolta: $('#blocoVolta'), voltaDados: $('#voltaDados'), btnNaoSouEu: $('#btnNaoSouEu'), blocoNome: $('#blocoNome'), blocoContato: $('#blocoContato'),
     blocoQuem: $('#blocoQuem'), fQuem: $('#fQuem'), lNome: $('#lNome'), blocoFilho: $('#blocoFilho'), fFilho: $('#fFilho'), btnOutroFilho: $('#btnOutroFilho'),
     listaIrmaos: $('#listaIrmaos'), btnAddIrmao: $('#btnAddIrmao'), blocoModoIrmaos: $('#blocoModoIrmaos'), fModoIrmaos: $('#fModoIrmaos'),
     proximo: $('#proximo'), proximoTxt: $('#proximoTxt'), btnProximo: $('#btnProximo'),
@@ -343,6 +377,8 @@
   let conv = lerLocal(CHAVE_CONVERSA);
   let ultimoId = 0, canal = null, timerPoll = null, ultimoDia = '', ultimoAutor = '', naoLidas = 0, tempId = 0;
   let canalOk = false, carregando = false, statusAtual = '', recebeuBroadcast = false;
+  // Motor de atendimento (Fase 7): quem responde é o banco, na mesma chamada. passoAtual = pergunta em aberto.
+  let motorAtivo = false, passoAtual = null, ultimoMs = null;
   const vistos = new Set();
 
   /* ---------- utilidades ---------- */
@@ -386,44 +422,54 @@
     }
     if (ult < texto.length) pai.appendChild(document.createTextNode(texto.slice(ult)));
   }
+  // Pergunta nova do assistente: se ela é maior que a tela (formulário), mostra o começo dela; senão, rola até o fim.
+  function mostrarNova(n) {
+    const box = el.msgs;
+    if (n.offsetHeight > box.clientHeight - 40) box.scrollTop += n.getBoundingClientRect().top - box.getBoundingClientRect().top - 8;
+    else box.scrollTop = box.scrollHeight;
+  }
   function rolarFim(forca) {
     const perto = el.msgs.scrollHeight - el.msgs.scrollTop - el.msgs.clientHeight < 160;
     if (forca || perto) el.msgs.scrollTop = el.msgs.scrollHeight;
   }
 
   /* ---------- telas ---------- */
+  // Quem já usou o chat neste aparelho não preenche nada de novo: nome, telefone e e-mail vêm do cache.
+  function perfilSalvo() {
+    const p = lerLocal(CHAVE_PERFIL);
+    return p && p.nome && p.telefone && p.email && p.aceite ? p : null;
+  }
   function mostrarForm(manterEscolha) {
-    fecharCanal();
+    fecharCanal(); pararAcompanhar();
     el.telaChat.hidden = true; el.telaChat.style.display = 'none';
     el.telaInicio.hidden = false; el.btnMenu.hidden = true; el.menu.hidden = true;
     el.ponto.className = 'ponto'; el.status.textContent = 'Online';
-    const p = lerLocal(CHAVE_PERFIL) || {};
+    const p = lerLocal(CHAVE_PERFIL) || {}, salvo = perfilSalvo();
     el.fNome.value = p.nome || ''; el.fTel.value = p.telefone || ''; el.fEmail.value = p.email || '';
-    el.fMsg.value = ''; el.fAceite.checked = false; el.erroForm.textContent = ''; el.fFilho.value = '';
+    el.fAceite.checked = !!salvo; el.erroForm.textContent = ''; el.fFilho.value = '';
+    el.blocoVolta.hidden = !salvo; el.blocoNome.hidden = !!salvo; el.blocoContato.hidden = !!salvo;
+    el.tituloInicio.textContent = salvo ? `Olá de novo, ${primeiroNome(salvo.nome)}!` : 'Vamos agendar?';
+    if (salvo) el.voltaDados.textContent = `${salvo.nome} · ${salvo.telefone} · ${salvo.email}`;
     if (!manterEscolha) escolha = null;
     irmaosForm = []; modoIrmaos = 'um_de_cada_vez';
-    carregarOpcoesInicio();
+    desenharQuem();
     if (manterEscolha) setTimeout(() => el.fFilho.focus(), 50);
   }
+  function naoSouEu() {
+    apagarLocal(CHAVE_PERFIL); apagarLocal(CHAVE_CONVERSA); apagarLocal(CHAVE_MSGS);
+    conv = null; mostrarForm(true);
+    el.fNome.focus();
+  }
 
-  /* ---------- unidade e médico de preferência (início do formulário) ---------- */
-  // escolha = null (ainda não escolheu) | { unidade: '' (não sei) ou chave, medico: '' (sem preferência) ou nome,
-  //                                         tipo: 'proprio' | 'filho', tipoManual: o paciente mexeu na pergunta "quem será atendido" }
-  let opcoesInicio = null, escolha = null;
+  /* ---------- quem será atendido (início do formulário) ---------- */
+  // A unidade não é perguntada: consulta de criança vai para a Desenvoar, de adulto para a CSI, e exame mostra todas no calendário.
+  // escolha = null (ainda não escolheu) | { tipo: 'proprio' | 'filho' }
+  let escolha = null;
   let irmaosForm = [], modoIrmaos = 'um_de_cada_vez';   // outros filhos digitados no formulário e como agendar
   const primeiroNome = (s) => String(s || '').trim().split(/\s+/)[0] || '';
   const PARTICULAS = new Set(['de', 'da', 'do', 'das', 'dos', 'e']);
   function nomeBonito(s) {
     return String(s || '').toLowerCase().split(/\s+/).map((p, i) => (i && PARTICULAS.has(p) ? p : p.charAt(0).toUpperCase() + p.slice(1))).join(' ');
-  }
-  async function carregarOpcoesInicio() {
-    if (!opcoesInicio) {
-      try {
-        const { data, error } = await db.rpc('chat_opcoes_inicio');
-        if (!error && Array.isArray(data) && data.length) opcoesInicio = data;
-      } catch { /* sem a lista, o formulário segue sem a pergunta e a IA pergunta a unidade no chat */ }
-    }
-    desenharUnidades();
   }
   function cartao(titulo, texto, marcado, aoClicar) {
     const b = document.createElement('button');
@@ -433,38 +479,13 @@
     b.append(t, d); b.addEventListener('click', aoClicar);
     return b;
   }
-  function desenharUnidades() {
-    el.blocoUnidade.hidden = !opcoesInicio;
-    if (!opcoesInicio) { el.blocoQuem.hidden = true; el.blocoMedico.hidden = true; el.blocoFilho.hidden = true; return; }
-    const itens = [...opcoesInicio.map((u) => ({ chave: u.chave, titulo: u.rotulo, texto: u.descricao, filho: u.fluxo === 'pediatria' })),
-      { chave: '', titulo: 'Ainda não sei', texto: 'A gente ajuda você a escolher no chat', filho: false }];
-    el.fUnidades.replaceChildren(...itens.map((u) => cartao(u.titulo, u.texto, !!escolha && escolha.unidade === u.chave, () => {
-      // Unidade pediátrica já sugere "meu filho(a)"; quem mexeu na pergunta mantém a escolha dele.
-      const manual = !!escolha && escolha.tipoManual;
-      escolha = { unidade: u.chave, medico: '', tipo: manual ? escolha.tipo : (u.filho ? 'filho' : 'proprio'), tipoManual: manual };
-      el.erroForm.textContent = ''; desenharUnidades();
-    })));
-
-    // Quem será atendido: define o caminho (responsável falando pelo filho x o próprio paciente).
-    el.blocoQuem.hidden = !escolha;
-    if (escolha) {
-      const quem = (tipo, titulo, texto) => cartao(titulo, texto, escolha.tipo === tipo, () => { escolha.tipo = tipo; escolha.tipoManual = true; desenharUnidades(); });
-      el.fQuem.replaceChildren(quem('proprio', 'Eu mesmo(a)', 'Sou o paciente'), quem('filho', 'Meu filho ou filha', 'Sou o responsável'));
-    }
+  function desenharQuem() {
+    const quem = (tipo, titulo, texto) => cartao(titulo, texto, !!escolha && escolha.tipo === tipo, () => { escolha = { tipo }; el.erroForm.textContent = ''; desenharQuem(); });
+    el.fQuem.replaceChildren(quem('proprio', 'Para mim', 'Sou o paciente (adulto)'), quem('filho', 'Para meu filho(a)', 'Sou o responsável'));
     const filho = !!escolha && escolha.tipo === 'filho';
-    el.lNome.textContent = filho ? 'Seu nome (responsável)' : 'Seu nome';
+    el.lNome.textContent = filho ? 'Seu nome (responsável)' : 'Seu nome completo';
     el.blocoFilho.hidden = !filho;
     desenharIrmaos(filho);
-
-    // Médico de preferência: fica depois dos dados de contato.
-    const un = escolha && opcoesInicio.find((u) => u.chave === escolha.unidade);
-    const medicos = un ? un.medicos || [] : [];
-    el.blocoMedico.hidden = !medicos.length;
-    if (medicos.length) {
-      const sem = new Option('Sem preferência', '');
-      el.fMedico.replaceChildren(sem, ...medicos.map((m) => new Option(nomeBonito(m.nome) + (m.especialidade ? ' — ' + m.especialidade : ''), m.nome)));
-      el.fMedico.value = escolha.medico || '';
-    }
   }
   const MAX_IRMAOS = 4;
   function desenharIrmaos(filho) {
@@ -490,7 +511,6 @@
     irmaosForm.push(''); desenharIrmaos(true);
     const ins = el.listaIrmaos.querySelectorAll('input'); if (ins.length) ins[ins.length - 1].focus();
   });
-  el.fMedico.addEventListener('change', () => { if (escolha) escolha.medico = el.fMedico.value; });
   function mostrarChat() {
     el.btnOutroFilho.hidden = !(conv && conv.tipo === 'filho');
     atualizarProximo();
@@ -500,9 +520,16 @@
   }
 
   /* ---------- conversa ---------- */
+  // Cópia das últimas mensagens neste aparelho: ao abrir pelo link do WhatsApp ou do e-mail a conversa aparece na hora.
+  let cacheMsgs = [], tGuardar = null, carregarDeNovo = false;
+  const WIDGET_LARGO = new Set(['escolha', 'campos', 'acompanhar']);
+  function guardarMsgs() {
+    clearTimeout(tGuardar);
+    tGuardar = setTimeout(() => { if (conv) gravarLocal(CHAVE_MSGS, { conversa: conv.id, msgs: cacheMsgs.slice(-80), motor: motorAtivo, passo: passoAtual, status: statusAtual }); }, 300);
+  }
   function limparConversa() {
-    el.msgs.textContent = ''; vistos.clear(); ultimoId = 0; ultimoDia = ''; ultimoAutor = ''; statusAtual = '';
-    if (config.boas_vindas) {
+    el.msgs.textContent = ''; vistos.clear(); ultimoId = 0; ultimoDia = ''; ultimoAutor = ''; statusAtual = ''; cacheMsgs = [];
+    if (config.boas_vindas && !motorAtivo) {
       const b = document.createElement('div'); b.className = 'boas-vindas'; b.textContent = config.boas_vindas; el.msgs.appendChild(b);
     }
   }
@@ -513,7 +540,8 @@
       ultimoDia = dia; ultimoAutor = '';
     }
     const n = document.createElement('div');
-    n.className = 'msg ' + m.autor + (pendente ? ' pendente' : '');
+    n.className = 'msg ' + m.autor + (pendente ? ' pendente' : '') + (m.opcoes && WIDGET_LARGO.has(m.opcoes.tipo) ? ' com-widget' : '');
+    if (m.opcoes && m.opcoes.tipo === 'anexo') n.dataset.anexo = '1';
     if (m.autor === 'agente' && m.agente && ultimoAutor !== 'agente:' + m.agente) {
       const q = document.createElement('span'); q.className = 'quem'; q.textContent = m.agente; n.appendChild(q);
     }
@@ -528,40 +556,66 @@
     if (m.id == null || vistos.has(m.id)) return false;
     vistos.add(m.id);
     if (m.id > ultimoId) ultimoId = m.id;
-    desenhar(m, false);
-    atualizarWidgets();
-    rolarFim(m.autor === 'cliente');
+    cacheMsgs.push({ id: m.id, autor: m.autor, texto: m.texto, opcoes: m.opcoes || null, criado_em: m.criado_em, agente: m.agente || null });
+    if (m.autor === 'agente' && m.opcoes && m.opcoes.passo) passoAtual = m.opcoes.passo;
+    const n = desenhar(m, false);
+    atualizarWidgets(); atualizarCompor();
+    if (m.autor === 'agente') mostrarNova(n); else rolarFim(m.autor === 'cliente');
     if (m.autor !== 'cliente' && document.hidden && !dePolling) {
       naoLidas++; document.title = `(${naoLidas}) ${config.nome_empresa}`;
     }
+    guardarMsgs();
     return true;
   }
   function atualizarStatus(status, agente) {
     statusAtual = status;
     el.aviso.hidden = status !== 'encerrada';
+    el.btnAtendente.hidden = !motorAtivo;
     if (status === 'em_atendimento') {
       el.ponto.className = 'ponto atendendo'; el.status.textContent = agente ? `${agente} está atendendo` : 'Em atendimento';
     } else if (status === 'encerrada') {
       el.ponto.className = 'ponto'; el.status.textContent = 'Atendimento encerrado';
+    } else if (motorAtivo) {
+      el.ponto.className = 'ponto atendendo'; el.status.textContent = 'Assistente automático · responde na hora';
     } else {
       el.ponto.className = 'ponto aguardando'; el.status.textContent = 'Aguardando um atendente';
     }
+    atualizarCompor();
+  }
+  // Com o assistente automático o paciente só toca nas opções; o campo de texto aparece quando a pergunta pede texto
+  // ou quando quem responde é a equipe.
+  function ultimaDoAssistente() {
+    for (let i = cacheMsgs.length - 1; i >= 0; i--) {
+      const m = cacheMsgs[i];
+      if (m.autor === 'sistema' || (m.opcoes && m.opcoes.tipo === 'anexo')) continue;
+      return m.autor === 'agente' ? m : null;
+    }
+    return null;
+  }
+  function atualizarCompor() {
+    const ult = ultimaDoAssistente();
+    const pedeTexto = !!(ult && ult.opcoes && ult.opcoes.texto_livre);
+    el.formEnviar.hidden = motorAtivo && !pedeTexto;
+    el.texto.placeholder = pedeTexto && ult.opcoes.placeholder ? ult.opcoes.placeholder : 'Digite uma mensagem';
   }
   async function carregar() {
-    if (!conv || carregando) return;
+    if (!conv) return;
+    if (carregando) { carregarDeNovo = true; return; }
     carregando = true;
     try {
       const { data, error } = await db.rpc('chat_listar', { p_conversa: conv.id, p_token: conv.token, p_apos: ultimoId });
       if (error) {
-        if (error.code === '28000') { apagarLocal(CHAVE_CONVERSA); conv = null; mostrarForm(); }
+        if (error.code === '28000') { apagarLocal(CHAVE_CONVERSA); apagarLocal(CHAVE_MSGS); conv = null; mostrarForm(); }
         return;
       }
+      motorAtivo = !!data.motor_ativo; passoAtual = data.passo || passoAtual;
       // Mensagem da equipe que só apareceu pela consulta = o aviso instantâneo não chegou; volta a consultar rápido.
       const novasDaEquipe = (data.mensagens || []).filter((m) => adicionar(m, true) && m.autor !== 'cliente').length;
       if (novasDaEquipe) recebeuBroadcast = false;
       atualizarStatus(data.status, data.agente);
+      guardarMsgs();
     } catch { /* sem rede: o próximo ciclo tenta de novo */ }
-    finally { carregando = false; }
+    finally { carregando = false; if (carregarDeNovo) { carregarDeNovo = false; carregar(); } }
   }
   function fecharCanal() {
     if (canal) { db.removeChannel(canal); canal = null; }
@@ -580,46 +634,63 @@
     timerPoll = setInterval(() => { ciclos++; if (!canalOk || !recebeuBroadcast || ciclos % 5 === 0) carregar(); }, 4000);
   }
   async function abrirChat() {
+    const c = lerLocal(CHAVE_MSGS), doCache = c && c.conversa === conv.id && Array.isArray(c.msgs);
+    motorAtivo = doCache ? !!c.motor : false; passoAtual = doCache ? c.passo || null : null;
     mostrarChat(); limparConversa();
-    atualizarStatus('aguardando');
+    if (doCache) c.msgs.forEach((m) => adicionar(m, true));
+    atualizarStatus((doCache && c.status) || 'aguardando');
+    rolarFim(true);
     await carregar();
     if (!conv) return;
-    assinar(); rolarFim(true); el.texto.focus();
+    assinar(); rolarFim(true);
+  }
+  // A resposta do assistente volta na mesma chamada: desenha sem esperar o aviso em tempo real e mede o tempo que o paciente viu.
+  function mostrarRespostas(lista, t0) {
+    (lista || []).forEach((m) => adicionar(m, true));
+    if (t0 != null) ultimoMs = Math.round(performance.now() - t0);
   }
 
   /* ---------- ações ---------- */
   async function iniciar(ev) {
     ev.preventDefault();
     el.erroForm.textContent = '';
-    const nome = el.fNome.value.trim(), tel = el.fTel.value.replace(/\D/g, '');
-    if (opcoesInicio && !escolha) { el.erroForm.textContent = 'Escolha a unidade (ou "Ainda não sei").'; el.blocoUnidade.scrollIntoView({ block: 'center' }); return; }
-    const filho = !!escolha && escolha.tipo === 'filho', nomeFilho = el.fFilho.value.trim();
+    const salvo = perfilSalvo();
+    const nome = salvo ? salvo.nome : el.fNome.value.trim(), telTxt = salvo ? salvo.telefone : el.fTel.value, tel = telTxt.replace(/\D/g, '');
+    const email = salvo ? salvo.email : el.fEmail.value.trim();
+    if (!escolha) { el.erroForm.textContent = 'Toque em "Para mim" ou em "Para meu filho(a)".'; el.blocoQuem.scrollIntoView({ block: 'center' }); return; }
+    const filho = escolha.tipo === 'filho', nomeFilho = el.fFilho.value.trim();
     if (nome.length < 2) { el.erroForm.textContent = filho ? 'Informe o seu nome (responsável).' : 'Informe seu nome.'; el.fNome.focus(); return; }
     if (filho && nomeFilho.length < 2) { el.erroForm.textContent = 'Informe o nome da criança.'; el.fFilho.focus(); return; }
     const irmaos = filho ? irmaosForm.map((x) => x.trim()).filter((x) => x.length >= 2) : [];
     if (filho && irmaosForm.some((x) => x.trim() && x.trim().length < 2)) { el.erroForm.textContent = 'Confira o nome dos outros filhos.'; return; }
     if (tel.length < 10) { el.erroForm.textContent = 'Informe o telefone com DDD.'; el.fTel.focus(); return; }
-    if (!el.fAceite.checked) { el.erroForm.textContent = 'Marque a caixa de concordância para continuar.'; el.fAceite.focus(); return; }
-    el.btnIniciar.disabled = true; el.btnIniciar.textContent = 'Iniciando…';
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { el.erroForm.textContent = 'Informe um e-mail válido.'; el.fEmail.focus(); return; }
+    if (!salvo && !el.fAceite.checked) { el.erroForm.textContent = 'Marque a caixa de concordância para continuar.'; el.fAceite.focus(); return; }
+    el.btnIniciar.disabled = true; el.btnIniciar.textContent = 'Começando…';
+    const t0 = performance.now();
     try {
       const origem = new URLSearchParams(location.search).get('origem');
       const { data, error } = await db.rpc('chat_iniciar', {
-        p_nome: nome, p_telefone: el.fTel.value, p_email: el.fEmail.value.trim() || null,
-        p_mensagem: el.fMsg.value.trim() || null, p_aceite: true, p_origem: origem,
-        ...(escolha ? { p_paciente_tipo: escolha.tipo, p_paciente_nome: filho ? nomeFilho : null } : {}),
-        ...(irmaos.length ? { p_irmaos: irmaos, p_irmaos_modo: modoIrmaos } : {}),
-        ...(escolha && escolha.unidade ? { p_unidade: escolha.unidade, p_medico: escolha.medico || null } : {})
+        p_nome: nome, p_telefone: telTxt, p_email: email, p_aceite: true, p_origem: origem,
+        p_paciente_tipo: escolha.tipo, p_paciente_nome: filho ? nomeFilho : null,
+        ...(irmaos.length ? { p_irmaos: irmaos, p_irmaos_modo: modoIrmaos } : {})
       });
       if (error) throw error;
-      const un = escolha && opcoesInicio && opcoesInicio.find((u) => u.chave === escolha.unidade);
-      conv = { id: data.conversa_id, token: data.token, unidade: un ? un.catalogo : '', unidadeChave: un ? un.chave : '', tipo: filho ? 'filho' : 'proprio', nomeCrianca: filho ? nomeFilho : '', irmaos, irmaosModo: irmaos.length ? modoIrmaos : '' };
+      conv = { id: data.conversa_id, token: data.token, tipo: filho ? 'filho' : 'proprio', nomeCrianca: filho ? nomeFilho : '', irmaos, irmaosModo: irmaos.length ? modoIrmaos : '' };
       gravarLocal(CHAVE_CONVERSA, conv);
-      gravarLocal(CHAVE_PERFIL, { nome, telefone: el.fTel.value, email: el.fEmail.value.trim() });
-      await abrirChat();
+      gravarLocal(CHAVE_PERFIL, { nome, telefone: telTxt, email, aceite: true });
+      apagarLocal(CHAVE_MSGS);
+      motorAtivo = data.motor === 'fluxo'; passoAtual = null;
+      mostrarChat(); limparConversa();
+      mostrarRespostas(data.respostas, t0);
+      atualizarStatus('aguardando');
+      await carregar();
+      if (!conv) return;
+      assinar(); rolarFim(true);
     } catch (e) {
       el.erroForm.textContent = mensagemErro(e);
     } finally {
-      el.btnIniciar.disabled = false; el.btnIniciar.textContent = 'Iniciar conversa';
+      el.btnIniciar.disabled = false; el.btnIniciar.textContent = 'Começar';
     }
   }
   async function enviar(ev) {
@@ -635,17 +706,43 @@
     temp.dataset.temp = String(++tempId);
     atualizarWidgets();
     rolarFim(true); el.btnEnviar.disabled = true;
+    const t0 = performance.now();
     try {
       const { data, error } = await db.rpc('chat_enviar', { p_conversa: conv.id, p_token: conv.token, p_texto: texto });
       if (error) throw error;
       temp.remove();
-      if (!vistos.has(data.id)) { ultimoDia = ''; adicionarLocal(data.id, texto); }
+      if (Array.isArray(data.respostas) && data.respostas.length) mostrarRespostas(data.respostas, t0);
+      else if (!vistos.has(data.id)) { ultimoDia = ''; adicionarLocal(data.id, texto); }
       carregar();
     } catch (e) {
       temp.remove(); atualizarWidgets();
       if (devolverAoCampo) { el.texto.value = texto; autoAltura(); }
       toast(mensagemErro(e));
-    } finally { el.btnEnviar.disabled = false; if (devolverAoCampo) el.texto.focus(); }
+    } finally { el.btnEnviar.disabled = false; if (devolverAoCampo && !el.formEnviar.hidden) el.texto.focus(); }
+  }
+  // Toque numa opção ou formulário enviado: vai estruturado para o motor, que responde na mesma chamada.
+  async function responder(passo, valor, texto, botao) {
+    if (!conv) return false;
+    const temp = texto ? desenhar({ autor: 'cliente', texto, criado_em: new Date().toISOString() }, true) : null;
+    if (temp) atualizarWidgets();
+    if (botao) botao.disabled = true;
+    rolarFim(true);
+    const t0 = performance.now();
+    try {
+      const { data, error } = await db.rpc('chat_responder', { p_conversa: conv.id, p_token: conv.token, p_passo: passo || null, p_valor: valor, p_texto: texto || null, p_ms: ultimoMs });
+      if (error) throw error;
+      if (temp) temp.remove();
+      mostrarRespostas(data.respostas, t0);
+      carregar();
+      return true;
+    } catch (e) {
+      if (temp) temp.remove();
+      atualizarWidgets();
+      if (botao) botao.disabled = false;
+      toast(mensagemErro(e));
+      carregar();
+      return false;
+    }
   }
   function adicionarLocal(id, texto) {
     // Reconstrói só se a mensagem ainda não chegou por broadcast: busca o estado oficial.
@@ -653,10 +750,21 @@
     desenhar({ id, autor: 'cliente', texto, criado_em: new Date().toISOString() }, false);
     rolarFim(true);
   }
-  function novaConversa() {
-    el.menu.hidden = true; el.btnMenu.setAttribute('aria-expanded', 'false');
-    if (!confirm('Iniciar uma nova conversa? O histórico desta fica guardado com a equipe.')) return;
-    apagarLocal(CHAVE_CONVERSA); conv = null; mostrarForm();
+  function fecharMenu() { el.menu.hidden = true; el.btnMenu.setAttribute('aria-expanded', 'false'); }
+  function novaConversa(semPerguntar) {
+    fecharMenu();
+    if (semPerguntar !== true && !confirm('Fazer um novo pedido? O histórico deste fica guardado com a equipe.')) return;
+    apagarLocal(CHAVE_CONVERSA); apagarLocal(CHAVE_MSGS); conv = null; mostrarForm();
+  }
+  function sair() {
+    fecharMenu();
+    if (!confirm('Sair deste aparelho? Seus dados deixam de aparecer aqui; a conversa fica guardada com a equipe.')) return;
+    naoSouEu();
+  }
+  function pedirAtendente() {
+    fecharMenu();
+    if (!motorAtivo) { if (!el.formEnviar.hidden) el.texto.focus(); return; }
+    responder(passoAtual, { acao: 'atendente' }, 'Quero falar com um atendente.');
   }
   function atualizarProximo() {
     const fila = (conv && conv.irmaos) || [];
@@ -676,17 +784,17 @@
       const { data, error } = await db.rpc('chat_irmao_iniciar', { p_origem: conv.id, p_token: conv.token });
       if (error) throw error;
       conv = { ...conv, id: data.conversa_id, token: data.token, nomeCrianca: data.paciente_nome, irmaos: data.irmaos || [], irmaosModo: data.irmaos_modo || '' };
-      gravarLocal(CHAVE_CONVERSA, conv);
+      gravarLocal(CHAVE_CONVERSA, conv); apagarLocal(CHAVE_MSGS);
       await abrirChat();
     } catch (e) { toast(mensagemErro(e)); }
     finally { el.btnProximo.disabled = false; }
   }
-  // Outro filho(a): nova conversa com os dados do responsável e a unidade já preenchidos (uma conversa por criança).
+  // Outro filho(a): nova conversa com os dados do responsável já preenchidos (uma conversa por criança).
   function outroFilho() {
-    el.menu.hidden = true; el.btnMenu.setAttribute('aria-expanded', 'false');
+    fecharMenu();
     if (!conv) return;
-    escolha = { unidade: conv.unidadeChave || '', medico: '', tipo: 'filho', tipoManual: true };
-    apagarLocal(CHAVE_CONVERSA); conv = null; mostrarForm(true);
+    escolha = { tipo: 'filho' };
+    apagarLocal(CHAVE_CONVERSA); apagarLocal(CHAVE_MSGS); conv = null; mostrarForm(true);
   }
   function autoAltura() { el.texto.style.height = 'auto'; el.texto.style.height = Math.min(el.texto.scrollHeight, 140) + 'px'; }
 
@@ -731,7 +839,7 @@
   function fecharFolha() {
     $('#folha').hidden = true; document.body.style.overflow = '';
     $('#folhaCorpo').replaceChildren(); $('#folhaRodape').replaceChildren();
-    P = null; C = null;
+    P = null; C = null; B = null;
     if (folhaFoco && folhaFoco.focus) { try { folhaFoco.focus(); } catch { /* ignora */ } }
   }
 
@@ -741,18 +849,200 @@
     if (!o || typeof o !== 'object') return;
     const w = h('div', { class: 'widget', 'data-tipo': String(o.tipo) });
     if (o.tipo === 'lista') widgetLista(w, o);
-    else if (o.tipo === 'pedido_exames') {
+    else if (o.tipo === 'escolha') widgetEscolha(w, o);
+    else if (o.tipo === 'campos') widgetCampos(w, o);
+    else if (o.tipo === 'acompanhar') widgetAcompanhar(w);
+    else if (o.tipo === 'texto') w.append(h('p', { class: 'w-nota' }, 'Escreva no campo aqui embaixo e toque na setinha para enviar.'));
+    else if (o.tipo === 'nova') w.append(h('button', { class: 'btn-w', type: 'button', onclick: () => novaConversa(true) }, 'Fazer um novo pedido'));
+    else if (o.tipo === 'busca_exame') {
+      w.append(h('div', { class: 'acoes-w' },
+        h('button', { class: 'btn-w', type: 'button', onclick: () => abrirBusca(o) }, 'Procurar o exame pelo nome'),
+        h('button', { class: 'btn-w sec', type: 'button', onclick: () => abrirBusca(o, true) }, 'Tirar foto do pedido médico'),
+        h('button', { class: 'btn-w sec', type: 'button', onclick: abrirPedido }, 'Escolher pelo desenho do corpo')));
+    } else if (o.tipo === 'pedido_exames') {
       w.append(h('button', { class: 'btn-w', type: 'button', onclick: abrirPedido }, o.rotulo || 'Escolher exames no mapa do corpo'),
         h('p', { class: 'w-nota' }, 'Você pode marcar várias partes do corpo e vários exames.'));
     } else if (o.tipo === 'pedido_consulta') {
       w.append(h('button', { class: 'btn-w', type: 'button', onclick: abrirConsulta }, o.rotulo || 'Escolher o tipo de consulta'),
         h('p', { class: 'w-nota' }, 'É a escolha que libera o calendário de horários.'));
     } else if (o.tipo === 'calendario') {
-      w.append(h('button', { class: 'btn-w', type: 'button', onclick: () => abrirCalendario(1) }, o.rotulo || 'Escolher data e horário'),
+      w.append(h('button', { class: 'btn-w', type: 'button', onclick: () => abrirCalendario(o.grupo || 1) }, o.rotulo || 'Escolher data e horário'),
         h('p', { class: 'w-nota' }, 'Os horários são uma previsão; o atendente confirma o dia e o horário.'));
     } else return;
+    if (Array.isArray(o.acoes) && o.acoes.length && o.passo) {
+      w.append(h('div', { class: 'acoes-w' }, o.acoes.map((a) => h('button', { class: 'btn-w sec', type: 'button',
+        onclick: (ev) => responder(o.passo, a.valor, a.rotulo, ev.currentTarget) }, a.rotulo))));
+    }
     pai.append(w);
   }
+
+  /* escolha: botões grandes (um toque já responde), com filtro que vai estreitando a lista enquanto digita */
+  const semAcento = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  function caixaFiltro(botoes, rotulo) {
+    const f = h('input', { class: 'filtro', type: 'search', placeholder: rotulo || 'Digite para procurar', 'aria-label': rotulo || 'Procurar na lista', autocomplete: 'off', enterkeyhint: 'go' });
+    const vazio = h('p', { class: 'w-nota', hidden: true }, 'Nada encontrado com esse nome.');
+    f.addEventListener('input', () => {
+      const q = semAcento(f.value).trim().split(/\s+/).filter(Boolean), vis = [];
+      botoes.forEach((b) => { const ok = q.every((p) => b.dataset.busca.includes(p)); b.hidden = !ok; b.classList.remove('unico'); if (ok) vis.push(b); });
+      if (q.length && vis.length === 1) vis[0].classList.add('unico');
+      vazio.hidden = vis.length > 0;
+    });
+    f.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); const v = botoes.filter((b) => !b.hidden); if (v.length === 1) v[0].click(); } });
+    return [f, vazio];
+  }
+  function widgetEscolha(w, o) {
+    const itens = (Array.isArray(o.itens) ? o.itens : []).filter((i) => i && i.rotulo);
+    const botoes = itens.map((i) => {
+      const b = h('button', { class: 'op', type: 'button', onclick: (ev) => responder(o.passo, i.valor, i.rotulo, ev.currentTarget) },
+        h('strong', {}, i.rotulo), i.desc ? h('span', {}, i.desc) : null);
+      b.dataset.busca = semAcento(i.rotulo + ' ' + (i.desc || ''));
+      return b;
+    });
+    if (o.filtro) w.append(...caixaFiltro(botoes));
+    w.append(h('div', { class: 'op-lista' + (botoes.length > 8 ? ' rolar' : '') }, botoes));
+    if (o.outro) {
+      const inp = h('input', { class: 'filtro', type: 'text', maxlength: '120', placeholder: o.outro.placeholder || 'Escreva aqui', hidden: true });
+      const env = h('button', { class: 'btn-w', type: 'button', hidden: true }, 'Enviar');
+      const abrir = h('button', { class: 'btn-w sec', type: 'button', onclick: () => { abrir.hidden = true; inp.hidden = false; env.hidden = false; inp.focus(); } }, o.outro.rotulo || 'Outro');
+      env.addEventListener('click', (ev) => { const v = inp.value.trim(); if (v.length < 2) { toast('Escreva o nome.'); return; } responder(o.passo, { outro: v }, v, ev.currentTarget); });
+      inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); env.click(); } });
+      w.append(h('div', { class: 'acoes-w' }, abrir, inp, env));
+    }
+  }
+
+  /* campos: um grupo de dados por mensagem, com máscara, conferência do CPF e CEP que preenche o endereço */
+  const UFS = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'];
+  function mascaraData(v) { const d = v.replace(/\D/g, '').slice(0, 8); return d.length > 4 ? `${d.slice(0, 2)}/${d.slice(2, 4)}/${d.slice(4)}` : d.length > 2 ? `${d.slice(0, 2)}/${d.slice(2)}` : d; }
+  function mascaraCpf(v) { const d = v.replace(/\D/g, '').slice(0, 11); let r = d.slice(0, 3); if (d.length > 3) r += '.' + d.slice(3, 6); if (d.length > 6) r += '.' + d.slice(6, 9); if (d.length > 9) r += '-' + d.slice(9); return r; }
+  function mascaraCep(v) { const d = v.replace(/\D/g, '').slice(0, 8); return d.length > 5 ? d.slice(0, 5) + '-' + d.slice(5) : d; }
+  function cpfOk(c) {
+    const d = c.replace(/\D/g, '');
+    if (d.length !== 11 || /^(\d)\1+$/.test(d)) return false;
+    let s = 0; for (let i = 0; i < 9; i++) s += +d[i] * (10 - i);
+    if ((s * 10) % 11 % 10 !== +d[9]) return false;
+    s = 0; for (let i = 0; i < 10; i++) s += +d[i] * (11 - i);
+    return (s * 10) % 11 % 10 === +d[10];
+  }
+  function dataOk(v) {
+    const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(v); if (!m) return false;
+    const d = new Date(+m[3], +m[2] - 1, +m[1]);
+    return d.getFullYear() === +m[3] && d.getMonth() === +m[2] - 1 && d.getDate() === +m[1] && +m[3] >= 1900 && +m[3] <= 2100;
+  }
+  async function buscarCep(cep, ins) {
+    try {
+      const r = await fetch(`https://viacep.com.br/ws/${cep.replace(/\D/g, '')}/json/`);
+      const j = await r.json();
+      if (!j || j.erro) { toast('CEP não encontrado. Preencha o endereço.'); return; }
+      const pre = (k, v) => { if (ins[k] && v && !ins[k].value) ins[k].value = v; };
+      pre('endereco', j.logradouro); pre('bairro', j.bairro); pre('cidade', j.localidade);
+      if (ins.uf && j.uf) ins.uf.value = j.uf;
+      if (ins.numero) ins.numero.focus();
+    } catch { /* sem o serviço do CEP o paciente digita o endereço */ }
+  }
+  function widgetCampos(w, o) {
+    const campos = (Array.isArray(o.campos) ? o.campos : []).filter((c) => c && c.nome);
+    const ins = {}, vals = {}, erros = {};
+    const form = h('form', { novalidate: true });
+    for (const c of campos) {
+      const id = 'c' + Math.random().toString(36).slice(2);
+      const erro = h('p', { class: 'erro-campo', hidden: true }); erros[c.nome] = erro;
+      let campo;
+      if (c.tipo === 'sexo') {
+        vals[c.nome] = c.valor || '';
+        const op = (v, t) => h('button', { type: 'button', class: 'chip', 'aria-pressed': String(vals[c.nome] === v),
+          onclick: (ev) => { vals[c.nome] = v; [...ev.currentTarget.parentNode.children].forEach((b) => b.setAttribute('aria-pressed', String(b === ev.currentTarget))); erro.hidden = true; } }, t);
+        campo = h('div', { class: 'sexo', role: 'group', 'aria-label': c.rotulo }, op('F', 'Feminino'), op('M', 'Masculino'));
+      } else if (c.tipo === 'uf') {
+        campo = h('select', { id }, h('option', { value: '' }, '—'), UFS.map((u) => h('option', { value: u }, u)));
+        if (c.valor) campo.value = String(c.valor).toUpperCase();
+        ins[c.nome] = campo;
+      } else {
+        const modo = { data: 'numeric', cpf: 'numeric', cep: 'numeric', tel: 'tel' }[c.tipo];
+        const ph = { data: 'dia/mês/ano', cpf: '000.000.000-00', cep: '00000-000', tel: '(71) 99999-9999' }[c.tipo] || '';
+        const ac = { nome: 'name', celular: 'tel-national', telefone: 'tel-national', cep: 'postal-code', endereco: 'address-line1', bairro: 'address-level3', cidade: 'address-level2' }[c.nome] || 'off';
+        campo = h('input', { id, type: c.tipo === 'tel' ? 'tel' : 'text', inputmode: modo, placeholder: ph, autocomplete: ac, maxlength: c.tipo === 'texto' ? '160' : '20' });
+        const masc = { data: mascaraData, cpf: mascaraCpf, cep: mascaraCep, tel: mascaraTel }[c.tipo];
+        if (c.valor) campo.value = masc ? masc(String(c.valor)) : String(c.valor);
+        campo.addEventListener('input', () => {
+          if (masc) campo.value = masc(campo.value);
+          campo.classList.remove('ruim'); erro.hidden = true;
+          if (c.tipo === 'cep' && campo.value.replace(/\D/g, '').length === 8) buscarCep(campo.value, ins);
+        });
+        ins[c.nome] = campo;
+      }
+      form.append(h('div', { class: 'cp' }, h('label', { for: id }, c.rotulo, c.obrigatorio ? '' : h('span', { class: 'opc' }, ' (se souber)')), campo, erro));
+    }
+    const btn = h('button', { class: 'btn-w', type: 'submit' }, o.botao || 'Continuar');
+    form.append(h('div', { class: 'acoes-w' }, btn,
+      o.pular ? h('button', { class: 'btn-w sec', type: 'button', onclick: (ev) => responder(o.passo, { pular: true }, o.pular, ev.currentTarget) }, o.pular) : null));
+    form.addEventListener('submit', (ev) => {
+      ev.preventDefault();
+      const saida = {}; let primeiro = null;
+      for (const c of campos) {
+        const v = c.tipo === 'sexo' ? vals[c.nome] : String(ins[c.nome].value || '').trim();
+        let msg = '';
+        if (!v) { if (c.obrigatorio) msg = c.tipo === 'sexo' ? 'Toque em uma opção.' : 'Preencha este campo.'; }
+        else if (c.tipo === 'data' && !dataOk(v)) msg = 'Data inválida. Use dia/mês/ano, por exemplo 25/03/1980.';
+        else if (c.tipo === 'cpf' && !cpfOk(v)) msg = 'Os números do CPF não conferem. Confira, por favor.';
+        else if (c.tipo === 'tel' && ![10, 11].includes(v.replace(/\D/g, '').length)) msg = 'Informe o DDD e o número.';
+        else if (c.tipo === 'cep' && v.replace(/\D/g, '').length !== 8) msg = 'O CEP tem 8 números.';
+        else if (c.nome === 'nome' && v.split(/\s+/).length < 2) msg = 'Escreva o nome completo (nome e sobrenome).';
+        erros[c.nome].textContent = msg; erros[c.nome].hidden = !msg;
+        if (ins[c.nome]) ins[c.nome].classList.toggle('ruim', !!msg);
+        if (msg && !primeiro) primeiro = ins[c.nome] || erros[c.nome];
+        if (v) saida[c.nome] = v;
+      }
+      if (primeiro) { if (primeiro.focus) primeiro.focus(); primeiro.scrollIntoView({ block: 'center' }); return; }
+      responder(o.passo, saida, null, btn);
+    });
+    w.append(form);
+  }
+
+  /* acompanhamento ao vivo: há quanto tempo o pedido foi enviado, se já foi confirmado e se a equipe está online */
+  let acompBox = null, acompDados = null, acompDelta = 0, acompT = null, acompP = null;
+  function widgetAcompanhar(w) {
+    const box = h('div', { class: 'acomp', 'aria-live': 'polite' }, h('b', {}, 'Solicitação registrada'), h('p', {}, 'Carregando…'));
+    w.append(box);
+    acompBox = box;
+    if (acompDados) desenharAcomp();
+    if (!acompP) { acompP = setInterval(atualizarAcomp, 15000); acompT = setInterval(desenharAcomp, 1000); }
+    setTimeout(atualizarAcomp, 50);
+  }
+  function pararAcompanhar() { clearInterval(acompT); clearInterval(acompP); acompT = acompP = null; acompBox = null; acompDados = null; }
+  async function atualizarAcomp() {
+    if (!conv || !acompBox || document.hidden) return;
+    try {
+      const { data, error } = await db.rpc('chat_acompanhar', { p_conversa: conv.id, p_token: conv.token });
+      if (error || !data) return;
+      acompDados = data; acompDelta = Date.now() - new Date(data.agora).getTime();
+      desenharAcomp();
+    } catch { /* tenta de novo no próximo ciclo */ }
+  }
+  function desenharAcomp() {
+    const b = acompBox, d = acompDados;
+    if (!b || !d || !b.isConnected) return;
+    const envio = d.enviado_em ? new Date(d.enviado_em).getTime() : null;
+    const seg = envio ? Math.max(0, Math.floor((Date.now() - acompDelta - envio) / 1000)) : 0;
+    const relogio = `${String(Math.floor(seg / 3600)).padStart(2, '0')}:${String(Math.floor(seg / 60) % 60).padStart(2, '0')}:${String(seg % 60).padStart(2, '0')}`;
+    const horarios = (d.horarios || []).map((x) => { const dt = dataLocal(x.data); return `${DIAS_SEMANA[dt.getDay()]}, ${dt.getDate()}/${String(dt.getMonth() + 1).padStart(2, '0')} às ${x.hora}${x.unidade ? ' — ' + x.unidade : ''}`; });
+    const filhos = [];
+    if (d.confirmado) {
+      b.className = 'acomp ok';
+      filhos.push(h('b', {}, '✓ Agendamento confirmado'), ...horarios.map((x) => h('p', {}, x)), h('p', {}, 'O atendente confirmou com você. Qualquer dúvida, é só escrever aqui.'));
+    } else if (d.conversa === 'em_atendimento') {
+      b.className = 'acomp ok';
+      filhos.push(h('b', {}, `${d.agente || 'Um atendente'} está atendendo você`), h('p', {}, 'Responda aqui mesmo, no campo de mensagem.'));
+    } else {
+      b.className = 'acomp';
+      filhos.push(h('b', {}, d.pedido === 'pronto' ? 'Aguardando a confirmação do atendente' : 'Aguardando um atendente'),
+        h('div', { class: 'relogio', 'aria-label': 'Tempo desde o envio' }, relogio),
+        ...(horarios.length ? [h('p', {}, 'Horário escolhido (previsão): ' + horarios.join('; '))] : []),
+        h('p', {}, d.equipe_online ? 'A equipe está online e já recebeu a sua solicitação.'
+          : 'No momento não estamos online, mas a sua solicitação está registrada. Um atendente vai responder assim que possível, já sabendo de tudo.'));
+    }
+    b.replaceChildren(...filhos);
+  }
+
   // Consulta: o paciente escolhe o tipo (Pediatria, Puericultura, Neuropediatria...); isso cria o item do pedido e libera o calendário.
   async function abrirConsulta() {
     if (!conv) return;
@@ -764,24 +1054,147 @@
       if (error) throw error;
       if (!conv || conv.id !== minha) return;
       const lista = (data && data.consultas) || [];
-      let sel = null;
-      const btn = h('button', { class: 'btn-w', type: 'button', disabled: true }, 'Escolha uma consulta');
-      f.corpo.replaceChildren(...[
-        data.medico_preferido ? h('p', { class: 'p-dica' }, 'Médico de preferência: ' + nomeBonito(data.medico_preferido) + '. As consultas dele aparecem primeiro.') : null,
-        lista.length ? h('div', {}, lista.map((c) => h('label', { class: 'w-op' },
-          h('input', { type: 'radio', name: 'consulta', onchange: () => { sel = c; btn.disabled = false; btn.textContent = 'Escolher: ' + c.rotulo; } }),
-          h('span', {}, c.rotulo + (c.do_medico ? ' (do seu médico)' : ''))))) : h('p', { class: 'p-dica' }, 'Não há consultas cadastradas para esta unidade. Descreva no chat o que você precisa que o atendente ajuda.')].filter(Boolean));
-      f.rodape.replaceChildren(btn);
-      btn.addEventListener('click', async () => {
-        if (!sel) return;
-        btn.disabled = true;
+      const salvar = async (c, botao) => {
+        botao.disabled = true;
         try {
-          const { error: e2 } = await db.rpc('chat_consulta_salvar', { p_conversa: conv.id, p_token: conv.token, p_procedimento_id: sel.id });
+          const { error: e2 } = await db.rpc('chat_consulta_salvar', { p_conversa: conv.id, p_token: conv.token, p_procedimento_id: c.id });
           if (e2) throw e2;
-          fecharFolha(); toast('Consulta escolhida.'); carregar();
-        } catch (e) { toast(mensagemErro(e)); btn.disabled = false; }
+          fecharFolha(); carregar();
+        } catch (e) { toast(mensagemErro(e)); botao.disabled = false; }
+      };
+      const botoes = lista.map((c) => {
+        const b = h('button', { class: 'op', type: 'button', onclick: (ev) => salvar(c, ev.currentTarget) }, h('strong', {}, c.rotulo), c.do_medico ? h('span', {}, 'Do seu médico de preferência') : null);
+        b.dataset.busca = semAcento(c.rotulo);
+        return b;
       });
+      f.corpo.replaceChildren(...(lista.length
+        ? [...(botoes.length > 7 ? caixaFiltro(botoes, 'Digite a especialidade (ex.: pediatria)') : []), h('div', { class: 'op-lista' }, botoes)]
+        : [h('p', { class: 'p-dica' }, 'Não há consultas cadastradas agora. Toque em "Falar com um atendente" no menu (⋮) que a equipe ajuda.')]));
+      f.rodape.replaceChildren(h('p', { class: 'w-nota' }, 'Toque na consulta para escolher.'));
     } catch (e) { f.corpo.replaceChildren(h('p', { class: 'erro-form' }, mensagemErro(e))); }
+  }
+
+  /* ---------- busca do exame: pelo nome ou pela foto do pedido médico (leitura no próprio celular) ---------- */
+  let B = null;
+  function abrirBusca(o, comFoto) {
+    if (!conv) return;
+    const f = abrirFolha('Escolher o exame');
+    B = { itens: new Map(), res: [], titulo: '', t: null, lista: null, status: null, rodape: f.rodape };
+    const busca = h('input', { class: 'filtro', type: 'search', placeholder: 'Digite o exame (ex.: ressonância joelho)', 'aria-label': 'Procurar exame', autocomplete: 'off', value: (o && o.termo) || '' });
+    const fotoIn = h('input', { type: 'file', accept: 'image/*', capture: 'environment', hidden: true });
+    B.status = h('p', { class: 'foto-status', hidden: true });
+    B.lista = h('div', { 'aria-live': 'polite' });
+    const naoAchei = h('div', { class: 'acoes-w', hidden: true });
+    const livre = h('input', { class: 'filtro', type: 'text', maxlength: '160', placeholder: 'Nome do exame como está no pedido' });
+    naoAchei.append(livre, h('button', { class: 'btn-w', type: 'button', onclick: () => {
+      const v = livre.value.trim(); if (v.length < 3) { toast('Escreva o nome do exame.'); return; }
+      B.itens.set('t' + Date.now(), { texto: v, nome: v }); livre.value = ''; naoAchei.hidden = true; desenharResultados();
+    } }, 'Adicionar ao pedido'));
+    f.corpo.replaceChildren(
+      h('div', { class: 'acoes-w' }, h('button', { class: 'btn-w sec', type: 'button', onclick: () => fotoIn.click() }, '📷 Tirar foto do pedido médico')),
+      B.status, busca, B.lista, fotoIn,
+      h('div', { class: 'acoes-w', style: 'margin-top:12px' },
+        h('button', { class: 'btn-w sec', type: 'button', onclick: () => { fecharFolha(); abrirPedido(); } }, 'Prefiro escolher pelo desenho do corpo'),
+        h('button', { class: 'btn-w sec', type: 'button', onclick: () => { naoAchei.hidden = false; livre.focus(); } }, 'Não encontrei meu exame')),
+      naoAchei);
+    busca.addEventListener('input', () => { clearTimeout(B.t); B.t = setTimeout(() => buscarExame(busca.value), 250); });
+    fotoIn.addEventListener('change', () => { if (fotoIn.files && fotoIn.files[0]) lerFoto(fotoIn.files[0]); fotoIn.value = ''; });
+    buscarExame(busca.value);
+    if (comFoto) fotoIn.click();
+  }
+  async function buscarExame(termo, ocr) {
+    const e = B; if (!e || !conv) return;
+    try {
+      const { data, error } = await db.rpc('chat_exames_buscar', { p_conversa: conv.id, p_token: conv.token, p_termo: termo || '', p_ocr: !!ocr });
+      if (error) throw error;
+      if (B !== e) return;
+      e.res = data || [];
+      if (ocr) e.res.filter((x) => x.sugerido).forEach((x) => marcarExame(x, true));
+      e.titulo = ocr ? 'Encontrado no pedido médico (confira):' : (String(termo || '').trim() ? 'Toque para marcar:' : 'Mais pedidos (ou digite acima):');
+      desenharResultados();
+    } catch (err) { toast(mensagemErro(err)); }
+  }
+  function marcarExame(x, sim) {
+    if (!sim) { B.itens.delete(x.id); return; }
+    B.itens.set(x.id, { ...x, lado: x.bilateral || !x.tem_lado ? null : (x.lado || null) });
+  }
+  const precisaLado = (x) => !x.texto && x.tem_lado && !x.bilateral;
+  function desenharResultados() {
+    const e = B; if (!e) return;
+    const filhos = [];
+    if (e.itens.size) {
+      filhos.push(h('div', { class: 'carrinho' }, h('h3', {}, 'Seu pedido'), h('ul', {}, [...e.itens.entries()].map(([k, x]) => h('li', {},
+        h('span', {}, x.texto ? x.texto + ' (o atendente confere)' : nomeBonito(x.nome),
+          precisaLado(x) ? h('div', { class: 'chips', style: 'margin:6px 0 0' }, ['D', 'E', 'A'].map((l) => h('button', { type: 'button', class: 'chip', 'aria-pressed': String(x.lado === l),
+            onclick: () => { x.lado = l; desenharResultados(); } }, l === 'D' ? 'Lado direito' : l === 'E' ? 'Lado esquerdo' : 'Os dois lados'))) : null),
+        h('button', { type: 'button', 'aria-label': 'Tirar do pedido', onclick: () => { e.itens.delete(k); desenharResultados(); } }, '×'))))));
+    }
+    filhos.push(h('p', { class: 'p-dica' }, e.titulo));
+    if (!e.res.length) filhos.push(h('p', { class: 'p-dica' }, 'Nenhum exame encontrado com esse nome. Tente outra palavra ou toque em "Não encontrei meu exame".'));
+    for (const x of e.res) {
+      const cb = h('input', { type: 'checkbox', checked: e.itens.has(x.id), onchange: () => { marcarExame(x, cb.checked); desenharResultados(); } });
+      filhos.push(h('label', { class: 'res-item' }, cb, h('span', {}, nomeBonito(x.nome), x.linha ? h('small', {}, 'No pedido: ' + x.linha) : null)));
+    }
+    e.lista.replaceChildren(...filhos);
+    const n = e.itens.size, falta = [...e.itens.values()].some((x) => precisaLado(x) && !x.lado);
+    e.rodape.replaceChildren(h('button', { class: 'btn-w', type: 'button', disabled: !n || falta, onclick: enviarBusca },
+      !n ? 'Marque o exame' : falta ? 'Escolha o lado do exame' : `Enviar pedido (${n} ${n === 1 ? 'exame' : 'exames'})`));
+  }
+  async function enviarBusca(ev) {
+    const e = B; if (!e) return;
+    const itens = [...e.itens.values()].map((x) => (x.texto ? { texto: x.texto } : { procedimento_id: x.id, lado: x.lado || null, regiao: x.regiao || null }));
+    ev.currentTarget.disabled = true;
+    const t0 = performance.now();
+    try {
+      const { data, error } = await db.rpc('chat_exames_salvar', { p_conversa: conv.id, p_token: conv.token, p_itens: itens });
+      if (error) throw error;
+      fecharFolha(); mostrarRespostas(data.respostas, t0); carregar();
+    } catch (err) { toast(mensagemErro(err)); desenharResultados(); }
+  }
+  // Foto do pedido: vai sempre para o atendente; a leitura (OCR) roda no celular e só ajuda a marcar os exames, nunca trava o pedido.
+  async function lerFoto(arq) {
+    const e = B; if (!e) return;
+    e.status.hidden = false; e.status.textContent = 'Preparando a foto…';
+    let dataUrl;
+    try { dataUrl = await reduzirFoto(arq, 1600); } catch { e.status.textContent = 'Não consegui abrir a foto. Procure o exame pelo nome.'; return; }
+    e.status.textContent = 'Lendo o pedido… você pode continuar procurando pelo nome enquanto isso.';
+    let texto = '';
+    try { texto = await lerTexto(dataUrl); } catch { texto = ''; }
+    db.rpc('chat_anexo_enviar', { p_conversa: conv.id, p_token: conv.token, p_mime: 'image/jpeg', p_base64: dataUrl, p_ocr: texto || null })
+      .then(({ error }) => { if (error) toast(mensagemErro(error)); });
+    if (B !== e) return;
+    if (texto.replace(/\s/g, '').length >= 4) {
+      e.status.textContent = 'Pedido lido e foto enviada ao atendente. Confira os exames marcados abaixo.';
+      await buscarExame(texto, true);
+    } else e.status.textContent = 'Não consegui ler o pedido, mas a foto foi enviada ao atendente. Procure o exame pelo nome.';
+  }
+  function reduzirFoto(arq, max) {
+    return new Promise((ok, falha) => {
+      const img = new Image(), url = URL.createObjectURL(arq);
+      img.onload = () => {
+        const k = Math.min(1, max / Math.max(img.width, img.height)), c = document.createElement('canvas');
+        c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(url); ok(c.toDataURL('image/jpeg', 0.8));
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); falha(new Error('foto')); };
+      img.src = url;
+    });
+  }
+  let tesseract = null;
+  function carregarTesseract() {
+    if (!tesseract) tesseract = new Promise((ok, falha) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
+      s.onload = () => ok(window.Tesseract); s.onerror = () => { tesseract = null; falha(new Error('ocr')); };
+      document.head.append(s);
+    });
+    return tesseract;
+  }
+  async function lerTexto(dataUrl) {
+    const T = await carregarTesseract();
+    const r = await Promise.race([T.recognize(dataUrl, 'por'), new Promise((_, f) => setTimeout(() => f(new Error('tempo')), 60000))]);
+    return (r && r.data && r.data.text) || '';
   }
   function widgetLista(w, o) {
     const itens = (Array.isArray(o.itens) ? o.itens : []).slice(0, 16).filter((i) => i && i.rotulo);
@@ -801,16 +1214,17 @@
     if (outro) w.append(outro);
     w.append(btn);
   }
-  // Só a lista da última pergunta fica ativa; as respondidas ficam esmaecidas.
+  // Só a pergunta em aberto fica ativa; as respondidas ficam esmaecidas. A foto do pedido não conta como resposta.
   function atualizarWidgets() {
     const msgs = [...el.msgs.querySelectorAll('.msg')];
     let ultimoCliente = -1;
-    msgs.forEach((m, i) => { if (m.classList.contains('cliente')) ultimoCliente = i; });
+    msgs.forEach((m, i) => { if (m.classList.contains('cliente') && !m.dataset.anexo) ultimoCliente = i; });
     msgs.forEach((m, i) => {
-      m.querySelectorAll('.widget[data-tipo="lista"]').forEach((w) => {
+      m.querySelectorAll('.widget').forEach((w) => {
+        if (w.dataset.tipo === 'acompanhar' || w.dataset.tipo === 'nova') return;
         const ativo = i > ultimoCliente;
         w.classList.toggle('respondido', !ativo);
-        w.querySelectorAll('input,button').forEach((x) => { x.disabled = !ativo; });
+        w.querySelectorAll('input,button,select').forEach((x) => { x.disabled = !ativo; });
       });
     });
   }
@@ -1181,6 +1595,9 @@
   });
   document.addEventListener('click', (e) => { if (!el.menu.hidden && !el.menu.contains(e.target) && e.target !== el.btnMenu) el.menu.hidden = true; });
   el.btnNova.addEventListener('click', novaConversa);
+  el.btnAtendente.addEventListener('click', pedirAtendente);
+  el.btnSair.addEventListener('click', sair);
+  el.btnNaoSouEu.addEventListener('click', naoSouEu);
   el.btnOutroFilho.addEventListener('click', outroFilho);
   el.btnProximo.addEventListener('click', proximoFilho);
   document.addEventListener('visibilitychange', () => {
