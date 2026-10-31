@@ -131,6 +131,10 @@ A IA consulta, a cada mensagem do paciente, um catálogo copiado de relatórios 
 
 O formulário pergunta primeiro a unidade (Desenvoar = atendimento pediátrico; CSI = exames e consultas; CSI RM/TC = ressonância e tomografia; "Ainda não sei") e **quem será atendido** (o próprio ou um filho(a), com o responsável falando pelo filho; uma conversa por criança e "Agendar para outro filho(a)" no menu). O médico de preferência vem depois do e-mail. A IA já nasce no caminho certo e o calendário filtra por unidade e médico. Passo a passo, texto do n8n e limites em `docs/fase6-unidade-e-medico.md`; SQL em `supabase/fase6-unidade-e-medico.sql` e `supabase/fase6b-alerta-preco.sql` (**aplicados no projeto em 30/10/2026**). Falta só o n8n (ver `docs/fase6-roteiro-de-teste-e-producao.md`).
 
+### Próximo passo: resposta em menos de 1 segundo, sem a IA responder o paciente (Fase 7, em planejamento)
+
+Hoje a resposta da IA leva 7 s na mediana (medido em 31/10/2026). O plano troca a IA no caminho do paciente por um motor de fluxo dentro do Supabase e deixa a IA nos bastidores: mapear o processo, testar com pacientes simulados e propor melhorias que a equipe aprova. Mapa completo do processo, ordem de trabalho e decisões pendentes em `docs/plano-fase7-fluxo-sem-ia.md`.
+
 ## Estado do projeto e como retomar
 
 **Aba Aprendizado (administrador)**: relatório de onde a IA erra, preço do catálogo x Klingo e casos para melhorar o prompt (Fase 5; SQL em `supabase/fase5-aprendizado.sql`).
