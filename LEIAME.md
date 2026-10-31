@@ -12,6 +12,8 @@ n8n/novo-atendimento.json   workflow para importar no n8n
 
 Fase 9 (31/10/2026): correções do teste da paciente, Sentinela e mensagens empáticas. Veja `docs/fase9-sentinela.md`. Falta rodar `supabase/fase9-sentinela.sql` no Supabase.
 
+Convênio de quem volta (31/10/2026): o chat deixa de copiar o convênio da vez anterior e pergunta ("É assim também agora?"); corrigir o plano tira a carteirinha antiga. Veja `docs/lembrete-mudar-escolhas-e-convenio.md`, seção 0. Falta rodar `supabase/correcao-convenio-quem-volta.sql` no Supabase (depois de `fase4` e `fase7`).
+
 Banco: projeto Supabase `webchat-atendimento` (sa-east-1), já com tabelas, regras de segurança e tempo real.
 
 ## Publicar no GitHub Pages

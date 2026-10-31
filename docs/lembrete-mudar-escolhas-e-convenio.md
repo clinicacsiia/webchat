@@ -2,6 +2,22 @@
 
 Registrado em 31/10/2026, a pedido da equipe, **para fazer depois**. Público: pessoas de 70 anos ou mais, com pouca prática no celular. Tudo precisa ser de tocar, com caixas grandes, e o sistema precisa entender e refazer as contas sozinho quando a pessoa muda de ideia.
 
+## 0. Andamento (31/10/2026)
+
+**Feito: convênio de quem volta (itens 4.3 e 3.1 a 3.3), no arquivo `supabase/correcao-convenio-quem-volta.sql` (ainda NÃO aplicado no Supabase).**
+Teste: `npm run test:convenio` (20 de 20, usa as funções reais do motor num Postgres embutido).
+
+- "Repetir o último exame" e "Continuar o pedido que ficou pela metade" não copiam mais o convênio. O chat pergunta, com dois botões grandes: "Da última vez o atendimento foi pelo convênio X. É assim também agora?" (**Sim, é o mesmo** / **Não, mudou**). "Não, mudou" abre a lista de convênios de sempre. A pessoa também pode digitar ("sim", "mudou", "continua").
+- "Corrigir o plano" na confirmação: se escolher **outro** convênio, a carteirinha e a validade já digitadas saem e a carteirinha é pedida de novo; se escolher o mesmo, nada é apagado. O horário já escolhido **fica** (é uma previsão que o atendente confirma), a pessoa é avisada e o atendente recebe uma nota para conferir se o médico/unidade atende o convênio novo.
+- Trocar a **consulta** passou a refazer o horário, como já acontecia ao trocar o exame.
+
+**O que a leitura do código mostrou diferente do que está escrito na seção 3:**
+- Item 3.2 ("os dados continuam os mesmos mantém a carteirinha antiga"): **não acontece**. A carteirinha nunca é guardada no cadastro do paciente (`pacientes.sql` tira `matricula` e `validade` antes de gravar), então numa conversa nova ela é sempre pedida. O que existia era a carteirinha digitada **na mesma conversa** sobrevivendo ao "Corrigir o plano", que agora está corrigido.
+- Item 3.4 ("Corrigir o pedido não refaz o horário"): para **exames** já refazia (`fluxo_avancar` apaga `escolha_horario` ao receber "Pedido de exames:"). Só a consulta ficava de fora.
+- A tela "Olá de novo, {nome}!" é só o nome salvo no aparelho (`index.html`); ela não guarda convênio, então não há convênio a mostrar ali.
+
+**Ainda por fazer:** caixas de marcar para todas as escolhas, mudar ao vivo (4.2), mapa de dependências no banco (`fluxo_dependencia`), validade vencida da carteirinha (opcional em 4.3) e o teste com pessoas de 70 anos ou mais (4.4).
+
 ## 1. O que foi pedido
 
 1. **Caixas de marcar (checkbox) para todas as escolhas**, para facilitar.
