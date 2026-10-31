@@ -20,7 +20,7 @@ Atualizado em 2026-10-30. Leia este arquivo inteiro antes de mexer em qualquer c
 Nada disto está no repositório; é preciso refazer nas conexões da conta nova:
 1. **GitHub**: acesso ao repositório `clinicacsiia/webchat` (trabalhar em uma branch nova a partir da `main` e abrir PR para ela).
 2. **Supabase** (conector): projeto `webchat-atendimento`, id `nrvuynjwcgwpjdptkiay` (sa-east-1). É o MESMO projeto: não crie outro. A conta nova precisa de acesso a ele.
-3. **n8n** (conector): instância `clinicacsi.app.n8n.cloud`, workflow `wAbzjPqZNCztKriZ` "Triagem IA - Atendimento" (versão ativa `7bcf2009-34ff-4085-a17f-a931ff68188f`). Falta escolher/confirmar a credencial Anthropic no nó "Triagem com Claude" se a conta mudar.
+3. **n8n** (conector): instância `clinicacsi.app.n8n.cloud`, workflow `wAbzjPqZNCztKriZ` "Triagem IA - Atendimento" (versão ativa `1ada4ac8-6cd6-44b8-84a9-5037e2da1de3`, de 31/10/2026). Falta escolher/confirmar a credencial Anthropic no nó "Triagem com Claude" se a conta mudar.
 4. **Gmail** (opcional): o e-mail ao suporte do Klingo está só como rascunho (`docs/fase-0-email-suporte-klingo.md` tem o texto).
 5. **Segredos (não estão no repositório, e não devem estar):**
    - `KLINGO_APP_TOKEN`: secret da Edge Function `sync-catalogo-klingo` (Supabase > Edge Functions > Secrets).

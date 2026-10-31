@@ -45,7 +45,7 @@ Supabase > Authentication > Email Templates > "Confirm signup": cole o conteúdo
 3. No painel: Configurações > Webhook do n8n > cole a URL > Salvar.
 4. Troque o último nó por Telegram, E-mail ou WhatsApp. O texto pronto está no campo `texto`.
 
-Só nascem execuções no n8n quando uma conversa nova começa (não a cada mensagem), então o plano de 1000 execuções rende.
+Com a triagem por IA ligada, **cada mensagem do paciente** gera uma execução no n8n (e mais uma a cada conversa nova): confira se a cota do plano do n8n aguenta o volume do mês.
 
 ## Como cada pessoa usa
 
@@ -107,7 +107,7 @@ A IA consulta, a cada mensagem do paciente, um catálogo copiado de relatórios 
 - **Foto de referência** (`catalogo_foto`, `referencia = true`): cópia do catálogo de 29/10/2026, antes da limpeza no Klingo. Não apagar.
 - **Aba Catálogo** do painel (só administrador): o que limpar no Klingo (sem agenda vigente, duplicados, agenda de teste, sem preço, mais pedidos sem preparo) e o histórico de mudanças.
 - SQL em `supabase/catalogo-historico*.sql` e `supabase/catalogo-precos.sql`. Plano completo e fases em `docs/`.
-- **n8n**: o fluxo `Triagem IA - Atendimento` precisa estar **publicado** para valer (o rascunho não atende ninguém). O nó "Ler resposta da IA" lê `merged_response` ou o bloco de texto, e o nó do Claude usa `maxTokens` 4000 (com 1200 o JSON vinha cortado e caía na resposta de emergência).
+- **n8n**: o fluxo `Triagem IA - Atendimento` precisa estar **publicado** para valer (o rascunho não atende ninguém). O nó "Ler resposta da IA" lê `merged_response` ou o bloco de texto, e o nó do Claude usa `maxTokens` 4000 (com 1200 o JSON vinha cortado e caía na resposta de emergência). Correção de 31/10/2026 (IA que parava depois da primeira resposta, mensagens sem resposta, falhas que encerravam o atendimento): `docs/n8n-correcao-2026-10-31.md`.
 
 ### Paciente que volta (conferência de identidade)
 
