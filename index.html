@@ -255,7 +255,20 @@
   .res-item { display: flex; gap: 10px; align-items: flex-start; padding: 11px 6px; border-bottom: 1px solid var(--linha); cursor: pointer; }
   .res-item input { width: 22px; height: 22px; accent-color: var(--verde); flex: none; margin-top: 1px; }
   .res-item small { display: block; color: var(--texto-suave); }
-  .foto-status { font-size: 14px; color: var(--texto-suave); margin: 6px 0 10px; }
+  .foto-status { font-size: 15px; color: var(--texto); background: var(--verde-claro); border-radius: 10px; padding: 10px 12px; margin: 8px 0 10px; }
+  .girando { display: inline-block; width: 14px; height: 14px; margin-right: 8px; vertical-align: -2px; border: 2px solid var(--verde); border-right-color: transparent; border-radius: 50%; }
+  @media (prefers-reduced-motion: no-preference) { .girando { animation: gira .9s linear infinite; } @keyframes gira { to { transform: rotate(360deg); } } }
+  /* Exames lidos do pedido: um cartão por exame */
+  .g-resumo p { margin: 4px 0 10px; font-size: 16px; }
+  .grupo { border: 1.5px solid var(--linha); border-radius: 12px; padding: 10px 12px; margin: 0 0 12px; background: var(--papel); }
+  .grupo.duvida, .grupo.nenhum { border-color: #e2c27a; background: #fffaf0; }
+  .g-titulo { margin: 0 0 6px; font-size: 13px; font-weight: 700; color: var(--texto-suave); text-transform: uppercase; letter-spacing: .03em; }
+  .g-recorte { display: block; max-width: 100%; max-height: 90px; border: 1px solid var(--linha); border-radius: 6px; margin: 0 0 8px; background: #fff; }
+  .g-escrito, .g-entendi { margin: 0 0 6px; font-size: 15px; }
+  .g-pergunta { margin: 8px 0 4px; font-size: 16px; font-weight: 650; }
+  .g-aviso { margin: 4px 0; font-size: 15px; color: var(--aviso); }
+  .res-item.grande { font-size: 17px; padding: 13px 6px; }
+  .res-item.grande input { width: 26px; height: 26px; }
   @media (prefers-reduced-motion: no-preference) { .msg { animation: entra .16s ease-out; } @keyframes entra { from { opacity: 0; transform: translateY(4px); } } }
 </style>
 </head>
@@ -1074,15 +1087,21 @@
     } catch (e) { f.corpo.replaceChildren(h('p', { class: 'erro-form' }, mensagemErro(e))); }
   }
 
-  /* ---------- busca do exame: pelo nome ou pela foto do pedido médico (leitura no próprio celular) ---------- */
+  /* ---------- busca do exame: pelo nome ou pela foto do pedido médico ---------- */
+  // A foto é lida de dois jeitos ao mesmo tempo: no celular (Tesseract, texto impresso, resultado em segundos) e pela IA
+  // no servidor (letra de médico; função ler-pedido). Cada exame do pedido vira um cartão: certo (já marcado), parecido
+  // (marcado, com "Não é este?") ou em dúvida (o paciente escolhe entre exames diferentes, ou deixa para o atendente).
+  // O que o paciente tocou nunca é desfeito por uma leitura que chega depois.
   let B = null;
   function abrirBusca(o, comFoto) {
     if (!conv) return;
     const f = abrirFolha('Escolher o exame');
-    B = { itens: new Map(), res: [], titulo: '', t: null, lista: null, status: null, rodape: f.rodape };
+    B = { itens: new Map(), res: [], titulo: '', t: null, lista: null, status: null, rodape: f.rodape, leituras: [], termo: '', recusados: new Set() };
     const busca = h('input', { class: 'filtro', type: 'search', placeholder: 'Digite o exame (ex.: ressonância joelho)', 'aria-label': 'Procurar exame', autocomplete: 'off', value: (o && o.termo) || '' });
-    const fotoIn = h('input', { type: 'file', accept: 'image/*', capture: 'environment', hidden: true });
-    B.status = h('p', { class: 'foto-status', hidden: true });
+    const camera = h('input', { type: 'file', accept: 'image/*', capture: 'environment', hidden: true });
+    const galeria = h('input', { type: 'file', accept: 'image/*', hidden: true });
+    B.camera = camera; B.galeria = galeria;
+    B.status = h('div', { class: 'foto-status', hidden: true, 'aria-live': 'polite' });
     B.lista = h('div', { 'aria-live': 'polite' });
     const naoAchei = h('div', { class: 'acoes-w', hidden: true });
     const livre = h('input', { class: 'filtro', type: 'text', maxlength: '160', placeholder: 'Nome do exame como está no pedido' });
@@ -1090,17 +1109,19 @@
       const v = livre.value.trim(); if (v.length < 3) { toast('Escreva o nome do exame.'); return; }
       B.itens.set('t' + Date.now(), { texto: v, nome: v }); livre.value = ''; naoAchei.hidden = true; desenharResultados();
     } }, 'Adicionar ao pedido'));
-    f.corpo.replaceChildren(
-      h('div', { class: 'acoes-w' }, h('button', { class: 'btn-w sec', type: 'button', onclick: () => fotoIn.click() }, '📷 Tirar foto do pedido médico')),
-      B.status, busca, B.lista, fotoIn,
+    B.botoesFoto = h('div', { class: 'acoes-w' },
+      h('button', { class: 'btn-w sec', type: 'button', onclick: () => camera.click() }, '📷 Tirar foto do pedido agora'),
+      h('button', { class: 'btn-w sec', type: 'button', onclick: () => galeria.click() }, '🖼️ Escolher a foto do pedido na galeria'),
+      h('p', { class: 'w-nota' }, 'Dica: ponha a folha numa mesa com boa luz e pegue a folha inteira. A foto fica guardada com segurança para o atendente conferir o seu pedido.'));
+    f.corpo.replaceChildren(B.botoesFoto, B.status, busca, B.lista, camera, galeria,
       h('div', { class: 'acoes-w', style: 'margin-top:12px' },
         h('button', { class: 'btn-w sec', type: 'button', onclick: () => { fecharFolha(); abrirPedido(); } }, 'Prefiro escolher pelo desenho do corpo'),
         h('button', { class: 'btn-w sec', type: 'button', onclick: () => { naoAchei.hidden = false; livre.focus(); } }, 'Não encontrei meu exame')),
       naoAchei);
     busca.addEventListener('input', () => { clearTimeout(B.t); B.t = setTimeout(() => buscarExame(busca.value), 250); });
-    fotoIn.addEventListener('change', () => { if (fotoIn.files && fotoIn.files[0]) lerFoto(fotoIn.files[0]); fotoIn.value = ''; });
+    for (const inp of [camera, galeria]) inp.addEventListener('change', () => { if (inp.files && inp.files[0]) lerFoto(inp.files[0]); inp.value = ''; });
     buscarExame(busca.value);
-    if (comFoto) fotoIn.click();
+    if (comFoto) camera.click();
   }
   async function buscarExame(termo, ocr) {
     const e = B; if (!e || !conv) return;
@@ -1108,93 +1129,285 @@
       const { data, error } = await db.rpc('chat_exames_buscar', { p_conversa: conv.id, p_token: conv.token, p_termo: termo || '', p_ocr: !!ocr });
       if (error) throw error;
       if (B !== e) return;
-      e.res = data || [];
+      e.res = data || []; e.termo = String(termo || '').trim();
       if (ocr) e.res.filter((x) => x.sugerido).forEach((x) => marcarExame(x, true));
-      e.titulo = ocr ? 'Encontrado no pedido médico (confira):' : (String(termo || '').trim() ? 'Toque para marcar:' : 'Mais pedidos (ou digite acima):');
+      e.titulo = ocr ? 'Encontrado no pedido médico (confira):' : e.termo ? 'Toque para marcar:' : 'Mais pedidos (ou digite acima):';
       desenharResultados();
     } catch (err) { toast(mensagemErro(err)); }
   }
-  function marcarExame(x, sim) {
+  function marcarExame(x, sim, grupo, auto) {
     if (!sim) { B.itens.delete(x.id); return; }
-    B.itens.set(x.id, { ...x, lado: x.bilateral || !x.tem_lado ? null : (x.lado || null) });
+    if (grupo) for (const [k, v] of B.itens) if (v.grupo === grupo) B.itens.delete(k);
+    B.itens.set(x.id, { ...x, lado: x.bilateral || !x.tem_lado ? null : (x.lado || null), grupo: grupo || null, auto: !!auto });
   }
   const precisaLado = (x) => !x.texto && x.tem_lado && !x.bilateral;
+  const ORDINAL = ['1º', '2º', '3º', '4º', '5º', '6º', '7º', '8º', '9º', '10º', '11º', '12º'];
+  function escolhaLado(x) {
+    return h('div', { class: 'chips', style: 'margin:6px 0 0', role: 'group', 'aria-label': 'Lado do exame' }, ['D', 'E', 'A'].map((l) => h('button', { type: 'button', class: 'chip', 'aria-pressed': String(x.lado === l),
+      onclick: () => { x.lado = l; x.auto = false; desenharResultados(); } }, l === 'D' ? 'Lado direito' : l === 'E' ? 'Lado esquerdo' : 'Os dois lados')));
+  }
+  // Cartão de um exame lido do pedido.
+  function cartaoGrupo(e, g, i) {
+    const marcado = [...e.itens.values()].find((v) => v.grupo === g.chave);
+    const caixa = h('div', { class: 'grupo ' + g.certeza });
+    caixa.append(h('p', { class: 'g-titulo' }, `${ORDINAL[i] || (i + 1) + 'º'} exame do pedido`));
+    if (g.recorte) caixa.append(h('img', { class: 'g-recorte', src: g.recorte, alt: 'Trecho do pedido: ' + g.linha }));
+    else if (g.linha) caixa.append(h('p', { class: 'g-escrito' }, 'No papel está escrito: ', h('q', {}, g.linha)));
+    if (g.explicacao) caixa.append(h('p', { class: 'g-entendi' }, 'Entendi: ', h('strong', {}, g.explicacao)));
+    const rotulo = (op) => op.rotulo || nomeBonito(op.exame.nome);
+    const opcao = (op) => {
+      const cb = h('input', { type: 'checkbox', checked: !!(marcado && marcado.id === op.exame.id),
+        onchange: () => { marcarExame(op.exame, cb.checked, g.chave, false); if (cb.checked) e.recusados.delete(op.exame.id); else e.recusados.add(op.exame.id); desenharResultados(); } });
+      return h('label', { class: 'res-item grande' }, cb, h('span', {}, rotulo(op), op.rotulo ? h('small', {}, nomeBonito(op.exame.nome)) : null));
+    };
+    const naoSei = () => {
+      const cb = h('input', { type: 'checkbox', checked: !!(marcado && marcado.texto),
+        onchange: () => {
+          for (const [k, v] of e.itens) if (v.grupo === g.chave) e.itens.delete(k);
+          if (cb.checked) e.itens.set(g.chave + ':t', textoDoGrupo(g));
+          desenharResultados();
+        } });
+      return h('label', { class: 'res-item grande' }, cb, h('span', {}, 'Não sei. O atendente confere pela foto.'));
+    };
+    if (g.certeza === 'nenhum') {
+      const noPedido = e.itens.has(g.chave + ':t');
+      caixa.append(h('p', { class: 'g-aviso' }, g.origem === 'ia' && !g.explicacao ? 'Não consegui ler este exame.' : 'Não encontrei este exame na lista da clínica.',
+        noPedido ? ' O atendente vai conferir pela foto. Ele já está no seu pedido.' : ' Ele ficou fora do pedido.'),
+        h('button', { type: 'button', class: 'link-add', onclick: () => {
+          g.fora = noPedido;
+          if (noPedido) e.itens.delete(g.chave + ':t'); else e.itens.set(g.chave + ':t', textoDoGrupo(g));
+          desenharResultados();
+        } }, noPedido ? 'Isto não é um exame: tirar do pedido' : 'Pôr de volta no pedido'));
+    } else if (g.certeza === 'duvida') {
+      caixa.append(h('p', { class: 'g-pergunta' }, 'Não tenho certeza de qual exame é este. Qual destes está no seu pedido?'), ...g.opcoes.map(opcao), naoSei());
+    } else {
+      caixa.append(opcao(g.opcoes[0]));
+      if (g.opcoes.length > 1 || g.certeza === 'media') {
+        const outras = h('div', { hidden: !g.abrir }, ...g.opcoes.slice(1).map(opcao), naoSei());
+        caixa.append(h('button', { type: 'button', class: 'link-add', 'aria-expanded': String(!!g.abrir),
+          onclick: () => { g.abrir = !g.abrir; desenharResultados(); } }, g.abrir ? 'Esconder as outras opções' : 'Não é este? Ver outras opções'), outras);
+      }
+    }
+    if (marcado && precisaLado(marcado)) caixa.append(h('p', { class: 'g-pergunta' }, marcado.lado ? 'Lado (confira):' : 'De qual lado?'), escolhaLado(marcado));
+    return caixa;
+  }
   function desenharResultados() {
     const e = B; if (!e) return;
     const filhos = [];
-    if (e.itens.size) {
-      filhos.push(h('div', { class: 'carrinho' }, h('h3', {}, 'Seu pedido'), h('ul', {}, [...e.itens.entries()].map(([k, x]) => h('li', {},
-        h('span', {}, x.texto ? x.texto + ' (o atendente confere)' : nomeBonito(x.nome),
-          precisaLado(x) ? h('div', { class: 'chips', style: 'margin:6px 0 0' }, ['D', 'E', 'A'].map((l) => h('button', { type: 'button', class: 'chip', 'aria-pressed': String(x.lado === l),
-            onclick: () => { x.lado = l; desenharResultados(); } }, l === 'D' ? 'Lado direito' : l === 'E' ? 'Lado esquerdo' : 'Os dois lados'))) : null),
-        h('button', { type: 'button', 'aria-label': 'Tirar do pedido', onclick: () => { e.itens.delete(k); desenharResultados(); } }, '×'))))));
+    const grupos = e.leituras.flatMap((l) => l.grupos);
+    e.botoesFoto.hidden = e.leituras.length > 0; // lido o pedido, o resultado sobe; outra folha tem botão próprio embaixo
+    if (e.leituras.length) {
+      const total = e.leituras.reduce((s, l) => s + Math.max(l.total || 0, l.grupos.length), 0), achados = grupos.length;
+      const naoPedido = e.leituras.some((l) => l.e_pedido === false);
+      filhos.push(h('div', { class: 'g-resumo' },
+        naoPedido ? h('p', {}, 'Esta foto não parece um pedido de exame. Se for, o atendente confere. Você também pode tirar outra foto ou procurar pelo nome.') : null,
+        achados ? h('p', {}, h('strong', {}, achados === 1 ? 'Encontrei 1 exame no seu pedido.' : `Encontrei ${achados} exames no seu pedido.`), ' Confira cada um:') : null,
+        total > achados ? h('p', { class: 'g-aviso' }, `O pedido parece ter ${total} exames. ${total - achados === 1 ? 'Um deles' : 'Alguns'} eu não consegui ler: o atendente confere pela foto.`) : null));
+      grupos.forEach((g, i) => filhos.push(cartaoGrupo(e, g, i)));
+      filhos.push(h('div', { class: 'acoes-w' }, h('button', { class: 'btn-w sec', type: 'button', onclick: () => e.galeria.click() }, '+ O pedido tem outra folha? Enviar outra foto')));
     }
-    filhos.push(h('p', { class: 'p-dica' }, e.titulo));
-    if (!e.res.length) filhos.push(h('p', { class: 'p-dica' }, 'Nenhum exame encontrado com esse nome. Tente outra palavra ou toque em "Não encontrei meu exame".'));
-    for (const x of e.res) {
-      const cb = h('input', { type: 'checkbox', checked: e.itens.has(x.id), onchange: () => { marcarExame(x, cb.checked); desenharResultados(); } });
-      filhos.push(h('label', { class: 'res-item' }, cb, h('span', {}, nomeBonito(x.nome), x.linha ? h('small', {}, 'No pedido: ' + x.linha) : null)));
+    const avulsos = [...e.itens.entries()].filter(([, x]) => !x.grupo);
+    if (avulsos.length) {
+      filhos.push(h('div', { class: 'carrinho' }, h('h3', {}, e.leituras.length ? 'Outros exames que você marcou' : 'Seu pedido'), h('ul', {}, avulsos.map(([k, x]) => h('li', {},
+        h('span', {}, x.texto ? x.texto + ' (o atendente confere)' : nomeBonito(x.nome), precisaLado(x) ? escolhaLado(x) : null),
+        h('button', { type: 'button', 'aria-label': 'Tirar do pedido', onclick: () => { e.itens.delete(k); if (!x.texto) e.recusados.add(x.id); desenharResultados(); } }, '×'))))));
+    }
+    // Com o pedido lido, a lista de "mais pedidos" só aparece quando o paciente digita.
+    if (!e.leituras.length || e.termo) {
+      filhos.push(h('p', { class: 'p-dica' }, e.leituras.length ? 'Procurar outro exame:' : e.titulo));
+      if (!e.res.length) filhos.push(h('p', { class: 'p-dica' }, 'Nenhum exame encontrado com esse nome. Tente outra palavra ou toque em "Não encontrei meu exame".'));
+      for (const x of e.res) {
+        const cb = h('input', { type: 'checkbox', checked: e.itens.has(x.id), onchange: () => { marcarExame(x, cb.checked); if (cb.checked) e.recusados.delete(x.id); else e.recusados.add(x.id); desenharResultados(); } });
+        filhos.push(h('label', { class: 'res-item' }, cb, h('span', {}, nomeBonito(x.nome), x.linha ? h('small', {}, 'No pedido: ' + x.linha) : null)));
+      }
     }
     e.lista.replaceChildren(...filhos);
     const n = e.itens.size, falta = [...e.itens.values()].some((x) => precisaLado(x) && !x.lado);
-    e.rodape.replaceChildren(h('button', { class: 'btn-w', type: 'button', disabled: !n || falta, onclick: enviarBusca },
-      !n ? 'Marque o exame' : falta ? 'Escolha o lado do exame' : `Enviar pedido (${n} ${n === 1 ? 'exame' : 'exames'})`));
+    const semResposta = grupos.some((g) => g.certeza === 'duvida' && ![...e.itens.values()].some((v) => v.grupo === g.chave));
+    e.rodape.replaceChildren(h('button', { class: 'btn-w', type: 'button', disabled: !n || falta || semResposta, onclick: enviarBusca },
+      semResposta ? 'Responda qual é o exame acima' : !n ? 'Marque o exame' : falta ? 'Escolha o lado do exame' : `Enviar pedido (${n} ${n === 1 ? 'exame' : 'exames'})`));
   }
   async function enviarBusca(ev) {
     const e = B; if (!e) return;
-    const itens = [...e.itens.values()].map((x) => (x.texto ? { texto: x.texto } : { procedimento_id: x.id, lado: x.lado || null, regiao: x.regiao || null }));
+    const lista = [...e.itens.values()];
+    const itens = lista.map((x) => (x.texto ? { texto: x.texto } : { procedimento_id: x.id, lado: x.lado || null, regiao: x.regiao || null }));
     ev.currentTarget.disabled = true;
     const t0 = performance.now();
+    // O que o paciente escolheu em cada foto fica junto da foto (serve para medir e melhorar a leitura). Não trava o envio.
+    for (const l of e.leituras) {
+      const escolha = lista.filter((x) => x.grupo && x.grupo.startsWith(l.anexo + ':')).map((x) => {
+        const g = l.grupos.find((y) => y.chave === x.grupo);
+        return { linha: g ? g.linha : null, procedimento_id: x.texto ? null : x.id, lado: x.lado || null, texto: x.texto || null, auto: x.auto, certeza: g ? g.certeza : null };
+      });
+      db.rpc('chat_pedido_escolha', { p_conversa: conv.id, p_token: conv.token, p_anexo: l.anexo, p_escolha: escolha }).then(() => {}, () => {});
+    }
     try {
       const { data, error } = await db.rpc('chat_exames_salvar', { p_conversa: conv.id, p_token: conv.token, p_itens: itens });
       if (error) throw error;
       fecharFolha(); mostrarRespostas(data.respostas, t0); carregar();
     } catch (err) { toast(mensagemErro(err)); desenharResultados(); }
   }
-  // Foto do pedido: vai sempre para o atendente; a leitura (OCR) roda no celular e só ajuda a marcar os exames, nunca trava o pedido.
+
+  // Põe a leitura de uma foto na tela. A leitura da IA substitui a do celular da mesma foto sem desfazer nada que o
+  // paciente decidiu: o exame que ele escolheu vira a opção marcada do cartão novo e o que ele tirou continua fora.
+  // Só some o que foi marcado sozinho (auto) e a leitura nova não confirma.
+  const simples = (t) => semAcento(t).replace(/[^a-z0-9]/g, '');
+  const textoDoGrupo = (g) => ({ texto: 'Exame do pedido: ' + (g.explicacao || g.linha || 'ilegível'), nome: g.linha, grupo: g.chave });
+  function aplicarLeitura(e, anexo, r, foto) {
+    const grupos = (r && Array.isArray(r.grupos) ? r.grupos : []).filter((g) => g.certeza === 'nenhum' || (Array.isArray(g.opcoes) && g.opcoes.length));
+    const antes = e.leituras.find((l) => l.anexo === anexo);
+    if (antes && antes.origem === 'ia' && r.origem !== 'ia') return;
+    const nova = { anexo, origem: r.origem, total: r.total || 0, e_pedido: r.e_pedido, grupos: grupos.map((g, i) => ({ ...g, opcoes: [...(g.opcoes || [])],
+      chave: anexo + ':' + r.origem + ':' + i, recorte: g.caixa && foto ? recortar(foto, g.caixa) : null })) };
+    const idsNovos = new Set(nova.grupos.flatMap((g) => g.certeza === 'duvida' ? [] : g.opcoes.map((op) => op.exame.id)));
+    if (antes) {
+      // O mesmo exame nas duas leituras: mesma escrita ou um exame em comum.
+      const par = (velho) => nova.grupos.find((g) => simples(g.linha) === simples(velho.linha) || g.opcoes.some((op) => velho.opcoes.some((o) => o.exame.id === op.exame.id)));
+      for (const velho of antes.grupos) {
+        const g = par(velho); if (!g) continue;
+        if (!g.recorte) g.recorte = velho.recorte; // a IA não traz a posição da linha: usa o recorte da leitura do celular
+        if (velho.fora) g.fora = true;
+      }
+      for (const [k, v] of e.itens) {
+        if (!v.grupo || !v.grupo.startsWith(anexo + ':')) continue;
+        if (v.auto && (v.texto || !idsNovos.has(v.id))) { e.itens.delete(k); continue; }
+        const velho = antes.grupos.find((g) => g.chave === v.grupo), g = velho && !v.auto ? par(velho) : null;
+        v.grupo = null;
+        if (!g) continue;
+        if (v.texto) v.grupo = g.chave; // "Não sei, o atendente confere" continua valendo para o mesmo exame
+        else if (!g.opcoes.some((op) => op.exame.id === v.id)) { g.opcoes.unshift({ exame: v }); if (g.certeza === 'nenhum') g.certeza = 'media'; }
+      }
+      e.leituras[e.leituras.indexOf(antes)] = nova;
+    } else e.leituras.push(nova);
+    for (const g of nova.grupos) {
+      if ([...e.itens.values()].some((v) => v.grupo === g.chave)) continue;
+      // O exame que já está no pedido responde o cartão. Uma dúvida só o paciente responde: marcação automática não vale.
+      const ja = g.opcoes.map((op) => e.itens.get(op.exame.id)).find((v) => v && !(v.auto && g.certeza === 'duvida'));
+      for (const op of g.opcoes) { const v = e.itens.get(op.exame.id); if (v && v !== ja && v.auto) e.itens.delete(op.exame.id); }
+      if (ja) { ja.grupo = g.chave; continue; }
+      if ((g.certeza === 'alta' || g.certeza === 'media') && !e.recusados.has(g.opcoes[0].exame.id)) marcarExame(g.opcoes[0].exame, true, g.chave, true);
+      else if (g.certeza === 'nenhum' && !g.fora) e.itens.set(g.chave + ':t', { ...textoDoGrupo(g), auto: true });
+    }
+    desenharResultados();
+  }
+  function recortar(foto, b) {
+    try {
+      const [x0, y0, x1, y1] = b.map(Number), m = 8;
+      const x = Math.max(0, x0 - m), y = Math.max(0, y0 - m), w = Math.min(foto.width, x1 + m) - x, hh = Math.min(foto.height, y1 + m) - y;
+      if (!(w > 10 && hh > 6)) return null;
+      const k = Math.min(1, 900 / w), c = document.createElement('canvas');
+      c.width = Math.round(w * k); c.height = Math.round(hh * k);
+      c.getContext('2d').drawImage(foto, x, y, w, hh, 0, 0, c.width, c.height);
+      return c.toDataURL('image/jpeg', 0.85);
+    } catch { return null; }
+  }
+  function status(e, texto, ocupado) {
+    e.status.hidden = !texto;
+    e.status.replaceChildren(ocupado ? h('span', { class: 'girando', 'aria-hidden': 'true' }) : '', texto || '');
+  }
+  // Foto do pedido: vai sempre para o atendente. As leituras só ajudam a marcar os exames e nunca travam o pedido.
   async function lerFoto(arq) {
     const e = B; if (!e) return;
-    e.status.hidden = false; e.status.textContent = 'Preparando a foto…';
-    let dataUrl;
-    try { dataUrl = await reduzirFoto(arq, 1600); } catch { e.status.textContent = 'Não consegui abrir a foto. Procure o exame pelo nome.'; return; }
-    e.status.textContent = 'Lendo o pedido… você pode continuar procurando pelo nome enquanto isso.';
-    let texto = '';
-    try { texto = await lerTexto(dataUrl); } catch { texto = ''; }
-    db.rpc('chat_anexo_enviar', { p_conversa: conv.id, p_token: conv.token, p_mime: 'image/jpeg', p_base64: dataUrl, p_ocr: texto || null })
-      .then(({ error }) => { if (error) toast(mensagemErro(error)); });
-    if (B !== e) return;
-    if (texto.replace(/\s/g, '').length >= 4) {
-      e.status.textContent = 'Pedido lido e foto enviada ao atendente. Confira os exames marcados abaixo.';
-      await buscarExame(texto, true);
-    } else e.status.textContent = 'Não consegui ler o pedido, mas a foto foi enviada ao atendente. Procure o exame pelo nome.';
+    status(e, 'Preparando a foto…', true);
+    let foto;
+    try { foto = await abrirFoto(arq, 1800); } catch { status(e, 'Não consegui abrir a foto. Tente de novo ou procure o exame pelo nome.'); return; }
+    const dataUrl = foto.toDataURL('image/jpeg', 0.82);
+    status(e, 'Lendo o seu pedido… Isso leva alguns segundos. Você pode continuar procurando pelo nome enquanto isso.', true);
+    let anexo = null;
+    try {
+      const { data, error } = await db.rpc('chat_anexo_enviar', { p_conversa: conv.id, p_token: conv.token, p_mime: 'image/jpeg', p_base64: dataUrl, p_ocr: null });
+      if (error) throw error;
+      anexo = data && data.id;
+    } catch (err) { toast(mensagemErro(err)); }
+    let iaPronta = false, celularPronto = false;
+    const fim = () => {
+      if (B !== e) return;
+      const l = e.leituras.find((x) => x.anexo === anexo);
+      if (l && l.grupos.length) status(e, l.origem === 'ia' || iaPronta ? 'Pedido lido e foto enviada ao atendente.' : 'Já li a parte impressa. Ainda estou lendo a letra do médico…', !(l.origem === 'ia' || iaPronta));
+      else if (iaPronta && celularPronto && l) status(e, 'Li o pedido, mas não reconheci os exames. A foto foi enviada ao atendente, que confere. Você também pode procurar o exame pelo nome.');
+      else if (iaPronta && celularPronto) status(e, anexo ? 'Não consegui ler o pedido, mas a foto foi enviada ao atendente. Procure o exame pelo nome ou toque em "Não encontrei meu exame".' : 'Não consegui ler o pedido. Procure o exame pelo nome.');
+    };
+    if (anexo) {
+      comLimite(db.functions.invoke('ler-pedido', { body: { conversa: conv.id, token: conv.token, anexo } }), 75000)
+        .then(({ data }) => { if (B === e && data && data.ok) aplicarLeitura(e, anexo, { ...data, origem: 'ia' }, foto); })
+        .catch(() => {}).finally(() => { iaPronta = true; fim(); });
+    } else iaPronta = true;
+    try {
+      const r = await lerTexto(foto);
+      if (B === e && r.texto.replace(/\s/g, '').length >= 4) {
+        const { data, error } = anexo ? await db.rpc('chat_pedido_ler', { p_conversa: conv.id, p_token: conv.token, p_anexo: anexo, p_texto: r.texto, p_linhas: r.linhas,
+          p_largura: foto.width, p_altura: foto.height }) : { data: null, error: true };
+        if (B !== e) return;
+        if (!error) aplicarLeitura(e, anexo, { ...data, origem: 'leitura' }, foto);
+        else if (!e.leituras.length) await buscarExame(r.texto, true); // banco sem a Fase 8 ou foto não guardada: a busca antiga pelo texto
+      }
+    } catch { /* a leitura do celular é só uma ajuda */ }
+    celularPronto = true; fim();
   }
-  function reduzirFoto(arq, max) {
+  const comLimite = (p, ms) => Promise.race([p, new Promise((_, f) => setTimeout(() => f(new Error('tempo')), ms))]);
+  function abrirFoto(arq, max) {
     return new Promise((ok, falha) => {
       const img = new Image(), url = URL.createObjectURL(arq);
       img.onload = () => {
         const k = Math.min(1, max / Math.max(img.width, img.height)), c = document.createElement('canvas');
         c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
         c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-        URL.revokeObjectURL(url); ok(c.toDataURL('image/jpeg', 0.8));
+        URL.revokeObjectURL(url); ok(c);
       };
       img.onerror = () => { URL.revokeObjectURL(url); falha(new Error('foto')); };
       img.src = url;
     });
   }
-  let tesseract = null;
-  function carregarTesseract() {
-    if (!tesseract) tesseract = new Promise((ok, falha) => {
-      const s = document.createElement('script');
-      s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
-      s.onload = () => ok(window.Tesseract); s.onerror = () => { tesseract = null; falha(new Error('ocr')); };
-      document.head.append(s);
-    });
-    return tesseract;
+  // Prepara a foto para o OCR: tons de cinza, tira a sombra e o fundo desigual (divide pela imagem borrada) e estica o contraste.
+  // Foto de celular de papel em cima da mesa costuma ter sombra da mão e luz de um lado só: é o que mais derruba o Tesseract.
+  function prepararParaLeitura(foto) {
+    const w = foto.width, hh = foto.height, c = document.createElement('canvas');
+    c.width = w; c.height = hh;
+    const ctx = c.getContext('2d', { willReadFrequently: true });
+    const fw = Math.max(1, Math.round(w / 24)), fh = Math.max(1, Math.round(hh / 24)), f = document.createElement('canvas');
+    f.width = fw; f.height = fh;
+    const fctx = f.getContext('2d', { willReadFrequently: true });
+    fctx.imageSmoothingQuality = 'high'; fctx.drawImage(foto, 0, 0, fw, fh);
+    ctx.imageSmoothingQuality = 'high'; ctx.drawImage(f, 0, 0, w, hh);
+    const fundo = ctx.getImageData(0, 0, w, hh).data;
+    ctx.drawImage(foto, 0, 0);
+    const img = ctx.getImageData(0, 0, w, hh), d = img.data, hist = new Uint32Array(256), cinza = new Uint8ClampedArray(w * hh);
+    for (let i = 0, p = 0; i < d.length; i += 4, p++) {
+      const y = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+      const b = Math.max(16, 0.299 * fundo[i] + 0.587 * fundo[i + 1] + 0.114 * fundo[i + 2]);
+      const v = Math.min(255, (y / b) * 235);
+      cinza[p] = v; hist[cinza[p]]++;
+    }
+    let acc = 0, lo = 0, hi = 255; const n = w * hh;
+    for (let v = 0; v < 256; v++) { acc += hist[v]; if (acc < n * 0.01) lo = v; if (acc < n * 0.995) hi = v; }
+    const esc = 255 / Math.max(1, hi - lo);
+    for (let i = 0, p = 0; i < d.length; i += 4, p++) { const v = (cinza[p] - lo) * esc; d[i] = d[i + 1] = d[i + 2] = v; }
+    ctx.putImageData(img, 0, 0);
+    return c;
   }
-  async function lerTexto(dataUrl) {
-    const T = await carregarTesseract();
-    const r = await Promise.race([T.recognize(dataUrl, 'por'), new Promise((_, f) => setTimeout(() => f(new Error('tempo')), 60000))]);
-    return (r && r.data && r.data.text) || '';
+  let leitor = null;
+  function carregarTesseract() {
+    if (!leitor) leitor = new Promise((ok, falha) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@7.0.0/dist/tesseract.min.js';
+      s.onload = () => window.Tesseract.createWorker('por', 1).then(ok, falha);
+      s.onerror = falha;
+      document.head.append(s);
+    }).catch((err) => { leitor = null; throw err; });
+    return leitor;
+  }
+  // Texto e linhas (com a posição de cada uma, para recortar o trecho e mostrar ao paciente).
+  async function lerTexto(foto) {
+    const worker = await carregarTesseract();
+    const r = await comLimite(worker.recognize(prepararParaLeitura(foto), { rotateAuto: true }, { text: true, blocks: true }), 60000);
+    // Se o Tesseract girou a foto para ler, a posição das linhas não serve para recortar a foto original.
+    const girou = Math.abs((r.data && r.data.rotateRadians) || 0) > 0.03, linhas = [];
+    for (const bl of (r.data && r.data.blocks) || []) for (const pa of bl.paragraphs || []) for (const li of pa.lines || []) {
+      const t = String(li.text || '').replace(/\s+/g, ' ').trim();
+      if (t.replace(/[^\p{L}\p{N}]/gu, '').length < 3 || li.confidence < 25) continue;
+      linhas.push({ t: t.slice(0, 160), c: Math.round(li.confidence), b: girou ? null : [li.bbox.x0, li.bbox.y0, li.bbox.x1, li.bbox.y1] });
+    }
+    return { texto: (r.data && r.data.text) || '', linhas: linhas.slice(0, 40) };
   }
   function widgetLista(w, o) {
     const itens = (Array.isArray(o.itens) ? o.itens : []).slice(0, 16).filter((i) => i && i.rotulo);

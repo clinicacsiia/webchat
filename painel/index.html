@@ -25,6 +25,18 @@
   .btn.prim { background: var(--verde); border-color: var(--verde); color: #fff; }
   .btn.prim:hover { background: #0f5a42; }
   .btn.perigo { color: var(--erro); border-color: #e6bcb8; }
+  .anexo-caixa { margin-top: 6px; font-size: 13.5px; }
+  .anexo-sub { margin: 8px 0 2px; font-weight: 650; }
+  .anexo-lista { margin: 0 0 4px; padding-left: 18px; }
+  .anexo-ops { color: var(--suave); font-size: 12.5px; }
+  .anexo-tag { margin-left: 6px; border-radius: 999px; padding: 1px 7px; font-size: 11.5px; background: var(--verde-claro); }
+  .anexo-tag.duvida, .anexo-tag.nenhum, .anexo-tag.media { background: #fff1d6; color: var(--aviso); }
+  .conferir { margin-top: 8px; border: 1px solid var(--linha); border-radius: 9px; padding: 6px 10px; background: var(--papel); }
+  .conferir summary { cursor: pointer; font-weight: 650; }
+  .conf-linha { border-top: 1px solid var(--linha); padding: 8px 0; display: grid; gap: 6px; }
+  .conf-exame { display: flex; gap: 8px; align-items: center; justify-content: space-between; }
+  .conf-res { display: flex; flex-wrap: wrap; gap: 6px; }
+  .conf-acoes { display: flex; gap: 8px; justify-content: flex-end; padding-top: 6px; }
   .btn:disabled { opacity: .55; cursor: default; }
   input[type=text], input[type=email], input[type=password], input[type=search], input[type=url], textarea, select {
     width: 100%; padding: 10px 12px; border: 1.5px solid var(--linha); border-radius: 9px; background: var(--papel);
@@ -720,7 +732,8 @@
     box.replaceChildren(...out);
     if (rolar || perto) box.scrollTop = box.scrollHeight;
   }
-  // Foto do pedido médico enviada pelo paciente (com o texto que o celular leu, para conferir).
+  // Foto do pedido médico enviada pelo paciente, com o que foi lido (celular e IA), o que o paciente marcou
+  // e a conferência da equipe. Conferir ensina o sistema: a mesma escrita, da próxima vez, já vem com o exame certo.
   async function verAnexo(id, botao) {
     botao.disabled = true;
     try {
@@ -728,8 +741,75 @@
       if (error) throw error;
       if (!data) { toast('Foto não encontrada.'); return; }
       const img = h('img', { src: `data:${data.mime};base64,${data.base64}`, alt: 'Foto do pedido médico', style: 'display:block;max-width:100%;margin-top:6px;border-radius:8px' });
-      botao.replaceWith(h('a', { href: img.src, target: '_blank', rel: 'noopener' }, img), data.ocr ? h('details', {}, h('summary', {}, 'Texto lido do pedido'), h('pre', { style: 'white-space:pre-wrap;font-size:12px' }, data.ocr)) : null);
+      const nomes = new Map((data.itens || []).map((i) => [i.procedimento_id, i.procedimento]));
+      for (const g of (data.ia && data.ia.grupos) || []) for (const o of g.opcoes || []) nomes.set(o.exame.id, o.exame.nome);
+      botao.replaceWith(h('div', { class: 'anexo-caixa' }, h('a', { href: img.src, target: '_blank', rel: 'noopener' }, img), leituraDoAnexo(data, nomes), conferenciaDoAnexo(id, data, nomes)));
     } catch (e) { toast(msgErro(e)); botao.disabled = false; }
+  }
+  const LADO_CURTO = { D: ' (direito)', E: ' (esquerdo)', A: ' (os dois lados)' };
+  function leituraDoAnexo(d, nomes) {
+    const partes = [];
+    const ia = d.ia;
+    if (ia && Array.isArray(ia.grupos)) {
+      const CERTEZA = { alta: 'certo', media: 'provável', duvida: 'em dúvida', nenhum: 'não identificado' };
+      partes.push(h('p', { class: 'anexo-sub' }, `Leitura da IA: ${ia.total || ia.grupos.length} exame(s), letra ${ia.legibilidade || '?'}${d.ia_ms ? ` · ${(d.ia_ms / 1000).toFixed(1)} s` : ''}`),
+        h('ul', { class: 'anexo-lista' }, ia.grupos.map((g) => h('li', {}, h('b', {}, `“${g.linha || '?'}”`), g.explicacao ? ` → ${g.explicacao}` : '',
+          h('span', { class: 'anexo-tag ' + g.certeza }, CERTEZA[g.certeza] || g.certeza),
+          g.opcoes && g.opcoes.length ? h('div', { class: 'anexo-ops' }, g.opcoes.map((o) => nomeBonito(o.exame.nome)).join(' · ')) : null))));
+    } else if (d.ia_erro) partes.push(h('p', { class: 'anexo-sub' }, 'A leitura da IA falhou: ' + d.ia_erro));
+    if (Array.isArray(d.escolha) && d.escolha.length) {
+      partes.push(h('p', { class: 'anexo-sub' }, 'O paciente marcou:'), h('ul', { class: 'anexo-lista' }, d.escolha.map((x) => h('li', {},
+        x.texto || (x.procedimento_id ? nomeBonito(nomes.get(x.procedimento_id) || '#' + x.procedimento_id) : '?'), x.lado ? LADO_CURTO[x.lado] || '' : '', x.linha ? h('span', { class: 'anexo-ops' }, ` (no papel: “${x.linha}”)`) : '',
+        x.auto ? h('span', { class: 'anexo-ops' }, ' · deixou como veio') : null))));
+    }
+    if (d.ocr) partes.push(h('details', {}, h('summary', {}, 'Texto lido no celular'), h('pre', { style: 'white-space:pre-wrap;font-size:12px' }, d.ocr)));
+    return h('div', {}, partes);
+  }
+  // Uma linha por exame do pedido: como está escrito + o exame certo do catálogo. Vem preenchida com o que já se sabe.
+  function conferenciaDoAnexo(id, d, nomes) {
+    let linhas;
+    if (Array.isArray(d.gabarito) && d.gabarito.length) linhas = d.gabarito.map((x) => ({ ...x }));
+    else if (Array.isArray(d.escolha) && d.escolha.length) linhas = d.escolha.map((x) => ({ linha: x.linha || '', procedimento_id: x.procedimento_id, lado: x.lado }));
+    else if (d.ia && d.ia.grupos && d.ia.grupos.length) linhas = d.ia.grupos.map((g) => ({ linha: g.linha || '', procedimento_id: g.opcoes && g.opcoes[0] ? g.opcoes[0].exame.id : null, lado: g.lado }));
+    else linhas = (d.itens || []).filter((i) => i.procedimento_id).map((i) => ({ linha: '', procedimento_id: i.procedimento_id, lado: i.lado }));
+    const caixa = h('details', { class: 'conferir', open: !d.gabarito || null });
+    const corpo = h('div', {});
+    const desenhar = () => {
+      corpo.replaceChildren(
+        h('p', { class: 'anexo-ops' }, 'Escreva cada exame como está no papel e escolha o exame certo. Na próxima vez que essa escrita aparecer, o sistema já acerta sozinho.'),
+        ...linhas.map((l, i) => {
+          const busca = h('input', { class: 'inp', type: 'search', placeholder: 'Procurar exame no catálogo', 'aria-label': 'Procurar exame' });
+          const res = h('div', { class: 'conf-res' });
+          let t = null;
+          busca.addEventListener('input', () => {
+            clearTimeout(t); t = setTimeout(async () => {
+              const { data } = await db.rpc('painel_exames_buscar', { p_termo: busca.value });
+              res.replaceChildren(...(data || []).map((x) => h('button', { type: 'button', class: 'btn', onclick: () => { l.procedimento_id = x.id; nomes.set(x.id, x.nome); desenhar(); } }, nomeBonito(x.nome))));
+            }, 250);
+          });
+          return h('div', { class: 'conf-linha' },
+            h('input', { class: 'inp', type: 'text', value: l.linha || '', placeholder: 'Como está escrito (ex.: RNM J E)', 'aria-label': 'Como está escrito no pedido',
+              oninput: (ev) => { l.linha = ev.target.value; } }),
+            h('div', { class: 'conf-exame' }, l.procedimento_id ? h('b', {}, nomeBonito(nomes.get(l.procedimento_id) || '#' + l.procedimento_id)) : h('i', {}, 'Escolha o exame'),
+              h('button', { type: 'button', class: 'btn', onclick: () => { linhas.splice(i, 1); desenhar(); } }, 'Tirar')),
+            busca, res);
+        }),
+        h('div', { class: 'conf-acoes' },
+          h('button', { type: 'button', class: 'btn', onclick: () => { linhas.push({ linha: '', procedimento_id: null, lado: null }); desenhar(); } }, '+ Exame'),
+          h('button', { type: 'button', class: 'btn prim', onclick: async (ev) => {
+            const itens = linhas.filter((l) => l.procedimento_id).map((l) => ({ linha: (l.linha || '').trim(), procedimento_id: l.procedimento_id, lado: l.lado || null }));
+            if (!itens.length) { toast('Escolha pelo menos um exame.'); return; }
+            ev.currentTarget.disabled = true;
+            const { data, error } = await db.rpc('painel_anexo_conferir', { p_id: id, p_itens: itens });
+            ev.currentTarget.disabled = false;
+            if (error) { toast(msgErro(error)); return; }
+            toast(data && data.aprendidos ? `Conferido. O sistema aprendeu ${data.aprendidos} escrita(s).` : 'Conferido.');
+            caixa.open = false; caixa.querySelector('summary').textContent = 'Conferência salva ✓ (abrir para mudar)';
+          } }, 'Salvar conferência')));
+    };
+    desenhar();
+    caixa.append(h('summary', {}, d.gabarito ? 'Conferência salva ✓ (abrir para mudar)' : 'Conferir a leitura (ensina o sistema)'), corpo);
+    return caixa;
   }
   async function atualizarConversa(campos) {
     const { error } = await db.from('conversas').update(campos).eq('id', S.abertaId);
