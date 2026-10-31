@@ -1,4 +1,4 @@
--- Remarcar: qualquer horário da lista segue sozinho pelo chat. Escrito em 31/10/2026; AINDA NÃO aplicado no Supabase.
+-- Remarcar: qualquer horário da lista segue sozinho pelo chat. Escrito em 31/10/2026; Aplicado no projeto webchat-atendimento em 31/10/2026.
 -- Antes: só o horário de índice 0 da lista (o de data mais distante, porque a lista é da data mais nova para a mais velha) era copiado e seguia para o
 --   convênio e o calendário; escolher qualquer outro horário ("Remarcar Ultrassom de 10/11") mandava o paciente para o atendente.
 -- Agora: o exame do horário ESCOLHIDO é copiado (pre_reaproveitar aceita 'ultimo:N', N = posição na lista de paciente_historico_para_ia.ultimas) e o
@@ -27,11 +27,11 @@ end $$;
 select pg_temp.remendar('public.pre_reaproveitar(uuid,text)'::regprocedure, 'v_off',
   array[E'declare v_conf jsonb; v_pid uuid; v_ex jsonb; v_orig uuid; v_n int;',
         E'  if p_origem = ''ultimo'' then\n',
-        E'and jsonb_array_length(h.exames) > 0\n',
+        E'jsonb_array_length(h.exames) > 0',
         E'desc limit 1;'],
   array[E'declare v_conf jsonb; v_pid uuid; v_ex jsonb; v_orig uuid; v_n int; v_off int := 0;',
         E'  if p_origem ~ ''^ultimo(:[0-9])?$'' then\n    v_off := coalesce(nullif(substr(p_origem, 8), ''''), ''0'')::int;\n',
-        E'and (v_off > 0 or jsonb_array_length(h.exames) > 0)\n',
+        E'(v_off > 0 or jsonb_array_length(h.exames) > 0)',
         E'desc limit 1 offset v_off;']);
 
 -- 2. Remarcar: copia o horário escolhido (não só o primeiro) e guarda o convênio DELE.
