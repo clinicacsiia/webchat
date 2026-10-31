@@ -17,7 +17,11 @@ Outro assunto resolvido pelo chat (31/10/2026): cancelar e remarcar listam os ex
 
 Meus dados (31/10/2026): quem tem conta pode ver o que a clínica guarda, baixar uma cópia e apagar a conta (só o login; cadastro e pedidos continuam com a clínica). Veja `docs/login-paciente-passo-a-passo.md`. SQL `supabase/meus-dados.sql` aplicado no Supabase em 31/10/2026; falta o jurídico revisar o texto antes de abrir o login ao público.
 
-Login do paciente (31/10/2026): o instalador `supabase/aplicar-login-paciente.sql` está aplicado no Supabase e o login está **desligado** (`config.login_paciente = nao`; `cadastro_equipe_sem_convite = sim`, valor de transição). Para ligar, siga `docs/login-paciente-passo-a-passo.md`.
+Login do paciente (31/10/2026): o instalador `supabase/aplicar-login-paciente.sql` está aplicado no Supabase e o login está **ligado só para teste** (`config.login_paciente = sim`; `cadastro_equipe_sem_convite = nao`, ligados em 31/10/2026). Para o passo a passo, siga `docs/login-paciente-passo-a-passo.md`.
+
+**PENDENTE (decidido em 31/10/2026):**
+1. ~~E-mail de autenticação do Supabase não enviava~~ **Resolvido em 31/10/2026:** SMTP do Gmail (senha de app) configurado em Authentication > SMTP Settings; confirmação de conta testada e funcionando. Falta só trocar o texto dos modelos "Confirm signup" e "Reset password" por algo genérico da clínica.
+2. **Novo desenho de cadastro, sem tela de login separada:** o paciente informa nome, telefone e e-mail; o sistema compara com a tabela `pacientes` e liga a conta ao cadastro existente; o paciente escolhe a senha e confirma com a data de nascimento. Ainda não implementado.
 
 Banco: projeto Supabase `webchat-atendimento` (sa-east-1), já com tabelas, regras de segurança e tempo real.
 
