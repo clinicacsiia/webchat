@@ -110,6 +110,12 @@ export function criarMundo(opcoes = {}) {
       // login do paciente (opcional)
       case 'login_paciente_ativo': return { body: m.loginAtivo === true };
       case 'conta_paciente_resumo': return { body: m.conta || { conta: false } };
+      case 'conta_paciente_vincular': {
+        if (!m.conta) return { status: 400, body: { code: '42501', message: 'Entre na sua conta para ligar o cadastro.' } };
+        const resultado = m.vinculo || 'nada_pendente';
+        if (resultado === 'vinculado') m.conta = { ...m.conta, cadastro_salvo: true };
+        return { body: { resultado } };
+      }
       case 'conta_paciente_perfil': {
         if (!m.conta) return { status: 400, body: { code: '42501', message: 'Entre na sua conta para salvar os dados.' } };
         m.conta = { ...m.conta, nome: String(corpo.p_nome || '').trim(), telefone: String(corpo.p_telefone || '').replace(/\D/g, '') };

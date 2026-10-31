@@ -39,9 +39,9 @@ function criarAuth({ senhaCerta = 'Senha1234', email = 'ana@teste.local', meta =
 }
 const conta = (extra = {}) => ({ conta: true, email: 'ana@teste.local', nome: 'Ana Souza', telefone: '71999998888', cadastro_salvo: false, aceitou_lgpd: true, ...extra });
 
-async function abrir({ ativo = true, contaDoBanco = null, auth = criarAuth(), sessaoGuardada = false, hash = '' } = {}) {
-  const mundo = criarMundo({ loginAtivo: ativo, conta: contaDoBanco });
-  const init = sessaoGuardada ? [[(s) => localStorage.setItem('csi-paciente-auth', s), JSON.stringify(sessao('ana@teste.local', {}))]] : [];
+async function abrir({ ativo = true, contaDoBanco = null, auth = criarAuth(), sessaoGuardada = false, hash = '', vinculo = null } = {}) {
+  const mundo = criarMundo({ loginAtivo: ativo, conta: contaDoBanco, vinculo });
+  const init = sessaoGuardada ? [[(s) => localStorage.setItem('csi-paciente-auth', s), JSON.stringify(sessao('ana@teste.local', auth.meta || {}))]] : [];
   const p = await novaPaginaChat(browser, mundo, { init, auth: auth.tratar });
   await p.page.goto(`${base}/index.html${hash}`);
   await p.page.waitForSelector('#formInicio', { state: 'visible', timeout: 8000 });
@@ -79,25 +79,29 @@ await caso('Criar conta: senha fraca, nome curto e falta do aceite são barrados
   await x.page.click('#btnContaCriar'); await x.page.waitForSelector('#cNome');
   const tentar = async () => { await x.page.click('.conta-form button[type=submit]'); await espera(150); return texto(x.page, '.conta-form .erro-form'); };
   const e1 = await tentar();
-  await x.page.fill('#cNome', 'Ana Souza'); await x.page.fill('#cTel', '71999998888'); await x.page.fill('#cEmail', 'ana@teste.local');
+  await x.page.fill('#cNome', 'Ana Souza'); await x.page.fill('#cTel', '71999998888'); await x.page.fill('#cNasc', '25/03/1980'); await x.page.fill('#cEmail', 'ana@teste.local');
+  await x.page.fill('#cNasc', ''); const e1b = await tentar();
+  await x.page.fill('#cNasc', '31/02/1980'); const e1c = await tentar();
+  await x.page.fill('#cNasc', '25/03/2999'); const e1d = await tentar();
+  await x.page.fill('#cNasc', '25/03/1980');
   await x.page.fill('#cSenha', 'curta1'); const e2 = await tentar();
   await x.page.fill('#cSenha', 'somenteletras'); const e3 = await tentar();
   await x.page.fill('#cSenha', 'Senha1234'); const e4 = await tentar();
-  const r = { e1, e2, e3, e4, chamadasAuth: x.auth.chamadas.length };
+  const r = { e1, e1b, e1c, e1d, e2, e3, e4, chamadasAuth: x.auth.chamadas.length };
   await x.ctx.close();
-  return { ok: /nome/i.test(e1) && /8 caracteres/.test(e2) && /8 caracteres/.test(e3) && /concord/i.test(e4) && r.chamadasAuth === 0, detalhe: JSON.stringify(r) };
+  return { ok: /nome/i.test(e1) && /nascimento/i.test(e1b) && /nascimento/i.test(e1c) && /nascimento/i.test(e1d) && /8 caracteres/.test(e2) && /8 caracteres/.test(e3) && /concord/i.test(e4) && r.chamadasAuth === 0, detalhe: JSON.stringify(r) };
 });
 
 await caso('Criar conta: envia e-mail, nome e telefone (só números) e o endereço de volta; mostra "Enquanto não confirmar, nada de login"', async () => {
   const x = await abrir();
   await x.page.click('#btnContaCriar'); await x.page.waitForSelector('#cNome');
-  await x.page.fill('#cNome', 'Ana Souza'); await x.page.fill('#cTel', '71999998888'); await x.page.fill('#cEmail', 'ana@teste.local'); await x.page.fill('#cSenha', 'Senha1234');
+  await x.page.fill('#cNome', 'Ana Souza'); await x.page.fill('#cTel', '71999998888'); await x.page.fill('#cNasc', '25/03/1980'); await x.page.fill('#cEmail', 'ana@teste.local'); await x.page.fill('#cSenha', 'Senha1234');
   await x.page.check('#cAceite'); await x.page.click('.conta-form button[type=submit]');
   await x.page.waitForSelector('.conta-ok', { timeout: 5000 });
   const msg = await texto(x.page, '.conta-ok'); const s = x.auth.chamadas.find((c) => c.caminho === '/auth/v1/signup');
   const logado = await visivel(x.page, '#btnContaSair');
   await x.ctx.close();
-  return { ok: !!s && s.corpo.email === 'ana@teste.local' && s.corpo.data.nome === 'Ana Souza' && s.corpo.data.telefone === '71999998888' && /\/index\.html$|\/$/.test(s.busca.redirect_to || '') && /ana@teste\.local/.test(msg) && !logado,
+  return { ok: !!s && s.corpo.email === 'ana@teste.local' && s.corpo.data.nome === 'Ana Souza' && s.corpo.data.telefone === '71999998888' && s.corpo.data.dt_nasc === '1980-03-25' && /\/index\.html$|\/$/.test(s.busca.redirect_to || '') && /ana@teste\.local/.test(msg) && !logado,
            detalhe: `redirect_to=${s?.busca.redirect_to}; logado=${logado}` };
 });
 
@@ -272,6 +276,39 @@ await caso('Apagar a conta: se o banco falha, a conta continua, a janela fica ab
   const r = { erro: await texto(x.page, '#folhaCorpo .erro-form'), aberta: await x.page.evaluate(() => !document.querySelector('#folha').hidden), conta: await visivel(x.page, '#btnContaSair'), botao: await texto(x.page, '#btnApagarSim') };
   await x.ctx.close();
   return { ok: /Sem conexão/.test(r.erro) && r.aberta && r.conta && /Sim, apagar/.test(r.botao), detalhe: JSON.stringify(r) };
+});
+
+await caso('Criar conta: o campo de data de nascimento aplica a máscara dd/mm/aaaa', async () => {
+  const x = await abrir();
+  await x.page.click('#btnContaCriar'); await x.page.waitForSelector('#cNasc');
+  await x.page.type('#cNasc', '25031980');
+  const v = await x.page.$eval('#cNasc', (e) => e.value);
+  await x.ctx.close();
+  return { ok: v === '25/03/1980', detalhe: v };
+});
+
+await caso('Depois de confirmar o e-mail, conta nova com data de nascimento pede ao banco para ligar ao cadastro e avisa', async () => {
+  const x = await abrir({ contaDoBanco: conta(), auth: criarAuth({ meta: { nome: 'Ana Souza', telefone: '71999998888', dt_nasc: '1980-03-25' } }), sessaoGuardada: true, vinculo: 'vinculado' });
+  const n = chamou(x.mundo, 'conta_paciente_vincular').length;
+  const aviso = await texto(x.page, '#toast');
+  const ligado = x.mundo.conta && x.mundo.conta.cadastro_salvo === true;
+  await x.ctx.close();
+  return { ok: n === 1 && /ligada ao seu cadastro/.test(aviso || '') && ligado, detalhe: `chamadas=${n}; aviso=${aviso}` };
+});
+
+await caso('Cadastro não encontrado: avisa com calma, continua logada e pode agendar', async () => {
+  const x = await abrir({ contaDoBanco: conta(), auth: criarAuth({ meta: { nome: 'Ana Souza', telefone: '71999998888', dt_nasc: '1980-03-25' } }), sessaoGuardada: true, vinculo: 'nao_encontrado' });
+  const aviso = await texto(x.page, '#toast'), logada = await visivel(x.page, '#btnContaSair'), nome = await visivel(x.page, '#blocoNome');
+  await x.ctx.close();
+  return { ok: /N[ãa]o achamos seu cadastro/.test(aviso || '') && logada, detalhe: `aviso=${aviso}; logada=${logada}; nome=${nome}` };
+});
+
+await caso('Sem data de nascimento pendente (conta antiga ou já ligada): nem chama o vínculo', async () => {
+  const a = await abrir({ contaDoBanco: conta(), sessaoGuardada: true });
+  const b = await abrir({ contaDoBanco: conta({ cadastro_salvo: true }), auth: criarAuth({ meta: { dt_nasc: '1980-03-25' } }), sessaoGuardada: true });
+  const r = { semData: chamou(a.mundo, 'conta_paciente_vincular').length, jaLigada: chamou(b.mundo, 'conta_paciente_vincular').length };
+  await a.ctx.close(); await b.ctx.close();
+  return { ok: r.semData === 0 && r.jaLigada === 0, detalhe: JSON.stringify(r) };
 });
 
 await caso('nenhuma exceção de JavaScript em toda a tela de login (ligada e desligada)', async () => {

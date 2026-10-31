@@ -528,9 +528,9 @@
   function lerLocal(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } }
   function gravarLocal(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
   function apagarLocal(k) { try { localStorage.removeItem(k); } catch {} }
-  function toast(msg) {
+  function toast(msg, ms = 4200) {
     el.toast.textContent = msg; el.toast.hidden = false;
-    clearTimeout(toast.t); toast.t = setTimeout(() => { el.toast.hidden = true; }, 4200);
+    clearTimeout(toast.t); toast.t = setTimeout(() => { el.toast.hidden = true; }, ms);
   }
   function mensagemErro(e) {
     const m = (e && e.message) || '';
@@ -2220,6 +2220,14 @@
   const PAGINA_URL = location.origin + location.pathname;
   const TURNSTILE_SITEKEY = '';   // CAPTCHA (Cloudflare Turnstile, grátis). Se ligar "CAPTCHA protection" no Supabase, cole aqui a chave do site.
   let loginAtivo = false, conta = null;   // conta = resumo devolvido por conta_paciente_resumo (conta:true, email, nome, telefone) ou null
+  // dd/mm/aaaa -> aaaa-mm-dd; vazio se a data não existir, for futura ou muito antiga.
+  function dataNascimentoISO(txt) {
+    const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(String(txt).trim());
+    if (!m) return '';
+    const dia = +m[1], mes = +m[2], ano = +m[3], d = new Date(Date.UTC(ano, mes - 1, dia));
+    if (d.getUTCFullYear() !== ano || d.getUTCMonth() !== mes - 1 || d.getUTCDate() !== dia || ano < 1900 || d.getTime() > Date.now()) return '';
+    return `${m[3]}-${m[2]}-${m[1]}`;
+  }
   const senhaValida = (s) => s.length >= 8 && /[A-Za-z]/.test(s) && /\d/.test(s);
   const SENHA_REGRA = 'A senha precisa ter pelo menos 8 caracteres, com letras e números.';
   function erroConta(e) {
@@ -2275,7 +2283,22 @@
     if ((!conta.nome || !conta.telefone) && meta.nome && meta.telefone) {   // primeira entrada depois de criar a conta: guarda o perfil digitado no cadastro
       try { const r = await db.rpc('conta_paciente_perfil', { p_nome: String(meta.nome), p_telefone: String(meta.telefone), p_aceite: true }); if (!r.error && r.data && r.data.conta) conta = r.data; } catch { /* tenta de novo na próxima vez */ }
     }
+    if (!conta.cadastro_salvo && meta.dt_nasc) await ligarAoCadastro();
     atualizarContaUI();
+  }
+  // Depois de confirmar o e-mail, o banco compara nome, telefone, e-mail e data de nascimento com o cadastro da clínica. O resultado só diz se ligou.
+  async function ligarAoCadastro() {
+    try {
+      const r = await db.rpc('conta_paciente_vincular');
+      const res = r.data && r.data.resultado;
+      if (res === 'vinculado') {
+        const rr = await db.rpc('conta_paciente_resumo');
+        if (!rr.error && rr.data && rr.data.conta) conta = rr.data;
+        toast('Sua conta foi ligada ao seu cadastro na clínica.');
+      } else if (res === 'nao_encontrado' || res === 'bloqueado') {
+        toast('Conta criada. Não achamos seu cadastro com esses dados; você pode agendar normalmente e a equipe confere depois.', 9000);
+      }
+    } catch { /* tenta de novo no próximo acesso */ }
   }
   function salvarPerfilNaConta(nome, telefone) {
     if (!conta) return;
@@ -2338,6 +2361,8 @@
     } else if (modo === 'criar') {
       const n = campoTxt('cNome', 'Seu nome', { type: 'text', autocomplete: 'name', maxlength: 120 }), t = campoTxt('cTel', 'Telefone com DDD (de preferência o WhatsApp)', { type: 'tel', inputmode: 'tel', autocomplete: 'tel-national', placeholder: '(71) 99999-9999', maxlength: 16 });
       t.inp.addEventListener('input', () => { t.inp.value = mascaraTel(t.inp.value); });
+      const d = campoTxt('cNasc', 'Data de nascimento', { type: 'text', inputmode: 'numeric', autocomplete: 'bday', placeholder: 'dd/mm/aaaa', maxlength: 10 });
+      d.inp.addEventListener('input', () => { d.inp.value = mascaraData(d.inp.value); });
       const e = campoTxt('cEmail', 'E-mail', { type: 'email', autocomplete: 'email', value: emailAtual }), s = campoSenha('cSenha', 'Crie uma senha', 'new-password');
       const aceite = h('input', { type: 'checkbox', id: 'cAceite' });
       const btn = h('button', { class: 'btn-primario', type: 'submit' }, 'Criar conta');
@@ -2346,14 +2371,16 @@
         if (nome.length < 2) throw new Error('Informe o seu nome.');
         if (tel.length < 10) throw new Error('Informe o telefone com DDD.');
         if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error('Informe um e-mail válido.');
+        const nasc = dataNascimentoISO(d.inp.value);
+        if (!nasc) throw new Error('Informe a data de nascimento completa, no formato dia/mês/ano.');
         if (!senhaValida(s.inp.value)) throw new Error(SENHA_REGRA);
         if (!aceite.checked) throw new Error('Marque a caixa de concordância para criar a conta.');
-        const { data, error } = await db.auth.signUp({ email, password: s.inp.value, options: { emailRedirectTo: PAGINA_URL, data: { nome, telefone: tel }, captchaToken: await cap.token() } });
+        const { data, error } = await db.auth.signUp({ email, password: s.inp.value, options: { emailRedirectTo: PAGINA_URL, data: { nome, telefone: tel, dt_nasc: nasc }, captchaToken: await cap.token() } });
         if (error) throw error;
         if (data.session) { fecharFolha(); toast('Conta criada. Seus dados ficam salvos.'); return; }
         avisoEnviado('Quase pronto!', `Enviamos uma mensagem para ${email}. Abra o e-mail e toque no link para confirmar a conta. Se a mensagem não aparecer, olhe a caixa de spam. Quem já tem conta pode usar "Entrar".`);
-      }) }, h('p', { class: 'sub' }, 'Com a conta, seus dados ficam salvos e você não precisa repetir tudo no próximo agendamento. O e-mail serve só para confirmar a conta e redefinir a senha.'),
-      n.campo, t.campo, e.campo, s.campo, s.mostrar,
+      }) }, h('p', { class: 'sub' }, 'Informe os mesmos dados do seu cadastro na clínica (nome, telefone e e-mail). Se você já é paciente, ligamos a conta ao seu cadastro e você não precisa repetir tudo no próximo agendamento. O e-mail serve para confirmar a conta e redefinir a senha.'),
+      n.campo, t.campo, e.campo, d.campo, s.campo, s.mostrar,
       h('label', { class: 'aceite' }, aceite, h('span', {}, 'Concordo que a clínica guarde meu nome, telefone, e-mail e os pedidos que eu fizer para me atender e para eu não precisar repetir as informações (LGPD).')),
       cap.el, erro, btn, rodape(['Já tenho conta', 'entrar'])));
     } else if (modo === 'esqueci') {

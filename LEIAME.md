@@ -21,7 +21,7 @@ Login do paciente (31/10/2026): o instalador `supabase/aplicar-login-paciente.sq
 
 **PENDENTE (decidido em 31/10/2026):**
 1. ~~E-mail de autenticação do Supabase não enviava~~ **Resolvido em 31/10/2026:** SMTP do Gmail (senha de app) configurado em Authentication > SMTP Settings; confirmação de conta testada e funcionando. Falta só trocar o texto dos modelos "Confirm signup" e "Reset password" por algo genérico da clínica.
-2. **Novo desenho de cadastro, sem tela de login separada:** o paciente informa nome, telefone e e-mail; o sistema compara com a tabela `pacientes` e liga a conta ao cadastro existente; o paciente escolhe a senha e confirma com a data de nascimento. Ainda não implementado.
+2. **Cadastro ligado ao paciente existente (31/10/2026):** o paciente cria a conta com nome, telefone, e-mail, data de nascimento e senha; ao confirmar o e-mail, `conta_paciente_vincular()` procura em `pacientes` UM cadastro em que e-mail confirmado, telefone, nome e nascimento batem juntos (fora de revisão e sem outra conta) e liga a conta. Máximo 5 tentativas por hora; a resposta só diz se ligou. SQL `supabase/vincular-cadastro.sql` **aplicado no Supabase**; a tela (`index.html`) precisa ser publicada para valer. Teste: `npm run test:vincular` e `npm run test:login`. Detalhes em `docs/login-paciente-passo-a-passo.md`.
 
 Banco: projeto Supabase `webchat-atendimento` (sa-east-1), já com tabelas, regras de segurança e tempo real.
 

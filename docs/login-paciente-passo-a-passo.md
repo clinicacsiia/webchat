@@ -67,6 +67,17 @@ Arquivo `supabase/meus-dados.sql` (rodar **depois** do instalador do login; pode
 - **Voltar atrás:** `drop function public.conta_paciente_meus_dados(), public.conta_paciente_excluir(text);` (o botão passa a dar erro; para escondê-lo é preciso publicar o chat sem a tela).
 - Teste: `npm run test:meus-dados` (banco) e `npm run test:login` (tela). Não foi testado contra o Supabase real: a exclusão apaga de `auth.users`, e o primeiro teste de ponta a ponta com uma conta de verdade continua pendente (passo 6).
 
+## Cadastro ligado ao paciente que já existe (31/10/2026)
+
+Arquivo `supabase/vincular-cadastro.sql` (rodar **depois** do instalador do login; pode rodar de novo sem problema). Quem já é paciente da clínica não precisa que a equipe ligue a conta à mão.
+
+- **Na tela:** "Criar conta" pede nome, telefone, e-mail, data de nascimento e senha. Use os mesmos dados do cadastro na clínica.
+- **Depois de confirmar o e-mail,** o chat chama `conta_paciente_vincular()`. O banco liga a conta ao cadastro **somente se** estas quatro coisas batem **no mesmo cadastro**: e-mail da conta (já confirmado) = e-mail do cadastro, telefone, nome e data de nascimento. Cadastro sem e-mail ou sem data de nascimento nunca é ligado sozinho (a equipe liga).
+- **Fica de fora:** cadastro em revisão (`revisar`), cadastro já ligado a outra conta e caso ambíguo (dois cadastros iguais).
+- **Segurança:** o e-mail confirmado é a prova principal (só quem abre aquele e-mail chega ao link). A data de nascimento é conferida no banco, no máximo 5 tentativas por hora por conta, e é apagada do login depois da tentativa. A resposta ao paciente só diz "ligou" ou "não achamos"; nenhum dado do cadastro volta.
+- **Se não achar:** a conta fica criada e o paciente agenda normalmente; a equipe pode ligar depois. Quem ligou aparece em `contas_paciente` (`vinculado_em`, `vinculo_metodo`, `vinculo_tentativas`).
+- **Voltar atrás:** `drop function public.conta_paciente_vincular();` (as colunas novas podem ficar). Sem a função, a tela só mostra o aviso de "não achamos".
+
 ## Ainda não existe (próximas etapas)
 
 - Dependentes (filhos) ligados à conta do responsável.
