@@ -1,0 +1,20 @@
+{
+  "name": "webchat-testes",
+  "private": true,
+  "type": "module",
+  "description": "Testes do webchat: SQL do módulo Fila (Postgres embutido) e fumaça das páginas em navegador. Não vai para o GitHub Pages.",
+  "scripts": {
+    "test:sql": "node sql-fila.test.mjs",
+    "test:delta": "node sql-delta.test.mjs",
+    "test:sw": "node sw.test.mjs",
+    "test:navegador": "node navegador.smoke.mjs",
+    "test:edge": "node --experimental-strip-types --test ../supabase/functions/sync-catalogo-klingo/conferencia.test.ts ../supabase/functions/sync-catalogo-klingo/precos.test.ts",
+    "test:python": "python3 -m pytest -q ../biometria",
+    "test": "npm run test:edge && npm run test:python && npm run test:sql && npm run test:delta && npm run test:sw && npm run test:navegador"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.2.17",
+    "@supabase/supabase-js": "2.49.4",
+    "playwright": "^1.48.0"
+  }
+}
