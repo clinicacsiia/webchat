@@ -13,7 +13,7 @@ n8n/novo-atendimento.json   workflow para importar no n8n
 Fase 9 (31/10/2026): correções do teste da paciente, Sentinela e mensagens empáticas. Veja `docs/fase9-sentinela.md`. SQL aplicado no Supabase em 31/10/2026.
 
 Convênio de quem volta (31/10/2026): o chat deixa de copiar o convênio da vez anterior e pergunta ("É assim também agora?"); corrigir o plano tira a carteirinha antiga. Veja `docs/lembrete-mudar-escolhas-e-convenio.md`, seção 0. SQL `supabase/correcao-convenio-quem-volta.sql` aplicado no Supabase em 31/10/2026.
-Outro assunto resolvido pelo chat (31/10/2026): cancelar e remarcar listam os exames marcados e seguem sozinhos; resultado de exame mostra a orientação cadastrada. Veja `docs/assuntos-resolvidos.md`. SQL `supabase/assuntos-resolvidos.sql` **ainda não aplicado** no Supabase.
+Outro assunto resolvido pelo chat (31/10/2026): cancelar e remarcar listam os exames marcados e seguem sozinhos; resultado de exame mostra a orientação cadastrada. Veja `docs/assuntos-resolvidos.md`. SQL `supabase/assuntos-resolvidos.sql` aplicado no Supabase em 31/10/2026.
 
 Meus dados (31/10/2026): quem tem conta pode ver o que a clínica guarda, baixar uma cópia e apagar a conta (só o login; cadastro e pedidos continuam com a clínica). Veja `docs/login-paciente-passo-a-passo.md`. SQL `supabase/meus-dados.sql` aplicado no Supabase em 31/10/2026; falta o jurídico revisar o texto antes de abrir o login ao público.
 

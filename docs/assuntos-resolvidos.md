@@ -1,6 +1,6 @@
 # Outro assunto: o chat resolve sozinho o que dá (31/10/2026)
 
-Arquivo `supabase/assuntos-resolvidos.sql` (**ainda não aplicado** no Supabase; rodar depois de `fase7-motor.sql`, `fase4-paciente-que-volta.sql` e `correcao-convenio-quem-volta.sql`; pode rodar de novo sem problema).
+Arquivo `supabase/assuntos-resolvidos.sql` (**aplicado no Supabase em 31/10/2026**; ordem: rodar depois de `fase7-motor.sql`, `fase4-paciente-que-volta.sql` e `correcao-convenio-quem-volta.sql`; pode rodar de novo sem problema).
 
 | Opção do paciente | Antes | Agora |
 |---|---|---|
@@ -26,4 +26,4 @@ Os outros textos novos (`assunto_qual_remarcar`, `assunto_qual_cancelar`, `assun
 - O site só conhece os horários que o Klingo já sincronizou no histórico (`paciente_historico`, campo `futuro`); consultas ainda não aparecem nessa lista.
 - Remarcar copia o exame só do horário mais recente (é o que `pre_reaproveitar` faz hoje).
 - Cancelar e remarcar continuam sendo confirmados por um atendente no Klingo; o chat só tira o trabalho de perguntar.
-- Não testado contra o Supabase real: `npm run test:assuntos` (21 verificações) usa o Postgres embutido com as funções reais do motor.
+- Aplicado no Supabase real e conferido (as 5 funções do motor e os textos novos), mas ainda sem teste de ponta a ponta com uma conversa de verdade. `npm run test:assuntos` (21 verificações) usa o Postgres embutido com as funções reais do motor.

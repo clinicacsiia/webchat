@@ -1,4 +1,4 @@
--- Outro assunto: o chat resolve sozinho o que dá, em vez de mandar tudo para o atendente. Escrito em 31/10/2026; AINDA NÃO aplicado no projeto webchat-atendimento.
+-- Outro assunto: o chat resolve sozinho o que dá, em vez de mandar tudo para o atendente. Escrito em 31/10/2026; Aplicado no projeto webchat-atendimento em 31/10/2026.
 -- Antes: Remarcar, Cancelar, Resultado de exame, Dúvida, Reclamação e Outro terminavam todos em "Conte em poucas palavras", e um atendente lia.
 -- Agora:
 --   * Cancelar: se o paciente já foi identificado (data de nascimento conferida) e tem exame marcado para o futuro, o chat lista os horários
