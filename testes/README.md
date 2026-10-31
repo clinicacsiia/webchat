@@ -29,6 +29,7 @@ npm test
 | `npm run test:nomes` | `nomes-exame.js` com nomes reais do catálogo de produção: prefixo, `(UNILATERAL)`, parênteses, nome cortado, ordem e repetidos | 28 de 28 |
 | `npm run test:sql9` | `supabase/fase9-sentinela.sql` num Postgres embutido: incidentes, token, limite, painel, textos só trocados se forem os originais | 14 de 14 |
 | `npm run test:corrida` | Chat no navegador com o Supabase simulado e atrasos controlados: resposta que chega antes da mensagem do paciente, cursor de consulta, cópia de outra versão | 4 de 4 |
+| `npm run test:historico` | Conversas anteriores no chat: guarda as últimas 5 por aparelho, reabre uma antiga com as mensagens do servidor, atalho no formulário, "Sair" apaga a lista, token inválido sai da lista | 7 de 7 |
 | `npm run test:sentinela-navegador` | Cada regra da Sentinela no navegador, aviso de IA, mensagem de previsão, letra maior, lista do corpo alinhada nomes de exame legíveis e lado visível e confirmado | 19 de 19 |
 
 ## O que estes testes NÃO provam

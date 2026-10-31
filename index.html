@@ -146,6 +146,14 @@
   .btn-w { background: var(--verde); color: #fff; border: 0; border-radius: 10px; padding: 11px 16px; font-weight: 650; cursor: pointer; }
   .btn-w:hover { background: #0f5a42; }
   .btn-w:disabled { opacity: .5; cursor: default; }
+  .hist-dica { margin: 0 0 12px; color: var(--texto-suave); font-size: calc(14px * var(--esc)); }
+  .hist-item { display: flex; flex-direction: column; gap: 3px; width: 100%; text-align: left; margin-bottom: 10px; padding: 12px 14px; background: #fff; border: 1.5px solid var(--linha); border-radius: 12px; font: inherit; cursor: pointer; }
+  .hist-item:hover { border-color: var(--verde); }
+  .hist-item.atual { border-color: var(--verde); background: #f1f6f3; }
+  .hist-titulo { font-weight: 650; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .hist-atual { font-size: calc(12px * var(--esc)); font-weight: 650; color: #fff; background: var(--verde); border-radius: 999px; padding: 1px 8px; }
+  .hist-data { color: var(--texto-suave); font-size: calc(13px * var(--esc)); }
+  .hist-ultima { color: var(--texto); font-size: calc(14px * var(--esc)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .btn-w.sec { background: var(--papel); color: var(--verde); border: 1.5px solid var(--verde); }
   .widget.respondido { opacity: .6; }
   .widget .w-nota { font-size: calc(13.5px * var(--esc)); color: var(--texto-suave); margin: 6px 0 0; }
@@ -350,6 +358,7 @@
     <button type="button" id="btnOutroFilho" hidden>Agendar para outro filho(a)</button>
     <button type="button" id="btnLetra">Letra maior</button>
     <button type="button" id="btnSuporte">Código de suporte</button>
+    <button type="button" id="btnHistorico" hidden>Conversas anteriores</button>
     <button type="button" id="btnNova">Fazer um novo pedido</button>
     <button type="button" id="btnSair">Sair (não sou eu)</button>
   </div>
@@ -402,6 +411,7 @@
       <p class="erro-form" id="erroForm" role="alert"></p>
       <button class="btn-primario" id="btnIniciar" type="submit">Começar</button>
     </form>
+    <button type="button" class="link-add" id="btnHistoricoForm" hidden>Ver conversas anteriores</button>
   </section>
 
   <!-- Tela 2: conversa -->
@@ -443,15 +453,17 @@
   const CHAVE_PERFIL = 'webchat.perfil.v1';
   const CHAVE_MSGS = 'webchat.msgs.v1';   // últimas mensagens da conversa: a tela abre na hora, antes da rede
   const CHAVE_LETRA = 'webchat.letra.v1';
+  const CHAVE_HIST = 'webchat.historico.v1';   // as últimas conversas deste aparelho (cada uma com o seu token): dá para voltar a elas
+  const MAX_HIST = 5;                          // mínimo pedido: 3
   // Muda a cada alteração do chat. Cópia de mensagens guardada por outra versão é descartada (era isso que mostrava conversa velha e travada).
-  const VERSAO_APP = '2026.10.31-11';
+  const VERSAO_APP = '2026.10.31-12';
   const ESCALAS = [1, 1.18, 1.36], ROTULO_LETRA = ['Letra maior', 'Letra muito maior', 'Letra normal'];
 
   const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
   const $ = (s) => document.querySelector(s);
   const el = {
     empresa: $('#empresa'), avatar: $('#avatar'), ponto: $('#ponto'), status: $('#status'),
-    btnMenu: $('#btnMenu'), menu: $('#menu'), btnNova: $('#btnNova'), btnAtendente: $('#btnAtendente'), btnSair: $('#btnSair'),
+    btnMenu: $('#btnMenu'), menu: $('#menu'), btnNova: $('#btnNova'), btnHistorico: $('#btnHistorico'), btnHistoricoForm: $('#btnHistoricoForm'), btnAtendente: $('#btnAtendente'), btnSair: $('#btnSair'),
     btnLetra: $('#btnLetra'), btnSuporte: $('#btnSuporte'), apoio: $('#apoio'), barraHumano: $('#barraHumano'), btnHumano: $('#btnHumano'),
     telaInicio: $('#telaInicio'), telaChat: $('#telaChat'), boasForm: $('#boasVindasForm'), tituloInicio: $('#tituloInicio'),
     form: $('#formInicio'), fNome: $('#fNome'), fTel: $('#fTel'), fEmail: $('#fEmail'),
@@ -547,15 +559,65 @@
     el.blocoVolta.hidden = !salvo; el.blocoNome.hidden = !!salvo; el.blocoContato.hidden = !!salvo;
     el.tituloInicio.textContent = salvo ? `Olá de novo, ${primeiroNome(salvo.nome)}!` : 'Vamos agendar?';
     if (salvo) el.voltaDados.textContent = `${salvo.nome} · ${salvo.telefone} · ${salvo.email}`;
+    atualizarAcessoHistorico();
     if (!manterEscolha) escolha = null;
     irmaosForm = []; modoIrmaos = 'um_de_cada_vez';
     desenharQuem();
     if (manterEscolha) setTimeout(() => el.fFilho.focus(), 50);
   }
   function naoSouEu() {
-    apagarLocal(CHAVE_PERFIL); apagarLocal(CHAVE_CONVERSA); apagarLocal(CHAVE_MSGS);
+    apagarLocal(CHAVE_PERFIL); apagarLocal(CHAVE_CONVERSA); apagarLocal(CHAVE_MSGS); apagarLocal(CHAVE_HIST);   // aparelho de outra pessoa: nada do paciente anterior fica
     conv = null; mostrarForm(true);
     el.fNome.focus();
+  }
+
+  /* ---------- conversas anteriores (as últimas MAX_HIST deste aparelho) ---------- */
+  // Cada item guarda o id e o token da conversa; as mensagens vêm do servidor ao reabrir (chat_listar), então nada se perde.
+  // A lista fica ordenada da mais nova para a mais antiga e descarta as mais antigas além de MAX_HIST.
+  function lerHist() {
+    const l = lerLocal(CHAVE_HIST);
+    return Array.isArray(l) ? l.filter((x) => x && x.id && x.token) : [];
+  }
+  function registrarHistorico(c, extra) {
+    if (!c || !c.id || !c.token) return;
+    const lista = lerHist(), antigo = lista.find((x) => x.id === c.id) || {};
+    const item = {
+      ...antigo, id: c.id, token: c.token, tipo: c.tipo || 'proprio', nomeCrianca: c.nomeCrianca || '',
+      irmaos: c.irmaos || [], irmaosModo: c.irmaosModo || '', criado_em: antigo.criado_em || Date.now(), ...extra
+    };
+    gravarLocal(CHAVE_HIST, [item, ...lista.filter((x) => x.id !== c.id)].sort((a, b) => b.criado_em - a.criado_em).slice(0, MAX_HIST));
+  }
+  function esquecerHistorico(id) { gravarLocal(CHAVE_HIST, lerHist().filter((x) => x.id !== id)); }
+  function abrirHistorico() {
+    fecharMenu();
+    const lista = lerHist();
+    const { corpo } = abrirFolha('Conversas anteriores');
+    if (!lista.length) { corpo.replaceChildren(h('p', { class: 'carregando' }, 'Nenhuma conversa anterior neste aparelho.')); return; }
+    corpo.replaceChildren(
+      h('p', { class: 'hist-dica' }, `As últimas ${MAX_HIST} conversas ficam guardadas neste aparelho. Toque em uma para rever as mensagens.`),
+      ...lista.map((it) => {
+        const atual = !!(conv && conv.id === it.id), quando = new Date(it.criado_em);
+        const titulo = it.tipo === 'filho' && it.nomeCrianca ? 'Atendimento de ' + it.nomeCrianca : 'Meu atendimento';
+        return h('button', { type: 'button', class: 'hist-item' + (atual ? ' atual' : ''), onclick: () => abrirAnterior(it) },
+          h('span', { class: 'hist-titulo' }, titulo, atual ? h('span', { class: 'hist-atual' }, 'Aberta agora') : null),
+          h('span', { class: 'hist-data' }, rotuloDia(quando.toISOString()) + ' às ' + hora(quando.toISOString())),
+          it.ultima ? h('span', { class: 'hist-ultima' }, it.ultima) : null);
+      }));
+  }
+  // Volta a uma conversa guardada: troca a conversa aberta e busca as mensagens dela no servidor.
+  function abrirAnterior(it) {
+    const jaAberta = conv && conv.id === it.id && !el.telaChat.hidden;
+    fecharFolha();
+    if (jaAberta) return;
+    clearTimeout(tGuardar); fecharCanal(); pararAcompanhar();
+    conv = { id: it.id, token: it.token, tipo: it.tipo, nomeCrianca: it.nomeCrianca, irmaos: it.irmaos || [], irmaosModo: it.irmaosModo || '' };
+    gravarLocal(CHAVE_CONVERSA, conv);
+    abrirChat();
+  }
+  function atualizarAcessoHistorico() {
+    const n = lerHist().length;
+    el.btnHistorico.hidden = n < 2;       // no chat: só vale a pena se existir outra além da aberta
+    el.btnHistoricoForm.hidden = n < 1;   // no formulário: nenhuma está aberta
   }
 
   /* ---------- quem será atendido (início do formulário) ---------- */
@@ -633,7 +695,12 @@
   const WIDGET_LARGO = new Set(['escolha', 'campos', 'acompanhar']);
   function guardarMsgs() {
     clearTimeout(tGuardar);
-    tGuardar = setTimeout(() => { if (conv) gravarLocal(CHAVE_MSGS, { v: VERSAO_APP, salvo_em: Date.now(), conversa: conv.id, msgs: cacheMsgs.slice(-80), motor: motorAtivo, passo: passoAtual, status: statusAtual }); }, 300);
+    tGuardar = setTimeout(() => {
+      if (!conv) return;
+      gravarLocal(CHAVE_MSGS, { v: VERSAO_APP, salvo_em: Date.now(), conversa: conv.id, msgs: cacheMsgs.slice(-80), motor: motorAtivo, passo: passoAtual, status: statusAtual });
+      const ult = cacheMsgs.length ? cacheMsgs[cacheMsgs.length - 1] : null;   // prévia da lista de conversas anteriores
+      if (ult && ult.texto) registrarHistorico(conv, { ultima: String(ult.texto).replace(/\s+/g, ' ').slice(0, 90) });
+    }, 300);
   }
   // Aviso fixo no começo da conversa: quem fala (uma IA), que uma pessoa acompanha e que o resultado é uma PREVISÃO.
   function preencherAvisoIA(caixa) {
@@ -781,7 +848,7 @@
       const { data, error } = await db.rpc('chat_listar', { p_conversa: conv.id, p_token: conv.token, p_apos: baseServidor });
       if (!conv || conv.id !== minha) return;   // trocou de conversa durante a espera
       if (error) {
-        if (error.code === '28000') { apagarLocal(CHAVE_CONVERSA); apagarLocal(CHAVE_MSGS); conv = null; mostrarForm(); }
+        if (error.code === '28000') { esquecerHistorico(minha); apagarLocal(CHAVE_CONVERSA); apagarLocal(CHAVE_MSGS); conv = null; mostrarForm(); }
         else mon('erro', { onde: 'carregar', codigo: error.code || null });
         return;
       }
@@ -858,7 +925,7 @@
       });
       if (error) throw error;
       conv = { id: data.conversa_id, token: data.token, tipo: filho ? 'filho' : 'proprio', nomeCrianca: filho ? nomeFilho : '', irmaos, irmaosModo: irmaos.length ? modoIrmaos : '' };
-      gravarLocal(CHAVE_CONVERSA, conv);
+      gravarLocal(CHAVE_CONVERSA, conv); registrarHistorico(conv);
       gravarLocal(CHAVE_PERFIL, { nome, telefone: telTxt, email, aceite: true });
       apagarLocal(CHAVE_MSGS);
       motorAtivo = data.motor === 'fluxo'; passoAtual = null;
@@ -937,7 +1004,7 @@
   function fecharMenu() { el.menu.hidden = true; el.btnMenu.setAttribute('aria-expanded', 'false'); }
   function novaConversa(semPerguntar) {
     fecharMenu();
-    if (semPerguntar !== true && !confirm('Fazer um novo pedido? O histórico deste fica guardado com a equipe.')) return;
+    if (semPerguntar !== true && !confirm('Fazer um novo pedido? Este continua em "Conversas anteriores" e fica guardado com a equipe.')) return;
     apagarLocal(CHAVE_CONVERSA); apagarLocal(CHAVE_MSGS); conv = null; mostrarForm();
   }
   function sair() {
@@ -967,8 +1034,9 @@
     try {
       const { data, error } = await db.rpc('chat_irmao_iniciar', { p_origem: conv.id, p_token: conv.token });
       if (error) throw error;
+      registrarHistorico({ ...conv, irmaos: [] });   // a fila de irmãos segue com a conversa nova; a anterior não a repete
       conv = { ...conv, id: data.conversa_id, token: data.token, nomeCrianca: data.paciente_nome, irmaos: data.irmaos || [], irmaosModo: data.irmaos_modo || '' };
-      gravarLocal(CHAVE_CONVERSA, conv); apagarLocal(CHAVE_MSGS);
+      gravarLocal(CHAVE_CONVERSA, conv); registrarHistorico(conv); apagarLocal(CHAVE_MSGS);
       await abrirChat();
     } catch (e) { toast(mensagemErro(e)); }
     finally { el.btnProximo.disabled = false; }
@@ -2033,8 +2101,11 @@
     if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && matchMedia('(hover: hover)').matches) { e.preventDefault(); el.formEnviar.requestSubmit(); }
   });
   el.btnMenu.addEventListener('click', () => {
+    if (el.menu.hidden) atualizarAcessoHistorico();
     el.menu.hidden = !el.menu.hidden; el.btnMenu.setAttribute('aria-expanded', String(!el.menu.hidden));
   });
+  el.btnHistorico.addEventListener('click', abrirHistorico);
+  el.btnHistoricoForm.addEventListener('click', abrirHistorico);
   document.addEventListener('click', (e) => { if (!el.menu.hidden && !el.menu.contains(e.target) && e.target !== el.btnMenu) el.menu.hidden = true; });
   el.btnNova.addEventListener('click', novaConversa);
   el.btnAtendente.addEventListener('click', pedirAtendente);
@@ -2110,7 +2181,7 @@
     el.avatar.textContent = (config.nome_empresa.trim()[0] || 'A').toUpperCase();
     if (config.boas_vindas) el.boasForm.textContent = config.boas_vindas;
     iniciarSentinela();
-    if (conv && conv.id && conv.token) abrirChat(); else mostrarForm();
+    if (conv && conv.id && conv.token) { registrarHistorico(conv); abrirChat(); } else mostrarForm();   // registrar: conversa de antes desta versão entra na lista
   }
   init();
   if (window.__WEBCHAT_TESTE__) window.__WEBCHAT_TESTE__.adicionar = adicionar;   // gancho dos testes de navegador (não existe em produção)
