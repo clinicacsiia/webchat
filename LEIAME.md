@@ -147,6 +147,22 @@ A IA não fala com o paciente. Liga e desliga em `config.motor` (`fluxo` | `ia`)
 - Plano e mapa do processo: `docs/plano-fase7-fluxo-sem-ia.md`.
 - SQL: `supabase/fase7-motor.sql`, aplicado em 31/10/2026.
 
+### Leitura do pedido médico: letra de médico e dúvida explicada (Fase 8)
+
+A foto do pedido é lida de dois jeitos ao mesmo tempo:
+
+- **No celular** (Tesseract 7, com a sombra e a foto torta corrigidas): lê o texto impresso em 2 a 3 segundos.
+- **No servidor**, pela IA de visão (Edge Function `ler-pedido`): lê a letra do médico.
+
+O paciente vê um cartão por exame, com o recorte da linha da foto. Quando a leitura não tem certeza, ele é avisado e escolhe com caixas grandes ("Qual destes está no seu pedido?"), ou deixa para o atendente conferir pela foto. O que o paciente decidiu nunca é desfeito por uma leitura que chega depois.
+
+As fotos e as leituras ficam guardadas. No painel, "Conferir a leitura (ensina o sistema)" grava a escrita do médico e o exame certo, e da próxima vez a mesma escrita já vem certa.
+
+- Detalhes, pesquisa, custos e testes: `docs/fase8-leitura-do-pedido.md`.
+- SQL: `supabase/fase8-leitura-pedido.sql` (**ainda não aplicado**).
+- Função: `supabase/functions/ler-pedido`. Publicar sem JWT e criar o secret `ANTHROPIC_API_KEY`. Sem a chave, o chat usa só a leitura do celular.
+- **Para depois**: mudar escolhas ao vivo e o convênio de quem volta, em `docs/lembrete-mudar-escolhas-e-convenio.md`. Hoje o "Repetir o último exame" copia o convênio antigo sem perguntar.
+
 ## Estado do projeto e como retomar
 
 **Aba Aprendizado (administrador)**: relatório de onde a IA erra, preço do catálogo x Klingo e casos para melhorar o prompt (Fase 5; SQL em `supabase/fase5-aprendizado.sql`).
