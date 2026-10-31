@@ -113,6 +113,16 @@
   .conta-form .mostrar input { width: 18px; height: 18px; accent-color: var(--verde); }
   .conta-form .rodape-links { display: flex; flex-wrap: wrap; gap: 4px 18px; justify-content: center; margin-top: 12px; }
   .conta-ok { background: var(--verde-claro); border-radius: 12px; padding: 14px; margin: 0 0 14px; }
+  .dados-lista { margin: 0 0 16px; padding: 12px 14px; background: #f1f6f3; border-radius: 12px; font-size: calc(16px * var(--esc)); }
+  .dados-lista dt { font-weight: 650; margin-top: 8px; }
+  .dados-lista dt:first-child { margin-top: 0; }
+  .dados-lista dd { margin: 2px 0 0; color: var(--texto-suave); word-break: break-word; }
+  .dados-form .btn-primario + .btn-primario, .dados-form .btn-primario + .btn-sec { margin-top: 10px; }
+  .btn-sec { width: 100%; background: #fff; color: var(--verde); border: 2px solid var(--verde); border-radius: 12px; padding: 12px 16px; font-weight: 650; font-size: calc(17px * var(--esc)); cursor: pointer; }
+  .btn-perigo { width: 100%; background: var(--erro); color: #fff; border: 0; border-radius: 12px; padding: 14px 16px; font-weight: 650; font-size: calc(17px * var(--esc)); cursor: pointer; }
+  .btn-perigo:disabled, .btn-sec:disabled { opacity: .6; cursor: default; }
+  .dados-form .sub { margin: 0 0 14px; color: var(--texto-suave); }
+  .dados-form h3 { margin: 18px 0 8px; font-size: calc(17px * var(--esc)); }
 
   /* Conversa */
   .msgs { flex: 1; overflow-y: auto; padding: 14px 12px 8px; display: flex; flex-direction: column; gap: 4px; overscroll-behavior: contain; }
@@ -387,6 +397,7 @@
       <span class="acoes">
         <button type="button" class="link-add" id="btnContaEntrar">Entrar</button>
         <button type="button" class="link-add" id="btnContaCriar">Criar conta</button>
+        <button type="button" class="link-add" id="btnContaDados" hidden>Meus dados</button>
         <button type="button" class="link-add" id="btnContaSair" hidden>Sair da conta</button>
       </span>
     </div>
@@ -475,7 +486,7 @@
   const CHAVE_HIST = 'webchat.historico.v1';   // as últimas conversas deste aparelho (cada uma com o seu token): dá para voltar a elas
   const MAX_HIST = 5;                          // mínimo pedido: 3
   // Muda a cada alteração do chat. Cópia de mensagens guardada por outra versão é descartada (era isso que mostrava conversa velha e travada).
-  const VERSAO_APP = '2026.10.31-13';
+  const VERSAO_APP = '2026.10.31-14';
   const ESCALAS = [1, 1.18, 1.36], ROTULO_LETRA = ['Letra maior', 'Letra muito maior', 'Letra normal'];
 
   // Chegou pelo link "esqueci a senha"? O supabase-js limpa o endereço ao ler o link, então a pergunta é feita antes de criá-lo.
@@ -488,7 +499,7 @@
     btnMenu: $('#btnMenu'), menu: $('#menu'), btnNova: $('#btnNova'), btnHistorico: $('#btnHistorico'), btnHistoricoForm: $('#btnHistoricoForm'), btnAtendente: $('#btnAtendente'), btnSair: $('#btnSair'),
     btnLetra: $('#btnLetra'), btnSuporte: $('#btnSuporte'), apoio: $('#apoio'), barraHumano: $('#barraHumano'), btnHumano: $('#btnHumano'),
     telaInicio: $('#telaInicio'), telaChat: $('#telaChat'), boasForm: $('#boasVindasForm'), tituloInicio: $('#tituloInicio'),
-    faixaConta: $('#faixaConta'), faixaContaTxt: $('#faixaContaTxt'), btnContaEntrar: $('#btnContaEntrar'), btnContaCriar: $('#btnContaCriar'), btnContaSair: $('#btnContaSair'),
+    faixaConta: $('#faixaConta'), faixaContaTxt: $('#faixaContaTxt'), btnContaEntrar: $('#btnContaEntrar'), btnContaCriar: $('#btnContaCriar'), btnContaDados: $('#btnContaDados'), btnContaSair: $('#btnContaSair'),
     form: $('#formInicio'), fNome: $('#fNome'), fTel: $('#fTel'), fEmail: $('#fEmail'),
     fAceite: $('#fAceite'), erroForm: $('#erroForm'), btnIniciar: $('#btnIniciar'),
     blocoVolta: $('#blocoVolta'), voltaDados: $('#voltaDados'), btnNaoSouEu: $('#btnNaoSouEu'), blocoNome: $('#blocoNome'), blocoContato: $('#blocoContato'),
@@ -2159,6 +2170,7 @@
   el.btnNaoSouEu.addEventListener('click', naoSouEu);
   el.btnContaEntrar.addEventListener('click', () => abrirContaFolha('entrar'));
   el.btnContaCriar.addEventListener('click', () => abrirContaFolha('criar'));
+  el.btnContaDados.addEventListener('click', abrirMeusDados);
   el.btnContaSair.addEventListener('click', sair);
   el.btnOutroFilho.addEventListener('click', outroFilho);
   el.btnProximo.addEventListener('click', proximoFilho);
@@ -2248,7 +2260,7 @@
 
   function atualizarContaUI(semForm) {
     el.faixaConta.hidden = !loginAtivo;
-    el.btnContaEntrar.hidden = el.btnContaCriar.hidden = !!conta; el.btnContaSair.hidden = !conta;
+    el.btnContaEntrar.hidden = el.btnContaCriar.hidden = !!conta; el.btnContaSair.hidden = el.btnContaDados.hidden = !conta;
     el.faixaContaTxt.textContent = conta ? 'Conta: ' + conta.email : 'Tem conta? Seus dados ficam salvos para a próxima vez.';
     el.btnSair.textContent = conta ? 'Sair da conta' : 'Sair (não sou eu)';
     if (!semForm && !el.telaInicio.hidden) mostrarForm(!!escolha);   // refaz o formulário já com (ou sem) os dados da conta
@@ -2366,6 +2378,104 @@
       }) }, s.campo, s.mostrar, erro, btn));
     }
     const primeiro = corpo.querySelector('input'); if (primeiro) setTimeout(() => primeiro.focus(), 50);
+  }
+
+  // "Meus dados" (LGPD, art. 18): ver o que a clínica guarda, baixar uma cópia e apagar a conta. Apagar a conta remove só o login;
+  // cadastro, pedidos e conversas continuam guardados pela clínica (o texto abaixo diz isso antes de confirmar). Revisão jurídica pendente.
+  const dataHora = (iso) => { try { return new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }); } catch { return String(iso || ''); } };
+  const dataCurta = (iso) => { try { return new Date(String(iso).length === 10 ? iso + 'T12:00:00' : iso).toLocaleDateString('pt-BR'); } catch { return String(iso || ''); } };
+  const nomeDeArquivo = () => 'meus-dados-' + new Date().toISOString().slice(0, 10);
+  function baixarArquivo(nome, conteudo, tipo) {
+    const url = URL.createObjectURL(new Blob(['\ufeff' + conteudo], { type: tipo + ';charset=utf-8' }));
+    const a = h('a', { href: url, download: nome }); document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }
+  // Texto simples e legível (abre em qualquer celular); o mesmo conteúdo em formato de computador vai no outro botão.
+  function textoMeusDados(d) {
+    const L = [], pr = (rot, v) => { if (v != null && String(v).trim() !== '') L.push(rot + ': ' + v); };
+    const c = d.conta || {}, p = d.cadastro;
+    L.push('MEUS DADOS NA CLÍNICA', 'Gerado em ' + dataHora(d.gerado_em), '', 'SUA CONTA');
+    pr('E-mail', c.email); pr('Nome', c.nome); pr('Telefone', c.telefone); pr('Conta criada em', c.criada_em && dataHora(c.criada_em)); pr('Concordou com o uso dos dados em', c.aceitou_lgpd_em && dataHora(c.aceitou_lgpd_em));
+    L.push('', 'SEU CADASTRO DE PACIENTE');
+    if (!p) L.push('Ainda não há cadastro ligado à sua conta.');
+    else {
+      pr('Nome', p.nome); pr('Data de nascimento', p.data_nascimento && dataCurta(p.data_nascimento)); pr('CPF', p.cpf); pr('E-mail', p.email);
+      pr('Telefones', (p.telefones || []).join(', '));
+      Object.entries(p.outros_dados || {}).forEach(([k, v]) => pr(k.charAt(0).toUpperCase() + k.slice(1).replace(/_/g, ' '), typeof v === 'object' ? JSON.stringify(v) : v));
+    }
+    L.push('', 'ATENDIMENTOS ANTERIORES');
+    if (!(d.historico || []).length) L.push('Nenhum.');
+    (d.historico || []).forEach((x) => {
+      const ex = (x.exames || []).map((e) => (e && (e.exame || e.modalidade)) || '').filter(Boolean).join(' + ');
+      L.push('- ' + dataCurta(x.quando) + (ex ? ': ' + ex : '') + (x.unidade ? ' (' + x.unidade + ')' : '') + (x.convenio ? ', convênio ' + x.convenio : '') + (x.cancelado ? ' [cancelado]' : ''));
+    });
+    L.push('', 'PEDIDOS QUE VOCÊ FEZ NO CHAT');
+    if (!(d.pedidos || []).length) L.push('Nenhum.');
+    (d.pedidos || []).forEach((x) => {
+      L.push('- ' + dataHora(x.iniciado_em) + ' (para ' + x.para + ')' + (x.tipo ? ', ' + x.tipo : '') + (x.situacao ? ', situação: ' + x.situacao : ''));
+      if ((x.exames || []).length) L.push('    Exames: ' + x.exames.join(' + '));
+      if (x.convenio) L.push('    Convênio: ' + x.convenio);
+      if (x.unidade) L.push('    Unidade: ' + x.unidade);
+      if (x.profissional) L.push('    Profissional: ' + x.profissional);
+    });
+    L.push('', 'SUAS CONVERSAS');
+    if (!(d.mensagens || []).length) L.push('Nenhuma.');
+    (d.mensagens || []).forEach((m) => L.push('[' + dataHora(m.quando) + '] ' + m.quem + ': ' + m.texto));
+    L.push('', d.observacao || '');
+    return L.join('\r\n');
+  }
+  async function abrirMeusDados() {
+    if (!conta) return;
+    const { corpo } = abrirFolha('Meus dados');
+    const erro = h('p', { class: 'erro-form', role: 'alert' });
+    const tem = (v) => (v ? 'Sim' : 'Ainda não');
+    function tela() {
+      const btnTxt = h('button', { type: 'button', class: 'btn-primario', id: 'btnBaixarTxt' }, 'Baixar uma cópia dos meus dados');
+      const btnJson = h('button', { type: 'button', class: 'btn-sec', id: 'btnBaixarJson' }, 'Baixar em formato de computador (JSON)');
+      const baixar = (btn, rotulo, tipo) => async () => {
+        erro.textContent = ''; btn.disabled = true; btn.textContent = 'Preparando…';
+        try {
+          const { data, error } = await db.rpc('conta_paciente_meus_dados');
+          if (error) throw error;
+          if (tipo === 'json') baixarArquivo(nomeDeArquivo() + '.json', JSON.stringify(data, null, 2), 'application/json');
+          else baixarArquivo(nomeDeArquivo() + '.txt', textoMeusDados(data), 'text/plain');
+          toast('Cópia dos seus dados baixada.');
+        } catch (e) { erro.textContent = erroConta(e); } finally { btn.disabled = false; btn.textContent = rotulo; }
+      };
+      btnTxt.addEventListener('click', baixar(btnTxt, 'Baixar uma cópia dos meus dados', 'txt'));
+      btnJson.addEventListener('click', baixar(btnJson, 'Baixar em formato de computador (JSON)', 'json'));
+      corpo.replaceChildren(h('div', { class: 'dados-form' },
+        h('p', { class: 'sub' }, 'Aqui você vê o que a clínica guarda sobre você, baixa uma cópia e, se quiser, apaga a sua conta.'),
+        h('dl', { class: 'dados-lista' },
+          h('dt', {}, 'E-mail da conta'), h('dd', {}, conta.email || '—'),
+          h('dt', {}, 'Nome e telefone da conta'), h('dd', {}, [conta.nome, conta.telefone].filter(Boolean).join(' · ') || '—'),
+          h('dt', {}, 'Cadastro de paciente ligado à conta'), h('dd', {}, tem(conta.cadastro_salvo))),
+        btnTxt, btnJson, erro,
+        h('h3', {}, 'Apagar a minha conta'),
+        h('p', { class: 'sub' }, 'Você deixa de poder entrar e o seu e-mail sai da conta. Mas o cadastro, os pedidos e as conversas que você já fez continuam guardados pela clínica, porque ela precisa manter esses registros do atendimento. Para pedir algo além disso, fale com a clínica.'),
+        h('button', { type: 'button', class: 'btn-sec', id: 'btnApagarConta', onclick: confirmar }, 'Apagar a minha conta')));
+    }
+    function confirmar() {
+      const btnSim = h('button', { type: 'button', class: 'btn-perigo', id: 'btnApagarSim' }, 'Sim, apagar a minha conta');
+      btnSim.addEventListener('click', async () => {
+        erro.textContent = ''; btnSim.disabled = true; btnSim.textContent = 'Apagando…';
+        try {
+          const { error } = await db.rpc('conta_paciente_excluir', { p_confirmacao: 'EXCLUIR' });
+          if (error) throw error;
+          try { await db.auth.signOut({ scope: 'local' }); } catch { /* a conta já foi apagada; o aparelho é limpo mesmo assim */ }
+          conta = null; fecharFolha(); atualizarContaUI(true); naoSouEu();
+          toast('Sua conta foi apagada. O cadastro e os pedidos continuam guardados pela clínica.');
+        } catch (e) { erro.textContent = erroConta(e); btnSim.disabled = false; btnSim.textContent = 'Sim, apagar a minha conta'; }
+      });
+      corpo.replaceChildren(h('div', { class: 'dados-form' },
+        h('div', { class: 'conta-ok' }, h('b', {}, 'Tem certeza?'),
+          h('p', {}, 'Isto não pode ser desfeito. Você precisará criar uma nova conta se quiser voltar a salvar os seus dados.')),
+        h('p', { class: 'sub' }, 'Vai ser apagado: o login e o e-mail da conta. Continua guardado pela clínica: o cadastro de paciente, os pedidos, as conversas e o histórico de atendimentos.'),
+        erro, btnSim,
+        h('button', { type: 'button', class: 'btn-sec', id: 'btnApagarNao', onclick: tela }, 'Não, voltar')));
+      const nao = $('#btnApagarNao'); if (nao) nao.focus();   // o botão seguro é o que recebe o foco
+    }
+    tela();
   }
 
   /* ---------- início ---------- */

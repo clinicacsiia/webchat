@@ -55,10 +55,21 @@ O interruptor só liga de verdade se `cadastro_equipe_sem_convite = 'nao'` (pass
 - **Equipe se cadastrar sem convite de novo:** `update public.config set valor = 'sim' where chave = 'cadastro_equipe_sem_convite';` (isso também esconde a tela de login).
 - Os passos de reverter o código SQL estão no cabeçalho de cada arquivo em `supabase/`.
 
+## Meus dados: ver, baixar uma cópia e apagar a conta (31/10/2026)
+
+Arquivo `supabase/meus-dados.sql` (rodar **depois** do instalador do login; pode rodar de novo sem problema). No chat, quem está logado vê o botão **Meus dados** ao lado de "Sair da conta".
+
+- **Ver:** e-mail, nome e telefone da conta e se há cadastro de paciente ligado. Abrir a janela não registra nada.
+- **Baixar uma cópia:** um arquivo de texto legível (e, em outro botão, o mesmo conteúdo em JSON) com a conta, o cadastro, o histórico de atendimentos, os pedidos e as conversas **da própria conta**. Ficam de fora as notas internas da equipe, o resumo da IA e as fotos de pedido (a tela informa quantas existem; para recebê-las a pessoa fala com a clínica).
+- **Apagar a conta:** apaga **só o login** (conta, e-mail e vínculo). **Cadastro de paciente, pedidos, conversas, fotos e histórico continuam guardados pela clínica**, e a tela diz isso, em dois toques, antes de confirmar.
+- **Registro:** cada cópia e cada exclusão grava uma linha sem dado pessoal em `conta_paciente_evento` (tipo, data, se havia cadastro e quantas conversas). Só o administrador lê: `select * from public.conta_paciente_evento order by id desc;`.
+- **Revisão jurídica pendente:** o texto da tela e a lista do que continua guardado precisam ser lidos pelo jurídico antes de ligar o login ao público. Se a clínica decidir apagar mais (por exemplo nome e telefone do cadastro), é uma mudança em `conta_paciente_excluir`.
+- **Voltar atrás:** `drop function public.conta_paciente_meus_dados(), public.conta_paciente_excluir(text);` (o botão passa a dar erro; para escondê-lo é preciso publicar o chat sem a tela).
+- Teste: `npm run test:meus-dados` (banco) e `npm run test:login` (tela). Não foi testado contra o Supabase real: a exclusão apaga de `auth.users`, e o primeiro teste de ponta a ponta com uma conta de verdade continua pendente (passo 6).
+
 ## Ainda não existe (próximas etapas)
 
 - Dependentes (filhos) ligados à conta do responsável.
-- Tela "meus dados": exportar e excluir a conta (LGPD art. 18). Hoje a exclusão é feita pela equipe.
 - Vincular à conta um cadastro antigo (a recepção valida a identidade e faz o vínculo).
 - Limite de tentativas e bloqueio por conta (hoje valem os limites do Supabase Auth por IP).
 - Resultado de exame: o sistema ainda não guarda laudos.
