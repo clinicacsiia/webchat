@@ -260,6 +260,10 @@ create or replace function public.fila_mudar(p_id uuid, p_para text) returns voi
 begin
   perform public.fila_equipe_ok();
   if p_para not in ('atendido', 'cancelado', 'chamado') then raise exception 'Situação inválida.' using errcode = '22023'; end if;
+  -- Chamar de novo: quem já estava chamado ganha um novo aviso de "sua vez" (apaga o antigo para o gatilho gerar e enviar outro push).
+  if p_para = 'chamado' then
+    delete from public.fila_aviso where tipo = 'vez' and fila_id = p_id and exists (select 1 from public.fila_chegada where id = p_id and status = 'chamado');
+  end if;
   update public.fila_chegada set status = p_para,
          chamado_em = case when p_para = 'chamado' then now() else chamado_em end,
          concluido_em = case when p_para in ('atendido', 'cancelado') then now() else concluido_em end

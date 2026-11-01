@@ -62,6 +62,14 @@ await caso('cada aviso sai uma vez só (nova chamada não repete "perto")', asyn
   await como(staff, () => q('select public.fila_mudar($1, $2)', [ida, 'atendido']));
   return { ok: (await q(`select count(*)::int n from public.fila_aviso where conta_id = $1 and tipo = 'perto'`, [d]))[0].n === 1 };
 });
+await caso('chamar novamente: quem já está chamado ganha outro aviso "sua vez" para enviar', async () => {
+  const idb = (await q(`select id from public.fila_chegada where conta_id = $1`, [b]))[0].id;
+  await como(staff, () => q('select public.fila_mudar($1, $2)', [idb, 'chamado']));
+  await q(`update public.fila_aviso set enviado_em = now() where fila_id = $1`, [idb]);
+  await como(staff, () => q('select public.fila_mudar($1, $2)', [idb, 'chamado']));
+  const r = await q(`select count(*)::int n, count(*) filter (where enviado_em is null)::int pend from public.fila_aviso where fila_id = $1 and tipo = 'vez'`, [idb]);
+  return { ok: r[0].n === 1 && r[0].pend === 1, detalhe: JSON.stringify(r[0]) };
+});
 await caso('paciente atendido vê "atendido"', async () => {
   const r = (await como(a, () => q('select public.fila_minha_vez() r')))[0].r;
   return { ok: r.situacao === 'atendido', detalhe: JSON.stringify(r) };

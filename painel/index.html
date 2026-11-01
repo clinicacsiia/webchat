@@ -799,7 +799,7 @@
       h('td', {}, x.status === 'chamado' ? 'Chamado' : (i + 1) + 'º'), h('td', {}, 'Senha ' + x.senha), h('td', {}, x.nome),
       h('td', {}, hora(x.chegou_em) + (x.origem === 'recepcao' ? ' · registrado pela recepção' : ' · avisou pelo celular') + (x.conta_id ? '' : ' · sem aviso no celular')),
       h('td', {},
-        x.status === 'aguardando' ? h('button', { class: 'btn', type: 'button', onclick: () => acaoFila('chamar', () => db.rpc('fila_mudar', { p_id: x.id, p_para: 'chamado' }), 'Paciente chamado.') }, 'Chamar') : null,
+        h('button', { class: 'btn', type: 'button', onclick: () => acaoFila('chamar', () => db.rpc('fila_mudar', { p_id: x.id, p_para: 'chamado' }), x.status === 'chamado' ? 'Paciente chamado novamente.' : 'Paciente chamado.') }, x.status === 'chamado' ? 'Chamar novamente' : 'Chamar'),
         h('button', { class: 'btn prim', type: 'button', onclick: () => acaoFila('atendido', () => db.rpc('fila_mudar', { p_id: x.id, p_para: 'atendido' }), 'Atendimento concluído.') }, 'Atendido'),
         h('button', { class: 'btn perigo', type: 'button', onclick: () => { if (confirm('Tirar ' + x.nome + ' da fila?')) acaoFila('cancelar', () => db.rpc('fila_mudar', { p_id: x.id, p_para: 'cancelado' }), 'Removido da fila.'); } }, 'Tirar')));
     const tabela = F.itens.length
