@@ -28,6 +28,8 @@
   .campo input { width:100%; font-size:1rem; padding:12px; border:1px solid var(--linha); border-radius:10px; background:var(--papel); color:var(--texto); }
   button.principal { width:100%; background:var(--azul); color:#fff; border:0; border-radius:12px; padding:16px; font-size:1.1rem; font-weight:700; cursor:pointer; }
   button.principal:disabled { opacity:.6; }
+  button.verde { width:100%; background:#1b7a3d; color:#fff; border:0; border-radius:16px; font-size:1.7rem; font-weight:800; padding:28px 16px; cursor:pointer; box-shadow:0 4px 14px rgba(27,122,61,.35); }
+  button.verde:disabled { opacity:.6; }
   button.link { background:none; border:0; color:var(--azul); text-decoration:underline; font-size:.95rem; padding:8px 0; cursor:pointer; }
   a { color:var(--azul); }
   .erro { color:var(--erro); font-weight:600; }
@@ -75,55 +77,118 @@
   const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
   const instalado = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 
-  let reg = null, canal = null, tPoll = null, ultimo = null, sessao = null;
+  let reg = null, canal = null, tPoll = null, ultimo = null, sessao = null, modo = null, pedirCheckinAoEntrar = false;   // modo: 'conta' (logado) | 'ticket' (check-in sem login) | null
 
-  /* ---------- 1) permissão de notificação (primeiro passo, antes de tudo) ---------- */
-  function telaPermissao() {
-    btnSair.hidden = true;
-    const negada = 'Notification' in window && Notification.permission === 'denied';
-    const filhos = [h('h1', {}, 'Ative os avisos'),
-      h('p', {}, 'Para acompanhar a fila, precisamos avisar você quando estiver perto e quando for a sua vez. Sem os avisos o portal não funciona.')];
-    if (!('Notification' in window) || !('serviceWorker' in navigator)) {
-      filhos.push(h('p', { class: 'erro' }, 'Este navegador não permite avisos. Use o Chrome (Android) ou o Safari (iPhone) atualizado.'));
-    } else if (ios && !instalado) {
-      filhos.push(h('p', { class: 'erro' }, 'No iPhone os avisos só funcionam com o portal instalado.'),
-        h('p', {}, 'Toque em Compartilhar (quadrado com seta) e depois em "Adicionar à Tela de Início". Abra o portal pelo ícone novo.'));
-    } else if (negada) {
-      filhos.push(h('p', { class: 'erro' }, 'Os avisos estão bloqueados neste aparelho.'),
-        h('p', {}, 'Toque no cadeado ao lado do endereço do site, escolha "Notificações" e mude para "Permitir". Depois toque em Tentar de novo.'),
-        h('button', { class: 'principal', type: 'button', onclick: () => location.reload() }, 'Tentar de novo'));
-    } else {
-      filhos.push(h('button', { class: 'principal', type: 'button', id: 'btnPerm', onclick: pedirPermissao }, 'Permitir avisos'));
-    }
-    mostrar(h('div', { class: 'cartao' }, filhos));
+  /* ---------- 1) início: check-in sem login ---------- */
+  const TICKET_CHAVE = 'csi-checkin-ticket';
+  const guardarTicket = (t) => { try { if (t) localStorage.setItem(TICKET_CHAVE, t); else localStorage.removeItem(TICKET_CHAVE); } catch { /* sem armazenamento: o ticket vale só nesta tela */ memTicket = t || null; } };
+  let memTicket = null;
+  const lerTicket = () => { try { return localStorage.getItem(TICKET_CHAVE) || memTicket; } catch { return memTicket; } };
+
+  function telaInicio() {
+    btnSair.hidden = true; modo = null;
+    mostrar(h('div', { class: 'cartao' },
+      h('h1', {}, 'Chegou na clínica?'),
+      h('button', { class: 'verde', type: 'button', id: 'btnCheckin', onclick: () => telaCheckin() }, 'Fazer check-in'),
+      h('p', { class: 'suave', style: 'margin-top:14px' }, 'Ainda não se cadastrou? Sem problema: faça o check-in e você será chamado.'),
+      h('p', { style: 'margin-top:18px;margin-bottom:0' }, 'Já tem conta? ', h('button', { class: 'link', type: 'button', id: 'btnJaTenho', onclick: () => telaLogin() }, 'Entrar com e-mail e senha'))));
   }
-  async function pedirPermissao() {
-    const b = document.getElementById('btnPerm'); if (b) b.disabled = true;
-    try { await Notification.requestPermission(); } catch { /* cai na checagem abaixo */ }
-    iniciar();
+
+  function campo(id, rotulo, props) { return h('div', { class: 'campo' }, h('label', { for: id }, rotulo), h('input', Object.assign({ id }, props))); }
+
+  function telaCheckin(msg, v) {
+    v = v || {}; btnSair.hidden = true; modo = null;
+    const nome = campo('cn', 'Nome completo', { type: 'text', autocomplete: 'name', required: true, maxlength: 120, value: v.nome || '' });
+    const email = campo('ce', 'E-mail', { type: 'email', autocomplete: 'email', inputmode: 'email', required: true, maxlength: 200, value: v.email || '' });
+    const fone = campo('ct', 'Celular com DDD', { type: 'tel', autocomplete: 'tel', inputmode: 'tel', required: true, maxlength: 20, placeholder: '(11) 91234-5678', value: v.fone || '' });
+    const erro = h('p', { class: 'erro', role: 'alert' }, msg || '');
+    const btn = h('button', { class: 'verde', style: 'font-size:1.3rem;padding:20px 12px', type: 'submit' }, 'Fazer check-in');
+    mostrar(h('form', { class: 'cartao', novalidate: true, onsubmit: async (ev) => {
+      ev.preventDefault(); erro.textContent = ''; btn.disabled = true;
+      const d = { nome: nome.querySelector('input').value.trim(), email: email.querySelector('input').value.trim(), fone: fone.querySelector('input').value.trim() };
+      try { await enviarCheckin(d, false); }
+      catch (e) { erro.textContent = e.message || 'Não foi possível fazer o check-in. Tente de novo.'; btn.disabled = false; }
+    } },
+      h('h1', {}, 'Seus dados'), h('p', { class: 'suave' }, 'Só precisamos disto para chamar você.'),
+      nome, email, fone, erro, btn,
+      h('button', { class: 'link', type: 'button', onclick: () => telaInicio() }, 'Voltar')));
+  }
+
+  async function enviarCheckin(d, ajudaSenha) {
+    const { data, error } = await db.rpc('checkin_publico', { p_nome: d.nome, p_email: d.email, p_telefone: d.fone, p_ajuda_senha: ajudaSenha });
+    if (error) throw new Error(error.code === '22023' || error.code === '54000' ? error.message : 'Não foi possível fazer o check-in agora. Tente de novo ou fale com a recepção.');
+    if (data && data.situacao === 'conta_existente') return telaContaExistente(d);
+    if (!data || !data.ticket) throw new Error('Não foi possível fazer o check-in agora.');
+    guardarTicket(data.ticket); iniciar();
+  }
+
+  // Os mesmos dados de uma conta: entrar com a senha (e já avisar a chegada) ou pedir ajuda da recepção.
+  function telaContaExistente(d) {
+    btnSair.hidden = true; modo = null;
+    const senha = h('input', { id: 's', type: 'password', autocomplete: 'current-password', maxlength: 72 });
+    const erro = h('p', { class: 'erro', role: 'alert' });
+    const btn = h('button', { class: 'principal', type: 'submit' }, 'Entrar e fazer check-in');
+    const ajuda = h('button', { class: 'link', type: 'button', id: 'btnEsqueci', onclick: async (e) => {
+      e.currentTarget.disabled = true; erro.textContent = '';
+      try { await enviarCheckin(d, true); } catch (x) { erro.textContent = x.message; e.currentTarget.disabled = false; }
+    } }, 'Não lembro a senha: chamar a recepção');
+    mostrar(h('form', { class: 'cartao', novalidate: true, onsubmit: async (ev) => {
+      ev.preventDefault(); erro.textContent = ''; btn.disabled = true;
+      try { await entrar(d.email, senha.value, true); } catch (x) { erro.textContent = x.message; btn.disabled = false; }
+    } },
+      h('h1', {}, 'Encontramos o seu cadastro'), h('p', {}, 'Digite a sua senha para entrar e fazer o check-in.'),
+      h('p', { class: 'suave' }, d.email),
+      h('div', { class: 'campo' }, h('label', { for: 's' }, 'Senha'), senha), erro, btn,
+      h('p', { class: 'suave', style: 'margin:14px 0 0' }, 'Esqueceu? A recepção confere que é você e libera um acesso temporário.'), ajuda,
+      h('button', { class: 'link', type: 'button', onclick: () => telaInicio() }, 'Voltar')));
+  }
+
+  async function entrar(email, senha, fazerCheckin) {
+    if (!email || !senha) throw new Error('Informe o e-mail e a senha.');
+    const { error } = await db.auth.signInWithPassword({ email, password: senha });
+    if (error) throw new Error(/invalid|credenciais/i.test(error.message) ? 'E-mail ou senha incorretos.' : /confirm/i.test(error.message) ? 'Confirme o seu e-mail (veja a caixa de entrada) e tente de novo.' : error.message);
+    guardarTicket(null); pedirCheckinAoEntrar = !!fazerCheckin; iniciar();
   }
 
   /* ---------- 2) login ---------- */
-  function telaLogin(msg) {
-    btnSair.hidden = true;
-    const email = h('input', { id: 'e', type: 'email', autocomplete: 'email', required: true, inputmode: 'email' });
+  function telaLogin(msg, ini) {
+    ini = ini || {}; btnSair.hidden = true; modo = null;
+    const email = h('input', { id: 'e', type: 'email', autocomplete: 'email', required: true, inputmode: 'email', value: ini.email || '' });
     const senha = h('input', { id: 's', type: 'password', autocomplete: 'current-password', required: true, maxlength: 72 });
     const erro = h('p', { class: 'erro', role: 'alert' }, msg || '');
     const btn = h('button', { class: 'principal', type: 'submit' }, 'Entrar');
     mostrar(h('form', { class: 'cartao', novalidate: true, onsubmit: async (ev) => {
       ev.preventDefault(); erro.textContent = ''; btn.disabled = true;
-      try {
-        if (!email.value.trim() || !senha.value) throw new Error('Informe o e-mail e a senha.');
-        const { error } = await db.auth.signInWithPassword({ email: email.value.trim(), password: senha.value });
-        if (error) throw error;
-        iniciar();
-      } catch (e) { erro.textContent = /invalid|credenciais/i.test(e.message) ? 'E-mail ou senha incorretos.' : /confirm/i.test(e.message) ? 'Confirme o seu e-mail (veja a caixa de entrada) e tente de novo.' : e.message; btn.disabled = false; }
+      try { await entrar(email.value.trim(), senha.value, false); } catch (e) { erro.textContent = e.message; btn.disabled = false; }
     } },
-      h('h1', {}, 'Entre na sua conta'), h('p', { class: 'suave' }, 'Use o mesmo e-mail e senha do chat de atendimento.'),
+      h('h1', {}, 'Entre na sua conta'), h('p', { class: 'suave' }, ini.dica || 'Use o mesmo e-mail e senha do chat de atendimento.'),
       h('div', { class: 'campo' }, h('label', { for: 'e' }, 'E-mail'), email),
       h('div', { class: 'campo' }, h('label', { for: 's' }, 'Senha'), senha),
       erro, btn,
-      h('p', { class: 'suave', style: 'margin-top:14px' }, 'Ainda não tem conta? ', h('a', { href: CHAT_URL }, 'Crie pelo chat de atendimento'), ' e volte aqui.')));
+      h('p', { class: 'suave', style: 'margin-top:14px' }, 'Ainda não tem conta? ', h('button', { class: 'link', type: 'button', onclick: () => telaInicio() }, 'Faça o check-in'), ' e a recepção cria a sua.')));
+  }
+
+  /* ---------- senha provisória: obriga criar uma nova ---------- */
+  function telaTrocarSenha() {
+    btnSair.hidden = false; modo = null;
+    const n1 = h('input', { id: 'n1', type: 'password', autocomplete: 'new-password', required: true, maxlength: 72 });
+    const n2 = h('input', { id: 'n2', type: 'password', autocomplete: 'new-password', required: true, maxlength: 72 });
+    const erro = h('p', { class: 'erro', role: 'alert' });
+    const btn = h('button', { class: 'principal', type: 'submit' }, 'Salvar nova senha');
+    mostrar(h('form', { class: 'cartao', novalidate: true, onsubmit: async (ev) => {
+      ev.preventDefault(); erro.textContent = '';
+      if (n1.value.length < 8) { erro.textContent = 'Use pelo menos 8 caracteres, com letras e números.'; return; }
+      if (/^csi/i.test(n1.value) && n1.value.length < 12) { erro.textContent = 'Escolha uma senha que não seja a provisória.'; return; }
+      if (n1.value !== n2.value) { erro.textContent = 'As senhas não são iguais.'; return; }
+      btn.disabled = true;
+      const { error } = await db.auth.updateUser({ password: n1.value });
+      if (error) { erro.textContent = /weak|least|short|characters|password/i.test(error.message) ? 'Senha fraca. Use pelo menos 8 caracteres, com letras e números.' : error.message; btn.disabled = false; return; }
+      await db.rpc('conta_senha_trocada');
+      iniciar();
+    } },
+      h('h1', {}, 'Crie a sua senha'), h('p', { class: 'suave' }, 'Você entrou com uma senha provisória. Escolha uma senha só sua para continuar.'),
+      h('div', { class: 'campo' }, h('label', { for: 'n1' }, 'Nova senha'), n1),
+      h('div', { class: 'campo' }, h('label', { for: 'n2' }, 'Repita a nova senha'), n2), erro, btn));
   }
 
   /* ---------- 3) portal ---------- */
@@ -154,6 +219,14 @@
     else if (novo.situacao === 'aguardando' && antes.situacao === 'aguardando' && novo.a_frente <= AVISAR_PERTO && antes.a_frente > AVISAR_PERTO)
       avisoLocal('Está perto da sua vez', (novo.a_frente === 1 ? 'Falta 1 pessoa' : 'Faltam ' + novo.a_frente + ' pessoas') + ' à sua frente. Fique por perto.', 'perto');
   }
+  const atualizarAtual = () => (modo === 'ticket' ? atualizarTicket() : modo === 'conta' ? atualizar() : null);
+  async function atualizarTicket() {
+    const t = lerTicket(); if (!t) return;
+    const { data, error } = await db.rpc('fila_minha_vez_ticket', { p_ticket: t });
+    if (error) return desenhar(null, 'Não foi possível atualizar agora. Tentando de novo…');
+    if (!data || data.situacao === 'fora') { desligar(); guardarTicket(null); return telaInicio(); }   // fila de outro dia, ticket antigo ou pessoa retirada da fila
+    aoMudar(data); desenhar(data);
+  }
   async function atualizar() {
     const { data, error } = await db.rpc('fila_minha_vez');
     if (error) {
@@ -174,6 +247,7 @@
     const vivo = h('p', { class: 'suave' }, h('span', { class: 'vivo' + (canal && canal.state === 'joined' ? ' on' : '') }), 'Atualizando sozinho');
     if (aviso) nos.push(h('div', { class: 'cartao' }, h('p', { class: 'erro', role: 'alert' }, aviso)));
     if (!f) { nos.push(h('div', { class: 'cartao' }, h('p', {}, 'Carregando a fila…'))); return mostrar(...nos); }
+    if (modo === 'ticket') nos.push(...cartoesTicket(f));
     if (f.situacao === 'chamado') {
       nos.push(h('div', { class: 'cartao vez', role: 'status' }, h('h1', {}, 'É a sua vez!'), h('p', {}, 'Pode se dirigir ao atendimento. A equipe está esperando você.'), f.senha ? h('p', { class: 'suave' }, 'Sua senha: ' + f.senha) : null));
     } else if (f.situacao === 'aguardando') {
@@ -192,34 +266,66 @@
              h('button', { class: 'principal', type: 'button', onclick: (e) => cheguei(e.currentTarget) }, 'Cheguei')],
         h('p', { class: 'suave', style: 'margin-top:12px' }, f.total ? f.total + (f.total === 1 ? ' pessoa aguarda' : ' pessoas aguardam') + ' agora.' : 'Ninguém aguardando agora.')));
     }
+    nos.push(...cartaoAvisos());
     nos.push(vivo);
     mostrar(...nos);
+  }
+  // Sem login: se a recepção criou/redefiniu a conta, a pessoa entra aqui mesmo; senão, só aguarda e é chamada.
+  function cartoesTicket(f) {
+    const nos = [];
+    if (f.conta_pronta) {
+      const senha = h('input', { id: 'sp', type: 'password', autocomplete: 'current-password', maxlength: 72 });
+      const erro = h('p', { class: 'erro', role: 'alert' });
+      nos.push(h('form', { class: 'cartao', novalidate: true, onsubmit: async (ev) => {
+        ev.preventDefault(); erro.textContent = '';
+        try { await entrar(f.email, senha.value, false); } catch (x) { erro.textContent = x.message; }
+      } }, h('h1', {}, 'Sua conta está pronta'), h('p', {}, 'A recepção liberou o seu acesso. Digite a senha provisória que ela informou para entrar.'),
+        h('p', { class: 'suave' }, f.email), h('div', { class: 'campo' }, h('label', { for: 'sp' }, 'Senha provisória'), senha), erro,
+        h('button', { class: 'principal', type: 'submit' }, 'Entrar')));
+    } else if (f.pede_senha) {
+      nos.push(h('div', { class: 'cartao' }, h('p', { style: 'margin:0' }, 'A recepção foi avisada de que você precisa de ajuda com a senha. Ela vai liberar um acesso temporário.')));
+    } else {
+      nos.push(h('div', { class: 'cartao' }, h('p', { style: 'margin:0' }, 'Mantenha esta tela aberta. A recepção vai chamar você.')));
+    }
+    return nos;
+  }
+  function cartaoAvisos() {
+    if (!('Notification' in window) || !('serviceWorker' in navigator) || Notification.permission !== 'default' || (ios && !instalado)) return [];
+    return [h('div', { class: 'cartao' }, h('p', { class: 'suave' }, 'Quer um aviso no celular quando estiver perto da sua vez?'),
+      h('button', { class: 'principal', type: 'button', id: 'btnAvisos', onclick: async (e) => { e.currentTarget.disabled = true; try { await Notification.requestPermission(); } catch { /* ignora */ } if (modo === 'conta') assinarPush(); desenhar(ultimo); } }, 'Ativar avisos'))];
   }
   function ligarTempoReal() {
     if (canal) return;
     canal = db.channel('fila-chegada', { config: { broadcast: { self: false } } })
-      .on('broadcast', { event: 'fila_mudou' }, () => atualizar())
+      .on('broadcast', { event: 'fila_mudou' }, () => atualizarAtual())
       .subscribe();
-    tPoll = setInterval(() => { if (!document.hidden) atualizar(); }, 15000);   // reserva se o tempo real cair
-    document.addEventListener('visibilitychange', () => { if (!document.hidden && sessao) atualizar(); });
+    tPoll = setInterval(() => { if (!document.hidden) atualizarAtual(); }, 15000);   // reserva se o tempo real cair
+    if (!ligarTempoReal.vis) { ligarTempoReal.vis = true; document.addEventListener('visibilitychange', () => { if (!document.hidden) atualizarAtual(); }); }
   }
-  function desligar() { if (canal) { db.removeChannel(canal); canal = null; } clearInterval(tPoll); ultimo = null; }
+  function desligar() { if (canal) { db.removeChannel(canal); canal = null; } clearInterval(tPoll); ultimo = null; modo = null; }
 
   btnSair.addEventListener('click', async () => {
-    try { if (reg) { const s = await reg.pushManager.getSubscription(); if (s) { await db.rpc('fila_push_remover', { p_endpoint: s.endpoint }); await s.unsubscribe(); } } } catch { /* ignora */ }
-    desligar(); sessao = null; await db.auth.signOut({ scope: 'local' }); telaLogin();
+    try { if (reg) { const x = await reg.pushManager.getSubscription(); if (x) { await db.rpc('fila_push_remover', { p_endpoint: x.endpoint }); await x.unsubscribe(); } } } catch { /* ignora */ }
+    desligar(); sessao = null; guardarTicket(null); await db.auth.signOut({ scope: 'local' }); telaInicio();
   });
 
   async function iniciar() {
-    // Ordem: avisos permitidos -> login -> portal.
-    if (!('Notification' in window) || !('serviceWorker' in navigator) || Notification.permission !== 'granted' || (ios && !instalado)) return telaPermissao();
-    try { reg = await navigator.serviceWorker.register('sw.js', { scope: './' }); await navigator.serviceWorker.ready; } catch { return telaPermissao(); }
+    // Sem exigir nada antes: quem chega faz o check-in. Avisos e login são opcionais.
+    desligar();
+    if ('serviceWorker' in navigator && !reg) { try { reg = await navigator.serviceWorker.register('sw.js', { scope: './' }); await navigator.serviceWorker.ready; } catch { /* sem aviso no celular; o resto funciona */ } }
     const { data: { session } } = await db.auth.getSession();
-    if (!session) return telaLogin();
+    if (!session) {
+      if (lerTicket()) { modo = 'ticket'; sessao = null; desenhar(null); ligarTempoReal(); atualizarTicket(); return; }
+      return telaInicio();
+    }
     const { data: conta } = await db.rpc('conta_paciente_resumo');
     if (!conta || !conta.conta) { await db.auth.signOut({ scope: 'local' }); return telaLogin('Essa conta não é de paciente. Entre com a conta que você usa no chat.'); }
-    sessao = session; desenhar(null);
-    assinarPush(); ligarTempoReal(); atualizar();
+    const { data: trocar } = await db.rpc('conta_precisa_trocar_senha');
+    if (trocar === true) return telaTrocarSenha();
+    sessao = session; modo = 'conta'; desenhar(null);
+    assinarPush(); ligarTempoReal();
+    if (pedirCheckinAoEntrar) { pedirCheckinAoEntrar = false; const { data, error } = await db.rpc('fila_cheguei'); if (!error && data) { aoMudar(data); return desenhar(data); } }
+    atualizar();
   }
   iniciar();
 })();

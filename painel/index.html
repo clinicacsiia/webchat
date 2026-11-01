@@ -801,10 +801,10 @@
 
   /* ---------- aba Fila: quem chegou e quem é o próximo ---------- */
   // O banco calcula a posição e gera os avisos (chegou, perto, sua vez) para o celular do paciente; aqui a equipe só registra, chama e conclui.
-  const F = { itens: [], tRecarga: null };
+  const F = { itens: [], tRecarga: null, acesso: null };
   const hojeFila = () => new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(new Date());
   async function carregarFila() {
-    const { data, error } = await db.from('fila_chegada').select('id,nome,senha,status,origem,conta_id,chegou_em,chamado_em').in('status', ['aguardando', 'chamado']).order('chegou_em').order('id');
+    const { data, error } = await db.from('fila_chegada').select('id,nome,senha,status,origem,conta_id,chegou_em,chamado_em,email,telefone,pede_senha').in('status', ['aguardando', 'chamado']).order('chegou_em').order('id');
     if (error) throw error;
     const hoje = hojeFila();
     F.itens = (data || []).filter((x) => new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(new Date(x.chegou_em)) === hoje);
@@ -814,21 +814,40 @@
   function agendarFila() { clearTimeout(F.tRecarga); F.tRecarga = setTimeout(async () => { try { await carregarFila(); if (S.aba === 'fila') renderFila(); } catch { /* tenta de novo no próximo evento */ } }, 250); }
   async function viewFila(c) {
     c.append(h('div', { class: 'pagina', id: 'paginaFila' }, h('h2', {}, 'Fila'), h('p', { class: 'sub' }, 'Carregando…')));
-    try { await carregarFila(); } catch (e) { c.replaceChildren(h('div', { class: 'pagina' }, h('h2', {}, 'Fila'), h('p', { class: 'erro' }, msgErro(e)), h('p', { class: 'dica' }, 'Se a mensagem fala em tabela inexistente, falta aplicar supabase/fila-chegada.sql no Supabase.'))); return; }
+    try { await carregarFila(); } catch (e) { c.replaceChildren(h('div', { class: 'pagina' }, h('h2', {}, 'Fila'), h('p', { class: 'erro' }, msgErro(e)), h('p', { class: 'dica' }, 'Se a mensagem fala em tabela ou coluna inexistente, falta aplicar supabase/fila-chegada.sql e supabase/checkin-sem-login.sql no Supabase.'))); return; }
     if (S.aba === 'fila') renderFila();
   }
   async function acaoFila(nome, fn, ok) {
     try { const { error } = await fn(); if (error) throw error; if (ok) toast(ok); await carregarFila(); renderFila(); } catch (e) { toast(msgErro(e)); }
   }
+  // Conta criada / senha redefinida: a equipe lê a senha provisória e passa para o paciente (ela só aparece aqui, uma vez).
+  async function acessoFila(x, tipo) {
+    const msg = tipo === 'criar' ? 'Criar a conta de ' + x.nome + ' (' + x.email + ') com a senha provisória csi?'
+      : 'Gerar uma senha provisória para ' + x.nome + '? Confira que é a pessoa mesma, aí no balcão. A senha antiga deixa de valer.';
+    if (!confirm(msg)) return;
+    try {
+      const { data, error } = await db.rpc(tipo === 'criar' ? 'fila_criar_conta' : 'fila_redefinir_senha', { p_id: x.id });
+      if (error) throw error;
+      F.acesso = { nome: x.nome, email: data.email, senha: data.senha, tipo };
+      await carregarFila(); renderFila();
+    } catch (e) { toast(msgErro(e)); }
+  }
   function renderFila() {
     const c = document.getElementById('conteudo'); if (!c || S.aba !== 'fila') return;
     const espera = F.itens.filter((x) => x.status === 'aguardando'), chamados = F.itens.filter((x) => x.status === 'chamado');
     const hora = (t) => new Date(t).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
-    const nome = h('input', { type: 'text', id: 'fNome', maxlength: '120', placeholder: 'Nome de quem chegou', 'aria-label': 'Nome de quem chegou' });
+    const nome = h('input', { type: 'text', id: 'fNome', maxlength: '120', placeholder: 'Nome completo de quem chegou', 'aria-label': 'Nome de quem chegou' });
+    const mail = h('input', { type: 'email', id: 'fEmail', maxlength: '200', placeholder: 'E-mail (opcional)', 'aria-label': 'E-mail' });
+    const fone = h('input', { type: 'tel', id: 'fFone', maxlength: '20', placeholder: 'Celular com DDD (opcional)', 'aria-label': 'Celular' });
+    const criar = h('input', { type: 'checkbox', id: 'fCriar' });
     const linha = (x, i) => h('tr', {},
       h('td', {}, x.status === 'chamado' ? 'Chamado' : (i + 1) + 'º'), h('td', {}, 'Senha ' + x.senha), h('td', {}, x.nome),
-      h('td', {}, hora(x.chegou_em) + (x.origem === 'recepcao' ? ' · registrado pela recepção' : ' · avisou pelo celular') + (x.conta_id ? '' : ' · sem aviso no celular')),
+      h('td', {}, hora(x.chegou_em) + (x.origem === 'recepcao' ? ' · registrado pela recepção' : ' · avisou pelo celular') + (x.conta_id ? ' · com conta' : ' · sem conta'),
+        x.pede_senha ? h('div', { class: 'selo erro', style: 'display:inline-block;margin-top:4px' }, 'Esqueceu a senha') : null,
+        x.telefone || x.email ? h('div', { class: 'sub' }, [x.telefone, x.email].filter(Boolean).join(' · ')) : null),
       h('td', {},
+        !x.conta_id && x.email && x.telefone ? h('button', { class: 'btn', type: 'button', onclick: () => acessoFila(x, 'criar') }, 'Criar conta') : null,
+        x.conta_id || x.pede_senha ? h('button', { class: 'btn', type: 'button', onclick: () => acessoFila(x, 'redefinir') }, 'Redefinir senha') : null,
         h('button', { class: 'btn', type: 'button', onclick: () => acaoFila('chamar', () => db.rpc('fila_mudar', { p_id: x.id, p_para: 'chamado' }), x.status === 'chamado' ? 'Paciente chamado novamente.' : 'Paciente chamado.') }, x.status === 'chamado' ? 'Chamar novamente' : 'Chamar'),
         h('button', { class: 'btn prim', type: 'button', onclick: () => acaoFila('atendido', () => db.rpc('fila_mudar', { p_id: x.id, p_para: 'atendido' }), 'Atendimento concluído.') }, 'Atendido'),
         h('button', { class: 'btn perigo', type: 'button', onclick: () => { if (confirm('Tirar ' + x.nome + ' da fila?')) acaoFila('cancelar', () => db.rpc('fila_mudar', { p_id: x.id, p_para: 'cancelado' }), 'Removido da fila.'); } }, 'Tirar')));
@@ -836,14 +855,30 @@
       ? h('div', { class: 'tabela-wrap' }, h('table', {}, h('thead', {}, h('tr', {}, ['Posição', 'Senha', 'Nome', 'Chegada', 'Ações'].map((t) => h('th', {}, t)))),
           h('tbody', {}, [...chamados.map((x) => linha(x, 0)), ...espera.map((x, i) => linha(x, i))])))
       : h('p', { class: 'sub' }, 'Ninguém na fila agora.');
-    const antes = document.getElementById('fNome') ? document.getElementById('fNome').value : '';
-    nome.value = antes;
+    for (const [el, id] of [[nome, 'fNome'], [mail, 'fEmail'], [fone, 'fFone']]) { const o = document.getElementById(id); if (o) el.value = o.value; }
+    const oc = document.getElementById('fCriar'); if (oc) criar.checked = oc.checked;
+    const acesso = F.acesso ? h('div', { class: 'cartao-aviso', role: 'status', style: 'border:2px solid #1b7a3d;border-radius:12px;padding:12px 14px;margin:10px 0' },
+      h('b', {}, F.acesso.tipo === 'criar' ? 'Conta criada para ' + F.acesso.nome : 'Senha provisória de ' + F.acesso.nome),
+      h('div', {}, 'E-mail: ' + F.acesso.email), h('div', { style: 'font-size:1.4rem;font-weight:800' }, 'Senha provisória: ' + F.acesso.senha),
+      h('div', { class: 'sub' }, 'Passe esta senha à pessoa. No primeiro acesso ela escolhe uma senha nova. Ela entra pelo celular, na tela de check-in.'),
+      h('button', { class: 'btn', type: 'button', onclick: () => { F.acesso = null; renderFila(); } }, 'Entendi, fechar')) : null;
     c.replaceChildren(h('div', { class: 'pagina' }, h('h2', {}, 'Fila'),
       h('p', { class: 'sub' }, espera.length + (espera.length === 1 ? ' pessoa aguardando' : ' pessoas aguardando') + (chamados.length ? ' · ' + chamados.length + ' chamada(s) em atendimento' : '') + '. O paciente é avisado no celular quando estiver perto e na vez dele.'),
       h('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 14px' },
         h('button', { class: 'btn prim', type: 'button', disabled: !espera.length, onclick: () => acaoFila('proximo', () => db.rpc('fila_chamar_proximo'), 'Próximo chamado.') }, 'Chamar o próximo'),
-        nome, h('button', { class: 'btn', type: 'button', onclick: () => { const n = nome.value.trim(); if (!n) { toast('Digite o nome de quem chegou.'); return; } acaoFila('registrar', () => db.rpc('fila_registrar_chegada', { p_nome: n }), 'Chegada registrada.'); } }, 'Registrar chegada')),
-      tabela));
+        nome, mail, fone,
+        h('label', { style: 'display:flex;align-items:center;gap:6px' }, criar, 'Criar conta (senha csi)'),
+        h('button', { class: 'btn', type: 'button', onclick: async () => {
+          const n = nome.value.trim(); if (!n) { toast('Digite o nome de quem chegou.'); return; }
+          try {
+            const { data, error } = await db.rpc('fila_registrar_completo', { p_nome: n, p_email: mail.value.trim(), p_telefone: fone.value.trim(), p_criar_conta: criar.checked });
+            if (error) throw error;
+            if (data && data.senha) F.acesso = { nome: n, email: data.email, senha: data.senha, tipo: 'criar' }; else toast('Chegada registrada.');
+            nome.value = mail.value = fone.value = ''; criar.checked = false;
+            await carregarFila(); renderFila();
+          } catch (e) { toast(msgErro(e)); }
+        } }, 'Registrar chegada')),
+      acesso, tabela));
   }
 
   /* ---------- aba Jornada: onde está cada paciente, ao vivo ---------- */
