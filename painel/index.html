@@ -121,6 +121,36 @@
   .chat-topo .quem span { font-size: 13px; color: var(--suave); }
   .chat-topo .quem a { color: var(--azul); }
   .voltar { display: none; }
+  /* Quadro: outra forma de ver as conversas (dentro do Atendimento) */
+  .modo { display: inline-flex; border: 1.5px solid var(--linha); border-radius: 999px; overflow: hidden; margin-right: 4px; }
+  .modo button { border: 0; background: var(--papel); padding: 5px 12px; font-size: 13px; font-weight: 650; cursor: pointer; }
+  .modo button[aria-pressed=true] { background: var(--verde-escuro); color: #fff; }
+  #quadro { display: none; flex-direction: column; min-width: 0; min-height: 0; background: var(--fundo); }
+  .inbox.quadro { grid-template-columns: 1fr; }
+  .inbox.quadro .lista, .inbox.quadro .chat { display: none; }
+  .inbox.quadro #quadro { display: flex; }
+  .inbox.quadro.aberta { grid-template-columns: minmax(0, 1fr) minmax(360px, 42%); }
+  .inbox.quadro.aberta .chat { display: flex; }
+  .q-topo { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; padding: 10px; background: var(--papel); border-bottom: 1px solid var(--linha); }
+  .q-topo input { width: 190px; padding: 5px 10px; font-size: 13px; }
+  .q-colunas { flex: 1; min-height: 0; display: flex; gap: 10px; padding: 10px; overflow: auto; align-items: flex-start; }
+  .q-col { flex: 0 0 250px; background: #e6eee9; border-radius: 12px; display: flex; flex-direction: column; max-height: 100%; min-height: 0; }
+  .q-col.alvo { outline: 2px dashed var(--verde); }
+  .q-col h3 { margin: 0; padding: 10px 12px 6px; font-size: 13.5px; display: flex; justify-content: space-between; gap: 6px; }
+  .q-col h3 span { color: var(--suave); font-weight: 600; }
+  .q-lista { overflow-y: auto; padding: 4px 8px 8px; display: grid; gap: 7px; min-height: 30px; }
+  .q-card { text-align: left; background: var(--papel); border: 1.5px solid var(--linha); border-radius: 10px; padding: 8px 10px; cursor: pointer; display: block; width: 100%; }
+  .q-card:hover { border-color: var(--verde); }
+  .q-card[aria-current=true] { border-color: var(--verde); background: #e3f1e8; }
+  .q-card.p2 { border-left: 4px solid #e08a00; } .q-card.p3 { border-left: 4px solid var(--erro); }
+  .q-card b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .q-card .q2 { color: var(--suave); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .q-card .q3 { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 4px; font-size: 12px; }
+  .q-chip { border-radius: 6px; padding: 1px 6px; background: #eef3f0; color: var(--suave); font-weight: 650; }
+  .q-chip.alerta { background: #fde2df; color: var(--erro); } .q-chip.aviso { background: #fff0cf; color: var(--aviso); }
+  #cartaoJ:empty { display: none; }
+  .cartaoJ { background: #f4f1fb; border-bottom: 1px solid var(--linha); padding: 8px 14px; font-size: 13.5px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .cartaoJ select { width: auto; padding: 5px 8px; font-size: 13px; }
   .msgs { flex: 1; overflow-y: auto; padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; min-height: 0; }
   .dia { align-self: center; background: rgba(16,48,43,.1); color: var(--suave); font-size: 12px; padding: 3px 11px; border-radius: 999px; margin: 10px 0 6px; }
   .msg { max-width: 72%; padding: 8px 11px 6px; border-radius: 14px; background: var(--papel); box-shadow: 0 1px 1px rgba(16,48,43,.08); white-space: pre-wrap; overflow-wrap: anywhere; }
@@ -185,6 +215,9 @@
     .inbox.aberta .lista { display: none; }
     .inbox.aberta .chat { display: flex; }
     .voltar { display: inline-block; }
+    .inbox.quadro.aberta { grid-template-columns: 1fr; }
+    .inbox.quadro.aberta #quadro { display: none; }
+    .q-col { flex-basis: 78vw; }
     .msg { max-width: 88%; }
   }
   @media (prefers-reduced-motion: no-preference) { .msg { animation: entra .15s ease-out; } @keyframes entra { from { opacity: 0; transform: translateY(4px); } } }
@@ -260,7 +293,9 @@
   const S = {
     me: null, agentes: new Map(), conversas: [], filtro: 'aguardando', abertaId: null, msgs: [], vistos: new Set(),
     aba: 'atendimento', canal: null, ao_vivo: false, contatos: [], mudo: localStorage.getItem('painel.mudo') === '1',
-    buscaContatos: '', periodo: 'todos', tagFiltro: '', pre: null
+    buscaContatos: '', periodo: 'todos', tagFiltro: '', pre: null,
+    modo: (() => { try { return localStorage.getItem('painel.modo') === 'quadro' ? 'quadro' : 'lista'; } catch { return 'lista'; } })(),
+    quadro: [], colunasQ: [], transQ: [], fq: 'todos', buscaQ: '', quadroOk: true
   };
   /* ---------- pré-agendamento montado pela IA ---------- */
   const ROTULO_PRE = { rascunho: 'Em coleta', pronto: 'Pronto para marcar', agendado: 'Agendado', cancelado: 'Cancelado' };
@@ -550,6 +585,7 @@
         if (S.ao_vivo) agendarRecarga();
       });
   }
+  setInterval(() => { if (S.me && S.aba === 'atendimento' && S.modo === 'quadro' && !document.hidden) carregarQuadro(); }, 30000);
   // Painel aberto = equipe online: o chat avisa o paciente se não houver ninguém (e o contador mostra isso).
   let tPresenca = null;
   function marcarPresenca() {
@@ -559,7 +595,7 @@
     if (!marcarPresenca.ligado) { marcarPresenca.ligado = true; document.addEventListener('visibilitychange', () => { if (S.me && !document.hidden) db.rpc('painel_presenca').then(() => {}); }); }
   }
   function desligarTempoReal() { if (S.canal) { db.removeChannel(S.canal); S.canal = null; } }
-  function agendarRecarga() { clearTimeout(tRecarga); tRecarga = setTimeout(async () => { await carregarConversas(); if (S.aba === 'atendimento') { renderLista(); renderTopoChat(); renderAlertaPreco(); carregarPre(); } atualizarSelo(); }, 250); }
+  function agendarRecarga() { clearTimeout(tRecarga); tRecarga = setTimeout(async () => { await carregarConversas(); if (S.aba === 'atendimento') { renderLista(); renderTopoChat(); renderAlertaPreco(); carregarPre(); if (S.modo === 'quadro') carregarQuadro(); } atualizarSelo(); }, 250); }
   function aoNovaMensagem(m) {
     if (m.autor === 'cliente') {
       const c = S.conversas.find((x) => x.id === m.conversa_id);
@@ -640,19 +676,21 @@
     });
   }
   function viewAtendimento(c) {
-    const inbox = h('div', { class: 'inbox' + (S.abertaId ? ' aberta' : ''), id: 'inbox' },
+    const inbox = h('div', { class: 'inbox' + (S.abertaId ? ' aberta' : '') + (S.modo === 'quadro' ? ' quadro' : ''), id: 'inbox' },
       h('section', { class: 'lista', 'aria-label': 'Conversas' },
         h('div', { class: 'filtros', id: 'filtros' }),
         h('div', { class: 'itens', id: 'itens' })),
+      h('section', { id: 'quadro', 'aria-label': 'Quadro das conversas' }),
       h('section', { class: 'chat', id: 'chat', 'aria-label': 'Conversa' }));
     c.append(inbox); renderLista(); renderChat();
+    if (S.modo === 'quadro') { renderQuadro(); carregarQuadro(); }
   }
   function renderLista() {
     const f = document.getElementById('filtros'), it = document.getElementById('itens'); if (!f || !it) return;
     const cont = (fn) => S.conversas.filter(fn).length;
     const defs = [['aguardando', 'Aguardando', cont((x) => x.status === 'aguardando')], ['meus', 'Meus', cont((x) => x.status === 'em_atendimento' && x.agente_id === S.me.id)],
       ['abertas', 'Abertas', cont((x) => x.status !== 'encerrada')], ['encerradas', 'Encerradas', null]];
-    f.replaceChildren(...defs.map(([id, rot, n]) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(S.filtro === id), onclick: () => { S.filtro = id; renderLista(); } }, n != null ? `${rot} (${n})` : rot)));
+    f.replaceChildren(seletorModo(), ...defs.map(([id, rot, n]) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(S.filtro === id), onclick: () => { S.filtro = id; renderLista(); } }, n != null ? `${rot} (${n})` : rot)));
     const lista = filtradas();
     if (!lista.length) {
       const msgs = { aguardando: ['Ninguém na fila', 'Novas conversas aparecem aqui na hora.'], meus: ['Nada com você agora', 'Assuma uma conversa da fila para começar.'], abertas: ['Sem conversas abertas', ''], encerradas: ['Nenhuma encerrada ainda', ''] };
@@ -667,10 +705,121 @@
         h('div', { class: 'l3' }, h('span', { class: 'tag ' + c.status }, ROTULO_STATUS[c.status]), c.triagem_urgencia === 'alta' ? h('span', { class: 'urg alta' }, 'Urgente') : null, c.alerta_agenda ? h('span', { class: 'urg media', title: 'Conferência automática da agenda' }, c.alerta_agenda) : null, alertasDe(c.id).length ? h('span', { class: 'urg alta', title: 'Valor informado fora da referência (só a equipe vê)' }, 'Conferir valor') : null, c.ia_ativa && c.status === 'aguardando' ? h('span', { style: 'color:var(--suave)' }, c.motor === 'fluxo' ? 'Assistente automático' : 'IA atendendo') : null, ag ? h('span', { style: 'color:var(--suave)' }, ag.nome) : null));
     }));
   }
+
+  /* ---------- quadro das conversas (dentro do Atendimento) ---------- */
+  // Só entram cartões ligados a uma conversa do chat: os dados do Klingo sem conversa nunca são carregados aqui.
+  function seletorModo() {
+    const bt = (id, rot) => h('button', { type: 'button', 'aria-pressed': String(S.modo === id), onclick: () => mudarModo(id) }, rot);
+    return h('div', { class: 'modo', role: 'group', 'aria-label': 'Forma de ver as conversas' }, bt('lista', 'Lista'), bt('quadro', 'Quadro'));
+  }
+  function mudarModo(m) {
+    if (S.modo === m) return;
+    S.modo = m; try { localStorage.setItem('painel.modo', m); } catch {}
+    const inbox = document.getElementById('inbox'); if (!inbox) return;
+    inbox.classList.toggle('quadro', m === 'quadro');
+    renderLista();
+    if (m === 'quadro') { renderQuadro(); carregarQuadro(); }
+  }
+  async function carregarQuadro() {
+    try {
+      const [cols, cards, tr] = await Promise.all([
+        db.from('jornada_coluna').select('id,nome,ordem,origem').eq('ativa', true).order('ordem'),
+        db.from('v_jornada_quadro').select('id,paciente_nome,coluna,data_ref,unidade,coluna_desde,responsavel,prioridade,versao,conversa_id,primeiro_exame,n_ativos,atrasado,n_tarefas_abertas,n_tarefas_vencidas,proxima_hora').not('conversa_id', 'is', null),
+        db.from('jornada_transicao').select('de,para')]);
+      const erro = cols.error || cards.error || tr.error;
+      if (erro) { S.quadroOk = false; S.quadro = []; renderQuadro(); renderCartaoJ(); return; }
+      S.quadroOk = true; S.colunasQ = cols.data || []; S.quadro = cards.data || []; S.transQ = tr.data || [];
+    } catch { S.quadroOk = false; }
+    if (S.aba === 'atendimento') { renderQuadro(); renderCartaoJ(); }
+  }
+  const conversaDoCartao = (k) => S.conversas.find((c) => c.id === k.conversa_id);
+  function cartoesFiltrados() {
+    const q = S.buscaQ.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+    return S.quadro.filter((k) => {
+      const c = conversaDoCartao(k);
+      if (S.fq === 'meus' && !(k.responsavel === S.me.id || (c && c.agente_id === S.me.id))) return false;
+      if (S.fq === 'atrasados' && !k.atrasado) return false;
+      if (S.fq === 'aguardando' && !(c && c.status === 'aguardando')) return false;
+      if (q) {
+        const nome = ((c ? nomeLista(c) : k.paciente_nome) || '') + ' ' + (k.primeiro_exame || '');
+        if (!nome.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').includes(q)) return false;
+      }
+      return true;
+    });
+  }
+  function destinosDe(k) {
+    const manuais = new Set(S.colunasQ.filter((x) => x.origem === 'manual').map((x) => x.id));
+    return S.transQ.filter((t) => t.de === k.coluna && manuais.has(t.para)).map((t) => t.para);
+  }
+  async function moverCartao(k, para) {
+    let nota = null;
+    if (para === 'perdido') { nota = prompt('Por que este contato foi perdido? (mínimo 3 letras)'); if (nota == null) return; }
+    const { error } = await db.rpc('jornada_mover_card', { p_card: k.id, p_para: para, p_versao: k.versao, p_nota: nota });
+    if (error) { toast(/CONFLITO/.test(error.message || '') ? 'Outra pessoa mexeu neste cartão. Atualizei o quadro.' : msgErro(error)); }
+    await carregarQuadro();
+  }
+  async function atribuirCartao(k, quem) {
+    const { error } = await db.rpc('jornada_atribuir_card', { p_card: k.id, p_responsavel: quem || null, p_versao: k.versao });
+    if (error) toast(/CONFLITO/.test(error.message || '') ? 'Outra pessoa mexeu neste cartão. Atualizei o quadro.' : msgErro(error));
+    await carregarQuadro();
+  }
+  function renderQuadro() {
+    const box = document.getElementById('quadro'); if (!box) return;
+    if (!S.quadroOk) { box.replaceChildren(h('div', { class: 'vazio' }, h('b', {}, 'O quadro ainda não está disponível'), 'Use a lista por enquanto. Se continuar assim, avise o administrador.'), h('div', { class: 'q-topo' }, seletorModo())); return; }
+    const lista = cartoesFiltrados();
+    const fch = (id, rot) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(S.fq === id), onclick: () => { S.fq = id; renderQuadro(); } }, rot);
+    const busca = h('input', { type: 'search', placeholder: 'Buscar nome ou exame', 'aria-label': 'Buscar no quadro', value: S.buscaQ });
+    busca.addEventListener('input', () => { S.buscaQ = busca.value; clearTimeout(renderQuadro.t); renderQuadro.t = setTimeout(() => { renderQuadro(); document.querySelector('#quadro input[type=search]')?.focus(); }, 200); });
+    const topo = h('div', { class: 'q-topo' }, seletorModo(), fch('todos', 'Todos'), fch('meus', 'Meus'), fch('aguardando', 'Aguardando'), fch('atrasados', 'Atrasados'), busca);
+    const porColuna = new Map();
+    lista.forEach((k) => { if (!porColuna.has(k.coluna)) porColuna.set(k.coluna, []); porColuna.get(k.coluna).push(k); });
+    const cols = S.colunasQ.filter((c) => porColuna.has(c.id) || (c.origem === 'manual' && ['contato', 'orcamento', 'autorizacao'].includes(c.id)));
+    const colunas = h('div', { class: 'q-colunas' }, cols.length ? cols.map((c) => colunaQuadro(c, porColuna.get(c.id) || [])) : h('div', { class: 'vazio', style: 'width:100%' }, h('b', {}, 'Nada no quadro'), 'Conversas com pedido de exame aparecem aqui.'));
+    box.replaceChildren(topo, colunas);
+  }
+  function colunaQuadro(c, cartoes) {
+    const col = h('div', { class: 'q-col', 'data-coluna': c.id },
+      h('h3', {}, c.nome, h('span', {}, String(cartoes.length))),
+      h('div', { class: 'q-lista' }, cartoes.sort((a, b) => (b.prioridade - a.prioridade) || String(a.coluna_desde).localeCompare(String(b.coluna_desde))).map(cartaoQuadro)));
+    col.addEventListener('dragover', (e) => { if (S.arrasta && destinosDe(S.arrasta).includes(c.id)) { e.preventDefault(); col.classList.add('alvo'); } });
+    col.addEventListener('dragleave', () => col.classList.remove('alvo'));
+    col.addEventListener('drop', (e) => { e.preventDefault(); col.classList.remove('alvo'); const k = S.arrasta; S.arrasta = null; if (k && destinosDe(k).includes(c.id)) moverCartao(k, c.id); });
+    return col;
+  }
+  function cartaoQuadro(k) {
+    const c = conversaDoCartao(k);
+    const ag = k.responsavel ? S.agentes.get(k.responsavel) : null;
+    const el = h('button', { class: 'q-card p' + (k.prioridade || 0), type: 'button', 'aria-current': String(k.conversa_id === S.abertaId), draggable: 'true', onclick: () => { if (c) abrirConversa(k.conversa_id); else toast('Essa conversa não está na lista carregada.'); } },
+      h('b', {}, c ? nomeLista(c) : (k.paciente_nome || 'Contato')),
+      h('div', { class: 'q2' }, (k.primeiro_exame || 'Sem exame ainda') + (k.n_ativos > 1 ? ` +${k.n_ativos - 1}` : '')),
+      h('div', { class: 'q3' },
+        c && c.nao_lidas_agente > 0 ? h('span', { class: 'q-chip aviso' }, c.nao_lidas_agente + ' nova(s)') : null,
+        c && c.status === 'aguardando' ? h('span', { class: 'q-chip aviso' }, 'Aguardando') : null,
+        k.atrasado ? h('span', { class: 'q-chip alerta' }, 'Atrasado') : null,
+        k.n_tarefas_abertas > 0 ? h('span', { class: 'q-chip' + (k.n_tarefas_vencidas > 0 ? ' alerta' : '') }, '☑ ' + k.n_tarefas_abertas) : null,
+        ag ? h('span', { class: 'q-chip' }, ag.nome) : null));
+    el.addEventListener('dragstart', (e) => { S.arrasta = k; try { e.dataTransfer.setData('text/plain', String(k.id)); } catch {} });
+    el.addEventListener('dragend', () => { S.arrasta = null; });
+    return el;
+  }
+  // Barra "Cartão" no alto da conversa: onde o atendente move e atribui (serve no celular, onde não se arrasta).
+  function renderCartaoJ() {
+    const box = document.getElementById('cartaoJ'); if (!box) return;
+    const k = S.abertaId ? S.quadro.find((x) => x.conversa_id === S.abertaId) : null;
+    if (!k || !S.quadroOk) { box.replaceChildren(); return; }
+    const col = S.colunasQ.find((x) => x.id === k.coluna);
+    const dest = destinosDe(k).map((id) => S.colunasQ.find((x) => x.id === id)).filter(Boolean);
+    const sel = dest.length ? h('select', { 'aria-label': 'Mover o cartão para', onchange: (e) => { if (e.target.value) moverCartao(k, e.target.value); } }, h('option', { value: '' }, 'Mover para…'), dest.map((d) => h('option', { value: d.id }, d.nome))) : null;
+    const pessoas = [...S.agentes.values()].filter((a) => a.ativo && (a.papel === 'admin' || a.papel === 'atendente'));
+    const resp = h('select', { 'aria-label': 'Responsável pelo cartão', onchange: (e) => atribuirCartao(k, e.target.value) },
+      h('option', { value: '' }, 'Sem responsável'), pessoas.map((a) => h('option', { value: a.id, selected: a.id === k.responsavel }, a.nome)));
+    box.replaceChildren(h('div', { class: 'cartaoJ' }, h('span', {}, h('b', {}, 'Etapa: '), col ? col.nome : k.coluna), sel, resp));
+  }
   async function abrirConversa(id) {
     S.abertaId = id; S.msgs = []; S.vistos = new Set(); S.pre = null; S.preSig = null;
     document.getElementById('inbox')?.classList.add('aberta');
     renderLista(); renderChat(); carregarPre();
+    if (S.modo === 'quadro') renderQuadro();
     const { data, error } = await db.from('mensagens').select('id,conversa_id,autor,agente_id,texto,criado_em,opcoes').eq('conversa_id', id).order('id').limit(1000);
     if (S.abertaId !== id) return;
     if (error) { toast(msgErro(error)); return; }
@@ -686,8 +835,8 @@
     const enviar = h('button', { class: 'btn prim', type: 'button', id: 'btnEnviar', onclick: enviarMsg }, 'Enviar');
     area.addEventListener('input', () => { area.style.height = 'auto'; area.style.height = Math.min(area.scrollHeight, 140) + 'px'; });
     area.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); enviarMsg(); } });
-    box.replaceChildren(h('div', { class: 'chat-topo', id: 'chatTopo' }), h('div', { id: 'triagem' }), h('div', { id: 'alertaPreco' }), h('div', { id: 'pre' }), h('div', { class: 'msgs', id: 'msgs', 'aria-live': 'polite' }), h('div', { class: 'compor' }, area, enviar));
-    renderTopoChat(); renderAlertaPreco(); desenharMsgs(true);
+    box.replaceChildren(h('div', { class: 'chat-topo', id: 'chatTopo' }), h('div', { id: 'triagem' }), h('div', { id: 'alertaPreco' }), h('div', { id: 'cartaoJ' }), h('div', { id: 'pre' }), h('div', { class: 'msgs', id: 'msgs', 'aria-live': 'polite' }), h('div', { class: 'compor' }, area, enviar));
+    renderTopoChat(); renderAlertaPreco(); renderCartaoJ(); desenharMsgs(true);
   }
   function renderTopoChat() {
     const t = document.getElementById('chatTopo'); const c = conversaAberta(); if (!t || !c) return;
@@ -703,7 +852,7 @@
       c.triagem_urgencia ? h('span', { class: 'urg ' + c.triagem_urgencia }, 'Urgência ' + ({ baixa: 'baixa', media: 'média', alta: 'alta' })[c.triagem_urgencia]) : null,
       c.triagem_resumo ? h('div', {}, c.triagem_resumo) : null)] : []));
     t.replaceChildren(
-      h('button', { class: 'btn voltar', type: 'button', onclick: () => { S.abertaId = null; document.getElementById('inbox')?.classList.remove('aberta'); renderLista(); renderChat(); } }, 'Voltar'),
+      h('button', { class: 'btn voltar', type: 'button', onclick: () => { S.abertaId = null; document.getElementById('inbox')?.classList.remove('aberta'); renderLista(); renderChat(); if (S.modo === 'quadro') renderQuadro(); } }, 'Voltar'),
       h('div', { class: 'quem' }, h('b', {}, nomeLista(c)),
         h('span', {}, ct.telefone ? h('a', { href: 'https://wa.me/55' + soDigitos(ct.telefone), target: '_blank', rel: 'noopener noreferrer' }, fmtTel(ct.telefone)) : '', ct.email ? ' · ' + ct.email : '',
           ' · ', ROTULO_STATUS[c.status], ag ? ' com ' + ag.nome : ''),
