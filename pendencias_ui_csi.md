@@ -21,14 +21,20 @@
 - **Ação necessária:** o responsável pela marca aprovar os tons, ou indicar outro par que cumpra 4,5:1.
 - **Prioridade:** baixa.
 
-## 4. Painel de Atendimento sem cabeçalho de página e sem indicadores
+## 4. ~~Painel de Atendimento sem cabeçalho de página e sem indicadores~~ (feito em 01/11/2026)
+**Resolvido:** título, data e quatro cartões (Conversas hoje, Em espera, Encerradas hoje, Alertas), calculados do que o painel já carrega, sem consulta nova. Não há "variação vs. dia anterior" porque não há dado do dia anterior. Também entraram a barra de busca no topo (filtra a lista e o quadro por nome, telefone e última mensagem), o sino e o nome de quem está logado.
+
+_Texto original:_
 - **Arquivo/componente:** `painel/index.html`, `viewAtendimento()`.
 - **Problema:** a aba Atendimento abre direto em lista, quadro e conversa, sem título "Painel de Atendimento" nem cartões de indicadores (Atendimentos Hoje, Em Espera, Concluídos, Alertas). Os cartões `.num` existem só em outras abas.
 - **Impedimento:** criar o cabeçalho e os indicadores exige novo bloco de interface e novas consultas ou contagens, o que é lógica nova e está fora do escopo visual.
 - **Ação necessária:** aprovar a evolução e definir a origem de cada número, que deve vir de dados reais.
 - **Prioridade:** média.
 
-## 5. Menu da sidebar sem ícones
+## 5. ~~Menu da sidebar sem ícones~~ (feito em 01/11/2026)
+**Resolvido:** ícones de traço (SVG embutido, sem biblioteca) antes de cada item; `data-aba`, `onclick` e os selos foram mantidos. Linhas da lista ganharam avatar com iniciais e etiquetas de status coloridas.
+
+_Texto original:_
 - **Arquivo/componente:** `painel/index.html`, `nav.nav button` (função `montarApp`).
 - **Problema:** os itens têm só texto, sem os ícones uniformes da referência visual.
 - **Impedimento:** o projeto não tem biblioteca de ícones, e incluir ícones exige alterar a estrutura interna dos botões que têm `onclick`, `data-aba` e selos de contagem usados por testes.
