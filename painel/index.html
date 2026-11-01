@@ -151,6 +151,19 @@
   #cartaoJ:empty { display: none; }
   .cartaoJ { background: #f4f1fb; border-bottom: 1px solid var(--linha); padding: 8px 14px; font-size: 13.5px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
   .cartaoJ select { width: auto; padding: 5px 8px; font-size: 13px; }
+  /* A mesma pessoa em várias conversas, exame em aberto e remarcação */
+  #pessoa:empty, #exameAberto:empty { display: none; }
+  .pessoa { background: #eef6ff; border-bottom: 1px solid var(--linha); padding: 8px 14px; font-size: 13.5px; }
+  .pessoa summary { cursor: pointer; font-weight: 650; }
+  .pessoa ul { margin: 6px 0 0; padding-left: 18px; } .pessoa li { margin: 5px 0; overflow-wrap: anywhere; }
+  .pessoa .btn { padding: 2px 8px; font-size: 12px; margin-left: 4px; }
+  .ex-caixa { background: #fff8e6; border-bottom: 1px solid #f0dca8; padding: 8px 14px; font-size: 13.5px; }
+  .ex-caixa.falta { background: #fdf0f0; border-color: #f3c9c4; }
+  .ex-acoes { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; } .ex-acoes .btn { padding: 4px 10px; font-size: 13px; }
+  .ex-caixa .urg { margin-left: 6px; }
+  .sug { background: #eef6ff; border: 1px solid #c9dff5; border-radius: 10px; padding: 8px 10px; margin: 8px; font-size: 13.5px; }
+  .sug-acoes { display: flex; gap: 6px; margin-top: 6px; } .sug-acoes .btn { padding: 4px 10px; font-size: 13px; }
+  .msg-outra { align-self: center; background: rgba(16,48,43,.06); color: var(--suave); font-size: 12px; padding: 2px 10px; border-radius: 999px; margin: 6px 0 2px; }
   /* Aba Jornada: onde está cada paciente, ao vivo */
   .jornada { flex: 1; min-height: 0; min-width: 0; display: flex; flex-direction: column; background: var(--fundo); }
   .j-status { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 8px 12px; font-size: 13px; background: var(--papel); border-bottom: 1px solid var(--linha); }
@@ -318,7 +331,8 @@
     aba: 'atendimento', canal: null, ao_vivo: false, contatos: [], mudo: localStorage.getItem('painel.mudo') === '1',
     buscaContatos: '', periodo: 'todos', tagFiltro: '', pre: null,
     modo: (() => { try { return localStorage.getItem('painel.modo') === 'quadro' ? 'quadro' : 'lista'; } catch { return 'lista'; } })(),
-    quadro: [], colunasQ: [], transQ: [], fq: 'todos', buscaQ: '', quadroOk: true
+    quadro: [], colunasQ: [], transQ: [], fq: 'todos', buscaQ: '', quadroOk: true,
+    grupos: new Map(), sugestoes: [], abertos: [], remarcar: [], outrosQ: new Map()
   };
   /* ---------- pré-agendamento montado pela IA ---------- */
   const ROTULO_PRE = { rascunho: 'Em coleta', pronto: 'Pronto para marcar', agendado: 'Agendado', cancelado: 'Cancelado' };
@@ -575,9 +589,10 @@
 
   /* ---------- aba Jornada: onde está cada paciente, ao vivo ---------- */
   // O banco lê o Klingo e vigia os prazos sozinho, a cada minuto (jornada_vigiar). O painel só mostra e avisa: não fala com o Klingo.
-  const J = { cards: [], colunas: [], trans: [], estado: null, ok: true, lente: 'hoje', filtro: 'todos', unidade: '', busca: '', aberto: null, nAtencao: 0, seq: 0, canal: null, tRecarga: null };
+  const J = { cards: [], colunas: [], trans: [], estado: null, ok: true, lente: 'hoje', filtro: 'todos', unidade: '', busca: '', aberto: null, nAtencao: 0, seq: 0, canal: null, tRecarga: null,
+    pessoas: new Map(), junto: new Map(), agrupar: (() => { try { return localStorage.getItem('painel.jagrupar') !== '0'; } catch { return true; } })() };
   const LENTES_J = [['hoje', 'Hoje'], ['perto', 'Ontem a amanhã'], ['todos', 'Próximos 30 dias']];
-  const COLS_J = 'id,paciente_nome,coluna,coluna_nome,etapa,origem,ordem,data_ref,unidade,coluna_desde,responsavel,prioridade,versao,conversa_id,primeiro_exame,n_ativos,atrasado,n_tarefas_abertas,n_tarefas_vencidas,proxima_hora';
+  const COLS_J = 'id,paciente_nome,coluna,coluna_nome,etapa,origem,ordem,data_ref,unidade,coluna_desde,responsavel,prioridade,versao,conversa_id,primeiro_exame,n_ativos,atrasado,n_tarefas_abertas,n_tarefas_vencidas,proxima_hora,paciente_chave';
   const hojeBR = () => new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(new Date());
   const somaDiasJ = (iso, n) => new Date(Date.parse(iso + 'T00:00:00Z') + n * 86400000).toISOString().slice(0, 10);
   const semAcento = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
@@ -635,14 +650,16 @@
   async function carregarJornada() {
     const minha = ++J.seq;
     try {
-      const [cols, trans, cards, est] = await Promise.all([
+      const [cols, trans, cards, est, pess] = await Promise.all([
         db.from('jornada_coluna').select('id,nome,ordem,origem,etapa,sla_min').eq('ativa', true).order('ordem'),
         db.from('jornada_transicao').select('de,para'),
         consultaCardsJ(),
-        db.from('jornada_sync_estado').select('klingo_em,klingo_erro,klingo_falhas,vigia_em,vigia_erro').eq('id', true).maybeSingle()]);
+        db.from('jornada_sync_estado').select('klingo_em,klingo_erro,klingo_falhas,vigia_em,vigia_erro').eq('id', true).maybeSingle(),
+        Promise.resolve(db.rpc('jornada_pessoas')).then((r) => r, () => ({ error: true, data: null }))]);
       if (minha !== J.seq) return;
       if (cols.error || trans.error || cards.error) { J.ok = false; J.cards = []; }
-      else { J.ok = true; J.colunas = cols.data || []; J.trans = trans.data || []; J.cards = cards.data || []; J.estado = est.error ? null : est.data; }
+      else { J.ok = true; J.colunas = cols.data || []; J.trans = trans.data || []; J.cards = cards.data || []; J.estado = est.error ? null : est.data;
+        J.pessoas = new Map(); (pess && !pess.error && Array.isArray(pess.data) ? pess.data : []).forEach((r) => J.pessoas.set(r.card_id, r)); }
     } catch { if (minha !== J.seq) return; J.ok = false; }
     if (S.aba === 'jornada') renderJornada();
     atualizarAtencao();
@@ -656,16 +673,38 @@
     if (!e.klingo_em || seg(e.klingo_em) > 600) return { cls: 'aviso', txt: 'Atualizando os dados do Klingo…' };
     return { cls: 'ok', txt: `Monitorando · Klingo lido há ${duracao(e.klingo_em)}` };
   }
+  // Pontuação de quem merece ser o cartão "da frente" quando a pessoa tem vários: o que pede ação agora vem primeiro.
+  const ESCORE_J = { faltou: 100, chegou: 85, em_atendimento: 85, a_confirmar: 80, confirmado: 80, contato: 70, orcamento: 70, autorizacao: 70, agendado: 70, finalizado: 40, laudo_pendente: 40,
+    laudo_entregue: 40, faturamento: 40, nps_retorno: 40, concluido: 30, remarcado: 20, cancelado: 20, perdido: 10 };
+  const escoreJ = (k) => (k.n_tarefas_vencidas > 0 ? 50 : 0) + (ESCORE_J[k.coluna] ?? 30);
+  const pessoaDoCartao = (k) => (J.pessoas.get(k.id) || {}).pessoa || null;
+  function agruparJ(lista) {
+    J.junto = new Map();
+    if (!J.agrupar || !J.pessoas.size) return lista;
+    const porPessoa = new Map(), out = [];
+    for (const k of lista) {
+      const pe = pessoaDoCartao(k);
+      if (!pe) { out.push(k); continue; }
+      if (!porPessoa.has(pe)) porPessoa.set(pe, []);
+      porPessoa.get(pe).push(k);
+    }
+    for (const [, ks] of porPessoa) {
+      ks.sort((a, b) => escoreJ(b) - escoreJ(a) || String(b.data_ref).localeCompare(String(a.data_ref)) || b.id - a.id);
+      out.push(ks[0]); J.junto.set(ks[0].id, ks.slice(1));
+    }
+    return out;
+  }
+  const irmaosDoCartao = (k) => { const pe = pessoaDoCartao(k); return pe ? J.cards.filter((x) => x.id !== k.id && pessoaDoCartao(x) === pe) : []; };
   function cartoesJ() {
     const q = semAcento(J.busca.trim());
-    return J.cards.filter((k) => {
+    return agruparJ(J.cards.filter((k) => {
       if (J.filtro === 'meus' && k.responsavel !== S.me.id) return false;
       if (J.filtro === 'livres' && k.responsavel) return false;
       if (J.filtro === 'aviso' && !(k.n_tarefas_vencidas > 0 || k.atrasado)) return false;
       if (J.unidade && k.unidade !== J.unidade) return false;
       if (q && !semAcento((k.paciente_nome || '') + ' ' + (k.primeiro_exame || '')).includes(q)) return false;
       return true;
-    });
+    }));
   }
   function renderJornada() {
     const box = document.getElementById('jornada'); if (!box) return;
@@ -689,6 +728,7 @@
       LENTES_J.map(([id, rot]) => chip(rot, J.lente === id, () => { J.lente = id; carregarJornada(); renderJornada(); })),
       h('span', { style: 'width:8px' }),
       [['todos', 'Todos'], ['meus', 'Meus'], ['livres', 'Sem responsável'], ['aviso', 'Com aviso']].map(([id, rot]) => chip(rot, J.filtro === id, () => { J.filtro = id; renderJornada(); })),
+      J.pessoas.size ? chip('Um cartão por paciente', J.agrupar, () => { J.agrupar = !J.agrupar; try { localStorage.setItem('painel.jagrupar', J.agrupar ? '1' : '0'); } catch {} renderJornada(); }) : null,
       selUn, busca);
     const lista = cartoesJ(), porColuna = new Map();
     lista.forEach((k) => { if (!porColuna.has(k.coluna)) porColuna.set(k.coluna, []); porColuna.get(k.coluna).push(k); });
@@ -719,7 +759,9 @@
         k.proxima_hora ? h('span', { class: 'q-chip' }, 'às ' + fmtHora(k.proxima_hora)) : null,
         h('span', { class: 'q-chip' + (k.atrasado ? ' alerta' : ''), title: 'Tempo nesta etapa' }, duracao(k.coluna_desde)),
         k.n_tarefas_vencidas > 0 ? h('span', { class: 'q-chip alerta', title: 'Aviso aberto' }, '⚠ ' + k.n_tarefas_vencidas) : (k.n_tarefas_abertas > 0 ? h('span', { class: 'q-chip' }, '☑ ' + k.n_tarefas_abertas) : null),
-        k.conversa_id ? h('span', { class: 'q-chip' }, 'Chat') : null,
+        k.conversa_id || (J.pessoas.get(k.id) || {}).conversa_id ? h('span', { class: 'q-chip' }, 'Chat') : null,
+        (J.junto.get(k.id) || []).length ? h('span', { class: 'q-chip', title: 'Outros cartões da mesma pessoa, unidos neste' }, `+${J.junto.get(k.id).length} da mesma pessoa`) : null,
+        (J.pessoas.get(k.id) || {}).sugestao ? h('span', { class: 'q-chip aviso', title: 'Parece ser uma pessoa que também conversou pelo chat' }, 'Mesma pessoa do chat?') : null,
         ag ? h('span', { class: 'q-chip' }, ag.nome) : null));
   }
   const destinosJ = (k) => { const man = new Set(J.colunas.filter((x) => x.origem === 'manual').map((x) => x.id)); return J.trans.filter((t) => t.de === k.coluna && man.has(t.para)).map((t) => t.para); };
@@ -756,6 +798,41 @@
       default: return `${quem}: ${e.tipo}`;
     }
   }
+  // Em um cartão: os outros cartões da mesma pessoa, a sugestão "é a mesma pessoa do chat?" e a remarcação de quem faltou.
+  function secoesPessoaJ(k, pess, outros) {
+    const out = [];
+    if (outros.length) {
+      out.push(h('div', { class: 'j-sec' }, h('h4', {}, `Esta pessoa tem mais ${outros.length} cartão(ões)`),
+        h('ul', {}, outros.map((o) => { const c = J.colunas.find((x) => x.id === o.coluna);
+          return h('li', {}, `${c ? c.nome : o.coluna} · ${dataBR(o.data_ref)} · ${o.primeiro_exame || 'sem exame'} `, h('button', { class: 'btn', type: 'button', style: 'padding:2px 8px;font-size:12px', onclick: () => abrirCartaoJ(o.id) }, 'Abrir')); }))));
+    }
+    if (pess.sugestao && k.paciente_chave) {
+      out.push(h('div', { class: 'j-sec' }, h('h4', {}, 'Parece a mesma pessoa do chat'),
+        h('div', { style: 'font-size:13.5px' }, 'O nome e o telefone batem com uma conversa do chat. Falta uma confirmação sua para unir os dois.'),
+        h('div', { class: 'j-acoes' }, h('button', { class: 'btn prim', type: 'button', onclick: async () => {
+          const { error } = await db.rpc('pessoa_klingo_confirmar', { p_prontuario: k.paciente_chave, p_conversa: pess.sugestao });
+          if (error) { toast(msgErro(error)); return; }
+          toast('Unidos.'); await depoisDeMexer(k.id); } }, 'É a mesma pessoa'))));
+    } else if (pess.pessoa && pess.pessoa.startsWith('g:') && !k.conversa_id && k.paciente_chave) {
+      out.push(h('div', { class: 'j-sec' }, h('div', { style: 'font-size:13px;color:var(--suave)' }, 'Unido à conversa do chat desta pessoa. ',
+        h('button', { class: 'btn', type: 'button', style: 'padding:2px 8px;font-size:12px', onclick: async () => {
+          if (!confirm('Desfazer a união com a conversa do chat? Se o nome, o telefone e o dia da marcação ainda baterem, ela volta a ser unida sozinha.')) return;
+          const { error } = await db.rpc('pessoa_klingo_desfazer', { p_prontuario: k.paciente_chave });
+          if (error) { toast(msgErro(error)); return; }
+          await depoisDeMexer(k.id); } }, 'Desfazer'))));
+    }
+    if (k.coluna === 'faltou') {
+      out.push(h('div', { class: 'j-sec' }, h('h4', {}, 'Faltou: remarcar'),
+        pess.conversa_id
+          ? h('div', {}, h('div', { style: 'font-size:13.5px' }, 'O paciente tem conversa no chat. Ele recebe uma pergunta com botões e remarca sozinho, passo a passo (exame, convênio, calendário e dados).'),
+              h('div', { class: 'j-acoes' }, h('button', { class: 'btn prim', type: 'button', onclick: async () => {
+                const { data, error } = await db.rpc('jornada_remarcar_pelo_chat', { p_card: k.id });
+                if (error) { toast(msgErro(error)); return; }
+                toast(data && data.canal === 'botoes' ? 'Pedido enviado pelo chat, com botões.' : 'Mensagem enviada ao paciente.'); } }, 'Pedir ao paciente que remarque pelo chat')))
+          : h('div', { style: 'font-size:13.5px' }, 'Este paciente não está ligado a uma conversa do chat. Ligue para oferecer a nova data (veja a tarefa do cartão).')));
+    }
+    return out;
+  }
   async function abrirCartaoJ(id) {
     const k = J.cards.find((x) => x.id === id); if (!k) return;
     const primeira = !dlg.open;
@@ -767,6 +844,7 @@
       db.from('jornada_evento').select('id,quando,tipo,origem,usuario,de_coluna,para_coluna,detalhe').eq('card_id', id).order('quando', { ascending: false }).limit(15)]);
     if (J.aberto !== id) return;
     const col = J.colunas.find((x) => x.id === k.coluna);
+    const pess = J.pessoas.get(k.id) || {}, outros = irmaosDoCartao(k), conversaDoPaciente = k.conversa_id || pess.conversa_id || null;
     const dest = destinosJ(k).map((d) => J.colunas.find((x) => x.id === d)).filter(Boolean);
     const sel = dest.length ? h('select', { 'aria-label': 'Mover o paciente para', onchange: (e) => { if (e.target.value) moverJ(k, e.target.value); } }, h('option', { value: '' }, 'Mover para…'), dest.map((d) => h('option', { value: d.id }, d.nome))) : null;
     const pessoas = [...S.agentes.values()].filter((a) => a.ativo && (a.papel === 'admin' || a.papel === 'atendente'));
@@ -779,7 +857,8 @@
       h('h3', {}, k.paciente_nome || 'Paciente sem nome'),
       h('div', { style: 'color:var(--suave);font-size:14px' }, `${col ? col.nome : k.coluna} · parado há ${duracao(k.coluna_desde)}${k.unidade ? ' · ' + k.unidade : ''}${k.proxima_hora ? ' · horário ' + fmtDataHora(k.proxima_hora) : ''}`),
       h('div', { class: 'j-acoes' }, sel, resp, !k.responsavel ? h('button', { class: 'btn', type: 'button', onclick: () => atribuirJ(k, S.me.id) }, 'Assumir') : null,
-        k.conversa_id ? h('button', { class: 'btn', type: 'button', onclick: () => { dlg.close(); S.aba = 'atendimento'; renderAba(); abrirConversa(k.conversa_id); } }, 'Abrir conversa') : null),
+        conversaDoPaciente ? h('button', { class: 'btn', type: 'button', onclick: () => { dlg.close(); S.aba = 'atendimento'; renderAba(); abrirConversa(conversaDoPaciente); } }, 'Abrir conversa') : null),
+      ...secoesPessoaJ(k, pess, outros),
       h('div', { class: 'j-sec' }, h('h4', {}, 'Exames'), exames.length ? h('ul', {}, exames) : h('div', { style: 'font-size:13.5px' }, 'Nenhum exame neste cartão.')),
       h('div', { class: 'j-sec' }, h('h4', {}, 'Avisos e tarefas'), tarefas.length ? h('ul', {}, tarefas) : h('div', { style: 'font-size:13.5px' }, 'Nada pendente.')),
       h('div', { class: 'j-sec' }, h('h4', {}, 'Histórico'), (ev.data || []).length ? h('ul', {}, (ev.data || []).map((e) => h('li', {}, fmtDataHora(e.quando) + ' · ' + textoEventoJ(e)))) : h('div', { style: 'font-size:13.5px' }, 'Sem registros.')),
@@ -842,24 +921,30 @@
     if (!marcarPresenca.ligado) { marcarPresenca.ligado = true; document.addEventListener('visibilitychange', () => { if (S.me && !document.hidden) db.rpc('painel_presenca').then(() => {}); }); }
   }
   function desligarTempoReal() { if (S.canal) { db.removeChannel(S.canal); S.canal = null; } }
-  function agendarRecarga() { clearTimeout(tRecarga); tRecarga = setTimeout(async () => { await carregarConversas(); if (S.aba === 'atendimento') { renderLista(); renderTopoChat(); renderAlertaPreco(); carregarPre(); if (S.modo === 'quadro') carregarQuadro(); } atualizarSelo(); }, 250); }
+  function agendarRecarga() { clearTimeout(tRecarga); tRecarga = setTimeout(async () => { await carregarConversas(); if (S.aba === 'atendimento') { renderLista(); renderTopoChat(); renderPessoaChat(); renderAlertaPreco(); carregarPre(); if (S.modo === 'quadro') carregarQuadro(); } atualizarSelo(); }, 250); }
   function aoNovaMensagem(m) {
     if (m.autor === 'cliente') {
       const c = S.conversas.find((x) => x.id === m.conversa_id);
-      if (m.conversa_id !== S.abertaId || document.hidden) avisar(c ? (c.nome_informado || (c.contatos && c.contatos.nome)) || 'Nova mensagem' : 'Nova mensagem', String(m.texto).slice(0, 100));
+      if (!(S.abertaId && membrosDe(S.abertaId).includes(m.conversa_id)) || document.hidden) avisar(c ? (c.nome_informado || (c.contatos && c.contatos.nome)) || 'Nova mensagem' : 'Nova mensagem', String(m.texto).slice(0, 100));
     }
-    if (m.conversa_id === S.abertaId && !S.vistos.has(m.id)) {
+    if (S.abertaId && membrosDe(S.abertaId).includes(m.conversa_id) && !S.vistos.has(m.id)) {
       S.vistos.add(m.id); S.msgs.push(m); desenharMsgs(true);
       if (m.autor === 'cliente') marcarLida(m.conversa_id);
     }
     agendarRecarga();
   }
-  function marcarLida(id) {
+  const pendLidas = new Set();
+  function marcarLida(ids) {
+    [].concat(ids).forEach((i) => pendLidas.add(i));
     clearTimeout(tLido);
-    tLido = setTimeout(() => { db.from('conversas').update({ nao_lidas_agente: 0 }).eq('id', id).then(() => {}); }, 400);
+    tLido = setTimeout(() => {
+      const lista = [...pendLidas]; pendLidas.clear();
+      const q = db.from('conversas').update({ nao_lidas_agente: 0 });
+      (lista.length === 1 ? q.eq('id', lista[0]) : q.in('id', lista)).then(() => {});
+    }, 400);
   }
   function atualizarSelo() {
-    const n = S.conversas.filter((c) => c.status === 'aguardando').length;
+    const n = pessoas().filter((p) => statusPessoa(p) === 'aguardando').length;
     const s = document.getElementById('seloAguardando'); if (s) { s.textContent = n; s.hidden = n === 0; }
     document.title = (n ? `(${n}) ` : '') + (J.nAtencao ? `⚠${J.nAtencao} ` : '') + 'Painel de atendimento';
   }
@@ -873,6 +958,7 @@
     if (error && /paciente_tipo|paciente_nome|unidade_inicial|medico_preferido/.test(error.message || '')) ({ data, error } = await consulta(base));
     if (error) { toast(msgErro(error)); return; }
     S.conversas = data || [];
+    await carregarPessoas();
     await carregarAlertasPreco();
   }
   // Alertas de valor (só administrador e atendente leem: a regra de acesso do banco esconde dos demais e do paciente).
@@ -901,6 +987,137 @@
         } }, 'Conferi, está certo'));
     }));
   }
+  /* ---------- a mesma pessoa em várias conversas, exame em aberto e remarcação (supabase/pessoa-unica.sql) ---------- */
+  // Leitura do que o banco já agrupou: conversas da mesma pessoa viram UMA na lista e no chat (nada é apagado nem movido).
+  // Se o SQL ainda não foi aplicado, as consultas falham em silêncio e a tela funciona como antes (uma conversa por linha).
+  async function carregarPessoas() {
+    const vazio = () => ({ error: true, data: null });
+    const [g, ab, rm, su] = await Promise.all([
+      Promise.resolve(db.from('conversa_grupo').select('conversa_id,grupo_id,sinais,origem,confirmado_por')).then((r) => r, vazio),
+      Promise.resolve(db.from('v_agendamento_aberto').select('pre_id,conversa_id,chave,quando,exames,passou')).then((r) => r, vazio),
+      Promise.resolve(db.from('v_remarcacao_pendente').select('fechamento_id,conversa_id,exames,quando,desfecho,remarcacao')).then((r) => r, vazio),
+      Promise.resolve(db.rpc('pessoa_sugestoes')).then((r) => r, vazio)]);
+    S.grupos = new Map(); (g.error ? [] : g.data || []).forEach((r) => S.grupos.set(r.conversa_id, r));
+    S.abertos = ab.error ? [] : ab.data || []; S.remarcar = rm.error ? [] : rm.data || [];
+    S.sugestoes = su.error || !Array.isArray(su.data) ? [] : su.data;
+  }
+  const grupoDe = (id) => { const g = S.grupos.get(id); return g ? g.grupo_id : null; };
+  const maisRecente = (a, b) => String(b.atualizado_em).localeCompare(String(a.atualizado_em));
+  // Conversas da mesma pessoa, da mais recente para a mais antiga (só a própria, se estiver sozinha).
+  function membrosDe(id) {
+    const g = grupoDe(id);
+    const ms = g ? S.conversas.filter((c) => grupoDe(c.id) === g).sort(maisRecente).map((c) => c.id) : [];
+    return ms.length ? ms : [id];
+  }
+  const repDe = (id) => membrosDe(id)[0];
+  function pessoas() {
+    const vistos = new Set(), out = [];
+    for (const c of S.conversas) {
+      if (vistos.has(c.id)) continue;
+      const ms = membrosDe(c.id).map((id) => S.conversas.find((x) => x.id === id)).filter(Boolean);
+      const membros = ms.length ? ms : [c];
+      membros.forEach((m) => vistos.add(m.id));
+      out.push({ rep: membros[0], membros });
+    }
+    return out;
+  }
+  const statusPessoa = (p) => (p.membros.some((m) => m.status === 'aguardando') ? 'aguardando' : p.membros.some((m) => m.status === 'em_atendimento') ? 'em_atendimento' : 'encerrada');
+  const abertosDe = (id) => { const ids = membrosDe(id); return S.abertos.filter((a) => ids.includes(a.conversa_id)); };
+  const remarcarDe = (id) => { const ids = membrosDe(id); return S.remarcar.filter((a) => ids.includes(a.conversa_id)); };
+  const ROTULO_SINAL = { nome: 'nome', telefone: 'telefone', email: 'e-mail', nascimento: 'data de nascimento', conta: 'conta de login' };
+  const listaPt = (xs) => (xs.length > 1 ? xs.slice(0, -1).join(', ') + ' e ' + xs[xs.length - 1] : xs.join(''));
+  const quandoCurto = (q) => (q ? `${String(q).slice(8, 10)}/${String(q).slice(5, 7)} às ${String(q).slice(11, 16)}` : '');
+  async function recarregarPessoas() {
+    await carregarPessoas();
+    if (S.aba !== 'atendimento') return;
+    renderLista(); renderTopoChat(); renderPessoaChat(); atualizarSelo();
+    if (S.modo === 'quadro') renderQuadro();
+  }
+  // Chama uma função do banco, avisa o resultado e relê o agrupamento. Devolve os dados, ou null se o banco recusou.
+  async function rpcPessoa(nome, args, aviso) {
+    const { data, error } = await db.rpc(nome, args);
+    if (error) { toast(msgErro(error).replace(/^EXAME_EM_ABERTO: /, '')); return null; }
+    if (aviso) toast(typeof aviso === 'function' ? aviso(data) : aviso);
+    await recarregarPessoas();
+    return data || {};
+  }
+  async function confirmarPessoa(s) {
+    if (!confirm(`${nomeBonito(s.nome_a)} e ${nomeBonito(s.nome_b)} são a mesma pessoa? Você será a terceira confirmação (batem ${listaPt((s.sinais || []).map((x) => ROTULO_SINAL[x] || x))}).`)) return;
+    const r = await rpcPessoa('pessoa_confirmar', { p_a: s.a, p_b: s.b }, 'Conversas unidas.');
+    if (r) { await carregarMensagensAbertas(); }
+  }
+  async function separarPessoa(id) {
+    if (!confirm('Esta conversa NÃO é da mesma pessoa? Ela sai do grupo e não será unida de novo.')) return;
+    const r = await rpcPessoa('pessoa_separar', { p_conversa: id }, 'Conversa separada.');
+    if (r) { await carregarMensagensAbertas(); }
+  }
+  function renderSugestoes() {
+    if (!S.sugestoes.length) return null;
+    const mostrar = S.sugestoes.slice(0, 3);
+    return h('div', { id: 'sugestoes' }, mostrar.map((s) => h('div', { class: 'sug' },
+      h('b', {}, 'Parece a mesma pessoa'),
+      h('div', {}, `${nomeBonito(s.nome_a)} e ${nomeBonito(s.nome_b)}: batem ${listaPt((s.sinais || []).map((x) => ROTULO_SINAL[x] || x))}. Falta uma confirmação sua.`),
+      h('div', { class: 'sug-acoes' },
+        h('button', { class: 'btn prim', type: 'button', onclick: () => confirmarPessoa(s) }, 'É a mesma pessoa'),
+        h('button', { class: 'btn', type: 'button', onclick: () => rpcPessoa('pessoa_recusar', { p_a: s.a, p_b: s.b }, 'Certo, não vou sugerir de novo.') }, 'Não é')))),
+      S.sugestoes.length > 3 ? h('div', { class: 'dica', style: 'padding:0 12px 8px' }, `E mais ${S.sugestoes.length - 3} sugestão(ões).`) : null);
+  }
+  // Faixa do chat: conversas unidas + exames em aberto + remarcações pendentes da mesma pessoa.
+  function renderPessoaChat() {
+    const box = document.getElementById('pessoa'), ex = document.getElementById('exameAberto'); if (!box || !ex) return;
+    const ids = S.abertaId ? membrosDe(S.abertaId) : [];
+    if (ids.length > 1) {
+      const g = S.grupos.get(ids[0]) || S.grupos.get(ids[1]) || {};
+      const quem = g.origem === 'equipe' ? 'confirmado por ' + (((S.agentes.get(g.confirmado_por)) || {}).nome || 'um atendente') : 'batem ' + listaPt((g.sinais || []).map((x) => ROTULO_SINAL[x] || x));
+      box.replaceChildren(h('details', { class: 'pessoa' },
+        h('summary', {}, `${ids.length} conversas da mesma pessoa, unidas (${quem})`),
+        h('ul', {}, ids.map((id) => { const c = S.conversas.find((x) => x.id === id); return h('li', {}, `${c ? fmtDataHora(c.criado_em) : ''} · ${(c && c.ultima_mensagem) || 'sem mensagens'}`,
+          h('button', { class: 'btn', type: 'button', onclick: () => separarPessoa(id) }, 'Não é a mesma pessoa')); })),
+        h('div', { class: 'dica' }, 'Nada é apagado. As mensagens aparecem juntas e a sua resposta vai para a conversa onde o paciente escreveu por último.')));
+    } else box.replaceChildren();
+    const ab = S.abertaId ? abertosDe(S.abertaId) : [], rm = S.abertaId ? remarcarDe(S.abertaId) : [];
+    const btn = (rot, fn, cls = '') => h('button', { class: 'btn ' + cls, type: 'button', onclick: fn }, rot);
+    const DESFECHOS = [['compareceu', 'Compareceu'], ['faltou', 'Faltou'], ['cancelou', 'Cancelou'], ['remarcou', 'Remarcou']];
+    ex.replaceChildren(
+      ...ab.map((a) => h('div', { class: 'ex-caixa', 'data-aberto': a.conversa_id },
+        h('b', {}, 'Exame em aberto: '), `${a.exames || 'exame marcado'}${a.quando ? ' — ' + quandoCurto(a.quando) : ''}`, a.passou ? h('span', { class: 'urg alta' }, 'o horário já passou') : null,
+        h('div', { class: 'dica' }, 'Alguém precisa fechar: a equipe aqui ou o próprio paciente pelo chat. Enquanto isso, a conversa não pode ser encerrada.'),
+        h('div', { class: 'ex-acoes' },
+          DESFECHOS.map(([v, rot]) => btn(rot, () => { if (confirm(`Registrar "${rot}" para ${a.exames || 'este exame'}?`)) rpcPessoa('agendamento_fechar', { p_conversa: a.conversa_id, p_desfecho: v, p_nota: null }, 'Exame fechado.'); })),
+          btn('Perguntar ao paciente pelo chat', () => rpcPessoa('agendamento_perguntar', { p_conversa: a.conversa_id, p_modo: 'fechar', p_item: null },
+            (r) => (r.canal === 'botoes' ? 'Pergunta enviada pelo chat, com botões para o paciente responder.' : 'Mensagem enviada ao paciente.')), 'prim')))),
+      ...rm.map((r) => h('div', { class: 'ex-caixa falta', 'data-remarcar': r.fechamento_id },
+        h('b', {}, r.desfecho === 'faltou' ? 'Faltou: ' : 'Quer remarcar: '), `${r.exames || 'exame'}${r.quando ? ' — ' + quandoCurto(r.quando) : ''}`,
+        h('div', { class: 'dica' }, { pendente: 'Ninguém avisou o paciente ainda.', pedida: 'Pergunta enviada. Esperando o paciente.', aceita: 'O paciente aceitou e está remarcando pelo chat. Quando o novo horário for marcado, isto fecha sozinho.' }[r.remarcacao] || ''),
+        h('div', { class: 'ex-acoes' },
+          r.remarcacao !== 'aceita' ? btn('Pedir ao paciente que remarque pelo chat', () => rpcPessoa('agendamento_perguntar', { p_conversa: r.conversa_id, p_modo: 'remarcar', p_item: null },
+            (x) => (x.canal === 'botoes' ? 'Pedido enviado pelo chat, com botões.' : 'Mensagem enviada ao paciente.')), 'prim') : null,
+          btn('Já remarcado', () => { if (confirm('O novo horário já foi marcado?')) rpcPessoa('agendamento_remarcacao_resolver', { p_fechamento: r.fechamento_id, p_resultado: 'feita' }, 'Remarcação concluída.'); }),
+          btn('Paciente desistiu', () => { if (confirm('O paciente desistiu de remarcar?')) rpcPessoa('agendamento_remarcacao_resolver', { p_fechamento: r.fechamento_id, p_resultado: 'recusada' }, 'Registrado.'); })))));
+  }
+  // Para onde vai a resposta da equipe: a conversa em que o paciente escreveu por último (é a que o aparelho dele está lendo).
+  function alvoResposta() {
+    const ids = membrosDe(S.abertaId); let alvo = ids[0] || S.abertaId, t = '';
+    for (const m of S.msgs) if (m.autor === 'cliente' && ids.includes(m.conversa_id) && String(m.criado_em) >= t) { t = String(m.criado_em); alvo = m.conversa_id; }
+    return alvo;
+  }
+  // Um cartão por pessoa no quadro das conversas: fica o da conversa mais recente; os outros viram "+N".
+  function colapsarCartoes(lista) {
+    S.outrosQ = new Map();
+    const porGrupo = new Map(), out = [];
+    for (const k of lista) {
+      const g = k.conversa_id ? grupoDe(k.conversa_id) : null;
+      if (!g) { out.push(k); continue; }
+      if (!porGrupo.has(g)) porGrupo.set(g, []);
+      porGrupo.get(g).push(k);
+    }
+    for (const [, ks] of porGrupo) {
+      const data = (k) => { const c = S.conversas.find((x) => x.id === k.conversa_id); return c ? String(c.atualizado_em) : ''; };
+      ks.sort((a, b) => data(b).localeCompare(data(a)));
+      out.push(ks[0]); S.outrosQ.set(ks[0].id, ks.length - 1);
+    }
+    return out;
+  }
   const conversaAberta = () => S.conversas.find((c) => c.id === S.abertaId);
   // Responsável falando pelo filho: a lista mostra "Maria · Lucas" (senão três filhos da mesma mãe parecem a mesma conversa).
   const nomeLista = (c) => (c.nome_informado || (c.contatos ? c.contatos.nome : 'Contato')) + (c.paciente_tipo === 'filho' && c.paciente_nome ? ' · ' + c.paciente_nome : '');
@@ -914,14 +1131,6 @@
     if (c.medico_preferido) partes.push('Médico de preferência: ' + nomeBonito(c.medico_preferido));
     return partes.length ? partes.join(' · ') : null;
   }
-  function filtradas() {
-    return S.conversas.filter((c) => {
-      if (S.filtro === 'aguardando') return c.status === 'aguardando';
-      if (S.filtro === 'meus') return c.status === 'em_atendimento' && c.agente_id === S.me.id;
-      if (S.filtro === 'abertas') return c.status !== 'encerrada';
-      return c.status === 'encerrada';
-    });
-  }
   function viewAtendimento(c) {
     const inbox = h('div', { class: 'inbox' + (S.abertaId ? ' aberta' : '') + (S.modo === 'quadro' ? ' quadro' : ''), id: 'inbox' },
       h('section', { class: 'lista', 'aria-label': 'Conversas' },
@@ -934,22 +1143,37 @@
   }
   function renderLista() {
     const f = document.getElementById('filtros'), it = document.getElementById('itens'); if (!f || !it) return;
-    const cont = (fn) => S.conversas.filter(fn).length;
-    const defs = [['aguardando', 'Aguardando', cont((x) => x.status === 'aguardando')], ['meus', 'Meus', cont((x) => x.status === 'em_atendimento' && x.agente_id === S.me.id)],
-      ['abertas', 'Abertas', cont((x) => x.status !== 'encerrada')], ['encerradas', 'Encerradas', null]];
+    const todas = pessoas();
+    const fn = { aguardando: (p) => statusPessoa(p) === 'aguardando', meus: (p) => p.membros.some((m) => m.status === 'em_atendimento' && m.agente_id === S.me.id),
+      abertas: (p) => statusPessoa(p) !== 'encerrada', encerradas: (p) => statusPessoa(p) === 'encerrada' };
+    const cont = (g) => todas.filter(g).length;
+    const defs = [['aguardando', 'Aguardando', cont(fn.aguardando)], ['meus', 'Meus', cont(fn.meus)], ['abertas', 'Abertas', cont(fn.abertas)], ['encerradas', 'Encerradas', null]];
     f.replaceChildren(seletorModo(), ...defs.map(([id, rot, n]) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(S.filtro === id), onclick: () => { S.filtro = id; renderLista(); } }, n != null ? `${rot} (${n})` : rot)));
-    const lista = filtradas();
+    const lista = todas.filter(fn[S.filtro]);
+    const sug = renderSugestoes();
     if (!lista.length) {
       const msgs = { aguardando: ['Ninguém na fila', 'Novas conversas aparecem aqui na hora.'], meus: ['Nada com você agora', 'Assuma uma conversa da fila para começar.'], abertas: ['Sem conversas abertas', ''], encerradas: ['Nenhuma encerrada ainda', ''] };
-      it.replaceChildren(h('div', { class: 'vazio' }, h('b', {}, msgs[S.filtro][0]), msgs[S.filtro][1]));
+      it.replaceChildren(...(sug ? [sug] : []), h('div', { class: 'vazio' }, h('b', {}, msgs[S.filtro][0]), msgs[S.filtro][1]));
       return;
     }
-    it.replaceChildren(...lista.map((c) => {
-      const ag = c.agente_id ? S.agentes.get(c.agente_id) : null;
-      return h('button', { class: 'item', type: 'button', 'aria-current': String(c.id === S.abertaId), onclick: () => abrirConversa(c.id) },
+    it.replaceChildren(...(sug ? [sug] : []), ...lista.map((p) => {
+      const c = p.rep, st = statusPessoa(p);
+      const ag = (p.membros.find((m) => m.agente_id) || {}).agente_id ? S.agentes.get(p.membros.find((m) => m.agente_id).agente_id) : null;
+      const naoLidas = p.membros.reduce((n, m) => n + (m.nao_lidas_agente || 0), 0);
+      const nAb = abertosDe(c.id).length, nRem = remarcarDe(c.id).length;
+      const comAlerta = p.membros.some((m) => alertasDe(m.id).length);
+      return h('button', { class: 'item', type: 'button', 'aria-current': String(p.membros.some((m) => m.id === S.abertaId)), onclick: () => abrirConversa(c.id) },
         h('div', { class: 'l1' }, h('span', {}, nomeLista(c)), h('span', { class: 'hora' }, fmtHoraLista(c.atualizado_em))),
-        h('div', { class: 'l2' }, h('span', { class: 'prev' }, c.ultima_mensagem || 'Sem mensagens'), c.nao_lidas_agente > 0 ? h('span', { class: 'nl' }, c.nao_lidas_agente) : null),
-        h('div', { class: 'l3' }, h('span', { class: 'tag ' + c.status }, ROTULO_STATUS[c.status]), c.triagem_urgencia === 'alta' ? h('span', { class: 'urg alta' }, 'Urgente') : null, c.alerta_agenda ? h('span', { class: 'urg media', title: 'Conferência automática da agenda' }, c.alerta_agenda) : null, alertasDe(c.id).length ? h('span', { class: 'urg alta', title: 'Valor informado fora da referência (só a equipe vê)' }, 'Conferir valor') : null, c.ia_ativa && c.status === 'aguardando' ? h('span', { style: 'color:var(--suave)' }, c.motor === 'fluxo' ? 'Assistente automático' : 'IA atendendo') : null, ag ? h('span', { style: 'color:var(--suave)' }, ag.nome) : null));
+        h('div', { class: 'l2' }, h('span', { class: 'prev' }, c.ultima_mensagem || 'Sem mensagens'), naoLidas > 0 ? h('span', { class: 'nl' }, naoLidas) : null),
+        h('div', { class: 'l3' }, h('span', { class: 'tag ' + st }, ROTULO_STATUS[st]),
+          p.membros.length > 1 ? h('span', { class: 'urg', title: 'Conversas da mesma pessoa, unidas' }, `${p.membros.length} conversas unidas`) : null,
+          nAb ? h('span', { class: 'urg alta', title: 'Exame marcado que ninguém fechou ainda' }, 'Exame em aberto') : null,
+          nRem ? h('span', { class: 'urg media', title: 'Faltou e ainda falta marcar o novo horário' }, 'Remarcar') : null,
+          p.membros.some((m) => m.triagem_urgencia === 'alta') ? h('span', { class: 'urg alta' }, 'Urgente') : null,
+          c.alerta_agenda ? h('span', { class: 'urg media', title: 'Conferência automática da agenda' }, c.alerta_agenda) : null,
+          comAlerta ? h('span', { class: 'urg alta', title: 'Valor informado fora da referência (só a equipe vê)' }, 'Conferir valor') : null,
+          c.ia_ativa && st === 'aguardando' ? h('span', { style: 'color:var(--suave)' }, c.motor === 'fluxo' ? 'Assistente automático' : 'IA atendendo') : null,
+          ag ? h('span', { style: 'color:var(--suave)' }, ag.nome) : null));
     }));
   }
 
@@ -982,7 +1206,7 @@
   const conversaDoCartao = (k) => S.conversas.find((c) => c.id === k.conversa_id);
   function cartoesFiltrados() {
     const q = S.buscaQ.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-    return S.quadro.filter((k) => {
+    return colapsarCartoes(S.quadro.filter((k) => {
       const c = conversaDoCartao(k);
       if (S.fq === 'meus' && !(k.responsavel === S.me.id || (c && c.agente_id === S.me.id))) return false;
       if (S.fq === 'atrasados' && !k.atrasado) return false;
@@ -992,7 +1216,7 @@
         if (!nome.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').includes(q)) return false;
       }
       return true;
-    });
+    }));
   }
   function destinosDe(k) {
     const manuais = new Set(S.colunasQ.filter((x) => x.origem === 'manual').map((x) => x.id));
@@ -1043,6 +1267,8 @@
         c && c.nao_lidas_agente > 0 ? h('span', { class: 'q-chip aviso' }, c.nao_lidas_agente + ' nova(s)') : null,
         c && c.status === 'aguardando' ? h('span', { class: 'q-chip aviso' }, 'Aguardando') : null,
         k.atrasado ? h('span', { class: 'q-chip alerta' }, 'Atrasado') : null,
+        S.outrosQ.get(k.id) > 0 ? h('span', { class: 'q-chip', title: 'Outras conversas da mesma pessoa, unidas neste cartão' }, `+${S.outrosQ.get(k.id)} da mesma pessoa`) : null,
+        abertosDe(k.conversa_id).length ? h('span', { class: 'q-chip alerta' }, 'Exame em aberto') : null,
         k.n_tarefas_abertas > 0 ? h('span', { class: 'q-chip' + (k.n_tarefas_vencidas > 0 ? ' alerta' : '') }, '☑ ' + k.n_tarefas_abertas) : null,
         ag ? h('span', { class: 'q-chip' }, ag.nome) : null));
     el.addEventListener('dragstart', (e) => { S.arrasta = k; try { e.dataTransfer.setData('text/plain', String(k.id)); } catch {} });
@@ -1052,7 +1278,8 @@
   // Barra "Cartão" no alto da conversa: onde o atendente move e atribui (serve no celular, onde não se arrasta).
   function renderCartaoJ() {
     const box = document.getElementById('cartaoJ'); if (!box) return;
-    const k = S.abertaId ? S.quadro.find((x) => x.conversa_id === S.abertaId) : null;
+    const ids = S.abertaId ? membrosDe(S.abertaId) : [];
+    const k = S.abertaId ? (S.quadro.find((x) => x.conversa_id === S.abertaId) || S.quadro.find((x) => ids.includes(x.conversa_id))) : null;
     if (!k || !S.quadroOk) { box.replaceChildren(); return; }
     const col = S.colunasQ.find((x) => x.id === k.coluna);
     const dest = destinosDe(k).map((id) => S.colunasQ.find((x) => x.id === id)).filter(Boolean);
@@ -1063,16 +1290,24 @@
     box.replaceChildren(h('div', { class: 'cartaoJ' }, h('span', {}, h('b', {}, 'Etapa: '), col ? col.nome : k.coluna), sel, resp));
   }
   async function abrirConversa(id) {
+    id = repDe(id);   // várias conversas da mesma pessoa abrem juntas, pela mais recente
     S.abertaId = id; S.msgs = []; S.vistos = new Set(); S.pre = null; S.preSig = null;
     document.getElementById('inbox')?.classList.add('aberta');
     renderLista(); renderChat(); carregarPre();
     if (S.modo === 'quadro') renderQuadro();
-    const { data, error } = await db.from('mensagens').select('id,conversa_id,autor,agente_id,texto,criado_em,opcoes').eq('conversa_id', id).order('id').limit(1000);
+    await carregarMensagens(id);
+  }
+  const carregarMensagensAbertas = () => (S.abertaId ? carregarMensagens(S.abertaId) : Promise.resolve());
+  async function carregarMensagens(id) {
+    const ids = membrosDe(id);
+    const q = db.from('mensagens').select('id,conversa_id,autor,agente_id,texto,criado_em,opcoes');
+    const { data, error } = await (ids.length === 1 ? q.eq('conversa_id', id) : q.in('conversa_id', ids)).order('criado_em').order('id').limit(1000);
     if (S.abertaId !== id) return;
     if (error) { toast(msgErro(error)); return; }
     S.msgs = data || []; S.vistos = new Set(S.msgs.map((m) => m.id));
     desenharMsgs(true);
-    const c = conversaAberta(); if (c && c.nao_lidas_agente > 0) { c.nao_lidas_agente = 0; marcarLida(id); renderLista(); }
+    const nl = ids.map((i) => S.conversas.find((c) => c.id === i)).filter((c) => c && c.nao_lidas_agente > 0);
+    if (nl.length) { nl.forEach((c) => { c.nao_lidas_agente = 0; }); marcarLida(nl.map((c) => c.id)); renderLista(); }
   }
   function renderChat() {
     const box = document.getElementById('chat'); if (!box) return;
@@ -1082,8 +1317,8 @@
     const enviar = h('button', { class: 'btn prim', type: 'button', id: 'btnEnviar', onclick: enviarMsg }, 'Enviar');
     area.addEventListener('input', () => { area.style.height = 'auto'; area.style.height = Math.min(area.scrollHeight, 140) + 'px'; });
     area.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); enviarMsg(); } });
-    box.replaceChildren(h('div', { class: 'chat-topo', id: 'chatTopo' }), h('div', { id: 'triagem' }), h('div', { id: 'alertaPreco' }), h('div', { id: 'cartaoJ' }), h('div', { id: 'pre' }), h('div', { class: 'msgs', id: 'msgs', 'aria-live': 'polite' }), h('div', { class: 'compor' }, area, enviar));
-    renderTopoChat(); renderAlertaPreco(); renderCartaoJ(); desenharMsgs(true);
+    box.replaceChildren(h('div', { class: 'chat-topo', id: 'chatTopo' }), h('div', { id: 'pessoa' }), h('div', { id: 'exameAberto' }), h('div', { id: 'triagem' }), h('div', { id: 'alertaPreco' }), h('div', { id: 'cartaoJ' }), h('div', { id: 'pre' }), h('div', { class: 'msgs', id: 'msgs', 'aria-live': 'polite' }), h('div', { class: 'compor' }, area, enviar));
+    renderTopoChat(); renderPessoaChat(); renderAlertaPreco(); renderCartaoJ(); desenharMsgs(true);
   }
   function renderTopoChat() {
     const t = document.getElementById('chatTopo'); const c = conversaAberta(); if (!t || !c) return;
@@ -1112,10 +1347,14 @@
   function desenharMsgs(rolar) {
     const box = document.getElementById('msgs'); if (!box) return;
     const perto = box.scrollHeight - box.scrollTop - box.clientHeight < 180;
-    const out = []; let dia = '', ultimoQuem = '';
+    const out = []; let dia = '', ultimoQuem = '', ultimaConv = null;
+    const unidas = S.abertaId && membrosDe(S.abertaId).length > 1;
+    if (unidas) S.msgs.sort((a, b) => String(a.criado_em).localeCompare(String(b.criado_em)) || a.id - b.id);
     S.msgs.forEach((m) => {
       const d = rotuloDia(m.criado_em);
       if (d !== dia) { out.push(h('div', { class: 'dia' }, d)); dia = d; ultimoQuem = ''; }
+      if (unidas && ultimaConv !== null && m.conversa_id !== ultimaConv) { out.push(h('div', { class: 'msg-outra' }, 'Outra conversa da mesma pessoa · ' + fmtHora(m.criado_em))); ultimoQuem = ''; }
+      ultimaConv = m.conversa_id;
       const ag = m.agente_id ? S.agentes.get(m.agente_id) : null;
       const quem = m.autor === 'agente' ? (ag ? ag.nome : 'Assistente virtual') : '';
       out.push(h('div', { class: 'msg ' + m.autor },
@@ -1208,14 +1447,22 @@
     return caixa;
   }
   async function atualizarConversa(campos) {
-    const { error } = await db.from('conversas').update(campos).eq('id', S.abertaId);
-    if (error) { toast(msgErro(error)); return false; }
-    Object.assign(conversaAberta() || {}, campos);
+    // Todas as conversas da mesma pessoa mudam juntas (assumir, transferir, encerrar).
+    const ids = membrosDe(S.abertaId);
+    const q = db.from('conversas').update(campos);
+    const { error } = await (ids.length === 1 ? q.eq('id', S.abertaId) : q.in('id', ids));
+    if (error) {
+      if (/EXAME_EM_ABERTO/.test(error.message || '')) { toast(msgErro(error).replace(/^EXAME_EM_ABERTO: /, '')); document.getElementById('exameAberto')?.scrollIntoView?.({ block: 'center' }); await recarregarPessoas(); }
+      else toast(msgErro(error));
+      return false;
+    }
+    ids.forEach((i) => Object.assign(S.conversas.find((c) => c.id === i) || {}, campos));
     renderTopoChat(); renderLista(); atualizarSelo();
     return true;
   }
   const assumir = () => atualizarConversa({ status: 'em_atendimento', agente_id: S.me.id });
   async function encerrar() {
+    if (abertosDe(S.abertaId).length) { toast('Há exame marcado sem desfecho. Registre se o paciente compareceu, faltou, cancelou ou remarcou antes de encerrar.'); document.getElementById('exameAberto')?.scrollIntoView?.({ block: 'center' }); return; }
     if (!confirm('Encerrar este atendimento? O cliente será avisado.')) return;
     await atualizarConversa({ status: 'encerrada' });
   }
@@ -1230,7 +1477,7 @@
     btn.disabled = true;
     try {
       if (c.status !== 'em_atendimento' || !c.agente_id) { if (!(await assumir())) return; }
-      const { data, error } = await db.from('mensagens').insert({ conversa_id: c.id, autor: 'agente', agente_id: S.me.id, texto })
+      const { data, error } = await db.from('mensagens').insert({ conversa_id: alvoResposta(), autor: 'agente', agente_id: S.me.id, texto })
         .select('id,conversa_id,autor,agente_id,texto,criado_em,opcoes').single();
       if (error) throw error;
       caixa.value = ''; caixa.style.height = 'auto';

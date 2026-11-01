@@ -27,6 +27,8 @@ Quadro das conversas (01/11/2026): o Atendimento ganhou o alternador Lista | Qua
 
 Aba Jornada (01/11/2026): onde está cada paciente, ao vivo, com o Klingo lido a cada minuto no expediente e aviso quando alguém demora (prazo da etapa ou horário que passou). Veja `docs/jornada-monitoramento.md`.
 
+Uma pessoa, uma conversa (01/11/2026): conversas da mesma pessoa (nome + 2 informações) aparecem unidas no Atendimento e na Jornada; exame marcado fica em aberto até a equipe, o paciente (pelo chat) ou o Klingo fechar; falta vira remarcação que o paciente faz sozinho pelo chat. **Pronto e testado, mas o SQL ainda NÃO foi aplicado no Supabase.** Veja `docs/pessoa-unica.md`, seção "Como ligar".
+
 Lista completa do que falta, com a ordem de dependência: `docs/pendencias-e-dependencias.md` (conferida no banco real em 01/11/2026).
 
 Banco: projeto Supabase `webchat-atendimento` (sa-east-1), já com tabelas, regras de segurança e tempo real.
