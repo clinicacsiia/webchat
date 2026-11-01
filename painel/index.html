@@ -294,6 +294,49 @@
   .link-chat { display: flex; gap: 8px; }
   .link-chat input { flex: 1; }
 
+
+  /* ===== Visual novo (somente aparência): ícones, barra do topo, cabeçalho com indicadores, linhas com avatar ===== */
+  .ic-svg { display: inline-flex; flex: none; } .ic-svg svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .marca { gap: 8px; } .marca .marca-nome { font-weight: 800; font-size: 26px; letter-spacing: 1px; line-height: 1; } .marca small { font-weight: 500; font-size: 11px; opacity: .65; letter-spacing: 0; }
+  .nav button .nav-rot { flex: 1; min-width: 0; }
+  .nav button { justify-content: flex-start; }
+  .coluna { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+  .coluna > .conteudo { flex: 1; }
+  .topo { display: flex; align-items: center; gap: 16px; padding: 10px 20px; background: var(--csi-surface); border-bottom: 1px solid var(--csi-border); flex: none; }
+  .busca-geral { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; border: 1px solid var(--csi-border-strong); border-radius: var(--radius-md); padding: 0 14px; background: var(--csi-surface); color: var(--csi-text-secondary); transition: border-color var(--csi-ease), box-shadow var(--csi-ease); }
+  .busca-geral:focus-within { border-color: var(--csi-primary); box-shadow: var(--csi-focus); }
+  .busca-geral input[type=search] { border: 0; box-shadow: none; padding: 10px 0; background: transparent; min-width: 0; }
+  .busca-geral input[type=search]:focus { box-shadow: none; }
+  .sino { position: relative; width: 40px; height: 40px; display: grid; place-items: center; border: 0; background: none; border-radius: 50%; color: var(--csi-text-secondary); }
+  .sino:hover { background: var(--csi-primary-soft); }
+  .sino i { position: absolute; top: 7px; right: 8px; width: 9px; height: 9px; border-radius: 50%; background: var(--csi-danger); border: 2px solid #fff; box-sizing: content-box; }
+  .usuario { display: flex; align-items: center; gap: 10px; border-left: 1px solid var(--csi-border); padding-left: 16px; min-width: 0; }
+  .usuario b { display: block; font-size: 14px; line-height: 1.2; } .usuario span { font-size: 12.5px; color: var(--csi-text-secondary); }
+  .av-i { width: 38px; height: 38px; border-radius: 50%; background: var(--csi-primary-soft); color: var(--csi-primary-strong); display: grid; place-items: center; font-weight: 700; font-size: 13px; flex: none; text-transform: uppercase; }
+  .painel-cab { flex: none; padding: 16px 16px 0; }
+  .cab-linha { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+  .painel-cab h2 { margin: 0; font-size: 23px; line-height: 1.2; display: flex; align-items: center; gap: 10px; } .painel-cab h2 .ic-svg svg { width: 28px; height: 28px; }
+  .painel-cab p.sub { margin: 4px 0 0; color: var(--csi-text-secondary); }
+  .data-hoje { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--csi-border-strong); border-radius: var(--radius-md); padding: 8px 12px; font-weight: 600; background: var(--csi-surface); }
+  .data-hoje .ic-svg svg { width: 18px; height: 18px; }
+  .kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
+  .kpi { display: flex; gap: 12px; align-items: center; padding: 12px 14px; background: var(--csi-surface); border: 1px solid var(--csi-border); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); min-width: 0; }
+  .kpi .ic-k { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; flex: none; }
+  .kpi .ic-k.az { background: var(--csi-primary-soft); color: var(--csi-primary-strong); } .kpi .ic-k.la { background: var(--csi-warning-soft); color: var(--csi-warning-strong); }
+  .kpi .ic-k.ve { background: var(--csi-success-soft); color: var(--csi-success-strong); } .kpi .ic-k.vm { background: var(--csi-danger-bg); color: var(--csi-danger-strong); }
+  .kpi small { display: block; color: var(--csi-text-secondary); font-weight: 600; font-size: 13px; } .kpi strong { font-size: 28px; line-height: 1.1; }
+  .item { display: grid; grid-template-columns: 40px minmax(0, 1fr); column-gap: 12px; align-items: start; }
+  .item > .av-i { grid-row: 1 / span 3; align-self: center; width: 40px; height: 40px; }
+  .item > div { grid-column: 2; min-width: 0; }
+  .item .l3 { flex-wrap: wrap; row-gap: 4px; } .item .l3 .urg, .item .l3 .tag { white-space: nowrap; }
+  .item[aria-current=true] > .av-i { background: var(--csi-surface); }
+  .item .tag { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 2px 10px; }
+  .item .tag::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+  .item .tag.encerrada::before { content: '✓'; width: auto; height: auto; background: none; font-size: 11px; }
+  @media (max-height: 820px) { .kpis, .painel-cab p.sub { display: none; } .painel-cab { padding-top: 10px; } .painel-cab h2 { font-size: 19px; } }
+  @media (min-width: 861px) { .eu b, .eu > span { display: none; } }
+  @media (max-width: 1100px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
   /* Desktop compacto e tablet largo: sidebar e lista um pouco mais estreitas para a conversa não ser espremida */
   @media (max-width: 1100px) and (min-width: 861px) {
     .app { grid-template-columns: 216px minmax(0, 1fr); }
@@ -303,6 +346,11 @@
   @media (max-width: 860px) {
     .app { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; }
     .conteudo { grid-row: 1; }
+    .coluna { grid-row: 1; }
+    .topo { padding: 8px 12px; gap: 8px; } .usuario { border-left: 0; padding-left: 0; } .usuario > div { display: none; }
+    .painel-cab { padding: 8px 12px 0; } .painel-cab p.sub, .kpis { display: none; } .painel-cab h2 { font-size: 18px; } .data-hoje { padding: 5px 9px; font-size: 13px; }
+    .conteudo:has(.inbox.aberta) .painel-cab { display: none; }
+    .nav button .nav-rot { flex: none; }
     .lateral { grid-row: 2; flex-direction: row; padding: 4px 6px calc(4px + env(safe-area-inset-bottom)); align-items: center; gap: 0; overflow: hidden; }
     .marca, .eu .acoes, .eu span, .inst { display: none; }
     .eu { border: 0; padding: 0 6px; margin-left: auto; }
@@ -360,6 +408,33 @@
     for (const c of kids.flat(Infinity)) { if (c == null || c === false) continue; e.append(c.nodeType ? c : document.createTextNode(String(c))); }
     return e;
   }
+  /* ícones simples (traço), só decorativos */
+  const ICONES = {
+    fone: '<path d="M4 14v-2a8 8 0 0 1 16 0v2M4 14h3v5H4zM17 14h3v5h-3z"/>',
+    pin: '<path d="M12 21s-7-6-7-11a7 7 0 0 1 14 0c0 5-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/>',
+    pessoas: '<circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.4"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M15 14.5c3 0 6 1.5 6 5.5"/>',
+    lista: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>',
+    pessoa: '<circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-4 3-6.5 7-6.5s7 2.5 7 6.5"/>',
+    barras: '<path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/>',
+    livro: '<path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2zM4 19V5"/>',
+    engrenagem: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/>',
+    busca: '<circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/>',
+    sino: '<path d="M6 17v-6a6 6 0 0 1 12 0v6l1.5 2h-15zM10 21h4"/>',
+    calendario: '<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/>',
+    ampulheta: '<path d="M7 3h10M7 21h10M8 3c0 5 8 5 8 9s-8 4-8 9M16 3c0 5-8 5-8 9s8 4 8 9"/>',
+    ok: '<path d="m5 12 5 5 9-10"/>',
+    alerta: '<path d="M12 3 2 20h20zM12 10v4M12 17v.5"/>'
+  };
+  function icone(nome) {
+    const e = document.createElement('span'); e.className = 'ic-svg'; e.setAttribute('aria-hidden', 'true');
+    e.innerHTML = '<svg viewBox="0 0 24 24" focusable="false">' + (ICONES[nome] || '') + '</svg>';   // texto fixo daqui de cima, nunca vindo do banco
+    return e;
+  }
+  function iniciais(nome) {
+    const p = String(nome || '').trim().split(/\s+/).filter(Boolean);
+    if (!p.length) return '?';
+    return (p[0][0] + (p.length > 1 ? p[p.length - 1][0] : '')).toUpperCase();
+  }
   function toast(msg) {
     const t = document.getElementById('toast'); t.textContent = msg; t.hidden = false;
     clearTimeout(toast.t); toast.t = setTimeout(() => { t.hidden = true; }, 4200);
@@ -402,7 +477,7 @@
   const S = {
     me: null, agentes: new Map(), conversas: [], filtro: 'aguardando', abertaId: null, msgs: [], vistos: new Set(),
     aba: 'atendimento', canal: null, ao_vivo: false, contatos: [], mudo: localStorage.getItem('painel.mudo') === '1',
-    buscaContatos: '', periodo: 'todos', tagFiltro: '', pre: null,
+    buscaContatos: '', busca: '', periodo: 'todos', tagFiltro: '', pre: null,
     modo: (() => { try { return localStorage.getItem('painel.modo') === 'quadro' ? 'quadro' : 'lista'; } catch { return 'lista'; } })(),
     quadro: [], colunasQ: [], transQ: [], fq: 'todos', buscaQ: '', quadroOk: true,
     grupos: new Map(), sugestoes: [], abertos: [], remarcar: [], outrosQ: new Map()
@@ -632,13 +707,14 @@
   /* ---------- estrutura ---------- */
   function montarApp() {
     const abas = [];
+    const ICONE_ABA = { atendimento: 'fone', jornada: 'pin', fila: 'pessoas', contatos: 'lista', equipe: 'pessoa', catalogo: 'barras', aprendizado: 'livro', config: 'engrenagem' };
     if (podeAtender()) { abas.push(['atendimento', 'Atendimento']); abas.push(['jornada', 'Jornada']); abas.push(['fila', 'Fila']); }
     abas.push(['contatos', 'Contatos']);
     if (ehAdmin()) { abas.push(['equipe', 'Equipe']); abas.push(['catalogo', 'Catálogo']); abas.push(['aprendizado', 'Aprendizado']); abas.push(['config', 'Configurações']); }
     const nav = h('nav', { class: 'nav', 'aria-label': 'Seções' }, abas.map(([id, rot]) =>
-      h('button', { type: 'button', 'data-aba': id, onclick: () => { S.aba = id; renderAba(); } }, h('span', {}, rot), id === 'atendimento' ? h('span', { class: 'selo', id: 'seloAguardando', hidden: true }, '0') : null, id === 'fila' ? h('span', { class: 'selo', id: 'seloFila', hidden: true }, '0') : null, id === 'jornada' ? h('span', { class: 'selo erro', id: 'seloJornada', title: 'Pacientes que precisam de atenção agora', hidden: true }, '0') : null)));
+      h('button', { type: 'button', 'data-aba': id, onclick: () => { S.aba = id; renderAba(); } }, icone(ICONE_ABA[id] || 'lista'), h('span', { class: 'nav-rot' }, rot), id === 'atendimento' ? h('span', { class: 'selo', id: 'seloAguardando', hidden: true }, '0') : null, id === 'fila' ? h('span', { class: 'selo', id: 'seloFila', hidden: true }, '0') : null, id === 'jornada' ? h('span', { class: 'selo erro', id: 'seloJornada', title: 'Pacientes que precisam de atenção agora', hidden: true }, '0') : null)));
     const lateral = h('aside', { class: 'lateral' },
-      h('div', { class: 'marca' }, h('i', { id: 'pontoVivo' }), 'Atendimento'),
+      h('div', { class: 'marca' }, h('i', { id: 'pontoVivo' }), h('span', { class: 'marca-nome' }, 'CSI'), h('small', {}, 'Atendimento')),
       nav, h('div', { class: 'espaco' }),
       h('div', { class: 'eu' }, h('b', {}, S.me.nome || S.me.email || 'Equipe'), h('span', {}, ROTULO_PAPEL[S.me.papel]),
         h('div', { class: 'acoes' },
@@ -652,7 +728,16 @@
         h('p', {}, 'Tel: (71) 3181-7666 | WhatsApp: (71) 99980-3806'),
         h('p', {}, 'Seg a Sex: 7hs às 18h30 | Sáb: 8hs às 12hs'),
         h('p', {}, 'Resp. Técnico: Dr. João Rafael Santos Carneiro | CRM 24778 - CBR')));
-    raiz.replaceChildren(h('div', { class: 'app' }, lateral, h('div', { class: 'conteudo', id: 'conteudo' })));
+    const topo = h('header', { class: 'topo' },
+      h('label', { class: 'busca-geral' }, icone('busca'),
+        h('input', { type: 'search', id: 'buscaGeral', placeholder: 'Buscar paciente…', 'aria-label': 'Buscar paciente ou conversa', autocomplete: 'off',
+          oninput: (ev) => buscarGeral(ev.target.value), onkeydown: (ev) => { if (ev.key === 'Enter' && podeAtender() && S.aba !== 'atendimento') { S.aba = 'atendimento'; renderAba(); } } })),
+      podeAtender() ? h('button', { type: 'button', class: 'sino', id: 'btnSino', 'aria-label': 'Ver conversas aguardando', title: 'Conversas aguardando e alertas da Jornada',
+        onclick: () => { S.busca = ''; S.buscaQ = ''; S.filtro = 'aguardando'; S.aba = 'atendimento'; const b = document.getElementById('buscaGeral'); if (b) b.value = ''; renderAba(); } },
+        icone('sino'), h('i', { id: 'sinoPonto', hidden: true })) : null,
+      h('div', { class: 'usuario' }, h('span', { class: 'av-i', 'aria-hidden': 'true' }, iniciais(S.me.nome || S.me.email)),
+        h('div', {}, h('b', {}, S.me.nome || S.me.email || 'Equipe'), h('span', {}, ROTULO_PAPEL[S.me.papel]))));
+    raiz.replaceChildren(h('div', { class: 'app' }, lateral, h('div', { class: 'coluna' }, topo, h('div', { class: 'conteudo', id: 'conteudo' }))));
   }
   function renderAba() {
     document.querySelectorAll('.nav button').forEach((b) => b.setAttribute('aria-current', b.dataset.aba === S.aba ? 'page' : 'false'));
@@ -1078,9 +1163,37 @@
       (lista.length === 1 ? q.eq('id', lista[0]) : q.in('id', lista)).then(() => {});
     }, 400);
   }
+  /* ---------- busca do topo e indicadores do dia (só leitura, a partir do que o painel já carregou) ---------- */
+  function buscarGeral(v) {
+    S.busca = v; S.buscaQ = v;
+    if (S.aba !== 'atendimento') return;
+    renderLista(); if (S.modo === 'quadro') renderQuadro();
+  }
+  function combinaBusca(p) {
+    const q = semAcento(S.busca).trim(); if (!q) return true;
+    return p.membros.some((m) => semAcento([nomeLista(m), m.ultima_mensagem, m.nome_informado, m.contatos && m.contatos.telefone, m.contatos && m.contatos.email].join(' ')).includes(q));
+  }
+  function atualizarKpis() {
+    const box = document.getElementById('kpis'), sino = document.getElementById('sinoPonto');
+    const todas = pessoas(), agora = new Date();
+    const hoje = (iso) => iso && mesmoDia(new Date(iso), agora);
+    const nHoje = todas.filter((p) => p.membros.some((m) => hoje(m.criado_em))).length;
+    const nEspera = todas.filter((p) => statusPessoa(p) === 'aguardando').length;
+    const nFim = todas.filter((p) => statusPessoa(p) === 'encerrada' && p.membros.some((m) => hoje(m.atualizado_em))).length;
+    const nAlerta = (typeof J !== 'undefined' && J.nAtencao) || 0;
+    if (sino) sino.hidden = !(nEspera || nAlerta);
+    if (!box) return;
+    const k = (cls, ic, rot, n, dica) => h('div', { class: 'kpi', title: dica }, h('div', { class: 'ic-k ' + cls }, icone(ic)), h('div', {}, h('small', {}, rot), h('strong', {}, String(n))));
+    box.replaceChildren(
+      k('az', 'pessoas', 'Conversas hoje', nHoje, 'Conversas que começaram hoje'),
+      k('la', 'ampulheta', 'Em espera', nEspera, 'Esperando alguém da equipe assumir'),
+      k('ve', 'ok', 'Encerradas hoje', nFim, 'Conversas encerradas hoje'),
+      k('vm', 'alerta', 'Alertas', nAlerta, 'Pacientes que precisam de atenção na Jornada'));
+  }
   function atualizarSelo() {
     const n = pessoas().filter((p) => statusPessoa(p) === 'aguardando').length;
     const s = document.getElementById('seloAguardando'); if (s) { s.textContent = n; s.hidden = n === 0; }
+    atualizarKpis();
     document.title = (n ? `(${n}) ` : '') + (J.nAtencao ? `⚠${J.nAtencao} ` : '') + 'Painel de atendimento';
   }
 
@@ -1275,7 +1388,12 @@
         h('div', { class: 'itens', id: 'itens' })),
       h('section', { id: 'quadro', 'aria-label': 'Quadro das conversas' }),
       h('section', { class: 'chat', id: 'chat', 'aria-label': 'Conversa' }));
-    c.append(inbox); renderLista(); renderChat();
+    const cab = h('div', { class: 'painel-cab' },
+      h('div', { class: 'cab-linha' },
+        h('div', {}, h('h2', {}, icone('fone'), 'Painel de Atendimento'), h('p', { class: 'sub' }, 'Acompanhe as conversas do dia, o que está em espera e os alertas.')),
+        h('div', { class: 'data-hoje' }, icone('calendario'), 'Hoje, ' + new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'short', year: 'numeric' }))),
+      h('div', { class: 'kpis', id: 'kpis', 'aria-label': 'Indicadores do dia' }));
+    c.append(cab, inbox); atualizarKpis(); renderLista(); renderChat();
     if (S.modo === 'quadro') { renderQuadro(); carregarQuadro(); }
   }
   function renderLista() {
@@ -1286,10 +1404,11 @@
     const cont = (g) => todas.filter(g).length;
     const defs = [['aguardando', 'Aguardando', cont(fn.aguardando)], ['meus', 'Meus', cont(fn.meus)], ['abertas', 'Abertas', cont(fn.abertas)], ['encerradas', 'Encerradas', null]];
     f.replaceChildren(seletorModo(), ...defs.map(([id, rot, n]) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(S.filtro === id), onclick: () => { S.filtro = id; renderLista(); } }, n != null ? `${rot} (${n})` : rot)));
-    const lista = todas.filter(fn[S.filtro]);
+    const buscando = S.busca.trim() !== '';
+    const lista = buscando ? todas.filter(combinaBusca) : todas.filter(fn[S.filtro]);   // com busca, procura em todas as conversas
     const sug = renderSugestoes();
     if (!lista.length) {
-      const msgs = { aguardando: ['Ninguém na fila', 'Novas conversas aparecem aqui na hora.'], meus: ['Nada com você agora', 'Assuma uma conversa da fila para começar.'], abertas: ['Sem conversas abertas', ''], encerradas: ['Nenhuma encerrada ainda', ''] };
+      const msgs = buscando ? { [S.filtro]: ['Nada encontrado', 'Confira o nome ou limpe a busca no alto da tela.'] } : { aguardando: ['Ninguém na fila', 'Novas conversas aparecem aqui na hora.'], meus: ['Nada com você agora', 'Assuma uma conversa da fila para começar.'], abertas: ['Sem conversas abertas', ''], encerradas: ['Nenhuma encerrada ainda', ''] };
       it.replaceChildren(...(sug ? [sug] : []), h('div', { class: 'vazio' }, h('b', {}, msgs[S.filtro][0]), msgs[S.filtro][1]));
       return;
     }
@@ -1300,6 +1419,7 @@
       const nAb = abertosDe(c.id).length, nRem = remarcarDe(c.id).length;
       const comAlerta = p.membros.some((m) => alertasDe(m.id).length);
       return h('button', { class: 'item', type: 'button', 'aria-current': String(p.membros.some((m) => m.id === S.abertaId)), onclick: () => abrirConversa(c.id) },
+        h('span', { class: 'av-i', 'aria-hidden': 'true' }, iniciais(nomeLista(c))),
         h('div', { class: 'l1' }, h('span', {}, nomeLista(c)), h('span', { class: 'hora' }, fmtHoraLista(c.atualizado_em))),
         h('div', { class: 'l2' }, h('span', { class: 'prev' }, c.ultima_mensagem || 'Sem mensagens'), naoLidas > 0 ? h('span', { class: 'nl' }, naoLidas) : null),
         h('div', { class: 'l3' }, h('span', { class: 'tag ' + st }, ROTULO_STATUS[st]),
