@@ -1,0 +1,15 @@
+{
+  "name": "Minha vez na clínica",
+  "short_name": "Minha vez",
+  "description": "Avise que chegou e acompanhe a sua posição na fila.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0f2a4a",
+  "theme_color": "#0f2a4a",
+  "lang": "pt-BR",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
