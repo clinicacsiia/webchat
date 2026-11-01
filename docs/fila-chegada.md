@@ -45,3 +45,14 @@ A fila **zera todo dia** (fuso de Brasília). O paciente nunca lê a tabela da f
 - **iPhone:** notificação só com o portal instalado na Tela de Início (iOS 16.4+).
 - Este módulo é **separado** da fila de assinatura biométrica (`docs/fila-biometria.md`), que continua pendente.
 - Testes: `npm run test:chegada-sql` e `npm run test:minha-vez` (em `testes/`).
+
+## Check-in sem login + conta criada pela recepção (01/11/2026)
+
+`supabase/checkin-sem-login.sql` (testes: `npm run test:checkin-sql`, `npm run test:minha-vez`).
+
+- **Portal** (`/minha-vez/`): a tela inicial tem um botão verde grande **Fazer check-in** e a observação "ainda não se cadastrou? faça o check-in e você será chamado". Não exige mais permissão de aviso nem login. A pessoa digita nome completo, e-mail e celular; fica com um *ticket* secreto guardado no aparelho e vê a própria posição.
+- **Mesmo e-mail + mesmo celular de uma conta**: o portal oferece entrar com a senha (e já faz o check-in) ou **"Não lembro a senha: chamar a recepção"**. Só quando os dois dados batem o portal diz que a conta existe (não revela quem tem conta).
+- **Fila da equipe** (aba Fila): **Criar conta** (senha provisória `csi`), **Redefinir senha** (gera `csi` + 4 números, derruba as sessões antigas) e o cadastro da chegada já aceita e-mail, celular e "Criar conta". A senha aparece num quadro verde só para a equipe repassar. Quem esqueceu a senha aparece com o selo "Esqueceu a senha". Estar na fila é a prova de que a pessoa está na clínica (no lugar do token).
+- **Primeiro acesso com senha provisória**: o portal obriga criar uma senha nova (mín. 8) antes de mostrar a fila.
+- Limite de 300 check-ins sem conta por dia (`config.checkin_sem_login_max_dia`).
+- Não vale ainda no chat de atendimento (`index.html`): lá a senha provisória não é cobrada.

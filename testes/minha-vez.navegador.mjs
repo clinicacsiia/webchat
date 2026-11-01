@@ -28,9 +28,9 @@ const TOKEN = `${b64({ alg: 'HS256', typ: 'JWT' })}.${b64({ sub: ID, role: 'auth
 const usuario = { id: ID, aud: 'authenticated', role: 'authenticated', email: 'ana@teste.local', email_confirmed_at: '2026-11-01T10:00:00Z', app_metadata: {}, user_metadata: {}, created_at: '2026-11-01T10:00:00Z' };
 const sessao = { access_token: TOKEN, token_type: 'bearer', expires_in: 3600, expires_at: Math.floor(Date.now() / 1000) + 3600, refresh_token: 'r', user: usuario };
 
-async function abrir({ permissao = true, logado = false } = {}) {
+async function abrir({ permissao = true, logado = false, ticket = null } = {}) {
   const ctx = await browser.newContext({ permissions: permissao ? ['notifications'] : [] });
-  const estado = { fila: { situacao: 'fora', total: 2, pode_chegar: true }, rpcs: [], avisos: [] };
+  const estado = { fila: { situacao: 'fora', total: 2, pode_chegar: true }, rpcs: [], avisos: [], trocar: false, checkin: { situacao: 'aguardando', ticket: 'tk-1', senha: 4, posicao: 4, a_frente: 3, total: 4 }, ticketFila: null };
   await ctx.route('**/cdn.jsdelivr.net/**', (r) => r.fulfill({ contentType: 'text/javascript', body: lib }));
   await ctx.route('**/*.supabase.co/**', async (r) => {
     const u = new URL(r.request().url()), j = (body, status = 200) => r.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
@@ -42,6 +42,10 @@ async function abrir({ permissao = true, logado = false } = {}) {
       if (nome === 'fila_minha_vez') return j(estado.fila);
       if (nome === 'fila_cheguei') { estado.fila = { situacao: 'aguardando', senha: 3, posicao: 3, a_frente: 2, total: 3 }; return j(estado.fila); }
       if (nome === 'fila_config_publica') return j({ vapid: '' });
+      if (nome === 'conta_precisa_trocar_senha') return j(estado.trocar);
+      if (nome === 'conta_senha_trocada') { estado.trocar = false; return j(null); }
+      if (nome === 'checkin_publico') { const c = JSON.parse(r.request().postData() || '{}'); estado.ultimoCheckin = c; return j(c.p_email === 'ana@teste.local' && !c.p_ajuda_senha ? { situacao: 'conta_existente', email: c.p_email } : estado.checkin); }
+      if (nome === 'fila_minha_vez_ticket') return j(estado.ticketFila || estado.checkin);
       return j(null);
     }
     return j({});
@@ -52,26 +56,65 @@ async function abrir({ permissao = true, logado = false } = {}) {
     const orig = ServiceWorkerRegistration.prototype.showNotification;
     ServiceWorkerRegistration.prototype.showNotification = function (t, o) { window.__avisos.push(t); return Promise.resolve(); };
   });
+  if (ticket) await page.addInitScript((t) => localStorage.setItem('csi-checkin-ticket', t), ticket);
   if (logado) await page.addInitScript((s) => localStorage.setItem('csi-paciente-auth', s), JSON.stringify(sessao));
   await page.goto(`${base}/minha-vez/`);
   return { page, ctx, estado };
 }
 const texto = (p) => p.locator('#raiz').innerText();
 
-await caso('sem permissão de aviso: pede para permitir e não mostra login', async () => {
-  const { page, ctx } = await abrir({ permissao: false });
-  await page.waitForSelector('#btnPerm, .erro, h1'); const t = await texto(page); await ctx.close();
-  return { ok: /Ative os avisos/.test(t) && !/Entre na sua conta/.test(t), detalhe: t.slice(0, 60) };
+await caso('sem login e sem permissão de aviso: mostra o botão verde de check-in e a observação', async () => {
+  const { page, ctx } = await abrir({ permissao: false }); await page.waitForSelector('#btnCheckin'); const t = await texto(page);
+  const cor = await page.$eval('#btnCheckin', (e) => getComputedStyle(e).backgroundColor); await ctx.close();
+  return { ok: /Fazer check-in/.test(t) && /Ainda não se cadastrou/.test(t) && /será chamado/.test(t) && cor === 'rgb(27, 122, 61)' && !/Ative os avisos/.test(t), detalhe: cor };
 });
-await caso('com permissão e sem login: mostra o login', async () => {
-  const { page, ctx } = await abrir(); await page.waitForSelector('#e'); const ok = /Entre na sua conta/.test(await texto(page)); await ctx.close(); return { ok };
+await caso('check-in sem conta: pede nome, e-mail e celular, entra na fila e guarda o ticket', async () => {
+  const { page, ctx, estado } = await abrir(); await page.click('#btnCheckin');
+  await page.fill('#cn', 'Maria da Silva'); await page.fill('#ce', 'maria@teste.local'); await page.fill('#ct', '(11) 98888-7777'); await page.click('button[type=submit]');
+  await page.waitForFunction(() => /4º/.test(document.body.innerText));
+  const t = await texto(page); const tk = await page.evaluate(() => localStorage.getItem('csi-checkin-ticket')); await ctx.close();
+  return { ok: tk === 'tk-1' && /Mantenha esta tela aberta/.test(t) && estado.ultimoCheckin.p_nome === 'Maria da Silva' && estado.ultimoCheckin.p_telefone === '(11) 98888-7777', detalhe: t.replace(/\n+/g, ' | ').slice(0, 120) };
+});
+await caso('ticket guardado reabre direto na posição; quando a recepção cria a conta, oferece entrar', async () => {
+  const { page, ctx, estado } = await abrir({ ticket: 'tk-1' }); await page.waitForFunction(() => /4º/.test(document.body.innerText));
+  estado.ticketFila = { situacao: 'aguardando', senha: 4, posicao: 3, a_frente: 2, total: 4, conta_pronta: true, email: 'maria@teste.local', pede_senha: false };
+  await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+  await page.waitForFunction(() => /Sua conta está pronta/.test(document.body.innerText), null, { timeout: 5000 });
+  await ctx.close(); return { ok: true };
+});
+await caso('ticket de outro dia (situação fora) volta ao início e apaga o ticket', async () => {
+  const { page, ctx, estado } = await abrir({ ticket: 'tk-velho' }); estado.ticketFila = { situacao: 'fora', total: 0 };
+  await page.waitForSelector('#btnCheckin'); const tk = await page.evaluate(() => localStorage.getItem('csi-checkin-ticket')); await ctx.close(); return { ok: tk === null };
+});
+await caso('mesmos dados de uma conta: oferece senha e "chamar a recepção" (check-in com ajuda de senha)', async () => {
+  const { page, ctx, estado } = await abrir(); await page.click('#btnCheckin');
+  await page.fill('#cn', 'Ana Teste'); await page.fill('#ce', 'ana@teste.local'); await page.fill('#ct', '11911112222'); await page.click('button[type=submit]');
+  await page.waitForSelector('#btnEsqueci'); const t1 = await texto(page);
+  await page.click('#btnEsqueci'); await page.waitForFunction(() => /4º/.test(document.body.innerText));
+  await ctx.close(); return { ok: /Encontramos o seu cadastro/.test(t1) && estado.ultimoCheckin.p_ajuda_senha === true };
+});
+await caso('mesmos dados de uma conta + senha certa: entra e já faz o check-in', async () => {
+  const { page, ctx, estado } = await abrir(); await page.click('#btnCheckin');
+  await page.fill('#cn', 'Ana Teste'); await page.fill('#ce', 'ana@teste.local'); await page.fill('#ct', '11911112222'); await page.click('button[type=submit]');
+  await page.waitForSelector('#s'); await page.fill('#s', 'certa'); await page.click('button[type=submit]');
+  await page.waitForFunction(() => /3º/.test(document.body.innerText)); await ctx.close(); return { ok: estado.rpcs.includes('fila_cheguei') };
+});
+await caso('senha provisória: obriga criar senha nova antes do portal', async () => {
+  const { page, ctx, estado } = await abrir({ logado: true }); estado.trocar = true; await page.reload();
+  await page.waitForSelector('#n1'); const t = await texto(page);
+  await page.fill('#n1', 'abc'); await page.fill('#n2', 'abc'); await page.click('button[type=submit]');
+  await page.waitForFunction(() => /pelo menos 8/.test(document.body.innerText)); await ctx.close();
+  return { ok: /Crie a sua senha/.test(t) && !/Chegou na clínica/.test(t) };
+});
+await caso('com permissão e sem login: "Entrar" leva ao login', async () => {
+  const { page, ctx } = await abrir(); await page.click('#btnJaTenho'); await page.waitForSelector('#e'); const ok = /Entre na sua conta/.test(await texto(page)); await ctx.close(); return { ok };
 });
 await caso('senha errada mostra erro em português', async () => {
-  const { page, ctx } = await abrir(); await page.fill('#e', 'ana@teste.local'); await page.fill('#s', 'errada'); await page.click('button[type=submit]');
+  const { page, ctx } = await abrir(); await page.click('#btnJaTenho'); await page.fill('#e', 'ana@teste.local'); await page.fill('#s', 'errada'); await page.click('button[type=submit]');
   await page.waitForFunction(() => /incorretos/.test(document.body.innerText)); await ctx.close(); return { ok: true };
 });
 await caso('entra, vê "Chegou na clínica?" e toca Cheguei → 3º da fila, 2 à frente', async () => {
-  const { page, ctx, estado } = await abrir(); await page.fill('#e', 'ana@teste.local'); await page.fill('#s', 'certa'); await page.click('button[type=submit]');
+  const { page, ctx, estado } = await abrir(); await page.click('#btnJaTenho'); await page.fill('#e', 'ana@teste.local'); await page.fill('#s', 'certa'); await page.click('button[type=submit]');
   await page.waitForFunction(() => /Chegou na clínica/.test(document.body.innerText));
   await page.click('text=Cheguei');
   await page.waitForFunction(() => /3º/.test(document.body.innerText));
@@ -89,9 +132,9 @@ await caso('sessão guardada abre direto no portal; quando chamam, mostra "É a 
   const av = await page.evaluate(() => window.__avisos); await ctx.close();
   return { ok: av.includes('Está perto da sua vez') || av.includes('É a sua vez!'), detalhe: JSON.stringify(av) };
 });
-await caso('Sair volta ao login', async () => {
+await caso('Sair volta ao início', async () => {
   const { page, ctx } = await abrir({ logado: true }); await page.waitForSelector('#btnSair:not([hidden])'); await page.click('#btnSair');
-  await page.waitForSelector('#e'); await ctx.close(); return { ok: true };
+  await page.waitForSelector('#btnCheckin'); await ctx.close(); return { ok: true };
 });
 
 await browser.close(); srv.close();
