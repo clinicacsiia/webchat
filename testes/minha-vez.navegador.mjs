@@ -42,6 +42,7 @@ async function abrir({ permissao = true, logado = false, ticket = null } = {}) {
       if (nome === 'fila_minha_vez') return j(estado.fila);
       if (nome === 'fila_cheguei') { estado.fila = { situacao: 'aguardando', senha: 3, posicao: 3, a_frente: 2, total: 3 }; return j(estado.fila); }
       if (nome === 'fila_config_publica') return j({ vapid: '' });
+      if (nome === 'paciente_jornada') return j(estado.jornada || { visitas: [], resumo: { total: 0, feitos: 0, faltam: 0, laudos: 0 } });
       if (nome === 'conta_precisa_trocar_senha') return j(estado.trocar);
       if (nome === 'conta_senha_trocada') { estado.trocar = false; return j(null); }
       if (nome === 'checkin_publico') { const c = JSON.parse(r.request().postData() || '{}'); estado.ultimoCheckin = c; return j(c.p_email === 'ana@teste.local' && !c.p_ajuda_senha ? { situacao: 'conta_existente', email: c.p_email } : estado.checkin); }
@@ -66,7 +67,7 @@ const texto = (p) => p.locator('#raiz').innerText();
 await caso('sem login e sem permissão de aviso: mostra o botão verde de check-in e a observação', async () => {
   const { page, ctx } = await abrir({ permissao: false }); await page.waitForSelector('#btnCheckin'); const t = await texto(page);
   const cor = await page.$eval('#btnCheckin', (e) => getComputedStyle(e).backgroundColor); await ctx.close();
-  return { ok: /Fazer check-in/.test(t) && /Ainda não se cadastrou/.test(t) && /será chamado/.test(t) && cor === 'rgb(27, 122, 61)' && !/Ative os avisos/.test(t), detalhe: cor };
+  return { ok: /Fazer check-in/.test(t) && /Ainda não se cadastrou/.test(t) && /será chamado/.test(t) && cor === 'rgb(22, 122, 67)' && !/Ative os avisos/.test(t), detalhe: cor };
 });
 await caso('check-in sem conta: pede nome, e-mail e celular, entra na fila e guarda o ticket', async () => {
   const { page, ctx, estado } = await abrir(); await page.click('#btnCheckin');
@@ -131,6 +132,16 @@ await caso('sessão guardada abre direto no portal; quando chamam, mostra "É a 
   await page.waitForFunction(() => /É a sua vez/.test(document.body.innerText), null, { timeout: 5000 });
   const av = await page.evaluate(() => window.__avisos); await ctx.close();
   return { ok: av.includes('Está perto da sua vez') || av.includes('É a sua vez!'), detalhe: JSON.stringify(av) };
+});
+await caso('Seus exames: resumo "1 de 3 feitos · faltam 2", passo de cada exame, "em andamento" e nenhum horário', async () => {
+  const { page, ctx, estado } = await abrir({ logado: true });
+  estado.jornada = { conferida: true, resumo: { total: 3, feitos: 1, faltam: 2, laudos: 0 }, visitas: [{ data: new Date().toISOString().slice(0, 10), unidade: 'Centro', exames: [
+    { nome: 'RM JOELHO', ok: 5, em_atendimento: false, excecao: null }, { nome: 'RM COLUNA', ok: 4, em_atendimento: true, excecao: null }, { nome: 'US ABDOME', ok: 2, em_atendimento: false, excecao: null }, { nome: 'TC CRANIO', ok: null, excecao: 'cancelado' }] }] };
+  await page.waitForFunction(() => /Chegou na clínica/.test(document.body.innerText));
+  await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+  await page.waitForFunction(() => /Seus exames/.test(document.body.innerText), null, { timeout: 5000 });
+  const t = await texto(page); const feitos = await page.locator('.passos li.feito').count(); const agora = await page.locator('.passos li.agora').count(); await ctx.close();
+  return { ok: /1 de 3 exames feitos · faltam 2/.test(t) && /Seu exame está sendo feito agora/.test(t) && /Laudo está sendo preparado|laudo está sendo preparado/.test(t) && /foi cancelado/.test(t) && /em andamento/.test(t) && feitos === 5 + 4 + 2 && agora === 3 && !/\d{1,2}:\d{2}/.test(t), detalhe: feitos + ' ' + agora + ' ' + t.replace(/\n+/g, ' | ').slice(0, 160) };
 });
 await caso('Sair volta ao início', async () => {
   const { page, ctx } = await abrir({ logado: true }); await page.waitForSelector('#btnSair:not([hidden])'); await page.click('#btnSair');

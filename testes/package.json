@@ -24,7 +24,7 @@
     "test:historico": "node historico.navegador.mjs",
     "test:sentinela-navegador": "node sentinela.navegador.mjs",
     "test:nomes": "node nomes-exame.test.mjs",
-    "test": "npm run test:edge && npm run test:python && npm run test:sql && npm run test:delta && npm run test:sw && npm run test:sentinela && npm run test:nomes && npm run test:sql9 && npm run test:convenio && npm run test:assuntos && npm run test:contas && npm run test:protecao && npm run test:login && npm run test:meus-dados && npm run test:navegador && npm run test:corrida && npm run test:historico && npm run test:sentinela-navegador && npm run test:login && npm run test:quadro && npm run test:jornada && npm run test:pessoa-sql && npm run test:pessoa && npm run test:chegada-sql && npm run test:checkin-sql && npm run test:minha-vez",
+    "test": "npm run test:edge && npm run test:python && npm run test:sql && npm run test:delta && npm run test:sw && npm run test:sentinela && npm run test:nomes && npm run test:sql9 && npm run test:convenio && npm run test:assuntos && npm run test:contas && npm run test:protecao && npm run test:login && npm run test:meus-dados && npm run test:navegador && npm run test:corrida && npm run test:historico && npm run test:sentinela-navegador && npm run test:login && npm run test:quadro && npm run test:jornada && npm run test:pessoa-sql && npm run test:pessoa && npm run test:chegada-sql && npm run test:checkin-sql && npm run test:jornada-paciente && npm run test:minha-vez",
     "test:carga": "CARGA_SIMULADO=1 CARGA_DURACAO_S=15 CARGA_RAMPA_S=3 node carga.mjs",
     "carga": "node carga.mjs",
     "test:quadro": "node quadro.navegador.mjs",
@@ -33,6 +33,7 @@
     "test:pessoa": "node pessoa.navegador.mjs",
     "test:chegada-sql": "node sql-chegada.test.mjs",
     "test:checkin-sql": "node sql-checkin.test.mjs",
+    "test:jornada-paciente": "node sql-jornada-paciente.test.mjs",
     "test:minha-vez": "node minha-vez.navegador.mjs"
   },
   "devDependencies": {

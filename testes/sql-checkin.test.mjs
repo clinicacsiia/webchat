@@ -16,7 +16,7 @@ await db.exec(`
   create table auth.sessions (id uuid primary key default gen_random_uuid(), user_id uuid, not_after timestamptz);
   create function extensions.crypt(p text, s text) returns text language sql as $$ select 'h:' || p $$;
   create function extensions.gen_salt(t text) returns text language sql as $$ select 'x' $$;
-  create table public.contas_paciente (id uuid primary key references auth.users(id) on delete cascade, email text, paciente_id uuid references public.pacientes(id), nome text, telefone text);
+  create table public.contas_paciente (id uuid primary key references auth.users(id) on delete cascade, email text, paciente_id uuid references public.pacientes(id), nome text, telefone text, identidade_conferida_em timestamptz);
   create table public.equipe_convites (email text primary key, usado_em timestamptz);
   create function public.novo_usuario() returns trigger language plpgsql security definer as $$ begin insert into public.contas_paciente (id, email) values (new.id, new.email); return new; end $$;
   create trigger on_auth_user_created after insert on auth.users for each row execute function public.novo_usuario();
