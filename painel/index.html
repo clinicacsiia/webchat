@@ -316,14 +316,15 @@
     return mesmoDia(d, n) ? d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
       : d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
   }
-  const fmtHora = (iso) => new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-  const fmtDataHora = (iso) => new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
+  const fmtHora = (iso) => { const d = iso ? new Date(iso) : null; return !d || isNaN(d) ? '' : d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }); };
+  const fmtDataHora = (iso) => { const d = iso ? new Date(iso) : null; return !d || isNaN(d) ? '' : d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }); };
   function rotuloDia(iso) {
     const d = new Date(iso), n = new Date(), o = new Date(n); o.setDate(n.getDate() - 1);
     if (mesmoDia(d, n)) return 'Hoje'; if (mesmoDia(d, o)) return 'Ontem';
     return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
   }
   function linkificar(texto) {
+    texto = texto == null ? '' : String(texto);
     const out = []; const re = /(https?:\/\/[^\s<]+)/g; let ult = 0, m;
     while ((m = re.exec(texto))) {
       if (m.index > ult) out.push(texto.slice(ult, m.index));
@@ -577,7 +578,7 @@
     const lateral = h('aside', { class: 'lateral' },
       h('div', { class: 'marca' }, h('i', { id: 'pontoVivo' }), 'Atendimento'),
       nav, h('div', { class: 'espaco' }),
-      h('div', { class: 'eu' }, h('b', {}, S.me.nome), h('span', {}, ROTULO_PAPEL[S.me.papel]),
+      h('div', { class: 'eu' }, h('b', {}, S.me.nome || S.me.email || 'Equipe'), h('span', {}, ROTULO_PAPEL[S.me.papel]),
         h('div', { class: 'acoes' },
           podeAtender() ? h('button', { type: 'button', id: 'btnSom', onclick: alternarSom }, S.mudo ? 'Som desligado' : 'Som ligado') : null,
           podeAtender() && 'Notification' in window && Notification.permission === 'default' ? h('button', { type: 'button', onclick: pedirNotificacao }, 'Ativar avisos') : null,
@@ -609,6 +610,7 @@
   const semAcento = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
   function duracao(desde) {
     const m = Math.max(0, Math.floor((Date.now() - new Date(desde).getTime()) / 60000));
+    if (!Number.isFinite(m)) return 'algum tempo';
     if (m < 1) return 'agora';
     if (m < 60) return m + ' min';
     const hh = Math.floor(m / 60);
@@ -752,7 +754,7 @@
     const ag = k.responsavel ? S.agentes.get(k.responsavel) : null;
     return h('div', { class: 'j-aviso' },
       h('div', { class: 'quem' }, h('b', {}, k.paciente_nome || 'Paciente sem nome'),
-        h('span', {}, `${k.coluna_nome} · parado há ${duracao(k.coluna_desde)}${k.proxima_hora ? ' · horário ' + fmtHora(k.proxima_hora) : ''}${ag ? ' · ' + ag.nome : ' · sem responsável'}`)),
+        h('span', {}, `${k.coluna_nome || 'Sem etapa'} · parado há ${duracao(k.coluna_desde)}${k.proxima_hora ? ' · horário ' + fmtHora(k.proxima_hora) : ''}${ag ? ' · ' + ag.nome : ' · sem responsável'}`)),
       !k.responsavel ? h('button', { class: 'btn', type: 'button', onclick: () => atribuirJ(k, S.me.id) }, 'Assumir') : null,
       h('button', { class: 'btn prim', type: 'button', onclick: () => abrirCartaoJ(k.id) }, 'Resolver'));
   }
@@ -805,7 +807,7 @@
       case 'divergencia': return `${quem}: o Klingo diz outra coisa do que o painel mostra. Conferir.`;
       case 'atribuido': return d.responsavel ? `${quem}: responsável ${(S.agentes.get(d.responsavel) || {}).nome || 'definido'}` : `${quem}: tirou o responsável`;
       case 'tarefa': return `${quem}: ${d.acao === 'alerta' ? 'aviso aberto' : d.acao === 'feita' ? 'tarefa concluída' : 'tarefa'}${d.titulo ? ' · ' + d.titulo : ''}`;
-      case 'prioridade': return `${quem}: prioridade ${d.de} → ${d.para}${d.motivo ? ' · ' + d.motivo : ''}`;
+      case 'prioridade': return `${quem}: prioridade ${d.de || '—'} → ${d.para || '—'}${d.motivo ? ' · ' + d.motivo : ''}`;
       default: return `${quem}: ${e.tipo}`;
     }
   }
@@ -860,7 +862,7 @@
     const sel = dest.length ? h('select', { 'aria-label': 'Mover o paciente para', onchange: (e) => { if (e.target.value) moverJ(k, e.target.value); } }, h('option', { value: '' }, 'Mover para…'), dest.map((d) => h('option', { value: d.id }, d.nome))) : null;
     const pessoas = [...S.agentes.values()].filter((a) => a.ativo && (a.papel === 'admin' || a.papel === 'atendente'));
     const resp = h('select', { 'aria-label': 'Responsável', onchange: (e) => atribuirJ(k, e.target.value) }, h('option', { value: '' }, 'Sem responsável'), pessoas.map((a) => h('option', { value: a.id, selected: a.id === k.responsavel }, a.nome)));
-    const exames = (ex.data || []).map((e) => h('li', {}, `${e.procedimento} · ${e.status}${e.agendado_para ? ' · ' + fmtDataHora(e.agendado_para) : ''}${e.operadora ? ' · ' + e.operadora : ''}`));
+    const exames = (ex.data || []).map((e) => h('li', {}, `${e.procedimento || 'Exame'} · ${e.status || 'sem situação'}${e.agendado_para ? ' · ' + fmtDataHora(e.agendado_para) : ''}${e.operadora ? ' · ' + e.operadora : ''}`));
     const tarefas = (ta.data || []).map((t) => h('li', { class: !t.feita_em && t.vence_em && new Date(t.vence_em) < new Date() ? 'aberta' : '' },
       t.titulo, t.feita_em ? ' (feita)' : '', ' ', !t.feita_em ? h('button', { class: 'btn', type: 'button', style: 'padding:2px 8px;font-size:12px', onclick: () => tarefaFeitaJ(t, k) }, 'Feita') : null));
     dlg.className = 'largo';
@@ -936,7 +938,7 @@
   function aoNovaMensagem(m) {
     if (m.autor === 'cliente') {
       const c = S.conversas.find((x) => x.id === m.conversa_id);
-      if (!(S.abertaId && membrosDe(S.abertaId).includes(m.conversa_id)) || document.hidden) avisar(c ? (c.nome_informado || (c.contatos && c.contatos.nome)) || 'Nova mensagem' : 'Nova mensagem', String(m.texto).slice(0, 100));
+      if (!(S.abertaId && membrosDe(S.abertaId).includes(m.conversa_id)) || document.hidden) avisar(c ? (c.nome_informado || (c.contatos && c.contatos.nome)) || 'Nova mensagem' : 'Nova mensagem', String(m.texto || '').slice(0, 100));
     }
     if (S.abertaId && membrosDe(S.abertaId).includes(m.conversa_id) && !S.vistos.has(m.id)) {
       S.vistos.add(m.id); S.msgs.push(m); desenharMsgs(true);
@@ -1349,7 +1351,7 @@
     const ultima = S.msgs.length ? S.msgs[S.msgs.length - 1] : null;
     let pontos = [];
     if (!minha) {
-      pontos = [{ tom: urgente ? 'alta' : 'media', titulo: dono ? `Esta conversa está com ${dono.nome}` : (urgente ? 'Urgente: assuma esta conversa agora' : 'Assuma esta conversa para responder'),
+      pontos = [{ tom: urgente ? 'alta' : 'media', titulo: dono ? `Esta conversa está com ${dono.nome || 'outro atendente'}` : (urgente ? 'Urgente: assuma esta conversa agora' : 'Assuma esta conversa para responder'),
         detalhe: dono ? 'Só assuma se combinar com essa pessoa.' : (c.triagem_resumo || 'Ninguém atende ainda. Leia o resumo e as mensagens abaixo.'), rot: dono ? 'Assumir mesmo assim' : 'Assumir', fn: () => assumir() }];
     } else {
       if (al.length) pontos.push({ tom: 'alta', titulo: 'Confira o valor informado', detalhe: 'Está fora do valor de referência. Confirme no Klingo.', rot: 'Ver valor', fn: ir('alertaPreco') });
@@ -1375,14 +1377,14 @@
     const tri = document.getElementById('triagem');
     if (tri) tri.replaceChildren(...(c.triagem_resumo || (c.ia_ativa && c.status === 'aguardando') ? [h('div', { class: 'triagem' },
       h('b', {}, c.ia_ativa && c.status === 'aguardando' ? (c.motor === 'fluxo' ? 'Assistente automático atendendo' : 'Assistente virtual atendendo')
-        : (c.motor === 'fluxo' ? 'Resumo do assistente automático' : 'Triagem da assistente virtual')),
+        : (c.motor === 'fluxo' ? 'Resumo do assistente automático' : 'Triagem do assistente virtual')),
       c.triagem_urgencia ? h('span', { class: 'urg ' + c.triagem_urgencia }, 'Urgência ' + ({ baixa: 'baixa', media: 'média', alta: 'alta' })[c.triagem_urgencia]) : null,
       c.triagem_resumo ? h('div', {}, c.triagem_resumo) : null)] : []));
     t.replaceChildren(
       h('button', { class: 'btn voltar', type: 'button', onclick: () => { S.abertaId = null; document.getElementById('inbox')?.classList.remove('aberta'); renderLista(); renderChat(); if (S.modo === 'quadro') renderQuadro(); } }, 'Voltar'),
       h('div', { class: 'quem' }, h('b', {}, nomeLista(c)),
         h('span', {}, ct.telefone ? h('a', { href: 'https://wa.me/55' + soDigitos(ct.telefone), target: '_blank', rel: 'noopener noreferrer' }, fmtTel(ct.telefone)) : '', ct.email ? ' · ' + ct.email : '',
-          ' · ', ROTULO_STATUS[c.status], ag ? ' com ' + ag.nome : ''),
+          ' · ', ROTULO_STATUS[c.status], ag && ag.nome ? ' com ' + ag.nome : ''),
         detalheInicio(c) ? h('span', { style: 'display:block;font-weight:600' }, detalheInicio(c)) : null),
       !minha && c.status !== 'encerrada' ? h('button', { class: 'btn prim', type: 'button', onclick: () => assumir(true) }, 'Assumir') : null,
       c.status === 'encerrada' ? h('button', { class: 'btn', type: 'button', onclick: () => assumir(true) }, 'Reabrir') : null,
@@ -1515,7 +1517,7 @@
   }
   async function transferir(agenteId) {
     const ag = S.agentes.get(agenteId);
-    if (!confirm(`Transferir esta conversa para ${ag ? ag.nome : 'outro atendente'}?`)) { renderTopoChat(); return; }
+    if (!confirm(`Transferir esta conversa para ${ag && ag.nome ? ag.nome : 'outro atendente'}?`)) { renderTopoChat(); return; }
     await atualizarConversa({ agente_id: agenteId, status: 'em_atendimento' });
   }
   async function enviarMsg() {
@@ -1727,12 +1729,12 @@
     if (!ok) throw new Error('Conta criada, mas não foi possível liberar o acesso. Libere na lista abaixo.');
   }
   async function redefinirSenha(a) {
-    const nova = prompt(`Nova senha provisória para ${a.nome} (mínimo 8 caracteres).\nNo próximo acesso a pessoa vai escolher uma senha só dela.`);
+    const nova = prompt(`Nova senha provisória para ${a.nome || a.email || 'esta pessoa'} (mínimo 8 caracteres).\nNo próximo acesso a pessoa vai escolher uma senha só dela.`);
     if (nova === null) return;
     if (nova.length < 8) { toast('A senha precisa ter pelo menos 8 caracteres.'); return; }
     const { error } = await db.rpc('admin_redefinir_senha', { p_agente: a.id, p_senha: nova });
     if (error) { toast(msgErro(error)); return; }
-    toast(`Senha de ${a.nome} redefinida. Passe a nova senha para a pessoa.`);
+    toast(`Senha de ${a.nome || a.email || 'esta pessoa'} redefinida. Passe a nova senha para a pessoa.`);
   }
   async function minhaSenha() {
     const nova = prompt('Nova senha para a sua conta (mínimo 8 caracteres):');
@@ -1748,7 +1750,7 @@
   }
   function viewEquipeRecarregar() { const c = document.getElementById('conteudo'); c.replaceChildren(); viewEquipe(c); }
   async function removerAgente(a) {
-    if (!confirm(`Remover ${a.nome} da equipe? As conversas dessa pessoa continuam salvas.`)) return;
+    if (!confirm(`Remover ${a.nome || a.email || 'esta pessoa'} da equipe? As conversas dessa pessoa continuam salvas.`)) return;
     const { error } = await db.from('agentes').delete().eq('id', a.id);
     if (error) { toast(msgErro(error)); return; }
     S.agentes.delete(a.id); toast('Pessoa removida da equipe.'); viewEquipeRecarregar();

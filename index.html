@@ -537,7 +537,7 @@
     if (!m || /failed to fetch|networkerror|load failed/i.test(m)) return 'Sem conexão. Confira sua internet e tente de novo.';
     return m;
   }
-  function hora(iso) { return new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }); }
+  function hora(iso) { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }); }
   function rotuloDia(iso) {
     const d = new Date(iso), h = new Date();
     const dia = (x) => x.toDateString();
@@ -556,6 +556,7 @@
     return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
   }
   function linkificar(pai, texto) {
+    texto = texto == null ? '' : String(texto);
     const re = /(https?:\/\/[^\s<]+)/g; let ult = 0, m;
     while ((m = re.exec(texto))) {
       if (m.index > ult) pai.appendChild(document.createTextNode(texto.slice(ult, m.index)));
@@ -1434,7 +1435,7 @@
     const marcado = [...e.itens.values()].find((v) => v.grupo === g.chave);
     const caixa = h('div', { class: 'grupo ' + g.certeza });
     caixa.append(h('p', { class: 'g-titulo' }, `${ORDINAL[i] || (i + 1) + 'º'} exame do pedido`));
-    if (g.recorte) caixa.append(h('img', { class: 'g-recorte', src: g.recorte, alt: 'Trecho do pedido: ' + g.linha }));
+    if (g.recorte) caixa.append(h('img', { class: 'g-recorte', src: g.recorte, alt: g.linha ? 'Trecho do pedido: ' + g.linha : 'Trecho do pedido' }));
     else if (g.linha) caixa.append(h('p', { class: 'g-escrito' }, 'No papel está escrito: ', h('q', {}, g.linha)));
     if (g.explicacao) caixa.append(h('p', { class: 'g-entendi' }, 'Entendi: ', h('strong', {}, g.explicacao)));
     const rotulo = (op) => op.rotulo || exameTexto(op.exame.nome);
@@ -1883,8 +1884,8 @@
   function selecionadas() {
     const partes = agruparPartes();
     if (!partes.length) return h('p', { class: 'p-dica' }, 'Nenhuma parte escolhida ainda.');
-    return h('div', { class: 'sel-lista' }, partes.map((p) => h('span', { class: 'tag' }, `${p.regiao_nome}${LADO_TXT[p.lado] ? ' — ' + LADO_TXT[p.lado] : ''}`,
-      h('button', { type: 'button', 'aria-label': 'Tirar ' + p.regiao_nome, onclick: () => { for (const k of [...P.partes.keys()]) if (k.startsWith(p.regiao + ':')) P.partes.delete(k); desenharPedido(); } }, '×'))));
+    return h('div', { class: 'sel-lista' }, partes.map((p) => h('span', { class: 'tag' }, `${p.regiao_nome || 'Parte do corpo'}${LADO_TXT[p.lado] ? ' — ' + LADO_TXT[p.lado] : ''}`,
+      h('button', { type: 'button', 'aria-label': 'Tirar ' + (p.regiao_nome || 'a parte do corpo'), onclick: () => { for (const k of [...P.partes.keys()]) if (k.startsWith(p.regiao + ':')) P.partes.delete(k); desenharPedido(); } }, '×'))));
   }
   async function examesDe(mod, regiao) {
     const k = `${mod}|${regiao}`, estado = P;   // a folha pode ser fechada (P = null) enquanto a consulta roda
@@ -1930,9 +1931,9 @@
     corpo.append(passosTopo(3, 3), h('h2', { class: 'passo-titulo' }, 'Qual exame?'), h('p', { class: 'passo-sub' }, 'Toque no exame que está no seu pedido. Se não tiver certeza, deixe o atendente escolher.'));
     for (const p of P.lista) {
       const o = organizarExames(opcoesDaParte(p), p), nome = 'ex' + p.regiao + p.lado, atual = P.escolhas.get(chaveParte(p));
-      const bloco = h('section', { class: 'bloco-parte' }, h('h3', {}, `${MOD_NOME[P.mod]} — ${p.regiao_nome}`));
+      const bloco = h('section', { class: 'bloco-parte' }, h('h3', {}, `${MOD_NOME[P.mod] || 'Exame'} — ${p.regiao_nome || 'parte do corpo'}`));
       if (p.tem_lado) {
-        bloco.append(h('div', { class: 'lado-sel', role: 'group', 'aria-label': `Qual lado: ${p.regiao_nome}` }, h('p', { class: 'lado-q' }, 'Qual lado é o exame?'),
+        bloco.append(h('div', { class: 'lado-sel', role: 'group', 'aria-label': `Qual lado: ${p.regiao_nome || 'parte do corpo'}` }, h('p', { class: 'lado-q' }, 'Qual lado é o exame?'),
           h('div', { class: 'seg tres' }, ['D', 'E', 'A'].map((v) => h('button', { type: 'button', 'aria-pressed': String(p.lado === v), onclick: () => mudarLado(p, v) }, LADO_ROTULO[v])))));
       }
       // O lado aparece em cada opção, com palavras simples (nada de "unilateral").
@@ -2382,8 +2383,8 @@
 
   // "Meus dados" (LGPD, art. 18): ver o que a clínica guarda, baixar uma cópia e apagar a conta. Apagar a conta remove só o login;
   // cadastro, pedidos e conversas continuam guardados pela clínica (o texto abaixo diz isso antes de confirmar). Revisão jurídica pendente.
-  const dataHora = (iso) => { try { return new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }); } catch { return String(iso || ''); } };
-  const dataCurta = (iso) => { try { return new Date(String(iso).length === 10 ? iso + 'T12:00:00' : iso).toLocaleDateString('pt-BR'); } catch { return String(iso || ''); } };
+  const dataHora = (iso) => { if (!iso) return ''; try { const d = new Date(iso); return isNaN(d) ? String(iso) : d.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }); } catch { return String(iso || ''); } };
+  const dataCurta = (iso) => { if (!iso) return ''; try { const d = new Date(String(iso).length === 10 ? iso + 'T12:00:00' : iso); return isNaN(d) ? String(iso) : d.toLocaleDateString('pt-BR'); } catch { return String(iso || ''); } };
   const nomeDeArquivo = () => 'meus-dados-' + new Date().toISOString().slice(0, 10);
   function baixarArquivo(nome, conteudo, tipo) {
     const url = URL.createObjectURL(new Blob(['\ufeff' + conteudo], { type: tipo + ';charset=utf-8' }));
@@ -2412,7 +2413,7 @@
     L.push('', 'PEDIDOS QUE VOCÊ FEZ NO CHAT');
     if (!(d.pedidos || []).length) L.push('Nenhum.');
     (d.pedidos || []).forEach((x) => {
-      L.push('- ' + dataHora(x.iniciado_em) + ' (para ' + x.para + ')' + (x.tipo ? ', ' + x.tipo : '') + (x.situacao ? ', situação: ' + x.situacao : ''));
+      L.push('- ' + dataHora(x.iniciado_em) + (x.para ? ' (para ' + x.para + ')' : '') + (x.tipo ? ', ' + x.tipo : '') + (x.situacao ? ', situação: ' + x.situacao : ''));
       if ((x.exames || []).length) L.push('    Exames: ' + x.exames.join(' + '));
       if (x.convenio) L.push('    Convênio: ' + x.convenio);
       if (x.unidade) L.push('    Unidade: ' + x.unidade);
@@ -2420,7 +2421,7 @@
     });
     L.push('', 'SUAS CONVERSAS');
     if (!(d.mensagens || []).length) L.push('Nenhuma.');
-    (d.mensagens || []).forEach((m) => L.push('[' + dataHora(m.quando) + '] ' + m.quem + ': ' + m.texto));
+    (d.mensagens || []).forEach((m) => L.push('[' + dataHora(m.quando) + '] ' + (m.quem || 'Mensagem') + ': ' + (m.texto || '(sem texto)')));
     L.push('', d.observacao || '');
     return L.join('\r\n');
   }
