@@ -261,6 +261,19 @@ await caso('quadro das conversas: um cartão por pessoa ("+1 da mesma pessoa")',
   return { ok: nomes.filter((n) => n === 'Maria Souza').length === 1 && /\+1 da mesma pessoa/.test(chip) && /Exame em aberto/.test(chip), detalhe: `${nomes}|${chip.replace(/\n/g, ' ')}` };
 });
 
+await caso('próximo passo: a conversa com exame em aberto mostra UMA decisão no alto, e em tela baixa as mensagens ainda têm espaço', async () => {
+  const { page, ctx, reg } = await abrir();
+  await filtro(page, 'Abertas');
+  await page.setViewportSize({ width: 1280, height: 560 });
+  await page.click('.itens .item:has-text("Maria Souza")'); await page.waitForSelector('.ex-caixa'); await page.waitForSelector('.proximo');
+  const texto = await page.locator('#proximo').innerText();
+  const botao = await page.locator('#proximo button').allInnerTexts();
+  const alturas = await page.evaluate(() => ({ msgs: document.getElementById('msgs').clientHeight, ctxMax: document.getElementById('contexto').clientHeight, janela: innerHeight }));
+  await ctx.close();
+  return { ok: botao.length === 1 && texto.length > 10 && alturas.msgs >= 90 && alturas.ctxMax <= alturas.janela * 0.2 && !reg.excecoes.length,
+           detalhe: reg.excecoes[0] ?? `${texto.replace(/\n/g, ' / ')} | botão=${botao} | ${JSON.stringify(alturas)}` };
+});
+
 await caso('banco SEM o SQL novo: cada conversa continua em sua linha e nada quebra', async () => {
   const { page, ctx, reg } = await abrir({ semSql: true });
   await filtro(page, 'Abertas');

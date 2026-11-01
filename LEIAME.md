@@ -29,6 +29,8 @@ Aba Jornada (01/11/2026): onde está cada paciente, ao vivo, com o Klingo lido a
 
 Uma pessoa, uma conversa (01/11/2026): conversas da mesma pessoa (nome + 2 informações) aparecem unidas no Atendimento e na Jornada; exame marcado fica em aberto até a equipe, o paciente (pelo chat) ou o Klingo fechar; falta vira remarcação que o paciente faz sozinho pelo chat. **Pronto e testado, mas o SQL ainda NÃO foi aplicado no Supabase.** Veja `docs/pessoa-unica.md`, seção "Como ligar".
 
+Próximo passo na conversa (01/11/2026): no alto de cada conversa, uma faixa mostra a única decisão que falta (assumir, conferir valor, fechar exame, remarcar, marcar no Klingo ou responder), com um botão que leva até ela. Os avisos de apoio ficam numa área que rola e se encolhe conforme a altura da tela, para as mensagens sempre terem espaço. Só mudou a tela (`painel/index.html`); não há SQL novo.
+
 Lista completa do que falta, com a ordem de dependência: `docs/pendencias-e-dependencias.md` (conferida no banco real em 01/11/2026).
 
 Banco: projeto Supabase `webchat-atendimento` (sa-east-1), já com tabelas, regras de segurança e tempo real.
