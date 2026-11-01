@@ -46,8 +46,8 @@ const RELATORIO = { dias: 28, desde: '2026-10-02T10:58:04+00:00', resumo: { cria
 
 const CORS = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' };
 
-async function novaPagina(browser, { logado = false, vinculos = [] } = {}) {
-  const ctx = await browser.newContext();
+async function novaPagina(browser, { logado = false, vinculos = [], conversas = [], celular = false } = {}) {
+  const ctx = await browser.newContext(celular ? { viewport: { width: 390, height: 800 } } : {});
   const decisoes = [];
   if (logado) {
     await ctx.addInitScript(([id, jwt, email]) => {
@@ -76,6 +76,7 @@ async function novaPagina(browser, { logado = false, vinculos = [] } = {}) {
     else if (url.pathname.endsWith('/rpc/vinculo_decidir')) { decisoes.push(JSON.parse(req.postData() || '{}')); corpo = { ok: true }; }
     else if (url.pathname.endsWith('/rpc/chat_config')) corpo = { nome_empresa: 'Clínica de Teste', boas_vindas: 'Olá! Como podemos ajudar?' };
     else if (url.pathname.startsWith('/auth/v1/user')) corpo = { id: ADMIN.id, aud: 'authenticated', role: 'authenticated', email: ADMIN.email };
+    else if (url.pathname.startsWith('/rest/v1/conversas')) corpo = objeto ? null : conversas;
     else if (url.pathname.startsWith('/rest/v1/agentes')) corpo = objeto ? ADMIN : [ADMIN];
     else if (url.pathname.endsWith('/rpc/catalogo_mudancas') || url.pathname.endsWith('/rpc/ia_exemplos')) corpo = [];
     else if (url.pathname.endsWith('/rpc/ia_relatorio')) corpo = RELATORIO;
@@ -199,6 +200,73 @@ await caso('painel: sem nada para conferir mostra a mensagem vazia e esconde o s
   const txt = await page.locator('.vazio').textContent(), oculto = await page.locator('#seloVinculos').evaluate((e) => e.hidden);
   await ctx.close();
   return { ok: /Nada para conferir/.test(txt) && oculto && erros.excecoes.length === 0, detalhe: erros.excecoes[0] ?? txt };
+});
+
+const CT_ALISSON = { id: 'c0000000-0000-4000-8000-000000000001', nome: 'Alisson Oliveira da Cruz', telefone: '71992641845', email: 'alisson@exemplo.com' };
+const CT_MARIA = { id: 'c0000000-0000-4000-8000-000000000002', nome: 'Maria Souza', telefone: '71988887777', email: null };
+const conv = (n, ct, status, minutosAtras, extra = {}) => ({ id: `d0000000-0000-4000-8000-0000000000${String(n).padStart(2, '0')}`, status, agente_id: null, ultima_mensagem: `mensagem ${n}`, nao_lidas_agente: 0,
+  criado_em: new Date(Date.now() - minutosAtras * 60000).toISOString(), atualizado_em: new Date(Date.now() - minutosAtras * 60000).toISOString(), contato_id: ct.id, ia_ativa: false, motor: 'fluxo',
+  triagem_resumo: null, triagem_urgencia: null, alerta_agenda: null, nome_informado: ct.nome, email_informado: ct.email, paciente_tipo: 'proprio', paciente_nome: null, contatos: ct, ...extra });
+// a mais nova (1) e três anteriores do mesmo contato, uma delas encerrada; mais outro contato com uma conversa só
+const CONVERSAS = [conv(1, CT_ALISSON, 'aguardando', 2), conv(2, CT_MARIA, 'aguardando', 5), conv(3, CT_ALISSON, 'aguardando', 60, { nao_lidas_agente: 2 }), conv(4, CT_ALISSON, 'em_atendimento', 600), conv(5, CT_ALISSON, 'encerrada', 3000)];
+
+await caso('painel: conversas do mesmo contato ficam agrupadas, a mais nova sempre visível, as anteriores recolhidas e abrem ao tocar', async () => {
+  const { page, ctx, erros } = await novaPagina(browser, { logado: true, conversas: CONVERSAS });
+  await page.goto(`${base}/painel/`);
+  await page.waitForSelector('.item', { timeout: 10000 });
+  await page.click('.chip:has-text("Abertas")'); await page.waitForTimeout(150);
+  const linhas = async () => page.locator('#itens .item').evaluateAll((es) => es.map((e) => e.innerText.replace(/\s+/g, ' ').trim()));
+  const fechado = await linhas();
+  const toggle = await page.locator('.grupo-toggle').allTextContents();
+  const semLer = await page.locator('.grupo-toggle .nl').allTextContents();
+  await page.click('.grupo-toggle'); await page.waitForTimeout(150);
+  const aberto = await linhas(), subs = await page.locator('.grupo-outras .item').count();
+  await page.click('.grupo-toggle'); await page.waitForTimeout(150);
+  const recolheu = (await linhas()).length;
+  await page.click('.chip:has-text("Encerradas")'); await page.waitForTimeout(150);
+  const encerradas = await linhas();
+  await ctx.close();
+  const ok = fechado.length === 2 && /mensagem 1/.test(fechado[0]) && /mensagem 2/.test(fechado[1]) && toggle.length === 1 && /2 conversas anteriores deste contato/.test(toggle[0]) && semLer.join() === '2'
+    && aberto.length === 4 && subs === 2 && /mensagem 3/.test(aberto[1]) && /mensagem 4/.test(aberto[2]) && recolheu === 2 && encerradas.length === 1 && /mensagem 5/.test(encerradas[0]) && erros.excecoes.length === 0;
+  return { ok, detalhe: erros.excecoes[0] ?? JSON.stringify({ fechado, toggle, semLer, aberto, recolheu, encerradas }) };
+});
+
+await caso('painel (celular): abrir conversa mostra "← Conversas"; o botão e o voltar do aparelho levam de volta à lista, sem sair do painel', async () => {
+  const { page, ctx, erros } = await novaPagina(browser, { logado: true, conversas: CONVERSAS, celular: true });
+  await page.goto(`${base}/painel/`);
+  await page.waitForSelector('.item', { timeout: 10000 });
+  const visivelLista = () => page.locator('.lista').isVisible(), visivelChat = () => page.locator('.chat').isVisible();
+  const inicio = { lista: await visivelLista(), chat: await visivelChat() };
+  await page.locator('#itens .item').first().click(); await page.waitForTimeout(300);
+  const dentro = { lista: await visivelLista(), chat: await visivelChat(), botao: await page.locator('#btnVoltarLista').isVisible(), texto: await page.locator('#btnVoltarLista').textContent() };
+  await page.click('#btnVoltarLista'); await page.waitForTimeout(300);
+  const aposBotao = { lista: await visivelLista(), chat: await visivelChat(), url: page.url() };
+  await page.locator('#itens .item').first().click(); await page.waitForTimeout(300);
+  await page.goBack(); await page.waitForTimeout(300);   // o botão voltar do celular
+  const aposGesto = { lista: await visivelLista(), chat: await visivelChat(), url: page.url() };
+  await ctx.close();
+  const ok = inicio.lista && !inicio.chat && !dentro.lista && dentro.chat && dentro.botao && /Conversas/.test(dentro.texto) && aposBotao.lista && !aposBotao.chat && /\/painel\//.test(aposBotao.url)
+    && aposGesto.lista && !aposGesto.chat && /\/painel\//.test(aposGesto.url) && erros.excecoes.length === 0;
+  return { ok, detalhe: erros.excecoes[0] ?? JSON.stringify({ inicio, dentro, aposBotao, aposGesto }) };
+});
+
+await caso('painel: dentro da conversa aparecem as "Outras conversas deste contato" e tocar em uma abre a anterior', async () => {
+  const { page, ctx, erros } = await novaPagina(browser, { logado: true, conversas: CONVERSAS });
+  await page.goto(`${base}/painel/`);
+  await page.waitForSelector('.item', { timeout: 10000 });
+  await page.locator('#itens .item').first().click();
+  await page.waitForSelector('#outrasConversas summary', { timeout: 5000 });
+  const resumo = await page.locator('#outrasConversas summary').textContent();
+  await page.click('#outrasConversas summary');
+  const chips = await page.locator('#outrasConversas .chips button').allTextContents();
+  await page.locator('#outrasConversas .chips button', { hasText: 'Encerrada' }).click(); await page.waitForTimeout(400);
+  const aberta = await page.locator('#chatTopo .quem span').first().textContent();
+  const marcada = await page.locator('#itens .item[aria-current=true]').count();
+  const resumo2 = await page.locator('#outrasConversas summary').textContent();
+  const chipsMaria = await (async () => { await page.locator('#btnVoltarLista').evaluate((b) => b.click()); await page.waitForTimeout(200); await page.locator('#itens .item', { hasText: 'Maria Souza' }).click(); await page.waitForTimeout(300); return page.locator('#outrasConversas summary').count(); })();
+  await ctx.close();
+  const ok = /Outras conversas deste contato \(3\)/.test(resumo) && chips.length === 3 && chips.some((c) => /Encerrada/.test(c)) && /Encerrada/.test(aberta) && /\(3\)/.test(resumo2) && chipsMaria === 0 && erros.excecoes.length === 0;
+  return { ok, detalhe: erros.excecoes[0] ?? JSON.stringify({ resumo, chips, aberta, marcada, resumo2, chipsMaria }) };
 });
 
 // A tela da Fila foi retirada do repositório (a antiga era incompatível). Os casos voltam sozinhos quando a pasta fila/ voltar.

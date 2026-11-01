@@ -1,5 +1,6 @@
 -- FLUXOGRAMA: entrada (paciente cria a conta com nome completo, telefone, e-mail, data de nascimento e senha; confirma o e-mail; o chat chama conta_paciente_vincular com o JWT dele) -> validação (só conta de paciente logada; e-mail da conta CONFIRMADO; nome completo e data de nascimento obrigatórios; no máximo 5 tentativas por hora) -> lógica (acha UM cadastro livre e fora de revisão com nome e data de nascimento iguais; conta os acertos: nome + nascimento + telefone + e-mail; 4 acertos liga sozinho; 3 acertos liga sozinho e abre aviso "atualizar" para o atendente; só nome + nascimento NÃO liga e abre pedido "verificar" para o atendente decidir) -> saída (contas_paciente.paciente_id, vinculo_solicitacoes, resultado 'vinculado' / 'vinculado_conferir' / 'em_analise' / 'nao_encontrado' / 'bloqueado' / 'email_nao_confirmado' / 'nada_pendente' / 'ja_vinculado'; RPCs vinculo_listar e vinculo_decidir para a equipe)
--- Versão 1.2 — 31/10/2026 / Mudança: CPF como prova extra (liga a conta quando telefone e e-mail não batem) e pedido de mudança de e-mail ou telefone do cadastro, sempre com o atendente no final
+-- Versão 1.3 — 01/11/2026 / Mudança: cadastros repetidos (mesmo nome e nascimento) vão para o atendente em vez de "não encontrado"
+-- (1.2, 31/10/2026: CPF como prova extra (liga a conta quando telefone e e-mail não batem) e pedido de mudança de e-mail ou telefone do cadastro, sempre com o atendente no final
 -- (1.1: 3 acertos ligam sozinho com aviso ao atendente; menos de 3 vai para o atendente decidir)
 --
 -- DEPENDE de supabase/contas-paciente.sql, protecao-identidade.sql e login-paciente.sql (e de pacientes.sql: fone_chave, norm_nome, nome_confere, data_ou_nula).
@@ -11,7 +12,8 @@
 --        4 acertos  -> liga sozinho, sem aviso.
 --        3 acertos  -> liga sozinho e abre um aviso "atualizar": o atendente confere e atualiza o telefone ou o e-mail do cadastro (ou desfaz o vínculo).
 --        2 acertos  -> NÃO liga. Abre um pedido "verificar": o atendente decide vincular (com ou sem atualizar o cadastro) ou recusar.
---   4. Fica de fora (resultado "não encontrado", sem aviso): cadastro em revisão (revisar), cadastro já ligado a outra conta, nenhum cadastro com nome e nascimento iguais, ou mais de um.
+--   4. Fica de fora (resultado "não encontrado", sem aviso): cadastro em revisão (revisar), cadastro já ligado a outra conta ou nenhum cadastro com nome e nascimento iguais.
+--      Mais de um cadastro igual (v1.3): NÃO liga; abre pedido "verificar" marcado 'cadastro_duplicado' para o atendente decidir (e unir os repetidos).
 --   5. CPF (conta_paciente_confirmar_cpf): quem ficou em "só nome + nascimento" pode informar o CPF. Se bater com o CPF do MESMO cadastro, vira o 3º acerto: a conta é ligada e o aviso "atualizar" abre para o atendente conferir telefone e e-mail.
 --   6. Mudar e-mail ou telefone do cadastro (conta_paciente_pedir_alteracao): só conta já ligada, informando o CPF do cadastro. Nada muda sozinho: abre um pedido "alterar" e o atendente aplica ou recusa. O CPF nunca é guardado nem devolvido; só é comparado.
 --   7. No máximo 5 tentativas por hora por conta (contam tentativa de vínculo, de CPF e de pedido de alteração); cada cadastro de conta faz uma tentativa (a data digitada é apagada depois).
@@ -93,15 +95,23 @@ begin
 
   -- nome completo (2+ palavras) e data de nascimento são obrigatórios
   if v_dt is not null and coalesce(cardinality(string_to_array(public.norm_nome(v_nome), ' ')), 0) >= 2 then
-    select count(*), (array_agg(q.id))[1], (array_agg(q.t_ok))[1], (array_agg(q.e_ok))[1] into v_n, v_pid, v_t, v_e
-      from (select p.id,
-                   coalesce(public.fone_chave(v_tel) = any(p.telefones), false) as t_ok,
-                   (p.email is not null and lower(btrim(p.email)) = lower(btrim(coalesce(v_u.email, '')))) as e_ok
-              from public.pacientes p
-             where not p.revisar and p.dt_nasc = v_dt and public.nome_confere(v_nome, p.nome)
-               and not exists (select 1 from public.contas_paciente o where o.paciente_id = p.id and o.id <> v_uid)) q;
+    -- o melhor candidato (mais acertos, depois validado, depois o mais recente) e quantos cadastros iguais existem
+    select r.n, r.id, r.t_ok, r.e_ok into v_n, v_pid, v_t, v_e
+      from (select q.*, count(*) over () as n, row_number() over (order by (q.t_ok::int + q.e_ok::int) desc, q.validado desc, q.atualizado_em desc) as rn
+              from (select p.id, p.validado, p.atualizado_em,
+                           coalesce(public.fone_chave(v_tel) = any(p.telefones), false) as t_ok,
+                           (p.email is not null and lower(btrim(p.email)) = lower(btrim(coalesce(v_u.email, '')))) as e_ok
+                      from public.pacientes p
+                     where not p.revisar and p.dt_nasc = v_dt and public.nome_confere(v_nome, p.nome)
+                       and not exists (select 1 from public.contas_paciente o where o.paciente_id = p.id and o.id <> v_uid)) q) r
+     where r.rn = 1;
 
-    if v_n = 1 then
+    if v_n > 1 then   -- cadastros repetidos (mesmo nome e nascimento): nunca liga sozinho; o atendente decide e une os repetidos
+      insert into public.vinculo_solicitacoes (conta_id, paciente_id, tipo, batem, diferem, conta_nome, conta_telefone)
+      values (v_uid, v_pid, 'verificar', array['nome', 'nascimento', 'cadastro_duplicado'], '{}'::text[], v_nome, v_tel)
+      on conflict (conta_id, tipo) where status = 'aberta' do update set paciente_id = excluded.paciente_id, batem = excluded.batem, diferem = excluded.diferem, conta_nome = excluded.conta_nome, conta_telefone = excluded.conta_telefone, criado_em = now();
+      v_res := 'em_analise';
+    elsif v_n = 1 then
       v_batem := array['nome', 'nascimento'] || case when v_t then array['telefone'] else '{}'::text[] end || case when v_e then array['email'] else '{}'::text[] end;
       v_diferem := case when v_t then '{}'::text[] else array['telefone'] end || case when v_e then '{}'::text[] else array['email'] end;
       if v_t or v_e then

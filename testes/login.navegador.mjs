@@ -39,9 +39,10 @@ function criarAuth({ senhaCerta = 'Senha1234', email = 'ana@teste.local', meta =
 }
 const conta = (extra = {}) => ({ conta: true, email: 'ana@teste.local', nome: 'Ana Souza', telefone: '71999998888', cadastro_salvo: false, aceitou_lgpd: true, ...extra });
 
-async function abrir({ ativo = true, contaDoBanco = null, auth = criarAuth(), sessaoGuardada = false, hash = '', vinculo = null, mundoExtra = {} } = {}) {
+async function abrir({ ativo = true, contaDoBanco = null, auth = criarAuth(), sessaoGuardada = false, hash = '', vinculo = null, mundoExtra = {}, histLocal = null } = {}) {
   const mundo = criarMundo({ loginAtivo: ativo, conta: contaDoBanco, vinculo, ...mundoExtra });
   const init = sessaoGuardada ? [[(s) => localStorage.setItem('csi-paciente-auth', s), JSON.stringify(sessao('ana@teste.local', auth.meta || {}))]] : [];
+  if (histLocal) init.push([(s) => localStorage.setItem('webchat.historico.v1', s), JSON.stringify(histLocal)]);
   const p = await novaPaginaChat(browser, mundo, { init, auth: auth.tratar });
   await p.page.goto(`${base}/index.html${hash}`);
   await p.page.waitForSelector('#formInicio', { state: 'visible', timeout: 8000 });
@@ -388,6 +389,25 @@ await caso('Criar conta: nome com uma palavra só é barrado ("nome completo")',
   const erro = await texto(x.page, '.conta-form .erro-form'), rotulo = await texto(x.page, 'label[for=cNome]'), rede = x.auth.chamadas.length;
   await x.ctx.close();
   return { ok: /nome completo/i.test(erro || '') && /Nome completo/.test(rotulo || '') && rede === 0, detalhe: `erro=${erro}; rotulo=${rotulo}; rede=${rede}` };
+});
+
+await caso('Conversas anteriores pela conta: entrega ao banco as conversas do aparelho e traz as da conta (outro aparelho, depois de sair); quem não tem conta continua só com o aparelho', async () => {
+  const agora = Date.now();
+  const local = [{ id: 'aaaaaaaa-aaaa-4aaa-8aaa-000000000001', token: 'tok1', tipo: 'proprio', nomeCrianca: '', irmaos: [], irmaosModo: '', criado_em: agora - 1000, ultima: 'mensagem local' }];
+  const daConta = [{ id: 'bbbbbbbb-bbbb-4bbb-8bbb-000000000002', token: 'tok2', criado_em: agora - 86400000, tipo: 'filho', nomeCrianca: 'Pedro', ultima: 'mensagem da conta' },
+                   { id: 'aaaaaaaa-aaaa-4aaa-8aaa-000000000001', token: 'tok1', criado_em: agora - 1000, tipo: 'proprio', nomeCrianca: '', ultima: 'mensagem local' }];
+  const x = await abrir({ contaDoBanco: conta(), sessaoGuardada: true, histLocal: local, mundoExtra: { conversasConta: daConta } });
+  await espera(300);
+  const adocao = chamou(x.mundo, 'conta_paciente_adotar_conversas'), lista = chamou(x.mundo, 'conta_paciente_conversas').length;
+  const botao = await visivel(x.page, '#btnHistoricoForm');
+  await x.page.click('#btnHistoricoForm'); await x.page.waitForSelector('.hist-item');
+  const itens = await x.page.locator('.hist-item').allTextContents(), dica = await texto(x.page, '.hist-dica');
+  await x.ctx.close();
+  const sem = await abrir({ contaDoBanco: null, histLocal: local });
+  const semChamadas = chamou(sem.mundo, 'conta_paciente_adotar_conversas').length + chamou(sem.mundo, 'conta_paciente_conversas').length;
+  await sem.page.click('#btnHistoricoForm'); await sem.page.waitForSelector('.hist-item'); const so1 = await sem.page.locator('.hist-item').count(), dica2 = await texto(sem.page, '.hist-dica');
+  await sem.ctx.close();
+  return { ok: adocao.length === 1 && adocao[0].corpo.p_itens.length === 1 && adocao[0].corpo.p_itens[0].token === 'tok1' && lista === 1 && botao && itens.length === 2 && /Pedro/.test(itens.join()) && /na sua conta/.test(dica) && semChamadas === 0 && so1 === 1 && /neste aparelho/.test(dica2), detalhe: JSON.stringify({ adocao: adocao.length, lista, botao, itens, dica, semChamadas, so1 }) };
 });
 
 await caso('Sem data de nascimento pendente (conta antiga ou já ligada): nem chama o vínculo', async () => {

@@ -119,6 +119,20 @@
   .tag.encerrada { background: #e8ecea; color: var(--suave); }
   .nl { background: var(--verde); color: #fff; border-radius: 999px; font-size: 12px; font-weight: 700; min-width: 20px; text-align: center; padding: 0 6px; flex: none; }
   .vazio { color: var(--suave); text-align: center; padding: 36px 20px; }
+  .grupo { border-bottom: 1px solid #edf2ee; }
+  .grupo .item { border-bottom: 0; }
+  .grupo-toggle { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; background: #f4f8f5; border: 0; border-top: 1px dashed #dbe5df; padding: 7px 14px; font-size: 13px; color: var(--suave); font-weight: 600; cursor: pointer; }
+  .grupo-toggle:hover { background: #ecf3ee; }
+  .grupo-toggle .seta { display: inline-block; transition: transform .12s; }
+  .grupo-toggle[aria-expanded=true] .seta { transform: rotate(90deg); }
+  .grupo-outras { background: #f8fbf9; border-left: 4px solid #cfe0d6; }
+  .grupo-outras .item { padding: 9px 14px 9px 12px; border-top: 1px solid #edf2ee; }
+  .outras-conversas { background: var(--papel); border-bottom: 1px solid var(--linha); padding: 6px 14px; font-size: 13px; }
+  .outras-conversas summary { cursor: pointer; font-weight: 650; color: var(--azul); }
+  .outras-conversas .chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 0 4px; }
+  .outras-conversas .chips button { border: 1.5px solid var(--linha); background: var(--papel); border-radius: 999px; padding: 4px 10px; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+  .outras-conversas .chips button:hover { background: #f4f8f5; }
+  .voltar-conversas { font-weight: 700; }
   .vazio b { display: block; color: var(--texto); margin-bottom: 4px; }
 
   .chat { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: #e8efea; }
@@ -267,7 +281,7 @@
   const S = {
     me: null, agentes: new Map(), conversas: [], filtro: 'aguardando', abertaId: null, msgs: [], vistos: new Set(),
     aba: 'atendimento', canal: null, ao_vivo: false, contatos: [], mudo: localStorage.getItem('painel.mudo') === '1',
-    buscaContatos: '', periodo: 'todos', tagFiltro: '', pre: null, vinculos: []
+    buscaContatos: '', periodo: 'todos', tagFiltro: '', pre: null, vinculos: [], gruposAbertos: new Set()
   };
   /* ---------- pré-agendamento montado pela IA ---------- */
   const ROTULO_PRE = { rascunho: 'Em coleta', pronto: 'Pronto para marcar', agendado: 'Agendado', cancelado: 'Cancelado' };
@@ -306,10 +320,14 @@
       db.from('pre_agendamentos').select('*').eq('conversa_id', id).maybeSingle(),
       db.from('pre_agendamento_itens').select('modalidade,regiao_nome,lado,procedimento,quantidade').eq('conversa_id', id).eq('ativo', true).order('id')
     ]);
+    // O histórico reúne os cadastros de TODAS as conversas deste contato (a pessoa pode ter mais de um cadastro por conversas feitas sem login).
     let hist = [];
-    if (data && data.paciente_id) {
+    const atual = S.conversas.find((x) => x.id === id), irmas = atual && atual.contato_id ? S.conversas.filter((x) => x.contato_id === atual.contato_id).map((x) => x.id) : [id];
+    const pids = new Set(data && data.paciente_id ? [data.paciente_id] : []);
+    if (irmas.length > 1) { const { data: pres } = await db.from('pre_agendamentos').select('paciente_id').in('conversa_id', irmas).not('paciente_id', 'is', null); (pres || []).forEach((x) => pids.add(x.paciente_id)); }
+    if (pids.size) {
       const r = await db.from('paciente_historico').select('id,pre_agendamento_id,ocorreu_em,criado_em,unidade,profissional,plano,exames,origem,cancelado')
-        .eq('paciente_id', data.paciente_id).order('criado_em', { ascending: false }).limit(6);
+        .in('paciente_id', [...pids]).order('criado_em', { ascending: false }).limit(8);
       hist = r.data || [];
     }
     if (S.abertaId !== id) return;
@@ -629,7 +647,9 @@
         h('p', { class: 'dica' }, alterar
           ? 'O paciente pediu para mudar o ' + (v.diferem || []).map((k) => ROTULO_ACERTO[k] || k).join(' e ') + ' do cadastro e informou o CPF correto. Aplicar muda o cadastro do chat; corrija também no Klingo.'
           : verificar
-          ? 'Só o nome e a data de nascimento batem com um cadastro. A conta NÃO foi ligada. Confira com o paciente (por exemplo pelo WhatsApp) se o telefone e o e-mail mudaram.'
+          ? (v.batem || []).includes('cadastro_duplicado')
+            ? 'Há MAIS DE UM cadastro com este nome e data de nascimento (o mostrado é o mais provável). A conta NÃO foi ligada. Una os cadastros repetidos no Klingo e depois vincule.'
+            : 'Só o nome e a data de nascimento batem com um cadastro. A conta NÃO foi ligada. Confira com o paciente (por exemplo pelo WhatsApp) se o telefone e o e-mail mudaram.'
           : 'Bateram ' + (v.batem || []).map((k) => ROTULO_ACERTO[k] || k).join(', ') + '. A conta já foi ligada ao cadastro. Confira se o ' + (v.diferem || []).map((k) => ROTULO_ACERTO[k] || k).join(' e ') + ' do cadastro está desatualizado.'),
         h('table', { class: 'comparacao' },
           h('thead', {}, h('tr', {}, ['', alterar ? 'Pedido do paciente' : 'Digitado na conta', 'Cadastro da clínica', ''].map((t) => h('th', {}, t)))),
@@ -729,16 +749,33 @@
       it.replaceChildren(h('div', { class: 'vazio' }, h('b', {}, msgs[S.filtro][0]), msgs[S.filtro][1]));
       return;
     }
-    it.replaceChildren(...lista.map((c) => {
+    // Agrupa pelo contato: a conversa mais NOVA fica sempre visível; as anteriores do mesmo contato ficam recolhidas logo abaixo.
+    const grupos = new Map();
+    lista.forEach((c) => { const k = c.contato_id || c.id; if (!grupos.has(k)) grupos.set(k, { k, cab: c, outras: [] }); else grupos.get(k).outras.push(c); });
+    const linha = (c, sub) => {
       const ag = c.agente_id ? S.agentes.get(c.agente_id) : null;
-      return h('button', { class: 'item', type: 'button', 'aria-current': String(c.id === S.abertaId), onclick: () => abrirConversa(c.id) },
+      return h('button', { class: 'item' + (sub ? ' sub' : ''), type: 'button', 'aria-current': String(c.id === S.abertaId), onclick: () => abrirConversa(c.id) },
         h('div', { class: 'l1' }, h('span', {}, nomeLista(c)), h('span', { class: 'hora' }, fmtHoraLista(c.atualizado_em))),
         h('div', { class: 'l2' }, h('span', { class: 'prev' }, c.ultima_mensagem || 'Sem mensagens'), c.nao_lidas_agente > 0 ? h('span', { class: 'nl' }, c.nao_lidas_agente) : null),
         h('div', { class: 'l3' }, h('span', { class: 'tag ' + c.status }, ROTULO_STATUS[c.status]), c.triagem_urgencia === 'alta' ? h('span', { class: 'urg alta' }, 'Urgente') : null, c.alerta_agenda ? h('span', { class: 'urg media', title: 'Conferência automática da agenda' }, c.alerta_agenda) : null, alertasDe(c.id).length ? h('span', { class: 'urg alta', title: 'Valor informado fora da referência (só a equipe vê)' }, 'Conferir valor') : null, c.ia_ativa && c.status === 'aguardando' ? h('span', { style: 'color:var(--suave)' }, c.motor === 'fluxo' ? 'Assistente automático' : 'IA atendendo') : null, ag ? h('span', { style: 'color:var(--suave)' }, ag.nome) : null));
+    };
+    it.replaceChildren(...[...grupos.values()].map((g) => {
+      if (!g.outras.length) return linha(g.cab, false);
+      if (g.outras.some((x) => x.id === S.abertaId)) S.gruposAbertos.add(g.k);   // a conversa aberta nunca fica escondida
+      const aberto = S.gruposAbertos.has(g.k), semLer = g.outras.reduce((n, x) => n + (x.nao_lidas_agente || 0), 0);
+      const toggle = h('button', { class: 'grupo-toggle', type: 'button', 'aria-expanded': String(aberto), onclick: () => { if (S.gruposAbertos.has(g.k)) S.gruposAbertos.delete(g.k); else S.gruposAbertos.add(g.k); renderLista(); } },
+        h('span', { class: 'seta', 'aria-hidden': 'true' }, '▸'), `${g.outras.length} ${g.outras.length === 1 ? 'conversa anterior' : 'conversas anteriores'} deste contato`, semLer ? h('span', { class: 'nl' }, semLer) : null);
+      return h('div', { class: 'grupo' }, linha(g.cab, false), toggle, aberto ? h('div', { class: 'grupo-outras' }, g.outras.map((x) => linha(x, true))) : null);
     }));
   }
+  // No celular a lista e a conversa ocupam a tela inteira: o botão "Voltar" (e o voltar do aparelho) leva de volta à lista.
+  const telaPequena = () => window.matchMedia('(max-width: 860px)').matches;
+  function fecharConversa() { S.abertaId = null; document.getElementById('inbox')?.classList.remove('aberta'); renderLista(); renderChat(); }
+  function voltarParaLista() { if (history.state && history.state.chat) history.back(); else fecharConversa(); }
+  window.addEventListener('popstate', () => { if (S.abertaId && !(history.state && history.state.chat)) fecharConversa(); });
   async function abrirConversa(id) {
     S.abertaId = id; S.msgs = []; S.vistos = new Set(); S.pre = null; S.preSig = null;
+    if (telaPequena() && !(history.state && history.state.chat)) { try { history.pushState({ chat: true }, ''); } catch { /* sem histórico: só o botão */ } }
     document.getElementById('inbox')?.classList.add('aberta');
     renderLista(); renderChat(); carregarPre();
     const { data, error } = await db.from('mensagens').select('id,conversa_id,autor,agente_id,texto,criado_em,opcoes').eq('conversa_id', id).order('id').limit(1000);
@@ -756,11 +793,23 @@
     const enviar = h('button', { class: 'btn prim', type: 'button', id: 'btnEnviar', onclick: enviarMsg }, 'Enviar');
     area.addEventListener('input', () => { area.style.height = 'auto'; area.style.height = Math.min(area.scrollHeight, 140) + 'px'; });
     area.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); enviarMsg(); } });
-    box.replaceChildren(h('div', { class: 'chat-topo', id: 'chatTopo' }), h('div', { id: 'triagem' }), h('div', { id: 'alertaPreco' }), h('div', { id: 'pre' }), h('div', { class: 'msgs', id: 'msgs', 'aria-live': 'polite' }), h('div', { class: 'compor' }, area, enviar));
+    box.replaceChildren(h('div', { class: 'chat-topo', id: 'chatTopo' }), h('div', { id: 'outrasConversas' }), h('div', { id: 'triagem' }), h('div', { id: 'alertaPreco' }), h('div', { id: 'pre' }), h('div', { class: 'msgs', id: 'msgs', 'aria-live': 'polite' }), h('div', { class: 'compor' }, area, enviar));
     renderTopoChat(); renderAlertaPreco(); desenharMsgs(true);
+  }
+  // Outras conversas do MESMO contato (qualquer situação), para abrir uma anterior sem voltar à lista.
+  function renderOutrasConversas() {
+    const box = document.getElementById('outrasConversas'), c = conversaAberta(); if (!box || !c) return;
+    const outras = S.conversas.filter((x) => x.id !== c.id && c.contato_id && x.contato_id === c.contato_id).slice(0, 12);
+    if (!outras.length) { box.replaceChildren(); return; }
+    const aberta = box.querySelector('details')?.open;
+    box.replaceChildren(h('details', { class: 'outras-conversas', open: aberta || null },
+      h('summary', {}, `Outras conversas deste contato (${outras.length})`),
+      h('div', { class: 'chips' }, outras.map((x) => h('button', { type: 'button', class: 'chip-conversa', title: x.ultima_mensagem || '', onclick: () => abrirConversa(x.id) },
+        fmtDataHora(x.criado_em) + ' · ' + ROTULO_STATUS[x.status] + (x.paciente_tipo === 'filho' && x.paciente_nome ? ' · ' + x.paciente_nome : ''))))));
   }
   function renderTopoChat() {
     const t = document.getElementById('chatTopo'); const c = conversaAberta(); if (!t || !c) return;
+    renderOutrasConversas();
     const ct = c.contatos || {}; const ag = c.agente_id ? S.agentes.get(c.agente_id) : null;
     const minha = c.status === 'em_atendimento' && c.agente_id === S.me.id;
     const atendentes = [...S.agentes.values()].filter((a) => a.ativo && (a.papel === 'admin' || a.papel === 'atendente') && a.id !== c.agente_id);
@@ -773,7 +822,7 @@
       c.triagem_urgencia ? h('span', { class: 'urg ' + c.triagem_urgencia }, 'Urgência ' + ({ baixa: 'baixa', media: 'média', alta: 'alta' })[c.triagem_urgencia]) : null,
       c.triagem_resumo ? h('div', {}, c.triagem_resumo) : null)] : []));
     t.replaceChildren(
-      h('button', { class: 'btn voltar', type: 'button', onclick: () => { S.abertaId = null; document.getElementById('inbox')?.classList.remove('aberta'); renderLista(); renderChat(); } }, 'Voltar'),
+      h('button', { class: 'btn voltar voltar-conversas', type: 'button', id: 'btnVoltarLista', onclick: voltarParaLista }, '← Conversas'),
       h('div', { class: 'quem' }, h('b', {}, nomeLista(c)),
         h('span', {}, ct.telefone ? h('a', { href: 'https://wa.me/55' + soDigitos(ct.telefone), target: '_blank', rel: 'noopener noreferrer' }, fmtTel(ct.telefone)) : '', ct.email ? ' · ' + ct.email : '',
           ' · ', ROTULO_STATUS[c.status], ag ? ' com ' + ag.nome : ''),

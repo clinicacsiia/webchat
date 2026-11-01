@@ -157,10 +157,17 @@ await casoL('NÃO liga nem avisa: cadastro já ligado a outra conta', async () =
   const r = await vincular(outro.id);
   return { ok: r === 'nao_encontrado' && (await ligado(outro.id)) === null && (await ligado(dono.id)) === p && (await aviso(outro.id)) === null, detalhe: r };
 });
-await casoL('NÃO liga: dois cadastros iguais (ambíguo)', async () => {
-  const c = await conta(); await paciente({ email: c.email }); await paciente({ email: c.email });
-  const r = await vincular(c.id);
-  return { ok: r === 'nao_encontrado' && (await ligado(c.id)) === null && (await aviso(c.id)) === null, detalhe: r };
+await casoL('dois cadastros iguais (repetidos): NÃO liga sozinho; vira pedido "verificar" marcado como cadastro duplicado, apontando o melhor candidato', async () => {
+  const c = await conta({ tel: '71977776666' }); const fraco = await paciente({ email: 'rep1@exemplo.com' }), forte = await paciente({ email: c.email });
+  const r = await vincular(c.id), a = await aviso(c.id);
+  const pid = (await q(`select paciente_id from public.vinculo_solicitacoes where conta_id = $1`, [c.id]))[0].paciente_id;
+  return { ok: r === 'em_analise' && (await ligado(c.id)) === null && a.tipo === 'verificar' && a.batem.includes('cadastro_duplicado') && pid === forte && pid !== fraco, detalhe: JSON.stringify(a) };
+});
+await casoL('repetidos: o atendente VINCULA ao candidato indicado e a conta passa a ser reconhecida', async () => {
+  const c = await conta({ tel: '71977776666' }); await paciente({ email: 'rep2@exemplo.com' }); const forte = await paciente({ email: c.email });
+  await vincular(c.id);
+  const r = await decidir(EQUIPE, await idAviso(c.id), 'vincular');
+  return { ok: r.status === 'vinculada' && (await ligado(c.id)) === forte };
 });
 await casoL('a resposta traz só o resultado (nenhum dado do cadastro)', async () => {
   const c = await conta(); await paciente({ email: c.email });

@@ -100,6 +100,14 @@ O CPF entra em dois pontos e **nunca é guardado nem devolvido**: o banco só co
 - **Registro:** `contas_paciente.vinculo_metodo` = 'cpf' e a tabela `vinculo_solicitacoes` (tipo, quem decidiu, quando; sem CPF).
 - **Voltar atrás:** `drop function public.conta_paciente_confirmar_cpf(text), public.conta_paciente_pedir_alteracao(text, text, text), public.conta_paciente_vinculo_estado(), public.cpf_digitos(text), public.cpf_valido(text);` (a janela mostra um erro e o caso continua com o atendente).
 
+### Histórico de conversas e cadastros repetidos (01/11/2026)
+
+- **Chat do paciente, "Conversas anteriores":** quem está logado vê as conversas **da conta**, em qualquer aparelho e depois de sair (até 15). As conversas feitas neste aparelho **antes de entrar** passam a ser da conta, mas só se o aparelho tiver o token da conversa **e** o e-mail ou o telefone da conversa for o da conta (aparelho compartilhado não passa a conversa de outra pessoa). Sem conta, continua valendo só o aparelho (últimas 5). SQL: `supabase/historico-conta.sql` (aplicado). Teste: `npm run test:historico-conta`.
+- **Cadastros repetidos (mesmo nome e nascimento):** a conta **não** é ligada sozinha. Abre um pedido "Decidir se vincula" marcado "mais de um cadastro", apontando o mais provável (mais acertos, depois validado, depois o mais recente). Una os repetidos no Klingo e depois vincule. (`vincular-cadastro.sql` v1.3.)
+- **Painel, aba Atendimento:** as conversas do mesmo contato ficam **agrupadas**. A mais nova fica sempre visível; as anteriores ficam recolhidas em "N conversas anteriores deste contato" (com o total de não lidas). A conversa aberta nunca fica escondida. Dentro da conversa, "Outras conversas deste contato" abre qualquer uma anterior. O "Histórico do paciente" reúne os cadastros de todas as conversas do contato.
+- **Voltar no celular:** a conversa tem o botão **← Conversas**, e o botão voltar do aparelho também leva à lista (sem sair do painel).
+- **União manual de cadastros (31/10/2026):** os dois cadastros de teste do Alisson foram unidos (histórico, agendamentos e conversas foram para o cadastro que ficou; o repetido foi apagado). Não há tela para isso: se precisar de novo, peça o SQL.
+
 ## Textos dos e-mails (Supabase > Authentication > Emails > Templates)
 
 Cole o conteúdo destes arquivos (o mesmo texto serve para paciente e para equipe):

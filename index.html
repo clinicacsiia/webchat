@@ -484,7 +484,8 @@
   const CHAVE_MSGS = 'webchat.msgs.v1';   // últimas mensagens da conversa: a tela abre na hora, antes da rede
   const CHAVE_LETRA = 'webchat.letra.v1';
   const CHAVE_HIST = 'webchat.historico.v1';   // as últimas conversas deste aparelho (cada uma com o seu token): dá para voltar a elas
-  const MAX_HIST = 5;                          // mínimo pedido: 3
+  const MAX_HIST = 5;                          // mínimo pedido: 3 (aparelho sem conta)
+  const MAX_HIST_CONTA = 15;                   // quem tem conta guarda mais: as conversas também ficam na conta
   // Muda a cada alteração do chat. Cópia de mensagens guardada por outra versão é descartada (era isso que mostrava conversa velha e travada).
   const VERSAO_APP = '2026.10.31-14';
   const ESCALAS = [1, 1.18, 1.36], ROTULO_LETRA = ['Letra maior', 'Letra muito maior', 'Letra normal'];
@@ -623,7 +624,26 @@
       ...antigo, id: c.id, token: c.token, tipo: c.tipo || 'proprio', nomeCrianca: c.nomeCrianca || '',
       irmaos: c.irmaos || [], irmaosModo: c.irmaosModo || '', criado_em: antigo.criado_em || Date.now(), ...extra
     };
-    gravarLocal(CHAVE_HIST, [item, ...lista.filter((x) => x.id !== c.id)].sort((a, b) => b.criado_em - a.criado_em).slice(0, MAX_HIST));
+    gravarLocal(CHAVE_HIST, [item, ...lista.filter((x) => x.id !== c.id)].sort((a, b) => b.criado_em - a.criado_em).slice(0, maxHist()));
+  }
+  const maxHist = () => (conta ? MAX_HIST_CONTA : MAX_HIST);
+  // Conta de paciente: as conversas feitas neste aparelho entram na conta (só com o token e quando o e-mail/telefone é o da conta) e a lista da conta
+  // volta para cá, então "Conversas anteriores" funciona em qualquer aparelho e depois de sair.
+  async function sincronizarHistoricoConta() {
+    if (!conta) return;
+    try {
+      const itens = lerHist().map((x) => ({ id: x.id, token: x.token }));
+      if (conv && conv.id && conv.token && !itens.some((x) => x.id === conv.id)) itens.push({ id: conv.id, token: conv.token });
+      if (itens.length) await db.rpc('conta_paciente_adotar_conversas', { p_itens: itens });
+      const r = await db.rpc('conta_paciente_conversas');
+      if (!r.error && Array.isArray(r.data) && r.data.length) {
+        const local = lerHist(), porId = new Map(local.map((x) => [x.id, x]));
+        const todas = [...porId.values()];
+        r.data.forEach((x) => { if (x && x.id && x.token && !porId.has(x.id)) todas.push({ id: x.id, token: x.token, tipo: x.tipo || 'proprio', nomeCrianca: x.nomeCrianca || '', irmaos: [], irmaosModo: '', criado_em: Number(x.criado_em) || Date.now(), ultima: x.ultima || '' }); });
+        gravarLocal(CHAVE_HIST, todas.sort((a, b) => b.criado_em - a.criado_em).slice(0, maxHist()));
+      }
+    } catch { /* segue só com o que este aparelho guarda */ }
+    atualizarAcessoHistorico();
   }
   function esquecerHistorico(id) { gravarLocal(CHAVE_HIST, lerHist().filter((x) => x.id !== id)); }
   function abrirHistorico() {
@@ -632,7 +652,7 @@
     const { corpo } = abrirFolha('Conversas anteriores');
     if (!lista.length) { corpo.replaceChildren(h('p', { class: 'carregando' }, 'Nenhuma conversa anterior neste aparelho.')); return; }
     corpo.replaceChildren(
-      h('p', { class: 'hist-dica' }, `As últimas ${MAX_HIST} conversas ficam guardadas neste aparelho. Toque em uma para rever as mensagens.`),
+      h('p', { class: 'hist-dica' }, (conta ? `Suas últimas ${MAX_HIST_CONTA} conversas ficam guardadas na sua conta e aparecem em qualquer aparelho. Toque em uma para rever as mensagens.` : `As últimas ${MAX_HIST} conversas ficam guardadas neste aparelho. Toque em uma para rever as mensagens.`)),
       ...lista.map((it) => {
         const atual = !!(conv && conv.id === it.id), quando = new Date(it.criado_em);
         const titulo = it.tipo === 'filho' && it.nomeCrianca ? 'Atendimento de ' + it.nomeCrianca : 'Meu atendimento';
@@ -2284,6 +2304,7 @@
       try { const r = await db.rpc('conta_paciente_perfil', { p_nome: String(meta.nome), p_telefone: String(meta.telefone), p_aceite: true }); if (!r.error && r.data && r.data.conta) conta = r.data; } catch { /* tenta de novo na próxima vez */ }
     }
     if (!conta.cadastro_salvo && meta.dt_nasc) await ligarAoCadastro();
+    await sincronizarHistoricoConta();
     atualizarContaUI();
   }
   // Depois de confirmar o e-mail, o banco compara nome, telefone, e-mail e data de nascimento com o cadastro da clínica. O resultado só diz se ligou.

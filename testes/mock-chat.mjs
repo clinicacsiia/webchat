@@ -123,6 +123,8 @@ export function criarMundo(opcoes = {}) {
         return { body: { resultado } };
       }
       case 'conta_paciente_pedir_alteracao': return { body: { resultado: m.alteracaoResultado || 'pedido_enviado' } };
+      case 'conta_paciente_adotar_conversas': return { body: (corpo.p_itens || []).length };
+      case 'conta_paciente_conversas': return { body: m.conversasConta || [] };
       case 'conta_paciente_perfil': {
         if (!m.conta) return { status: 400, body: { code: '42501', message: 'Entre na sua conta para salvar os dados.' } };
         m.conta = { ...m.conta, nome: String(corpo.p_nome || '').trim(), telefone: String(corpo.p_telefone || '').replace(/\D/g, '') };
