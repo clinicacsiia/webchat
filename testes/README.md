@@ -34,6 +34,21 @@ npm test
 | `npm run test:historico` | Conversas anteriores no chat: guarda as últimas 5 por aparelho, reabre uma antiga com as mensagens do servidor, atalho no formulário, "Sair" apaga a lista, token inválido sai da lista | 7 de 7 |
 | `npm run test:sentinela-navegador` | Cada regra da Sentinela no navegador, aviso de IA, mensagem de previsão, letra maior, lista do corpo alinhada nomes de exame legíveis e lado visível e confirmado | 19 de 19 |
 
+## Teste de carga (100 pacientes)
+
+`testes/carga.mjs` simula 100 pacientes ao mesmo tempo chamando as mesmas funções RPC do `index.html` (`chat_config`, `chat_iniciar`, `chat_listar` a cada 4 s, `chat_responder`, `chat_enviar`). Mede tempo (p50/p95/p99) e erros por chamada e, **junto com a carga**, prova as travas de proteção: token errado (28000), 20 mensagens por minuto (54000), 5 conversas por hora por telefone (54000) e dados inválidos (22023 e não 5xx). Sai com código 1 se o p95 passar de 1,5 s, houver mais de 1% de erro inesperado ou uma trava falhar.
+
+| Comando | O que faz |
+|---|---|
+| `npm run test:carga` | Roda contra um servidor de mentira (`carga-simulado.mjs`). Seguro; só prova que o próprio teste mede e reprova direito. Os tempos não dizem nada sobre o Supabase. |
+| `CARGA_CONFIRMO=SIM npm run carga` | Roda contra o Supabase **real**. Cria 100 conversas "TESTE DE CARGA nnn" (e-mail `@example.invalid`) que a equipe vê no painel. Sem `CARGA_CONFIRMO=SIM` o script se recusa. |
+
+Depois de rodar na produção, execute `testes/carga-limpeza.sql` no SQL Editor (primeiro o `select` de conferência, depois o `delete`). Prefira horário sem atendimento e avise a equipe.
+
+Ajustes por variável: `CARGA_USUARIOS` (100, máx. 300), `CARGA_RAMPA_S` (10), `CARGA_DURACAO_S` (60), `CARGA_P95_MAX_MS` (1500), `CARGA_ERROS_MAX_PCT` (1), `CARGA_JSON` (grava o resultado num arquivo), `CARGA_URL` e `CARGA_KEY` (outro projeto, por exemplo um de homologação, o que é o mais indicado).
+
+Não mede: Realtime por WebSocket, n8n, Klingo, o painel da equipe nem o navegador do paciente. Com Realtime funcionando a carga real é menor que a medida aqui (a consulta cai de 4 s para 20 s).
+
 ## O que estes testes NÃO provam
 
 Leia isto antes de tratar "tudo verde" como "pronto para produção".
