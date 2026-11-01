@@ -25,16 +25,14 @@ A fila **zera todo dia** (fuso de Brasília). O paciente nunca lê a tabela da f
 
 `supabase/fila-chegada.sql` **já está aplicado** no Supabase (em 6 partes; tabelas, RLS, funções, gatilho e tempo real conferidos). Os avisos com o portal aberto já funcionam. A recepção confirma a chegada pelo QR code do portal, por isso `fila_autochegada` fica em `sim`.
 
-## O que falta ligar
+## Push com o site fechado: ligado (01/11/2026)
 
-1. ~~Aplicar o SQL~~ (feito).
-2. Para o aviso chegar **com o celular bloqueado ou o site fechado** (Web Push), faça também:
-   1. Gerar as chaves: `npx web-push generate-vapid-keys`.
-   2. Ativar a extensão `pg_net` (Database > Extensions) e criar no Vault o segredo `fila_aviso_segredo` (um texto longo qualquer).
-   3. `supabase secrets set FILA_AVISO_SEGREDO=<o mesmo texto> VAPID_PUBLICA=... VAPID_PRIVADA=... VAPID_CONTATO=mailto:seu@email`
-   4. `supabase functions deploy fila-avisar --no-verify-jwt` (a função se protege pelo cabeçalho `x-fila-aviso-segredo`).
-   5. No SQL: `update public.config set valor = '<URL da função>' where chave = 'fila_push_url'; update public.config set valor = '<VAPID_PUBLICA>' where chave = 'fila_vapid_publica';`
-3. Publicar no GitHub Pages (a pasta `minha-vez/` já está no repositório) e divulgar o link `.../webchat/minha-vez/` (um QR code na recepção funciona bem).
+- Chaves VAPID geradas; a **chave privada** está só nos segredos da função (`VAPID_PRIVADA`, em https://supabase.com/dashboard/project/nrvuynjwcgwpjdptkiay/functions/secrets) e a pública em `config.fila_vapid_publica`.
+- O segredo de autenticação fica no Vault (`fila_aviso_segredo`); o banco o manda no cabeçalho `x-fila-aviso-segredo` e a função o confere. Sem ele, a função responde 401.
+- Função `fila-avisar` publicada (sem verificação de JWT): https://supabase.com/dashboard/project/nrvuynjwcgwpjdptkiay/functions/fila-avisar (erros de envio em `.../logs`).
+- `config.fila_push_url` aponta para a função. Testado: gatilho -> `pg_net` -> função -> 200.
+- **Ainda não testado com um celular real** (precisa de um aparelho que aceitou os avisos). Para testar: abrir o portal no celular, permitir, entrar, tocar em Cheguei, bloquear a tela e chamar pela aba Fila.
+- Para trocar as chaves: gerar um par novo, atualizar `VAPID_PRIVADA` e `config.fila_vapid_publica`; os celulares reinscrevem sozinhos na próxima abertura do portal.
 
 ## Ajustes
 
