@@ -378,6 +378,7 @@
     <button type="button" id="btnAtendente" hidden>Falar com um atendente</button>
     <button type="button" id="btnOutroFilho" hidden>Agendar para outro filho(a)</button>
     <button type="button" id="btnLetra">Letra maior</button>
+    <button type="button" id="btnLetraMenor" hidden>Letra menor</button>
     <button type="button" id="btnSuporte">Código de suporte</button>
     <button type="button" id="btnHistorico" hidden>Conversas anteriores</button>
     <button type="button" id="btnNova">Fazer um novo pedido</button>
@@ -486,8 +487,8 @@
   const CHAVE_HIST = 'webchat.historico.v1';   // as últimas conversas deste aparelho (cada uma com o seu token): dá para voltar a elas
   const MAX_HIST = 5;                          // mínimo pedido: 3
   // Muda a cada alteração do chat. Cópia de mensagens guardada por outra versão é descartada (era isso que mostrava conversa velha e travada).
-  const VERSAO_APP = '2026.10.31-14';
-  const ESCALAS = [1, 1.18, 1.36], ROTULO_LETRA = ['Letra maior', 'Letra muito maior', 'Letra normal'];
+  const VERSAO_APP = '2026.11.01-1';
+  const ESCALAS = [1, 1.18, 1.36], TOAST_LETRA = ['Letra normal.', 'Letra grande.', 'Letra muito grande.'];
 
   // Chegou pelo link "esqueci a senha"? O supabase-js limpa o endereço ao ler o link, então a pergunta é feita antes de criá-lo.
   let veioDoLinkDeSenha = /[#&?]type=recovery(&|$)/.test(location.hash + location.search);
@@ -497,7 +498,7 @@
   const el = {
     empresa: $('#empresa'), avatar: $('#avatar'), ponto: $('#ponto'), status: $('#status'),
     btnMenu: $('#btnMenu'), menu: $('#menu'), btnNova: $('#btnNova'), btnHistorico: $('#btnHistorico'), btnHistoricoForm: $('#btnHistoricoForm'), btnAtendente: $('#btnAtendente'), btnSair: $('#btnSair'),
-    btnLetra: $('#btnLetra'), btnSuporte: $('#btnSuporte'), apoio: $('#apoio'), barraHumano: $('#barraHumano'), btnHumano: $('#btnHumano'),
+    btnLetra: $('#btnLetra'), btnLetraMenor: $('#btnLetraMenor'), btnSuporte: $('#btnSuporte'), apoio: $('#apoio'), barraHumano: $('#barraHumano'), btnHumano: $('#btnHumano'),
     telaInicio: $('#telaInicio'), telaChat: $('#telaChat'), boasForm: $('#boasVindasForm'), tituloInicio: $('#tituloInicio'),
     faixaConta: $('#faixaConta'), faixaContaTxt: $('#faixaContaTxt'), btnContaEntrar: $('#btnContaEntrar'), btnContaCriar: $('#btnContaCriar'), btnContaDados: $('#btnContaDados'), btnContaSair: $('#btnContaSair'),
     form: $('#formInicio'), fNome: $('#fNome'), fTel: $('#fTel'), fEmail: $('#fEmail'),
@@ -2156,11 +2157,13 @@
   function aplicarLetra(n, gravar) {
     letra = Math.max(0, Math.min(2, Number(n) || 0));
     document.documentElement.style.setProperty('--esc', String(ESCALAS[letra]));
-    el.btnLetra.textContent = ROTULO_LETRA[letra];
+    el.btnLetra.hidden = letra >= ESCALAS.length - 1;   // já no maior tamanho
+    el.btnLetraMenor.hidden = letra <= 0;               // já no tamanho normal
     if (gravar) gravarLocal(CHAVE_LETRA, letra);
   }
   aplicarLetra(lerLocal(CHAVE_LETRA), false);
-  el.btnLetra.addEventListener('click', () => { aplicarLetra((letra + 1) % 3, true); fecharMenu(); toast(letra === 0 ? 'Letra normal.' : letra === 1 ? 'Letra grande.' : 'Letra muito grande.'); });
+  el.btnLetra.addEventListener('click', () => { aplicarLetra(letra + 1, true); fecharMenu(); toast(TOAST_LETRA[letra]); });
+  el.btnLetraMenor.addEventListener('click', () => { aplicarLetra(letra - 1, true); fecharMenu(); toast(TOAST_LETRA[letra]); });
   el.btnSuporte.hidden = !window.Sentinela;
   el.btnSuporte.addEventListener('click', async () => {
     fecharMenu();
