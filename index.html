@@ -51,7 +51,7 @@
   .topo-nome { font-weight: 650; font-size: calc(18px * var(--esc)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .topo-status { font-size: calc(15.5px * var(--esc)); opacity: .9; display: flex; align-items: center; gap: 6px; min-width: 0; }
   .topo-status #status { line-height: 1.25; }
-  .ponto { width: 8px; height: 8px; border-radius: 50%; background: #9aa9a3; flex: none; }
+  .ponto { width: 8px; height: 8px; border-radius: 50%; background: #9aa7b6; flex: none; }
   .ponto.aguardando { background: #f2b84b; }
   .ponto.atendendo { background: #4ade80; }
   .btn-menu {
@@ -152,7 +152,7 @@
   .aviso-encerrado { background: #fff7e5; color: var(--aviso); text-align: center; font-size: calc(15.5px * var(--esc)); padding: 8px 12px; border-top: 1px solid #f0dfb8; flex: none; }
 
   .toast {
-    position: fixed; left: 50%; bottom: calc(86px + env(safe-area-inset-bottom)); transform: translateX(-50%); background: #2b2f2e; color: #fff;
+    position: fixed; left: 50%; bottom: calc(86px + env(safe-area-inset-bottom)); transform: translateX(-50%); background: #2a3039; color: #fff;
     padding: 10px 16px; border-radius: 10px; font-size: calc(15.5px * var(--esc)); z-index: 30; max-width: calc(100% - 32px); text-align: center;
   }
 
@@ -205,7 +205,7 @@
   .corpo-svg .parte:hover { fill: #bcd6f5; }
   .corpo-svg .parte:focus-visible { outline: none; stroke: #0b5cad; stroke-width: 3; }
   .corpo-svg .parte.sel { fill: var(--verde); stroke: #154a94; }
-  .corpo-svg .parte.off { fill: #eef1ef; stroke: #c6cfca; cursor: not-allowed; stroke-dasharray: 3 2; }
+  .corpo-svg .parte.off { fill: #eef1f5; stroke: #c6cfda; cursor: not-allowed; stroke-dasharray: 3 2; }
   .corpo-svg text { font-size: 11px; fill: #3b4a5e; pointer-events: none; font-weight: 700; }
   .corpo-svg text.letra { fill: #fff; font-size: 12px; }
   .corpo-cap { font-size: calc(13.5px * var(--esc)); color: var(--texto-suave); text-align: center; max-width: 320px; margin: 0; }
@@ -236,8 +236,8 @@
   .cal-dia { aspect-ratio: 1 / 1; min-height: 40px; border: 1.5px solid transparent; border-radius: 10px; background: transparent; cursor: pointer; font-size: calc(16.5px * var(--esc)); position: relative; padding: 0; }
   .cal-dia.livre { background: var(--papel); border-color: var(--linha); font-weight: 650; }
   .cal-dia.livre::after { content: ""; position: absolute; left: 50%; bottom: 5px; width: 6px; height: 6px; margin-left: -3px; border-radius: 50%; background: var(--verde); }
-  .cal-dia.lotado { color: #a5b0ab; text-decoration: line-through; cursor: not-allowed; }
-  .cal-dia.fechado { color: #c2cac6; cursor: not-allowed; }
+  .cal-dia.lotado { color: #a5afbc; text-decoration: line-through; cursor: not-allowed; }
+  .cal-dia.fechado { color: #c2cad6; cursor: not-allowed; }
   .cal-dia.hoje { box-shadow: inset 0 0 0 2px #4a8fe0; }
   .cal-dia.sel { background: var(--verde); color: #fff; border-color: var(--verde); }
   .cal-dia.sel::after { background: #fff; }
@@ -245,7 +245,7 @@
   .slot { border: 1.5px solid var(--verde); background: var(--papel); color: var(--verde); border-radius: 10px; padding: 9px 4px; font-weight: 650; cursor: pointer; }
   .slot:hover { background: #eef4fc; }
   .slot.sel { background: var(--verde); color: #fff; }
-  .slot.off { border-color: var(--linha); color: #aeb8b3; background: #f1f4f2; text-decoration: line-through; cursor: not-allowed; }
+  .slot.off { border-color: var(--linha); color: #aeb7c4; background: #f1f4f8; text-decoration: line-through; cursor: not-allowed; }
   .slot.chegada { grid-column: 1 / -1; }
   .legenda { display: flex; gap: 12px; flex-wrap: wrap; font-size: calc(13.5px * var(--esc)); color: var(--texto-suave); margin: 10px 0 0; }
   .legenda i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; margin-right: 4px; }
@@ -2085,7 +2085,7 @@
         'aria-label': rotulo, 'aria-pressed': String(C.dia === s), onclick: () => { C.dia = s; C.slot = null; desenharCalendario(); } }, String(d)));
     }
     corpo.append(grade);
-    corpo.append(h('div', { class: 'legenda' }, h('span', {}, h('i', { style: 'background:var(--verde)' }), 'Com horário livre'), h('span', {}, h('i', { style: 'background:#c2cac6' }), 'Lotado ou sem atendimento')));
+    corpo.append(h('div', { class: 'legenda' }, h('span', {}, h('i', { style: 'background:var(--verde)' }), 'Com horário livre'), h('span', {}, h('i', { style: 'background:#c2cad6' }), 'Lotado ou sem atendimento')));
 
     if (C.dia) {
       const dt = dataLocal(C.dia), slots = dias.get(C.dia) || [];
@@ -2105,7 +2105,7 @@
       } else normais.forEach((x) => grid.append(botao(x)));
       chegada.forEach((x) => grid.append(h('button', { type: 'button', class: 'slot chegada' + (C.slot && C.slot.hora === x.hora ? ' sel' : ''),
         onclick: () => { C.slot = x; desenharCalendario(); } }, `Ordem de chegada, a partir das ${x.hora}`)));
-      corpo.append(grid, h('div', { class: 'legenda' }, h('span', {}, h('i', { style: 'background:var(--verde)' }), 'Livre'), h('span', {}, h('i', { style: 'background:#dfe4e1' }), 'Ocupado ou indisponível')));
+      corpo.append(grid, h('div', { class: 'legenda' }, h('span', {}, h('i', { style: 'background:var(--verde)' }), 'Livre'), h('span', {}, h('i', { style: 'background:#dfe4ea' }), 'Ocupado ou indisponível')));
     } else if (![...dias.values()].some((x) => x.length)) {
       corpo.append(h('p', { class: 'p-dica', style: 'margin-top:12px' }, 'Não há horários livres nos próximos dias com esses filtros. Tente outro período ou unidade, ou envie sua preferência por mensagem que o atendente procura para você.'));
     }
