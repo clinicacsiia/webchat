@@ -23,6 +23,8 @@ Login do paciente (31/10/2026): o instalador `supabase/aplicar-login-paciente.sq
 1. ~~E-mail de autenticação do Supabase não enviava~~ **Resolvido em 31/10/2026:** SMTP do Gmail (senha de app) configurado em Authentication > SMTP Settings; confirmação de conta testada e funcionando. Falta só trocar o texto dos modelos "Confirm signup" e "Reset password" por algo genérico da clínica.
 2. **Novo desenho de cadastro, sem tela de login separada:** o paciente informa nome, telefone e e-mail; o sistema compara com a tabela `pacientes` e liga a conta ao cadastro existente; o paciente escolhe a senha e confirma com a data de nascimento. Ainda não implementado.
 
+Lista completa do que falta, com a ordem de dependência: `docs/pendencias-e-dependencias.md` (conferida no banco real em 01/11/2026).
+
 Banco: projeto Supabase `webchat-atendimento` (sa-east-1), já com tabelas, regras de segurança e tempo real.
 
 ## Publicar no GitHub Pages
