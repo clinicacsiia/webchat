@@ -95,7 +95,8 @@ Cada item só começa quando os listados em "Depende de" estiverem prontos.
 
 | # | Item | Quem | Depende de |
 |---|---|---|---|
-| G1 | **Versionar o módulo Jornada** (SQL das 9 migrações, Edge Function `sync-jornada-klingo`, cron, chaves de `config`, documento e testes) | Claude | você dizer qual sessão ou me dar acesso ao que foi feito; ou exportar do banco |
+| G1 | **Versionar o quadro** (SQL das 9 migrações `jornada_01` a `jornada_09`, Edge Function `sync-jornada-klingo`, cron, chaves de `config`). O quadro entrou no painel em 01/11/2026 como função do Atendimento (`docs/quadro-nas-conversas.md`); o SQL e a função ainda existem só no Supabase | Claude | confirmar que a outra sessão terminou |
+| G3 | Klingo só para o que importa: atualizar status de quem tem conversa e dos agendamentos de hoje, sem carregar o relatório inteiro; decidir se se apaga o que já foi carregado (2.704 cartões) | Claude, com sua confirmação para apagar | G1 |
 | G2 | Registrar no `LEIAME.md` o estado do que for sendo concluído | Claude | cada item |
 
 ## 3. Por onde começar
