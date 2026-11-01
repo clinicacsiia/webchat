@@ -187,6 +187,16 @@
   .j-sec li.aberta { color: var(--erro); font-weight: 650; }
   .j-acoes { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
   .j-acoes select { width: auto; padding: 6px 8px; font-size: 13.5px; }
+  /* Próximo passo: a única coisa que o atendente precisa decidir agora, sempre visível */
+  #proximo:empty { display: none; }
+  .proximo { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 8px 14px; background: #e3f1e8; border-bottom: 1px solid var(--linha); border-left: 5px solid var(--verde); }
+  .proximo.media { background: #fff0cf; border-left-color: #e08a00; } .proximo.alta { background: #fde2df; border-left-color: var(--erro); }
+  .proximo .texto { flex: 1; min-width: 180px; } .proximo .texto b { display: block; font-size: 15px; }
+  .proximo .texto span { font-size: 13px; color: var(--suave); }
+  /* Os avisos e dados de apoio ficam numa área que rola e se ajusta à altura da tela, para a conversa nunca ficar sem espaço */
+  #contexto { flex: none; max-height: 36vh; overflow-y: auto; overscroll-behavior: contain; }
+  @media (max-height: 720px) { #contexto { max-height: 26vh; } .chat-topo { padding: 6px 12px; } .proximo { padding: 6px 12px; } }
+  @media (max-height: 560px) { #contexto { max-height: 18vh; } }
   .msgs { flex: 1; overflow-y: auto; padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; min-height: 0; }
   .dia { align-self: center; background: rgba(16,48,43,.1); color: var(--suave); font-size: 12px; padding: 3px 11px; border-radius: 999px; margin: 10px 0 6px; }
   .msg { max-width: 72%; padding: 8px 11px 6px; border-radius: 14px; background: var(--papel); box-shadow: 0 1px 1px rgba(16,48,43,.08); white-space: pre-wrap; overflow-wrap: anywhere; }
@@ -424,7 +434,7 @@
   function renderPre() {
     const box = document.getElementById('pre'); if (!box) return;
     const p = S.pre;
-    if (!p) { box.replaceChildren(); return; }
+    if (!p) { box.replaceChildren(); renderProximo(); return; }
     const resumo = [p.tipo, p.especialidade, p.procedimento, p.plano && 'Plano: ' + p.plano, p.unidade, p.profissional && 'Prof.: ' + p.profissional, p.preferencia_horario && 'Preferência: ' + p.preferencia_horario].filter(Boolean).join(' · ');
     const linhas = CAMPOS_PRE.filter(([k]) => (p.paciente || {})[k]);
     const aberto = p.status === 'rascunho' || p.status === 'pronto';
@@ -451,6 +461,7 @@
         h('button', { class: 'btn', type: 'button', onclick: async () => { try { await navigator.clipboard.writeText(textoPre(p)); toast('Dados copiados.'); } catch { toast('Não consegui copiar.'); } } }, 'Copiar dados'),
         aberto ? h('button', { class: 'btn prim', type: 'button', onclick: () => statusPre('agendado') }, 'Marcar como agendado (se não mudar sozinho)') : null,
         aberto ? h('button', { class: 'btn', type: 'button', onclick: () => statusPre('cancelado') }, 'Cancelar pré-agendamento') : null)));
+    renderProximo();
   }
   const podeAtender = () => S.me && (S.me.papel === 'admin' || S.me.papel === 'atendente');
   const ehAdmin = () => S.me && S.me.papel === 'admin';
@@ -986,6 +997,7 @@
           S.alertasPreco = (S.alertasPreco || []).filter((x) => x.conversa_id !== a.conversa_id); renderAlertaPreco(); renderLista();
         } }, 'Conferi, está certo'));
     }));
+    renderProximo();
   }
   /* ---------- a mesma pessoa em várias conversas, exame em aberto e remarcação (supabase/pessoa-unica.sql) ---------- */
   // Leitura do que o banco já agrupou: conversas da mesma pessoa viram UMA na lista e no chat (nada é apagado nem movido).
@@ -1094,6 +1106,7 @@
             (x) => (x.canal === 'botoes' ? 'Pedido enviado pelo chat, com botões.' : 'Mensagem enviada ao paciente.')), 'prim') : null,
           btn('Já remarcado', () => { if (confirm('O novo horário já foi marcado?')) rpcPessoa('agendamento_remarcacao_resolver', { p_fechamento: r.fechamento_id, p_resultado: 'feita' }, 'Remarcação concluída.'); }),
           btn('Paciente desistiu', () => { if (confirm('O paciente desistiu de remarcar?')) rpcPessoa('agendamento_remarcacao_resolver', { p_fechamento: r.fechamento_id, p_resultado: 'recusada' }, 'Registrado.'); })))));
+    renderProximo();
   }
   // Para onde vai a resposta da equipe: a conversa em que o paciente escreveu por último (é a que o aparelho dele está lendo).
   function alvoResposta() {
@@ -1317,8 +1330,40 @@
     const enviar = h('button', { class: 'btn prim', type: 'button', id: 'btnEnviar', onclick: enviarMsg }, 'Enviar');
     area.addEventListener('input', () => { area.style.height = 'auto'; area.style.height = Math.min(area.scrollHeight, 140) + 'px'; });
     area.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); enviarMsg(); } });
-    box.replaceChildren(h('div', { class: 'chat-topo', id: 'chatTopo' }), h('div', { id: 'pessoa' }), h('div', { id: 'exameAberto' }), h('div', { id: 'triagem' }), h('div', { id: 'alertaPreco' }), h('div', { id: 'cartaoJ' }), h('div', { id: 'pre' }), h('div', { class: 'msgs', id: 'msgs', 'aria-live': 'polite' }), h('div', { class: 'compor' }, area, enviar));
+    box.replaceChildren(h('div', { class: 'chat-topo', id: 'chatTopo' }), h('div', { id: 'proximo', 'aria-live': 'polite' }),
+      h('div', { id: 'contexto' }, h('div', { id: 'pessoa' }), h('div', { id: 'exameAberto' }), h('div', { id: 'triagem' }), h('div', { id: 'alertaPreco' }), h('div', { id: 'cartaoJ' }), h('div', { id: 'pre' })),
+      h('div', { class: 'msgs', id: 'msgs', 'aria-live': 'polite' }), h('div', { class: 'compor' }, area, enviar));
     renderTopoChat(); renderPessoaChat(); renderAlertaPreco(); renderCartaoJ(); desenharMsgs(true);
+  }
+  // "Próximo passo": escolhe, pela ordem do que é mais urgente, a única decisão que falta e leva o atendente até ela.
+  // Só lê o que a tela já carregou; não grava nada. Os outros pontos continuam logo abaixo, na área de apoio.
+  function renderProximo() {
+    const box = document.getElementById('proximo'); if (!box) return;
+    const c = conversaAberta(); if (!c || c.status === 'encerrada') { box.replaceChildren(); return; }
+    const ir = (id) => () => document.getElementById(id)?.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
+    const ids = membrosDe(c.id), minha = c.status === 'em_atendimento' && c.agente_id === S.me.id;
+    const urgente = ids.some((i) => ((S.conversas.find((x) => x.id === i) || {}).triagem_urgencia) === 'alta');
+    const dono = c.agente_id && c.agente_id !== S.me.id ? S.agentes.get(c.agente_id) : null;
+    const ab = abertosDe(c.id), rm = remarcarDe(c.id), al = alertasDe(c.id);
+    const pre = S.pre && ['rascunho', 'pronto'].includes(S.pre.status) ? S.pre : null;
+    const ultima = S.msgs.length ? S.msgs[S.msgs.length - 1] : null;
+    let pontos = [];
+    if (!minha) {
+      pontos = [{ tom: urgente ? 'alta' : 'media', titulo: dono ? `Esta conversa está com ${dono.nome}` : (urgente ? 'Urgente: assuma esta conversa agora' : 'Assuma esta conversa para responder'),
+        detalhe: dono ? 'Só assuma se combinar com essa pessoa.' : (c.triagem_resumo || 'Ninguém atende ainda. Leia o resumo e as mensagens abaixo.'), rot: dono ? 'Assumir mesmo assim' : 'Assumir', fn: () => assumir() }];
+    } else {
+      if (al.length) pontos.push({ tom: 'alta', titulo: 'Confira o valor informado', detalhe: 'Está fora do valor de referência. Confirme no Klingo.', rot: 'Ver valor', fn: ir('alertaPreco') });
+      if (ab.length) pontos.push({ tom: ab.some((a) => a.passou) ? 'alta' : 'media', titulo: ab.some((a) => a.passou) ? 'O horário do exame já passou: registre o que aconteceu' : 'Exame marcado sem desfecho',
+        detalhe: 'Compareceu, faltou, cancelou ou remarcou. Sem isso a conversa não encerra.', rot: 'Fechar exame', fn: ir('exameAberto') });
+      if (rm.length) pontos.push({ tom: 'media', titulo: 'Falta remarcar o exame', detalhe: 'Peça ao paciente que remarque pelo chat ou registre que já foi remarcado.', rot: 'Remarcar', fn: ir('exameAberto') });
+      if (pre) pontos.push({ tom: 'media', titulo: 'Marque o horário no Klingo e depois avise o paciente', detalhe: 'O pré-agendamento está pronto para conferir.', rot: 'Ver pré-agendamento', fn: ir('pre') });
+      if (ultima && ultima.autor === 'cliente') pontos.push({ tom: 'media', titulo: 'O paciente está esperando a sua resposta', detalhe: String(ultima.texto || '').slice(0, 90), rot: 'Responder', fn: () => document.getElementById('caixa')?.focus() });
+    }
+    if (!pontos.length) { box.replaceChildren(); return; }
+    const p = pontos[0];
+    box.replaceChildren(h('div', { class: 'proximo ' + p.tom },
+      h('div', { class: 'texto' }, h('b', {}, p.titulo), h('span', {}, p.detalhe + (pontos.length > 1 ? ` · mais ${pontos.length - 1} ponto(s) logo abaixo` : ''))),
+      h('button', { class: 'btn prim', type: 'button', onclick: p.fn }, p.rot)));
   }
   function renderTopoChat() {
     const t = document.getElementById('chatTopo'); const c = conversaAberta(); if (!t || !c) return;
@@ -1343,6 +1388,7 @@
       c.status === 'encerrada' ? h('button', { class: 'btn', type: 'button', onclick: () => assumir(true) }, 'Reabrir') : null,
       sel,
       c.status !== 'encerrada' ? h('button', { class: 'btn perigo', type: 'button', onclick: encerrar }, 'Encerrar') : null);
+    renderProximo();
   }
   function desenharMsgs(rolar) {
     const box = document.getElementById('msgs'); if (!box) return;
@@ -1366,6 +1412,7 @@
     });
     box.replaceChildren(...out);
     if (rolar || perto) box.scrollTop = box.scrollHeight;
+    renderProximo();
   }
   // Foto do pedido médico enviada pelo paciente, com o que foi lido (celular e IA), o que o paciente marcou
   // e a conferência da equipe. Conferir ensina o sistema: a mesma escrita, da próxima vez, já vem com o exame certo.
