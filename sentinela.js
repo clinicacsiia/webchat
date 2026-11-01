@@ -406,15 +406,15 @@
   function injetarEstilo() {
     if (doc.getElementById('sentinela-estilo')) return;
     const st = doc.createElement('style'); st.id = 'sentinela-estilo';
-    st.textContent = '.apoio{flex:none;margin:0 10px 8px;padding:12px 14px;border-radius:14px;border:1.5px solid #a9d8bd;background:#eef8f2;color:#16231f;font-size:calc(16px * var(--esc,1));line-height:1.4;position:relative;max-height:50vh;overflow-y:auto}'
+    st.textContent = '.apoio{flex:none;margin:0 10px 8px;padding:12px 14px;border-radius:14px;border:1.5px solid #a9c6ec;background:#eef4fc;color:#15202e;font-size:calc(16px * var(--esc,1));line-height:1.4;position:relative;max-height:50vh;overflow-y:auto}'
       + '.apoio[hidden]{display:none}.apoio.aviso{background:#fff7e5;border-color:#f0dfb8}.apoio.erro{background:#fff3f1;border-color:#e8b4ae}'
       + '.apoio strong{display:block;margin:0 32px 4px 0}.apoio p{margin:0 0 8px}'
       + '.apoio .ap-fechar{position:absolute;top:4px;right:4px;width:40px;height:40px;border:0;background:transparent;font-size:26px;line-height:1;cursor:pointer;color:inherit}'
       + '.apoio .ap-botoes{display:flex;gap:8px;flex-wrap:wrap}'
-      + '.apoio .ap-btn{min-height:46px;padding:10px 14px;border-radius:12px;border:1.5px solid #146b50;background:#fff;color:#146b50;font:inherit;font-weight:650;cursor:pointer}'
-      + '.apoio .ap-btn.principal{background:#146b50;color:#fff}'
-      + '.apoio .ap-codigo{font-size:calc(14.5px * var(--esc,1));color:#5b6b65}'
-      + '.apoio .ap-codigo b{font-family:ui-monospace,Menlo,Consolas,monospace;color:#16231f;user-select:all;word-break:break-all}';
+      + '.apoio .ap-btn{min-height:46px;padding:10px 14px;border-radius:12px;border:1.5px solid #1d5fb8;background:#fff;color:#1d5fb8;font:inherit;font-weight:650;cursor:pointer}'
+      + '.apoio .ap-btn.principal{background:#1d5fb8;color:#fff}'
+      + '.apoio .ap-codigo{font-size:calc(14.5px * var(--esc,1));color:#5a6878}'
+      + '.apoio .ap-codigo b{font-family:ui-monospace,Menlo,Consolas,monospace;color:#15202e;user-select:all;word-break:break-all}';
     doc.head.append(st);
   }
   function aoErroJs(ev) {
