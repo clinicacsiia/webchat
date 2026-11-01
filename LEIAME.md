@@ -25,6 +25,8 @@ Login do paciente (31/10/2026): o instalador `supabase/aplicar-login-paciente.sq
 
 Quadro das conversas (01/11/2026): o Atendimento ganhou o alternador Lista | Quadro, com cartões por conversa, filtros, mover e responsável. Veja `docs/quadro-nas-conversas.md`.
 
+Aba Jornada (01/11/2026): onde está cada paciente, ao vivo, com o Klingo lido a cada minuto no expediente e aviso quando alguém demora (prazo da etapa ou horário que passou). Veja `docs/jornada-monitoramento.md`.
+
 Lista completa do que falta, com a ordem de dependência: `docs/pendencias-e-dependencias.md` (conferida no banco real em 01/11/2026).
 
 Banco: projeto Supabase `webchat-atendimento` (sa-east-1), já com tabelas, regras de segurança e tempo real.
