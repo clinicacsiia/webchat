@@ -157,6 +157,23 @@ await caso('conversa que o servidor não reconhece mais (token inválido) sai da
   return { ok: hist.length === 1 && hist[0].token === 'token-2', detalhe: `restaram=${hist.map((x) => x.token)}` };
 });
 
+await caso('seta "Voltar ao início": só aparece no chat, leva ao início e a conversa continua no histórico', async () => {
+  const mundo = criarVarias();
+  const { page, ctx } = await novaPaginaChat(browser, mundo);
+  await comecarConversa(page, base);
+  const noChat = await page.isVisible('#btnVoltarInicio');
+  await page.click('#btnVoltarInicio');
+  await page.waitForSelector('#formInicio', { state: 'visible' });
+  const noInicio = await page.isVisible('#btnVoltarInicio');
+  const atalho = await page.isVisible('#btnHistoricoForm');
+  await page.click('#btnHistoricoForm');
+  await page.waitForSelector('.hist-item');
+  await page.click('.hist-item >> nth=0');
+  await page.waitForSelector('#msgs .msg.agente >> text=Pergunta da conversa 1', { timeout: 6000 });
+  await ctx.close();
+  return { ok: noChat && !noInicio && atalho, detalhe: `chat=${noChat}, início=${noInicio}, atalho=${atalho}` };
+});
+
 await browser.close(); srv.close();
 const falhas = resultados.filter((r) => !r).length;
 console.log(`\n${resultados.length - falhas}/${resultados.length} verificações passaram`);

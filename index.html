@@ -58,6 +58,7 @@
     background: transparent; border: 0; color: #fff; width: 44px; height: 44px; border-radius: 50%; cursor: pointer; font-size: calc(23px * var(--esc)); line-height: 1;
   }
   .btn-menu:hover { background: rgba(255,255,255,.12); }
+  .btn-voltar { margin-left: -6px; }
   .menu {
     position: absolute; right: 10px; top: calc(58px + env(safe-area-inset-top)); background: var(--papel); border: 1px solid var(--linha);
     border-radius: 12px; box-shadow: 0 8px 24px rgba(16,48,43,.18); z-index: 20; min-width: 190px; overflow: hidden;
@@ -367,6 +368,7 @@
 <body>
 <div class="app" id="app">
   <header class="topo">
+    <button class="btn-menu btn-voltar" id="btnVoltarInicio" type="button" aria-label="Voltar ao início" hidden>&#8592;</button>
     <div class="avatar" id="avatar" aria-hidden="true">A</div>
     <div class="topo-info">
       <div class="topo-nome" id="empresa">Atendimento</div>
@@ -487,7 +489,7 @@
   const CHAVE_HIST = 'webchat.historico.v1';   // as últimas conversas deste aparelho (cada uma com o seu token): dá para voltar a elas
   const MAX_HIST = 5;                          // mínimo pedido: 3
   // Muda a cada alteração do chat. Cópia de mensagens guardada por outra versão é descartada (era isso que mostrava conversa velha e travada).
-  const VERSAO_APP = '2026.11.01-1';
+  const VERSAO_APP = '2026.11.01-2';
   const ESCALAS = [1, 1.18, 1.36], TOAST_LETRA = ['Letra normal.', 'Letra grande.', 'Letra muito grande.'];
 
   // Chegou pelo link "esqueci a senha"? O supabase-js limpa o endereço ao ler o link, então a pergunta é feita antes de criá-lo.
@@ -497,7 +499,7 @@
   const $ = (s) => document.querySelector(s);
   const el = {
     empresa: $('#empresa'), avatar: $('#avatar'), ponto: $('#ponto'), status: $('#status'),
-    btnMenu: $('#btnMenu'), menu: $('#menu'), btnNova: $('#btnNova'), btnHistorico: $('#btnHistorico'), btnHistoricoForm: $('#btnHistoricoForm'), btnAtendente: $('#btnAtendente'), btnSair: $('#btnSair'),
+    btnMenu: $('#btnMenu'), btnVoltarInicio: $('#btnVoltarInicio'), menu: $('#menu'), btnNova: $('#btnNova'), btnHistorico: $('#btnHistorico'), btnHistoricoForm: $('#btnHistoricoForm'), btnAtendente: $('#btnAtendente'), btnSair: $('#btnSair'),
     btnLetra: $('#btnLetra'), btnLetraMenor: $('#btnLetraMenor'), btnSuporte: $('#btnSuporte'), apoio: $('#apoio'), barraHumano: $('#barraHumano'), btnHumano: $('#btnHumano'),
     telaInicio: $('#telaInicio'), telaChat: $('#telaChat'), boasForm: $('#boasVindasForm'), tituloInicio: $('#tituloInicio'),
     faixaConta: $('#faixaConta'), faixaContaTxt: $('#faixaContaTxt'), btnContaEntrar: $('#btnContaEntrar'), btnContaCriar: $('#btnContaCriar'), btnContaDados: $('#btnContaDados'), btnContaSair: $('#btnContaSair'),
@@ -588,7 +590,7 @@
   function mostrarForm(manterEscolha) {
     fecharCanal(); pararAcompanhar();
     el.telaChat.hidden = true; el.telaChat.style.display = 'none';
-    el.telaInicio.hidden = false; el.btnMenu.hidden = true; el.menu.hidden = true;
+    el.telaInicio.hidden = false; el.btnMenu.hidden = true; el.btnVoltarInicio.hidden = true; el.menu.hidden = true;
     el.ponto.className = 'ponto'; el.status.textContent = 'Online';
     const p = lerLocal(CHAVE_PERFIL) || {}, salvo = perfilSalvo();
     el.fNome.value = p.nome || ''; el.fTel.value = p.telefone || ''; el.fEmail.value = p.email || '';
@@ -726,7 +728,7 @@
     atualizarProximo();
     el.telaInicio.hidden = true;
     el.telaChat.hidden = false; el.telaChat.style.display = 'contents';
-    el.btnMenu.hidden = false;
+    el.btnMenu.hidden = false; el.btnVoltarInicio.hidden = false;
   }
 
   /* ---------- conversa ---------- */
@@ -2141,6 +2143,11 @@
   el.texto.addEventListener('input', autoAltura);
   el.texto.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && matchMedia('(hover: hover)').matches) { e.preventDefault(); el.formEnviar.requestSubmit(); }
+  });
+  // Voltar ao início: a conversa continua guardada em "Conversas anteriores" (ver conversas anteriores no início).
+  el.btnVoltarInicio.addEventListener('click', () => {
+    clearTimeout(tGuardar); fecharMenu();
+    apagarLocal(CHAVE_CONVERSA); apagarLocal(CHAVE_MSGS); conv = null; mostrarForm();
   });
   el.btnMenu.addEventListener('click', () => {
     if (el.menu.hidden) atualizarAcessoHistorico();
