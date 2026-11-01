@@ -49,7 +49,7 @@
     --texto: var(--csi-text-main); --suave: var(--csi-text-secondary); --linha: var(--csi-border); --erro: var(--csi-danger-strong); --aviso: var(--csi-warning-strong); --azul: var(--csi-primary-strong);
   }
   * { box-sizing: border-box; }
-  html, body { height: 100%; margin: 0; }
+  html, body { height: 100%; margin: 0; overflow-x: hidden; }
   body { font-family: var(--font-family); font-size: 15px; line-height: 1.4; color: var(--texto); background: var(--fundo); -webkit-text-size-adjust: 100%; }
   button, input, textarea, select { font: inherit; color: inherit; }
   :focus-visible { outline: 3px solid var(--csi-primary); outline-offset: 2px; }
@@ -91,7 +91,7 @@
   .link { background: none; border: 0; color: var(--azul); cursor: pointer; padding: 6px 0; font-size: 14px; text-decoration: underline; }
 
   /* App */
-  .app { display: grid; grid-template-columns: 256px minmax(0, 1fr); height: 100dvh; height: var(--app-h, 100dvh); }
+  .app { display: grid; grid-template-columns: 256px minmax(0, 1fr); height: 100dvh; }
   .lateral { background: var(--csi-sidebar-bg); color: #fff; display: flex; flex-direction: column; padding: 16px 12px; gap: 4px; min-height: 0; overflow-y: auto; }
   .marca { font-weight: 700; font-size: 18px; padding: 6px 12px 16px; display: flex; align-items: center; gap: 10px; }
   .marca i { width: 10px; height: 10px; border-radius: 50%; background: #9aa9a3; display: inline-block; }
@@ -303,12 +303,15 @@
   @media (max-width: 860px) {
     .app { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; }
     .conteudo { grid-row: 1; }
-    .lateral { grid-row: 2; flex-direction: row; padding: 4px 6px calc(4px + env(safe-area-inset-bottom)); align-items: center; gap: 0; overflow: visible; }
+    .lateral { grid-row: 2; flex-direction: row; padding: 4px 6px calc(4px + env(safe-area-inset-bottom)); align-items: center; gap: 0; overflow: hidden; }
     .marca, .eu .acoes, .eu span, .inst { display: none; }
     .eu { border: 0; padding: 0 6px; margin-left: auto; }
     .eu b { font-size: 12px; }
-    .nav { flex-direction: row; flex: 1; justify-content: space-around; }
-    .nav button { flex-direction: column; gap: 2px; font-size: 12px; padding: 7px 8px; text-align: center; }
+    .lateral { min-width: 0; overflow: hidden; }
+    /* 8 abas não cabem na largura do celular: o menu rola de lado dentro dele, sem alargar a página */
+    .nav { flex-direction: row; flex: 1; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+    .nav::-webkit-scrollbar { display: none; }
+    .nav button { flex: 0 0 auto; flex-direction: column; gap: 2px; font-size: 12px; padding: 7px 10px; text-align: center; }
     .espaco { display: none; }
     .pagina { padding: 14px; }
     .inbox { grid-template-columns: minmax(0, 1fr); padding: 8px; gap: 8px; }
@@ -2043,20 +2046,6 @@
   entrar();
   if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
 })();
-
-  // Celular: o navegador às vezes não devolve a altura da tela depois que o teclado fecha e o menu fica no meio da tela.
-  // Recalcula a altura real sempre que a tela muda, o teclado fecha ou o app volta ao primeiro plano.
-  (function ajustarAltura() {
-    const aplicar = () => document.documentElement.style.setProperty('--app-h', (window.visualViewport ? Math.round(window.visualViewport.height) : window.innerHeight) + 'px');
-    const depois = () => { aplicar(); setTimeout(aplicar, 150); setTimeout(aplicar, 500); };
-    aplicar();
-    window.addEventListener('resize', aplicar);
-    window.addEventListener('orientationchange', depois);
-    window.addEventListener('pageshow', depois);
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) depois(); });
-    document.addEventListener('focusout', depois);
-    if (window.visualViewport) window.visualViewport.addEventListener('resize', aplicar);
-  })();
 </script>
 </body>
 </html>
