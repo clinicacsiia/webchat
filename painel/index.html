@@ -243,6 +243,21 @@
   #contexto { flex: none; max-height: 36vh; overflow-y: auto; overscroll-behavior: contain; }
   @media (max-height: 720px) { #contexto { max-height: 26vh; } .chat-topo { padding: 6px 12px; } .proximo { padding: 6px 12px; } }
   @media (max-height: 560px) { #contexto { max-height: 18vh; } }
+  /* Celular: cabeçalho e avisos mais enxutos para sobrar espaço para ler as mensagens */
+  @media (max-width: 640px) {
+    .chat-topo { padding: 6px 10px; gap: 6px; }
+    .chat-topo .quem { min-width: 0; }
+    .chat-topo .quem b { font-size: 15px; }
+    .chat-topo .quem span { font-size: 12px; }
+    .chat-topo .btn, .chat-topo select { padding: 5px 10px; font-size: 13px; }
+    .proximo { padding: 6px 10px; gap: 6px; }
+    .proximo .texto { min-width: 0; } .proximo .texto b { font-size: 14px; }
+    .proximo .texto span { display: none; }
+    .proximo .btn { padding: 5px 10px; font-size: 13px; }
+    #contexto { max-height: 22vh; }
+    .msgs { min-height: 38vh; padding: 10px; }
+    .msg { max-width: 88%; }
+  }
   .msgs { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 6px; min-height: 0; }
   .dia { align-self: center; background: rgba(30,58,95,.1); color: var(--suave); font-size: 12px; padding: 3px 11px; border-radius: 999px; margin: 10px 0 6px; }
   .msg { max-width: 72%; padding: 10px 14px 8px; border-radius: var(--radius-lg); background: var(--csi-surface); color: var(--csi-text-main); box-shadow: var(--shadow-sm); white-space: pre-wrap; overflow-wrap: anywhere; }
@@ -1502,7 +1517,7 @@
         : (c.motor === 'fluxo' ? 'Resumo do assistente automático' : 'Triagem do assistente virtual')),
       c.triagem_urgencia ? h('span', { class: 'urg ' + c.triagem_urgencia }, 'Urgência ' + ({ baixa: 'baixa', media: 'média', alta: 'alta' })[c.triagem_urgencia]) : null,
       c.triagem_resumo ? h('div', {}, c.triagem_resumo) : null)] : []));
-    t.replaceChildren(
+    t.replaceChildren(...[
       h('button', { class: 'btn voltar', type: 'button', onclick: () => { S.abertaId = null; document.getElementById('inbox')?.classList.remove('aberta'); renderLista(); renderChat(); if (S.modo === 'quadro') renderQuadro(); } }, 'Voltar'),
       h('div', { class: 'quem' }, h('b', {}, nomeLista(c)),
         h('span', {}, ct.telefone ? h('a', { href: 'https://wa.me/55' + soDigitos(ct.telefone), target: '_blank', rel: 'noopener noreferrer' }, fmtTel(ct.telefone)) : '', ct.email ? ' · ' + ct.email : '',
@@ -1511,7 +1526,7 @@
       !minha && c.status !== 'encerrada' ? h('button', { class: 'btn prim', type: 'button', onclick: () => assumir(true) }, 'Assumir') : null,
       c.status === 'encerrada' ? h('button', { class: 'btn', type: 'button', onclick: () => assumir(true) }, 'Reabrir') : null,
       sel,
-      c.status !== 'encerrada' ? h('button', { class: 'btn perigo', type: 'button', onclick: encerrar }, 'Encerrar') : null);
+      c.status !== 'encerrada' ? h('button', { class: 'btn perigo', type: 'button', onclick: encerrar }, 'Encerrar') : null].filter(Boolean));
     renderProximo();
   }
   function desenharMsgs(rolar) {
