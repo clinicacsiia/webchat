@@ -120,16 +120,37 @@ grant execute on function public.jornada_remarcar_pelo_chat(bigint) to authentic
 -- ======================================================================
 -- Fechar sozinho o exame em aberto quando o Klingo já diz como terminou (a equipe não precisa fechar à mão)
 -- ======================================================================
--- Só vale para marcação cujo horário passou há mais de 1 hora e cujo cartão do Klingo bate em 3 informações: nome + marca do telefone + o mesmo dia.
---   atendido -> compareceu | faltou -> faltou (a remarcação fica pendente) | remarcado -> remarcou (remarcação já feita) | só cancelado -> cancelou
+-- Só vale para cartão do Klingo que bate em 3 informações: nome + marca do telefone + o mesmo dia.
+--   atendido -> compareceu (vale na hora: o Klingo registrou o atendimento)
+--   faltou -> faltou (a remarcação fica pendente) | remarcado -> remarcou (remarcação já feita) | só cancelado -> cancelou: estes três esperam o horário passar há mais de 1 hora
+-- Depois de fechar, se a pessoa não tem mais exame em aberto nem remarcação pendente, a conversa se encerra sozinha (ou, se um atendente está falando com o paciente, ganha o aviso "pode encerrar").
 -- Registra origem = 'klingo'. Sem 3 informações, nada acontece e a equipe fecha à mão.
+-- Pessoa sem exame em aberto e sem remarcação pendente: encerra as conversas dela. Se um atendente está em atendimento, só deixa o aviso. Devolve quantas encerrou.
+create or replace function public.conversa_encerrar_se_resolvida(p_conversa uuid) returns integer
+language plpgsql security definer set search_path to '' as $$
+declare v_mem uuid[] := public.pessoa_membros(p_conversa); v_n integer := 0; c record;
+begin
+  if exists (select 1 from public.v_agendamento_aberto v where v.conversa_id = any (v_mem)) then return 0; end if;
+  if exists (select 1 from public.v_remarcacao_pendente r where r.conversa_id = any (v_mem)) then return 0; end if;
+  for c in select id, status from public.conversas where id = any (v_mem) and status <> 'encerrada' loop
+    if c.status = 'em_atendimento' then
+      update public.conversas set alerta_agenda = 'Exame concluído e conferido no Klingo. Pode encerrar a conversa.' where id = c.id;
+    else
+      update public.conversas set status = 'encerrada', encerrada_em = now(), ia_ativa = false, alerta_agenda = null, atualizado_em = now() where id = c.id;
+      v_n := v_n + 1;
+    end if;
+  end loop;
+  return v_n;
+end $$;
+revoke all on function public.conversa_encerrar_se_resolvida(uuid) from public, anon, authenticated;
+
 create or replace function public.agendamento_conferir_klingo() returns jsonb
 language plpgsql security definer set search_path to '' as $$
-declare v_sal text; a record; v_fecha text; v_id bigint; v_n integer := 0;
+declare v_sal text; a record; v_fecha text; v_id bigint; v_n integer := 0; v_enc integer := 0;
 begin
   select valor into v_sal from public.config where chave = 'ia_segredo';
   for a in
-    select v.conversa_id,
+    select v.conversa_id, v.quando < (now() at time zone 'America/Bahia') - interval '1 hour' as passou_1h,
            (select array_agg(distinct e.status) from public.jornada_card c
               join public.jornada_paciente p on p.prontuario = c.paciente_chave
               join public.jornada_exame e on e.card_id = c.id
@@ -138,19 +159,20 @@ begin
                and public.nome_confere(p.nome, public.pessoa_ficha(v.conversa_id) ->> 'nome')) as sts
       from public.v_agendamento_aberto v
       join public.conversas cv on cv.id = v.conversa_id join public.contatos ct on ct.id = cv.contato_id
-     where v.quando is not null and v.quando < (now() at time zone 'America/Bahia') - interval '1 hour'
+     where v.quando is not null and v.quando::date <= (now() at time zone 'America/Bahia')::date
   loop
     if a.sts is null then continue; end if;
     v_fecha := case when 'atendido' = any (a.sts) then 'compareceu' when 'faltou' = any (a.sts) then 'faltou' when 'remarcado' = any (a.sts) then 'remarcou'
                     when 'cancelado' = any (a.sts) and not ('agendado' = any (a.sts) or 'confirmado' = any (a.sts)) then 'cancelou' end;
-    if v_fecha is null then continue; end if;
+    if v_fecha is null or (v_fecha <> 'compareceu' and not a.passou_1h) then continue; end if;
     v_id := public.agendamento_fechar_interno(a.conversa_id, v_fecha, 'klingo', null, 'Conferido no Klingo.');
     if v_id is not null then
       if v_fecha = 'remarcou' then update public.agendamento_fechamento set remarcacao = 'feita' where id = v_id; end if;
       v_n := v_n + 1;
+      v_enc := v_enc + public.conversa_encerrar_se_resolvida(a.conversa_id);
     end if;
   end loop;
-  return jsonb_build_object('fechados', v_n);
+  return jsonb_build_object('fechados', v_n, 'encerradas', v_enc);
 end $$;
 revoke all on function public.agendamento_conferir_klingo() from public, anon, authenticated;
 grant execute on function public.agendamento_conferir_klingo() to service_role;

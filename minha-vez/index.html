@@ -377,6 +377,7 @@
     if (canal) return;
     canal = db.channel('fila-chegada', { config: { broadcast: { self: false } } })
       .on('broadcast', { event: 'fila_mudou' }, () => atualizarAtual())
+      .on('broadcast', { event: 'jornada_mudou' }, () => { if (modo === 'conta') atualizar(); })
       .subscribe();
     tPoll = setInterval(() => { if (!document.hidden) atualizarAtual(); }, 15000);   // reserva se o tempo real cair
     if (!ligarTempoReal.vis) { ligarTempoReal.vis = true; document.addEventListener('visibilitychange', () => { if (!document.hidden) atualizarAtual(); }); }

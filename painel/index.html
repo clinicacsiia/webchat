@@ -801,13 +801,16 @@
 
   /* ---------- aba Fila: quem chegou e quem é o próximo ---------- */
   // O banco calcula a posição e gera os avisos (chegou, perto, sua vez) para o celular do paciente; aqui a equipe só registra, chama e conclui.
-  const F = { itens: [], tRecarga: null, acesso: null };
+  const F = { itens: [], tRecarga: null, acesso: null, ident: {} };
   const hojeFila = () => new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(new Date());
   async function carregarFila() {
     const { data, error } = await db.from('fila_chegada').select('id,nome,senha,status,origem,conta_id,chegou_em,chamado_em,email,telefone,pede_senha').in('status', ['aguardando', 'chamado']).order('chegou_em').order('id');
     if (error) throw error;
     const hoje = hojeFila();
     F.itens = (data || []).filter((x) => new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(new Date(x.chegou_em)) === hoje);
+    // Identificação automática (paciente novo ou já cadastrado, conversas, exames em aberto, exames de hoje no Klingo). Sem o SQL novo, a fila segue sem ela.
+    F.ident = {};
+    try { const { data: ids, error: eId } = await db.rpc('fila_identificar_todos'); if (!eId && Array.isArray(ids)) for (const i of ids) F.ident[i.id] = i; } catch { /* sem identificação */ }
     const n = F.itens.filter((x) => x.status === 'aguardando').length;
     const sl = document.getElementById('seloFila'); if (sl) { sl.textContent = n; sl.hidden = n === 0; }
   }
@@ -832,6 +835,18 @@
       await carregarFila(); renderFila();
     } catch (e) { toast(msgErro(e)); }
   }
+  const ST_KLINGO = { agendado: 'agendado', confirmado: 'confirmado', atendido: 'atendido', cancelado: 'cancelado', remarcado: 'remarcado', faltou: 'faltou', pedido: 'pedido' };
+  function identificacaoNos(x) {
+    const i = F.ident[x.id]; if (!i) return null;
+    const nos = [];
+    const rot = i.situacao === 'cadastrado' ? ['Paciente já cadastrado', 'ok'] : i.situacao === 'talvez' ? ['Talvez já cadastrado: confira o nome', 'aviso'] : ['Paciente novo', 'novo'];
+    nos.push(h('div', { class: 'selo' + (rot[1] === 'aviso' ? ' erro' : ''), style: 'display:inline-block;margin-top:4px' + (rot[1] === 'ok' ? ';background:var(--csi-success-soft);color:var(--csi-success-strong)' : '') }, rot[0]));
+    if (i.paciente_nome && i.situacao !== 'novo') nos.push(h('div', { class: 'sub' }, 'Cadastro: ' + i.paciente_nome));
+    if ((i.conversas || []).length) nos.push(h('div', { class: 'sub' }, (i.conversas.length === 1 ? '1 conversa no chat' : i.conversas.length + ' conversas no chat') + (i.conversas.some((c) => c.status === 'em_atendimento') ? ' · atendimento em andamento' : '')));
+    for (const a of i.abertos || []) nos.push(h('div', { class: 'sub' }, h('b', {}, a.pendente ? 'Exame pendente: ' : 'Exame marcado: '), a.exames || 'exame', a.pendente ? ' (o horário já passou e ninguém registrou como foi)' : ''));
+    if ((i.klingo || []).length) nos.push(h('div', { class: 'sub' }, 'Hoje no Klingo: ' + i.klingo.map((e) => String(e.nome || '').toLowerCase() + ' (' + (ST_KLINGO[e.status] || e.status) + ')').join(', ')));
+    return h('div', {}, nos);
+  }
   function renderFila() {
     const c = document.getElementById('conteudo'); if (!c || S.aba !== 'fila') return;
     const espera = F.itens.filter((x) => x.status === 'aguardando'), chamados = F.itens.filter((x) => x.status === 'chamado');
@@ -844,7 +859,8 @@
       h('td', {}, x.status === 'chamado' ? 'Chamado' : (i + 1) + 'º'), h('td', {}, 'Senha ' + x.senha), h('td', {}, x.nome),
       h('td', {}, hora(x.chegou_em) + (x.origem === 'recepcao' ? ' · registrado pela recepção' : ' · avisou pelo celular') + (x.conta_id ? ' · com conta' : ' · sem conta'),
         x.pede_senha ? h('div', { class: 'selo erro', style: 'display:inline-block;margin-top:4px' }, 'Esqueceu a senha') : null,
-        x.telefone || x.email ? h('div', { class: 'sub' }, [x.telefone, x.email].filter(Boolean).join(' · ')) : null),
+        x.telefone || x.email ? h('div', { class: 'sub' }, [x.telefone, x.email].filter(Boolean).join(' · ')) : null,
+        identificacaoNos(x)),
       h('td', {},
         !x.conta_id && x.email && x.telefone ? h('button', { class: 'btn', type: 'button', onclick: () => acessoFila(x, 'criar') }, 'Criar conta') : null,
         x.conta_id || x.pede_senha ? h('button', { class: 'btn', type: 'button', onclick: () => acessoFila(x, 'redefinir') }, 'Redefinir senha') : null,
