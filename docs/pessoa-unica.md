@@ -80,3 +80,15 @@ Uma falta (marcada pela equipe, pelo paciente ou vinda do Klingo) vira **remarca
 - A lista do Atendimento carrega as 300 conversas mais recentes. Uma pessoa com conversa mais antiga que isso aparece só com as que foram carregadas.
 - "Compareci" informado pelo paciente fecha o exame, mas a equipe pode conferir no Klingo. O sistema não escreve no Klingo.
 - Não testado com o Supabase real, o Realtime nem pessoas de verdade (só com Postgres e navegador simulados).
+
+## 7. Automação completa (01/11/2026): o que muda sozinho
+
+Instalador único: `supabase/aplicar-automacao.sql` (pessoa-unica + pessoa-unica-jornada + automacao-sistema). **Aplicar de uma vez no SQL Editor**: a ferramenta de migração pede confirmação por causa dos `delete` das funções de grupo e expira.
+
+- **Klingo muda o status -> o chat acompanha na hora** (gatilho em `jornada_exame`; a rotina de 10 minutos fica como reserva). Só vale com 3 informações (nome + marca do telefone + o mesmo dia).
+  - *atendido*: fecha o exame em aberto como "compareceu" **na hora**; *faltou, remarcado, cancelado*: depois que o horário passou há mais de 1 hora.
+  - Sem exame em aberto e sem remarcação pendente, a **conversa se encerra sozinha**. Se um atendente está falando com o paciente (`em_atendimento`), ela **não** é encerrada: ganha o aviso "Exame concluído e conferido no Klingo. Pode encerrar a conversa.".
+  - *faltou*: fecha o exame, mas a conversa fica aberta (a remarcação está pendente).
+- **Portal do paciente em tempo real**: `jornada-tempo-real.sql` (**já aplicado**) avisa os portais abertos quando o status de um exame ou a etapa da visita muda; a tela se atualiza sem esperar os 15 s.
+- **Fila identifica sozinha** (`fila_identificar_todos`, aba Fila): "Paciente já cadastrado" (telefone ou e-mail **e** nome batem), "Talvez já cadastrado: confira o nome" (mesmo telefone, nome diferente: família), "Paciente novo"; quantas conversas da pessoa existem no chat (e se há atendimento em andamento); **exame pendente** (marcado pelo chat, horário já passou, ninguém registrou como foi); e os exames de hoje no Klingo com o status.
+- Limites: o paciente não recebe mensagem automática de "exame concluído" (falta canal, itens C6/D2); marcação feita direto no Klingo, sem chat, só aparece na Jornada.

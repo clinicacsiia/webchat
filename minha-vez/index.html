@@ -3,23 +3,29 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0f2a4a">
+<meta name="theme-color" content="#1e3a5f">
 <meta name="robots" content="noindex">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>Minha vez na clínica</title>
 <style>
-  :root { --azul-escuro:#0f2a4a; --azul:#1d5fb8; --azul-claro:#d6e6fa; --fundo:#e8eef6; --papel:#fff; --texto:#15202e; --suave:#5a6878; --linha:#cfd8e3; --erro:#b3261e; --ok:#1b7a3d; --ok-claro:#dff3e5; --aviso:#8a5a00; --aviso-claro:#fdf0d5; }
-  @media (prefers-color-scheme: dark) { :root { --fundo:#0b1522; --papel:#14233a; --texto:#e6edf6; --suave:#9fb0c4; --linha:#2a3d57; --azul-claro:#1a3558; --ok-claro:#12331f; --aviso-claro:#3a2c0b; } }
+  /* Padrão visual da CSI (mesmos tokens do painel e do chat) */
+  :root { --csi-primary:#0088cc; --csi-primary-strong:#006ba1; --csi-primary-soft:#e6f4fb; --csi-sidebar-bg:#1e3a5f; --csi-danger:#e74c3c; --csi-danger-bg:#fdf2f0; --csi-danger-strong:#b3261e;
+    --csi-success:#2ecc71; --csi-success-strong:#167a43; --csi-success-soft:#e8f8ef; --csi-warning-strong:#8a5a00; --csi-warning-soft:#fff4dc;
+    --csi-surface:#ffffff; --csi-background:#f8f9fa; --csi-border:#eaedf1; --csi-border-strong:#cfd6df; --csi-text-main:#333333; --csi-text-secondary:#5a6878;
+    --font-family:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif; --radius-md:10px; --radius-lg:16px; --shadow-md:0 4px 12px rgba(0,0,0,.08); --csi-focus:0 0 0 3px rgba(0,136,204,.28);
+    --azul-escuro:var(--csi-sidebar-bg); --azul:var(--csi-primary-strong); --azul-claro:var(--csi-primary-soft); --fundo:var(--csi-background); --papel:var(--csi-surface); --texto:var(--csi-text-main);
+    --suave:var(--csi-text-secondary); --linha:var(--csi-border); --erro:var(--csi-danger-strong); --ok:var(--csi-success-strong); --ok-claro:var(--csi-success-soft); --aviso:var(--csi-warning-strong); --aviso-claro:var(--csi-warning-soft); }
+  @media (prefers-color-scheme: dark) { :root { --csi-background:#0b1522; --csi-surface:#14233a; --csi-text-main:#e6edf6; --csi-text-secondary:#9fb0c4; --csi-border:#2a3d57; --csi-border-strong:#3a5072; --csi-primary-soft:#1a3558; --csi-success-soft:#12331f; --csi-warning-soft:#3a2c0b; --csi-primary-strong:#4aa8dd; --csi-success-strong:#4cc582; --csi-danger-strong:#ff8a80; --csi-warning-strong:#f0b955; } }
   * { box-sizing:border-box; }
   html,body { margin:0; min-height:100%; }
-  body { font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; background:var(--fundo); color:var(--texto); font-size:18px; line-height:1.45; }
+  body { font-family:var(--font-family); background:var(--fundo); color:var(--texto); font-size:18px; line-height:1.45; }
   header { background:var(--azul-escuro); color:#fff; padding:14px 16px; display:flex; align-items:center; justify-content:space-between; gap:12px; }
   header b { font-size:1.05rem; }
   header button { background:transparent; color:#fff; border:1px solid rgba(255,255,255,.5); border-radius:10px; padding:8px 12px; font-size:.9rem; }
   main { max-width:520px; margin:0 auto; padding:16px; }
-  .cartao { background:var(--papel); border:1px solid var(--linha); border-radius:16px; padding:20px; margin-bottom:14px; }
+  .cartao { background:var(--papel); border:1px solid var(--linha); border-radius:var(--radius-lg); padding:20px; margin-bottom:14px; box-shadow:var(--shadow-md); }
   h1 { font-size:1.35rem; margin:0 0 8px; }
   p { margin:0 0 12px; }
   .suave { color:var(--suave); font-size:.95rem; }
@@ -28,7 +34,7 @@
   .campo input { width:100%; font-size:1rem; padding:12px; border:1px solid var(--linha); border-radius:10px; background:var(--papel); color:var(--texto); }
   button.principal { width:100%; background:var(--azul); color:#fff; border:0; border-radius:12px; padding:16px; font-size:1.1rem; font-weight:700; cursor:pointer; }
   button.principal:disabled { opacity:.6; }
-  button.verde { width:100%; background:#1b7a3d; color:#fff; border:0; border-radius:16px; font-size:1.7rem; font-weight:800; padding:28px 16px; cursor:pointer; box-shadow:0 4px 14px rgba(27,122,61,.35); }
+  button.verde { width:100%; background:var(--csi-success-strong); color:#fff; border:0; border-radius:16px; font-size:1.7rem; font-weight:800; padding:28px 16px; cursor:pointer; box-shadow:0 4px 14px rgba(22,122,67,.35); }
   button.verde:disabled { opacity:.6; }
   button.link { background:none; border:0; color:var(--azul); text-decoration:underline; font-size:.95rem; padding:8px 0; cursor:pointer; }
   a { color:var(--azul); }
@@ -43,6 +49,26 @@
   .selo { display:inline-block; padding:4px 10px; border-radius:999px; font-size:.85rem; font-weight:700; background:var(--azul-claro); }
   .selo.ok { background:var(--ok-claro); color:var(--ok); } .selo.mau { background:var(--aviso-claro); color:var(--aviso); }
   .passo { display:flex; gap:10px; align-items:flex-start; margin-bottom:8px; }
+  h2 { font-size:1.15rem; margin:0 0 6px; }
+  .barra { height:12px; border-radius:999px; background:var(--csi-border); overflow:hidden; margin:10px 0 6px; }
+  .barra > i { display:block; height:100%; background:var(--csi-success-strong); border-radius:999px; transition:width .6s ease; }
+  .exame { border-top:1px solid var(--linha); padding:14px 0 4px; }
+  .exame:first-of-type { border-top:0; padding-top:6px; }
+  .exame b { display:block; font-size:1.02rem; }
+  .passos { display:flex; list-style:none; margin:12px 0 8px; padding:0; }
+  .passos li { flex:1; text-align:center; position:relative; font-size:.62rem; line-height:1.15; padding:0 1px; overflow-wrap:anywhere; color:var(--suave); }
+  .passos li::before { content:''; position:absolute; top:13px; left:-50%; width:100%; height:3px; background:var(--csi-border-strong); z-index:0; }
+  .passos li:first-child::before { display:none; }
+  .passos .bolha { position:relative; z-index:1; width:28px; height:28px; border-radius:50%; margin:0 auto 4px; display:flex; align-items:center; justify-content:center; background:var(--papel); border:3px solid var(--csi-border-strong); font-weight:800; font-size:.8rem; }
+  .passos li.feito { color:var(--texto); } .passos li.feito::before { background:var(--csi-success-strong); }
+  .passos li.feito .bolha { background:var(--csi-success-strong); border-color:var(--csi-success-strong); color:#fff; }
+  .passos li.agora { color:var(--azul); font-weight:700; } .passos li.agora::before { background:linear-gradient(90deg, var(--csi-success-strong), var(--csi-primary)); }
+  .passos li.agora .bolha { border-color:var(--csi-primary); border-top-color:transparent; animation:girar 1.1s linear infinite; }
+  .msg { margin:0 0 10px; font-size:.95rem; }
+  .excecao { background:var(--aviso-claro); border-radius:var(--radius-md); padding:10px 12px; margin:8px 0 10px; font-size:.95rem; }
+  .dia { color:var(--suave); font-size:.9rem; margin:0 0 4px; }
+  @keyframes girar { to { transform:rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .passos li.agora .bolha { animation:none; border-top-color:var(--csi-primary); } .barra > i { transition:none; } }
   [hidden] { display:none !important; }
   .vivo { display:inline-block; width:10px; height:10px; border-radius:50%; background:#9aa; margin-right:6px; } .vivo.on { background:#2ecc71; }
 </style>
@@ -52,6 +78,7 @@
 <main id="raiz"><div class="cartao"><p>Carregando…</p></div></main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../nomes-exame.js"></script>
 <script>
 (() => {
   'use strict';
@@ -233,7 +260,7 @@
       if (error.code === '28000' || /JWT|Entre/i.test(error.message)) { await db.auth.signOut({ scope: 'local' }); return telaLogin('Sua sessão terminou. Entre de novo.'); }
       return desenhar(null, 'Não foi possível atualizar agora. Tentando de novo…');
     }
-    aoMudar(data); desenhar(data);
+    aoMudar(data); await carregarJornada(); desenhar(data);
   }
   async function cheguei(btn) {
     btn.disabled = true;
@@ -266,6 +293,7 @@
              h('button', { class: 'principal', type: 'button', onclick: (e) => cheguei(e.currentTarget) }, 'Cheguei')],
         h('p', { class: 'suave', style: 'margin-top:12px' }, f.total ? f.total + (f.total === 1 ? ' pessoa aguarda' : ' pessoas aguardam') + ' agora.' : 'Ninguém aguardando agora.')));
     }
+    if (modo === 'conta') nos.push(...jornadaNos());
     nos.push(...cartaoAvisos());
     nos.push(vivo);
     mostrar(...nos);
@@ -294,10 +322,62 @@
     return [h('div', { class: 'cartao' }, h('p', { class: 'suave' }, 'Quer um aviso no celular quando estiver perto da sua vez?'),
       h('button', { class: 'principal', type: 'button', id: 'btnAvisos', onclick: async (e) => { e.currentTarget.disabled = true; try { await Notification.requestPermission(); } catch { /* ignora */ } if (modo === 'conta') assinarPush(); desenhar(ultimo); } }, 'Ativar avisos'))];
   }
+  /* ---------- Seus exames: onde cada um está, sem horários ---------- */
+  const PASSOS = ['Pedido', 'Agendado', 'Confirmado', 'Chegada', 'Exame feito', 'Laudo'];
+  const FRASE = {
+    1: 'Recebemos o seu pedido. Estamos organizando o agendamento.',
+    2: 'Exame agendado. Estamos confirmando o seu horário.',
+    3: 'Tudo certo! Falta só você chegar à clínica.',
+    4: 'Você está na clínica. Logo chamamos você para o exame.',
+    5: 'Exame realizado! O seu laudo está sendo preparado.',
+    6: 'Laudo pronto. É só pedir na recepção.'
+  };
+  const FRASE_EXC = {
+    cancelado: 'Este exame foi cancelado. Se foi engano, fale com a recepção.',
+    remarcado: 'Este exame foi remarcado. A recepção vai informar o novo dia.',
+    faltou: 'Não vimos você neste exame. A recepção pode ajudar a remarcar.'
+  };
+  let jornada = null;
+  async function carregarJornada() {
+    try { const { data, error } = await db.rpc('paciente_jornada'); if (!error && data) jornada = data; } catch { /* mantém o que já tinha */ }
+  }
+  const hojeBR = () => new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(new Date());
+  function rotuloDia(iso) {
+    const d = (n) => new Date(Date.parse(hojeBR() + 'T00:00:00Z') + n * 86400000).toISOString().slice(0, 10);
+    if (iso === hojeBR()) return 'Hoje'; if (iso === d(1)) return 'Amanhã'; if (iso === d(-1)) return 'Ontem';
+    return String(iso).slice(8, 10) + '/' + String(iso).slice(5, 7);
+  }
+  const tituloExame = (nome) => { try { return window.NomesExame ? window.NomesExame.apresentar(nome, { semPrefixo: false }).titulo : String(nome || 'Exame'); } catch { return String(nome || 'Exame'); } };
+  function exameNo(e) {
+    const filhos = [h('b', {}, tituloExame(e.nome))];
+    if (e.excecao) { filhos.push(h('div', { class: 'excecao' }, FRASE_EXC[e.excecao] || 'Fale com a recepção sobre este exame.')); return h('div', { class: 'exame' }, filhos); }
+    const ok = Math.max(0, Math.min(6, e.ok || 0));
+    filhos.push(h('ol', { class: 'passos', 'aria-label': 'Andamento do exame' }, PASSOS.map((nome, i) => {
+      const n = i + 1, estado = n <= ok ? 'feito' : n === ok + 1 ? 'agora' : '';
+      return h('li', { class: estado, 'aria-current': estado === 'agora' ? 'step' : null }, h('div', { class: 'bolha' }, estado === 'feito' ? '✓' : ''), nome, estado === 'agora' ? h('div', {}, 'em andamento') : null);
+    })));
+    filhos.push(h('p', { class: 'msg' }, e.em_atendimento ? 'Seu exame está sendo feito agora. Fique tranquilo(a).' : (FRASE[ok] || FRASE[1])));
+    return h('div', { class: 'exame' }, filhos);
+  }
+  function jornadaNos() {
+    const j = jornada; if (!j) return [];
+    const r = j.resumo || {}, vis = j.visitas || [];
+    if (!vis.length) return [h('div', { class: 'cartao' }, h('h2', {}, 'Seus exames'),
+      h('p', { class: 'suave', style: 'margin:0' }, 'Quando você tiver exames marcados, o andamento de cada um aparece aqui. Se acabou de agendar, pode levar alguns minutos.'))];
+    const pct = r.total ? Math.round(100 * r.feitos / r.total) : 0;
+    const nos = [h('div', { class: 'cartao' }, h('h2', {}, 'Seus exames'),
+      h('p', { style: 'margin:0' }, r.total === 0 ? 'Nenhum exame ativo agora.' : r.faltam === 0 ? 'Todos os ' + r.total + (r.total === 1 ? ' exame foi feito.' : ' exames foram feitos.')
+        : r.feitos + ' de ' + r.total + (r.total === 1 ? ' exame feito' : ' exames feitos') + ' · ' + (r.faltam === 1 ? 'falta 1' : 'faltam ' + r.faltam)),
+      h('div', { class: 'barra', role: 'progressbar', 'aria-valuemin': 0, 'aria-valuemax': 100, 'aria-valuenow': pct }, h('i', { style: 'width:' + pct + '%' })),
+      r.laudos ? h('p', { class: 'suave', style: 'margin:0' }, r.laudos === 1 ? '1 laudo pronto' : r.laudos + ' laudos prontos') : null)];
+    for (const v of vis) nos.push(h('div', { class: 'cartao' }, h('p', { class: 'dia' }, rotuloDia(v.data) + (v.unidade ? ' · ' + v.unidade : '')), v.exames.map(exameNo)));
+    return nos;
+  }
   function ligarTempoReal() {
     if (canal) return;
     canal = db.channel('fila-chegada', { config: { broadcast: { self: false } } })
       .on('broadcast', { event: 'fila_mudou' }, () => atualizarAtual())
+      .on('broadcast', { event: 'jornada_mudou' }, () => { if (modo === 'conta') atualizar(); })
       .subscribe();
     tPoll = setInterval(() => { if (!document.hidden) atualizarAtual(); }, 15000);   // reserva se o tempo real cair
     if (!ligarTempoReal.vis) { ligarTempoReal.vis = true; document.addEventListener('visibilitychange', () => { if (!document.hidden) atualizarAtual(); }); }
@@ -323,7 +403,7 @@
     const { data: trocar } = await db.rpc('conta_precisa_trocar_senha');
     if (trocar === true) return telaTrocarSenha();
     sessao = session; modo = 'conta'; desenhar(null);
-    assinarPush(); ligarTempoReal();
+    assinarPush(); ligarTempoReal(); carregarJornada().then(() => { if (ultimo) desenhar(ultimo); });
     if (pedirCheckinAoEntrar) { pedirCheckinAoEntrar = false; const { data, error } = await db.rpc('fila_cheguei'); if (!error && data) { aoMudar(data); return desenhar(data); } }
     atualizar();
   }

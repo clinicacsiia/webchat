@@ -13,10 +13,10 @@ await db.exec(`
     raw_app_meta_data jsonb, raw_user_meta_data jsonb default '{}'::jsonb, created_at timestamptz, updated_at timestamptz,
     confirmation_token text, recovery_token text, email_change_token_new text, email_change text, email_change_token_current text, reauthentication_token text, phone_change text, phone_change_token text);
   create table auth.identities (id uuid primary key default gen_random_uuid(), provider_id text, user_id uuid, identity_data jsonb, provider text, created_at timestamptz, updated_at timestamptz);
-  create table auth.sessions (id uuid primary key default gen_random_uuid(), user_id uuid);
+  create table auth.sessions (id uuid primary key default gen_random_uuid(), user_id uuid, not_after timestamptz);
   create function extensions.crypt(p text, s text) returns text language sql as $$ select 'h:' || p $$;
   create function extensions.gen_salt(t text) returns text language sql as $$ select 'x' $$;
-  create table public.contas_paciente (id uuid primary key references auth.users(id) on delete cascade, email text, paciente_id uuid references public.pacientes(id), nome text, telefone text);
+  create table public.contas_paciente (id uuid primary key references auth.users(id) on delete cascade, email text, paciente_id uuid references public.pacientes(id), nome text, telefone text, identidade_conferida_em timestamptz);
   create table public.equipe_convites (email text primary key, usado_em timestamptz);
   create function public.novo_usuario() returns trigger language plpgsql security definer as $$ begin insert into public.contas_paciente (id, email) values (new.id, new.email); return new; end $$;
   create trigger on_auth_user_created after insert on auth.users for each row execute function public.novo_usuario();
@@ -82,7 +82,7 @@ await caso('esqueci a senha: entra na fila marcado "pede senha"; equipe redefine
   const s = (await como(staff, () => q('select public.fila_redefinir_senha($1) r', [id])))[0].r;
   const u = (await q(`select encrypted_password p from auth.users where id = $1`, [conta]))[0];
   const f1 = (await q(`select pede_senha, conta_id from public.fila_chegada where id = $1`, [id]))[0];
-  return { ok: f0.pede_senha && f0.conta_id === null && /^csi\d{4}$/.test(s.senha) && u.p === 'h:' + s.senha && f1.conta_id === conta && !f1.pede_senha && (await q(`select count(*)::int n from auth.sessions where user_id = $1`, [conta]))[0].n === 0, detalhe: JSON.stringify(s) };
+  return { ok: f0.pede_senha && f0.conta_id === null && /^csi\d{4}$/.test(s.senha) && u.p === 'h:' + s.senha && f1.conta_id === conta && !f1.pede_senha && (await q(`select count(*)::int n from auth.sessions where user_id = $1 and (not_after is null or not_after > now())`, [conta]))[0].n === 0, detalhe: JSON.stringify(s) };
 });
 await caso('troca obrigatória: marca, e some depois de trocar', async () => {
   const a = (await como(conta, () => q('select public.conta_precisa_trocar_senha() r')))[0].r;

@@ -565,12 +565,72 @@ await caso('Klingo ainda "agendado" ou nome diferente (só 2 informações): NÃ
   return { ok: !a.f && !b.f && (await abertos(a.c)).length === 1 && (await abertos(b.c)).length === 1, detalhe: JSON.stringify([a.f, b.f]) };
 });
 
-await caso('Klingo: horário que passou há menos de 1 hora ainda não é conferido', async () => {
-  const c = await conversa({ nome: 'Recente Klingo', tel: '71944000007' });
-  await marcado(c, new Date().toISOString().slice(0, 10), new Date(Date.now() - 20 * 60000).toISOString().slice(11, 16));
-  await cartaoKlingo('K000007', 'RECENTE KLINGO', '71944000007', new Date().toISOString().slice(0, 10), 'a_confirmar', 'atendido');
+const recente = async (nome, tel, status) => {
+  const c = await conversa({ nome, tel }); const hoje = new Date().toISOString().slice(0, 10);
+  await marcado(c, hoje, new Date(Date.now() - 20 * 60000).toISOString().slice(11, 16));
+  await cartaoKlingo('K' + tel.slice(-6), nome.toUpperCase(), tel, hoje, 'a_confirmar', status);
   await db.query(`select public.agendamento_conferir_klingo()`);
+  return c;
+};
+await caso('Klingo: falta/cancelamento de horário que passou há menos de 1 hora ainda não é conferido', async () => {
+  const c = await recente('Recente Klingo', '71944000007', 'faltou');
   return { ok: (await abertos(c)).length === 1, detalhe: '' };
+});
+await caso('Klingo: "atendido" vale na hora (não espera 1 hora) e a conversa parada se encerra sozinha', async () => {
+  const c = await recente('Atendida Agora', '71944000008', 'atendido');
+  const cv = await um(`select status, ia_ativa, alerta_agenda from public.conversas where id = $1`, [c]);
+  return { ok: (await abertos(c)).length === 0 && cv.status === 'encerrada' && cv.ia_ativa === false, detalhe: JSON.stringify(cv) };
+});
+await caso('Klingo "atendido" com atendente falando com o paciente: não encerra, deixa o aviso "pode encerrar"', async () => {
+  const c = await conversa({ nome: 'Em Atendimento', tel: '71944000009' }); const hoje = new Date().toISOString().slice(0, 10);
+  await db.query(`update public.conversas set status = 'em_atendimento' where id = $1`, [c]);
+  await marcado(c, hoje, new Date(Date.now() - 20 * 60000).toISOString().slice(11, 16));
+  await cartaoKlingo('K000009', 'EM ATENDIMENTO', '71944000009', hoje, 'a_confirmar', 'atendido');
+  await db.query(`select public.agendamento_conferir_klingo()`);
+  const cv = await um(`select status, alerta_agenda from public.conversas where id = $1`, [c]);
+  return { ok: cv.status === 'em_atendimento' && /Pode encerrar/.test(cv.alerta_agenda), detalhe: JSON.stringify(cv) };
+});
+await caso('Klingo "faltou": fecha o exame mas NÃO encerra a conversa (a remarcação está pendente)', async () => {
+  const r = await casoKlingo('Faltosa Aberta', '71944000010', 'faltou');
+  const cv = await um(`select status from public.conversas where id = $1`, [r.c]);
+  return { ok: r.f.desfecho === 'faltou' && cv.status !== 'encerrada', detalhe: JSON.stringify(cv) };
+});
+
+// ---------------------------------------------------------------- 6. Automático: o status do Klingo muda e tudo acompanha na hora
+await db.exec(`
+  alter table public.jornada_exame add column if not exists confirm_status text; alter table public.jornada_exame add column if not exists operadora text;
+  create schema if not exists realtime;
+  create table realtime.messages (id bigint generated always as identity primary key, topic text, extension text, event text, payload jsonb, private boolean);
+  create function realtime.send(payload jsonb, event text, topic text, private boolean) returns void language plpgsql as $$ begin insert into realtime.messages (topic, extension, event, payload, private) values (topic, 'broadcast', event, payload, private); end $$;
+`);
+await db.exec(lerSql('jornada-tempo-real.sql')); await db.exec(lerSql('automacao-sistema.sql')); await db.exec(lerSql('automacao-sistema.sql'));
+await caso('gatilho: o Klingo muda o exame para atendido -> fecha o exame em aberto e encerra a conversa SEM esperar a rotina', async () => {
+  const c = await conversa({ nome: 'Gatilho Automatico', tel: '71944000020' }); const hoje = new Date().toISOString().slice(0, 10);
+  await marcado(c, hoje, new Date(Date.now() - 20 * 60000).toISOString().slice(11, 16));
+  const card = await cartaoKlingo('K000020', 'GATILHO AUTOMATICO', '71944000020', hoje, 'a_confirmar', 'agendado');
+  const antes = (await abertos(c)).length;
+  await db.query(`update public.jornada_exame set status = 'atendido' where card_id = $1`, [card]);
+  const cv = await um(`select status from public.conversas where id = $1`, [c]);
+  return { ok: antes === 1 && (await abertos(c)).length === 0 && cv.status === 'encerrada', detalhe: `antes=${antes} ${JSON.stringify(cv)}` };
+});
+await caso('gatilho: atualizar o exame sem mudar o status não faz nada (nem aviso em tempo real)', async () => {
+  const c = await conversa({ nome: 'Sem Mudanca', tel: '71944000021' }); const hoje = new Date().toISOString().slice(0, 10);
+  await marcado(c, hoje, '23:00');
+  const card = await cartaoKlingo('K000021', 'SEM MUDANCA', '71944000021', hoje, 'a_confirmar', 'agendado');
+  const n0 = (await um(`select count(*)::int n from realtime.messages where event = 'jornada_mudou'`)).n;
+  await db.query(`update public.jornada_exame set operadora = 'X' where card_id = $1`, [card]);
+  const n1 = (await um(`select count(*)::int n from realtime.messages where event = 'jornada_mudou'`)).n;
+  return { ok: n1 === n0 && (await abertos(c)).length === 1, detalhe: `${n0} ${n1}` };
+});
+await caso('tempo real: mudar o status do exame ou a etapa da visita avisa os portais ("jornada_mudou", sem dado pessoal)', async () => {
+  const c = await conversa({ nome: 'Aviso Portal', tel: '71944000022' }); const hoje = new Date().toISOString().slice(0, 10);
+  const card = await cartaoKlingo('K000022', 'AVISO PORTAL', '71944000022', hoje, 'a_confirmar', 'agendado');
+  const n0 = (await um(`select count(*)::int n from realtime.messages where event = 'jornada_mudou'`)).n;
+  await db.query(`update public.jornada_exame set status = 'confirmado' where card_id = $1`, [card]);
+  await db.query(`update public.jornada_card set coluna = 'chegou' where id = $1`, [card]);
+  const m = await db.query(`select payload::text p from realtime.messages where event = 'jornada_mudou' order by id desc limit 1`);
+  const n1 = (await um(`select count(*)::int n from realtime.messages where event = 'jornada_mudou'`)).n;
+  return { ok: n1 === n0 + 2 && m.rows[0].p === '{"evento": "jornada_mudou"}', detalhe: `${n0} ${n1} ${m.rows[0].p}` };
 });
 
 const falhas = resultados.filter((r) => !r).length;

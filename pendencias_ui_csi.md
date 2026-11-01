@@ -41,7 +41,10 @@ _Texto original:_
 - **Ação necessária:** escolher um conjunto de ícones SVG e aprovar a alteração do conteúdo dos botões.
 - **Prioridade:** baixa.
 
-## 6. Portal "Minha vez" fora do design system
+## 6. ~~Portal "Minha vez" fora do design system~~ (feito em 01/11/2026)
+**Resolvido:** o portal usa os tokens `--csi-*` (mesmas cores, raios, sombra e fonte do painel), com modo escuro.
+
+_Texto original:_
 - **Arquivo/componente:** `minha-vez/index.html`.
 - **Problema:** mantém a paleta antiga (`#1d5fb8`), fora das três áreas pedidas (sidebar, atendimento e chat).
 - **Impedimento:** não foi incluído no escopo desta tarefa.
