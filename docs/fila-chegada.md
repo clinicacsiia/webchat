@@ -21,10 +21,14 @@ O paciente abre o portal no celular, **permite os avisos**, **entra com a conta*
 
 A fila **zera todo dia** (fuso de Brasília). O paciente nunca lê a tabela da fila: só a própria posição. Os avisos não levam nome nem dado de saúde.
 
-## O que falta ligar (nada disso foi aplicado no Supabase)
+## Estado em 01/11/2026
 
-1. **Aplicar** `supabase/fila-chegada.sql` no SQL Editor (aditivo, pode repetir).
-2. **Avisos com o portal aberto** já funcionam depois do passo 1. Para o aviso chegar **com o celular bloqueado ou o site fechado** (Web Push), faça também:
+`supabase/fila-chegada.sql` **já está aplicado** no Supabase (em 6 partes; tabelas, RLS, funções, gatilho e tempo real conferidos). Os avisos com o portal aberto já funcionam. A recepção confirma a chegada pelo QR code do portal, por isso `fila_autochegada` fica em `sim`.
+
+## O que falta ligar
+
+1. ~~Aplicar o SQL~~ (feito).
+2. Para o aviso chegar **com o celular bloqueado ou o site fechado** (Web Push), faça também:
    1. Gerar as chaves: `npx web-push generate-vapid-keys`.
    2. Ativar a extensão `pg_net` (Database > Extensions) e criar no Vault o segredo `fila_aviso_segredo` (um texto longo qualquer).
    3. `supabase secrets set FILA_AVISO_SEGREDO=<o mesmo texto> VAPID_PUBLICA=... VAPID_PRIVADA=... VAPID_CONTATO=mailto:seu@email`

@@ -146,8 +146,7 @@ begin
   return null;
 end $$;
 revoke all on function public.fila_chegada_trg() from public, anon, authenticated;
-drop trigger if exists fila_chegada_aviso on public.fila_chegada;
-create trigger fila_chegada_aviso after insert or update of status on public.fila_chegada
+create or replace trigger fila_chegada_aviso after insert or update of status on public.fila_chegada
   for each statement execute function public.fila_chegada_trg();
 
 -- ============================================================

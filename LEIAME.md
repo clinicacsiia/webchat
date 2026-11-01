@@ -23,7 +23,7 @@ Login do paciente (31/10/2026): o instalador `supabase/aplicar-login-paciente.sq
 1. ~~E-mail de autenticação do Supabase não enviava~~ **Resolvido em 31/10/2026:** SMTP do Gmail (senha de app) configurado em Authentication > SMTP Settings; confirmação de conta testada e funcionando. Falta só trocar o texto dos modelos "Confirm signup" e "Reset password" por algo genérico da clínica.
 2. **Novo desenho de cadastro, sem tela de login separada:** o paciente informa nome, telefone e e-mail; o sistema compara com a tabela `pacientes` e liga a conta ao cadastro existente; o paciente escolhe a senha e confirma com a data de nascimento. Ainda não implementado.
 
-Fila de chegada e portal "Minha vez" (01/11/2026): o paciente permite os avisos, entra com a conta, toca em Cheguei e acompanha a posição; é avisado quando faltam 2 pessoas e na vez dele; a aba Fila do painel avisa a equipe. **Pronto e testado, mas o SQL ainda NÃO foi aplicado no Supabase.** Veja `docs/fila-chegada.md`.
+Fila de chegada e portal "Minha vez" (01/11/2026): o paciente permite os avisos, entra com a conta, toca em Cheguei e acompanha a posição; é avisado quando faltam 2 pessoas e na vez dele; a aba Fila do painel avisa a equipe. SQL `supabase/fila-chegada.sql` aplicado no Supabase em 01/11/2026 (falta só ligar o push com o site fechado). Veja `docs/fila-chegada.md`.
 
 Quadro das conversas (01/11/2026): o Atendimento ganhou o alternador Lista | Quadro, com cartões por conversa, filtros, mover e responsável. Veja `docs/quadro-nas-conversas.md`.
 
