@@ -91,7 +91,7 @@
   .link { background: none; border: 0; color: var(--azul); cursor: pointer; padding: 6px 0; font-size: 14px; text-decoration: underline; }
 
   /* App */
-  .app { display: grid; grid-template-columns: 256px minmax(0, 1fr); height: 100dvh; }
+  .app { display: grid; grid-template-columns: 256px minmax(0, 1fr); height: 100dvh; height: var(--app-h, 100dvh); }
   .lateral { background: var(--csi-sidebar-bg); color: #fff; display: flex; flex-direction: column; padding: 16px 12px; gap: 4px; min-height: 0; overflow-y: auto; }
   .marca { font-weight: 700; font-size: 18px; padding: 6px 12px 16px; display: flex; align-items: center; gap: 10px; }
   .marca i { width: 10px; height: 10px; border-radius: 50%; background: #9aa9a3; display: inline-block; }
@@ -2043,6 +2043,20 @@
   entrar();
   if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
 })();
+
+  // Celular: o navegador às vezes não devolve a altura da tela depois que o teclado fecha e o menu fica no meio da tela.
+  // Recalcula a altura real sempre que a tela muda, o teclado fecha ou o app volta ao primeiro plano.
+  (function ajustarAltura() {
+    const aplicar = () => document.documentElement.style.setProperty('--app-h', (window.visualViewport ? Math.round(window.visualViewport.height) : window.innerHeight) + 'px');
+    const depois = () => { aplicar(); setTimeout(aplicar, 150); setTimeout(aplicar, 500); };
+    aplicar();
+    window.addEventListener('resize', aplicar);
+    window.addEventListener('orientationchange', depois);
+    window.addEventListener('pageshow', depois);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) depois(); });
+    document.addEventListener('focusout', depois);
+    if (window.visualViewport) window.visualViewport.addEventListener('resize', aplicar);
+  })();
 </script>
 </body>
 </html>
