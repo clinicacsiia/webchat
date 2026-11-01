@@ -95,8 +95,8 @@ Cada item só começa quando os listados em "Depende de" estiverem prontos.
 
 | # | Item | Quem | Depende de |
 |---|---|---|---|
-| G1 | **Versionar o quadro** (SQL das 9 migrações `jornada_01` a `jornada_09`, Edge Function `sync-jornada-klingo`, cron, chaves de `config`). O quadro entrou no painel em 01/11/2026 como função do Atendimento (`docs/quadro-nas-conversas.md`); o SQL e a função ainda existem só no Supabase | Claude | confirmar que a outra sessão terminou |
-| G3 | Klingo só para o que importa: atualizar status de quem tem conversa e dos agendamentos de hoje, sem carregar o relatório inteiro; decidir se se apaga o que já foi carregado (2.704 cartões) | Claude, com sua confirmação para apagar | G1 |
+| G1 | **Versionar o quadro** (SQL das 9 migrações `jornada_01` a `jornada_09`, chaves de `config`). **Parcial em 01/11/2026:** a Edge Function `sync-jornada-klingo` e a migração `jornada_10` (monitor de 1 minuto e cron) já estão no repositório; faltam as 9 primeiras. O quadro entrou no painel em 01/11/2026 como função do Atendimento (`docs/quadro-nas-conversas.md`); o SQL e a função ainda existem só no Supabase | Claude | confirmar que a outra sessão terminou |
+| G3 | (**decisão mudou em 01/11/2026**: você pediu monitorar o paciente a cada minuto; ver `docs/jornada-monitoramento.md`) Klingo só para o que importa: atualizar status de quem tem conversa e dos agendamentos de hoje, sem carregar o relatório inteiro; decidir se se apaga o que já foi carregado (2.704 cartões) | Claude, com sua confirmação para apagar | G1 |
 | G2 | Registrar no `LEIAME.md` o estado do que for sendo concluído | Claude | cada item |
 
 ## 3. Por onde começar

@@ -1,5 +1,7 @@
 # Quadro nas conversas (01/11/2026)
 
+> Atualização: além deste quadro (só conversas), existe a aba **Jornada**, com todos os pacientes e o monitoramento de 1 minuto. Veja `docs/jornada-monitoramento.md`. Os itens 1 e 2 do "O que ainda falta" abaixo foram superados por ela.
+
 O quadro (kanban) **não é uma aba**. É uma segunda forma de ver as conversas, dentro do **Atendimento**: o alternador **Lista | Quadro** fica no alto da lista. A escolha fica guardada no aparelho.
 
 ## O que o atendente vê

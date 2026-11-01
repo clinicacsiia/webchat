@@ -24,8 +24,9 @@
     "test:historico": "node historico.navegador.mjs",
     "test:sentinela-navegador": "node sentinela.navegador.mjs",
     "test:nomes": "node nomes-exame.test.mjs",
-    "test": "npm run test:edge && npm run test:python && npm run test:sql && npm run test:delta && npm run test:sw && npm run test:sentinela && npm run test:nomes && npm run test:sql9 && npm run test:convenio && npm run test:assuntos && npm run test:contas && npm run test:protecao && npm run test:login && npm run test:quadro-sql && npm run test:meus-dados && npm run test:navegador && npm run test:corrida && npm run test:historico && npm run test:sentinela-navegador && npm run test:login && npm run test:quadro",
-    "test:quadro": "node quadro.navegador.mjs"
+    "test": "npm run test:edge && npm run test:python && npm run test:sql && npm run test:delta && npm run test:sw && npm run test:sentinela && npm run test:nomes && npm run test:sql9 && npm run test:convenio && npm run test:assuntos && npm run test:contas && npm run test:protecao && npm run test:login && npm run test:quadro-sql && npm run test:meus-dados && npm run test:navegador && npm run test:corrida && npm run test:historico && npm run test:sentinela-navegador && npm run test:login && npm run test:quadro && npm run test:jornada",
+    "test:quadro": "node quadro.navegador.mjs",
+    "test:jornada": "node jornada.navegador.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.2.17",

@@ -86,17 +86,19 @@ const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePa
 const abrir = async (opcoes) => { const t = await pagina(browser, opcoes); await t.page.goto(`${base}/painel/`); await t.page.waitForSelector('.modo', { timeout: 10000 }); return t; };
 const nomesNaColuna = (page, col) => page.locator(`.q-col[data-coluna="${col}"] .q-card b`).allInnerTexts();
 
-await caso('não existe aba "Jornada": o quadro é uma função do Atendimento', async () => {
+// Decisão de 01/11/2026: além do Quadro dentro do Atendimento (só conversas), existe a aba própria "Jornada" (todos os pacientes; testada em jornada.navegador.mjs).
+await caso('o quadro do Atendimento continua sendo um modo do Atendimento, e a aba Jornada vem logo depois dele', async () => {
   const { page, ctx, reg } = await abrir();
   const abas = await page.locator('nav.nav button').evaluateAll((b) => b.map((x) => x.dataset.aba));
   await ctx.close();
-  return { ok: !abas.some((a) => /jornada|quadro/i.test(a)) && abas.includes('atendimento') && !reg.excecoes.length, detalhe: abas.join(',') };
+  return { ok: !abas.includes('quadro') && abas[0] === 'atendimento' && abas[1] === 'jornada' && !reg.excecoes.length, detalhe: abas.join(',') };
 });
 
 await caso('Lista é o modo padrão e o quadro não é carregado antes de pedir', async () => {
   const { page, ctx, reg } = await abrir();
   const emLista = await page.locator('.modo button[aria-pressed=true]').innerText();
-  const pediu = reg.pedidos.some((p) => p.includes('v_jornada_quadro'));
+  // O selo de avisos da aba Jornada só CONTA (sem trazer linhas, sem nome de paciente): conta como "pediu" apenas quem lê os cartões.
+  const pediu = reg.pedidos.some((p) => p.includes('v_jornada_quadro') && p.includes('paciente_nome'));
   await ctx.close();
   return { ok: emLista === 'Lista' && !pediu, detalhe: `modo=${emLista}, pediu quadro=${pediu}` };
 });
@@ -106,7 +108,7 @@ await caso('Quadro: mostra as colunas com os cartões das conversas e só pede c
   await page.click('.modo button:has-text("Quadro")');
   await page.waitForSelector('.q-col', { timeout: 5000 });
   const c1 = await nomesNaColuna(page, 'contato'), c2 = await nomesNaColuna(page, 'orcamento'), c3 = await nomesNaColuna(page, 'agendado');
-  const pedido = reg.pedidos.find((p) => p.includes('v_jornada_quadro')) ?? '';
+  const pedido = reg.pedidos.find((p) => p.includes('v_jornada_quadro') && p.includes('paciente_nome')) ?? '';
   const salvo = await page.evaluate(() => localStorage.getItem('painel.modo'));
   await ctx.close();
   const ok = c1.join() === 'Maria Souza' && c2.join() === 'João Lima' && c3.join() === 'Ana Paula' && /conversa_id=not\.is\.null/.test(pedido) && salvo === 'quadro' && !reg.excecoes.length;
