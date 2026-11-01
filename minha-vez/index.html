@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f2a4a">
+<meta name="robots" content="noindex">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Minha vez na clínica</title>
+<style>
+  :root { --azul-escuro:#0f2a4a; --azul:#1d5fb8; --azul-claro:#d6e6fa; --fundo:#e8eef6; --papel:#fff; --texto:#15202e; --suave:#5a6878; --linha:#cfd8e3; --erro:#b3261e; --ok:#1b7a3d; --ok-claro:#dff3e5; --aviso:#8a5a00; --aviso-claro:#fdf0d5; }
+  @media (prefers-color-scheme: dark) { :root { --fundo:#0b1522; --papel:#14233a; --texto:#e6edf6; --suave:#9fb0c4; --linha:#2a3d57; --azul-claro:#1a3558; --ok-claro:#12331f; --aviso-claro:#3a2c0b; } }
+  * { box-sizing:border-box; }
+  html,body { margin:0; min-height:100%; }
+  body { font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; background:var(--fundo); color:var(--texto); font-size:18px; line-height:1.45; }
+  header { background:var(--azul-escuro); color:#fff; padding:14px 16px; display:flex; align-items:center; justify-content:space-between; gap:12px; }
+  header b { font-size:1.05rem; }
+  header button { background:transparent; color:#fff; border:1px solid rgba(255,255,255,.5); border-radius:10px; padding:8px 12px; font-size:.9rem; }
+  main { max-width:520px; margin:0 auto; padding:16px; }
+  .cartao { background:var(--papel); border:1px solid var(--linha); border-radius:16px; padding:20px; margin-bottom:14px; }
+  h1 { font-size:1.35rem; margin:0 0 8px; }
+  p { margin:0 0 12px; }
+  .suave { color:var(--suave); font-size:.95rem; }
+  .campo { margin-bottom:14px; }
+  .campo label { display:block; font-weight:600; margin-bottom:4px; }
+  .campo input { width:100%; font-size:1rem; padding:12px; border:1px solid var(--linha); border-radius:10px; background:var(--papel); color:var(--texto); }
+  button.principal { width:100%; background:var(--azul); color:#fff; border:0; border-radius:12px; padding:16px; font-size:1.1rem; font-weight:700; cursor:pointer; }
+  button.principal:disabled { opacity:.6; }
+  button.link { background:none; border:0; color:var(--azul); text-decoration:underline; font-size:.95rem; padding:8px 0; cursor:pointer; }
+  a { color:var(--azul); }
+  .erro { color:var(--erro); font-weight:600; }
+  .posicao { text-align:center; }
+  .posicao .num { font-size:5.5rem; font-weight:800; line-height:1; color:var(--azul); }
+  .posicao .rot { font-size:1.1rem; margin-top:4px; }
+  .perto { background:var(--aviso-claro); border-color:var(--aviso); }
+  .perto .num { color:var(--aviso); }
+  .vez { background:var(--ok-claro); border-color:var(--ok); text-align:center; }
+  .vez h1 { color:var(--ok); font-size:2rem; }
+  .selo { display:inline-block; padding:4px 10px; border-radius:999px; font-size:.85rem; font-weight:700; background:var(--azul-claro); }
+  .selo.ok { background:var(--ok-claro); color:var(--ok); } .selo.mau { background:var(--aviso-claro); color:var(--aviso); }
+  .passo { display:flex; gap:10px; align-items:flex-start; margin-bottom:8px; }
+  [hidden] { display:none !important; }
+  .vivo { display:inline-block; width:10px; height:10px; border-radius:50%; background:#9aa; margin-right:6px; } .vivo.on { background:#2ecc71; }
+</style>
+</head>
+<body>
+<header><b>Minha vez na clínica</b><button type="button" id="btnSair" hidden>Sair</button></header>
+<main id="raiz"><div class="cartao"><p>Carregando…</p></div></main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+(() => {
+  'use strict';
+  const SUPABASE_URL = 'https://nrvuynjwcgwpjdptkiay.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_e2GK1YGEj06STa_ESCevow_nvtATB-y';
+  const CHAT_URL = '../';
+  const AVISAR_PERTO = 2;   // só para o aviso local de reserva; o servidor decide o aviso real (config.fila_aviso_antes)
+  const raiz = document.getElementById('raiz'), btnSair = document.getElementById('btnSair');
+  // Mesma chave de sessão do chat: quem já entrou no chat já está logado aqui.
+  const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false, storageKey: 'csi-paciente-auth' } });
+
+  function h(tag, props, ...filhos) {
+    const e = document.createElement(tag);
+    for (const [k, v] of Object.entries(props || {})) {
+      if (v == null || v === false) continue;
+      if (k.startsWith('on')) e.addEventListener(k.slice(2), v); else if (k === 'class') e.className = v; else e.setAttribute(k, v === true ? '' : v);
+    }
+    for (const f of filhos.flat()) if (f != null && f !== false) e.append(f.nodeType ? f : document.createTextNode(String(f)));
+    return e;
+  }
+  const mostrar = (...nos) => raiz.replaceChildren(...nos);
+  const pode = 'serviceWorker' in navigator && 'Notification' in window && 'PushManager' in window;
+  const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const instalado = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+
+  let reg = null, canal = null, tPoll = null, ultimo = null, sessao = null;
+
+  /* ---------- 1) permissão de notificação (primeiro passo, antes de tudo) ---------- */
+  function telaPermissao() {
+    btnSair.hidden = true;
+    const negada = 'Notification' in window && Notification.permission === 'denied';
+    const filhos = [h('h1', {}, 'Ative os avisos'),
+      h('p', {}, 'Para acompanhar a fila, precisamos avisar você quando estiver perto e quando for a sua vez. Sem os avisos o portal não funciona.')];
+    if (!('Notification' in window) || !('serviceWorker' in navigator)) {
+      filhos.push(h('p', { class: 'erro' }, 'Este navegador não permite avisos. Use o Chrome (Android) ou o Safari (iPhone) atualizado.'));
+    } else if (ios && !instalado) {
+      filhos.push(h('p', { class: 'erro' }, 'No iPhone os avisos só funcionam com o portal instalado.'),
+        h('p', {}, 'Toque em Compartilhar (quadrado com seta) e depois em "Adicionar à Tela de Início". Abra o portal pelo ícone novo.'));
+    } else if (negada) {
+      filhos.push(h('p', { class: 'erro' }, 'Os avisos estão bloqueados neste aparelho.'),
+        h('p', {}, 'Toque no cadeado ao lado do endereço do site, escolha "Notificações" e mude para "Permitir". Depois toque em Tentar de novo.'),
+        h('button', { class: 'principal', type: 'button', onclick: () => location.reload() }, 'Tentar de novo'));
+    } else {
+      filhos.push(h('button', { class: 'principal', type: 'button', id: 'btnPerm', onclick: pedirPermissao }, 'Permitir avisos'));
+    }
+    mostrar(h('div', { class: 'cartao' }, filhos));
+  }
+  async function pedirPermissao() {
+    const b = document.getElementById('btnPerm'); if (b) b.disabled = true;
+    try { await Notification.requestPermission(); } catch { /* cai na checagem abaixo */ }
+    iniciar();
+  }
+
+  /* ---------- 2) login ---------- */
+  function telaLogin(msg) {
+    btnSair.hidden = true;
+    const email = h('input', { id: 'e', type: 'email', autocomplete: 'email', required: true, inputmode: 'email' });
+    const senha = h('input', { id: 's', type: 'password', autocomplete: 'current-password', required: true, maxlength: 72 });
+    const erro = h('p', { class: 'erro', role: 'alert' }, msg || '');
+    const btn = h('button', { class: 'principal', type: 'submit' }, 'Entrar');
+    mostrar(h('form', { class: 'cartao', novalidate: true, onsubmit: async (ev) => {
+      ev.preventDefault(); erro.textContent = ''; btn.disabled = true;
+      try {
+        if (!email.value.trim() || !senha.value) throw new Error('Informe o e-mail e a senha.');
+        const { error } = await db.auth.signInWithPassword({ email: email.value.trim(), password: senha.value });
+        if (error) throw error;
+        iniciar();
+      } catch (e) { erro.textContent = /invalid|credenciais/i.test(e.message) ? 'E-mail ou senha incorretos.' : /confirm/i.test(e.message) ? 'Confirme o seu e-mail (veja a caixa de entrada) e tente de novo.' : e.message; btn.disabled = false; }
+    } },
+      h('h1', {}, 'Entre na sua conta'), h('p', { class: 'suave' }, 'Use o mesmo e-mail e senha do chat de atendimento.'),
+      h('div', { class: 'campo' }, h('label', { for: 'e' }, 'E-mail'), email),
+      h('div', { class: 'campo' }, h('label', { for: 's' }, 'Senha'), senha),
+      erro, btn,
+      h('p', { class: 'suave', style: 'margin-top:14px' }, 'Ainda não tem conta? ', h('a', { href: CHAT_URL }, 'Crie pelo chat de atendimento'), ' e volte aqui.')));
+  }
+
+  /* ---------- 3) portal ---------- */
+  async function assinarPush() {
+    if (!pode || Notification.permission !== 'granted' || !reg) return;
+    try {
+      const { data } = await db.rpc('fila_config_publica');
+      const vapid = data && data.vapid;
+      if (!vapid) return;   // push com o site fechado ainda não configurado: os avisos funcionam com o portal aberto
+      let sub = await reg.pushManager.getSubscription();
+      if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ParaBytes(vapid) });
+      const j = sub.toJSON();
+      await db.rpc('fila_push_salvar', { p_endpoint: j.endpoint, p_p256dh: j.keys.p256dh, p_auth: j.keys.auth });
+    } catch { /* o portal segue sem push */ }
+  }
+  function b64ParaBytes(s) {
+    const p = '='.repeat((4 - s.length % 4) % 4), b = atob((s + p).replace(/-/g, '+').replace(/_/g, '/'));
+    return Uint8Array.from(b, (c) => c.charCodeAt(0));
+  }
+  async function avisoLocal(titulo, corpo, tipo) {
+    try { if (reg && Notification.permission === 'granted') await reg.showNotification(titulo, { body: corpo, icon: 'icon-192.png', tag: 'fila-' + tipo, renotify: true, requireInteraction: tipo === 'vez', vibrate: tipo === 'vez' ? [300, 120, 300, 120, 600] : [200, 100, 200] }); } catch { /* ignora */ }
+    if (navigator.vibrate) navigator.vibrate(tipo === 'vez' ? [300, 120, 300, 120, 600] : [200, 100, 200]);
+  }
+  function aoMudar(novo) {
+    const antes = ultimo; ultimo = novo;
+    if (!antes || !novo) return;
+    if (novo.situacao === 'chamado' && antes.situacao !== 'chamado') avisoLocal('É a sua vez!', 'Pode se dirigir ao atendimento.', 'vez');
+    else if (novo.situacao === 'aguardando' && antes.situacao === 'aguardando' && novo.a_frente <= AVISAR_PERTO && antes.a_frente > AVISAR_PERTO)
+      avisoLocal('Está perto da sua vez', (novo.a_frente === 1 ? 'Falta 1 pessoa' : 'Faltam ' + novo.a_frente + ' pessoas') + ' à sua frente. Fique por perto.', 'perto');
+  }
+  async function atualizar() {
+    const { data, error } = await db.rpc('fila_minha_vez');
+    if (error) {
+      if (error.code === '28000' || /JWT|Entre/i.test(error.message)) { await db.auth.signOut({ scope: 'local' }); return telaLogin('Sua sessão terminou. Entre de novo.'); }
+      return desenhar(null, 'Não foi possível atualizar agora. Tentando de novo…');
+    }
+    aoMudar(data); desenhar(data);
+  }
+  async function cheguei(btn) {
+    btn.disabled = true;
+    const { data, error } = await db.rpc('fila_cheguei');
+    if (error) { desenhar(ultimo, error.message); return; }
+    aoMudar(data); desenhar(data);
+  }
+  function desenhar(f, aviso) {
+    btnSair.hidden = false;
+    const nos = [];
+    const vivo = h('p', { class: 'suave' }, h('span', { class: 'vivo' + (canal && canal.state === 'joined' ? ' on' : '') }), 'Atualizando sozinho');
+    if (aviso) nos.push(h('div', { class: 'cartao' }, h('p', { class: 'erro', role: 'alert' }, aviso)));
+    if (!f) { nos.push(h('div', { class: 'cartao' }, h('p', {}, 'Carregando a fila…'))); return mostrar(...nos); }
+    if (f.situacao === 'chamado') {
+      nos.push(h('div', { class: 'cartao vez', role: 'status' }, h('h1', {}, 'É a sua vez!'), h('p', {}, 'Pode se dirigir ao atendimento. A equipe está esperando você.'), f.senha ? h('p', { class: 'suave' }, 'Sua senha: ' + f.senha) : null));
+    } else if (f.situacao === 'aguardando') {
+      const perto = f.a_frente <= AVISAR_PERTO;
+      nos.push(h('div', { class: 'cartao posicao' + (perto ? ' perto' : ''), role: 'status', 'aria-live': 'polite' },
+        h('div', { class: 'rot' }, 'Você é o(a)'), h('div', { class: 'num' }, f.posicao + 'º'), h('div', { class: 'rot' }, 'da fila'),
+        h('p', { style: 'margin-top:14px' }, f.a_frente === 0 ? 'Você é o próximo! Fique por perto.' : f.a_frente === 1 ? 'Falta 1 pessoa à sua frente.' : 'Faltam ' + f.a_frente + ' pessoas à sua frente.'),
+        h('span', { class: 'selo ' + (perto ? 'mau' : '') }, 'Senha ' + f.senha),
+        perto ? h('p', { style: 'margin-top:12px' }, 'Está chegando a sua vez.') : null));
+    } else if (f.situacao === 'atendido') {
+      nos.push(h('div', { class: 'cartao' }, h('h1', {}, 'Atendimento concluído'), h('p', {}, 'Obrigado pela visita! Se precisar de algo, é só falar com a gente pelo chat.'), h('a', { href: CHAT_URL }, 'Voltar ao chat')));
+    } else {
+      nos.push(h('div', { class: 'cartao' }, h('h1', {}, 'Chegou na clínica?'),
+        f.pode_chegar === false ? h('p', {}, 'Avise a recepção que você chegou. Ela vai colocar você na fila e o portal mostrará a sua posição.')
+          : [h('p', {}, 'Toque no botão para avisar a recepção. Você entra na fila e acompanha a sua posição aqui.'),
+             h('button', { class: 'principal', type: 'button', onclick: (e) => cheguei(e.currentTarget) }, 'Cheguei')],
+        h('p', { class: 'suave', style: 'margin-top:12px' }, f.total ? f.total + (f.total === 1 ? ' pessoa aguarda' : ' pessoas aguardam') + ' agora.' : 'Ninguém aguardando agora.')));
+    }
+    nos.push(vivo);
+    mostrar(...nos);
+  }
+  function ligarTempoReal() {
+    if (canal) return;
+    canal = db.channel('fila-chegada', { config: { broadcast: { self: false } } })
+      .on('broadcast', { event: 'fila_mudou' }, () => atualizar())
+      .subscribe();
+    tPoll = setInterval(() => { if (!document.hidden) atualizar(); }, 15000);   // reserva se o tempo real cair
+    document.addEventListener('visibilitychange', () => { if (!document.hidden && sessao) atualizar(); });
+  }
+  function desligar() { if (canal) { db.removeChannel(canal); canal = null; } clearInterval(tPoll); ultimo = null; }
+
+  btnSair.addEventListener('click', async () => {
+    try { if (reg) { const s = await reg.pushManager.getSubscription(); if (s) { await db.rpc('fila_push_remover', { p_endpoint: s.endpoint }); await s.unsubscribe(); } } } catch { /* ignora */ }
+    desligar(); sessao = null; await db.auth.signOut({ scope: 'local' }); telaLogin();
+  });
+
+  async function iniciar() {
+    // Ordem: avisos permitidos -> login -> portal.
+    if (!('Notification' in window) || !('serviceWorker' in navigator) || Notification.permission !== 'granted' || (ios && !instalado)) return telaPermissao();
+    try { reg = await navigator.serviceWorker.register('sw.js', { scope: './' }); await navigator.serviceWorker.ready; } catch { return telaPermissao(); }
+    const { data: { session } } = await db.auth.getSession();
+    if (!session) return telaLogin();
+    const { data: conta } = await db.rpc('conta_paciente_resumo');
+    if (!conta || !conta.conta) { await db.auth.signOut({ scope: 'local' }); return telaLogin('Essa conta não é de paciente. Entre com a conta que você usa no chat.'); }
+    sessao = session; desenhar(null);
+    assinarPush(); ligarTempoReal(); atualizar();
+  }
+  iniciar();
+})();
+</script>
+</body>
+</html>
