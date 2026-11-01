@@ -132,7 +132,7 @@ begin
   if v_email is null then raise exception 'Essa conta não é de paciente.' using errcode = '42501'; end if;
   v_senha := 'csi' || lpad((abs(('x' || substr(replace(gen_random_uuid()::text, '-', ''), 1, 7))::bit(28)::int) % 10000)::text, 4, '0');
   update auth.users set encrypted_password = extensions.crypt(v_senha, extensions.gen_salt('bf')), updated_at = now() where id = v_conta;
-  delete from auth.sessions where user_id = v_conta;   -- derruba quem estivesse logado com a senha antiga
+  update auth.sessions set not_after = now() where user_id = v_conta and (not_after is null or not_after > now());   -- expira quem estivesse logado com a senha antiga (update, não delete: a ferramenta de migração pede confirmação em delete)
   update public.contas_paciente set senha_provisoria = true where id = v_conta;
   if r.conta_id is null and not exists (select 1 from public.fila_chegada where conta_id = v_conta and status in ('aguardando', 'chamado')) then
     update public.fila_chegada set conta_id = v_conta where id = r.id;

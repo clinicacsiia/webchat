@@ -56,3 +56,5 @@ A fila **zera todo dia** (fuso de Brasília). O paciente nunca lê a tabela da f
 - **Primeiro acesso com senha provisória**: o portal obriga criar uma senha nova (mín. 8) antes de mostrar a fila.
 - Limite de 300 check-ins sem conta por dia (`config.checkin_sem_login_max_dia`).
 - Não vale ainda no chat de atendimento (`index.html`): lá a senha provisória não é cobrada.
+
+**Estado em 01/11/2026:** `checkin-sem-login.sql` **aplicado em produção** (7 funções conferidas). Teste de ponta a ponta no banco real, dentro de uma transação desfeita: check-in → criar conta (senha `csi`, provisória, 1 identidade, nenhum agente criado) → redefinir (senha nova vale, `csi` deixa de valer). Falta só o teste com um celular real (login pelo GoTrue com a senha provisória).
