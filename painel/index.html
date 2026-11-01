@@ -309,6 +309,36 @@
   .link-chat { display: flex; gap: 8px; }
   .link-chat input { flex: 1; }
 
+  /* ===== Configurações ===== */
+  .pagina.cfg { max-width: 860px; margin: 0 auto; width: 100%; }
+  .cfg-topo { display: flex; gap: 16px; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; position: sticky; top: -24px; z-index: 5; background: var(--fundo); padding: 24px 0 10px; margin-top: -24px; }
+  .cfg-salvar { display: flex; align-items: center; gap: 10px; } .cfg-salvar .btn.prim { padding: 10px 20px; }
+  .cfg-grupo, .cfg-destaque { background: var(--papel); border: 1px solid var(--linha); border-radius: var(--radius-lg); margin-bottom: 14px; box-shadow: var(--shadow-sm); }
+  .cfg-destaque { padding: 18px 20px; }
+  .cfg-grupo > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 12px; padding: 16px 20px; font-weight: 700; font-size: 16px; }
+  .cfg-grupo > summary::-webkit-details-marker { display: none; }
+  .cfg-grupo > summary::after { content: '▾'; margin-left: auto; color: var(--suave); transition: transform var(--csi-ease); }
+  .cfg-grupo:not([open]) > summary::after { transform: rotate(-90deg); }
+  .cfg-icone { width: 36px; height: 36px; border-radius: 10px; background: var(--csi-primary-soft); color: var(--csi-primary-strong); display: grid; place-items: center; }
+  .cfg-tit small { font-weight: 600; font-size: 11px; color: var(--suave); background: var(--fundo); border: 1px solid var(--linha); border-radius: 99px; padding: 1px 8px; margin-left: 6px; }
+  .cfg-corpo { padding: 0 20px 18px; border-top: 1px solid var(--linha); }
+  .cfg-desc { color: var(--suave); margin: 14px 0 6px; }
+  .cfg-linha { padding: 12px 0; border-bottom: 1px solid var(--linha); } .cfg-linha:last-of-type { border-bottom: 0; }
+  .cfg-linha p.dica { margin-top: 4px; }
+  .cfg-ctrl { display: flex; align-items: center; gap: 10px; }
+  .cfg-sim { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .cfg-sim label { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 200px; cursor: pointer; } .rot-forte { font-weight: 600; font-size: 14.5px; }
+  input.chave { appearance: none; width: 46px; height: 26px; border-radius: 99px; background: var(--csi-border-strong); position: relative; cursor: pointer; border: 0; padding: 0; flex: none; transition: background-color var(--csi-ease); }
+  input.chave::after { content: ''; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: var(--shadow-sm); transition: transform var(--csi-ease); }
+  input.chave:checked { background: var(--csi-success-strong); } input.chave:checked::after { transform: translateX(20px); }
+  input.chave:focus-visible { outline: none; box-shadow: var(--csi-focus); } input:disabled, textarea:disabled, select:disabled { opacity: .55; cursor: not-allowed; }
+  .qr-cartao { display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; margin-top: 14px; }
+  .cfg-destaque .qr-cartao { margin-top: 0; }
+  .qr-img { width: 200px; height: 200px; border: 1px solid var(--linha); border-radius: var(--radius-md); background: #fff; overflow: hidden; flex: none; display: grid; place-items: center; }
+  .qr-info { flex: 1; min-width: 240px; } .qr-acoes { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  @media (max-width: 640px) { .cfg-topo { position: static; margin-top: 0; padding-top: 0; } .pagina.cfg { padding: 16px; } }
+
+
 
   /* ===== Visual novo (somente aparência): ícones, barra do topo, cabeçalho com indicadores, linhas com avatar ===== */
   .ic-svg { display: inline-flex; flex: none; } .ic-svg svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
@@ -2014,34 +2044,142 @@
   }
 
   /* ---------- configurações ---------- */
+  // Tudo que o dono pode ajustar fica aqui, em grupos. Chaves que ainda não existem no banco aparecem desativadas.
+  const CFG_GRUPOS = [
+    { id: 'chat', icone: 'fone', titulo: 'Chat do cliente', desc: 'Como o chat aparece e se comporta.', campos: [
+      { k: 'nome_empresa', tipo: 'texto', rot: 'Nome exibido no chat', max: 60, padrao: 'Atendimento' },
+      { k: 'boas_vindas', tipo: 'area', rot: 'Mensagem de boas-vindas', max: 300 },
+      { k: 'ia_ativa', tipo: 'sim', rot: 'Assistente automático ligado', dica: 'Desligado: todas as conversas vão direto para a equipe.' },
+    ] },
+    { id: 'motor', icone: 'livro', titulo: 'Motor de atendimento', desc: 'Quem conduz a conversa com o paciente.', campos: [
+      { k: 'motor', tipo: 'escolha', rot: 'Motor', opcoes: [['fluxo', 'Fluxo guiado (sem IA)'], ['ia', 'Inteligência artificial']], dica: 'Fluxo guiado segue um roteiro fixo; IA conversa livremente.' },
+      { k: 'motor_telefones_teste', tipo: 'texto', rot: 'Telefones de teste', dica: 'Só esses números usam o motor novo (separe por vírgula). Vazio = ninguém em teste.' },
+    ] },
+    { id: 'fila', icone: 'pessoas', titulo: 'Fila e recepção', desc: 'Fila de chegada, avisos e QR code da recepção.', campos: [
+      { k: 'fila_autochegada', tipo: 'sim', rot: 'Paciente pode tocar “Cheguei”', dica: 'Desligado: só a recepção registra a chegada.' },
+      { k: 'fila_aviso_antes', tipo: 'numero', rot: 'Avisar “está perto” quando restarem', min: 0, max: 20, sufixo: 'pessoas à frente' },
+    ], qr: 'fila' },
+    { id: 'login', icone: 'pessoa', titulo: 'Cadastro e login', desc: 'Regras de entrada de pacientes e equipe.', campos: [
+      { k: 'login_paciente', tipo: 'sim', rot: 'Login de paciente ligado' },
+      { k: 'cadastro_equipe_sem_convite', tipo: 'sim', rot: 'Equipe pode se cadastrar sem convite', dica: 'Recomendado deixar desligado.' },
+      { k: 'reaproveitar_cadastro_convidado', tipo: 'sim', rot: 'Reaproveitar cadastro de convidado' },
+    ] },
+    { id: 'n8n', icone: 'engrenagem', titulo: 'Integração com n8n', desc: 'Para onde vão os dados de cada nova conversa.', campos: [
+      { k: 'n8n_webhook_url', tipo: 'url', rot: 'Webhook do n8n (nova conversa)', dica: 'Recebe nome, telefone, e-mail e a primeira mensagem. Vazio = desligado.' },
+      { k: 'n8n_webhook_token', tipo: 'senha', rot: 'Token do webhook', dica: 'Segredo enviado junto com a chamada. Deixe como está para manter.' },
+    ] },
+    { id: 'klingo', icone: 'pin', titulo: 'Jornada do paciente (Klingo)', desc: 'Relatório do Klingo usado na sincronização.', avancado: true, campos: [
+      { k: 'jornada_relatorio_id', tipo: 'texto', rot: 'Número do relatório' },
+      { k: 'jornada_relatorio_filtro', tipo: 'texto', rot: 'Filtro do relatório', dica: 'Ex.: criacao.' },
+      { k: 'jornada_identidade_klingo', tipo: 'sim', rot: 'Confirmar identidade pelo Klingo' },
+    ] },
+    { id: 'push', icone: 'barras', titulo: 'Avisos no celular (push)', desc: 'Normalmente não precisa mexer.', avancado: true, campos: [
+      { k: 'fila_push_url', tipo: 'url', rot: 'Endereço do envio de avisos' },
+      { k: 'fila_vapid_publica', tipo: 'texto', rot: 'Chave pública VAPID' },
+    ] },
+  ];
+  let _qrLib = null;
+  function carregarQr() {
+    if (_qrLib) return _qrLib;
+    _qrLib = new Promise((ok, falha) => {
+      if (window.qrcode) return ok(window.qrcode);
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js';
+      s.onload = () => ok(window.qrcode); s.onerror = () => { _qrLib = null; falha(new Error('Não consegui carregar o gerador de QR code. Confira a internet.')); };
+      document.head.append(s);
+    });
+    return _qrLib;
+  }
+  function desenharQr(qrcode, texto, lado) {
+    const q = qrcode(0, 'M'); q.addData(texto); q.make();
+    const n = q.getModuleCount(), margem = 4, cel = Math.max(2, Math.floor(lado / (n + margem * 2)));
+    const cv = document.createElement('canvas'); cv.width = cv.height = cel * (n + margem * 2);
+    const g = cv.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, cv.width, cv.height); g.fillStyle = '#000';
+    for (let r = 0; r < n; r++) for (let c2 = 0; c2 < n; c2++) if (q.isDark(r, c2)) g.fillRect((c2 + margem) * cel, (r + margem) * cel, cel, cel);
+    return cv;
+  }
+  // Cartão com um QR code: link editável (origem), pré-visualização, baixar e imprimir.
+  function cartaoQr(titulo, desc, linkBase, origemPadrao, legenda) {
+    const origem = h('input', { type: 'text', maxlength: '30', value: origemPadrao, 'aria-label': 'Nome da origem', placeholder: 'ex.: recepcao' });
+    const saida = h('div', { class: 'qr-img' }), linkTxt = h('input', { type: 'text', readonly: true, 'aria-label': 'Link do QR code' });
+    let canvas = null;
+    const montarLink = () => { const o = origem.value.trim().toLowerCase().replace(/[^a-z0-9_-]/g, ''); const u = new URL(linkBase); if (o) u.searchParams.set('origem', o); return u.href; };
+    async function atualizar() {
+      const link = montarLink(); linkTxt.value = link;
+      try { const lib = await carregarQr(); canvas = desenharQr(lib, link, 220); canvas.style.width = '200px'; canvas.style.height = '200px'; saida.replaceChildren(canvas); }
+      catch (e) { canvas = null; saida.replaceChildren(h('p', { class: 'erro' }, e.message)); }
+    }
+    origem.addEventListener('input', atualizar);
+    const baixar = h('button', { class: 'btn', type: 'button', onclick: () => {
+      if (!canvas) return; const grande = desenharQr(window.qrcode, linkTxt.value, 1000);
+      const a = document.createElement('a'); a.href = grande.toDataURL('image/png'); a.download = `qrcode-${(origem.value.trim() || 'link')}.png`; a.click();
+    } }, 'Baixar imagem');
+    const imprimir = h('button', { class: 'btn', type: 'button', onclick: () => {
+      if (!canvas) return; const grande = desenharQr(window.qrcode, linkTxt.value, 700);
+      const w = window.open('', '_blank'); if (!w) { toast('O navegador bloqueou a janela. Permita pop-ups para imprimir.'); return; }
+      const d = w.document; d.title = titulo;
+      const st = d.createElement('style'); st.textContent = 'body{font-family:system-ui,sans-serif;text-align:center;padding:40px}h1{font-size:34px;margin:0 0 8px}p{font-size:20px;color:#444}img{width:420px;height:420px;margin:24px 0}';
+      const h1 = d.createElement('h1'); h1.textContent = legenda; const im = d.createElement('img'); im.src = grande.toDataURL('image/png');
+      const p = d.createElement('p'); p.textContent = 'Aponte a câmera do celular para o QR code.';
+      d.head.append(st); d.body.append(h1, im, p); w.focus(); setTimeout(() => w.print(), 300);
+    } }, 'Imprimir cartaz');
+    const copiar = h('button', { class: 'btn', type: 'button', onclick: async () => { try { await navigator.clipboard.writeText(linkTxt.value); toast('Link copiado.'); } catch { toast('Copie o link manualmente.'); } } }, 'Copiar link');
+    atualizar();
+    return h('div', { class: 'qr-cartao' }, saida, h('div', { class: 'qr-info' }, h('strong', {}, titulo), h('p', { class: 'dica' }, desc),
+      h('label', { class: 'rot' }, 'Origem (para saber de onde veio o acesso)'), origem,
+      h('label', { class: 'rot', style: 'margin-top:8px' }, 'Link'), linkTxt,
+      h('div', { class: 'qr-acoes' }, copiar, baixar, imprimir)));
+  }
   async function viewConfig(c) {
     const { data, error } = await db.from('config').select('chave,valor');
     if (error) { c.replaceChildren(h('div', { class: 'pagina' }, h('p', { class: 'erro' }, msgErro(error)))); return; }
     const v = Object.fromEntries((data || []).map((r) => [r.chave, r.valor]));
-    const empresa = h('input', { type: 'text', id: 'cEmpresa', value: v.nome_empresa || '', maxlength: '60' });
-    const boas = h('textarea', { id: 'cBoas', rows: '3', maxlength: '300' }); boas.value = v.boas_vindas || '';
-    const hook = h('input', { type: 'url', id: 'cHook', value: v.n8n_webhook_url || '', placeholder: 'https://seu-n8n.app.n8n.cloud/webhook/…' });
-    const linkChat = new URL('../', location.href).href;
-    const salvar = h('button', { class: 'btn prim', type: 'button' }, 'Salvar configurações');
+    const lidos = {};   // chave -> função que devolve o valor atual do campo
+    const campoUi = (f) => {
+      const existe = f.k in v, id = 'cfg_' + f.k, atual = v[f.k] ?? '';
+      let ctrl, ler;
+      if (f.tipo === 'sim') {
+        ctrl = h('input', { type: 'checkbox', id, role: 'switch', class: 'chave' }); ctrl.checked = atual === 'sim'; ler = () => (ctrl.checked ? 'sim' : 'nao');
+      } else if (f.tipo === 'area') { ctrl = h('textarea', { id, rows: '3', maxlength: String(f.max || 300) }); ctrl.value = atual; ler = () => ctrl.value.trim(); }
+      else if (f.tipo === 'escolha') { ctrl = h('select', { id }, f.opcoes.map(([val, r]) => h('option', { value: val }, r))); ctrl.value = atual; ler = () => ctrl.value; }
+      else if (f.tipo === 'numero') { ctrl = h('input', { type: 'number', id, min: String(f.min ?? 0), max: String(f.max ?? 99), value: atual, style: 'max-width:110px' }); ler = () => String(Math.max(f.min ?? 0, Math.min(f.max ?? 99, parseInt(ctrl.value, 10) || 0))); }
+      else { ctrl = h('input', { type: f.tipo === 'url' ? 'url' : f.tipo === 'senha' ? 'password' : 'text', id, value: atual, maxlength: String(f.max || 300), autocomplete: 'off' }); ler = () => ctrl.value.trim() || (f.padrao || ''); }
+      if (!existe) { ctrl.disabled = true; }
+      else lidos[f.k] = { ler, inicial: atual };
+      const linha = f.tipo === 'sim'
+        ? h('div', { class: 'cfg-linha cfg-sim' }, h('label', { for: id }, h('span', { class: 'rot-forte' }, f.rot), f.dica ? h('span', { class: 'dica' }, f.dica) : null), ctrl)
+        : h('div', { class: 'cfg-linha' }, h('label', { class: 'rot', for: id }, f.rot), h('div', { class: 'cfg-ctrl' }, ctrl, f.sufixo ? h('span', { class: 'dica' }, f.sufixo) : null), f.dica ? h('p', { class: 'dica' }, f.dica) : null);
+      if (!existe) linha.append(h('p', { class: 'dica' }, 'Esta opção ainda não existe no banco; peça para criar a chave “' + f.k + '”.'));
+      return linha;
+    };
+    const urlBase = new URL('../', location.href), linkChat = urlBase.href, linkFila = new URL('../minha-vez/', location.href).href;
+    const grupoUi = (g) => {
+      const corpo = [g.desc ? h('p', { class: 'cfg-desc' }, g.desc) : null, ...g.campos.map(campoUi)];
+      if (g.qr === 'fila') corpo.push(h('div', { class: 'cfg-qr' },
+        cartaoQr('QR code da recepção', 'O paciente aponta a câmera, entra na fila e toca “Cheguei”. Imprima e deixe na recepção.', linkFila, 'recepcao', 'Chegou? Aponte a câmera aqui'),
+        ));
+      const det = h('details', { class: 'cfg-grupo', id: 'cfg-' + g.id }, h('summary', {}, h('span', { class: 'cfg-icone' }, icone(g.icone)), h('span', { class: 'cfg-tit' }, g.titulo, g.avancado ? h('small', {}, ' avançado') : null)), h('div', { class: 'cfg-corpo' }, corpo));
+      if (!g.avancado) det.open = true;
+      return det;
+    };
+    const salvar = h('button', { class: 'btn prim', type: 'button' }, 'Salvar alterações');
+    const status = h('span', { class: 'dica', 'aria-live': 'polite' });
     salvar.addEventListener('click', async () => {
       salvar.disabled = true;
-      const novos = { nome_empresa: empresa.value.trim() || 'Atendimento', boas_vindas: boas.value.trim(), n8n_webhook_url: hook.value.trim() };
       try {
-        for (const [chave, valor] of Object.entries(novos)) { const { error: e } = await db.from('config').update({ valor }).eq('chave', chave); if (e) throw e; }
-        toast('Configurações salvas.');
+        let n = 0;
+        for (const [chave, { ler, inicial }] of Object.entries(lidos)) {
+          const novo = ler(); if (novo === inicial) continue;
+          const { error: e } = await db.from('config').update({ valor: novo }).eq('chave', chave); if (e) throw e;
+          lidos[chave].inicial = novo; n++;
+        }
+        toast(n ? `Configurações salvas (${n} ${n === 1 ? 'alteração' : 'alterações'}).` : 'Nada para salvar.'); status.textContent = '';
       } catch (e) { toast(msgErro(e)); } finally { salvar.disabled = false; }
     });
-    c.append(h('div', { class: 'pagina', style: 'max-width:640px' }, h('h2', {}, 'Configurações'),
-      h('p', { class: 'sub' }, 'Ajustes do chat do cliente e da ligação com o n8n.'),
-      h('div', { class: 'campo' }, h('label', { class: 'rot' }, 'Link do chat para clientes'),
-        h('div', { class: 'link-chat' }, h('input', { type: 'text', readonly: true, value: linkChat, 'aria-label': 'Link do chat' }),
-          h('button', { class: 'btn', type: 'button', onclick: async () => { try { await navigator.clipboard.writeText(linkChat); toast('Link copiado.'); } catch { toast('Copie o link manualmente.'); } } }, 'Copiar')),
-        h('p', { class: 'dica' }, 'Dica: adicione ?origem=instagram (ou outro nome) ao link para saber de onde cada contato veio.')),
-      h('div', { class: 'campo' }, h('label', { class: 'rot', for: 'cEmpresa' }, 'Nome exibido no chat'), empresa),
-      h('div', { class: 'campo' }, h('label', { class: 'rot', for: 'cBoas' }, 'Mensagem de boas-vindas'), boas),
-      h('div', { class: 'campo' }, h('label', { class: 'rot', for: 'cHook' }, 'Webhook do n8n (nova conversa)'), hook,
-        h('p', { class: 'dica' }, 'Cada nova conversa envia nome, telefone, e-mail e a primeira mensagem para esse endereço. Deixe vazio para desligar.')),
-      salvar));
+    c.append(h('div', { class: 'pagina cfg' },
+      h('div', { class: 'cfg-topo' }, h('div', {}, h('h2', {}, 'Configurações'), h('p', { class: 'sub' }, 'Tudo que você controla do chat, da fila e das integrações, num lugar só.')), h('div', { class: 'cfg-salvar' }, status, salvar)),
+      h('div', { class: 'cfg-qr cfg-destaque' }, cartaoQr('QR code do chat', 'Leva o cliente direto para o chat de atendimento.', linkChat, 'qrcode', 'Fale com a gente')),
+      ...CFG_GRUPOS.map(grupoUi)));
   }
 
   /* ---------- catálogo do Klingo (só administrador) ---------- */
