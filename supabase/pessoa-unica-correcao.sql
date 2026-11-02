@@ -188,3 +188,11 @@ grant execute on function public.fila_identificar_todos() to authenticated;
 delete from public.conversa_grupo_recusa
  where por is null and jsonb_array_length(public.pessoa_sinais(a, b) -> 'conflitos') = 0;
 select sum(public.pessoa_agrupar(c.id)) as ligacoes_novas from public.conversas c;
+
+-- ======================================================================
+-- 6. COMO FOI APLICADO NO BANCO (em pedaços pequenos, sem delete dentro de função)
+--    Em vez de trocar pessoa_agrupar (tem delete e o Supabase pede confirmação), a união de grupos virou uma função à parte:
+--    public.pessoa_unir_grupos(uuid), chamada logo depois de pessoa_agrupar pelos dois gatilhos.
+--    Também no banco: pessoa_pedidos_de(uuid[]), pessoa_resumo_de(uuid[]) e a nova fila_identificar_todos().
+--    A seção 2 (pessoa_agrupar) deste arquivo NÃO precisa ser aplicada.
+-- ======================================================================
