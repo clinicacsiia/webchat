@@ -11,6 +11,7 @@
     "test:edge": "node --experimental-strip-types --test ../supabase/functions/sync-catalogo-klingo/conferencia.test.ts ../supabase/functions/sync-catalogo-klingo/precos.test.ts",
     "test:python": "python3 -m pytest -q ../biometria",
     "test:sentinela": "node sentinela.test.mjs",
+    "test:paciente-status": "node paciente-status.test.mjs",
     "test:sql9": "node sql-fase9.test.mjs",
     "test:convenio": "node sql-convenio.test.mjs",
     "test:assuntos": "node sql-assuntos.test.mjs",

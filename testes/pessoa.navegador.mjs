@@ -92,6 +92,11 @@ async function pagina(browser, { semSql = false, perguntaCanal = 'botoes' } = {}
     else if (p.startsWith('/rest/v1/v_agendamento_aberto')) { if (semSql) nao(); else corpo = ABERTOS; }
     else if (p.startsWith('/rest/v1/v_remarcacao_pendente')) { if (semSql) nao(); else corpo = REMARCAR; }
     else if (p.endsWith('/rpc/pessoa_sugestoes')) { if (semSql) nao(); else corpo = SUGESTOES; }
+    else if (p.endsWith('/rpc/pessoa_avisos_data')) { if (semSql) nao(); else corpo = [{ nome: 'Rita Alves', nasc_a: '1997-05-11', nasc_b: '1996-05-11', parecida: true, ids_a: ['r1'], ids_b: ['r2'] }]; }
+    else if (p.endsWith('/rpc/paciente_avisos')) { if (semSql) nao(); else corpo = [{ id: 5, conversa_id: 'r1', tipo: 'klingo_ligado', detalhe: { prontuario: 'P9' }, nome: 'Rita Alves' }, { id: 6, conversa_id: 'r1', tipo: 'dado_diferente', detalhe: { paciente_id: 'x', campos: { email: { cadastro: 'a@a.com', novo: 'b@b.com' } } }, nome: 'Rita Alves' }]; }
+    else if (p.endsWith('/rpc/pessoa_corrigir_data') || p.endsWith('/rpc/pessoa_manter_separado') || p.endsWith('/rpc/paciente_aviso_resolver')) { reg.rpcs.push({ rpc: p.split('/').pop(), ...JSON.parse(req.postData() || '{}') }); corpo = { ok: true }; }
+    else if (p.endsWith('/rpc/paciente_linha_do_tempo')) { if (semSql) nao(); else corpo = [{ conversa_id: 'm1', exames: 'Ressonância de joelho', status: 'faltou', quando: '2026-11-01T10:00:00', passo: 'Faltou' }, { conversa_id: 'm2', exames: 'Ultrassom de abdome', status: 'pronto', quando: null, passo: 'Pronto' }]; }
+    else if (p.endsWith('/rpc/paciente_klingo')) { if (semSql) nao(); else corpo = { pacientes: [{ prontuario: 'P77', nome: 'MARIA SOUZA' }], exames: [{ exame: 'TOMOGRAFIA DE CRÂNIO', status: 'atendido', quando: '2026-10-31T09:00:00', unidade: 'Brotas' }, { exame: 'RM DE JOELHO', status: 'confirmado', quando: '2026-11-04T08:00:00', unidade: 'Brotas' }] }; }
     else if (p.endsWith('/rpc/jornada_pessoas')) { if (semSql) nao(); else corpo = PESSOAS_J; }
     else if (p.startsWith('/rest/v1/jornada_coluna')) corpo = COLUNAS;
     else if (p.startsWith('/rest/v1/jornada_transicao')) corpo = [];
@@ -156,7 +161,7 @@ await caso('abrir mostra as mensagens das DUAS conversas, em ordem, com o aviso 
   await page.waitForSelector('.msg.cliente');
   const textos = await page.locator('#msgs .msg.cliente > span:not(.quem):not(.hora)').allInnerTexts();
   const sep = await page.locator('.msg-outra').count();
-  const faixa = await page.locator('.pessoa summary').innerText();
+  const faixa = await page.locator('#pessoa summary').innerText();
   const pedido = reg.pedidos.find((p) => p.includes('/mensagens') && p.startsWith('GET')) ?? '';
   await ctx.close();
   return { ok: textos.join('|') === 'mensagem antiga da Maria|mensagem nova da Maria' && sep === 1 && /2 conversas da mesma pessoa, unidas/.test(faixa) && /in\./.test(decodeURIComponent(pedido)), detalhe: `${textos}|sep=${sep}|${faixa}` };
@@ -232,20 +237,45 @@ await caso('falta: aparece "Faltou" com o pedido de remarcação pelo chat, "Já
 
 await caso('sugestão (2 de 3): mostra "Parece a mesma pessoa"; "É a mesma pessoa" chama pessoa_confirmar; "Não é" chama pessoa_recusar', async () => {
   const { page, ctx, reg } = await abrir();
-  const sug = await page.locator('.sug').innerText();
+  const barra = await page.locator('#barraAvisos').innerText();           // na lista só fica uma barra curta
   const antes = (await itens(page)).filter((n) => n === 'Carlos Lima').length;
-  await page.click('.sug >> text=É a mesma pessoa'); await page.waitForTimeout(400);
-  await page.click('.sug >> text=Não é'); await page.waitForTimeout(400);
+  await page.click('#barraAvisos >> text=Ver avisos'); await page.waitForSelector('#paginaAvisos .sug');   // os avisos ficam na aba Avisos
+  const sug = barra + ' ' + await page.locator('#paginaAvisos .sug').first().innerText();
+  await page.click('#paginaAvisos .sug >> text=É a mesma pessoa'); await page.waitForTimeout(400);
+  await page.click('#paginaAvisos .sug >> text=Não é'); await page.waitForTimeout(400);
   await ctx.close();
   const a = reg.rpcs.find((x) => x.rpc === 'pessoa_confirmar'), b = reg.rpcs.find((x) => x.rpc === 'pessoa_recusar');
-  return { ok: /Parece a mesma pessoa/.test(sug) && /nome e telefone/.test(sug) && antes === 2 && a.p_a === 'k1' && a.p_b === 'k2' && b.p_a === 'k1', detalhe: `${sug.replace(/\n/g, ' ')} | ${JSON.stringify(reg.rpcs)}` };
+  return { ok: /\d+ avisos? pendentes?/.test(sug) && /Parece a mesma pessoa/.test(sug) && /nome e telefone/.test(sug) && antes === 2 && a.p_a === 'k1' && a.p_b === 'k2' && b.p_a === 'k1', detalhe: `${sug.replace(/\n/g, ' ')} | ${JSON.stringify(reg.rpcs)}` };
+});
+
+await caso('histórico do paciente: pedidos do chat e exames do Klingo com o passo e o que fazer a seguir (paciente-status.js)', async () => {
+  const { page, ctx } = await abrir();
+  await filtro(page, 'Abertas'); await page.click('.item >> text=Maria Souza'); await page.waitForSelector('#historicoPaciente details');
+  const txt = (await page.locator('#historicoPaciente').innerText()).replace(/\n/g, ' ');
+  await ctx.close();
+  return { ok: /Histórico do paciente: 2 pedido\(s\) no chat · 2 no Klingo/.test(txt) && /Faltou: Ressonância de joelho/.test(txt) && /Oferecer um novo horário ou registrar que o paciente recusou/.test(txt)
+    && /Pedido pronto: Ultrassom de abdome/.test(txt) && /prontuário P77/.test(txt) && /Exame feito: tomografia de crânio/.test(txt) && /Entregar o resultado ao paciente/.test(txt) && /Confirmado: rm de joelho/.test(txt), detalhe: txt.slice(0, 500) };
+});
+
+await caso('aba Avisos: data diferente (corrigir e unir / manter separado) e avisos do paciente (Klingo, dado diferente com CPF conferido)', async () => {
+  const { page, ctx, reg } = await abrir();
+  const selo = await page.locator('#seloAvisos').innerText();
+  await page.click('nav.nav button[data-aba="avisos"]'); await page.waitForSelector('#paginaAvisos .sug >> text=Data de nascimento diferente');
+  const txt = await page.locator('#paginaAvisos').innerText();
+  await page.click('#avisosData button:has-text("11/05/1997")'); await page.waitForTimeout(300);
+  await page.click('#avisosData >> text=Manter separado'); await page.waitForTimeout(300);
+  await page.click('#avisosPaciente >> text=Atualizar cadastro'); await page.waitForTimeout(300);
+  await ctx.close();
+  const c = reg.rpcs.find((x) => x.rpc === 'pessoa_corrigir_data'), m = reg.rpcs.find((x) => x.rpc === 'pessoa_manter_separado'), r = reg.rpcs.find((x) => x.rpc === 'paciente_aviso_resolver');
+  return { ok: Number(selo) >= 3 && /11\/05\/1997/.test(txt) && /11\/05\/1996/.test(txt) && /Parece erro de digitação/.test(txt) && /ligado ao cadastro do Klingo/.test(txt) && /e-mail: a@a.com → b@b.com/.test(txt)
+    && c && c.p_data === '1997-05-11' && JSON.stringify(c.p_ids) === JSON.stringify(['r2']) && m && r && r.p_id === 5 + 1 && r.p_aplicar === true, detalhe: `selo=${selo} ${txt.replace(/\n/g, ' ').slice(0, 300)} | ${JSON.stringify(reg.rpcs)}` };
 });
 
 await caso('"Não é a mesma pessoa" na faixa das conversas unidas chama pessoa_separar', async () => {
   const { page, ctx, reg } = await abrir();
   await filtro(page, 'Abertas');
   await page.click('.itens .item:has-text("Maria Souza")'); await page.waitForSelector('.pessoa');
-  await page.click('.pessoa summary');
+  await page.click('#pessoa summary');
   await page.locator('.pessoa li').first().locator('button').click(); await page.waitForTimeout(400);
   await ctx.close();
   const r = reg.rpcs.find((x) => x.rpc === 'pessoa_separar');
