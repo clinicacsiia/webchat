@@ -1,7 +1,7 @@
 // Service worker do chat do cliente: abre na hora com a cópia guardada e busca a versão nova por trás (vale na próxima abertura).
 // O link pode vir do WhatsApp, do e-mail ou da bio com ?origem=...: a cópia é a mesma para todos.
-const VERSAO = 'webchat-cliente-v10';
-const BASE = ['./', 'index.html', 'sentinela.js', 'nomes-exame.js', 'icon-192.png', 'img/logo-csi.svg', 'img/logo-csi-simbolo.svg', 'manifest.webmanifest'];
+const VERSAO = 'webchat-cliente-v11';
+const BASE = ['./', 'index.html', 'privacidade.html', 'termos.html', 'sentinela.js', 'nomes-exame.js', 'icon-192.png', 'img/logo-csi.svg', 'img/logo-csi-simbolo.svg', 'manifest.webmanifest'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(VERSAO).then((c) => c.addAll(BASE)));
