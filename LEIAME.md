@@ -12,6 +12,8 @@ n8n/novo-atendimento.json   workflow para importar no n8n
 
 Fase 9 (31/10/2026): correções do teste da paciente, Sentinela e mensagens empáticas. Veja `docs/fase9-sentinela.md`. SQL aplicado no Supabase em 31/10/2026.
 
+Convênios e foto do pedido (02/11/2026): aba **Convênios** do painel (ligar/desligar convênio, mensagem e regra por convênio, avisos de preço, previsão), chat com a foto primeiro e depois tipo/parte/lado, fotos separadas para o atendente com pendência do Klingo. Veja `docs/convenios-e-foto.md`; SQL `supabase/convenios-e-foto.sql` aplicado no Supabase em 02/11/2026.
+
 Convênio de quem volta (31/10/2026): o chat deixa de copiar o convênio da vez anterior e pergunta ("É assim também agora?"); corrigir o plano tira a carteirinha antiga. Veja `docs/lembrete-mudar-escolhas-e-convenio.md`, seção 0. SQL `supabase/correcao-convenio-quem-volta.sql` aplicado no Supabase em 31/10/2026.
 Outro assunto resolvido pelo chat (31/10/2026): cancelar e remarcar listam os exames marcados e seguem sozinhos; resultado de exame mostra a orientação cadastrada. Veja `docs/assuntos-resolvidos.md`. SQL `supabase/assuntos-resolvidos.sql` aplicado no Supabase em 31/10/2026.
 

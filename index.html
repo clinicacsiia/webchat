@@ -1200,10 +1200,11 @@
     else if (o.tipo === 'texto') w.append(h('p', { class: 'w-nota' }, 'Escreva no campo aqui embaixo e toque na setinha para enviar.'));
     else if (o.tipo === 'nova') w.append(h('button', { class: 'btn-w', type: 'button', onclick: () => novaConversa(true) }, 'Fazer um novo pedido'));
     else if (o.tipo === 'busca_exame') {
+      // A foto vem primeiro (a pergunta é "você tem o pedido médico?"); sem pedido, o paciente monta o pedido por tipo, parte do corpo e lado.
       w.append(h('div', { class: 'acoes-w' },
-        h('button', { class: 'btn-w', type: 'button', onclick: () => abrirBusca(o) }, 'Procurar o exame pelo nome'),
-        h('button', { class: 'btn-w sec', type: 'button', onclick: () => abrirBusca(o, true) }, 'Tirar foto do pedido médico'),
-        h('button', { class: 'btn-w sec', type: 'button', onclick: abrirPedido }, 'Escolher pelo desenho do corpo')));
+        h('button', { class: 'btn-w', type: 'button', onclick: () => abrirFotoPedido(o) }, '📷 Tenho o pedido médico: enviar a foto'),
+        h('button', { class: 'btn-w sec', type: 'button', onclick: () => abrirPedido() }, 'Escolher o exame (tipo, parte do corpo e lado)'),
+        h('button', { class: 'link-add', type: 'button', onclick: () => abrirBusca(o) }, 'Sei o nome do exame: procurar pelo nome')));
     } else if (o.tipo === 'pedido_exames') {
       w.append(h('button', { class: 'btn-w', type: 'button', onclick: abrirPedido }, o.rotulo || 'Escolher exames no mapa do corpo'),
         h('p', { class: 'w-nota' }, 'Você pode marcar várias partes do corpo e vários exames.'));
@@ -1459,6 +1460,52 @@
     buscarExame(busca.value);
     if (comFoto) camera.click();
   }
+  // Folha só da foto do pedido: pede a foto antes, só lê o exame e tenta achá-lo na lista da clínica. Os exames achados seguem
+  // para a folha "Montar pedido de exames", onde o paciente confere, acrescenta outros (tipo, parte do corpo e lado) e envia tudo junto.
+  function abrirFotoPedido(o, carrinhoBase, fotosBase) {
+    if (!conv) return;
+    const f = abrirFolha('Foto do pedido médico');
+    B = { modo: 'foto', itens: new Map(), res: [], titulo: '', t: null, lista: null, status: null, rodape: f.rodape, leituras: [], termo: '', recusados: new Set(), fotos: fotosBase || 0, carrinhoBase: carrinhoBase || [] };
+    const camera = h('input', { type: 'file', accept: 'image/*', capture: 'environment', hidden: true });
+    const galeria = h('input', { type: 'file', accept: 'image/*', hidden: true });
+    B.camera = camera; B.galeria = galeria;
+    B.status = h('div', { class: 'foto-status', hidden: true, 'aria-live': 'polite' });
+    B.lista = h('div', { 'aria-live': 'polite' });
+    B.botoesFoto = h('div', { class: 'acoes-w' },
+      h('p', { class: 'p-dica' }, 'Eu leio só o exame do pedido e tento achá-lo na lista da clínica. A foto também vai para o atendente conferir.'),
+      h('button', { class: 'btn-w', type: 'button', onclick: () => camera.click() }, '📷 Tirar foto do pedido agora'),
+      h('button', { class: 'btn-w sec', type: 'button', onclick: () => galeria.click() }, '🖼️ Escolher a foto na galeria'),
+      h('p', { class: 'w-nota' }, 'Dica: ponha a folha numa mesa com boa luz e pegue a folha inteira. Se o pedido tiver mais de uma folha, você envia as outras em seguida.'));
+    f.corpo.replaceChildren(B.botoesFoto, B.status, B.lista, camera, galeria,
+      h('div', { class: 'acoes-w', style: 'margin-top:12px' },
+        h('button', { class: 'btn-w sec', type: 'button', onclick: () => { const base = B ? B.carrinhoBase : []; const n = B ? B.fotos : 0; fecharFolha(); abrirPedido(base, n); } }, 'Não tenho o pedido: escolher o exame')));
+    for (const inp of [camera, galeria]) inp.addEventListener('change', () => { if (inp.files && inp.files[0]) lerFoto(inp.files[0]); inp.value = ''; });
+    desenharResultados();
+    if (o && o.comFoto) camera.click();
+  }
+  // Leva o que foi achado na foto para o pedido da folha "Montar pedido de exames".
+  function fotoParaPedido() {
+    const e = B; if (!e) return;
+    const lista = [...e.itens.values()];
+    // O que o paciente escolheu em cada foto fica junto dela (serve para medir e melhorar a leitura). Não trava nada.
+    for (const l of e.leituras) {
+      const escolha = lista.filter((x) => x.grupo && x.grupo.startsWith(l.anexo + ':')).map((x) => {
+        const g = l.grupos.find((y) => y.chave === x.grupo);
+        return { linha: g ? g.linha : null, procedimento_id: x.texto ? null : x.id, lado: x.lado || null, texto: x.texto || null, auto: x.auto, certeza: g ? g.certeza : null };
+      });
+      db.rpc('chat_pedido_escolha', { p_conversa: conv.id, p_token: conv.token, p_anexo: l.anexo, p_escolha: escolha }).then(() => {}, () => {});
+    }
+    const novos = lista.map((x) => (x.texto
+      ? { texto: x.texto, modalidade: null, regiao: null, regiao_nome: null, lado: null, procedimento_id: null, procedimento: null }
+      : { modalidade: x.modalidade || null, regiao: x.regiao || null, regiao_nome: x.regiao_nome || null, lado: x.tem_lado ? (x.bilateral ? 'A' : x.lado) : 'N', procedimento_id: x.id, procedimento: x.nome }));
+    const base = e.carrinhoBase.slice();
+    for (const n of novos) {
+      const i = base.findIndex((b) => (n.texto ? b.texto === n.texto : b.procedimento_id === n.procedimento_id && b.lado === n.lado));
+      if (i < 0) base.push(n);
+    }
+    const fotos = e.fotos;
+    fecharFolha(); abrirPedido(base, fotos);
+  }
   async function buscarExame(termo, ocr) {
     const e = B; if (!e || !conv) return;
     try {
@@ -1549,7 +1596,7 @@
         h('button', { type: 'button', 'aria-label': 'Tirar do pedido', onclick: () => { e.itens.delete(k); if (!x.texto) e.recusados.add(x.id); desenharResultados(); } }, '×'))))));
     }
     // Com o pedido lido, a lista de "mais pedidos" só aparece quando o paciente digita.
-    if (!e.leituras.length || e.termo) {
+    if (e.modo !== 'foto' && (!e.leituras.length || e.termo)) {
       filhos.push(h('p', { class: 'p-dica' }, e.leituras.length ? 'Procurar outro exame:' : e.titulo));
       if (!e.res.length) filhos.push(h('p', { class: 'p-dica' }, 'Nenhum exame encontrado com esse nome. Tente outra palavra ou toque em "Não encontrei meu exame".'));
       for (const x of e.res) {
@@ -1560,6 +1607,16 @@
     e.lista.replaceChildren(...filhos);
     const n = e.itens.size, falta = [...e.itens.values()].some((x) => precisaLado(x) && !x.lado);
     const semResposta = grupos.some((g) => g.certeza === 'duvida' && ![...e.itens.values()].some((v) => v.grupo === g.chave));
+    if (e.modo === 'foto') {
+      const semLeitura = !n && e.fotos > 0 && !semResposta;
+      e.rodape.replaceChildren(
+        e.fotos ? h('p', { class: 'w-nota' }, `📎 ${e.fotos} ${e.fotos === 1 ? 'foto enviada' : 'fotos enviadas'} ao atendente.`) : null,
+        semLeitura
+          ? h('button', { class: 'btn-w', type: 'button', onclick: () => { e.itens.set('foto', { texto: 'Exame do pedido médico enviado em foto', nome: 'Exame do pedido médico' }); fotoParaPedido(); } }, 'Seguir só com a foto: o atendente confere')
+          : h('button', { class: 'btn-w', type: 'button', disabled: !n || falta || semResposta, onclick: fotoParaPedido },
+            semResposta ? 'Responda qual é o exame acima' : !e.fotos && !n ? 'Envie a foto do pedido' : !n ? 'Marque o exame' : falta ? 'Escolha o lado do exame' : `Continuar (${n} ${n === 1 ? 'exame' : 'exames'})`));
+      return;
+    }
     e.rodape.replaceChildren(h('button', { class: 'btn-w', type: 'button', disabled: !n || falta || semResposta, onclick: enviarBusca },
       semResposta ? 'Responda qual é o exame acima' : !n ? 'Marque o exame' : falta ? 'Escolha o lado do exame' : `Enviar pedido (${n} ${n === 1 ? 'exame' : 'exames'})`));
   }
@@ -1654,6 +1711,7 @@
       const { data, error } = await db.rpc('chat_anexo_enviar', { p_conversa: conv.id, p_token: conv.token, p_mime: 'image/jpeg', p_base64: dataUrl, p_ocr: null });
       if (error) throw error;
       anexo = data && data.id;
+      if (anexo) { e.fotos = (e.fotos || 0) + 1; desenharResultados(); }
     } catch (err) { toast(mensagemErro(err)); }
     let iaPronta = false, celularPronto = false;
     const fim = () => {
@@ -1811,11 +1869,11 @@
   const ladoDaForma = (ladoVisual, vista) => (ladoVisual == null ? 'N' : (vista === 'frente' ? (ladoVisual === 'L' ? 'D' : 'E') : (ladoVisual === 'L' ? 'E' : 'D')));
   const regiaoPorCodigo = (cod) => (P.cfg.regioes.find((r) => r.codigo === cod) || { codigo: cod, nome: cod, tem_lado: false });
 
-  async function abrirPedido() {
+  async function abrirPedido(inicial, fotos) {
     if (!conv) return;
     const f = abrirFolha('Montar pedido de exames');
     f.corpo.replaceChildren(h('p', { class: 'carregando' }, 'Carregando…'));
-    P = { cfg: null, mod: null, partes: new Map(), vista: 'frente', modo: 'desenho', carrinho: [], passo: 'tipo', exames: new Map(), escolhas: new Map(), lista: [], simples: null, simplesLado: 'A' };
+    P = { cfg: null, mod: null, partes: new Map(), vista: 'frente', modo: 'desenho', carrinho: Array.isArray(inicial) ? inicial : [], fotos: fotos || 0, passo: 'tipo', exames: new Map(), escolhas: new Map(), lista: [], simples: null, simplesLado: 'A' };
     try {
       const { data, error } = await db.rpc('chat_corpo', { p_conversa: conv.id, p_token: conv.token });
       if (error) throw error;
@@ -1829,20 +1887,23 @@
     const corpo = $('#folhaCorpo'), rodape = $('#folhaRodape');
     const rolagem = corpo.scrollTop;
     corpo.replaceChildren(); rodape.replaceChildren();
-    if (P.carrinho.length) corpo.append(blocoCarrinho());
+    if (P.carrinho.length || P.fotos) corpo.append(blocoCarrinho());
     if (P.passo === 'exames') passoExames(corpo); else if (P.passo === 'mapa' && modAtual()) passoMapa(corpo); else passoTipo(corpo);
     rodape.append(h('button', { class: 'btn-w', type: 'button', disabled: !P.carrinho.length, onclick: enviarPedido }, `Enviar pedido (${P.carrinho.length} ${P.carrinho.length === 1 ? 'exame' : 'exames'})`),
       h('p', { class: 'w-nota' }, 'Vira uma previsão: um atendente confirma depois.'));
     corpo.scrollTop = rolagem;
   }
   function rotuloItem(i) {
+    if (i.texto) return `${i.texto} (o atendente confere)`;
     const lado = LADO_TXT[i.lado] ? ` (${LADO_TXT[i.lado]})` : '';
+    if (!i.modalidade) return i.procedimento ? exameTexto(i.procedimento, true) : 'o atendente escolhe o exame';
     return `${MOD_NOME[i.modalidade] || i.modalidade}${i.regiao_nome ? ' — ' + i.regiao_nome : ''}${lado}: ${i.procedimento ? exameTexto(i.procedimento, true) : 'o atendente escolhe o exame'}${i.lado === 'A' && i.procedimento && !/bilateral/i.test(i.procedimento) ? ' (2 exames, um de cada lado)' : ''}`;
   }
   function blocoCarrinho() {
     return h('div', { class: 'carrinho' }, h('h3', {}, 'Seu pedido até agora'),
       h('ul', {}, P.carrinho.map((i, k) => h('li', {}, h('span', {}, rotuloItem(i)),
-        h('button', { type: 'button', 'aria-label': 'Remover ' + rotuloItem(i), onclick: () => { P.carrinho.splice(k, 1); desenharPedido(); } }, '×')))));
+        h('button', { type: 'button', 'aria-label': 'Remover ' + rotuloItem(i), onclick: () => { P.carrinho.splice(k, 1); desenharPedido(); } }, '×')))),
+      P.fotos ? h('p', { class: 'w-nota' }, `📎 ${P.fotos} ${P.fotos === 1 ? 'foto do pedido vai' : 'fotos do pedido vão'} junto, para o atendente conferir.`) : null);
   }
   function passosTopo(atual, total) {
     const rot = total === 3 ? ['Tipo', 'Parte', 'Exame'] : ['Tipo', 'Exame'];
@@ -1856,7 +1917,10 @@
       h('div', { class: 'op-grade', role: 'group', 'aria-label': 'Tipo de exame' }, P.cfg.modalidades.filter((m) => m.total > 0).map((m) =>
         h('button', { class: 'op', type: 'button', 'aria-pressed': String(m.codigo === P.mod),
           onclick: () => { P.mod = m.codigo; P.partes.clear(); P.simples = null; P.passo = 'mapa'; desenharPedido(); } },
-          h('strong', {}, MOD_NOME[m.codigo] || m.nome), h('span', {}, `${m.total} ${m.total === 1 ? 'exame' : 'exames'}`)))));
+          h('strong', {}, MOD_NOME[m.codigo] || m.nome), h('span', {}, `${m.total} ${m.total === 1 ? 'exame' : 'exames'}`)))),
+      h('div', { class: 'acoes-w', style: 'margin-top:10px' },
+        h('button', { class: 'btn-w sec', type: 'button', onclick: () => { const base = P.carrinho.slice(), n = P.fotos; fecharFolha(); abrirFotoPedido(null, base, n); } },
+          P.fotos ? '📷 Enviar mais uma foto do pedido' : '📷 Tenho o pedido médico: enviar a foto')));
   }
   // Passo 2: a parte do corpo, pelo desenho ou por uma lista organizada.
   function passoMapa(corpo) {
@@ -2047,12 +2111,14 @@
   }
   async function enviarPedido() {
     if (!P || !P.carrinho.length) return;
-    const itens = P.carrinho.map((i) => ({ modalidade: i.modalidade, regiao: i.regiao, lado: i.lado, procedimento_id: i.procedimento_id }));
+    const itens = P.carrinho.map((i) => (i.texto ? { texto: i.texto } : { modalidade: i.modalidade, regiao: i.regiao, lado: i.lado, procedimento_id: i.procedimento_id }));
     $('#folhaRodape button').disabled = true;
+    const t0 = performance.now();
     try {
-      const { error } = await db.rpc('chat_pedido_salvar', { p_conversa: conv.id, p_token: conv.token, p_itens: itens });
+      // Envia de uma vez o que veio da foto, o que foi montado por tipo/parte/lado e o que foi escrito à mão.
+      const { data, error } = await db.rpc('chat_pedido_enviar', { p_conversa: conv.id, p_token: conv.token, p_itens: itens });
       if (error) throw error;
-      fecharFolha(); toast('Pedido enviado.'); carregar();
+      fecharFolha(); mostrarRespostas(data && data.respostas, t0); carregar();
     } catch (e) { toast(mensagemErro(e)); desenharPedido(); }
   }
 
