@@ -293,6 +293,22 @@
   .cat-bloco ul { margin: 8px 0 0; padding-left: 18px; }
   .cat-bloco li { margin: 2px 0; overflow-wrap: anywhere; }
   .cat-bloco .sub-lista { color: var(--suave); }
+  .anexo-aviso { border-color: var(--csi-primary); background: var(--csi-primary-soft); } .galeria-item { margin-top: 8px; } .galeria { display: grid; gap: 6px; }
+  /* aba Convênios */
+  .cv-busca { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 0 0 12px; } .cv-busca input[type=search] { flex: 1 1 220px; min-width: 0; }
+  .cv-cartao { background: var(--papel); border: 1px solid var(--linha); border-radius: var(--radius-md); box-shadow: var(--shadow-sm); padding: 12px 14px; margin: 0 0 10px; }
+  .cv-cartao.off { background: var(--csi-background); border-style: dashed; }
+  .cv-topo { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; } .cv-topo h3 { margin: 0; font-size: 16px; flex: 1 1 160px; overflow-wrap: anywhere; }
+  .cv-tag { font-size: 12px; font-weight: 700; border-radius: 999px; padding: 1px 8px; background: var(--csi-success-soft); color: var(--csi-success-strong); }
+  .cv-tag.off { background: var(--csi-danger-bg); color: var(--erro); } .cv-tag.av { background: var(--csi-warning-soft); color: var(--aviso); }
+  .cv-nums { display: flex; flex-wrap: wrap; gap: 4px 18px; margin: 8px 0 4px; font-size: 13.5px; } .cv-nums span { color: var(--suave); } .cv-nums b { color: var(--texto); }
+  .cv-dica { margin: 6px 0; font-size: 13.5px; padding: 6px 10px; border-radius: var(--radius-md); background: var(--csi-primary-soft); }
+  .cv-dica.aviso { background: var(--csi-warning-soft); color: var(--aviso); } .cv-dica.erro { background: var(--csi-danger-bg); color: var(--erro); }
+  .cv-regras { margin: 8px 0 0; } .cv-regras summary { cursor: pointer; font-weight: 600; font-size: 14px; }
+  .cv-regras label { display: block; margin: 8px 0 0; font-size: 13px; color: var(--suave); } .cv-regras textarea, .cv-regras input[type=text] { width: 100%; box-sizing: border-box; margin-top: 3px; font: inherit; }
+  .cv-regras .linha-chk { display: flex; align-items: center; gap: 8px; color: var(--texto); font-size: 14px; }
+  .cv-acoes { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  .cv-ev { margin: 0 0 14px; } .cv-ev li { margin: 3px 0; } .cv-ev .rel { font-weight: 700; color: var(--erro); }
   table { width: 100%; border-collapse: collapse; font-size: 14px; }
   th, td { text-align: left; padding: 12px; border-bottom: 1px solid var(--linha); vertical-align: top; }
   th { font-size: 13px; color: var(--suave); font-weight: 650; background: var(--csi-background); white-space: nowrap; }
@@ -758,12 +774,12 @@
   /* ---------- estrutura ---------- */
   function montarApp() {
     const abas = [];
-    const ICONE_ABA = { atendimento: 'fone', jornada: 'pin', fila: 'pessoas', avisos: 'sino', contatos: 'lista', equipe: 'pessoa', catalogo: 'barras', aprendizado: 'livro', config: 'engrenagem' };
+    const ICONE_ABA = { atendimento: 'fone', jornada: 'pin', fila: 'pessoas', avisos: 'sino', contatos: 'lista', equipe: 'pessoa', catalogo: 'barras', convenios: 'lista', aprendizado: 'livro', config: 'engrenagem' };
     if (podeAtender()) { abas.push(['atendimento', 'Atendimento']); abas.push(['jornada', 'Jornada']); abas.push(['fila', 'Fila']); abas.push(['avisos', 'Avisos']); }
     abas.push(['contatos', 'Contatos']);
-    if (ehAdmin()) { abas.push(['equipe', 'Equipe']); abas.push(['catalogo', 'Catálogo']); abas.push(['aprendizado', 'Aprendizado']); abas.push(['config', 'Configurações']); }
+    if (ehAdmin()) { abas.push(['equipe', 'Equipe']); abas.push(['convenios', 'Convênios']); abas.push(['catalogo', 'Catálogo']); abas.push(['aprendizado', 'Aprendizado']); abas.push(['config', 'Configurações']); }
     const nav = h('nav', { class: 'nav', 'aria-label': 'Seções' }, abas.map(([id, rot]) =>
-      h('button', { type: 'button', 'data-aba': id, onclick: () => { S.aba = id; renderAba(); } }, icone(ICONE_ABA[id] || 'lista'), h('span', { class: 'nav-rot' }, rot), id === 'atendimento' ? h('span', { class: 'selo', id: 'seloAguardando', hidden: true }, '0') : null, id === 'fila' ? h('span', { class: 'selo', id: 'seloFila', hidden: true }, '0') : null, id === 'avisos' ? h('span', { class: 'selo', id: 'seloAvisos', hidden: true }, '0') : null, id === 'jornada' ? h('span', { class: 'selo erro', id: 'seloJornada', title: 'Pacientes que precisam de atenção agora', hidden: true }, '0') : null)));
+      h('button', { type: 'button', 'data-aba': id, onclick: () => { S.aba = id; renderAba(); } }, icone(ICONE_ABA[id] || 'lista'), h('span', { class: 'nav-rot' }, rot), id === 'atendimento' ? h('span', { class: 'selo', id: 'seloAguardando', hidden: true }, '0') : null, id === 'fila' ? h('span', { class: 'selo', id: 'seloFila', hidden: true }, '0') : null, id === 'avisos' ? h('span', { class: 'selo', id: 'seloAvisos', hidden: true }, '0') : null, id === 'convenios' ? h('span', { class: 'selo erro', id: 'seloConvenios', title: 'Mudanças de preço ou de convênio que você ainda não viu', hidden: true }, '0') : null, id === 'jornada' ? h('span', { class: 'selo erro', id: 'seloJornada', title: 'Pacientes que precisam de atenção agora', hidden: true }, '0') : null)));
     const lateral = h('aside', { class: 'lateral' },
       h('div', { class: 'marca' }, h('i', { id: 'pontoVivo' }), h('img', { class: 'marca-logo', src: '../img/logo-csi-branco.svg', alt: 'CSI - Clínica de Saúde e Imagem' }), h('small', {}, 'Atendimento')),
       nav, h('div', { class: 'espaco' }),
@@ -800,10 +816,12 @@
     else if (S.aba === 'jornada') viewJornada(c);
     else if (S.aba === 'contatos') viewContatos(c);
     else if (S.aba === 'equipe') viewEquipe(c);
+    else if (S.aba === 'convenios') viewConvenios(c);
     else if (S.aba === 'catalogo') viewCatalogo(c);
     else if (S.aba === 'aprendizado') viewAprendizado(c);
     else if (S.aba === 'config') viewConfig(c);
     atualizarSelo();
+    if (ehAdmin()) atualizarSeloConvenios();
   }
 
   /* ---------- aba Fila: quem chegou e quem é o próximo ---------- */
@@ -1251,7 +1269,7 @@
     if (!marcarPresenca.ligado) { marcarPresenca.ligado = true; document.addEventListener('visibilitychange', () => { if (S.me && !document.hidden) db.rpc('painel_presenca').then(() => {}); }); }
   }
   function desligarTempoReal() { if (S.canal) { db.removeChannel(S.canal); S.canal = null; } }
-  function agendarRecarga() { clearTimeout(tRecarga); tRecarga = setTimeout(async () => { await carregarConversas(); if (S.aba === 'atendimento') { renderLista(); renderTopoChat(); renderPessoaChat(); renderAlertaPreco(); carregarPre(); if (S.modo === 'quadro') carregarQuadro(); } atualizarSelo(); }, 250); }
+  function agendarRecarga() { clearTimeout(tRecarga); tRecarga = setTimeout(async () => { await carregarConversas(); if (S.aba === 'atendimento') { renderLista(); renderTopoChat(); renderPessoaChat(); renderAlertaPreco(); renderAnexosBox(); carregarPre(); if (S.modo === 'quadro') carregarQuadro(); } atualizarSelo(); }, 250); }
   function aoNovaMensagem(m) {
     if (m.autor === 'cliente') {
       const c = S.conversas.find((x) => x.id === m.conversa_id);
@@ -1321,7 +1339,22 @@
     S.conversas = data || [];
     await carregarPessoas();
     await carregarAlertasPreco();
+    // As fotos chegam logo depois, sem segurar a lista de conversas.
+    if (podeAtender()) carregarAnexos().then(() => { if (S.aba === 'atendimento') { renderLista(); renderAnexosBox(); renderProximo(); } });
   }
+  // Fotos de pedido médico por conversa (quantas e quantas faltam conferir no Klingo). Se o SQL ainda não existir, a tela segue sem o aviso.
+  async function carregarAnexos() {
+    try {
+      const { data, error } = await db.rpc('painel_anexos_resumo');
+      S.anexos = error ? new Map() : new Map((data || []).map((a) => [a.conversa_id, a]));
+    } catch { S.anexos = new Map(); }
+  }
+  const anexosDe = (id) => {
+    const ids = typeof membrosDe === 'function' ? membrosDe(id) : [id];
+    const r = { total: 0, sem_conferir: 0, ids: [] };
+    for (const i of ids) { const a = (S.anexos || new Map()).get(i); if (a) { r.total += a.total; r.sem_conferir += a.sem_conferir; r.ids.push(...a.ids); } }
+    return r;
+  };
   // Alertas de valor (só administrador e atendente leem: a regra de acesso do banco esconde dos demais e do paciente).
   async function carregarAlertasPreco() {
     try {
@@ -1636,6 +1669,7 @@
           p.membros.some((m) => m.triagem_urgencia === 'alta') ? h('span', { class: 'urg alta' }, 'Urgente') : null,
           c.alerta_agenda ? h('span', { class: 'urg media', title: 'Conferência automática da agenda' }, c.alerta_agenda) : null,
           comAlerta ? h('span', { class: 'urg alta', title: 'Valor informado fora da referência (só a equipe vê)' }, 'Conferir valor') : null,
+          anexosDe(c.id).total ? h('span', { class: 'urg ' + (anexosDe(c.id).sem_conferir ? 'media' : ''), title: 'Foto do pedido médico anexada' + (anexosDe(c.id).sem_conferir ? ': falta conferir no Klingo' : ' (conferida)') }, `Anexo: ${anexosDe(c.id).total} foto${anexosDe(c.id).total > 1 ? 's' : ''}`) : null,
           c.ia_ativa && st === 'aguardando' ? h('span', { style: 'color:var(--suave)' }, c.motor === 'fluxo' ? 'Assistente automático' : 'IA atendendo') : null,
           ag ? h('span', { style: 'color:var(--suave)' }, ag.nome) : null));
     }));
@@ -1782,9 +1816,9 @@
     area.addEventListener('input', () => { area.style.height = 'auto'; area.style.height = Math.min(area.scrollHeight, 140) + 'px'; });
     area.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); enviarMsg(); } });
     box.replaceChildren(h('div', { class: 'chat-topo', id: 'chatTopo' }), h('div', { id: 'proximo', 'aria-live': 'polite' }),
-      h('div', { id: 'contexto' }, h('div', { id: 'pessoa' }), h('div', { id: 'historicoPaciente' }), h('div', { id: 'exameAberto' }), h('div', { id: 'triagem' }), h('div', { id: 'alertaPreco' }), h('div', { id: 'cartaoJ' }), h('div', { id: 'pre' })),
+      h('div', { id: 'contexto' }, h('div', { id: 'pessoa' }), h('div', { id: 'historicoPaciente' }), h('div', { id: 'exameAberto' }), h('div', { id: 'triagem' }), h('div', { id: 'alertaPreco' }), h('div', { id: 'anexosBox' }), h('div', { id: 'cartaoJ' }), h('div', { id: 'pre' })),
       h('div', { class: 'msgs', id: 'msgs', 'aria-live': 'polite' }), h('div', { class: 'compor' }, area, enviar));
-    renderTopoChat(); renderPessoaChat(); renderAlertaPreco(); renderCartaoJ(); desenharMsgs(true);
+    renderTopoChat(); renderPessoaChat(); renderAlertaPreco(); renderAnexosBox(); renderCartaoJ(); desenharMsgs(true);
   }
   // "Próximo passo": escolhe, pela ordem do que é mais urgente, a única decisão que falta e leva o atendente até ela.
   // Só lê o que a tela já carregou; não grava nada. Os outros pontos continuam logo abaixo, na área de apoio.
@@ -1804,6 +1838,7 @@
         detalhe: dono ? 'Só assuma se combinar com essa pessoa.' : (c.triagem_resumo || 'Ninguém atende ainda. Leia o resumo e as mensagens abaixo.'), rot: dono ? 'Assumir mesmo assim' : 'Assumir', fn: () => assumir() }];
     } else {
       if (al.length) pontos.push({ tom: 'alta', titulo: 'Confira o valor informado', detalhe: 'Está fora do valor de referência. Confirme no Klingo.', rot: 'Ver valor', fn: ir('alertaPreco') });
+      if (anexosDe(c.id).sem_conferir) pontos.push({ tom: 'media', titulo: 'Pedido com foto: confira no Klingo', detalhe: 'Veja a foto, confira o cadastro, o convênio e o exame no Klingo e marque como conferido.', rot: 'Ver fotos', fn: ir('anexosBox') });
       if (ab.length) pontos.push({ tom: ab.some((a) => a.passou) ? 'alta' : 'media', titulo: ab.some((a) => a.passou) ? 'O horário do exame já passou: registre o que aconteceu' : 'Exame marcado sem desfecho',
         detalhe: 'Compareceu, faltou, cancelou ou remarcou. Sem isso a conversa não encerra.', rot: 'Fechar exame', fn: ir('exameAberto') });
       if (rm.length) pontos.push({ tom: 'media', titulo: 'Falta remarcar o exame', detalhe: 'Peça ao paciente que remarque pelo chat ou registre que já foi remarcado.', rot: 'Remarcar', fn: ir('exameAberto') });
@@ -1854,7 +1889,7 @@
       ultimaConv = m.conversa_id;
       const ag = m.agente_id ? S.agentes.get(m.agente_id) : null;
       const quem = m.autor === 'agente' ? (ag ? ag.nome : 'Assistente virtual') : '';
-      out.push(h('div', { class: 'msg ' + m.autor },
+      out.push(h('div', { class: 'msg ' + m.autor, 'data-anexo': m.opcoes && m.opcoes.tipo === 'anexo' ? String(m.opcoes.id) : null },
         m.autor === 'agente' && quem !== ultimoQuem ? h('span', { class: 'quem' }, quem) : null,
         h('span', {}, linkificar(m.texto)),
         m.opcoes && m.opcoes.tipo === 'anexo' ? h('div', {}, h('button', { class: 'btn', type: 'button', style: 'margin-top:6px', onclick: (ev) => verAnexo(m.opcoes.id, ev.currentTarget) }, 'Ver foto do pedido médico')) : null,
@@ -1864,6 +1899,30 @@
     box.replaceChildren(...out);
     if (rolar || perto) box.scrollTop = box.scrollHeight;
     renderProximo();
+  }
+  // Aviso de anexo no topo da conversa: quantas fotos, botão que abre todas e a pendência de conferir o pedido no Klingo.
+  function renderAnexosBox() {
+    const box = document.getElementById('anexosBox'); if (!box) return;
+    const c = conversaAberta(); const a = c ? anexosDe(c.id) : null;
+    if (!a || !a.total) { box.replaceChildren(); return; }
+    const galeria = h('div', { class: 'galeria' });
+    const abrir = h('button', { type: 'button', class: 'btn prim', onclick: () => {
+      if (galeria.childElementCount) { galeria.replaceChildren(); abrir.textContent = `Ver ${a.total === 1 ? 'a foto' : 'as ' + a.total + ' fotos'}`; return; }
+      abrir.textContent = 'Esconder fotos';
+      a.ids.forEach((id, i) => { const b = h('button', { type: 'button', class: 'btn' }, `Foto ${i + 1}`); galeria.append(h('div', { class: 'galeria-item' }, h('b', {}, `Foto ${i + 1} de ${a.total}`), b)); verAnexo(id, b); });
+    } }, `Ver ${a.total === 1 ? 'a foto' : 'as ' + a.total + ' fotos'}`);
+    const ir = h('button', { type: 'button', class: 'btn', onclick: () => { const els = document.querySelectorAll('#msgs [data-anexo]'); const el = els[els.length - 1]; if (el) el.scrollIntoView({ block: 'center', behavior: 'smooth' }); } }, 'Ir para a mensagem da foto');
+    const feito = a.sem_conferir === 0;
+    const conferir = h('button', { type: 'button', class: 'btn' + (feito ? '' : ' prim'), onclick: async (ev) => {
+      ev.currentTarget.disabled = true;
+      const r = await db.rpc('painel_anexo_klingo_conferido', { p_conversa: c.id, p_feito: !feito });
+      if (r.error) { toast(msgErro(r.error)); ev.currentTarget.disabled = false; return; }
+      await carregarAnexos(); renderAnexosBox(); renderLista(); renderProximo();
+    } }, feito ? 'Desfazer: voltou a faltar conferir' : 'Conferi no Klingo');
+    box.replaceChildren(h('div', { class: 'triagem anexo-aviso' },
+      h('b', {}, `Anexo: ${a.total} foto${a.total > 1 ? 's' : ''} do pedido médico`),
+      h('div', { class: 'dica' }, feito ? 'Pendência do Klingo: conferida.' : `Pendência do Klingo (${a.sem_conferir} foto${a.sem_conferir > 1 ? 's' : ''} sem conferir): veja se o paciente está cadastrado, se o convênio e a carteirinha estão válidos e se o convênio cobre o exame do pedido. Depois marque como conferido.`),
+      h('div', { class: 'cv-acoes' }, abrir, ir, conferir), galeria));
   }
   // Foto do pedido médico enviada pelo paciente, com o que foi lido (celular e IA), o que o paciente marcou
   // e a conferência da equipe. Conferir ensina o sistema: a mesma escrita, da próxima vez, já vem com o exame certo.
@@ -2341,7 +2400,145 @@
     c.append(h('div', { class: 'pagina cfg' },
       h('div', { class: 'cfg-topo' }, h('div', {}, h('h2', {}, 'Configurações'), h('p', { class: 'sub' }, 'Tudo que você controla do chat, da fila e das integrações, num lugar só.')), h('div', { class: 'cfg-salvar' }, status, salvar)),
       h('div', { class: 'cfg-qr cfg-destaque' }, cartaoQr('QR code do chat', 'Leva o cliente direto para o chat de atendimento.', linkChat, 'qrcode', 'Fale com a gente')),
+      h('div', { class: 'cat-bloco' }, h('b', {}, 'Convênios'), h('p', { class: 'dica' }, 'Desativar um convênio inteiro, escrever a mensagem de cada um e a regra "um exame por vez" ficam na aba Convênios.'),
+        h('button', { type: 'button', class: 'btn', onclick: () => { S.aba = 'convenios'; renderAba(); } }, 'Abrir Convênios')),
       ...CFG_GRUPOS.map(grupoUi)));
+  }
+
+  /* ---------- aba Convênios (só administrador) ---------- */
+  // Liga/desliga cada convênio, escreve a mensagem e a regra de cada um e vê o que mudou de preço. Os números vêm do Klingo (agendamentos e preços); a previsão é uma tendência simples, não uma garantia.
+  const CV_TIPO = { desativado: 'Desativado', ativado: 'Ativado', regra: 'Regra', mensagem: 'Mensagem', preco_convenio: 'Preço do convênio', preco_particular: 'Preço Particular', plano_novo: 'Plano novo', plano_removido: 'Plano removido', plano_alterado: 'Plano alterado' };
+  const CV = { busca: '', filtro: 'todos' };
+  async function atualizarSeloConvenios() {
+    const { data } = await db.rpc('convenio_aviso_contagem');
+    const s = document.getElementById('seloConvenios'); if (!s) return;
+    const n = data && data.novos ? Number(data.novos) : 0;
+    s.textContent = n > 99 ? '99+' : n; s.hidden = n === 0; s.classList.toggle('erro', !!(data && data.relevantes));
+  }
+  function dicaConvenio(x) {
+    const d = x.demanda || {}, pr = x.precos || {};
+    if (!x.ativo) return { tom: 'aviso', texto: `Desativado: o paciente não vê este convênio no chat.${d.ult_30d ? ` Teve ${d.ult_30d} agendamentos nos últimos 30 dias; confira se vale voltar.` : ''}` };
+    if (pr.procedimentos > 0 && !pr.alta) return { tom: 'aviso', texto: 'Nenhum preço com confiança alta. O atendente confirma o valor antes de prometer.' };
+    if (!d.total && !d.ult_30d) return { tom: 'aviso', texto: 'Sem agendamentos nos dados do Klingo. Se a clínica já não atende este convênio, vale desativar.' };
+    if (d.tendencia_pct != null && d.tendencia_pct <= -30) return { tom: 'aviso', texto: `A procura caiu ${Math.abs(d.tendencia_pct)}% em relação aos 30 dias anteriores.` };
+    if (Number(d.participacao_pct) >= 10) return { tom: '', texto: `Alta procura: ${d.participacao_pct}% dos agendamentos de convênio. Manter ativo.` };
+    return { tom: '', texto: 'Procura normal.' };
+  }
+  async function salvarConvenio(x, dados, aviso) {
+    const { data, error } = await db.rpc('convenio_salvar', { p_operadora: x.operadora, p_dados: dados });
+    if (error) { toast(msgErro(error)); return false; }
+    toast(aviso || 'Salvo.');
+    if (data && data.ativo === false && data.em_andamento) toast(`${data.em_andamento} conversa(s) em andamento já tinham escolhido este convênio: o atendente confere.`);
+    return true;
+  }
+  async function viewConvenios(c) {
+    c.replaceChildren(h('div', { class: 'pagina' }, h('h2', {}, 'Convênios'), h('p', { class: 'sub' }, 'Carregando…')));
+    const [p, ev] = await Promise.all([db.rpc('convenios_painel'), db.rpc('convenio_eventos', { p_limite: 40, p_so_novos: true })]);
+    if (S.aba !== 'convenios') return;
+    if (p.error || ev.error) { c.replaceChildren(h('div', { class: 'pagina' }, h('h2', {}, 'Convênios'), h('p', { class: 'erro' }, msgErro(p.error || ev.error)))); return; }
+    const P = p.data || {}, lista = P.convenios || [], novos = ev.data || [], part = P.particular || {}, pad = P.padroes || {};
+    atualizarSeloConvenios();
+    const recarregar = () => viewConvenios(c);
+
+    const blocoEv = novos.length ? h('div', { class: 'cat-bloco cv-ev' },
+      h('b', {}, `O que mudou e você ainda não viu (${novos.length}${novos.length >= 40 ? '+' : ''})`),
+      h('ul', {}, novos.map((e) => h('li', { class: e.relevante ? 'rel' : '' }, `${fmtDataHora(e.criado_em)} · ${CV_TIPO[e.tipo] || e.tipo} · ${e.descricao}${e.antes != null && e.depois != null && e.tipo.startsWith('preco') ? ` (${e.antes} → ${e.depois}${e.variacao_pct != null ? `, ${e.variacao_pct > 0 ? '+' : ''}${e.variacao_pct}%` : ''})` : ''}`))),
+      h('div', { class: 'cv-acoes' }, h('button', { type: 'button', class: 'btn', onclick: async () => { const r = await db.rpc('convenio_eventos_visto', {}); if (r.error) toast(msgErro(r.error)); else { toast('Marcado como visto.'); recarregar(); } } }, 'Marcar tudo como visto')),
+      h('p', { class: 'dica' }, 'Vermelho = mudança grande (10% ou mais) ou algo que saiu. Mudou o preço de um exame? Confira o valor que o atendente informa.')) : null;
+
+    const pintarDetalhe = async (x, alvo, botao) => {
+      if (alvo.childElementCount) { alvo.replaceChildren(); botao.textContent = 'Ver preços'; return; }
+      botao.disabled = true; botao.textContent = 'Carregando…';
+      const r = await db.rpc('convenio_detalhe', { p_operadora: x.operadora, p_limite: 60 });
+      botao.disabled = false; botao.textContent = 'Esconder preços';
+      if (r.error) { alvo.replaceChildren(h('p', { class: 'erro' }, msgErro(r.error))); return; }
+      const linhas = r.data || [], particular = /^particular/i.test(x.operadora);
+      const v = (n) => (n == null ? '—' : brl(n));
+      alvo.replaceChildren(h('div', { class: 'tabela-wrap', style: 'margin-top:8px' }, h('table', {},
+        h('thead', {}, h('tr', {}, ['Exame', particular ? '' : 'Neste convênio', 'Particular', 'Último valor nas marcações', 'Mudou'].filter(Boolean).map((t) => h('th', {}, t)))),
+        h('tbody', {}, linhas.length ? linhas.map((l) => h('tr', {},
+          h('td', {}, l.exame, h('span', { class: 'sub-lista' }, ` · ${l.demanda_90d} em 90 dias`)),
+          particular ? null : h('td', {}, v(l.valor_convenio), l.confianca_convenio && l.confianca_convenio !== 'alta' ? h('span', { class: 'sub-lista' }, ` (${l.confianca_convenio})`) : null),
+          h('td', {}, v(l.valor_particular), l.confianca_particular && l.confianca_particular !== 'alta' ? h('span', { class: 'sub-lista' }, ` (${l.confianca_particular}, ${l.amostras_particular || 0} marcação)`) : null),
+          h('td', {}, l.ultimo_valor_marcacao != null ? `${brl(l.ultimo_valor_marcacao)}${l.ultimo_valor_amostras ? ` (${l.ultimo_valor_amostras} amostras)` : ''}` : '—'),
+          h('td', {}, l.mudou_em ? h('span', { class: 'cv-tag av' }, `${fmtDataHora(l.mudou_em)}: ${l.mudou_de} → ${l.mudou_para}`) : ''))) :
+          [h('tr', {}, h('td', { colspan: 5 }, 'Nenhum exame com preço cadastrado.'))]))),
+        h('p', { class: 'dica' }, 'Particular é calculado das marcações recentes e pode oscilar; o chat nunca informa preço ao paciente, só o atendente.'));
+    };
+
+    const cartao = (x) => {
+      const d = x.demanda || {}, pr = x.precos || {}, dica = dicaConvenio(x), eParticular = /^particular/i.test(x.operadora);
+      const alvo = h('div', {});
+      const btnPrecos = h('button', { type: 'button', class: 'btn', onclick: () => pintarDetalhe(x, alvo, btnPrecos) }, 'Ver preços');
+      const fAviso = h('textarea', { rows: 2, maxlength: 600, placeholder: 'Opcional: o paciente lê isto ao escolher este convênio (ex.: "Traga a carteirinha e um documento com foto")' }, x.aviso || '');
+      const fInativo = h('textarea', { rows: 2, maxlength: 600, placeholder: pad.mensagem_inativo || '' }, x.mensagem_inativo || '');
+      const fVarios = h('textarea', { rows: 2, maxlength: 600, placeholder: pad.msg_varios || '' }, x.msg_varios || '');
+      const fMotivo = h('input', { type: 'text', maxlength: 200, placeholder: 'Opcional: por que desativou (só a equipe vê)', value: x.motivo || '' });
+      const chkUm = h('input', { type: 'checkbox' }); chkUm.checked = !!x.um_por_vez;
+      const regras = h('details', { class: 'cv-regras', open: !x.ativo || x.um_por_vez || !!x.aviso },
+        h('summary', {}, 'Regras e mensagens deste convênio'),
+        h('label', { class: 'linha-chk' }, chkUm, 'A clínica faz só um exame por vez neste convênio'),
+        h('label', {}, 'Aviso ao escolher este convênio', fAviso),
+        h('label', {}, 'Mensagem quando o pedido tem mais de um exame (vale se a regra acima estiver marcada; vazio = mensagem padrão)', fVarios),
+        eParticular ? null : h('label', {}, 'Mensagem quando o convênio está desativado (vazio = mensagem padrão)', fInativo),
+        eParticular ? null : h('label', {}, 'Motivo', fMotivo),
+        h('div', { class: 'cv-acoes' }, h('button', { type: 'button', class: 'btn prim', onclick: async () => {
+          const dados = { um_por_vez: chkUm.checked, aviso: fAviso.value, msg_varios: fVarios.value };
+          if (!eParticular) { dados.mensagem_inativo = fInativo.value; dados.motivo = fMotivo.value; }
+          if (await salvarConvenio(x, dados, 'Regras salvas.')) recarregar();
+        } }, 'Salvar regras')));
+      const trocar = h('button', { type: 'button', class: x.ativo ? 'btn perigo' : 'btn prim', onclick: async () => {
+        if (x.ativo && !confirm(`Desativar ${x.operadora}?\n\nO convênio some da lista do chat e quem digitar o nome recebe a mensagem de convênio desativado.\nÚltimos 30 dias: ${d.ult_30d || 0} agendamentos.\nConversas em andamento com este convênio: ${x.em_andamento || 0}.`)) return;
+        if (await salvarConvenio(x, { ativo: !x.ativo }, x.ativo ? 'Convênio desativado.' : 'Convênio ativado.')) recarregar();
+      } }, x.ativo ? 'Desativar' : 'Ativar');
+      return h('section', { class: 'cv-cartao' + (x.ativo ? '' : ' off'), 'data-nome': x.operadora.toLowerCase() },
+        h('div', { class: 'cv-topo' }, h('h3', {}, x.operadora),
+          h('span', { class: 'cv-tag' + (x.ativo ? '' : ' off') }, x.ativo ? 'Ativo' : 'Desativado'),
+          x.um_por_vez ? h('span', { class: 'cv-tag av' }, 'Um exame por vez') : null,
+          x.avisos_novos ? h('span', { class: 'cv-tag av' }, `${x.avisos_novos} mudança(s) nova(s)`) : null,
+          eParticular ? null : trocar),
+        h('div', { class: 'cv-nums' },
+          eParticular ? null : h('span', {}, 'Agendamentos em 30 dias ', h('b', {}, d.ult_30d || 0), d.tendencia_pct != null ? ` (${d.tendencia_pct > 0 ? '+' : ''}${d.tendencia_pct}%)` : ''),
+          eParticular ? null : h('span', {}, 'Previsão para os próximos 30 dias ', h('b', {}, d.previsao_30d || 0), d.confiavel ? '' : ' (pouco histórico)'),
+          eParticular ? null : h('span', {}, 'Parte do total ', h('b', {}, `${d.participacao_pct || 0}%`)),
+          h('span', {}, 'Exames com preço ', h('b', {}, pr.procedimentos || 0), pr.procedimentos ? ` (${pr.alta || 0} confiáveis)` : ''),
+          x.ultimo_exame ? h('span', {}, 'Último exame ', h('b', {}, `${x.ultimo_exame.procedimento}`), ` em ${fmtDataHora(x.ultimo_exame.quando)}`) : null,
+          x.ultimo_valor ? h('span', {}, 'Último valor visto ', h('b', {}, brl(x.ultimo_valor.valor)), ` (${x.ultimo_valor.procedimento})`) : null,
+          x.chat_30d ? h('span', {}, 'Pelo chat em 30 dias ', h('b', {}, x.chat_30d), x.chat_abandonados ? ` (${x.chat_abandonados} parados há mais de 1 dia)` : '') : null),
+        eParticular ? null : h('div', { class: 'cv-dica ' + dica.tom }, dica.texto),
+        regras, h('div', { class: 'cv-acoes' }, btnPrecos), alvo);
+    };
+
+    const particularX = { operadora: 'Particular', ativo: true, um_por_vez: false, aviso: null, demanda: {}, precos: part.precos || {}, avisos_novos: part.avisos_novos || 0, ultimo_exame: null, ultimo_valor: null };
+    const busca = h('input', { type: 'search', placeholder: 'Procurar convênio…', 'aria-label': 'Procurar convênio', value: CV.busca });
+    const chips = [['todos', 'Todos'], ['ativos', 'Ativos'], ['desativados', 'Desativados'], ['regras', 'Com regra']].map(([v, r]) => h('button', { type: 'button', class: 'chip', 'aria-pressed': String(CV.filtro === v), onclick: (ev) => { CV.filtro = v; chips.forEach((b) => b.setAttribute('aria-pressed', String(b === ev.currentTarget))); aplicar(); } }, r));
+    const caixa = h('div', {}, lista.map(cartao));
+    const aplicar = () => {
+      CV.busca = busca.value; const q = busca.value.trim().toLowerCase(); let n = 0;
+      caixa.querySelectorAll('.cv-cartao').forEach((el, i) => {
+        const x = lista[i];
+        const okF = CV.filtro === 'todos' || (CV.filtro === 'ativos' && x.ativo) || (CV.filtro === 'desativados' && !x.ativo) || (CV.filtro === 'regras' && (x.um_por_vez || x.aviso || x.mensagem_inativo));
+        const ok = okF && (!q || x.operadora.toLowerCase().includes(q)); el.hidden = !ok; if (ok) n++;
+      });
+      vazio.hidden = n > 0;
+    };
+    const vazio = h('p', { class: 'dica', hidden: true }, 'Nenhum convênio com este filtro.');
+    busca.addEventListener('input', aplicar);
+    const off = lista.filter((x) => !x.ativo).length, comRegra = lista.filter((x) => x.um_por_vez || x.aviso).length;
+    c.replaceChildren(h('div', { class: 'pagina' }, h('h2', {}, 'Convênios'),
+      h('p', { class: 'sub' }, 'Ligue ou desligue um convênio inteiro, escreva a mensagem e a regra de cada um e acompanhe preço e procura. Vale na hora para quem ainda vai escolher o convênio no chat.'),
+      h('div', { class: 'numeros' },
+        h('div', { class: 'num' }, h('b', {}, lista.length - off), h('span', {}, 'convênios ativos')),
+        h('div', { class: 'num' }, h('b', {}, off), h('span', {}, 'desativados')),
+        h('div', { class: 'num' }, h('b', {}, comRegra), h('span', {}, 'com regra ou aviso')),
+        h('div', { class: 'num' }, h('b', {}, P.avisos_novos || 0), h('span', {}, 'mudanças não vistas'))),
+      blocoEv,
+      h('div', { class: 'cv-busca' }, busca, ...chips),
+      caixa, vazio,
+      h('h3', {}, 'Particular'),
+      h('p', { class: 'dica' }, `O valor Particular vem das marcações recentes do Klingo e oscila (${part.mudancas_30d || 0} mudanças de valor em 30 dias). Ele nunca é desativado.`),
+      cartao(particularX)));
+    aplicar();
   }
 
   /* ---------- catálogo do Klingo (só administrador) ---------- */
