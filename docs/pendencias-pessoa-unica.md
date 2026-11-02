@@ -10,7 +10,7 @@
    `delete from public.conversa_grupo_recusa where por is null and jsonb_array_length(public.pessoa_sinais(a, b) -> 'conflitos') = 0;`
    Depois: `select sum(public.pessoa_unir_grupos(id)) from public.conversas;` (deve unir os 3 grupos do Alisson).
 2. **Aviso à atendente quando a data diverge**: FEITO (cartão "Data de nascimento diferente" no alto da lista: escolher a data certa e unir, ou manter separado).
-3. **Paciente no centro**: PARCIAL. Feito o bloco "Histórico do paciente" no chat (todos os exames de todas as conversas, com o passo de cada um e o que fazer: oferecer de novo, registrar recusa). Falta: uma conversa só na lista para o atendente (hoje já é uma por pessoa quando agrupada) e o módulo `.js` que recalcula o passo a passo.
+3. **Paciente no centro**: PARCIAL (02/11: avisos viraram a aba "Avisos" com contador, a lista de conversas só mostra uma barra curta; o passo a passo do exame agora vem de `paciente-status.js`, com 20 testes). Feito o bloco "Histórico do paciente" no chat (todos os exames de todas as conversas, com o passo de cada um e o que fazer: oferecer de novo, registrar recusa). Falta: uma conversa só na lista para o atendente (hoje já é uma por pessoa quando agrupada) e o módulo `.js` que recalcula o passo a passo.
 4. **Entrega de resultado** (link + usuário e senha): PENDENTE. Falta o link e a regra "exame antes de setembro".
 
 ## Klingo como centro do paciente (02/11/2026)
@@ -23,4 +23,8 @@
 2. Dados reais: guardar o que for preciso para ter certeza de que o paciente é ele ou para atualizar dados (telefone, e-mail, nascimento, CPF). O CPF é o fator para pedir atualização de um dado (as outras conferências já terão passado).
 3. Ligação automática chat <-> prontuário do Klingo, com notificação (como já é no cadastro novo). Sempre que alguém se cadastra ou tenta agendar, conferir com o que vem do Klingo.
 PENDÊNCIA CRÍTICA (detalhes em docs/klingo-relatorios-pendentes.md): o código só usa o relatório do Klingo (api-externa.klingo.app/api/info/relatorio), que traz nome e telefone, sem CPF, e-mail nem nascimento. Falta saber qual consulta do Klingo devolve paciente por prontuário/CPF, ou incluir essas colunas no relatório.
-SUPABASE: aprovações de `delete` expiram. Solução definitiva: em https://claude.ai/customize/connectors, abrir o Supabase e deixar execute_sql e apply_migration em "Sempre permitir".
+SUPABASE: comandos com `delete` fazem o próprio servidor do Supabase abrir uma pergunta de confirmação que esta sessão não consegue responder (expira em 60 s). Confirmado em 02/11/2026 mesmo com as ferramentas em "Sempre permitir" no conector: a permissão do Claude não resolve. Esses comandos precisam ser rodados pelo dono no editor SQL (https://supabase.com/dashboard/project/nrvuynjwcgwpjdptkiay/sql/new). Tudo o mais (create/alter/update/insert) passa normalmente.
+
+## Passo a passo do paciente (02/11/2026)
+`paciente-status.js` (raiz do projeto) é o único lugar que define o caminho Pedido > Pedido pronto > Marcado > Confirmado > Chegou > Exame feito > Resultado e os desvios (Faltou, Cancelou, Remarcando, Não concluído), com o que a equipe faz a seguir. Traduz o status do chat e do Klingo. O banco guarda o status de verdade (`pre_agendamentos`, `agendamento_fechamento`, `jornada_exame`); o módulo só traduz e mostra. O passo "Resultado" só existe quando o sistema receber o laudo (relatório C do Klingo).
+Aba **Avisos**: mesma pessoa?, data de nascimento diferente, paciente e Klingo. Cada aviso tem "Ver conversa".
