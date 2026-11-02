@@ -1483,14 +1483,18 @@
     if (!id) { el.replaceChildren(); return; }
     if (HP.id === id && Date.now() - HP.t < 5000) return;
     HP.id = id; HP.t = Date.now();
-    let r; try { r = await db.rpc('paciente_linha_do_tempo', { p_conversa: id }); } catch { return; }
+    let r, k; try { [r, k] = await Promise.all([db.rpc('paciente_linha_do_tempo', { p_conversa: id }), Promise.resolve(db.rpc('paciente_klingo', { p_conversa: id })).then((x) => x, () => null)]); } catch { return; }
     if (S.abertaId !== id) return;
     const itens = r && !r.error && Array.isArray(r.data) ? r.data : [];
-    if (!itens.length) { el.replaceChildren(); return; }
+    const kl = k && !k.error && k.data ? k.data : { pacientes: [], exames: [] };
+    if (!itens.length && !kl.exames.length) { el.replaceChildren(); return; }
     const pend = itens.filter((x) => ['faltou', 'cancelou', 'remarcou', 'pronto'].includes(x.status)).length;
     el.replaceChildren(h('details', { class: 'pessoa', open: pend > 0 },
-      h('summary', {}, `Histórico do paciente: ${itens.length} exame(s)` + (pend ? ` · ${pend} pedindo ação` : '')),
-      h('ul', {}, itens.map((x) => h('li', {}, h('b', {}, (ROT_HP[x.status] || x.status) + ': '), x.exames + (x.quando ? ' — ' + quandoCurto(x.quando) : ''), h('div', { class: 'dica' }, x.passo))))));
+      h('summary', {}, `Histórico do paciente: ${itens.length} pedido(s) no chat` + (kl.exames.length ? ` · ${kl.exames.length} no Klingo` : '') + (pend ? ` · ${pend} pedindo ação` : '')),
+      h('ul', {}, itens.map((x) => h('li', {}, h('b', {}, (ROT_HP[x.status] || x.status) + ': '), x.exames + (x.quando ? ' — ' + quandoCurto(x.quando) : ''), h('div', { class: 'dica' }, x.passo)))),
+      kl.exames.length ? h('div', {}, h('b', {}, `No Klingo (${kl.pacientes.map((q) => 'prontuário ' + q.prontuario).join(', ')}):`),
+        h('ul', {}, kl.exames.slice(0, 12).map((x) => h('li', {}, h('b', {}, (ST_KLINGO[x.status] || x.status) + ': '), String(x.exame || '').toLowerCase() + (x.quando ? ' — ' + quandoCurto(String(x.quando).replace('T', ' ')) : '')))),
+        kl.exames.length > 12 ? h('div', { class: 'dica' }, `E mais ${kl.exames.length - 12} no Klingo.`) : null) : null));
   }
   // Para onde vai a resposta da equipe: a conversa em que o paciente escreveu por último (é a que o aparelho dele está lendo).
   function alvoResposta() {

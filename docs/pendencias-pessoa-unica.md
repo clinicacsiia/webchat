@@ -12,3 +12,8 @@
 2. **Aviso à atendente quando a data diverge**: FEITO (cartão "Data de nascimento diferente" no alto da lista: escolher a data certa e unir, ou manter separado).
 3. **Paciente no centro**: PARCIAL. Feito o bloco "Histórico do paciente" no chat (todos os exames de todas as conversas, com o passo de cada um e o que fazer: oferecer de novo, registrar recusa). Falta: uma conversa só na lista para o atendente (hoje já é uma por pessoa quando agrupada) e o módulo `.js` que recalcula o passo a passo.
 4. **Entrega de resultado** (link + usuário e senha): PENDENTE. Falta o link e a regra "exame antes de setembro".
+
+## Klingo como centro do paciente (02/11/2026)
+- FEITO: `paciente_klingo(conversa)` acha o paciente no Klingo pelo nome + marca do telefone (ou pelo vínculo manual) e traz os exames dele. O bloco "Histórico do paciente" mostra "No Klingo" ao lado dos pedidos do chat.
+- Limites de hoje: o Klingo carregado cobre só 30/10 a 01/12, e guarda só nome + marca do telefone (sem e-mail nem nascimento, de propósito, por privacidade). 967 de 2.396 pacientes não têm prontuário (chave gerada por nome + telefone).
+- DECISÕES SUAS: (1) puxar histórico mais antigo do Klingo? (2) guardar telefone, e-mail e nascimento reais do Klingo no banco, hoje só a marca? (3) ligar o chat ao prontuário automaticamente (hoje só a leitura).
