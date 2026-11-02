@@ -525,7 +525,7 @@
     buscaContatos: '', busca: '', periodo: 'todos', tagFiltro: '', pre: null,
     modo: (() => { try { return localStorage.getItem('painel.modo') === 'quadro' ? 'quadro' : 'lista'; } catch { return 'lista'; } })(),
     quadro: [], colunasQ: [], transQ: [], fq: 'todos', buscaQ: '', quadroOk: true,
-    grupos: new Map(), sugestoes: [], avisosData: [], abertos: [], remarcar: [], outrosQ: new Map()
+    grupos: new Map(), sugestoes: [], avisosData: [], avisosPac: [], abertos: [], remarcar: [], outrosQ: new Map()
   };
   /* ---------- pré-agendamento montado pela IA ---------- */
   const ROTULO_PRE = { rascunho: 'Em coleta', pronto: 'Pronto para marcar', agendado: 'Agendado', cancelado: 'Cancelado' };
@@ -1344,12 +1344,14 @@
   // Se o SQL ainda não foi aplicado, as consultas falham em silêncio e a tela funciona como antes (uma conversa por linha).
   async function carregarPessoas() {
     const vazio = () => ({ error: true, data: null });
-    const [g, ab, rm, su, ad] = await Promise.all([
+    const [g, ab, rm, su, ad, ap] = await Promise.all([
       Promise.resolve(db.from('conversa_grupo').select('conversa_id,grupo_id,sinais,origem,confirmado_por')).then((r) => r, vazio),
       Promise.resolve(db.from('v_agendamento_aberto').select('pre_id,conversa_id,chave,quando,exames,passou')).then((r) => r, vazio),
       Promise.resolve(db.from('v_remarcacao_pendente').select('fechamento_id,conversa_id,exames,quando,desfecho,remarcacao')).then((r) => r, vazio),
       Promise.resolve(db.rpc('pessoa_sugestoes')).then((r) => r, vazio),
-      Promise.resolve(db.rpc('pessoa_avisos_data')).then((r) => r, vazio)]);
+      Promise.resolve(db.rpc('pessoa_avisos_data')).then((r) => r, vazio),
+      Promise.resolve(db.rpc('paciente_avisos')).then((r) => r, vazio)]);
+    S.avisosPac = ap.error || !Array.isArray(ap.data) ? [] : ap.data;
     S.avisosData = ad.error || !Array.isArray(ad.data) ? [] : ad.data;
     S.grupos = new Map(); (g.error ? [] : g.data || []).forEach((r) => S.grupos.set(r.conversa_id, r));
     S.abertos = ab.error ? [] : ab.data || []; S.remarcar = rm.error ? [] : rm.data || [];
@@ -1427,9 +1429,31 @@
         h('button', { class: 'btn prim', type: 'button', onclick: () => corrigirDataPessoa(av, av.nasc_b) }, dataBR(av.nasc_b)),
         h('button', { class: 'btn', type: 'button', onclick: () => manterSeparadoPessoa(av) }, 'Manter separado')))));
   }
+  // Avisos do paciente: ligado ao Klingo, mais de um prontuário, dado diferente do cadastro (com o CPF conferido), CPF diferente.
+  const prontuarioTxt = (p) => (String(p || '').startsWith('n:') ? 'sem prontuário, identificado por nome e telefone' : 'prontuário ' + p);
+  const ROT_CAMPO = { email: 'e-mail', dt_nasc: 'nascimento', telefone: 'celular' };
+  async function resolverAvisoPaciente(av, aplicar) {
+    await rpcPessoa('paciente_aviso_resolver', { p_id: av.id, p_aplicar: aplicar }, aplicar ? 'Cadastro atualizado.' : 'Aviso conferido.');
+  }
+  function renderAvisosPaciente() {
+    const lista = S.avisosPac || [];
+    if (!lista.length) return null;
+    const quem = (av) => nomeBonito(av.nome || 'Paciente');
+    return h('div', { id: 'avisosPaciente' }, lista.slice(0, 4).map((av) => {
+      const d = av.detalhe || {}, ok = h('button', { class: 'btn', type: 'button', onclick: () => resolverAvisoPaciente(av, false) }, 'Conferido');
+      if (av.tipo === 'klingo_ligado') return h('div', { class: 'sug' }, h('b', {}, 'Paciente ligado ao Klingo'), h('div', {}, `${quem(av)} foi ligado ao cadastro do Klingo (${prontuarioTxt(d.prontuario)}), pelo nome e pelo telefone.`), h('div', { class: 'sug-acoes' }, ok));
+      if (av.tipo === 'klingo_varios') return h('div', { class: 'sug' }, h('b', {}, 'Mais de um cadastro no Klingo'), h('div', {}, `${quem(av)} bate com ${(d.prontuarios || []).length} cadastros no Klingo. Confira qual é o certo; nada foi ligado.`), h('div', { class: 'sug-acoes' }, ok));
+      if (av.tipo === 'cpf_diferente') return h('div', { class: 'sug' }, h('b', {}, 'CPF diferente do cadastro'), h('div', {}, `${quem(av)} informou um CPF que não é o do cadastro encontrado pelo nome e telefone. Não atualizar nenhum dado; confira o documento.`), h('div', { class: 'sug-acoes' }, ok));
+      const campos = Object.entries(d.campos || {}).map(([k, v]) => `${ROT_CAMPO[k] || k}: ${v.cadastro ? dataOuTxt(v.cadastro) + ' → ' : ''}${dataOuTxt(v.novo)}`);
+      return h('div', { class: 'sug' }, h('b', {}, 'Dado diferente do cadastro'), h('div', {}, `${quem(av)} confirmou o CPF e informou dado novo: ${campos.join('; ')}.`),
+        h('div', { class: 'sug-acoes' }, h('button', { class: 'btn prim', type: 'button', onclick: () => resolverAvisoPaciente(av, true) }, 'Atualizar cadastro'), h('button', { class: 'btn', type: 'button', onclick: () => resolverAvisoPaciente(av, false) }, 'Manter como está')));
+    }));
+  }
+  const dataOuTxt = (v) => (/^\d{4}-\d{2}-\d{2}/.test(String(v)) ? dataBR(String(v).slice(0, 10)) : String(v));
   function renderSugestoes() {
-    const avisos = renderAvisosData();
-    if (!S.sugestoes.length) return avisos;
+    const avisos = h('div', {}, renderAvisosData(), renderAvisosPaciente());
+    const temAvisos = avisos.childNodes.length > 0;
+    if (!S.sugestoes.length) return temAvisos ? avisos : null;
     const mostrar = S.sugestoes.slice(0, 3);
     const sug = h('div', { id: 'sugestoes' }, mostrar.map((s) => h('div', { class: 'sug' },
       h('b', {}, 'Parece a mesma pessoa'),
@@ -1438,7 +1462,7 @@
         h('button', { class: 'btn prim', type: 'button', onclick: () => confirmarPessoa(s) }, 'É a mesma pessoa'),
         h('button', { class: 'btn', type: 'button', onclick: () => rpcPessoa('pessoa_recusar', { p_a: s.a, p_b: s.b }, 'Certo, não vou sugerir de novo.') }, 'Não é')))),
       S.sugestoes.length > 3 ? h('div', { class: 'dica', style: 'padding:0 12px 8px' }, `E mais ${S.sugestoes.length - 3} sugestão(ões).`) : null);
-    return avisos ? h('div', {}, avisos, sug) : sug;
+    return temAvisos ? h('div', {}, avisos, sug) : sug;
   }
   // Faixa do chat: conversas unidas + exames em aberto + remarcações pendentes da mesma pessoa.
   function renderPessoaChat() {
