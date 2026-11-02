@@ -1,0 +1,15 @@
+-- FLUXOGRAMA: entrada (conversa nova ou alterada; pedido com CPF/e-mail/celular/nascimento) -> validação (nome + marca do telefone batem com UM paciente do Klingo; CPF informado bate com o cadastro) -> lógica (liga a conversa ao prontuário sozinho e avisa; dado diferente com CPF conferido vira pedido de atualização; CPF diferente bloqueia a atualização) -> saída (tabela paciente_aviso, cartão no alto da lista do painel)
+-- DEPENDÊNCIAS: pessoa-unica.sql, pessoa-unica-correcao.sql, pacientes.sql, pessoa_klingo_vinculo, jornada_paciente
+-- ROLLBACK: drop table public.paciente_aviso; drop function public.paciente_klingo_ligar(uuid), public.paciente_dado_conferir(uuid), public.paciente_avisos(), public.paciente_aviso_resolver(bigint, boolean); depois recriar pessoa_agrupar_conversa_trg e pessoa_agrupar_pre_trg como em pessoa-unica.sql
+-- JÁ APLICADO no Supabase (migrações paciente_aviso_a ... f) em 02/11/2026. Os corpos das funções estão no banco (pg_get_functiondef). Resumo:
+--   paciente_aviso(id, conversa_id, tipo klingo_ligado|klingo_varios|dado_diferente|cpf_diferente, detalhe jsonb, criado_em, resolvido_em, resolvido_por)
+--     índice único (conversa_id, tipo) onde resolvido_em é nulo; RLS: só admin e atendente leem; só funções gravam.
+--   paciente_klingo_ligar(conversa): nome + marca do telefone (SHA-256 dos 8 últimos dígitos + ia_segredo) acham o paciente em jornada_paciente.
+--       1 cadastro  -> grava pessoa_klingo_vinculo (por = null, automático) e cria aviso klingo_ligado
+--       2+ cadastros -> não liga; cria aviso klingo_varios
+--   paciente_dado_conferir(conversa): CPF (11 dígitos) do pedido procurado em pacientes.
+--       achou  -> compara e-mail, nascimento e celular; se algo difere, aviso dado_diferente com {cadastro, novo}
+--       não achou mas o cadastro achado por nome e telefone tem outro CPF -> aviso cpf_diferente (nenhuma atualização é oferecida)
+--   paciente_avisos() lista os abertos; paciente_aviso_resolver(id, aplicar) fecha e, se aplicar, atualiza pacientes (e-mail, nascimento, celular).
+--   Os gatilhos pessoa_agrupar_conversa_trg e pessoa_agrupar_pre_trg chamam as funções acima, cada uma com erro engolido (nunca atrapalha o chat).
+-- PENDENTE (depende dos relatórios do Klingo, ver docs/klingo-relatorios-pendentes.md): CPF, nascimento e e-mail vindos do Klingo; hoje o CPF só é conferido contra a tabela pacientes.

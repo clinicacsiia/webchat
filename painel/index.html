@@ -525,7 +525,7 @@
     buscaContatos: '', busca: '', periodo: 'todos', tagFiltro: '', pre: null,
     modo: (() => { try { return localStorage.getItem('painel.modo') === 'quadro' ? 'quadro' : 'lista'; } catch { return 'lista'; } })(),
     quadro: [], colunasQ: [], transQ: [], fq: 'todos', buscaQ: '', quadroOk: true,
-    grupos: new Map(), sugestoes: [], abertos: [], remarcar: [], outrosQ: new Map()
+    grupos: new Map(), sugestoes: [], avisosData: [], avisosPac: [], abertos: [], remarcar: [], outrosQ: new Map()
   };
   /* ---------- pré-agendamento montado pela IA ---------- */
   const ROTULO_PRE = { rascunho: 'Em coleta', pronto: 'Pronto para marcar', agendado: 'Agendado', cancelado: 'Cancelado' };
@@ -1344,11 +1344,15 @@
   // Se o SQL ainda não foi aplicado, as consultas falham em silêncio e a tela funciona como antes (uma conversa por linha).
   async function carregarPessoas() {
     const vazio = () => ({ error: true, data: null });
-    const [g, ab, rm, su] = await Promise.all([
+    const [g, ab, rm, su, ad, ap] = await Promise.all([
       Promise.resolve(db.from('conversa_grupo').select('conversa_id,grupo_id,sinais,origem,confirmado_por')).then((r) => r, vazio),
       Promise.resolve(db.from('v_agendamento_aberto').select('pre_id,conversa_id,chave,quando,exames,passou')).then((r) => r, vazio),
       Promise.resolve(db.from('v_remarcacao_pendente').select('fechamento_id,conversa_id,exames,quando,desfecho,remarcacao')).then((r) => r, vazio),
-      Promise.resolve(db.rpc('pessoa_sugestoes')).then((r) => r, vazio)]);
+      Promise.resolve(db.rpc('pessoa_sugestoes')).then((r) => r, vazio),
+      Promise.resolve(db.rpc('pessoa_avisos_data')).then((r) => r, vazio),
+      Promise.resolve(db.rpc('paciente_avisos')).then((r) => r, vazio)]);
+    S.avisosPac = ap.error || !Array.isArray(ap.data) ? [] : ap.data;
+    S.avisosData = ad.error || !Array.isArray(ad.data) ? [] : ad.data;
     S.grupos = new Map(); (g.error ? [] : g.data || []).forEach((r) => S.grupos.set(r.conversa_id, r));
     S.abertos = ab.error ? [] : ab.data || []; S.remarcar = rm.error ? [] : rm.data || [];
     S.sugestoes = su.error || !Array.isArray(su.data) ? [] : su.data;
@@ -1403,16 +1407,62 @@
     const r = await rpcPessoa('pessoa_separar', { p_conversa: id }, 'Conversa separada.');
     if (r) { await carregarMensagensAbertas(); }
   }
+  // Mesmo nome, telefone e e-mail, mas datas de nascimento diferentes: a atendente diz qual está certa (e as conversas se unem) ou mantém separado.
+  async function corrigirDataPessoa(av, certa) {
+    const errados = certa === av.nasc_a ? av.ids_b : certa === av.nasc_b ? av.ids_a : [...av.ids_a, ...av.ids_b];
+    if (!confirm(`Confirmar ${dataBR(certa)} como data de nascimento de ${nomeBonito(av.nome)} e unir as conversas?`)) return;
+    const r = await rpcPessoa('pessoa_corrigir_data', { p_a: av.ids_a[0], p_b: av.ids_b[0], p_ids: errados, p_data: certa }, 'Data corrigida e conversas unidas.');
+    if (r) { await carregarMensagensAbertas(); }
+  }
+  async function manterSeparadoPessoa(av) {
+    if (!confirm(`Manter as conversas de ${nomeBonito(av.nome)} separadas? O robô não junta de novo.`)) return;
+    await rpcPessoa('pessoa_manter_separado', { p_ids_a: av.ids_a, p_ids_b: av.ids_b }, 'Mantidas separadas.');
+  }
+  function renderAvisosData() {
+    const lista = S.avisosData || [];
+    if (!lista.length) return null;
+    return h('div', { id: 'avisosData' }, lista.slice(0, 3).map((av) => h('div', { class: 'sug' },
+      h('b', {}, 'Data de nascimento diferente'),
+      h('div', {}, `${nomeBonito(av.nome)}: mesmo nome, telefone e e-mail, mas ${dataBR(av.nasc_a)} (${av.ids_a.length} conversa(s)) e ${dataBR(av.nasc_b)} (${av.ids_b.length} conversa(s)).` + (av.parecida ? ' Parece erro de digitação.' : '') + ' Qual está certa?'),
+      h('div', { class: 'sug-acoes' },
+        h('button', { class: 'btn prim', type: 'button', onclick: () => corrigirDataPessoa(av, av.nasc_a) }, dataBR(av.nasc_a)),
+        h('button', { class: 'btn prim', type: 'button', onclick: () => corrigirDataPessoa(av, av.nasc_b) }, dataBR(av.nasc_b)),
+        h('button', { class: 'btn', type: 'button', onclick: () => manterSeparadoPessoa(av) }, 'Manter separado')))));
+  }
+  // Avisos do paciente: ligado ao Klingo, mais de um prontuário, dado diferente do cadastro (com o CPF conferido), CPF diferente.
+  const prontuarioTxt = (p) => (String(p || '').startsWith('n:') ? 'sem prontuário, identificado por nome e telefone' : 'prontuário ' + p);
+  const ROT_CAMPO = { email: 'e-mail', dt_nasc: 'nascimento', telefone: 'celular' };
+  async function resolverAvisoPaciente(av, aplicar) {
+    await rpcPessoa('paciente_aviso_resolver', { p_id: av.id, p_aplicar: aplicar }, aplicar ? 'Cadastro atualizado.' : 'Aviso conferido.');
+  }
+  function renderAvisosPaciente() {
+    const lista = S.avisosPac || [];
+    if (!lista.length) return null;
+    const quem = (av) => nomeBonito(av.nome || 'Paciente');
+    return h('div', { id: 'avisosPaciente' }, lista.slice(0, 4).map((av) => {
+      const d = av.detalhe || {}, ok = h('button', { class: 'btn', type: 'button', onclick: () => resolverAvisoPaciente(av, false) }, 'Conferido');
+      if (av.tipo === 'klingo_ligado') return h('div', { class: 'sug' }, h('b', {}, 'Paciente ligado ao Klingo'), h('div', {}, `${quem(av)} foi ligado ao cadastro do Klingo (${prontuarioTxt(d.prontuario)}), pelo nome e pelo telefone.`), h('div', { class: 'sug-acoes' }, ok));
+      if (av.tipo === 'klingo_varios') return h('div', { class: 'sug' }, h('b', {}, 'Mais de um cadastro no Klingo'), h('div', {}, `${quem(av)} bate com ${(d.prontuarios || []).length} cadastros no Klingo. Confira qual é o certo; nada foi ligado.`), h('div', { class: 'sug-acoes' }, ok));
+      if (av.tipo === 'cpf_diferente') return h('div', { class: 'sug' }, h('b', {}, 'CPF diferente do cadastro'), h('div', {}, `${quem(av)} informou um CPF que não é o do cadastro encontrado pelo nome e telefone. Não atualizar nenhum dado; confira o documento.`), h('div', { class: 'sug-acoes' }, ok));
+      const campos = Object.entries(d.campos || {}).map(([k, v]) => `${ROT_CAMPO[k] || k}: ${v.cadastro ? dataOuTxt(v.cadastro) + ' → ' : ''}${dataOuTxt(v.novo)}`);
+      return h('div', { class: 'sug' }, h('b', {}, 'Dado diferente do cadastro'), h('div', {}, `${quem(av)} confirmou o CPF e informou dado novo: ${campos.join('; ')}.`),
+        h('div', { class: 'sug-acoes' }, h('button', { class: 'btn prim', type: 'button', onclick: () => resolverAvisoPaciente(av, true) }, 'Atualizar cadastro'), h('button', { class: 'btn', type: 'button', onclick: () => resolverAvisoPaciente(av, false) }, 'Manter como está')));
+    }));
+  }
+  const dataOuTxt = (v) => (/^\d{4}-\d{2}-\d{2}/.test(String(v)) ? dataBR(String(v).slice(0, 10)) : String(v));
   function renderSugestoes() {
-    if (!S.sugestoes.length) return null;
+    const avisos = h('div', {}, renderAvisosData(), renderAvisosPaciente());
+    const temAvisos = avisos.childNodes.length > 0;
+    if (!S.sugestoes.length) return temAvisos ? avisos : null;
     const mostrar = S.sugestoes.slice(0, 3);
-    return h('div', { id: 'sugestoes' }, mostrar.map((s) => h('div', { class: 'sug' },
+    const sug = h('div', { id: 'sugestoes' }, mostrar.map((s) => h('div', { class: 'sug' },
       h('b', {}, 'Parece a mesma pessoa'),
       h('div', {}, `${nomeBonito(s.nome_a)} e ${nomeBonito(s.nome_b)}: batem ${listaPt((s.sinais || []).map((x) => ROTULO_SINAL[x] || x))}. Falta uma confirmação sua.`),
       h('div', { class: 'sug-acoes' },
         h('button', { class: 'btn prim', type: 'button', onclick: () => confirmarPessoa(s) }, 'É a mesma pessoa'),
         h('button', { class: 'btn', type: 'button', onclick: () => rpcPessoa('pessoa_recusar', { p_a: s.a, p_b: s.b }, 'Certo, não vou sugerir de novo.') }, 'Não é')))),
       S.sugestoes.length > 3 ? h('div', { class: 'dica', style: 'padding:0 12px 8px' }, `E mais ${S.sugestoes.length - 3} sugestão(ões).`) : null);
+    return temAvisos ? h('div', {}, avisos, sug) : sug;
   }
   // Faixa do chat: conversas unidas + exames em aberto + remarcações pendentes da mesma pessoa.
   function renderPessoaChat() {
@@ -1446,7 +1496,29 @@
             (x) => (x.canal === 'botoes' ? 'Pedido enviado pelo chat, com botões.' : 'Mensagem enviada ao paciente.')), 'prim') : null,
           btn('Já remarcado', () => { if (confirm('O novo horário já foi marcado?')) rpcPessoa('agendamento_remarcacao_resolver', { p_fechamento: r.fechamento_id, p_resultado: 'feita' }, 'Remarcação concluída.'); }),
           btn('Paciente desistiu', () => { if (confirm('O paciente desistiu de remarcar?')) rpcPessoa('agendamento_remarcacao_resolver', { p_fechamento: r.fechamento_id, p_resultado: 'recusada' }, 'Registrado.'); })))));
+    renderHistoricoPaciente();
     renderProximo();
+  }
+  // Histórico do paciente: todos os exames que ele já pediu, em qualquer conversa, com o passo de cada um (faltou, marcado, pedido pronto...).
+  const HP = { id: null, t: 0 };
+  const ROT_HP = { faltou: 'Faltou', cancelou: 'Cancelou', remarcou: 'Remarcando', pronto: 'Pedido pronto', marcado: 'Marcado', rascunho: 'Não concluído', compareceu: 'Compareceu' };
+  async function renderHistoricoPaciente() {
+    const el = document.getElementById('historicoPaciente'), id = S.abertaId; if (!el) return;
+    if (!id) { el.replaceChildren(); return; }
+    if (HP.id === id && Date.now() - HP.t < 5000) return;
+    HP.id = id; HP.t = Date.now();
+    let r, k; try { [r, k] = await Promise.all([db.rpc('paciente_linha_do_tempo', { p_conversa: id }), Promise.resolve(db.rpc('paciente_klingo', { p_conversa: id })).then((x) => x, () => null)]); } catch { return; }
+    if (S.abertaId !== id) return;
+    const itens = r && !r.error && Array.isArray(r.data) ? r.data : [];
+    const kd = k && !k.error && k.data ? k.data : {}, kl = { pacientes: Array.isArray(kd.pacientes) ? kd.pacientes : [], exames: Array.isArray(kd.exames) ? kd.exames : [] };
+    if (!itens.length && !kl.exames.length) { el.replaceChildren(); return; }
+    const pend = itens.filter((x) => ['faltou', 'cancelou', 'remarcou', 'pronto'].includes(x.status)).length;
+    el.replaceChildren(h('details', { class: 'pessoa', open: pend > 0 },
+      h('summary', {}, `Histórico do paciente: ${itens.length} pedido(s) no chat` + (kl.exames.length ? ` · ${kl.exames.length} no Klingo` : '') + (pend ? ` · ${pend} pedindo ação` : '')),
+      h('ul', {}, itens.map((x) => h('li', {}, h('b', {}, (ROT_HP[x.status] || x.status) + ': '), x.exames + (x.quando ? ' — ' + quandoCurto(x.quando) : ''), h('div', { class: 'dica' }, x.passo)))),
+      kl.exames.length ? h('div', {}, h('b', {}, `No Klingo (${kl.pacientes.map((q) => 'prontuário ' + q.prontuario).join(', ')}):`),
+        h('ul', {}, kl.exames.slice(0, 12).map((x) => h('li', {}, h('b', {}, (ST_KLINGO[x.status] || x.status) + ': '), String(x.exame || '').toLowerCase() + (x.quando ? ' — ' + quandoCurto(String(x.quando).replace('T', ' ')) : '')))),
+        kl.exames.length > 12 ? h('div', { class: 'dica' }, `E mais ${kl.exames.length - 12} no Klingo.`) : null) : null));
   }
   // Para onde vai a resposta da equipe: a conversa em que o paciente escreveu por último (é a que o aparelho dele está lendo).
   function alvoResposta() {
@@ -1678,7 +1750,7 @@
     area.addEventListener('input', () => { area.style.height = 'auto'; area.style.height = Math.min(area.scrollHeight, 140) + 'px'; });
     area.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); enviarMsg(); } });
     box.replaceChildren(h('div', { class: 'chat-topo', id: 'chatTopo' }), h('div', { id: 'proximo', 'aria-live': 'polite' }),
-      h('div', { id: 'contexto' }, h('div', { id: 'pessoa' }), h('div', { id: 'exameAberto' }), h('div', { id: 'triagem' }), h('div', { id: 'alertaPreco' }), h('div', { id: 'cartaoJ' }), h('div', { id: 'pre' })),
+      h('div', { id: 'contexto' }, h('div', { id: 'pessoa' }), h('div', { id: 'historicoPaciente' }), h('div', { id: 'exameAberto' }), h('div', { id: 'triagem' }), h('div', { id: 'alertaPreco' }), h('div', { id: 'cartaoJ' }), h('div', { id: 'pre' })),
       h('div', { class: 'msgs', id: 'msgs', 'aria-live': 'polite' }), h('div', { class: 'compor' }, area, enviar));
     renderTopoChat(); renderPessoaChat(); renderAlertaPreco(); renderCartaoJ(); desenharMsgs(true);
   }
