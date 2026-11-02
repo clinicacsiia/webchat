@@ -3,11 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Atendimento</title>
-<meta name="theme-color" content="#0f2a4a">
-<meta name="description" content="Fale com a nossa equipe de atendimento.">
+<title>CSI - Clínica de Saúde e Imagem</title>
+<meta name="theme-color" content="#ffffff">
+<meta name="description" content="CSI - Clínica de Saúde e Imagem. Peça seu agendamento e fale com a nossa equipe.">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="icon" href="icon-192.png">
+<link rel="icon" href="img/logo-csi-simbolo.svg" type="image/svg+xml">
+<link rel="icon" href="icon-192.png" sizes="192x192">
 <link rel="apple-touch-icon" href="icon-192.png">
 <style>
   :root {
@@ -60,27 +61,24 @@
 
   /* Cabeçalho */
   .topo {
-    background: var(--verde-escuro); color: #fff; padding: calc(10px + env(safe-area-inset-top)) 12px 10px 14px;
-    display: flex; align-items: center; gap: 12px; flex: none;
+    background: var(--csi-surface); color: var(--csi-sidebar-bg); padding: calc(8px + env(safe-area-inset-top)) 8px 8px 14px;
+    display: flex; align-items: center; gap: 10px; flex: none; border-bottom: 3px solid var(--csi-primary); box-shadow: var(--shadow-sm);
   }
-  .avatar {
-    width: 42px; height: 42px; border-radius: 50%; background: var(--verde); display: grid; place-items: center;
-    font-weight: 700; font-size: calc(19px * var(--esc)); flex: none;
-  }
+  .topo-logo { height: 30px; width: auto; flex: none; display: block; }
   .topo-info { flex: 1; min-width: 0; }
-  .topo-nome { font-weight: 650; font-size: calc(18px * var(--esc)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .topo-status { font-size: calc(15.5px * var(--esc)); opacity: .9; display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .topo-nome { font-weight: 700; font-size: calc(16px * var(--esc)); line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .topo-status { font-size: calc(14.5px * var(--esc)); color: var(--texto-suave); display: flex; align-items: center; gap: 6px; min-width: 0; }
   .topo-status #status { line-height: 1.25; }
   .ponto { width: 8px; height: 8px; border-radius: 50%; background: #9aa7b6; flex: none; }
   .ponto.aguardando { background: #f2b84b; }
   .ponto.atendendo { background: #4ade80; }
   .btn-menu {
-    background: transparent; border: 0; color: #fff; width: 44px; height: 44px; border-radius: 50%; cursor: pointer; font-size: calc(23px * var(--esc)); line-height: 1;
+    background: transparent; border: 0; color: var(--csi-sidebar-bg); width: 44px; height: 44px; border-radius: 50%; cursor: pointer; font-size: calc(23px * var(--esc)); line-height: 1;
   }
-  .btn-menu:hover { background: rgba(255,255,255,.12); }
+  .btn-menu:hover { background: var(--csi-primary-soft); }
   .btn-voltar { margin-left: -6px; }
   .menu {
-    position: absolute; right: 10px; top: calc(58px + env(safe-area-inset-top)); background: var(--papel); border: 1px solid var(--linha);
+    position: absolute; right: 10px; top: calc(60px + env(safe-area-inset-top)); background: var(--papel); border: 1px solid var(--linha);
     border-radius: 12px; box-shadow: 0 8px 24px rgba(15,42,74,.18); z-index: 20; min-width: 190px; overflow: hidden;
   }
   .menu button { display: block; width: 100%; text-align: left; padding: 13px 16px; background: none; border: 0; cursor: pointer; }
@@ -90,13 +88,16 @@
   /* Formulário inicial */
   /* Tela inicial: coluna flexível para o bloco da clínica ficar no fim da tela */
   .inicio { flex: 1; overflow-y: auto; padding: 24px 16px calc(24px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; }
-  .inicio h1 { font-size: calc(28px * var(--esc)); line-height: 1.2; margin: 4px 0 6px; }
-  .inicio p.sub { margin: 0 0 18px; color: var(--texto-suave); }
+  .hero { text-align: center; padding: 6px 0 14px; }
+  .hero-logo { width: min(250px, 68%); height: auto; display: inline-block; }
+  .hero-nome { margin: 4px 0 0; font-size: calc(15px * var(--esc)); font-weight: 650; letter-spacing: .02em; color: var(--csi-sidebar-bg); }
+  .inicio h1 { font-size: calc(26px * var(--esc)); line-height: 1.2; margin: 6px 0 4px; text-align: center; }
+  .inicio p.sub { margin: 0 0 16px; color: var(--texto-suave); text-align: center; }
   .inicio > form { margin-bottom: 24px; }
   .inicio > .link-add { align-self: flex-start; margin-bottom: 16px; }
   /* Dados da clínica (somente leitura) */
   .inst-clinica { margin-top: auto; background: var(--csi-surface); border: 1px solid var(--csi-border); border-top: 4px solid var(--csi-primary); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); padding: 16px; font-size: calc(15px * var(--esc)); line-height: 1.5; }
-  .inst-clinica h2 { margin: 0 0 8px; font-size: calc(17px * var(--esc)); color: var(--csi-sidebar-bg); }
+  .inst-clinica h2 { margin: 0 0 8px; font-size: calc(16px * var(--esc)); color: var(--csi-sidebar-bg); }
   .inst-clinica p { margin: 0 0 8px; color: var(--texto-suave); overflow-wrap: anywhere; }
   .inst-clinica p:last-child { margin-bottom: 0; }
   .inst-clinica a { color: var(--verde); font-weight: 650; }
@@ -408,9 +409,9 @@
 <div class="app" id="app">
   <header class="topo">
     <button class="btn-menu btn-voltar" id="btnVoltarInicio" type="button" aria-label="Voltar ao início" hidden>&#8592;</button>
-    <div class="avatar" id="avatar" aria-hidden="true">A</div>
+    <img class="topo-logo" src="img/logo-csi-simbolo.svg" alt="" width="89" height="30">
     <div class="topo-info">
-      <div class="topo-nome" id="empresa">Atendimento</div>
+      <div class="topo-nome" id="empresa">CSI · Clínica de Saúde e Imagem</div>
       <div class="topo-status"><span class="ponto" id="ponto"></span><span id="status">Online</span></div>
     </div>
     <button class="btn-menu" id="btnMenu" aria-label="Menu" aria-haspopup="true" aria-expanded="false" hidden>&#8942;</button>
@@ -428,11 +429,13 @@
 
   <!-- Tela 1: dados iniciais -->
   <section class="inicio" id="telaInicio" hidden>
+    <div class="hero">
+      <img class="hero-logo" src="img/logo-csi.svg" alt="CSI - Clínica de Saúde e Imagem" width="250" height="105">
+    </div>
     <h1 id="tituloInicio">Vamos agendar?</h1>
-    <p class="sub" id="boasVindasForm">É só tocar nas opções. A resposta chega na hora.</p>
+    <p class="sub" id="boasVindasForm">É só tocar nas opções.</p>
     <div class="aviso-ia compacto" id="avisoForm">
-      <p><b>Olá! Eu sou o assistente virtual da clínica (uma inteligência artificial).</b> Estou aqui para deixar o seu atendimento mais rápido e tranquilo.</p>
-      <p>Uma pessoa da nossa equipe acompanha as conversas e pode falar com você a qualquer momento. O que fazemos aqui é montar uma <b>previsão de agendamento</b>; quem confirma data, horário e valor é um atendente.</p>
+      <p><b>Sou o assistente virtual (IA) da CSI.</b> Monto a sua <b>previsão de agendamento</b>; um atendente da equipe confirma data, horário e valor.</p>
     </div>
     <div class="conta-faixa" id="faixaConta" hidden>
       <span class="txt" id="faixaContaTxt"></span>
@@ -544,7 +547,7 @@
   const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, storageKey: 'csi-paciente-auth' } });
   const $ = (s) => document.querySelector(s);
   const el = {
-    empresa: $('#empresa'), avatar: $('#avatar'), ponto: $('#ponto'), status: $('#status'),
+    empresa: $('#empresa'), ponto: $('#ponto'), status: $('#status'),
     btnMenu: $('#btnMenu'), btnVoltarInicio: $('#btnVoltarInicio'), menu: $('#menu'), btnNova: $('#btnNova'), btnHistorico: $('#btnHistorico'), btnHistoricoForm: $('#btnHistoricoForm'), btnAtendente: $('#btnAtendente'), btnSair: $('#btnSair'),
     btnLetra: $('#btnLetra'), btnLetraMenor: $('#btnLetraMenor'), btnSuporte: $('#btnSuporte'), apoio: $('#apoio'), barraHumano: $('#barraHumano'), btnHumano: $('#btnHumano'),
     telaInicio: $('#telaInicio'), telaChat: $('#telaChat'), boasForm: $('#boasVindasForm'), tituloInicio: $('#tituloInicio'),
@@ -559,7 +562,8 @@
     btnEnviar: $('#btnEnviar'), toast: $('#toast')
   };
 
-  let config = { nome_empresa: 'Atendimento', boas_vindas: '' };
+  const NOME_CLINICA = 'CSI - Clínica de Saúde e Imagem';
+  let config = { nome_empresa: NOME_CLINICA, boas_vindas: '' };
   let conv = lerLocal(CHAVE_CONVERSA);
   // ultimoId = a maior mensagem já vista (por qualquer caminho). baseServidor = até onde a CONSULTA ao servidor já trouxe tudo:
   // só ela vira o p_apos. Se o aviso instantâneo trouxer a resposta (id 301) antes da mensagem do paciente (id 300),
@@ -797,9 +801,8 @@
       caixa.replaceChildren(h('p', {}, h('b', {}, 'Agora você está falando com uma pessoa da nossa equipe.'), ' Pode escrever à vontade, no campo aqui embaixo.'));
     } else if (motorAtivo) {
       caixa.replaceChildren(
-        h('p', {}, h('b', {}, 'Olá! Eu sou o assistente virtual da clínica, uma inteligência artificial (IA).'), ' Vou te ajudar com calma, um passo de cada vez.'),
-        h('p', {}, 'Uma pessoa da equipe acompanha esta conversa e pode falar com você a qualquer momento: é só tocar em “Falar com um atendente”.'),
-        h('p', {}, 'O que fazemos aqui é montar uma ', h('b', {}, 'previsão de agendamento'), ' para o atendimento ser mais rápido. ', h('b', {}, 'Quem confirma é um atendente.')));
+        h('p', {}, h('b', {}, 'Sou o assistente virtual (IA) da CSI.'), ' Vou te ajudar um passo de cada vez.'),
+        h('p', {}, 'Isto é uma ', h('b', {}, 'previsão de agendamento'), '. ', h('b', {}, 'Quem confirma é um atendente'), ': toque em “Falar com um atendente” quando quiser.'));
     } else {
       caixa.replaceChildren(h('p', {}, h('b', {}, 'Recebemos o seu pedido.'), ' Uma pessoa da equipe vai responder aqui. O que você já escolheu fica registrado como ', h('b', {}, 'previsão'), ' de agendamento, e o atendente confirma com você.'));
     }
@@ -2541,10 +2544,11 @@
       const { data } = await db.rpc('chat_config');
       if (data) config = Object.assign(config, data);
     } catch {}
+    // O nome da clínica é sempre o oficial (o nome genérico "Atendimento" do banco não aparece mais para o paciente).
+    if (!config.nome_empresa || /^atendimento$/i.test(config.nome_empresa.trim())) config.nome_empresa = NOME_CLINICA;
     document.title = config.nome_empresa;
-    el.empresa.textContent = config.nome_empresa;
-    el.avatar.textContent = (config.nome_empresa.trim()[0] || 'A').toUpperCase();
-    if (config.boas_vindas) el.boasForm.textContent = config.boas_vindas;
+    el.empresa.textContent = config.nome_empresa === NOME_CLINICA ? 'CSI · Clínica de Saúde e Imagem' : config.nome_empresa;
+    if (config.boas_vindas && config.boas_vindas.length <= 90) el.boasForm.textContent = config.boas_vindas;
     iniciarSentinela();
     if (conv && conv.id && conv.token) { registrarHistorico(conv); abrirChat(); } else mostrarForm();   // registrar: conversa de antes desta versão entra na lista
     iniciarConta();   // sem esperar: o formulário já está na tela; a conta (se existir) refaz o formulário quando chegar
