@@ -167,6 +167,25 @@
   .chat-topo .quem span { font-size: 13px; color: var(--suave); }
   .chat-topo .quem a { color: var(--azul); }
   .voltar { display: none; }
+  /* Cabeçalho em duas partes: quem é o paciente e o que dá para fazer com a conversa */
+  .topo-id { display: flex; align-items: center; gap: 10px; flex: 1 1 150px; min-width: 0; }
+  .topo-id .quem { min-width: 0; }
+  .chat-topo .quem b, .chat-topo .quem .contato, .chat-topo .quem .st { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chat-topo .quem .contato, .chat-topo .quem .st { display: block; }
+  .avatar { flex: none; width: 40px; height: 40px; border-radius: 50%; background: var(--csi-primary-soft); color: var(--csi-primary-strong); display: grid; place-items: center; font-weight: 700; font-size: 17px; }
+  .topo-acoes { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .topo-acoes select { width: auto; max-width: 150px; }
+  /* Atalhos dos avisos da conversa (só no celular) e sugestões de resposta */
+  #ctxChips, .ctx-head, .ctx-fundo { display: none; }
+  #sugestoes:empty { display: none; }
+  #sugestoes { display: flex; gap: 6px; align-items: center; overflow-x: auto; padding: 8px 12px 0; background: var(--csi-surface); border-top: 1px solid var(--linha); scrollbar-width: none; }
+  #sugestoes::-webkit-scrollbar { display: none; }
+  #sugestoes .rot { flex: none; font-size: 12px; color: var(--suave); font-weight: 650; }
+  .sug-resp { flex: none; max-width: 80%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border: 1px solid var(--csi-border-strong); background: var(--csi-surface); color: var(--csi-text-main); border-radius: 999px; padding: 6px 12px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; }
+  .sug-resp.dado { border-color: var(--csi-primary); background: var(--csi-primary-soft); color: var(--csi-primary-strong); }
+  .sug-resp:hover { border-color: var(--csi-primary); }
+  .chat .compor { border-top: 0; }
+  #sugestoes:not(:empty) + .compor { padding-top: 8px; }
   /* Quadro: outra forma de ver as conversas (dentro do Atendimento) */
   .modo { display: inline-flex; border: 1px solid var(--csi-border-strong); border-radius: 999px; overflow: hidden; margin-right: 4px; }
   .modo button { border: 0; background: var(--papel); padding: 5px 12px; font-size: 13px; font-weight: 650; cursor: pointer; transition: background-color var(--csi-ease); }
@@ -245,19 +264,37 @@
   #contexto { flex: none; max-height: 36vh; overflow-y: auto; overscroll-behavior: contain; }
   @media (max-height: 720px) { #contexto { max-height: 26vh; } .chat-topo { padding: 6px 12px; } .proximo { padding: 6px 12px; } }
   @media (max-height: 560px) { #contexto { max-height: 18vh; } }
+  /* Tela baixa (ou teclado aberto no celular): as sugestões saem para sobrar espaço para ler a conversa */
+  @media (max-height: 640px) { #sugestoes { display: none; } }
+  @media (max-height: 720px) and (min-width: 641px) { .avatar { display: none; } .chat-topo .quem .contato, .chat-topo .quem .st { display: inline; } .chat-topo .quem .st::before { content: ' · '; } .chat-topo .quem { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } }
+  @media (max-height: 460px) { #ctxChips { display: none !important; } }
   /* Celular: cabeçalho e avisos mais enxutos para sobrar espaço para ler as mensagens */
   @media (max-width: 640px) {
-    .chat-topo { padding: 6px 10px; gap: 6px; }
-    .chat-topo .quem { min-width: 0; }
+    .chat-topo { padding: 8px 10px; gap: 8px; flex-direction: column; align-items: stretch; flex-wrap: nowrap; }
+    .topo-id { flex: none; }
+    .avatar { width: 38px; height: 38px; font-size: 16px; }
     .chat-topo .quem b { font-size: 15px; }
     .chat-topo .quem span { font-size: 12px; }
-    .chat-topo .btn, .chat-topo select { padding: 5px 10px; font-size: 13px; }
+    .chat-topo .quem .st { font-size: 12px; }
+    .topo-acoes { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; }
+    .topo-acoes .btn, .topo-acoes select { width: 100%; min-width: 0; padding: 7px 6px; font-size: 13px; text-align: center; }
     .proximo { padding: 6px 10px; gap: 6px; }
     .proximo .texto { min-width: 0; } .proximo .texto b { font-size: 14px; }
     .proximo .texto span { display: none; }
     .proximo .btn { padding: 5px 10px; font-size: 13px; }
-    #contexto { max-height: 22vh; }
-    .msgs { min-height: 38vh; padding: 10px; }
+    .msgs { min-height: 120px; padding: 10px; }
+    /* Avisos e dados de apoio saem da frente da conversa: viram atalhos e abrem numa folha por cima */
+    #ctxChips:not(:empty) { display: flex; gap: 6px; overflow-x: auto; padding: 6px 10px; background: var(--papel); border-bottom: 1px solid var(--linha); scrollbar-width: none; }
+    #ctxChips::-webkit-scrollbar { display: none; }
+    .ctx-chip { flex: none; border: 1px solid var(--csi-border-strong); background: var(--csi-primary-soft); color: var(--csi-primary-strong); border-radius: 999px; padding: 5px 11px; font-size: 13px; font-weight: 650; cursor: pointer; white-space: nowrap; font-family: inherit; }
+    .ctx-chip.media { background: var(--csi-warning-soft); border-color: #e08a00; color: var(--aviso); }
+    .ctx-chip.alta { background: var(--csi-danger-bg); border-color: var(--csi-danger); color: var(--csi-danger-strong); }
+    #contexto { display: none; position: fixed; left: 0; right: 0; bottom: 0; z-index: 31; max-height: 72dvh; background: var(--csi-surface); border-radius: 16px 16px 0 0; box-shadow: 0 -8px 30px rgba(0,0,0,.28); padding-bottom: env(safe-area-inset-bottom); }
+    .chat.ctx-open #contexto { display: block; }
+    .ctx-fundo { position: fixed; inset: 0; z-index: 30; background: rgba(0,0,0,.4); }
+    .chat.ctx-open .ctx-fundo { display: block; }
+    .ctx-head { display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 1; background: var(--csi-surface); padding: 10px 14px; border-bottom: 1px solid var(--linha); font-weight: 700; }
+    .sug-resp { max-width: 86%; }
     .msg { max-width: 88%; }
   }
   .msgs { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 6px; min-height: 0; }
@@ -578,7 +615,7 @@
     // Só redesenha se algo mudou: a releitura a cada 15 s não pode fechar as seções abertas (Dados do paciente, Histórico).
     const sig = JSON.stringify([data, itens, hist]);
     if (sig === S.preSig) return;
-    S.preSig = sig; S.pre = data || null; S.preItens = itens || []; S.preHist = hist; renderPre();
+    S.preSig = sig; S.pre = data || null; S.preItens = itens || []; S.preHist = hist; renderPre(); renderSugestoesResposta();
   }
   // O status "Agendado" muda sozinho (conferência automática a cada 15 s): reler enquanto uma conversa está aberta.
   setInterval(() => { if (S.abertaId && S.aba === 'atendimento' && !document.hidden) carregarPre(); }, 15000);
@@ -1525,7 +1562,7 @@
           btn('Já remarcado', () => { if (confirm('O novo horário já foi marcado?')) rpcPessoa('agendamento_remarcacao_resolver', { p_fechamento: r.fechamento_id, p_resultado: 'feita' }, 'Remarcação concluída.'); }),
           btn('Paciente desistiu', () => { if (confirm('O paciente desistiu de remarcar?')) rpcPessoa('agendamento_remarcacao_resolver', { p_fechamento: r.fechamento_id, p_resultado: 'recusada' }, 'Registrado.'); })))));
     renderHistoricoPaciente();
-    renderProximo();
+    renderProximo(); renderSugestoesResposta();
   }
   // Histórico do paciente: todos os exames que ele já pediu, em qualquer conversa, com o passo de cada um (faltou, marcado, pedido pronto...).
   const HP = { id: null, t: 0 };
@@ -1545,7 +1582,7 @@
     const kd = k && !k.error && k.data ? k.data : {}, kl = { pacientes: Array.isArray(kd.pacientes) ? kd.pacientes : [], exames: Array.isArray(kd.exames) ? kd.exames : [] };
     if (!itens.length && !kl.exames.length) { el.replaceChildren(); return; }
     const pend = itens.filter((x) => ['faltou', 'cancelou', 'remarcou', 'pronto'].includes(x.status)).length;
-    el.replaceChildren(h('details', { class: 'pessoa', open: pend > 0 },
+    el.replaceChildren(h('details', { class: 'pessoa', open: pend > 0, 'data-n': itens.length, 'data-pend': pend },
       h('summary', {}, `Histórico do paciente: ${itens.length} pedido(s) no chat` + (kl.exames.length ? ` · ${kl.exames.length} no Klingo` : '') + (pend ? ` · ${pend} pedindo ação` : '')),
       h('ul', {}, itens.map((x) => h('li', {}, h('b', {}, rotuloPasso(x.status, 'chat') + ': '), x.exames + (x.quando ? ' — ' + quandoCurto(x.quando) : ''), h('div', { class: 'dica' }, proximoPasso(x.status, 'chat') || x.passo)))),
       kl.exames.length ? h('div', {}, h('b', {}, `No Klingo (${kl.pacientes.map((q) => 'prontuário ' + q.prontuario).join(', ')}):`),
@@ -1781,17 +1818,83 @@
     const enviar = h('button', { class: 'btn prim', type: 'button', id: 'btnEnviar', onclick: enviarMsg }, 'Enviar');
     area.addEventListener('input', () => { area.style.height = 'auto'; area.style.height = Math.min(area.scrollHeight, 140) + 'px'; });
     area.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); enviarMsg(); } });
-    box.replaceChildren(h('div', { class: 'chat-topo', id: 'chatTopo' }), h('div', { id: 'proximo', 'aria-live': 'polite' }),
-      h('div', { id: 'contexto' }, h('div', { id: 'pessoa' }), h('div', { id: 'historicoPaciente' }), h('div', { id: 'exameAberto' }), h('div', { id: 'triagem' }), h('div', { id: 'alertaPreco' }), h('div', { id: 'cartaoJ' }), h('div', { id: 'pre' })),
-      h('div', { class: 'msgs', id: 'msgs', 'aria-live': 'polite' }), h('div', { class: 'compor' }, area, enviar));
-    renderTopoChat(); renderPessoaChat(); renderAlertaPreco(); renderCartaoJ(); desenharMsgs(true);
+    box.classList.remove('ctx-open');
+    box.replaceChildren(h('div', { class: 'chat-topo', id: 'chatTopo' }), h('div', { id: 'proximo', 'aria-live': 'polite' }), h('div', { id: 'ctxChips', 'aria-label': 'Avisos desta conversa' }),
+      h('div', { class: 'ctx-fundo', onclick: fecharContexto }),
+      h('div', { id: 'contexto' }, h('div', { class: 'ctx-head' }, h('span', {}, 'Sobre este paciente'), h('button', { class: 'btn', type: 'button', onclick: fecharContexto }, 'Fechar')), h('div', { id: 'pessoa' }), h('div', { id: 'historicoPaciente' }), h('div', { id: 'exameAberto' }), h('div', { id: 'triagem' }), h('div', { id: 'alertaPreco' }), h('div', { id: 'cartaoJ' }), h('div', { id: 'pre' })),
+      h('div', { class: 'msgs', id: 'msgs', 'aria-live': 'polite' }), h('div', { id: 'sugestoes', 'aria-label': 'Sugestões de resposta' }), h('div', { class: 'compor' }, area, enviar));
+    if (S.ctxObs) S.ctxObs.disconnect();
+    S.ctxObs = new MutationObserver(() => { cancelAnimationFrame(S.ctxRaf); S.ctxRaf = requestAnimationFrame(renderCtxChips); });
+    S.ctxObs.observe(document.getElementById('contexto'), { childList: true, subtree: true });
+    renderTopoChat(); renderPessoaChat(); renderAlertaPreco(); renderCartaoJ(); desenharMsgs(true); renderCtxChips();
+  }
+  /* No celular os avisos e dados de apoio não ocupam a tela: cada um vira um atalho (chip) que abre a folha "Sobre este paciente".
+     No computador continuam abertos no alto, como antes. */
+  const ehCelular = () => window.matchMedia('(max-width: 640px)').matches;
+  function abrirContexto(id) {
+    if (ehCelular()) document.getElementById('chat')?.classList.add('ctx-open');
+    requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView?.({ block: ehCelular() ? 'start' : 'center', behavior: 'smooth' }));
+  }
+  function fecharContexto() { document.getElementById('chat')?.classList.remove('ctx-open'); }
+  function renderCtxChips() {
+    const box = document.getElementById('ctxChips'); if (!box) return;
+    const c = conversaAberta(); if (!c) { box.replaceChildren(); return; }
+    const cheio = (id) => (document.getElementById(id)?.children.length || 0) > 0;
+    const itens = [], chip = (id, rot, tom) => { if (cheio(id)) itens.push(h('button', { class: 'ctx-chip ' + (tom || ''), type: 'button', onclick: () => abrirContexto(id) }, rot)); };
+    const ids = membrosDe(c.id);
+    const caixas = document.querySelectorAll('#exameAberto .ex-caixa');
+    if (caixas.length) chip('exameAberto', document.querySelector('#exameAberto .ex-caixa.falta') ? 'Faltou: remarcar' : (caixas.length === 1 ? 'Exame em aberto' : caixas.length + ' exames em aberto'), document.querySelector('#exameAberto .ex-caixa.falta, #exameAberto .urg.alta') ? 'alta' : 'media');
+    chip('alertaPreco', 'Confira o valor', 'alta');
+    if (ids.length > 1) chip('pessoa', ids.length + ' conversas unidas');
+    const hp = document.querySelector('#historicoPaciente details');
+    if (hp) chip('historicoPaciente', 'Histórico (' + (hp.dataset.n || '') + ')' + (Number(hp.dataset.pend) > 0 ? ' · ' + hp.dataset.pend + ' pedindo ação' : ''), Number(hp.dataset.pend) > 0 ? 'media' : '');
+    chip('triagem', 'Triagem' + (ids.some((i) => ((S.conversas.find((x) => x.id === i) || {}).triagem_urgencia) === 'alta') ? ': urgente' : ''), ids.some((i) => ((S.conversas.find((x) => x.id === i) || {}).triagem_urgencia) === 'alta') ? 'alta' : '');
+    chip('cartaoJ', 'Jornada'); chip('pre', 'Pré-agendamento', 'media');
+    box.replaceChildren(...itens);
+  }
+  /* Sugestões de resposta: montadas só com o que a tela já tem (exames, remarcação, pré-agendamento, triagem, última mensagem).
+     Tocar numa sugestão só preenche a caixa de texto: quem atende lê, ajusta e envia. Nada é enviado sozinho. */
+  const primeiroNome = (n) => { const t = String(n || '').trim().split(/\s+/)[0] || ''; return t ? t.charAt(0).toUpperCase() + t.slice(1).toLowerCase() : ''; };
+  const exameLegivel = (x) => String(x || 'exame').toLowerCase().replace(/\b(rm|tc|us|usg|rx|pet|ct|ecg)\b/g, (m) => m.toUpperCase()).replace(/\s+\+\s+/g, ' e ').replace(/\s+/g, ' ').trim();
+  const saudacaoHora = () => { const hh = new Date().getHours(); return hh < 12 ? 'Bom dia' : hh < 18 ? 'Boa tarde' : 'Boa noite'; };
+  function montarSugestoes() {
+    const c = conversaAberta(); if (!c || c.status === 'encerrada' || !S.me) return [];
+    if (c.agente_id && c.agente_id !== S.me.id) return [];
+    const nome = primeiroNome(c.nome_informado || (c.contatos || {}).nome), n = nome ? ', ' + nome : '', cumpr = saudacaoHora() + (nome ? ', ' + nome : '') + '!';
+    const eu = primeiroNome(((S.agentes.get(S.me.id)) || {}).nome || S.me.nome);
+    const ids = membrosDe(c.id), ultima = S.msgs.length ? S.msgs[S.msgs.length - 1] : null;
+    const jaFalei = S.msgs.some((m) => m.autor === 'agente' && m.agente_id === S.me.id);
+    const dado = [], geral = [], quando = (q) => (q ? ' (' + quandoCurto(q) + ')' : '');
+    for (const r of remarcarDe(c.id)) {
+      const ex = exameLegivel(r.exames), q = quando(r.quando);
+      if (r.remarcacao === 'aceita') dado.push({ rot: 'Estou buscando o novo horário', texto: `Perfeito${n}! Estou verificando os horários disponíveis para ${ex} e já te retorno por aqui.` });
+      else if (r.desfecho === 'faltou') dado.push({ rot: 'Faltou: oferecer novo horário', texto: `${cumpr} Vi que o exame de ${ex}${q} não foi realizado. Quer que eu remarque para outro dia? Me diga os melhores dias e horários para você.` });
+      else dado.push({ rot: 'Perguntar dia e horário', texto: `${cumpr} Vi que você quer remarcar o exame de ${ex}${q}. Quais dias e horários ficam melhores para você?` });
+    }
+    for (const a of abertosDe(c.id)) {
+      const ex = exameLegivel(a.exames), q = quando(a.quando);
+      dado.push(a.passou ? { rot: 'Perguntar se compareceu', texto: `${cumpr} Como foi o seu exame de ${ex}${q}? Você conseguiu comparecer?` }
+        : { rot: 'Confirmar o exame marcado', texto: `${cumpr} Seu exame de ${ex} está marcado${q}. Você consegue comparecer?` });
+    }
+    if (S.pre && S.pre.status === 'pronto') dado.push({ rot: 'Avisar que vai marcar', texto: `Conferi o seu pedido${n} e vou marcar o horário no sistema. Assim que confirmar, te aviso por aqui.` });
+    if (ids.some((i) => ((S.conversas.find((x) => x.id === i) || {}).triagem_urgencia) === 'alta')) dado.push({ rot: 'Acolher (urgente)', texto: `Entendi${n}. Estou aqui e vou te ajudar agora. Pode me contar com mais detalhes o que está acontecendo?` });
+    if (!jaFalei) geral.push({ rot: 'Apresentar-se', texto: `${cumpr} Aqui é ${eu || 'da equipe'}, da Clínica CSI. Como posso ajudar?` });
+    if (ultima && ultima.autor === 'cliente') { geral.push({ rot: 'Já estou verificando', texto: `Já estou verificando isso para você${n}. Um momento, por favor.` }); geral.push({ rot: 'Pedir foto do pedido', texto: 'Pode me enviar uma foto do pedido médico, por favor?' }); }
+    if (jaFalei) geral.push({ rot: 'Encerrar com cortesia', texto: `Obrigado pelo contato${n}! Qualquer dúvida, é só chamar.` });
+    return [...dado.map((x) => ({ ...x, dado: true })), ...geral].slice(0, 6);
+  }
+  function renderSugestoesResposta() {
+    const box = document.getElementById('sugestoes'); if (!box) return;
+    const lista = montarSugestoes(), caixa = document.getElementById('caixa');
+    box.replaceChildren(...(lista.length ? [h('span', { class: 'rot' }, 'Sugestões:')] : []), ...lista.map((x) => h('button', { class: 'sug-resp' + (x.dado ? ' dado' : ''), type: 'button', title: x.texto,
+      onclick: () => { const v = caixa.value.trim(); caixa.value = v ? v + ' ' + x.texto : x.texto; caixa.dispatchEvent(new Event('input')); caixa.focus(); } }, x.rot)));
   }
   // "Próximo passo": escolhe, pela ordem do que é mais urgente, a única decisão que falta e leva o atendente até ela.
   // Só lê o que a tela já carregou; não grava nada. Os outros pontos continuam logo abaixo, na área de apoio.
   function renderProximo() {
     const box = document.getElementById('proximo'); if (!box) return;
     const c = conversaAberta(); if (!c || c.status === 'encerrada') { box.replaceChildren(); return; }
-    const ir = (id) => () => document.getElementById(id)?.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
+    const ir = (id) => () => abrirContexto(id);
     const ids = membrosDe(c.id), minha = c.status === 'em_atendimento' && c.agente_id === S.me.id;
     const urgente = ids.some((i) => ((S.conversas.find((x) => x.id === i) || {}).triagem_urgencia) === 'alta');
     const dono = c.agente_id && c.agente_id !== S.me.id ? S.agentes.get(c.agente_id) : null;
@@ -1821,7 +1924,7 @@
     const ct = c.contatos || {}; const ag = c.agente_id ? S.agentes.get(c.agente_id) : null;
     const minha = c.status === 'em_atendimento' && c.agente_id === S.me.id;
     const atendentes = [...S.agentes.values()].filter((a) => a.ativo && (a.papel === 'admin' || a.papel === 'atendente') && a.id !== c.agente_id);
-    const sel = atendentes.length ? h('select', { 'aria-label': 'Transferir para', style: 'width:auto', onchange: (e) => { if (e.target.value) transferir(e.target.value); } },
+    const sel = atendentes.length ? h('select', { 'aria-label': 'Transferir para', onchange: (e) => { if (e.target.value) transferir(e.target.value); } },
       h('option', { value: '' }, 'Transferir…'), atendentes.map((a) => h('option', { value: a.id }, a.nome))) : null;
     const tri = document.getElementById('triagem');
     if (tri) tri.replaceChildren(...(c.triagem_resumo || (c.ia_ativa && c.status === 'aguardando') ? [h('div', { class: 'triagem' },
@@ -1829,17 +1932,20 @@
         : (c.motor === 'fluxo' ? 'Resumo do assistente automático' : 'Triagem do assistente virtual')),
       c.triagem_urgencia ? h('span', { class: 'urg ' + c.triagem_urgencia }, 'Urgência ' + ({ baixa: 'baixa', media: 'média', alta: 'alta' })[c.triagem_urgencia]) : null,
       c.triagem_resumo ? h('div', {}, c.triagem_resumo) : null)] : []));
-    t.replaceChildren(...[
-      h('button', { class: 'btn voltar', type: 'button', onclick: () => { S.abertaId = null; document.getElementById('inbox')?.classList.remove('aberta'); renderLista(); renderChat(); if (S.modo === 'quadro') renderQuadro(); } }, 'Voltar'),
-      h('div', { class: 'quem' }, h('b', {}, nomeLista(c)),
-        h('span', {}, ct.telefone ? h('a', { href: 'https://wa.me/55' + soDigitos(ct.telefone), target: '_blank', rel: 'noopener noreferrer' }, fmtTel(ct.telefone)) : '', ct.email ? ' · ' + ct.email : '',
-          ' · ', ROTULO_STATUS[c.status], ag && ag.nome ? ' com ' + ag.nome : ''),
-        detalheInicio(c) ? h('span', { style: 'display:block;font-weight:600' }, detalheInicio(c)) : null),
-      !minha && c.status !== 'encerrada' ? h('button', { class: 'btn prim', type: 'button', onclick: () => assumir(true) }, 'Assumir') : null,
-      c.status === 'encerrada' ? h('button', { class: 'btn', type: 'button', onclick: () => assumir(true) }, 'Reabrir') : null,
-      sel,
-      c.status !== 'encerrada' ? h('button', { class: 'btn perigo', type: 'button', onclick: encerrar }, 'Encerrar') : null].filter(Boolean));
-    renderProximo();
+    const nome = nomeLista(c);
+    t.replaceChildren(
+      h('div', { class: 'topo-id' },
+        h('div', { class: 'avatar', 'aria-hidden': 'true' }, (nome.trim().charAt(0) || '?').toUpperCase()),
+        h('div', { class: 'quem' }, h('b', {}, nome),
+          h('span', { class: 'contato' }, ct.telefone ? h('a', { href: 'https://wa.me/55' + soDigitos(ct.telefone), target: '_blank', rel: 'noopener noreferrer' }, fmtTel(ct.telefone)) : '', ct.telefone && ct.email ? ' · ' : '', ct.email || ''),
+          h('span', { class: 'st' }, ROTULO_STATUS[c.status], ag && ag.nome ? ' com ' + ag.nome : '', detalheInicio(c) ? ' · ' + detalheInicio(c) : ''))),
+      h('div', { class: 'topo-acoes' },
+        ...[h('button', { class: 'btn voltar', type: 'button', onclick: () => { S.abertaId = null; document.getElementById('inbox')?.classList.remove('aberta'); renderLista(); renderChat(); if (S.modo === 'quadro') renderQuadro(); } }, 'Voltar'),
+        !minha && c.status !== 'encerrada' ? h('button', { class: 'btn prim', type: 'button', onclick: () => assumir(true) }, 'Assumir') : null,
+        c.status === 'encerrada' ? h('button', { class: 'btn', type: 'button', onclick: () => assumir(true) }, 'Reabrir') : null,
+        sel,
+        c.status !== 'encerrada' ? h('button', { class: 'btn perigo', type: 'button', onclick: encerrar }, 'Encerrar') : null].filter(Boolean)));
+    renderProximo(); renderSugestoesResposta();
   }
   function desenharMsgs(rolar) {
     const box = document.getElementById('msgs'); if (!box) return;
@@ -1863,7 +1969,7 @@
     });
     box.replaceChildren(...out);
     if (rolar || perto) box.scrollTop = box.scrollHeight;
-    renderProximo();
+    renderProximo(); renderSugestoesResposta();
   }
   // Foto do pedido médico enviada pelo paciente, com o que foi lido (celular e IA), o que o paciente marcou
   // e a conferência da equipe. Conferir ensina o sistema: a mesma escrita, da próxima vez, já vem com o exame certo.
