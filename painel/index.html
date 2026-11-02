@@ -1510,7 +1510,7 @@
     let r, k; try { [r, k] = await Promise.all([db.rpc('paciente_linha_do_tempo', { p_conversa: id }), Promise.resolve(db.rpc('paciente_klingo', { p_conversa: id })).then((x) => x, () => null)]); } catch { return; }
     if (S.abertaId !== id) return;
     const itens = r && !r.error && Array.isArray(r.data) ? r.data : [];
-    const kl = k && !k.error && k.data ? k.data : { pacientes: [], exames: [] };
+    const kd = k && !k.error && k.data ? k.data : {}, kl = { pacientes: Array.isArray(kd.pacientes) ? kd.pacientes : [], exames: Array.isArray(kd.exames) ? kd.exames : [] };
     if (!itens.length && !kl.exames.length) { el.replaceChildren(); return; }
     const pend = itens.filter((x) => ['faltou', 'cancelou', 'remarcou', 'pronto'].includes(x.status)).length;
     el.replaceChildren(h('details', { class: 'pessoa', open: pend > 0 },
