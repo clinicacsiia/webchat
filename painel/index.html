@@ -525,7 +525,7 @@
     buscaContatos: '', busca: '', periodo: 'todos', tagFiltro: '', pre: null,
     modo: (() => { try { return localStorage.getItem('painel.modo') === 'quadro' ? 'quadro' : 'lista'; } catch { return 'lista'; } })(),
     quadro: [], colunasQ: [], transQ: [], fq: 'todos', buscaQ: '', quadroOk: true,
-    grupos: new Map(), sugestoes: [], abertos: [], remarcar: [], outrosQ: new Map()
+    grupos: new Map(), sugestoes: [], avisosData: [], abertos: [], remarcar: [], outrosQ: new Map()
   };
   /* ---------- pré-agendamento montado pela IA ---------- */
   const ROTULO_PRE = { rascunho: 'Em coleta', pronto: 'Pronto para marcar', agendado: 'Agendado', cancelado: 'Cancelado' };
@@ -1344,11 +1344,13 @@
   // Se o SQL ainda não foi aplicado, as consultas falham em silêncio e a tela funciona como antes (uma conversa por linha).
   async function carregarPessoas() {
     const vazio = () => ({ error: true, data: null });
-    const [g, ab, rm, su] = await Promise.all([
+    const [g, ab, rm, su, ad] = await Promise.all([
       Promise.resolve(db.from('conversa_grupo').select('conversa_id,grupo_id,sinais,origem,confirmado_por')).then((r) => r, vazio),
       Promise.resolve(db.from('v_agendamento_aberto').select('pre_id,conversa_id,chave,quando,exames,passou')).then((r) => r, vazio),
       Promise.resolve(db.from('v_remarcacao_pendente').select('fechamento_id,conversa_id,exames,quando,desfecho,remarcacao')).then((r) => r, vazio),
-      Promise.resolve(db.rpc('pessoa_sugestoes')).then((r) => r, vazio)]);
+      Promise.resolve(db.rpc('pessoa_sugestoes')).then((r) => r, vazio),
+      Promise.resolve(db.rpc('pessoa_avisos_data')).then((r) => r, vazio)]);
+    S.avisosData = ad.error || !Array.isArray(ad.data) ? [] : ad.data;
     S.grupos = new Map(); (g.error ? [] : g.data || []).forEach((r) => S.grupos.set(r.conversa_id, r));
     S.abertos = ab.error ? [] : ab.data || []; S.remarcar = rm.error ? [] : rm.data || [];
     S.sugestoes = su.error || !Array.isArray(su.data) ? [] : su.data;
@@ -1403,16 +1405,40 @@
     const r = await rpcPessoa('pessoa_separar', { p_conversa: id }, 'Conversa separada.');
     if (r) { await carregarMensagensAbertas(); }
   }
+  // Mesmo nome, telefone e e-mail, mas datas de nascimento diferentes: a atendente diz qual está certa (e as conversas se unem) ou mantém separado.
+  async function corrigirDataPessoa(av, certa) {
+    const errados = certa === av.nasc_a ? av.ids_b : certa === av.nasc_b ? av.ids_a : [...av.ids_a, ...av.ids_b];
+    if (!confirm(`Confirmar ${dataBR(certa)} como data de nascimento de ${nomeBonito(av.nome)} e unir as conversas?`)) return;
+    const r = await rpcPessoa('pessoa_corrigir_data', { p_a: av.ids_a[0], p_b: av.ids_b[0], p_ids: errados, p_data: certa }, 'Data corrigida e conversas unidas.');
+    if (r) { await carregarMensagensAbertas(); }
+  }
+  async function manterSeparadoPessoa(av) {
+    if (!confirm(`Manter as conversas de ${nomeBonito(av.nome)} separadas? O robô não junta de novo.`)) return;
+    await rpcPessoa('pessoa_manter_separado', { p_ids_a: av.ids_a, p_ids_b: av.ids_b }, 'Mantidas separadas.');
+  }
+  function renderAvisosData() {
+    const lista = S.avisosData || [];
+    if (!lista.length) return null;
+    return h('div', { id: 'avisosData' }, lista.slice(0, 3).map((av) => h('div', { class: 'sug' },
+      h('b', {}, 'Data de nascimento diferente'),
+      h('div', {}, `${nomeBonito(av.nome)}: mesmo nome, telefone e e-mail, mas ${dataBR(av.nasc_a)} (${av.ids_a.length} conversa(s)) e ${dataBR(av.nasc_b)} (${av.ids_b.length} conversa(s)).` + (av.parecida ? ' Parece erro de digitação.' : '') + ' Qual está certa?'),
+      h('div', { class: 'sug-acoes' },
+        h('button', { class: 'btn prim', type: 'button', onclick: () => corrigirDataPessoa(av, av.nasc_a) }, dataBR(av.nasc_a)),
+        h('button', { class: 'btn prim', type: 'button', onclick: () => corrigirDataPessoa(av, av.nasc_b) }, dataBR(av.nasc_b)),
+        h('button', { class: 'btn', type: 'button', onclick: () => manterSeparadoPessoa(av) }, 'Manter separado')))));
+  }
   function renderSugestoes() {
-    if (!S.sugestoes.length) return null;
+    const avisos = renderAvisosData();
+    if (!S.sugestoes.length) return avisos;
     const mostrar = S.sugestoes.slice(0, 3);
-    return h('div', { id: 'sugestoes' }, mostrar.map((s) => h('div', { class: 'sug' },
+    const sug = h('div', { id: 'sugestoes' }, mostrar.map((s) => h('div', { class: 'sug' },
       h('b', {}, 'Parece a mesma pessoa'),
       h('div', {}, `${nomeBonito(s.nome_a)} e ${nomeBonito(s.nome_b)}: batem ${listaPt((s.sinais || []).map((x) => ROTULO_SINAL[x] || x))}. Falta uma confirmação sua.`),
       h('div', { class: 'sug-acoes' },
         h('button', { class: 'btn prim', type: 'button', onclick: () => confirmarPessoa(s) }, 'É a mesma pessoa'),
         h('button', { class: 'btn', type: 'button', onclick: () => rpcPessoa('pessoa_recusar', { p_a: s.a, p_b: s.b }, 'Certo, não vou sugerir de novo.') }, 'Não é')))),
       S.sugestoes.length > 3 ? h('div', { class: 'dica', style: 'padding:0 12px 8px' }, `E mais ${S.sugestoes.length - 3} sugestão(ões).`) : null);
+    return avisos ? h('div', {}, avisos, sug) : sug;
   }
   // Faixa do chat: conversas unidas + exames em aberto + remarcações pendentes da mesma pessoa.
   function renderPessoaChat() {
