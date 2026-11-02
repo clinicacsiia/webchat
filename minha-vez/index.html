@@ -8,7 +8,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
-<title>Minha vez na clínica</title>
+<title>Minha vez · CSI - Clínica de Saúde e Imagem</title>
 <style>
   /* Padrão visual da CSI (mesmos tokens do painel e do chat) */
   :root { --csi-primary:#0088cc; --csi-primary-strong:#006ba1; --csi-primary-soft:#e6f4fb; --csi-sidebar-bg:#1e3a5f; --csi-danger:#e74c3c; --csi-danger-bg:#fdf2f0; --csi-danger-strong:#b3261e;
@@ -21,9 +21,11 @@
   * { box-sizing:border-box; }
   html,body { margin:0; min-height:100%; }
   body { font-family:var(--font-family); background:var(--fundo); color:var(--texto); font-size:18px; line-height:1.45; }
-  header { background:var(--azul-escuro); color:#fff; padding:14px 16px; display:flex; align-items:center; justify-content:space-between; gap:12px; }
+  header { background:var(--csi-surface); color:var(--csi-sidebar-bg); padding:10px 16px; display:flex; align-items:center; justify-content:space-between; gap:12px; border-bottom:3px solid var(--csi-primary); }
+  .marca-cab { display:flex; align-items:center; gap:10px; min-width:0; } .marca-cab img { height:25px; width:auto; flex:none; }
+  @media (prefers-color-scheme: dark) { header { background:var(--azul-escuro); color:#fff; } .marca-cab img { background:#fff; border-radius:6px; padding:3px 6px; height:31px; } }
   header b { font-size:1.05rem; }
-  header button { background:transparent; color:#fff; border:1px solid rgba(255,255,255,.5); border-radius:10px; padding:8px 12px; font-size:.9rem; }
+  header button { background:transparent; color:inherit; border:1px solid currentColor; border-radius:10px; padding:8px 12px; font-size:.9rem; }
   main { max-width:520px; margin:0 auto; padding:16px; }
   .cartao { background:var(--papel); border:1px solid var(--linha); border-radius:var(--radius-lg); padding:20px; margin-bottom:14px; box-shadow:var(--shadow-md); }
   h1 { font-size:1.35rem; margin:0 0 8px; }
@@ -74,7 +76,7 @@
 </style>
 </head>
 <body>
-<header><b>Minha vez na clínica</b><button type="button" id="btnSair" hidden>Sair</button></header>
+<header><span class="marca-cab"><img src="../img/logo-csi-simbolo.svg" alt="CSI - Clínica de Saúde e Imagem" width="75" height="25"><b>Minha vez na clínica</b></span><button type="button" id="btnSair" hidden>Sair</button></header>
 <main id="raiz"><div class="cartao"><p>Carregando…</p></div></main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>

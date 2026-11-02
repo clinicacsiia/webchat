@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Painel de atendimento</title>
+<title>Painel de atendimento · CSI</title>
 <meta name="theme-color" content="#1e3a5f">
 <meta name="robots" content="noindex, nofollow">
 <link rel="manifest" href="manifest.webmanifest">
@@ -86,6 +86,8 @@
   .centro { min-height: 100dvh; display: grid; place-items: center; padding: 20px; background: var(--verde-escuro); }
   .cartao { width: 100%; max-width: 380px; background: var(--papel); border-radius: var(--radius-lg); padding: 26px 24px; box-shadow: var(--shadow-md); }
   .cartao h1 { font-size: 22px; margin: 0 0 4px; }
+  .logo-cartao { display: block; width: min(200px, 70%); height: auto; margin: 0 auto 14px; }
+  @media (prefers-color-scheme: dark) { .logo-cartao { background: #fff; border-radius: 12px; padding: 8px 12px; } }
   .cartao p.sub { margin: 0 0 18px; color: var(--suave); }
   .cartao .btn.prim { width: 100%; padding: 12px; font-size: 15px; }
   .link { background: none; border: 0; color: var(--azul); cursor: pointer; padding: 6px 0; font-size: 14px; text-decoration: underline; }
@@ -342,6 +344,7 @@
 
   /* ===== Visual novo (somente aparência): ícones, barra do topo, cabeçalho com indicadores, linhas com avatar ===== */
   .ic-svg { display: inline-flex; flex: none; } .ic-svg svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .marca .marca-logo { width: 150px; height: auto; } .marca { flex-wrap: wrap; } .marca small { flex-basis: 100%; }
   .marca { gap: 8px; } .marca .marca-nome { font-weight: 800; font-size: 26px; letter-spacing: 1px; line-height: 1; } .marca small { font-weight: 500; font-size: 11px; opacity: .65; letter-spacing: 0; }
   .nav button .nav-rot { flex: 1; min-width: 0; }
   .nav button { justify-content: flex-start; }
@@ -685,6 +688,7 @@
         modoCadastro ? h('p', { class: 'dica' }, 'Mínimo de 8 caracteres.') : null),
       erro, btn);
     return h('div', { class: 'centro' }, h('div', { class: 'cartao' },
+      h('img', { class: 'logo-cartao', src: '../img/logo-csi.svg', alt: 'CSI - Clínica de Saúde e Imagem', width: 200, height: 84 }),
       h('h1', {}, modoCadastro ? 'Criar conta da equipe' : 'Painel de atendimento'),
       h('p', { class: 'sub' }, modoCadastro ? 'Depois de criar, um administrador precisa liberar seu acesso.' : 'Entre com a sua conta da equipe.'),
       form,
@@ -693,6 +697,7 @@
   function telaLoginMostrar(cad) { raiz.replaceChildren(telaLogin(cad)); }
   function telaAviso(titulo, texto, aoVoltar) {
     return h('div', { class: 'centro' }, h('div', { class: 'cartao' },
+      h('img', { class: 'logo-cartao', src: '../img/logo-csi.svg', alt: 'CSI - Clínica de Saúde e Imagem', width: 200, height: 84 }),
       h('h1', {}, titulo), h('p', { class: 'sub' }, texto),
       h('button', { class: 'btn', type: 'button', onclick: aoVoltar || sair, style: 'width:100%' }, aoVoltar ? 'Voltar' : 'Sair')));
   }
@@ -760,7 +765,7 @@
     const nav = h('nav', { class: 'nav', 'aria-label': 'Seções' }, abas.map(([id, rot]) =>
       h('button', { type: 'button', 'data-aba': id, onclick: () => { S.aba = id; renderAba(); } }, icone(ICONE_ABA[id] || 'lista'), h('span', { class: 'nav-rot' }, rot), id === 'atendimento' ? h('span', { class: 'selo', id: 'seloAguardando', hidden: true }, '0') : null, id === 'fila' ? h('span', { class: 'selo', id: 'seloFila', hidden: true }, '0') : null, id === 'avisos' ? h('span', { class: 'selo', id: 'seloAvisos', hidden: true }, '0') : null, id === 'jornada' ? h('span', { class: 'selo erro', id: 'seloJornada', title: 'Pacientes que precisam de atenção agora', hidden: true }, '0') : null)));
     const lateral = h('aside', { class: 'lateral' },
-      h('div', { class: 'marca' }, h('i', { id: 'pontoVivo' }), h('span', { class: 'marca-nome' }, 'CSI'), h('small', {}, 'Atendimento')),
+      h('div', { class: 'marca' }, h('i', { id: 'pontoVivo' }), h('img', { class: 'marca-logo', src: '../img/logo-csi-branco.svg', alt: 'CSI - Clínica de Saúde e Imagem' }), h('small', {}, 'Atendimento')),
       nav, h('div', { class: 'espaco' }),
       h('div', { class: 'eu' }, h('b', {}, S.me.nome || S.me.email || 'Equipe'), h('span', {}, ROTULO_PAPEL[S.me.papel]),
         h('div', { class: 'acoes' },
