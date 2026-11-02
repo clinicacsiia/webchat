@@ -1472,7 +1472,25 @@
             (x) => (x.canal === 'botoes' ? 'Pedido enviado pelo chat, com botões.' : 'Mensagem enviada ao paciente.')), 'prim') : null,
           btn('Já remarcado', () => { if (confirm('O novo horário já foi marcado?')) rpcPessoa('agendamento_remarcacao_resolver', { p_fechamento: r.fechamento_id, p_resultado: 'feita' }, 'Remarcação concluída.'); }),
           btn('Paciente desistiu', () => { if (confirm('O paciente desistiu de remarcar?')) rpcPessoa('agendamento_remarcacao_resolver', { p_fechamento: r.fechamento_id, p_resultado: 'recusada' }, 'Registrado.'); })))));
+    renderHistoricoPaciente();
     renderProximo();
+  }
+  // Histórico do paciente: todos os exames que ele já pediu, em qualquer conversa, com o passo de cada um (faltou, marcado, pedido pronto...).
+  const HP = { id: null, t: 0 };
+  const ROT_HP = { faltou: 'Faltou', cancelou: 'Cancelou', remarcou: 'Remarcando', pronto: 'Pedido pronto', marcado: 'Marcado', rascunho: 'Não concluído', compareceu: 'Compareceu' };
+  async function renderHistoricoPaciente() {
+    const el = document.getElementById('historicoPaciente'), id = S.abertaId; if (!el) return;
+    if (!id) { el.replaceChildren(); return; }
+    if (HP.id === id && Date.now() - HP.t < 5000) return;
+    HP.id = id; HP.t = Date.now();
+    let r; try { r = await db.rpc('paciente_linha_do_tempo', { p_conversa: id }); } catch { return; }
+    if (S.abertaId !== id) return;
+    const itens = r && !r.error && Array.isArray(r.data) ? r.data : [];
+    if (!itens.length) { el.replaceChildren(); return; }
+    const pend = itens.filter((x) => ['faltou', 'cancelou', 'remarcou', 'pronto'].includes(x.status)).length;
+    el.replaceChildren(h('details', { class: 'pessoa', open: pend > 0 },
+      h('summary', {}, `Histórico do paciente: ${itens.length} exame(s)` + (pend ? ` · ${pend} pedindo ação` : '')),
+      h('ul', {}, itens.map((x) => h('li', {}, h('b', {}, (ROT_HP[x.status] || x.status) + ': '), x.exames + (x.quando ? ' — ' + quandoCurto(x.quando) : ''), h('div', { class: 'dica' }, x.passo))))));
   }
   // Para onde vai a resposta da equipe: a conversa em que o paciente escreveu por último (é a que o aparelho dele está lendo).
   function alvoResposta() {
@@ -1704,7 +1722,7 @@
     area.addEventListener('input', () => { area.style.height = 'auto'; area.style.height = Math.min(area.scrollHeight, 140) + 'px'; });
     area.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); enviarMsg(); } });
     box.replaceChildren(h('div', { class: 'chat-topo', id: 'chatTopo' }), h('div', { id: 'proximo', 'aria-live': 'polite' }),
-      h('div', { id: 'contexto' }, h('div', { id: 'pessoa' }), h('div', { id: 'exameAberto' }), h('div', { id: 'triagem' }), h('div', { id: 'alertaPreco' }), h('div', { id: 'cartaoJ' }), h('div', { id: 'pre' })),
+      h('div', { id: 'contexto' }, h('div', { id: 'pessoa' }), h('div', { id: 'historicoPaciente' }), h('div', { id: 'exameAberto' }), h('div', { id: 'triagem' }), h('div', { id: 'alertaPreco' }), h('div', { id: 'cartaoJ' }), h('div', { id: 'pre' })),
       h('div', { class: 'msgs', id: 'msgs', 'aria-live': 'polite' }), h('div', { class: 'compor' }, area, enviar));
     renderTopoChat(); renderPessoaChat(); renderAlertaPreco(); renderCartaoJ(); desenharMsgs(true);
   }
