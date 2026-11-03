@@ -764,7 +764,7 @@
     S.aba = podeAtender() ? 'atendimento' : 'contatos';
     await carregarAgentes();
     montarApp();
-    if (podeAtender()) { await carregarConversas(); ligarTempoReal(); marcarPresenca(); atualizarAtencao(); carregarFila().catch(() => {}); }
+    if (podeAtender()) { await carregarConversas(); ligarTempoReal(); marcarPresenca(); atualizarAtencao(); carregarFila().catch(() => {}); pedirNotificacaoAoEntrar(); }
     renderAba();
   }
   async function carregarAgentes() {
@@ -1238,6 +1238,17 @@
     if (!S.mudo) bip();
   }
   async function pedirNotificacao() { try { await Notification.requestPermission(); montarApp(); renderAba(); } catch {} }
+  // Pede a permissão assim que o atendente entra. Se o navegador exigir um clique (ex.: Safari), pede no primeiro toque na tela.
+  function pedirNotificacaoAoEntrar() {
+    if (!('Notification' in window) || Notification.permission !== 'default') return;
+    const feito = () => { try { montarApp(); renderAba(); } catch {} };
+    try {
+      const r = Notification.requestPermission(feito);
+      if (r && r.then) r.then(feito).catch(() => {});
+    } catch {}
+    const aoToque = () => { if (Notification.permission === 'default') pedirNotificacao(); };
+    addEventListener('pointerdown', aoToque, { once: true });
+  }
   function avisar(titulo, corpo) {
     bip();
     if ('Notification' in window && Notification.permission === 'granted' && document.hidden) {

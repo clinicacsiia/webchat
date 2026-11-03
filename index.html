@@ -1014,11 +1014,39 @@
     await carregar();
     if (!conv) return;
     assinar(); rolarFim(true);
+    assinarPush();
   }
   // A resposta do assistente volta na mesma chamada: desenha sem esperar o aviso em tempo real e mede o tempo que o paciente viu.
   function mostrarRespostas(lista, t0) {
     (lista || []).forEach((m) => adicionar(m, true));
     if (t0 != null) ultimoMs = Math.round(performance.now() - t0);
+  }
+
+  /* ---------- avisos (push) com o chat fechado ou em segundo plano ---------- */
+  const pushPossivel = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+  function b64ParaBytes(s) {
+    const p = '='.repeat((4 - s.length % 4) % 4), b = atob((s + p).replace(/-/g, '+').replace(/_/g, '/'));
+    return Uint8Array.from(b, (c) => c.charCodeAt(0));
+  }
+  // Guarda o aparelho no servidor para receber as respostas. Só funciona com a permissão dada (no iPhone, só com o site instalado na Tela de Início).
+  async function assinarPush() {
+    if (!pushPossivel() || Notification.permission !== 'granted' || !conv || !conv.id || !conv.token) return;
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const { data } = await db.rpc('chat_push_config');
+      const vapid = data && data.vapid;
+      if (!vapid) return;
+      let sub = await reg.pushManager.getSubscription();
+      if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ParaBytes(vapid) });
+      const j = sub.toJSON();
+      await db.rpc('chat_push_salvar', { p_conversa: conv.id, p_token: conv.token, p_endpoint: j.endpoint, p_p256dh: j.keys.p256dh, p_auth: j.keys.auth });
+    } catch { /* o chat segue sem push */ }
+  }
+  // Pede a permissão logo que a conversa começa (o toque em "Começar" vale como gesto, exigido por Safari/iPhone) e já inscreve o aparelho.
+  // Tem que ser chamado direto no toque (antes de qualquer espera); devolve uma promessa que termina quando a pessoa responde.
+  function pedirAvisos() {
+    if (!pushPossivel() || Notification.permission !== 'default') return Promise.resolve();
+    try { return Promise.resolve(Notification.requestPermission()).catch(() => {}); } catch { return Promise.resolve(); }
   }
 
   /* ---------- ações ---------- */
@@ -1037,6 +1065,7 @@
     if (tel.length < 10) { el.erroForm.textContent = 'Informe o telefone com DDD.'; el.fTel.focus(); return; }
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { el.erroForm.textContent = 'Informe um e-mail válido.'; el.fEmail.focus(); return; }
     if (!salvo && !el.fAceite.checked) { el.erroForm.textContent = 'Marque a caixa de concordância para continuar.'; el.fAceite.focus(); return; }
+    const respostaAvisos = pedirAvisos();
     el.btnIniciar.disabled = true; el.btnIniciar.textContent = 'Começando…';
     const t0 = performance.now();
     try {
@@ -1059,6 +1088,7 @@
       await carregar();
       if (!conv) return;
       assinar(); rolarFim(true);
+      respostaAvisos.then(assinarPush);
     } catch (e) {
       el.erroForm.textContent = mensagemErro(e);
     } finally {
