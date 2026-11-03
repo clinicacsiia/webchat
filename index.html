@@ -424,6 +424,7 @@
     <button type="button" id="btnSuporte">Código de suporte</button>
     <button type="button" id="btnHistorico" hidden>Conversas anteriores</button>
     <button type="button" id="btnNova">Fazer um novo pedido</button>
+    <button type="button" id="btnPrivacidade">Privacidade e termos</button>
     <button type="button" id="btnSair">Sair (não sou eu)</button>
   </div>
 
@@ -480,7 +481,7 @@
         </div>
         <label class="aceite">
           <input type="checkbox" id="fAceite">
-          <span>Concordo que a empresa guarde meu nome, telefone e a conversa para me atender e entrar em contato (LGPD).</span>
+          <span id="aceiteTxt">Concordo que a clínica guarde meu nome, telefone, e-mail e a conversa para me atender e entrar em contato. Li a <a href="privacidade.html" target="_blank" rel="noopener">Política de Privacidade</a> e os <a href="termos.html" target="_blank" rel="noopener">Termos</a>.</span>
         </label>
       </div>
       <p class="erro-form" id="erroForm" role="alert"></p>
@@ -493,6 +494,7 @@
       <p>Tel: <a href="tel:+557131817666">(71) 3181-7666</a> | WhatsApp: <a href="https://wa.me/5571999803806" target="_blank" rel="noopener">(71) 99980-3806</a></p>
       <p>Seg a Sex: 7hs às 18h30 | Sáb: 8hs às 12hs</p>
       <p>Resp. Técnico: Dr. João Rafael Santos Carneiro | CRM 24778 - CBR</p>
+      <p>CNPJ: a informar | <a href="privacidade.html">Política de Privacidade</a> | <a href="termos.html">Termos de Serviço</a></p>
     </aside>
   </section>
 
@@ -549,7 +551,7 @@
   const el = {
     empresa: $('#empresa'), ponto: $('#ponto'), status: $('#status'),
     btnMenu: $('#btnMenu'), btnVoltarInicio: $('#btnVoltarInicio'), menu: $('#menu'), btnNova: $('#btnNova'), btnHistorico: $('#btnHistorico'), btnHistoricoForm: $('#btnHistoricoForm'), btnAtendente: $('#btnAtendente'), btnSair: $('#btnSair'),
-    btnLetra: $('#btnLetra'), btnLetraMenor: $('#btnLetraMenor'), btnSuporte: $('#btnSuporte'), apoio: $('#apoio'), barraHumano: $('#barraHumano'), btnHumano: $('#btnHumano'),
+    btnLetra: $('#btnLetra'), btnLetraMenor: $('#btnLetraMenor'), btnSuporte: $('#btnSuporte'), btnPrivacidade: $('#btnPrivacidade'), apoio: $('#apoio'), barraHumano: $('#barraHumano'), btnHumano: $('#btnHumano'),
     telaInicio: $('#telaInicio'), telaChat: $('#telaChat'), boasForm: $('#boasVindasForm'), tituloInicio: $('#tituloInicio'),
     faixaConta: $('#faixaConta'), faixaContaTxt: $('#faixaContaTxt'), btnContaEntrar: $('#btnContaEntrar'), btnContaCriar: $('#btnContaCriar'), btnContaDados: $('#btnContaDados'), btnContaSair: $('#btnContaSair'),
     form: $('#formInicio'), fNome: $('#fNome'), fTel: $('#fTel'), fEmail: $('#fEmail'),
@@ -743,11 +745,19 @@
     b.append(t, d); b.addEventListener('click', aoClicar);
     return b;
   }
+  // Texto da caixa de aceite do formulário. Para criança, o responsável legal consente em nome dela (LGPD, art. 14).
+  function textoAceite(filho) {
+    const links = [' Li a ', h('a', { href: 'privacidade.html', target: '_blank', rel: 'noopener' }, 'Política de Privacidade'), ' e os ', h('a', { href: 'termos.html', target: '_blank', rel: 'noopener' }, 'Termos'), '.'];
+    return [filho
+      ? 'Sou o pai, a mãe ou o responsável legal da criança e concordo que a clínica guarde os dados dela e os meus (nome, telefone, e-mail e a conversa) para atendê-la e entrar em contato.'
+      : 'Concordo que a clínica guarde meu nome, telefone, e-mail e a conversa para me atender e entrar em contato.', ...links];
+  }
   function desenharQuem() {
     const quem = (tipo, titulo, texto) => cartao(titulo, texto, !!escolha && escolha.tipo === tipo, () => { escolha = { tipo }; el.erroForm.textContent = ''; desenharQuem(); });
     el.fQuem.replaceChildren(quem('proprio', 'Para mim', 'Sou o paciente (adulto)'), quem('filho', 'Para meu filho(a)', 'Sou o responsável'));
     const filho = !!escolha && escolha.tipo === 'filho';
     el.lNome.textContent = filho ? 'Seu nome (responsável)' : 'Seu nome completo';
+    const at = $('#aceiteTxt'); if (at) at.replaceChildren(...textoAceite(filho));
     el.blocoFilho.hidden = !filho;
     desenharIrmaos(filho);
   }
@@ -1495,6 +1505,14 @@
   // (marcado, com "Não é este?") ou em dúvida (o paciente escolhe entre exames diferentes, ou deixa para o atendente).
   // O que o paciente tocou nunca é desfeito por uma leitura que chega depois.
   let B = null;
+  // A foto do pedido médico é dado de saúde (LGPD, art. 11): antes de tirar ou escolher a foto, o paciente autoriza o uso de forma específica.
+  let fotoAutorizada = false;
+  function blocoAutorizaFoto() {
+    const cx = h('input', { type: 'checkbox', checked: fotoAutorizada, onchange: () => { fotoAutorizada = cx.checked; if (fotoAutorizada) msg.textContent = ''; } });
+    const msg = h('p', { class: 'erro-form', role: 'alert' });
+    const el = h('div', {}, h('label', { class: 'aceite' }, cx, h('span', {}, 'Autorizo a clínica a guardar a foto do meu pedido médico (dado de saúde) e a usá-la só para identificar os exames e para a equipe conferir o pedido. Veja a ', h('a', { href: 'privacidade.html', target: '_blank', rel: 'noopener' }, 'Política de Privacidade'), '.')), msg);
+    return { el, abrir: (botao) => () => { if (!fotoAutorizada) { msg.textContent = 'Marque a autorização para enviar a foto.'; cx.focus(); return; } botao.click(); } };
+  }
   function abrirBusca(o, comFoto) {
     if (!conv) return;
     const f = abrirFolha('Escolher o exame');
@@ -1511,10 +1529,11 @@
       const v = livre.value.trim(); if (v.length < 3) { toast('Escreva o nome do exame.'); return; }
       B.itens.set('t' + Date.now(), { texto: v, nome: v }); livre.value = ''; naoAchei.hidden = true; desenharResultados();
     } }, 'Adicionar ao pedido'));
-    B.botoesFoto = h('div', { class: 'acoes-w' },
-      h('button', { class: 'btn-w sec', type: 'button', onclick: () => camera.click() }, '📷 Tirar foto do pedido agora'),
-      h('button', { class: 'btn-w sec', type: 'button', onclick: () => galeria.click() }, '🖼️ Escolher a foto do pedido na galeria'),
-      h('p', { class: 'w-nota' }, 'Dica: ponha a folha numa mesa com boa luz e pegue a folha inteira. A foto fica guardada com segurança para o atendente conferir o seu pedido.'));
+    const aut = blocoAutorizaFoto();
+    B.botoesFoto = h('div', { class: 'acoes-w' }, aut.el,
+      h('button', { class: 'btn-w sec', type: 'button', onclick: aut.abrir(camera) }, '📷 Tirar foto do pedido agora'),
+      h('button', { class: 'btn-w sec', type: 'button', onclick: aut.abrir(galeria) }, '🖼️ Escolher a foto do pedido na galeria'),
+      h('p', { class: 'w-nota' }, 'Dica: ponha a folha numa mesa com boa luz e pegue a folha inteira. A foto fica guardada pela clínica para o atendente conferir o seu pedido.'));
     f.corpo.replaceChildren(B.botoesFoto, B.status, busca, B.lista, camera, galeria,
       h('div', { class: 'acoes-w', style: 'margin-top:12px' },
         h('button', { class: 'btn-w sec', type: 'button', onclick: () => { fecharFolha(); abrirPedido(); } }, 'Prefiro escolher pelo desenho do corpo'),
@@ -1523,7 +1542,7 @@
     busca.addEventListener('input', () => { clearTimeout(B.t); B.t = setTimeout(() => buscarExame(busca.value), 250); });
     for (const inp of [camera, galeria]) inp.addEventListener('change', () => { if (inp.files && inp.files[0]) lerFoto(inp.files[0]); inp.value = ''; });
     buscarExame(busca.value);
-    if (comFoto) camera.click();
+    if (comFoto && fotoAutorizada) camera.click();
   }
   // Folha só da foto do pedido: pede a foto antes, só lê o exame e tenta achá-lo na lista da clínica. Os exames achados seguem
   // para a folha "Montar pedido de exames", onde o paciente confere, acrescenta outros (tipo, parte do corpo e lado) e envia tudo junto.
@@ -1536,17 +1555,18 @@
     B.camera = camera; B.galeria = galeria;
     B.status = h('div', { class: 'foto-status', hidden: true, 'aria-live': 'polite' });
     B.lista = h('div', { 'aria-live': 'polite' });
+    const aut = blocoAutorizaFoto();
     B.botoesFoto = h('div', { class: 'acoes-w' },
-      h('p', { class: 'p-dica' }, 'Eu leio só o exame do pedido e tento achá-lo na lista da clínica. A foto também vai para o atendente conferir.'),
-      h('button', { class: 'btn-w', type: 'button', onclick: () => camera.click() }, '📷 Tirar foto do pedido agora'),
-      h('button', { class: 'btn-w sec', type: 'button', onclick: () => galeria.click() }, '🖼️ Escolher a foto na galeria'),
+      h('p', { class: 'p-dica' }, 'Eu leio só o exame do pedido e tento achá-lo na lista da clínica. A foto também vai para o atendente conferir.'), aut.el,
+      h('button', { class: 'btn-w', type: 'button', onclick: aut.abrir(camera) }, '📷 Tirar foto do pedido agora'),
+      h('button', { class: 'btn-w sec', type: 'button', onclick: aut.abrir(galeria) }, '🖼️ Escolher a foto na galeria'),
       h('p', { class: 'w-nota' }, 'Dica: ponha a folha numa mesa com boa luz e pegue a folha inteira. Se o pedido tiver mais de uma folha, você envia as outras em seguida.'));
     f.corpo.replaceChildren(B.botoesFoto, B.status, B.lista, camera, galeria,
       h('div', { class: 'acoes-w', style: 'margin-top:12px' },
         h('button', { class: 'btn-w sec', type: 'button', onclick: () => { const base = B ? B.carrinhoBase : []; const n = B ? B.fotos : 0; fecharFolha(); abrirPedido(base, n); } }, 'Não tenho o pedido: escolher o exame')));
     for (const inp of [camera, galeria]) inp.addEventListener('change', () => { if (inp.files && inp.files[0]) lerFoto(inp.files[0]); inp.value = ''; });
     desenharResultados();
-    if (o && o.comFoto) camera.click();
+    if (o && o.comFoto && fotoAutorizada) camera.click();
   }
   // Leva o que foi achado na foto para o pedido da folha "Montar pedido de exames".
   function fotoParaPedido() {
@@ -2351,6 +2371,7 @@
   aplicarLetra(lerLocal(CHAVE_LETRA), false);
   el.btnLetra.addEventListener('click', () => { aplicarLetra(letra + 1, true); fecharMenu(); toast(TOAST_LETRA[letra]); });
   el.btnLetraMenor.addEventListener('click', () => { aplicarLetra(letra - 1, true); fecharMenu(); toast(TOAST_LETRA[letra]); });
+  el.btnPrivacidade.addEventListener('click', () => { window.open('privacidade.html', '_blank', 'noopener'); });
   el.btnSuporte.hidden = !window.Sentinela;
   el.btnSuporte.addEventListener('click', async () => {
     fecharMenu();
@@ -2543,7 +2564,7 @@
         avisoEnviado('Quase pronto!', `Enviamos uma mensagem para ${email}. Abra o e-mail e toque no link para confirmar a conta. Se a mensagem não aparecer, olhe a caixa de spam. Quem já tem conta pode usar "Entrar".`);
       }) }, h('p', { class: 'sub' }, 'Com a conta, seus dados ficam salvos e você não precisa repetir tudo no próximo agendamento. O e-mail serve só para confirmar a conta e redefinir a senha.'),
       n.campo, t.campo, e.campo, s.campo, s.mostrar,
-      h('label', { class: 'aceite' }, aceite, h('span', {}, 'Concordo que a clínica guarde meu nome, telefone, e-mail e os pedidos que eu fizer para me atender e para eu não precisar repetir as informações (LGPD).')),
+      h('label', { class: 'aceite' }, aceite, h('span', {}, 'Concordo que a clínica guarde meu nome, telefone, e-mail e os pedidos que eu fizer para me atender e para eu não precisar repetir as informações. Li a ', h('a', { href: 'privacidade.html', target: '_blank', rel: 'noopener' }, 'Política de Privacidade'), ' e os ', h('a', { href: 'termos.html', target: '_blank', rel: 'noopener' }, 'Termos'), '.')),
       cap.el, erro, btn, rodape(['Já tenho conta', 'entrar'])));
     } else if (modo === 'esqueci') {
       const e = campoTxt('cEmail', 'E-mail da conta', { type: 'email', autocomplete: 'email', value: emailAtual });
@@ -2641,8 +2662,11 @@
           h('dt', {}, 'Cadastro de paciente ligado à conta'), h('dd', {}, tem(conta.cadastro_salvo))),
         btnTxt, btnJson, erro,
         h('h3', {}, 'Apagar a minha conta'),
-        h('p', { class: 'sub' }, 'Você deixa de poder entrar e o seu e-mail sai da conta. Mas o cadastro, os pedidos e as conversas que você já fez continuam guardados pela clínica, porque ela precisa manter esses registros do atendimento. Para pedir algo além disso, fale com a clínica.'),
-        h('button', { type: 'button', class: 'btn-sec', id: 'btnApagarConta', onclick: confirmar }, 'Apagar a minha conta')));
+        h('p', { class: 'sub' }, 'Você deixa de poder entrar e o seu e-mail sai da conta. Mas o cadastro, os pedidos e as conversas que você já fez continuam guardados pela clínica, porque a lei manda guardar registros de atendimento de saúde (LGPD, art. 16, I; prontuário: 20 anos). Você pode pedir à clínica a eliminação dos dados que a lei não obriga a guardar: ela responde em até 15 dias e diz o que fica e por quê.'),
+        h('button', { type: 'button', class: 'btn-sec', id: 'btnApagarConta', onclick: confirmar }, 'Apagar a minha conta'),
+        h('p', { class: 'sub', style: 'margin-top:14px' }, 'Para pedir à clínica a eliminação dos demais dados, ou qualquer outro direito da LGPD: ',
+          h('a', { id: 'linkPedidoDados', href: 'https://wa.me/5571999803806?text=' + encodeURIComponent('Olá! Sou titular de dados e quero exercer meus direitos da LGPD (acesso, correção ou eliminação). E-mail da minha conta: ' + (conta.email || '')), target: '_blank', rel: 'noopener' }, 'falar com a clínica pelo WhatsApp'),
+          '. Veja também a ', h('a', { href: 'privacidade.html', target: '_blank', rel: 'noopener' }, 'Política de Privacidade'), '.')));
     }
     function confirmar() {
       const btnSim = h('button', { type: 'button', class: 'btn-perigo', id: 'btnApagarSim' }, 'Sim, apagar a minha conta');
