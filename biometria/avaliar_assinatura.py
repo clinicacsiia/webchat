@@ -1,7 +1,9 @@
 # FLUXOGRAMA: entrada (item do n8n: pontos [{x, y, timestamp, pressao, traco}], perfil do paciente, tentativas_falhas, consentimento) -> validação (consentimento, tamanho, valores finitos, tempo crescente, duração, canvas normalizado) -> lógica (features dinâmicas -> distância normalizada contra o perfil -> score = 1/(1+d) arredondado -> limiar 0.30 -> EWMA do perfil só se aprovado; contador de 3 tentativas) -> saída (resultado para assinatura_registrar: aprovado, tipo, score, características, perfil novo, tentativas restantes, bloqueio)
 # Versão 1.0 — 30/10/2026 / Mudança: Implementação inicial
 #
-# Este arquivo é o corpo do nó Code (Python nativo) do workflow "Fila - validar assinatura" do n8n E o módulo testado
+# Desde 03/11/2026 este arquivo é a REFERÊNCIA do algoritmo: a Edge Function usa o porte em TypeScript
+# (supabase/functions/fila-validar-assinatura/avaliacao.ts), que o teste de paridade compara com o que este módulo devolve
+# (biometria/gerar_vetores.py). Antes, era o corpo do nó Code (Python nativo) do n8n e o módulo testado
 # por biometria/test_avaliar_assinatura.py. O sandbox do n8n não aceita import, class, type, getattr nem hasattr:
 # por isso só há funções, dicts e listas. A cola com o n8n começa depois da linha "n8n: cola do nó".
 

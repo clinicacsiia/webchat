@@ -1,5 +1,7 @@
 # Fila em tempo real + assinatura biométrica dinâmica
 
+> **Atualização de 03/11/2026: o n8n saiu do projeto.** Onde este documento diz "workflow do n8n" (seções 1, 5, 6 e 9), leia **Edge Function**: `fila-emitir-link` (e-mail do link) e `fila-validar-assinatura` (algoritmo em TypeScript, `supabase/functions/`). O banco chama a primeira por `config.fila_link_url` (migração `supabase/saida-n8n-fila.sql`); não há mais credencial no n8n, e sim os secrets `EMAIL_API_KEY` e `EMAIL_REMETENTE` no Supabase. O que continua valendo: o desenho do banco, o segredo por cabeçalho `x-fila-segredo`, as regras de tentativas e a LGPD. Detalhes em `docs/plano-sair-do-n8n.md`.
+
 Versão 2.0 — 30/10/2026 / Mudança: reescrito para o desenho atual (JWT assinado no banco, segredo do n8n por cabeçalho, Python no nó do n8n). Substitui a versão 1.0, que descrevia uma API FastAPI e um nó Code que assinava o JWT.
 
 > **Estado: NÃO está em produção e NÃO está completo.** O banco real está na v1; a migração v2 está escrita e testada, mas não aplicada. Faltam a tela do paciente (`fila/fila.js`), a aba da recepção, os dois workflows do n8n e o SMTP. A seção 5 diz a ordem exata para fechar. Provas e lacunas: `docs/auditoria-2026-10-30.md`.
