@@ -573,6 +573,8 @@
   let ultimoId = 0, baseServidor = 0, maiorDesenhado = 0, canal = null, timerPoll = null, ultimoDia = '', ultimoAutor = '', naoLidas = 0, tempId = 0;
   const provisorias = [];   // bolhas do paciente ainda sem número no servidor: { n: elemento, texto }
   let canalOk = false, carregando = false, statusAtual = '', recebeuBroadcast = false;
+  let semNovidade = 0, tOcioso = null, canalFechadoPorOcio = false;
+  const OCIO_ESCONDIDA_MS = 10 * 60 * 1000;
   // Motor de atendimento (Fase 7): quem responde é o banco, na mesma chamada. passoAtual = pergunta em aberto.
   let motorAtivo = false, passoAtual = null, ultimoMs = null;
   const vistos = new Set();
@@ -940,8 +942,10 @@
     el.formEnviar.hidden = motorAtivo && !pedeTexto;
     el.texto.placeholder = pedeTexto && ult.opcoes.placeholder ? ult.opcoes.placeholder : 'Digite uma mensagem';
   }
-  async function carregar() {
+  // daReserva === true: veio do relógio de segurança (não de uma ação do paciente nem de um aviso); só nesse caso o intervalo aumenta.
+  async function carregar(daReserva) {
     if (!conv) return;
+    if (daReserva !== true) semNovidade = 0;
     if (carregando) { carregarDeNovo = true; return; }
     carregando = true;
     const minha = conv.id;
@@ -956,7 +960,9 @@
       motorAtivo = !!data.motor_ativo; passoAtual = data.passo || passoAtual;
       // Mensagem da equipe que só apareceu pela consulta = o aviso instantâneo não chegou; volta a consultar rápido.
       const lista = data.mensagens || [];
-      const novasDaEquipe = lista.filter((m) => adicionar(m, true) && m.autor !== 'cliente').length;
+      let novas = 0, novasDaEquipe = 0;
+      for (const m of lista) if (adicionar(m, true)) { novas++; if (m.autor !== 'cliente') novasDaEquipe++; }
+      if (novas) semNovidade = 0;
       for (const m of lista) if (m.id > baseServidor) baseServidor = m.id;   // o cursor só anda pelo que o servidor entregou
       if (novasDaEquipe) recebeuBroadcast = false;
       atualizarStatus(data.status, data.agente);
@@ -966,7 +972,34 @@
   }
   function fecharCanal() {
     if (canal) { db.removeChannel(canal); canal = null; }
-    clearInterval(timerPoll); timerPoll = null; canalOk = false;
+    clearTimeout(timerPoll); timerPoll = null; canalOk = false; canalFechadoPorOcio = false;
+  }
+  // Consulta de reserva: espaçada. Sem prova de que o aviso instantâneo funciona, começa em 4 s e vai a 8, 15 e 30 s enquanto nada novo chega;
+  // com o aviso provado, 45 s. Aba escondida não consulta (ao voltar, o visibilitychange consulta na hora).
+  function intervaloReserva() {
+    if (canalOk && recebeuBroadcast) return 45000;
+    return [4000, 8000, 15000, 30000][Math.min(semNovidade, 3)];
+  }
+  function agendarReserva() {
+    clearTimeout(timerPoll);
+    timerPoll = setTimeout(() => {
+      if (!conv) return;
+      if (!document.hidden) { semNovidade++; carregar(true); }
+      agendarReserva();
+    }, intervaloReserva());
+  }
+  // Aba escondida por muito tempo: fecha o canal (libera a conexão no Supabase). Ao voltar, reabre e consulta.
+  function aoMudarVisibilidade() {
+    clearTimeout(tOcioso); tOcioso = null;
+    if (document.hidden) {
+      if (!conv || !canal) return;
+      tOcioso = setTimeout(() => { if (document.hidden && conv && canal) { fecharCanal(); canalFechadoPorOcio = true; } }, OCIO_ESCONDIDA_MS);
+      return;
+    }
+    naoLidas = 0; document.title = config.nome_empresa;
+    if (conv && canalFechadoPorOcio) { canalFechadoPorOcio = false; assinar(); }   // assinar() já consulta ao conectar
+    else carregar();
+    if (acompP) atualizarAcomp();
   }
   function assinar() {
     fecharCanal();
@@ -976,9 +1009,8 @@
         if (payload.autor !== 'cliente') { recebeuBroadcast = true; carregar(); }
       })
       .subscribe((s) => { canalOk = s === 'SUBSCRIBED'; if (canalOk) carregar(); });
-    // Rede de segurança: consulta a cada 4 s até o aviso instantâneo provar que funciona; depois, a cada 20 s.
-    let ciclos = 0; recebeuBroadcast = false;
-    timerPoll = setInterval(() => { ciclos++; if (!canalOk || !recebeuBroadcast || ciclos % 5 === 0) carregar(); }, 4000);
+    recebeuBroadcast = false; semNovidade = 0;
+    agendarReserva();
   }
   async function abrirChat() {
     const c = lerLocal(CHAVE_MSGS), doCache = !!(c && c.conversa === conv.id && c.v === VERSAO_APP && Array.isArray(c.msgs));
@@ -992,11 +1024,39 @@
     await carregar();
     if (!conv) return;
     assinar(); rolarFim(true);
+    assinarPush();
   }
   // A resposta do assistente volta na mesma chamada: desenha sem esperar o aviso em tempo real e mede o tempo que o paciente viu.
   function mostrarRespostas(lista, t0) {
     (lista || []).forEach((m) => adicionar(m, true));
     if (t0 != null) ultimoMs = Math.round(performance.now() - t0);
+  }
+
+  /* ---------- avisos (push) com o chat fechado ou em segundo plano ---------- */
+  const pushPossivel = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+  function b64ParaBytes(s) {
+    const p = '='.repeat((4 - s.length % 4) % 4), b = atob((s + p).replace(/-/g, '+').replace(/_/g, '/'));
+    return Uint8Array.from(b, (c) => c.charCodeAt(0));
+  }
+  // Guarda o aparelho no servidor para receber as respostas. Só funciona com a permissão dada (no iPhone, só com o site instalado na Tela de Início).
+  async function assinarPush() {
+    if (!pushPossivel() || Notification.permission !== 'granted' || !conv || !conv.id || !conv.token) return;
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const { data } = await db.rpc('chat_push_config');
+      const vapid = data && data.vapid;
+      if (!vapid) return;
+      let sub = await reg.pushManager.getSubscription();
+      if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ParaBytes(vapid) });
+      const j = sub.toJSON();
+      await db.rpc('chat_push_salvar', { p_conversa: conv.id, p_token: conv.token, p_endpoint: j.endpoint, p_p256dh: j.keys.p256dh, p_auth: j.keys.auth });
+    } catch { /* o chat segue sem push */ }
+  }
+  // Pede a permissão logo que a conversa começa (o toque em "Começar" vale como gesto, exigido por Safari/iPhone) e já inscreve o aparelho.
+  // Tem que ser chamado direto no toque (antes de qualquer espera); devolve uma promessa que termina quando a pessoa responde.
+  function pedirAvisos() {
+    if (!pushPossivel() || Notification.permission !== 'default') return Promise.resolve();
+    try { return Promise.resolve(Notification.requestPermission()).catch(() => {}); } catch { return Promise.resolve(); }
   }
 
   /* ---------- ações ---------- */
@@ -1015,6 +1075,7 @@
     if (tel.length < 10) { el.erroForm.textContent = 'Informe o telefone com DDD.'; el.fTel.focus(); return; }
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { el.erroForm.textContent = 'Informe um e-mail válido.'; el.fEmail.focus(); return; }
     if (!salvo && !el.fAceite.checked) { el.erroForm.textContent = 'Marque a caixa de concordância para continuar.'; el.fAceite.focus(); return; }
+    const respostaAvisos = pedirAvisos();
     el.btnIniciar.disabled = true; el.btnIniciar.textContent = 'Começando…';
     const t0 = performance.now();
     try {
@@ -1037,6 +1098,7 @@
       await carregar();
       if (!conv) return;
       assinar(); rolarFim(true);
+      respostaAvisos.then(assinarPush);
     } catch (e) {
       el.erroForm.textContent = mensagemErro(e);
     } finally {
@@ -1361,7 +1423,8 @@
     w.append(box);
     acompBox = box;
     if (acompDados) desenharAcomp();
-    if (!acompP) { acompP = setInterval(atualizarAcomp, 15000); acompT = setInterval(desenharAcomp, 1000); }
+    if (!acompP) acompP = setInterval(atualizarAcomp, 30000);
+    if (!acompT) acompT = setInterval(desenharAcomp, 1000);
     setTimeout(atualizarAcomp, 50);
   }
   function pararAcompanhar() { clearInterval(acompT); clearInterval(acompP); acompT = acompP = null; acompBox = null; acompDados = null; }
@@ -1372,6 +1435,8 @@
       if (error || !data) return;
       acompDados = data; acompDelta = Date.now() - new Date(data.agora).getTime();
       desenharAcomp();
+      // Confirmado ou encerrado: o dado não muda mais, então para de consultar (o relógio de 1 s é só local).
+      if (data.confirmado || data.conversa === 'encerrada') { clearInterval(acompP); acompP = null; }
     } catch { /* tenta de novo no próximo ciclo */ }
   }
   function desenharAcomp() {
@@ -2321,9 +2386,7 @@
   el.btnContaSair.addEventListener('click', sair);
   el.btnOutroFilho.addEventListener('click', outroFilho);
   el.btnProximo.addEventListener('click', proximoFilho);
-  document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) { naoLidas = 0; document.title = config.nome_empresa; carregar(); }
-  });
+  document.addEventListener('visibilitychange', aoMudarVisibilidade);
   addEventListener('online', carregar);
 
   /* ---------- Sentinela: o que ela pode ver e fazer no chat ---------- */

@@ -1,6 +1,6 @@
 // Service worker do chat do cliente: abre na hora com a cópia guardada e busca a versão nova por trás (vale na próxima abertura).
 // O link pode vir do WhatsApp, do e-mail ou da bio com ?origem=...: a cópia é a mesma para todos.
-const VERSAO = 'webchat-cliente-v11';
+const VERSAO = 'webchat-cliente-v12';
 const BASE = ['./', 'index.html', 'privacidade.html', 'termos.html', 'sentinela.js', 'nomes-exame.js', 'icon-192.png', 'img/logo-csi.svg', 'img/logo-csi-simbolo.svg', 'manifest.webmanifest'];
 
 self.addEventListener('install', (e) => {
@@ -39,5 +39,26 @@ self.addEventListener('fetch', (e) => {
     });
     if (guardada) { e.waitUntil(daRede.catch(() => {})); return guardada; }
     return daRede.catch(() => c.match('index.html'));
+  }));
+});
+
+// Push do chat: avisa que chegou resposta mesmo com o chat fechado. Se o chat já está na tela (visível), não repete o aviso.
+self.addEventListener('push', (e) => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch { d = {}; }
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((cs) => {
+    if (cs.some((c) => c.visibilityState === 'visible')) return;
+    return self.registration.showNotification(String(d.titulo || 'CSI · Clínica de Saúde e Imagem').slice(0, 80), {
+      body: String(d.corpo || 'Você recebeu uma resposta no chat.').slice(0, 200),
+      icon: 'icon-192.png', badge: 'icon-192.png', tag: 'chat-resposta', renotify: true, vibrate: [200, 100, 200]
+    });
+  }));
+});
+
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((cs) => {
+    for (const c of cs) if (c.url.startsWith(self.registration.scope) && 'focus' in c) return c.focus();
+    return self.clients.openWindow(self.registration.scope);
   }));
 });

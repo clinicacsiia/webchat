@@ -58,3 +58,19 @@ A fila **zera todo dia** (fuso de Brasília). O paciente nunca lê a tabela da f
 - Não vale ainda no chat de atendimento (`index.html`): lá a senha provisória não é cobrada.
 
 **Estado em 01/11/2026:** `checkin-sem-login.sql` **aplicado em produção** (7 funções conferidas). Teste de ponta a ponta no banco real, dentro de uma transação desfeita: check-in → criar conta (senha `csi`, provisória, 1 identidade, nenhum agente criado) → redefinir (senha nova vale, `csi` deixa de valer). Falta só o teste com um celular real (login pelo GoTrue com a senha provisória).
+
+## Push do chat do cliente (03/11/2026)
+
+O cliente que abriu uma conversa no chat (`index.html`) recebe uma notificação quando a clínica ou o assistente responde, **com o chat fechado, minimizado ou em segundo plano**.
+
+| Peça | Arquivo |
+|---|---|
+| Banco (tabela `chat_push_inscricao`, funções `chat_push_*`, gatilho em `mensagens`) | `supabase/chat-push.sql` (**já aplicado** em 03/11/2026) |
+| Envio do push | `supabase/functions/chat-avisar/index.ts` (**publicada**, sem JWT; confere o segredo do Vault) |
+| Página do chat | `index.html` (pede permissão ao tocar em "Começar" e guarda o aparelho) e `sw.js` (v11: recebe o push e abre o chat ao tocar) |
+
+- Usa as **mesmas chaves VAPID e o mesmo segredo** da fila. `config.chat_push_url` aponta para a função (vazio = desliga).
+- O aviso **não leva o texto da mensagem**: só "Você recebeu uma resposta no chat". Se o chat já está visível na tela, o aviso não aparece.
+- A inscrição fica presa à conversa (id + token). Aparelho que desinstalou é apagado no primeiro envio que falhar.
+- iPhone: só funciona com o site instalado na Tela de Início (iOS 16.4+). Quem abre o chat e já tinha permitido é inscrito sozinho.
+- **Não testado com celular real.** Testado: banco (token errado recusado), função (401 sem segredo, 200 com segredo). Para testar: abrir o chat no celular, permitir os avisos, iniciar a conversa, bloquear a tela e responder pelo painel.
