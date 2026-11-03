@@ -242,9 +242,22 @@
   .proximo .texto { flex: 1; min-width: 180px; } .proximo .texto b { display: block; font-size: 15px; }
   .proximo .texto span { font-size: 13px; color: var(--suave); }
   /* Os avisos e dados de apoio ficam numa área que rola e se ajusta à altura da tela, para a conversa nunca ficar sem espaço */
-  #contexto { flex: none; max-height: 36vh; overflow-y: auto; overscroll-behavior: contain; }
-  @media (max-height: 720px) { #contexto { max-height: 26vh; } .chat-topo { padding: 6px 12px; } .proximo { padding: 6px 12px; } }
-  @media (max-height: 560px) { #contexto { max-height: 18vh; } }
+  /* Telas médias/pequenas: a área de apoio fica FECHADA por padrão (só a faixa "Próximo passo" aparece) e abre sob demanda,
+     para nunca cobrir as mensagens sem o atendente pedir. Telas largas: vira uma coluna ao lado da conversa. */
+  #contexto { display: none; flex: none; overflow-y: auto; overscroll-behavior: contain; background: var(--csi-surface); border-bottom: 1px solid var(--linha); }
+  #contexto.aberto { display: block; max-height: 45vh; }
+  #ctxToggle { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; padding: 7px 16px; border: 0; border-bottom: 1px solid var(--linha); background: var(--csi-surface); color: var(--csi-primary-strong); font: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer; text-align: left; }
+  #ctxToggle:hover { background: var(--csi-primary-soft); }
+  #ctxToggle .seta { transition: transform .15s; } #ctxToggle[aria-expanded="true"] .seta { transform: rotate(180deg); }
+  #contexto .galeria img, #contexto .anexo-caixa img { max-height: 70vh; object-fit: contain; background: #fff; border: 1px solid var(--linha); cursor: zoom-in; }
+  @media (max-height: 720px) { #contexto.aberto { max-height: 40vh; } .chat-topo { padding: 6px 12px; } .proximo { padding: 6px 12px; } }
+  @media (min-width: 1280px) {
+    .chat { display: grid; grid-template-columns: minmax(0, 1fr) 380px; grid-template-rows: auto auto minmax(0, 1fr) auto; }
+    .chat > .chat-topo { grid-column: 1 / -1; grid-row: 1; } .chat > #proximo { grid-column: 1 / -1; grid-row: 2; }
+    .chat > #ctxToggle { display: none; }
+    .chat > #contexto, .chat > #contexto.aberto { display: block; max-height: none; grid-column: 2; grid-row: 3 / 5; border-left: 1px solid var(--linha); border-bottom: 0; }
+    .chat > .msgs { grid-column: 1; grid-row: 3; } .chat > .compor { grid-column: 1; grid-row: 4; }
+  }
   /* Celular: cabeçalho e avisos mais enxutos para sobrar espaço para ler as mensagens */
   @media (max-width: 640px) {
     .chat-topo { padding: 6px 10px; gap: 6px; }
@@ -256,7 +269,7 @@
     .proximo .texto { min-width: 0; } .proximo .texto b { font-size: 14px; }
     .proximo .texto span { display: none; }
     .proximo .btn { padding: 5px 10px; font-size: 13px; }
-    #contexto { max-height: 22vh; }
+    #contexto.aberto { max-height: 55vh; } #ctxToggle { padding: 6px 10px; }
     .msgs { min-height: 38vh; padding: 10px; }
     .msg { max-width: 88%; }
   }
@@ -1868,16 +1881,26 @@
     area.addEventListener('input', () => { area.style.height = 'auto'; area.style.height = Math.min(area.scrollHeight, 140) + 'px'; });
     area.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); enviarMsg(); } });
     box.replaceChildren(h('div', { class: 'chat-topo', id: 'chatTopo' }), h('div', { id: 'proximo', 'aria-live': 'polite' }),
+      h('button', { type: 'button', id: 'ctxToggle', 'aria-expanded': 'false', 'aria-controls': 'contexto', onclick: () => abrirContexto(!S.ctxAberto) }),
       h('div', { id: 'contexto' }, h('div', { id: 'pessoa' }), h('div', { id: 'historicoPaciente' }), h('div', { id: 'exameAberto' }), h('div', { id: 'triagem' }), h('div', { id: 'alertaPreco' }), h('div', { id: 'anexosBox' }), h('div', { id: 'cartaoJ' }), h('div', { id: 'pre' })),
       h('div', { class: 'msgs', id: 'msgs', 'aria-live': 'polite' }), h('div', { class: 'compor' }, area, enviar));
     renderTopoChat(); renderPessoaChat(); renderAlertaPreco(); renderAnexosBox(); renderCartaoJ(); desenharMsgs(true);
+    abrirContexto(false);
+  }
+  // Abre/fecha a área de detalhes (avisos, pré-agendamento, fotos). Fechada por padrão para não cobrir a conversa.
+  function abrirContexto(abrir) {
+    S.ctxAberto = !!abrir;
+    const ctx = document.getElementById('contexto'), tg = document.getElementById('ctxToggle'); if (!ctx || !tg) return;
+    ctx.classList.toggle('aberto', S.ctxAberto);
+    tg.setAttribute('aria-expanded', String(S.ctxAberto));
+    tg.replaceChildren(h('span', {}, S.ctxAberto ? 'Esconder detalhes e avisos' : 'Ver detalhes, avisos e fotos desta conversa'), h('span', { class: 'seta', 'aria-hidden': 'true' }, '▾'));
   }
   // "Próximo passo": escolhe, pela ordem do que é mais urgente, a única decisão que falta e leva o atendente até ela.
   // Só lê o que a tela já carregou; não grava nada. Os outros pontos continuam logo abaixo, na área de apoio.
   function renderProximo() {
     const box = document.getElementById('proximo'); if (!box) return;
     const c = conversaAberta(); if (!c || c.status === 'encerrada') { box.replaceChildren(); return; }
-    const ir = (id) => () => document.getElementById(id)?.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
+    const ir = (id) => () => { abrirContexto(true); setTimeout(() => document.getElementById(id)?.scrollIntoView?.({ block: 'start', behavior: 'smooth' }), 0); };
     const ids = membrosDe(c.id), minha = c.status === 'em_atendimento' && c.agente_id === S.me.id;
     const urgente = ids.some((i) => ((S.conversas.find((x) => x.id === i) || {}).triagem_urgencia) === 'alta');
     const dono = c.agente_id && c.agente_id !== S.me.id ? S.agentes.get(c.agente_id) : null;
