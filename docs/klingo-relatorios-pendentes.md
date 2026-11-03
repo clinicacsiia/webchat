@@ -1,6 +1,6 @@
 # Relatórios do Klingo para o chat (atualizado em 03/11/2026)
 
-**Estado: os 5 relatórios foram criados no Klingo (acesso só do Claude). Só o D foi executado; A, B, C e E estão salvos, mas sem teste de execução.** A API do Klingo que usamos só lê (`/api/info/relatorio`), então tudo passa por relatório.
+**Estado: os 5 relatórios foram criados no Klingo e testados em 03/11/2026 (só estrutura e contagem de linhas; nenhum valor de paciente foi lido, gravado ou mostrado).** A API do Klingo que usamos só lê (`/api/info/relatorio`), então tudo passa por relatório.
 
 Já usados antes (ver `docs/fase-0-verificacao.md`): **#13825** (marcações, filtro por data de criação), **#7**, **#47**, **#13981/#13983/#13984** (catálogo e preços).
 
@@ -14,7 +14,20 @@ Já usados antes (ver `docs/fase-0-verificacao.md`): **#13825** (marcações, fi
 | D | **#14027** | CHAT D - Tabela de Preço Particular | `Operadora - Nome` (texto, Apenas) |
 | E | **#14028** | CHAT E - Convênio x Procedimento | `Operadora - Nome` (texto, Apenas) |
 
-> Só o rótulo do D foi **conferido na tela de execução**. Os de A, B, C e E foram deduzidos (abrir a tela rodaria o relatório com dado de paciente): confirmar no primeiro teste. O B filtra só por "Data Agendado Para"; se precisar de período pela chegada, acrescentar "Check-In - Data".
+### Ids dos filtros na API (conferidos em 03/11/2026)
+Formato igual ao do #13825: valor em `:parmN=valor`; período em `:periodoN=l`, `:periodoN-from=AAAA-MM-DD`, `:periodoN-to=AAAA-MM-DD`.
+
+| Relatório | Filtros (id → nome) | Resultado do teste |
+|---|---|---|
+| A #14024 | `parm0` paciente_prontuario, `parm1` paciente_cpf, `parm2` paciente_nome (contém), `parm3` paciente_celular | Colunas conferidas (8). Filtro por nome "contém" funciona. **Sem nenhum filtro o Klingo recusa** ("Relatório sem parâmetros preenchidos"), o que protege contra baixar todos os pacientes |
+| B #14025 | `parm0` prontuario, `parm1` paciente_cpf, `periodo2` data_agendado_para | Colunas conferidas (21). Período de 12 meses funciona. Sem filtro, recusa |
+| C #14026 | `parm0` paciente_prontuario, `periodo1` atendimento_data | Colunas conferidas (8). Sem filtro, recusa |
+| D #14027 | `parm0` operadora_nome | Sem filtro devolve **67.613 linhas** (tabela inteira); com "SUS" 25 |
+| E #14028 | `parm0` operadora_nome | Sem filtro **64 linhas**; "Unimed" não existe (0) |
+
+Obs.: uma chamada do B com prontuário "1" e período até 03/11/2026 deu erro "."; com período até 31/10 e com período sem prontuário funcionou. Se o erro voltar, usar data final anterior a hoje. O B com 3 e com 12 meses voltou o mesmo total (17.836), então o histórico do Klingo parece começar há pouco tempo (confirmar com a clínica).
+
+> Colunas do C: não há "Situação do laudo" própria; use `Status - Nome` (col5) e `Laudo - Data Pronto` (col6).
 
 ## O que ficou diferente do pedido
 
@@ -32,8 +45,9 @@ Já usados antes (ver `docs/fase-0-verificacao.md`): **#13825** (marcações, fi
 4. Existe campo de **última atualização do cadastro** do paciente e de **hora real do atendimento**?
 
 ## Próximos passos
-- Executar A, B, C e E uma vez para validar colunas e filtros (cuidado: A, B e C trazem dado de paciente).
-- Configurar a leitura no sistema com os nomes exatos dos filtros.
+- ~~Executar A a E para validar colunas e filtros~~ (feito em 03/11/2026 com a função `klingo-inspecionar-chat`, que só devolve estrutura e contagem).
+- Testar A, B e C com um paciente real (prontuário/CPF conhecidos) para ver os valores; só a atendente ou o dono pode escolher o paciente.
+- Configurar a leitura no sistema (Edge Function) usando os ids acima.
 - Enquanto a pergunta 1 não for respondida, o valor Particular continua deduzido das marcações.
 
 ## Regra de trabalho
