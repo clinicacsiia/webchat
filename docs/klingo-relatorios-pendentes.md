@@ -37,6 +37,17 @@ Obs.: uma chamada do B com prontuário "1" e período até 03/11/2026 deu erro "
 - **D:** Id e nome do procedimento, valor, nome da tabela e operadora. **Sem data de vigência.** Filtrando "Particular" não veio nada (com "SUS" funcionou): o preço Particular parece não ficar nessa área de tabela de preços.
 - **E:** Operadora, procedimento, Cobertura (S/N), Autorização Prévia (S/N) e tipo/regra do filtro. **Faltam** Plano, situação do convênio (ativo/inativo), valor da tabela e quantidade máxima por pedido. O valor vem do D ou do #13983.
 
+## Função que usa A, B e C: `klingo-paciente` (03/11/2026)
+Edge Function no ar (`supabase/functions/klingo-paciente/`), chamada com `x-sync-key` (= `config.ia_segredo`) e corpo JSON:
+- `{"acao":"conferir","cpf":"…","nascimento":"AAAA-MM-DD"}` → `encontrado`, `ambiguo`, `confere`, `prontuario` (só se confere) e `cadastro_faltando` (quais entre email/celular/telefone estão vazios, nunca o valor).
+- `{"acao":"historico","prontuario":"…","nascimento":"…","meses":12}` → marcações enxutas (sem nome, CPF, valor, observação nem telefone).
+- `{"acao":"resultados","prontuario":"…","nascimento":"…","meses":12}` → atendimentos com `laudo_pronto` (sem link/senha: o Klingo não tem).
+Histórico e resultados **só saem depois de o nascimento conferir** com o cadastro daquele prontuário. Máximo de 12 meses (o Klingo recusa períodos maiores) e 200 linhas. Nada de paciente vai para log ou banco.
+
+**Testado sem paciente real:** 11 testes com dados inventados (`testes`: `npm run test:edge`) e chamadas reais com CPF/prontuário inexistente (volta "não encontrado"), entradas inválidas (400) e sem chave (403).
+**Ainda NÃO provado com paciente real:** se o Klingo guarda o CPF com ou sem pontos (a função tenta os dois) e em que formato vem o nascimento (aceita AAAA-MM-DD e DD/MM/AAAA). Fazer um teste com um paciente cadastrado, com autorização dele, antes de ligar ao chat.
+A função `klingo-inspecionar-chat` (só estrutura/contagem) continua publicada e pode ser apagada no painel.
+
 ## Pendências com o suporte do Klingo
 (Texto de e-mail em `docs/fase-0-email-suporte-klingo.md`; acrescentar estas perguntas.)
 1. Onde fica cadastrado o **preço Particular** (a tabela "Particular" não aparece no relatório D)?
@@ -46,14 +57,14 @@ Obs.: uma chamada do B com prontuário "1" e período até 03/11/2026 deu erro "
 
 ## Próximos passos
 - ~~Executar A a E para validar colunas e filtros~~ (feito em 03/11/2026 com a função `klingo-inspecionar-chat`, que só devolve estrutura e contagem).
-- Testar A, B e C com um paciente real (prontuário/CPF conhecidos) para ver os valores; só a atendente ou o dono pode escolher o paciente.
-- Configurar a leitura no sistema (Edge Function) usando os ids acima.
+- Testar `klingo-paciente` com um paciente real cadastrado (ver acima).
+- Ligar a função ao chat/n8n (verificação por CPF, pedido de atualização de dado, histórico sob demanda). Ainda não ligada.
 - Enquanto a pergunta 1 não for respondida, o valor Particular continua deduzido das marcações.
 
 ## Regra de trabalho
 Sempre que uma tarefa depender de relatório do Klingo editado ou criado, o Claude avisa **antes de começar** e diz qual relatório falta. Esta regra está em `CLAUDE.md`.
 
-## Tarefas agora liberadas (dependem do teste de A, B, C)
+## Tarefas agora liberadas (função pronta; falta ligar ao chat e testar com paciente real)
 Busca de histórico sob demanda (B); verificação por CPF e pedido de atualização de dado (A); ligação automática chat-prontuário com aviso (A).
 
 ## Ainda travadas
