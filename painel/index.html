@@ -597,7 +597,8 @@
     S.preSig = sig; S.pre = data || null; S.preItens = itens || []; S.preHist = hist; renderPre();
   }
   // O status "Agendado" muda sozinho (conferência automática a cada 15 s): reler enquanto uma conversa está aberta.
-  setInterval(() => { if (S.abertaId && S.aba === 'atendimento' && !document.hidden) carregarPre(); }, 15000);
+  // Reserva de 30 s: o tempo real não cobre a conferência automática, mas 15 s era mais do que a tela precisa.
+  setInterval(() => { if (S.abertaId && S.aba === 'atendimento' && !document.hidden) carregarPre(); }, 30000);
   const MOTIVOS_CANCELAMENTO = ['Paciente desistiu', 'Horário indisponível', 'Exame errado ou faltando', 'Plano ou convênio', 'Preço', 'Duplicado ou teste', 'Outro motivo'];
   // Janela de confirmação do cancelamento, com o motivo numa lista fixa. Devolve undefined (voltou), null (cancelar sem motivo) ou o motivo.
   function pedirMotivo() {
@@ -951,18 +952,19 @@
     c.append(h('div', { class: 'jornada', id: 'jornada' }));
     ligarJornada(); acordarKlingo(); renderJornada(); carregarJornada();
   }
-  // Tempo real da tela: qualquer mudança em cartão, exame ou tarefa relê o quadro (com um respiro para juntar rajadas).
+  // Tempo real da tela: qualquer mudança em cartão, exame ou tarefa relê o quadro. Rajadas viram UMA releitura a cada 2,5 s
+  // (o primeiro evento arma o relógio e os seguintes entram na mesma releitura; não adia para sempre).
   function ligarJornada() {
     sairJornada();
-    const recarregar = () => { clearTimeout(J.tRecarga); J.tRecarga = setTimeout(carregarJornada, 400); };
+    const recarregar = () => { if (J.tRecarga) return; J.tRecarga = setTimeout(() => { J.tRecarga = null; carregarJornada(); }, 2500); };
     J.canal = db.channel('painel-jornada')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'jornada_card' }, recarregar)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'jornada_exame' }, recarregar)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'jornada_tarefa' }, recarregar)
-      .subscribe();
+      .subscribe((st) => { J.vivo = st === 'SUBSCRIBED'; });
   }
   function sairJornada() {
-    clearTimeout(J.tRecarga);
+    clearTimeout(J.tRecarga); J.tRecarga = null; J.vivo = false;
     if (J.canal) { db.removeChannel(J.canal); J.canal = null; }
   }
   // Painel aberto na Jornada = pede ao banco para ler o Klingo de 1 em 1 minuto, mesmo fora do expediente.
@@ -1209,7 +1211,14 @@
     if (!dlg.open) { dlg.addEventListener('close', () => { dlg.className = ''; J.aberto = null; }, { once: true }); dlg.showModal(); }
   }
   // Atualiza a contagem de avisos mesmo fora da aba e relê a Jornada se ela estiver aberta (reserva caso o tempo real caia).
-  setInterval(() => { if (!S.me || !podeAtender() || document.hidden) return; atualizarAtencao(); if (S.aba === 'jornada') carregarJornada(); }, 30000);
+  // Com o tempo real da Jornada de pé, a releitura de reserva é a cada 2 min; sem ele, a cada 30 s.
+  let tickAtencao = 0;
+  setInterval(() => {
+    if (!S.me || !podeAtender() || document.hidden) return;
+    tickAtencao++;
+    if (tickAtencao % 2 === 0) atualizarAtencao();
+    if (S.aba === 'jornada' && (!J.vivo || tickAtencao % 4 === 0)) carregarJornada();
+  }, 30000);
   setInterval(() => { if (S.me && S.aba === 'jornada' && !document.hidden) acordarKlingo(); }, 60000);
 
   /* ---------- tempo real, som e avisos ---------- */
@@ -1259,7 +1268,20 @@
         if (S.ao_vivo) agendarRecarga();
       });
   }
-  setInterval(() => { if (S.me && S.aba === 'atendimento' && S.modo === 'quadro' && !document.hidden) carregarQuadro(); }, 30000);
+  // Quadro: com o tempo real ligado ele já é relido a cada evento (agendarRecarga), então a reserva só roda a cada 90 s.
+  let tickQuadro = 0;
+  setInterval(() => {
+    if (!(S.me && S.aba === 'atendimento' && S.modo === 'quadro' && !document.hidden)) return;
+    tickQuadro++;
+    if (!S.ao_vivo || tickQuadro % 3 === 0) carregarQuadro();
+  }, 30000);
+  // As reservas pulam as abas escondidas; ao voltar, atualiza uma vez.
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden || !S.me) return;
+    if (podeAtender()) atualizarAtencao();
+    if (S.aba === 'jornada') carregarJornada();
+    else if (S.aba === 'atendimento' && S.modo === 'quadro') carregarQuadro();
+  });
   // Painel aberto = equipe online: o chat avisa o paciente se não houver ninguém (e o contador mostra isso).
   let tPresenca = null;
   function marcarPresenca() {
