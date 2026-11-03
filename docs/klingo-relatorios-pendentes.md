@@ -1,46 +1,86 @@
-# PENDÊNCIA CRÍTICA: relatórios do Klingo que precisam ser editados ou criados (02/11/2026)
+# Relatórios do Klingo para o chat (atualizado em 03/11/2026)
 
-**Estado: NADA disso existe ainda (atualizado em 02/11/2026: acrescentados os relatórios D e E, de preço Particular e de convênio × procedimento).** Sem eles, o sistema não consegue ligar o chat ao paciente do Klingo, confirmar quem é o paciente por CPF, buscar histórico sob demanda nem entregar resultado. A API do Klingo que usamos só lê (`/api/info/relatorio`), então tudo passa por relatório.
+**Estado: os 5 relatórios foram criados no Klingo e testados em 03/11/2026 (só estrutura e contagem de linhas; nenhum valor de paciente foi lido, gravado ou mostrado).** A API do Klingo que usamos só lê (`/api/info/relatorio`), então tudo passa por relatório.
 
-Hoje o sistema usa só estes (ver `docs/fase-0-verificacao.md`): **#13825** (marcações, filtro por data de criação), **#7**, **#47**, **#13981/#13983/#13984** (catálogo e preços). Nenhum traz CPF, nascimento ou e-mail, e nenhum filtra por paciente.
+Já usados antes (ver `docs/fase-0-verificacao.md`): **#13825** (marcações, filtro por data de criação), **#7**, **#47**, **#13981/#13983/#13984** (catálogo e preços).
 
-## O que preciso que você faça no Klingo
+## Relatórios criados
 
-### Relatório A (NOVO): "Pacientes – cadastro"
-Para validar quem é o paciente, ligar chat e prontuário e saber o que precisa ser atualizado.
-- **Colunas:** Prontuário, Nome, **CPF**, **Data de nascimento**, **E-mail**, Celular, Telefone, Sexo (opcional), Data da última atualização do cadastro, Convênio/Operadora e carteirinha (opcionais).
-- **Filtros (o mais importante):** por **Prontuário**, por **CPF**, por **Nome** e por **Celular**. Sem filtro por paciente o sistema teria de baixar todos os pacientes.
+| Letra | Nº | Nome | Filtros (rótulo no Klingo · tipo) |
+|---|---|---|---|
+| A | **#14024** | CHAT A - Pacientes (Cadastro) | `Paciente - Prontuário` (Apenas), `Paciente - CPF` (Apenas), `Paciente - Nome` (Contém), `Paciente - Celular` (Apenas) |
+| B | **#14025** | CHAT B - Marcações do Paciente | `Prontuário` (Apenas), `Paciente - CPF` (Apenas), `Data Agendado Para` (período) |
+| C | **#14026** | CHAT C - Resultados / Laudos | `Paciente - Número de Prontuário` (Apenas), `Atendimento - Data` (período) |
+| D | **#14027** | CHAT D - Tabela de Preço Particular | `Operadora - Nome` (texto, Apenas) |
+| E | **#14028** | CHAT E - Convênio x Procedimento | `Operadora - Nome` (texto, Apenas) |
 
-### Relatório B (NOVO ou cópia do #13825): "Marcações do paciente"
-Histórico sob demanda: só o que a atendente pede, sem carregar tudo.
-- **Colunas:** as mesmas do #13825 (Id da Marcação, Id do Atendimento, Prontuário, Agendado Em, Agendado Para, Procedimento, Operadora, Unidade, Confirm Status, Cancelamento - Motivo, Status, Atendido S/N). Se o Klingo permitir, acrescentar **hora de chegada** e **hora do atendimento**.
-- **Filtros:** por **Prontuário** (ou CPF) **e** período longo (12 meses ou mais). Hoje o #13825 só filtra pela data em que a marcação foi criada.
+### Ids dos filtros na API (conferidos em 03/11/2026)
+Formato igual ao do #13825: valor em `:parmN=valor`; período em `:periodoN=l`, `:periodoN-from=AAAA-MM-DD`, `:periodoN-to=AAAA-MM-DD`.
 
-### Relatório C (NOVO, se o Klingo tiver): "Resultados / laudos"
-Para enviar o resultado ao paciente.
-- **Colunas:** Id do Atendimento, Prontuário, Procedimento, Data do exame, **Situação do laudo** (pendente, liberado, entregue), Data de liberação e, se existir, **link do resultado** e **usuário/senha ou código de acesso** do portal do paciente.
-- **Filtros:** por Prontuário e por período.
-- **Pergunta para o suporte do Klingo:** o Klingo gera link e senha do resultado pelo paciente? Se sim, qual relatório ou consulta devolve? (Texto de e-mail pronto em `docs/fase-0-email-suporte-klingo.md`; acrescente esta pergunta.)
+| Relatório | Filtros (id → nome) | Resultado do teste |
+|---|---|---|
+| A #14024 | `parm0` paciente_prontuario, `parm1` paciente_cpf, `parm2` paciente_nome (contém), `parm3` paciente_celular | Colunas conferidas (8). Filtro por nome "contém" funciona. **Sem nenhum filtro o Klingo recusa** ("Relatório sem parâmetros preenchidos"), o que protege contra baixar todos os pacientes |
+| B #14025 | `parm0` prontuario, `parm1` paciente_cpf, `periodo2` data_agendado_para | Colunas conferidas (21). Período de 12 meses funciona. Sem filtro, recusa |
+| C #14026 | `parm0` paciente_prontuario, `periodo1` atendimento_data | Colunas conferidas (8). Sem filtro, recusa |
+| D #14027 | `parm0` operadora_nome | Sem filtro devolve **67.613 linhas** (tabela inteira); com "SUS" 25 |
+| E #14028 | `parm0` operadora_nome | Sem filtro **64 linhas**; "Unimed" não existe (0) |
 
-### Relatório D (NOVO): "Tabela de preço Particular por procedimento"
-Hoje o valor Particular é **deduzido das marcações** (o valor mais comum em marcações recentes) e oscila: a CONSULTA já apareceu como R$ 380, R$ 220 e R$ 380 de novo. Com a tabela oficial o painel de Convênios deixa de adivinhar e passa a avisar quando o valor muda de verdade.
-- **Colunas:** Id do procedimento (o mesmo do catálogo), Nome do procedimento, **Valor Particular em reais**, **Data de início da vigência** (e fim, se houver), Tabela de preço (nome).
-- **Filtros:** nenhum obrigatório (a tabela inteira); se tiver, por vigência.
+Obs.: uma chamada do B com prontuário "1" e período até 03/11/2026 deu erro "."; com período até 31/10 e com período sem prontuário funcionou. Se o erro voltar, usar data final anterior a hoje. O B com 3 e com 12 meses voltou o mesmo total (17.836), então o histórico do Klingo parece começar há pouco tempo (confirmar com a clínica).
 
-### Relatório E (NOVO ou editar o #13981): "Convênio × procedimento: situação e cobertura"
-Para o painel saber, por convênio e por exame, se o convênio está ativo no Klingo, se cobre o exame, o valor da tabela do convênio e se exige autorização ou limite de quantidade.
-- **Colunas:** Operadora/Convênio, Plano, **Situação do convênio (ativo/inativo)**, Id do procedimento, Nome, **Cobre (S/N)**, **Valor da tabela do convênio**, **Exige autorização (S/N)**, Quantidade máxima por pedido (se existir), Data da última alteração.
-- **Filtros:** por Operadora e por Situação.
-- **Pergunta para o suporte do Klingo:** quando o cadastro de um convênio é inativado, o relatório traz isso? Qual campo?
+> Colunas do C: não há "Situação do laudo" própria; use `Status - Nome` (col5) e `Laudo - Data Pronto` (col6).
 
-### O que o painel já faz SEM esses dois relatórios (02/11/2026)
-A aba **Convênios** do painel já liga/desliga cada convênio, guarda mensagem e regra ("um exame por vez") por convênio e avisa mudanças de preço, usando o que já temos (#13825, #7, #13981/#13983/#13984). Os relatórios D e E só tornam os números mais confiáveis: **sem eles continua valendo o valor deduzido das marcações e o desligamento é manual.**
+## O que ficou diferente do pedido
 
-## O que eu preciso de volta
-O **número** de cada relatório novo (ou do #13825 alterado) e os **nomes exatos dos filtros**, para configurar a leitura. Não preciso do token: ele continua num secret do Supabase.
+- **A:** tem Prontuário, Nome, CPF, nascimento, e-mail, celular, telefone e **Data de Cadastro**. Não existe "última atualização do cadastro" no Klingo; usar a data de cadastro.
+- **B:** mesmas colunas do #13825, mais CPF, **Check-In (chegada)** e hora agendada. **Não existe hora real do atendimento.**
+- **C:** Id do atendimento, Prontuário, Paciente, Procedimento, data do exame, situação do laudo, data pronto e Id do laudo. **Não há link nem senha do portal** nessa área.
+- **D:** Id e nome do procedimento, valor, nome da tabela e operadora. **Sem data de vigência.** Filtrando "Particular" não veio nada (com "SUS" funcionou): o preço Particular parece não ficar nessa área de tabela de preços.
+- **E:** Operadora, procedimento, Cobertura (S/N), Autorização Prévia (S/N) e tipo/regra do filtro. **Faltam** Plano, situação do convênio (ativo/inativo), valor da tabela e quantidade máxima por pedido. O valor vem do D ou do #13983.
+
+## Função que usa A, B e C: `klingo-paciente` (03/11/2026)
+Edge Function no ar (`supabase/functions/klingo-paciente/`), chamada com `x-sync-key` (= `config.ia_segredo`) e corpo JSON:
+- `{"acao":"conferir","cpf":"…","nascimento":"AAAA-MM-DD"}` → `encontrado`, `ambiguo`, `confere`, `prontuario` (só se confere) e `cadastro_faltando` (quais entre email/celular/telefone estão vazios, nunca o valor).
+- `{"acao":"historico","prontuario":"…","nascimento":"…","meses":12}` → marcações enxutas (sem nome, CPF, valor, observação nem telefone).
+- `{"acao":"resultados","prontuario":"…","nascimento":"…","meses":12}` → atendimentos com `laudo_pronto` (sem link/senha: o Klingo não tem).
+Histórico e resultados **só saem depois de o nascimento conferir** com o cadastro daquele prontuário. Máximo de 12 meses (o Klingo recusa períodos maiores) e 200 linhas. Nada de paciente vai para log ou banco.
+
+**Testado sem paciente real:** 11 testes com dados inventados (`testes`: `npm run test:edge`) e chamadas reais com CPF/prontuário inexistente (volta "não encontrado"), entradas inválidas (400) e sem chave (403).
+**Ainda NÃO provado com paciente real:** se o Klingo guarda o CPF com ou sem pontos (a função tenta os dois) e em que formato vem o nascimento (aceita AAAA-MM-DD e DD/MM/AAAA). Fazer um teste com um paciente cadastrado, com autorização dele, antes de ligar ao chat.
+A função `klingo-inspecionar-chat` (só estrutura/contagem) continua publicada e pode ser apagada no painel.
+
+## Ligado ao chat (03/11/2026, sem n8n)
+Quando o paciente preenche **CPF + data de nascimento** no chat, o banco (`supabase/klingo-vinculo.sql`, gatilho `conversa_fluxo_klingo_trg`) chama a `klingo-paciente`, que confere no Klingo e grava o resultado por `paciente_klingo_registrar` (a resposta HTTP não leva dado de paciente). Fica em `paciente_klingo_vinculo` (RLS fechada): situação (`confere`, `divergente`, `nao_encontrado`, `ambiguo`, `erro`), **prontuário (só se o nascimento confere)**, quais campos do cadastro estão vazios e um resumo do histórico (total, data e nome do último exame, 12 meses). Não grava nome, telefone, e-mail nem CPF do Klingo. A equipe vê no resumo da conversa notas como "cadastro localizado (prontuário …)", "nascimento NÃO confere", "CPF não encontrado", "cadastro no Klingo sem: email, celular" e "Histórico no Klingo: N marcações…". Mudou o CPF ou a data na conversa → confere de novo. `config.klingo_paciente_url` vazio desliga.
+Ensaiado no banco real em transação desfeita (gatilho, vínculo e notas) e chamada real da função; **não ensaiado com paciente real**.
+
+**Push (os dois, no ar):** equipe (`avisar-equipe`, `config.equipe_push_url` preenchida; testada: 2 aparelhos receberam) e paciente (`chat-avisar`). Cada atendente precisa abrir o painel uma vez e permitir os avisos.
+
+## Pendências anotadas (03/11/2026)
+1. **Teste com paciente real** do `klingo-paciente`: o CPF do dono (86082026543) não foi achado no relatório A (0 linhas nos 3 formatos). Falta saber se o cadastro dele está sem CPF ou se o filtro "Apenas" de CPF não casa. Para fechar: nome completo e nascimento do cadastro, ou outro paciente que autorize.
+2. **Resultado de exame: link e senha** serão passados pela equipe (decisão do dono). Falta definir o canal e a tela: sugestão é a atendente enviar pelo chat/painel, com a senha em mensagem separada. O relatório C só diz se o laudo está pronto.
+3. **Histórico do Klingo para o paciente ver no chat** (hoje só a equipe vê o resumo; o paciente que volta usa o histórico do próprio chat). `klingo-paciente` já tem as ações `historico` e `resultados` para isso.
+4. **Aviso na tela do painel** com o vínculo (selo "Klingo: cadastro incompleto"); hoje aparece só nas notas do resumo.
+5. **Suporte do Klingo:** preço Particular; link/senha do resultado; convênio inativado; última atualização do cadastro e hora real do atendimento.
+6. **Limpeza que sobrou:** `fila_avisar_n8n`, `fila_entrar` e `fila_reenviar_link` ainda citam o n8n (módulo da fila, `supabase/saida-n8n-fila.sql`, não aplicado). `privacidade.html` cita o n8n: só mudar com revisão jurídica. Apagar a função temporária `klingo-inspecionar-chat` no painel do Supabase.
+7. Confirmar com a clínica se o histórico do Klingo é curto (3 e 12 meses deram o mesmo total no relatório B).
+
+## Pendências com o suporte do Klingo
+(Texto de e-mail em `docs/fase-0-email-suporte-klingo.md`; acrescentar estas perguntas.)
+1. Onde fica cadastrado o **preço Particular** (a tabela "Particular" não aparece no relatório D)?
+2. O Klingo gera **link e senha/código do resultado** para o paciente? Qual relatório ou consulta devolve?
+3. Há como saber que um **convênio foi inativado** (campo ou relatório)?
+4. Existe campo de **última atualização do cadastro** do paciente e de **hora real do atendimento**?
+
+## Próximos passos
+- ~~Executar A a E para validar colunas e filtros~~ (feito em 03/11/2026 com a função `klingo-inspecionar-chat`, que só devolve estrutura e contagem).
+- Testar `klingo-paciente` com um paciente real cadastrado (ver acima).
+- ~~Ligar ao chat~~ (feito, ver acima).
+- Enquanto a pergunta 1 não for respondida, o valor Particular continua deduzido das marcações.
 
 ## Regra de trabalho
 Sempre que uma tarefa depender de relatório do Klingo editado ou criado, o Claude avisa **antes de começar** e diz qual relatório falta. Esta regra está em `CLAUDE.md`.
 
-## Tarefas travadas por isto
-Busca de histórico sob demanda; verificação por CPF e pedido de atualização de dado; ligação automática chat-prontuário com aviso; envio de link e senha do resultado ao paciente.
+## Tarefas liberadas (ligadas ao chat; falta testar com paciente real)
+Busca de histórico sob demanda (B); verificação por CPF e pedido de atualização de dado (A); ligação automática chat-prontuário com aviso (A).
+
+## Ainda travadas
+Envio de link e senha do resultado ao paciente (sem link/senha no C; depende do suporte).
