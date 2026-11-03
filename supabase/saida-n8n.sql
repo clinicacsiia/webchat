@@ -11,7 +11,7 @@
 insert into public.config (chave, valor) values ('equipe_push_url', '') on conflict (chave) do nothing;
 
 -- ===== 2. Transferência para a equipe: sem n8n, com Web Push (Edge Function avisar-equipe) =====
-create or replace function public.fluxo_transferir(p_conversa uuid, p_motivo text, p_urgencia text, p_avisar boolean) returns void
+create or replace function public.fluxo_transferir(p_conversa uuid, p_motivo text, p_urgencia text default 'baixa', p_avisar boolean default true) returns void
 language plpgsql security definer set search_path to '' as $$
 declare v_url text; v_seg text; v_on boolean := public.fluxo_equipe_online();
 begin
