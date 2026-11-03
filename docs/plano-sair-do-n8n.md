@@ -12,12 +12,32 @@ Data: 03/11/2026. Decisão do dono: o n8n deixa de existir no projeto.
 
 Atenção: o segredo `ia_segredo` ficou escrito nos nós do fluxo arquivado. Ele **não pode ser trocado de qualquer jeito**, porque `fluxo_pre` o lê da tabela `config` para chamar `ia_pre_agendar`. Para trocar: atualizar `config.ia_segredo` e conferir antes se algum cron ou Edge Function o usa (`grep ia_segredo` no `cron.job` e em `supabase/functions`). Fazer na fase 1.
 
+## 1b. Estado da execução (03/11/2026, fim do dia)
+
+| Fase | Situação |
+|---|---|
+| 0. Esvaziar URL, despublicar e arquivar o fluxo | **Feita e conferida** |
+| Código no repositório (Edge Functions, migrações, painel, testes, documentação) | **Escrito e testado no ambiente de teste** (ver abaixo) |
+| 1. Migração do banco (`supabase/saida-n8n.sql`) | **NÃO aplicada.** O Supabase pediu confirmação humana dos `DROP` e o pedido expirou sem resposta. O banco real continua como estava |
+| 4. Fila: `supabase/fila-biometria-v2-delta.sql` e depois `supabase/saida-n8n-fila.sql` | **NÃO aplicadas** (mesma razão: têm `drop function`) |
+| Publicar as 3 Edge Functions (`avisar-equipe`, `fila-emitir-link`, `fila-validar-assinatura`) | **NÃO publicadas** |
+| Preencher `config.equipe_push_url` e `config.fila_link_url` | Depende de publicar as funções |
+| Tela da fila para o paciente (`fila/`) e aba da recepção para a assinatura | **Não feitas.** São uma construção grande e dependem da decisão de LGPD da biometria (item D7) |
+
+Ordem para aplicar no banco real (cada passo é uma migração separada, com ensaio antes):
+1. `saida-n8n.sql`, seções 1 a 3 (sem `DROP`) e conferir um chat completo.
+2. `saida-n8n.sql`, seção 4 (os `DROP`; confirmar quando o Supabase perguntar).
+3. Publicar `avisar-equipe` (sem verificação de JWT) e preencher `config.equipe_push_url` com `https://nrvuynjwcgwpjdptkiay.supabase.co/functions/v1/avisar-equipe`.
+4. Só quando for retomar a fila de assinatura: `fila-biometria-v2-delta.sql`, `saida-n8n-fila.sql`, publicar `fila-emitir-link` e `fila-validar-assinatura`, criar `EMAIL_API_KEY` e `EMAIL_REMETENTE`, e preencher `config.fila_link_url`.
+
+Sobre as 16 conversas antigas com `motor = 'ia'`: 4 estão em "aguardando" com a IA ativa (última mensagem em 31/10). Sem o n8n, ninguém responderia se o paciente escrevesse de novo. A seção 3 do `saida-n8n.sql` passa essas 4 para a equipe, com um aviso no resumo.
+
 ## 2. O que o n8n fazia, e para onde vai
 
 | # | Função no n8n | Situação hoje | Destino no programa |
 |---|---|---|---|
 | 1 | Triagem por IA a cada mensagem | Substituída pelo motor `fluxo` (Fase 7). Nada a portar | Remover (fase 1) |
-| 2 | Aviso à equipe quando há transferência | **Nunca foi montado** (nó vazio). O banco já monta o evento `transferencia` em `fluxo_transferir` | Edge Function `avisar-equipe` (e-mail), chamada pelo próprio `fluxo_transferir` via `pg_net` |
+| 2 | Aviso à equipe quando há transferência | **Nunca foi montado** (nó vazio). O banco já monta o evento `transferencia` em `fluxo_transferir` | Edge Function `avisar-equipe` (Web Push, que o projeto já usa; não precisa de provedor de e-mail), chamada pelo próprio `fluxo_transferir` via `pg_net` |
 | 3 | Fila: "emitir link" (e-mail com o link da assinatura) | **Nunca foi montado.** `fila_avisar_n8n` só dispara se `fila_webhook_url` estiver preenchida | Edge Function `fila-emitir-link` |
 | 4 | Fila: "validar assinatura" (rodar `biometria/avaliar_assinatura.py`) | **Nunca foi montado** | Edge Function `fila-validar-assinatura`, com o algoritmo em TypeScript |
 | 5 | Avisos por WhatsApp ao paciente | Nunca existiu | Fora deste plano (precisa de número na API oficial) |
@@ -42,9 +62,10 @@ Princípio: nada novo entra em produção antes de ter teste automático. Cada E
 - O sandbox restrito do n8n deixa de existir; o teste `test_avaliar_assinatura.py` com builtins do n8n é substituído pelo teste de paridade.
 
 ### 3.3 `avisar-equipe` (item 2)
-- `fluxo_transferir` troca o ramo do n8n por uma chamada à Edge Function, que manda um e-mail à equipe com nome, motivo, urgência e se há equipe online. Sem dado clínico no e-mail.
-- Lista de destinatários em `config.equipe_emails` (editável no painel).
-- Alternativa sem custo e sem provedor: notificação push do navegador (service worker). Decidir com o dono; o e-mail é o caminho mais simples.
+- Decisão: **Web Push** (o projeto já tem as chaves VAPID, o segredo no Vault e a função `fila-avisar`), não e-mail. Não precisa de provedor nem de custo.
+- `fluxo_transferir` chama a Edge Function por `pg_net` com só o id da conversa e a urgência. A função envia o aviso aos aparelhos de `push_inscricao` das contas de `agentes` ativos com papel admin ou atendente. Texto fixo, sem nome nem motivo.
+- O painel passou a registrar o aparelho da equipe (`assinarPushEquipe`, reaproveita `fila_config_publica` e `fila_push_salvar`) e o `painel/sw.js` ganhou o tratamento do aviso. Se o painel já está na tela, o próprio painel avisa e o push não repete.
+- Para a equipe receber, cada atendente precisa abrir o painel uma vez depois da atualização e permitir os avisos.
 
 ## 4. Limpeza do que era do n8n (fases 1 e 2, ainda não feitas)
 

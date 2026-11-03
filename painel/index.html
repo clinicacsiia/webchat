@@ -764,7 +764,7 @@
     S.aba = podeAtender() ? 'atendimento' : 'contatos';
     await carregarAgentes();
     montarApp();
-    if (podeAtender()) { await carregarConversas(); ligarTempoReal(); marcarPresenca(); atualizarAtencao(); carregarFila().catch(() => {}); pedirNotificacaoAoEntrar(); }
+    if (podeAtender()) { await carregarConversas(); ligarTempoReal(); marcarPresenca(); atualizarAtencao(); carregarFila().catch(() => {}); pedirNotificacaoAoEntrar(); assinarPushEquipe(); }
     renderAba();
   }
   async function carregarAgentes() {
@@ -1237,11 +1237,30 @@
     const b = document.getElementById('btnSom'); if (b) b.textContent = S.mudo ? 'Som desligado' : 'Som ligado';
     if (!S.mudo) bip();
   }
-  async function pedirNotificacao() { try { await Notification.requestPermission(); montarApp(); renderAba(); } catch {} }
+  async function pedirNotificacao() { try { await Notification.requestPermission(); montarApp(); renderAba(); assinarPushEquipe(); } catch {} }
+  // Aviso com o painel fechado: registra este aparelho para receber "paciente pediu atendimento" (Web Push, sem nome nem dado de saúde).
+  // Sem permissão, sem suporte ou sem chave VAPID, o painel segue só com o aviso de tela e o som, como antes.
+  function b64ParaBytes(t) {
+    const p = '='.repeat((4 - t.length % 4) % 4), b = atob((t + p).replace(/-/g, '+').replace(/_/g, '/'));
+    return Uint8Array.from(b, (c) => c.charCodeAt(0));
+  }
+  async function assinarPushEquipe() {
+    try {
+      if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window) || Notification.permission !== 'granted') return;
+      const reg = await navigator.serviceWorker.ready;
+      const { data } = await db.rpc('fila_config_publica');
+      const vapid = data && data.vapid;
+      if (!vapid) return;
+      let sub = await reg.pushManager.getSubscription();
+      if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ParaBytes(vapid) });
+      const j = sub.toJSON();
+      await db.rpc('fila_push_salvar', { p_endpoint: j.endpoint, p_p256dh: j.keys.p256dh, p_auth: j.keys.auth });
+    } catch { /* o painel segue sem push */ }
+  }
   // Pede a permissão assim que o atendente entra. Se o navegador exigir um clique (ex.: Safari), pede no primeiro toque na tela.
   function pedirNotificacaoAoEntrar() {
     if (!('Notification' in window) || Notification.permission !== 'default') return;
-    const feito = () => { try { montarApp(); renderAba(); } catch {} };
+    const feito = () => { try { montarApp(); renderAba(); assinarPushEquipe(); } catch {} };
     try {
       const r = Notification.requestPermission(feito);
       if (r && r.then) r.then(feito).catch(() => {});
@@ -2318,10 +2337,6 @@
       { k: 'cadastro_equipe_sem_convite', tipo: 'sim', rot: 'Equipe pode se cadastrar sem convite', dica: 'Recomendado deixar desligado.' },
       { k: 'reaproveitar_cadastro_convidado', tipo: 'sim', rot: 'Reaproveitar cadastro de convidado' },
     ] },
-    { id: 'n8n', icone: 'engrenagem', titulo: 'Integração com n8n', desc: 'Para onde vão os dados de cada nova conversa.', campos: [
-      { k: 'n8n_webhook_url', tipo: 'url', rot: 'Webhook do n8n (nova conversa)', dica: 'Recebe nome, telefone, e-mail e a primeira mensagem. Vazio = desligado.' },
-      { k: 'n8n_webhook_token', tipo: 'senha', rot: 'Token do webhook', dica: 'Segredo enviado junto com a chamada. Deixe como está para manter.' },
-    ] },
     { id: 'klingo', icone: 'pin', titulo: 'Jornada do paciente (Klingo)', desc: 'Relatório do Klingo usado na sincronização.', avancado: true, campos: [
       { k: 'jornada_relatorio_id', tipo: 'texto', rot: 'Número do relatório' },
       { k: 'jornada_relatorio_filtro', tipo: 'texto', rot: 'Filtro do relatório', dica: 'Ex.: criacao.' },
@@ -2670,7 +2685,7 @@
         : 'Ainda não há preços lidos do Klingo: o primeiro cálculo acontece na próxima atualização da agenda (a cada 10 minutos).'),
       tabela(['Exame', 'Operadora', 'Catálogo', 'Klingo', 'Diferença', 'Amostras'], (P.divergentes || []).map((x) => [x.exame, x.operadora, brl(x.catalogo), brl(x.klingo), (x.dif_pct > 0 ? '+' : '') + x.dif_pct + '%', x.amostras]), 'Nenhuma diferença relevante.'),
       h('h3', {}, 'Casos para melhorar o prompt'),
-      h('p', { class: 'dica' }, 'Alertas e cancelamentos recentes, sem dado de paciente. Copie e use para ajustar as instruções da IA no n8n.'),
+      h('p', { class: 'dica' }, 'Alertas e cancelamentos recentes, sem dado de paciente. Copie e use para ajustar os textos e as regras do motor de atendimento.'),
       h('div', { class: 'acoes' }, h('button', { class: 'btn', type: 'button', disabled: !EX.length, onclick: async () => { try { await navigator.clipboard.writeText(textoExemplos); toast('Casos copiados.'); } catch { toast('Não consegui copiar.'); } } }, 'Copiar casos')),
       tabela(['Quando', 'Caso', 'Exames', 'Plano', 'Etapa', 'Detalhe'], EX.map((x) => [fmtDataHora(x.quando), rotuloCaso(x.caso), (x.exames || []).join('; ') || '—', x.plano || '—', ROTULO_ETAPA[x.etapa] || x.etapa || '—', x.detalhe || '']), 'Nenhum caso no período.'),
       blocoIncidentes()));
