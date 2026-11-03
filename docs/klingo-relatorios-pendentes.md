@@ -6,15 +6,15 @@ Já usados antes (ver `docs/fase-0-verificacao.md`): **#13825** (marcações, fi
 
 ## Relatórios criados
 
-| Letra | Nº | Nome | Filtros |
+| Letra | Nº | Nome | Filtros (rótulo no Klingo · tipo) |
 |---|---|---|---|
-| A | **#14024** | CHAT A - Pacientes (Cadastro) | Prontuário, CPF, Nome (contém), Celular |
-| B | **#14025** | CHAT B - Marcações do Paciente | Prontuário, CPF, período |
-| C | **#14026** | CHAT C - Resultados / Laudos | Prontuário, período |
-| D | **#14027** | CHAT D - Tabela de Preço Particular | Operadora (opcional) |
-| E | **#14028** | CHAT E - Convênio x Procedimento | Operadora |
+| A | **#14024** | CHAT A - Pacientes (Cadastro) | `Paciente - Prontuário` (Apenas), `Paciente - CPF` (Apenas), `Paciente - Nome` (Contém), `Paciente - Celular` (Apenas) |
+| B | **#14025** | CHAT B - Marcações do Paciente | `Prontuário` (Apenas), `Paciente - CPF` (Apenas), `Data Agendado Para` (período) |
+| C | **#14026** | CHAT C - Resultados / Laudos | `Paciente - Número de Prontuário` (Apenas), `Atendimento - Data` (período) |
+| D | **#14027** | CHAT D - Tabela de Preço Particular | `Operadora - Nome` (texto, Apenas) |
+| E | **#14028** | CHAT E - Convênio x Procedimento | `Operadora - Nome` (texto, Apenas) |
 
-> Os nomes exatos dos filtros (parâmetros) ainda precisam ser conferidos ao configurar a leitura.
+> Só o rótulo do D foi **conferido na tela de execução**. Os de A, B, C e E foram deduzidos (abrir a tela rodaria o relatório com dado de paciente): confirmar no primeiro teste. O B filtra só por "Data Agendado Para"; se precisar de período pela chegada, acrescentar "Check-In - Data".
 
 ## O que ficou diferente do pedido
 
