@@ -48,6 +48,21 @@ Histórico e resultados **só saem depois de o nascimento conferir** com o cadas
 **Ainda NÃO provado com paciente real:** se o Klingo guarda o CPF com ou sem pontos (a função tenta os dois) e em que formato vem o nascimento (aceita AAAA-MM-DD e DD/MM/AAAA). Fazer um teste com um paciente cadastrado, com autorização dele, antes de ligar ao chat.
 A função `klingo-inspecionar-chat` (só estrutura/contagem) continua publicada e pode ser apagada no painel.
 
+## Ligado ao chat (03/11/2026, sem n8n)
+Quando o paciente preenche **CPF + data de nascimento** no chat, o banco (`supabase/klingo-vinculo.sql`, gatilho `conversa_fluxo_klingo_trg`) chama a `klingo-paciente`, que confere no Klingo e grava o resultado por `paciente_klingo_registrar` (a resposta HTTP não leva dado de paciente). Fica em `paciente_klingo_vinculo` (RLS fechada): situação (`confere`, `divergente`, `nao_encontrado`, `ambiguo`, `erro`), **prontuário (só se o nascimento confere)**, quais campos do cadastro estão vazios e um resumo do histórico (total, data e nome do último exame, 12 meses). Não grava nome, telefone, e-mail nem CPF do Klingo. A equipe vê no resumo da conversa notas como "cadastro localizado (prontuário …)", "nascimento NÃO confere", "CPF não encontrado", "cadastro no Klingo sem: email, celular" e "Histórico no Klingo: N marcações…". Mudou o CPF ou a data na conversa → confere de novo. `config.klingo_paciente_url` vazio desliga.
+Ensaiado no banco real em transação desfeita (gatilho, vínculo e notas) e chamada real da função; **não ensaiado com paciente real**.
+
+**Push (os dois, no ar):** equipe (`avisar-equipe`, `config.equipe_push_url` preenchida; testada: 2 aparelhos receberam) e paciente (`chat-avisar`). Cada atendente precisa abrir o painel uma vez e permitir os avisos.
+
+## Pendências anotadas (03/11/2026)
+1. **Teste com paciente real** do `klingo-paciente`: o CPF do dono (86082026543) não foi achado no relatório A (0 linhas nos 3 formatos). Falta saber se o cadastro dele está sem CPF ou se o filtro "Apenas" de CPF não casa. Para fechar: nome completo e nascimento do cadastro, ou outro paciente que autorize.
+2. **Resultado de exame: link e senha** serão passados pela equipe (decisão do dono). Falta definir o canal e a tela: sugestão é a atendente enviar pelo chat/painel, com a senha em mensagem separada. O relatório C só diz se o laudo está pronto.
+3. **Histórico do Klingo para o paciente ver no chat** (hoje só a equipe vê o resumo; o paciente que volta usa o histórico do próprio chat). `klingo-paciente` já tem as ações `historico` e `resultados` para isso.
+4. **Aviso na tela do painel** com o vínculo (selo "Klingo: cadastro incompleto"); hoje aparece só nas notas do resumo.
+5. **Suporte do Klingo:** preço Particular; link/senha do resultado; convênio inativado; última atualização do cadastro e hora real do atendimento.
+6. **Limpeza que sobrou:** `fila_avisar_n8n`, `fila_entrar` e `fila_reenviar_link` ainda citam o n8n (módulo da fila, `supabase/saida-n8n-fila.sql`, não aplicado). `privacidade.html` cita o n8n: só mudar com revisão jurídica. Apagar a função temporária `klingo-inspecionar-chat` no painel do Supabase.
+7. Confirmar com a clínica se o histórico do Klingo é curto (3 e 12 meses deram o mesmo total no relatório B).
+
 ## Pendências com o suporte do Klingo
 (Texto de e-mail em `docs/fase-0-email-suporte-klingo.md`; acrescentar estas perguntas.)
 1. Onde fica cadastrado o **preço Particular** (a tabela "Particular" não aparece no relatório D)?
@@ -58,13 +73,13 @@ A função `klingo-inspecionar-chat` (só estrutura/contagem) continua publicada
 ## Próximos passos
 - ~~Executar A a E para validar colunas e filtros~~ (feito em 03/11/2026 com a função `klingo-inspecionar-chat`, que só devolve estrutura e contagem).
 - Testar `klingo-paciente` com um paciente real cadastrado (ver acima).
-- Ligar a função ao chat/n8n (verificação por CPF, pedido de atualização de dado, histórico sob demanda). Ainda não ligada.
+- ~~Ligar ao chat~~ (feito, ver acima).
 - Enquanto a pergunta 1 não for respondida, o valor Particular continua deduzido das marcações.
 
 ## Regra de trabalho
 Sempre que uma tarefa depender de relatório do Klingo editado ou criado, o Claude avisa **antes de começar** e diz qual relatório falta. Esta regra está em `CLAUDE.md`.
 
-## Tarefas agora liberadas (função pronta; falta ligar ao chat e testar com paciente real)
+## Tarefas liberadas (ligadas ao chat; falta testar com paciente real)
 Busca de histórico sob demanda (B); verificação por CPF e pedido de atualização de dado (A); ligação automática chat-prontuário com aviso (A).
 
 ## Ainda travadas

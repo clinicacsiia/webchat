@@ -78,3 +78,10 @@ export function janela(meses: unknown, hoje: string): { de: string; ate: string 
   d.setUTCDate(d.getUTCDate() + 1);
   return { de: d.toISOString().slice(0, 10), ate: hoje };
 }
+
+// Resumo curto do histórico (para a nota da equipe): quantas marcações, a data e o nome do último exame. Ignora canceladas.
+export function resumoHistorico(linhas: Row[]) {
+  const ativas = marcacoes(linhas).filter((m) => !/cancel/i.test(`${m.status} ${m.motivo_cancelamento ?? ""}`));
+  const u = ativas[0];
+  return { total: ativas.length, ultima_data: u?.data ?? null, ultimo_procedimento: u?.procedimento ?? null };
+}

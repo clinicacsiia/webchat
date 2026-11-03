@@ -1,12 +1,13 @@
 // FLUXOGRAMA: entrada (POST com x-sync-key = config.ia_segredo e {"acao","cpf"|"prontuario","nascimento",...}) -> validação (formato de CPF, prontuário, nascimento) -> lógica (lê os relatórios A/B/C do Klingo só na memória; histórico e resultados só saem depois de o nascimento conferir) -> saída (veredito ou lista enxuta; nunca nome, CPF, telefone, e-mail, valor ou observação; nada vai para o log)
 // Versão 1.0 — 03/11/2026 / Mudança: Implementação inicial
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { conferir, cpfDigitos, cpfFormatos, hojeBrasilia, janela, marcacoes, nascimentoIso, prontuarioValido, REL, resultados, type Row } from "./mapa.ts";
+import { conferir, cpfDigitos, cpfFormatos, hojeBrasilia, janela, marcacoes, nascimentoIso, prontuarioValido, REL, resultados, resumoHistorico, type Row } from "./mapa.ts";
 
 // Ações: "conferir" {cpf, nascimento} | "historico" {prontuario, nascimento, meses?} | "resultados" {prontuario, nascimento, meses?}.
 // Chamada pelo banco/n8n com a chave interna. Os relatórios do Klingo recusam consulta sem filtro; aqui nunca se chama sem filtro.
 
 const KLINGO_URL = "https://api-externa.klingo.app/api/info/relatorio";
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { "Content-Type": "application/json" } });
 
 async function ler(token: string, id: string, filtros: Record<string, string>): Promise<Row[]> {
@@ -42,7 +43,20 @@ Deno.serve(async (req: Request) => {
         linhas = await ler(token, REL.A, { ":parm1": f });
         if (linhas.length) break;
       }
-      return json({ ok: true, ...conferir(linhas, nasc, cpf) });
+      const v = conferir(linhas, nasc, cpf);
+      // Chamada vinda do chat (traz o id da conversa): o resultado é gravado no banco e NÃO volta na resposta.
+      if (UUID.test(String(c?.conversa ?? ""))) {
+        let historico: unknown = null;
+        if (v.confere && v.prontuario) {
+          try {
+            const { de, ate } = janela(12, hojeBrasilia());
+            historico = resumoHistorico(await ler(token, REL.B, { ":parm0": v.prontuario, ":periodo2": "l", ":periodo2-from": de, ":periodo2-to": ate }));
+          } catch { historico = null; }
+        }
+        const { error } = await supabase.rpc("paciente_klingo_registrar", { p_conversa: c.conversa, p_resultado: { ...v, historico } });
+        return json({ ok: !error, registrado: !error });
+      }
+      return json({ ok: true, ...v });
     }
 
     if (c?.acao === "historico" || c?.acao === "resultados") {
@@ -61,6 +75,7 @@ Deno.serve(async (req: Request) => {
     }
     return json({ error: "acao desconhecida" }, 400);
   } catch (e) {
+    if (UUID.test(String(c?.conversa ?? ""))) await supabase.rpc("paciente_klingo_registrar", { p_conversa: c.conversa, p_resultado: { erro: true } });
     return json({ error: e instanceof Error ? e.message.slice(0, 200) : "erro" }, 502);   // mensagens não carregam dado de paciente
   }
 });

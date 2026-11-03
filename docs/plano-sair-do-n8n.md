@@ -32,6 +32,9 @@ Ordem para aplicar no banco real (cada passo é uma migração separada, com ens
 
 Sobre as 16 conversas antigas com `motor = 'ia'`: 4 estão em "aguardando" com a IA ativa (última mensagem em 31/10). Sem o n8n, ninguém responderia se o paciente escrevesse de novo. A seção 3 do `saida-n8n.sql` passa essas 4 para a equipe, com um aviso no resumo.
 
+## 1c. Atualização (03/11/2026, à noite)
+Aplicado no banco real: `saida-n8n.sql` seções 1 a 3 e a seção 4 (gatilho `mensagens_avisar_n8n`; funções `avisar_n8n_mensagem`, `ia_contexto`, `ia_responder`, `ia_responder_v2`, `ia_catalogo`; chaves `n8n_webhook_*` da config). `avisar-equipe` publicada e `config.equipe_push_url` preenchida (teste: 2 aparelhos receberam). Faltam só o módulo da fila (itens 3 e 4 do plano) e o texto de privacidade. O que está escrito na seção 1b acima como "NÃO aplicada" ficou desatualizado.
+
 ## 2. O que o n8n fazia, e para onde vai
 
 | # | Função no n8n | Situação hoje | Destino no programa |

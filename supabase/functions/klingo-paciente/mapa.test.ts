@@ -1,7 +1,7 @@
 // Testes com dados INVENTADOS (nenhum paciente real).
 import test from "node:test";
 import assert from "node:assert/strict";
-import { conferir, cpfDigitos, cpfFormatos, janela, marcacoes, nascimentoIso, prontuarioValido, resultados } from "./mapa.ts";
+import { resumoHistorico, conferir, cpfDigitos, cpfFormatos, janela, marcacoes, nascimentoIso, prontuarioValido, resultados } from "./mapa.ts";
 
 const A = (o: Record<string, unknown> = {}) => ({ col0: "9001", col1: "Fulana de Teste", col2: "123.456.789-09", col3: "1990-05-17", col4: "f@teste.com", col5: "71900000001", col6: "", col7: "2020-01-01", ...o });
 
@@ -63,4 +63,11 @@ test("janela: no máximo 12 meses, termina hoje", () => {
   assert.equal(janela(99, "2026-11-03").de, "2025-11-04");
   assert.equal(janela(undefined, "2026-11-03").de, "2025-11-04");
   assert.equal(janela(1, "2026-11-03").de, "2026-10-04");
+});
+
+test("resumo do histórico: ignora canceladas e pega a mais recente", () => {
+  const b = (o: Record<string, unknown>) => ({ col3: "1", col6: "2026-10-05", col9: "RM JOELHO", col16: "Agendado", col15: "", ...o });
+  const r = resumoHistorico([b({}), b({ col3: "2", col6: "2026-10-20", col9: "TC", col16: "Cancelado" }), b({ col3: "3", col6: "2026-09-01", col9: "US" })]);
+  assert.deepEqual(r, { total: 2, ultima_data: "2026-10-05", ultimo_procedimento: "RM JOELHO" });
+  assert.deepEqual(resumoHistorico([]), { total: 0, ultima_data: null, ultimo_procedimento: null });
 });
