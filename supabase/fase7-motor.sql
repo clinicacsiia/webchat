@@ -440,10 +440,8 @@ begin
       jsonb_build_object('nome', 'nome', 'rotulo', 'Nome completo' || (ctx ->> 'de_quem'), 'tipo', 'texto', 'obrigatorio', true, 'valor', v_nome),
       jsonb_build_object('nome', 'sexo', 'rotulo', 'Sexo', 'tipo', 'sexo', 'obrigatorio', true, 'valor', v_dig ->> 'sexo'),
       jsonb_build_object('nome', 'dt_nasc', 'rotulo', 'Data de nascimento', 'tipo', 'data', 'obrigatorio', true, 'valor', v_dig ->> 'dt_nasc'),
-      jsonb_build_object('nome', 'mae', 'rotulo', 'Nome da mãe', 'tipo', 'texto', 'obrigatorio', false, 'valor', v_dig ->> 'mae'),
       jsonb_build_object('nome', 'cpf', 'rotulo', case when (ctx ->> 'filho')::boolean then 'CPF da criança (ou do responsável, se ela não tiver)' else 'CPF' end,
-                         'tipo', 'cpf', 'obrigatorio', false, 'valor', v_dig ->> 'cpf'),
-      jsonb_build_object('nome', 'rg', 'rotulo', 'RG', 'tipo', 'texto', 'obrigatorio', false, 'valor', v_dig ->> 'rg')));
+                         'tipo', 'cpf', 'obrigatorio', true, 'valor', v_dig ->> 'cpf')));
   when 'dados_contato' then
     select ct.telefone into v_tel from public.contatos ct where ct.id = c.contato_id;
     v_txt := public.fluxo_t('dados_contato', ctx);
@@ -604,7 +602,7 @@ begin
       return '{"ok": true}';
     end if;
     foreach k in array case p_passo
-        when 'dados_ident' then array['nome','sexo','dt_nasc','mae','cpf','rg']
+        when 'dados_ident' then array['nome','sexo','dt_nasc','cpf']
         when 'dados_contato' then array['celular','telefone']
         when 'dados_endereco' then array['cep','endereco','numero','complemento','bairro','cidade','uf']
         else array['matricula','validade'] end loop
@@ -638,6 +636,7 @@ begin
       if v_pac ->> 'nome' is null and not ('o nome completo' = any(v_err)) then v_err := array_append(v_err, 'o nome completo'::text); end if;
       if v_pac ->> 'sexo' is null and not ('o sexo' = any(v_err)) then v_err := array_append(v_err, 'o sexo'::text); end if;
       if v_pac ->> 'dt_nasc' is null and not ('a data de nascimento' = any(v_err)) then v_err := array_append(v_err, 'a data de nascimento'::text); end if;
+      if v_pac ->> 'cpf' is null and not ('o CPF (os números não conferem)' = any(v_err)) then v_err := array_append(v_err, 'o CPF'::text); end if;
     elsif p_passo = 'dados_contato' and v_pac ->> 'celular' is null and not ('o celular (DDD + número)' = any(v_err)) then
       v_err := array_append(v_err, 'o celular (DDD + número)'::text);
     end if;
