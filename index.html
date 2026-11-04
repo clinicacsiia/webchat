@@ -87,17 +87,19 @@
 
   /* Formulário inicial */
   /* Tela inicial: coluna flexível para o bloco da clínica ficar no fim da tela */
-  .inicio { flex: 1; overflow-y: auto; padding: 24px 16px calc(24px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; }
+  .inicio { flex: 1; overflow-y: auto; padding: 18px 16px calc(24px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; }
   .hero { text-align: center; padding: 6px 0 14px; }
   .hero-logo { width: min(250px, 68%); height: auto; display: inline-block; }
   .hero-nome { margin: 4px 0 0; font-size: calc(15px * var(--esc)); font-weight: 650; letter-spacing: .02em; color: var(--csi-sidebar-bg); }
-  .inicio h1 { font-size: calc(26px * var(--esc)); line-height: 1.2; margin: 6px 0 4px; text-align: center; }
-  .inicio p.sub { margin: 0 0 16px; color: var(--texto-suave); text-align: center; }
+  .inicio h1 { font-size: calc(26px * var(--esc)); line-height: 1.2; margin: 0 0 4px; text-align: left; }
+  .inicio p.sub { margin: 0 0 8px; color: var(--texto-suave); text-align: left; }
   .inicio > form { margin-bottom: 24px; }
   .inicio > .link-add { align-self: flex-start; margin-bottom: 16px; }
   /* Dados da clínica (somente leitura) */
-  .inst-clinica { margin-top: auto; background: var(--csi-surface); border: 1px solid var(--csi-border); border-top: 4px solid var(--csi-primary); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); padding: 16px; font-size: calc(15px * var(--esc)); line-height: 1.5; }
-  .inst-clinica h2 { margin: 0 0 8px; font-size: calc(16px * var(--esc)); color: var(--csi-sidebar-bg); }
+  .inst-clinica { margin-top: auto; background: var(--csi-surface); border: 1px solid var(--csi-border); border-top: 4px solid var(--csi-primary); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); padding: 12px 16px; font-size: calc(15px * var(--esc)); line-height: 1.5; }
+  .inst-clinica summary { cursor: pointer; font-weight: 650; color: var(--csi-sidebar-bg); list-style: none; }
+  .inst-clinica summary::-webkit-details-marker { display: none; }
+  .inst-clinica[open] summary { margin-bottom: 10px; }
   .inst-clinica p { margin: 0 0 8px; color: var(--texto-suave); overflow-wrap: anywhere; }
   .inst-clinica p:last-child { margin-bottom: 0; }
   .inst-clinica a { color: var(--verde); font-weight: 650; }
@@ -135,7 +137,7 @@
   .btn-primario:disabled { opacity: .6; cursor: default; }
   .erro-form { color: var(--erro); font-size: calc(15.5px * var(--esc)); margin: 0 0 12px; min-height: 0; }
   /* conta do paciente (login opcional) */
-  .conta-faixa { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; justify-content: space-between; background: var(--csi-surface); border: 1px solid var(--csi-border); border-radius: var(--radius-md); padding: 8px 14px; margin: 0 0 14px; font-size: calc(15.5px * var(--esc)); }
+  .conta-faixa { display: flex; flex-wrap: wrap; gap: 0 12px; align-items: center; justify-content: space-between; padding: 0; margin: 0 0 12px; font-size: calc(14.5px * var(--esc)); color: var(--texto-suave); }
   .conta-faixa[hidden] { display: none; }
   .conta-faixa .txt { word-break: break-word; }
   .conta-faixa .acoes { display: flex; gap: 14px; }
@@ -287,8 +289,10 @@
   .carregando { padding: 28px 8px; text-align: center; color: var(--texto-suave); }
 
   /* Início: quem volta pelo cache */
-  .volta { background: var(--verde-claro); border: 1px solid #b9dcee; border-radius: var(--radius-md); padding: 12px 14px; margin: 0 0 16px; }
-  .volta-dados { margin: 0 0 2px; font-size: calc(16.5px * var(--esc)); }
+  .volta { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--verde-claro); border: 1px solid #b9dcee; border-radius: var(--radius-md); padding: 8px 14px; margin: 0 0 14px; }
+  .volta[hidden] { display: none; }
+  .volta-dados { margin: 0; font-size: calc(15.5px * var(--esc)); min-width: 0; overflow-wrap: anywhere; }
+  .volta .link-add { flex: none; font-size: calc(14.5px * var(--esc)); }
   .volta .link-add { margin: 0; padding: 4px 0; }
   .unidades.dois .unidade { min-height: 66px; }
   .unidades.dois .unidade strong { font-size: calc(18px * var(--esc)); }
@@ -430,14 +434,8 @@
 
   <!-- Tela 1: dados iniciais -->
   <section class="inicio" id="telaInicio" hidden>
-    <div class="hero">
-      <img class="hero-logo" src="img/logo-csi.svg" alt="CSI - Clínica de Saúde e Imagem" width="250" height="105">
-    </div>
     <h1 id="tituloInicio">Vamos agendar?</h1>
-    <p class="sub" id="boasVindasForm">É só tocar nas opções.</p>
-    <div class="aviso-ia compacto" id="avisoForm">
-      <p><b>Sou o assistente virtual (IA) da CSI.</b> Monto a sua <b>previsão de agendamento</b>; um atendente da equipe confirma data, horário e valor.</p>
-    </div>
+    <p class="sub" id="boasVindasForm">Responda rapidinho, é só tocar nas opções.</p>
     <div class="conta-faixa" id="faixaConta" hidden>
       <span class="txt" id="faixaContaTxt"></span>
       <span class="acoes">
@@ -488,14 +486,14 @@
       <button class="btn-primario" id="btnIniciar" type="submit">Começar</button>
     </form>
     <button type="button" class="link-add" id="btnHistoricoForm" hidden>Ver conversas anteriores</button>
-    <aside class="inst-clinica" aria-labelledby="instNome">
-      <h2 id="instNome">CSI - Clínica de Saúde e Imagem</h2>
+    <details class="inst-clinica">
+      <summary id="instNome">Sobre a clínica · endereço e horários</summary>
       <p>Rua Teixeira de Barros, 27, Brotas. Salvador - Bahia</p>
       <p>Tel: <a href="tel:+557131817666">(71) 3181-7666</a> | WhatsApp: <a href="https://wa.me/5571999803806" target="_blank" rel="noopener">(71) 99980-3806</a></p>
       <p>Seg a Sex: 7hs às 18h30 | Sáb: 8hs às 12hs</p>
       <p>Resp. Técnico: Dr. João Rafael Santos Carneiro | CRM 24778 - CBR</p>
       <p>CNPJ: a informar | <a href="privacidade.html">Política de Privacidade</a> | <a href="termos.html">Termos de Serviço</a></p>
-    </aside>
+    </details>
   </section>
 
   <!-- Tela 2: conversa -->
@@ -653,8 +651,9 @@
     el.btnNaoSouEu.hidden = !!(salvo && salvo.conta);   // conta logada: quem sai é a conta ("Sair da conta")
     el.fEmail.readOnly = !!(conta && !salvo);           // conta logada sem perfil salvo: o e-mail é o da conta
     if (conta && !salvo) el.fEmail.value = conta.email;
-    el.tituloInicio.textContent = salvo ? `Olá de novo, ${primeiroNome(salvo.nome)}!` : 'Vamos agendar?';
-    if (salvo) el.voltaDados.textContent = `${salvo.nome} · ${salvo.telefone} · ${salvo.email}`;
+    el.tituloInicio.textContent = salvo ? `Olá, ${primeiroNome(salvo.nome)}!` : 'Vamos agendar?';
+    if (salvo) el.voltaDados.textContent = `${salvo.nome} · ${salvo.telefone}`;
+    el.boasForm.hidden = !!salvo;   // quem volta já sabe o que fazer: vai direto à pergunta
     atualizarAcessoHistorico();
     if (!manterEscolha) escolha = null;
     irmaosForm = []; modoIrmaos = 'um_de_cada_vez';
@@ -2471,7 +2470,7 @@
   function atualizarContaUI(semForm) {
     el.faixaConta.hidden = !loginAtivo;
     el.btnContaEntrar.hidden = el.btnContaCriar.hidden = !!conta; el.btnContaSair.hidden = el.btnContaDados.hidden = !conta;
-    el.faixaContaTxt.textContent = conta ? 'Conta: ' + conta.email : 'Tem conta? Seus dados ficam salvos para a próxima vez.';
+    el.faixaContaTxt.textContent = conta ? 'Conta: ' + conta.email : 'Já tem conta?';
     el.btnSair.textContent = conta ? 'Sair da conta' : 'Sair (não sou eu)';
     if (!semForm && !el.telaInicio.hidden) mostrarForm(!!escolha);   // refaz o formulário já com (ou sem) os dados da conta
   }
