@@ -1295,27 +1295,43 @@
 
   /* escolha: botões grandes (um toque já responde), com filtro que vai estreitando a lista enquanto digita */
   const semAcento = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-  function caixaFiltro(botoes, rotulo) {
+  function caixaFiltro(botoes, rotulo, oculta) {
+    // oculta: a lista não aparece até a pessoa digitar (só os nomes que começam com o que digitou) ou tocar em "Mostrar".
     const f = h('input', { class: 'filtro', type: 'search', placeholder: rotulo || 'Digite para procurar', 'aria-label': rotulo || 'Procurar na lista', autocomplete: 'off', enterkeyhint: 'go' });
     const vazio = h('p', { class: 'w-nota', hidden: true }, 'Nada encontrado com esse nome.');
-    f.addEventListener('input', () => {
+    let mostrar = false;
+    const fixo = (b) => b.dataset.fixo === '1';
+    const bate = (b, p) => oculta ? b.dataset.busca.split(/\s+/).some((w) => w.startsWith(p)) : b.dataset.busca.includes(p);
+    const atualizar = () => {
       const q = semAcento(f.value).trim().split(/\s+/).filter(Boolean), vis = [];
-      botoes.forEach((b) => { const ok = q.every((p) => b.dataset.busca.includes(p)); b.hidden = !ok; b.classList.remove('unico'); if (ok) vis.push(b); });
+      botoes.forEach((b) => {
+        const ok = fixo(b) || (q.length ? q.every((p) => bate(b, p)) : !oculta || mostrar);
+        b.hidden = !ok; b.classList.remove('unico'); if (ok && !fixo(b)) vis.push(b);
+      });
       if (q.length && vis.length === 1) vis[0].classList.add('unico');
-      vazio.hidden = vis.length > 0;
-    });
-    f.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); const v = botoes.filter((b) => !b.hidden); if (v.length === 1) v[0].click(); } });
-    return [f, vazio];
+      vazio.hidden = !(q.length && vis.length === 0);
+    };
+    f.addEventListener('input', () => { if (f.value.trim()) mostrar = false; atualizar(); });
+    f.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); const v = botoes.filter((b) => !b.hidden && !fixo(b)); if (v.length === 1) v[0].click(); } });
+    const extras = [f, vazio];
+    if (oculta) {
+      const bt = h('button', { class: 'link-add', type: 'button', onclick: () => { mostrar = !mostrar; f.value = ''; bt.textContent = mostrar ? 'Esconder a lista de médicos' : 'Mostrar todos os médicos'; atualizar(); } }, 'Mostrar todos os médicos');
+      extras.push(bt);
+      atualizar();
+    }
+    return extras;
   }
   function widgetEscolha(w, o) {
     const itens = (Array.isArray(o.itens) ? o.itens : []).filter((i) => i && i.rotulo);
+    const oculta = o.passo === 'medico'; // nomes dos médicos só aparecem se a pessoa digitar ou pedir
     const botoes = itens.map((i) => {
       const b = h('button', { class: 'op', type: 'button', onclick: (ev) => responder(o.passo, i.valor, i.rotulo, ev.currentTarget) },
         h('strong', {}, i.rotulo), i.desc ? h('span', {}, i.desc) : null);
       b.dataset.busca = semAcento(i.rotulo + ' ' + (i.desc || ''));
+      if (oculta && i.valor === '') b.dataset.fixo = '1'; // "Tanto faz" sempre aparece
       return b;
     });
-    if (o.filtro) w.append(...caixaFiltro(botoes));
+    if (o.filtro || oculta) w.append(...caixaFiltro(botoes, oculta ? 'Digite a 1ª letra do nome do médico' : undefined, oculta));
     w.append(h('div', { class: 'op-lista' + (botoes.length > 8 ? ' rolar' : '') }, botoes));
     if (o.outro) {
       const inp = h('input', { class: 'filtro', type: 'text', maxlength: '120', placeholder: o.outro.placeholder || 'Escreva aqui', hidden: true });
