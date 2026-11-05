@@ -749,7 +749,7 @@
     return h('div', { class: 'centro' }, h('div', { class: 'cartao' },
       h('img', { class: 'logo-cartao', src: '../img/logo-csi.svg', alt: 'CSI - Clínica de Saúde e Imagem', width: 200, height: 84 }),
       h('h1', {}, modoCadastro ? 'Criar conta da equipe' : 'Painel de atendimento'),
-      h('p', { class: 'sub' }, modoCadastro ? 'Depois de criar, um administrador precisa liberar seu acesso.' : 'Entre com a sua conta da equipe.'),
+      h('p', { class: 'sub' }, modoCadastro ? 'Depois de criar, confirme o e-mail. Seu pedido vai para a aba Avisos e um administrador aprova ou recusa o acesso.' : 'Entre com a sua conta da equipe.'),
       form,
       h('button', { class: 'link', type: 'button', onclick: () => telaLoginMostrar(!modoCadastro) }, modoCadastro ? 'Já tenho conta. Entrar' : 'Primeiro acesso? Criar conta')));
   }
@@ -1336,6 +1336,7 @@
     if (!S.me || !podeAtender() || document.hidden) return;
     tickAtencao++;
     if (tickAtencao % 2 === 0) atualizarAtencao();
+    if (ehAdmin() && tickAtencao % 2 === 0) carregarPessoas().then(() => { atualizarSeloAvisos(); if (S.aba === 'avisos') renderAvisos(); }).catch(() => {});
     if (S.aba === 'jornada' && (!J.vivo || tickAtencao % 4 === 0)) carregarJornada();
   }, 30000);
   setInterval(() => { if (S.me && S.aba === 'jornada' && !document.hidden) acordarKlingo(); }, 60000);
@@ -1491,7 +1492,7 @@
       k('ve', 'ok', 'Encerradas hoje', nFim, 'Conversas encerradas hoje'),
       k('vm', 'alerta', 'Alertas', nAlerta, 'Pacientes que precisam de atenção na Jornada'));
   }
-  const totalAvisos = () => (S.sugestoes || []).length + (S.avisosData || []).length + (S.avisosPac || []).length;
+  const totalAvisos = () => (S.sugestoes || []).length + (S.avisosData || []).length + (S.avisosPac || []).length + (S.pedidosAcesso || []).length;
   function atualizarSeloAvisos() { const s = document.getElementById('seloAvisos'), n = totalAvisos(); if (s) { s.textContent = n; s.hidden = n === 0; } }
   function atualizarSelo() {
     atualizarSeloAvisos();
@@ -1567,6 +1568,9 @@
       Promise.resolve(db.rpc('pessoa_sugestoes')).then((r) => r, vazio),
       Promise.resolve(db.rpc('pessoa_avisos_data')).then((r) => r, vazio),
       Promise.resolve(db.rpc('paciente_avisos')).then((r) => r, vazio)]);
+    // Pedidos de acesso da equipe (e-mail já confirmado): só o administrador recebe linhas.
+    const pa = ehAdmin() ? await Promise.resolve(db.rpc('equipe_pedidos')).then((r) => r, vazio) : vazio();
+    S.pedidosAcesso = pa.error || !Array.isArray(pa.data) ? [] : pa.data;
     S.avisosPac = ap.error || !Array.isArray(ap.data) ? [] : ap.data;
     S.avisosData = ad.error || !Array.isArray(ad.data) ? [] : ad.data;
     S.grupos = new Map(); (g.error ? [] : g.data || []).forEach((r) => S.grupos.set(r.conversa_id, r));
@@ -1645,6 +1649,22 @@
     if (!confirm(`Manter as conversas de ${nomeBonito(av.nome)} separadas? O robô não junta de novo.`)) return;
     await rpcPessoa('pessoa_manter_separado', { p_ids_a: av.ids_a, p_ids_b: av.ids_b }, 'Mantidas separadas.');
   }
+  async function decidirAcesso(p, aprovar) {
+    const quem = p.nome || p.email || 'esta pessoa';
+    if (!confirm(aprovar ? `Liberar o acesso de ${quem} (${p.email || 'sem e-mail'}) como ${ROTULO_PAPEL[p.papel] || p.papel}?` : `Recusar o pedido de ${quem}? A conta será apagada.`)) return;
+    const r = await rpcPessoa('equipe_pedido_decidir', { p_agente: p.id, p_aprovar: aprovar }, aprovar ? `Acesso de ${quem} liberado.` : 'Pedido recusado.');
+    if (r) { await carregarAgentes(); }
+  }
+  function renderPedidosAcesso() {
+    const lista = S.pedidosAcesso || [];
+    if (!lista.length) return null;
+    return h('div', { id: 'avisosAcesso' }, lista.map((p) => h('div', { class: 'sug' },
+      h('b', {}, 'Pedido de acesso à equipe'),
+      h('div', {}, `${p.nome || 'Sem nome'} (${p.email || 'sem e-mail'}) criou uma conta e confirmou o e-mail. Liberar o acesso ao painel?`),
+      h('div', { class: 'sug-acoes' },
+        h('button', { class: 'btn prim', type: 'button', onclick: () => decidirAcesso(p, true) }, 'Aprovar'),
+        h('button', { class: 'btn perigo', type: 'button', onclick: () => decidirAcesso(p, false) }, 'Recusar')))));
+  }
   function renderAvisosData(tudo) {
     const lista = S.avisosData || [];
     if (!lista.length) return null;
@@ -1700,7 +1720,7 @@
     const n = totalAvisos();
     c.replaceChildren(h('div', { class: 'pagina', id: 'paginaAvisos' }, h('h2', {}, 'Avisos'),
       h('p', { class: 'sub' }, n ? 'O que precisa de uma decisão da equipe. Nada aqui bloqueia o atendimento.' : 'Nenhum aviso pendente.'),
-      secao('Mesma pessoa?', sugs), secao('Data de nascimento diferente', datas), secao('Paciente e Klingo', pac)));
+      secao('Pedidos de acesso', renderPedidosAcesso()), secao('Mesma pessoa?', sugs), secao('Data de nascimento diferente', datas), secao('Paciente e Klingo', pac)));
   }
   async function viewAvisos(c) {
     c.append(h('div', { class: 'pagina', id: 'paginaAvisos' }, h('h2', {}, 'Avisos'), h('p', { class: 'sub' }, 'Carregando…')));
