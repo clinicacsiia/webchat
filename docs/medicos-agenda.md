@@ -23,6 +23,13 @@ Aba só do administrador no painel. Mostra cada médico por unidade com a agenda
   - Convênio desligado na aba *Convênios* (clínica toda) aparece travado.
   - Como o chat aplica: lê o convênio da conversa (`pre_agendamentos.plano`, via `app.conversa`, que o chat já grava antes de pedir horários). Sem convênio ou Particular = sem filtro. Exame do pedido com restrição tira o médico daquele pedido.
   - O Klingo quase não preenche a coluna "operadoras" da agenda (40 de 16.446 linhas), por isso a regra por médico é manual no painel.
+  - **Filtros da lista de convênios (05/11/2026).** A lista traz todos os convênios da clínica (34); para a recepção não rolar tudo, há três filtros que se combinam com a busca por nome:
+    - *Deste médico / Da unidade / Todos os convênios*: mostra os convênios que têm **preço no Klingo** (`catalogo_preco`, fonte "convenio", sem removido) para algum exame do médico ou da unidade. Padrão: "Da unidade". Exemplo real: Alexandre Magno (Desenvoar) → 26 da unidade, 24 do médico, de 34; saem SUS, SUS Curso, Alerta Vida (e Sedação), Algodão Saúde, Amor Saúde, APUB e SIN Solutions.
+    - *Todos / Aceitos / Não aceitos / Com restrição de exame* (com contagem).
+    - *Qualquer exame*: só convênios com preço para aquele exame do médico.
+    - **É palpite pelas tabelas de preço, não a cobertura oficial.** O convênio que a equipe já ajustou (desligado ou com restrição) aparece sempre, em qualquer filtro. "Todos os convênios" mostra tudo. Convênio sem preço para os exames do médico ganha a nota "sem preço no Klingo…".
+    - A fonte exata seria o relatório #14028 (Convênio × Procedimento, coluna Cobertura S/N), que ainda não é lido pelo sistema; quando for, trocar a regra de `procs_medico`/`n_unidade` em `medico_detalhe`.
+    - O chat não muda: o filtro é só de exibição. O médico continua aceitando todo convênio que não estiver desligado.
 
 **C. Horários por dia e folgas.**
   - *Horários por dia*: uma linha por dia da semana, já preenchida com a grade do Klingo; cada dia pode ter mais de um turno (ex.: 08:00–12:00 e 14:00–18:00) ou ficar indisponível. Só reduz a grade do Klingo; o atendimento precisa terminar até a hora final do turno. Salvar uma grade igual à do Klingo apaga a regra. A grade por dia substitui a regra simples de dias/horas (a observação fica).
@@ -43,4 +50,4 @@ Botão **Mapa de salas** no topo da aba Médicos. Mostra, por unidade, cada cons
 
 Para a v1.1/v1.2 reaplique o `supabase/medicos-regras.sql` (seções 1, 1b, 2, 3, 4, 5 e 6, em partes; tudo é `create or replace`/`if not exists`) **antes** de publicar o painel. A seção 3 recria `agenda_horarios` (o chat passa a respeitar turnos, folgas e convênios) e a 4 traz as funções novas: `medico_detalhe`, `medico_turnos_salvar`, `medico_excecao_salvar/remover`, `medico_convenio_salvar`, `medico_particular_salvar`, `medico_proc_resolver`.
 
-Testes: `npm run test:medicos-sql` (76 casos, banco embutido) e `npm run test:medicos` (10 casos, navegador).
+Testes: `npm run test:medicos-sql` (80 casos, banco embutido) e `npm run test:medicos` (11 casos, navegador).

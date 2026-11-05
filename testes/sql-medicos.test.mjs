@@ -20,6 +20,9 @@ await db.exec(`
   insert into public.catalogo_procedimento values (1, 'CONSULTA PEDIATRICA', 'CONSULTAS'), (2, 'ULTRASSOM X', 'EXAMES'), (3, 'EXAME B', 'EXAMES');
   create table public.catalogo_plano (id serial primary key, operadora text, plano text, ativo boolean);
   insert into public.catalogo_plano (operadora, plano) values ('AMIL', 'A'), ('Sulamerica', 'B'), ('PARTICULAR', 'P');
+  create table public.catalogo_preco (id serial primary key, operadora text, procedimento_id int, fonte text, removido_em timestamptz);
+  insert into public.catalogo_preco (operadora, procedimento_id, fonte, removido_em) values
+    ('AMIL', 1, 'convenio', null), ('AMIL', 3, 'convenio', null), ('Sulamerica', 2, 'convenio', null), ('Sulamerica', 3, 'convenio', now()), ('AMIL', 1, 'particular', null);
   create function public.convenio_chave(t text) returns text language sql immutable as $$ select upper(regexp_replace(btrim(coalesce(t, '')), '\s+', ' ', 'g')) $$;
   create function public.convenio_ativo(t text) returns boolean language sql as $$ select true $$;
   create table public.pre_agendamentos (conversa_id uuid primary key, plano text);
@@ -176,6 +179,14 @@ ok('o detalhe mostra a restrição por exame', JSON.stringify((await dets()).con
 ok('restrição por exame que o Klingo não liga ao médico é recusada', (await erro(() => db.query(`select public.medico_convenio_salvar('DRA ANA','AMIL',2,false)`))) !== null);
 ok('Particular e convênio inexistente são recusados', (await erro(() => db.query(`select public.medico_convenio_salvar('DRA ANA','Particular',0,false)`))) !== null && (await erro(() => db.query(`select public.medico_convenio_salvar('DRA ANA','NAO EXISTE',0,false)`))) !== null);
 ok('a lista de convênios não traz Particular', !(await dets()).convenios.some((c) => /PARTICULAR/.test(c.chave)) && (await dets()).convenios.length === 2);
+{
+  // Filtros de convênio: cobertura inferida das tabelas de preço (só fonte "convenio" e sem removido) para os exames do médico e da unidade.
+  const d = await dets(), amil = d.convenios.find((c) => c.chave === 'AMIL'), sula = d.convenios.find((c) => c.chave === 'SULAMERICA');
+  ok('AMIL tem preço para a consulta (1) e o exame B (3) de DRA ANA; o preço "particular" não conta', JSON.stringify(amil.procs_medico) === '[1,3]', JSON.stringify(amil.procs_medico));
+  ok('Sulamerica só tem preço no exame 2 (não é de DRA ANA) e o preço removido não conta: nenhum exame do médico', JSON.stringify(sula.procs_medico) === '[]', JSON.stringify(sula.procs_medico));
+  ok('"da unidade" conta os exames da unidade CSI com preço (AMIL 2: exames 1 e 3; Sulamerica 1: exame 2 da sala RM)', amil.n_unidade === 2 && sula.n_unidade === 1, `${amil.n_unidade}/${sula.n_unidade}`);
+  ok('o detalhe diz quantos exames a unidade tem', d.n_procs_unidade === 3, String(d.n_procs_unidade));
+}
 await db.query(`select public.medico_convenio_salvar('DRA ANA','AMIL',3,true)`);
 await db.query(`select public.medico_particular_salvar('DRA ANA', true)`);
 ok('100% particular: convênio não vê o médico; Particular vê', (await comConversa(A1)) === 0 && (await comConversa(A2)) > 0 && (await dets()).particular === true);

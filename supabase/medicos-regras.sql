@@ -421,7 +421,7 @@ revoke all on function public.medico_admin() from public, anon, authenticated;
 -- Tudo de um médico numa chamada: turnos (do que vale hoje: turnos > regra antiga > grade do Klingo), exceções futuras, convênios e exames dele.
 create or replace function public.medico_detalhe(p_prof text, p_unid text) returns jsonb
 language plpgsql security definer set search_path to '' as $$
-declare k record; r public.medico_regra; v_origem text; v_turnos jsonb; pn text := public.norm_nome(p_prof);
+declare k record; r public.medico_regra; v_origem text; v_turnos jsonb; pn text := public.norm_nome(p_prof); v_pm integer[]; v_pu integer[];
 begin
   perform public.medico_admin();
   select * into k from public.medico_klingo() m where public.norm_nome(m.profissional) = pn and public.norm_nome(m.unidade) = public.norm_nome(p_unid);
@@ -429,6 +429,11 @@ begin
   select * into r from public.medico_regra x where public.norm_nome(x.profissional) = pn and public.norm_nome(x.unidade) = public.norm_nome(p_unid);
   select coalesce(jsonb_agg(jsonb_build_object('dia', t.dia, 'hora_ini', t.hora_ini, 'hora_fim', t.hora_fim) order by t.dia, t.hora_ini), '[]'::jsonb) into v_turnos
     from public.medico_turno t where public.norm_nome(t.profissional) = pn and public.norm_nome(t.unidade) = public.norm_nome(p_unid);
+  -- Exames ligados ao médico e à unidade na agenda do Klingo: base dos filtros "deste médico" e "da unidade" na lista de convênios.
+  select coalesce(array_agg(distinct a.procedimento_id), '{}') into v_pm from public.catalogo_agenda a
+    where public.norm_nome(a.profissional) = pn and a.vig_fim >= current_date and a.procedimento_id is not null;
+  select coalesce(array_agg(distinct a.procedimento_id), '{}') into v_pu from public.catalogo_agenda a
+    where public.norm_nome(a.unidade) = public.norm_nome(p_unid) and a.vig_fim >= current_date and a.procedimento_id is not null;
   if jsonb_array_length(v_turnos) > 0 then v_origem := 'turnos';
   else
     v_origem := case when r.profissional is null then 'klingo' else 'regra' end;
@@ -438,11 +443,17 @@ begin
   return jsonb_build_object(
     'origem', v_origem, 'turnos', v_turnos, 'nota', r.nota,
     'grade', jsonb_build_object('dias', k.dias, 'hora_ini', k.hora_ini, 'hora_fim', k.hora_fim),
+    'n_procs_unidade', cardinality(v_pu),
     'particular', exists (select 1 from public.medico_particular mp where mp.profissional = pn),
     'excecoes', coalesce((select jsonb_agg(jsonb_build_object('id', e.id, 'data_ini', e.data_ini, 'data_fim', e.data_fim, 'motivo', e.motivo) order by e.data_ini)
                           from public.medico_excecao e where e.profissional = pn and e.data_fim >= current_date), '[]'::jsonb),
     'convenios', coalesce((select jsonb_agg(jsonb_build_object('chave', o.ch, 'nome', o.nome, 'ativo_global', public.convenio_ativo(o.nome),
           'fora', exists (select 1 from public.medico_convenio_bloqueio b where b.profissional = pn and b.operadora = o.ch and b.procedimento_id = 0),
+          -- Cobertura inferida das tabelas de preço do convênio no Klingo (catalogo_preco): o convênio tem preço para quantos exames do médico / da unidade.
+          'procs_medico', coalesce((select jsonb_agg(distinct c.procedimento_id) from public.catalogo_preco c
+                                    where public.convenio_chave(c.operadora) = o.ch and c.fonte = 'convenio' and c.removido_em is null and c.procedimento_id = any(v_pm)), '[]'::jsonb),
+          'n_unidade', (select count(distinct c.procedimento_id) from public.catalogo_preco c
+                        where public.convenio_chave(c.operadora) = o.ch and c.fonte = 'convenio' and c.removido_em is null and c.procedimento_id = any(v_pu)),
           'restricoes', coalesce((select jsonb_agg(jsonb_build_object('procedimento_id', b.procedimento_id, 'nome', coalesce(pr.nome, 'Exame ' || b.procedimento_id)) order by pr.nome)
                                   from public.medico_convenio_bloqueio b left join public.catalogo_procedimento pr on pr.id = b.procedimento_id
                                   where b.profissional = pn and b.operadora = o.ch and b.procedimento_id > 0), '[]'::jsonb)) order by o.nome)
