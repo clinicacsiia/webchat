@@ -41,6 +41,11 @@ const MEDICOS = [
   { profissional: 'DANIELA LADEIA', unidade: 'CLÍNICA DE SAÚDE E IMAGEM - CSI', especialidade: 'Ortopedia', consulta: true, sala: false, dias: [1, 5], hora_ini: '08:00', hora_fim: '17:15', regra: { dias: [1], hora_ini: null, hora_fim: '12:00', nota: null }, bloqueado: false, aviso_id: 7 },
   { profissional: 'RM', unidade: 'CLÍNICA DE SAÚDE E IMAGEM - RM/TC', especialidade: null, consulta: false, sala: true, dias: [1, 2, 3, 4, 5, 6], hora_ini: '07:00', hora_fim: '18:50', regra: null, bloqueado: false, aviso_id: null }];
 const AVISOS = [{ id: 7, criado_em: agora, profissional: 'DANIELA LADEIA', unidade: 'CLÍNICA DE SAÚDE E IMAGEM - CSI', tipo: 'alterado', antes: { dias: [1], hora_ini: '08:00', hora_fim: '17:15' }, depois: { dias: [1, 5], hora_ini: '08:00', hora_fim: '17:15' }, status: 'pendente', tem_regra: true }];
+const PROC_AVISOS = [{ id: 31, criado_em: agora, profissional: 'DANIELA LADEIA', procedimento_id: 9, procedimento: 'ULTRASSOM DE JOELHO', especialidade: 'Ortopedia' }];
+const DETALHE = { origem: 'klingo', nota: null, grade: { dias: [2, 3, 4], hora_ini: '08:20', hora_fim: '17:00' }, turnos: [2, 3, 4].map((dia) => ({ dia, hora_ini: '08:20', hora_fim: '17:00' })),
+  particular: false, excecoes: [{ id: 5, data_ini: '2026-12-24', data_fim: '2026-12-26', motivo: 'Recesso' }],
+  convenios: [{ chave: 'AMIL', nome: 'AMIL', ativo_global: true, fora: false, restricoes: [] }, { chave: 'SULAMERICA', nome: 'Sulamerica', ativo_global: true, fora: true, restricoes: [] }, { chave: 'HAPVIDA', nome: 'HAPVIDA', ativo_global: false, fora: false, restricoes: [] }],
+  procs: [{ id: 1, nome: 'CONSULTA PEDIATRICA', consulta: true }, { id: 3, nome: 'EXAME B', consulta: false }] };
 const jwt = (sub) => { const b = (o) => Buffer.from(JSON.stringify(o)).toString('base64url'); return `${b({ alg: 'HS256', typ: 'JWT' })}.${b({ sub, role: 'authenticated', exp: Math.floor(Date.now() / 1000) + 86400 })}.x`; };
 
 function servidor() {
@@ -80,9 +85,11 @@ async function pagina(browser, { papel = 'admin' } = {}) {
     else if (p.startsWith('/rest/v1/jornada_coluna')) corpo = COLUNAS;
     else if (p.startsWith('/rest/v1/jornada_transicao')) corpo = TRANS;
     else if (p.startsWith('/rest/v1/v_jornada_quadro')) { if (false) { status = 404; corpo = { message: 'relation "v_jornada_quadro" does not exist' }; } else corpo = CARTOES; }
-    else if (p.endsWith('/rpc/medicos_painel')) corpo = { medicos: MEDICOS, avisos: AVISOS };
+    else if (p.endsWith('/rpc/medicos_painel')) corpo = { medicos: MEDICOS, avisos: AVISOS, proc_avisos: PROC_AVISOS };
     else if (p.endsWith('/rpc/medico_aviso_contagem')) corpo = { novos: AVISOS.length };
     else if (p.endsWith('/rpc/medico_aviso_resolver')) { reg.rpcs.push({ rpc: 'resolver', ...JSON.parse(req.postData() || '{}') }); corpo = { ok: true }; }
+    else if (p.endsWith('/rpc/medico_detalhe')) corpo = DETALHE;
+    else if (/\/rpc\/medico_(turnos_salvar|convenio_salvar|particular_salvar|excecao_salvar|excecao_remover|proc_resolver)$/.test(p)) { reg.rpcs.push({ rpc: p.split('/').pop(), ...JSON.parse(req.postData() || '{}') }); corpo = { regra: true, ok: true }; }
     else if (p.endsWith('/rpc/medico_salvar')) { reg.rpcs.push({ rpc: 'salvar', ...JSON.parse(req.postData() || '{}') }); corpo = { regra: true }; }
     else if (p.endsWith('/rpc/profissional_bloquear')) { reg.rpcs.push({ rpc: 'bloquear', ...JSON.parse(req.postData() || '{}') }); corpo = { ok: true, conversas: 2 }; }
     else if (p.endsWith('/rpc/jornada_mover_card')) corpo = { ok: true };
@@ -110,7 +117,7 @@ await caso('administrador vê a aba Médicos com selo 1, aviso e médicos pré-p
   await page.click('.nav button[data-aba=medicos]');
   await page.waitForSelector('.pagina table');
   const tab = await page.locator('.pagina table').innerText();
-  const aviso = await page.locator('.cv-ev').innerText();
+  const aviso = await page.locator('.cv-ev:has-text("Antes: Seg")').innerText();
   await ctx.close();
   return { ok: reg.excecoes.length === 0 && selo === '1' && /Alexandre Magno Teixeira Medeiros/.test(tab) && /Ter, Qua, Qui · 08:20–17:00/.test(tab) && /Seg · 08:00–12:00/.test(tab) && !/\bRM\b/.test(tab) && /Antes: Seg/.test(aviso), detalhe: `${selo} | ${reg.excecoes.join(';')} | ${tab.replace(/\s+/g, ' ').slice(0, 220)}` };
 });
@@ -124,23 +131,95 @@ await caso('atendente não vê a aba Médicos', async () => {
   return { ok: tem === 0, detalhe: String(tem) };
 });
 
-await caso('particularidades: abre já preenchido, só dias da grade, salva dias e horas', async () => {
+await caso('grade por dia: abre preenchida, dia fora do Klingo não edita, segundo turno e dia indisponível salvam certo', async () => {
   const { page, ctx, reg } = await pagina(browser);
   await page.goto(`${base}/painel/`);
   await page.click('.nav button[data-aba=medicos]');
   await page.waitForSelector('.pagina table');
   await page.locator('tr:has-text("Alexandre") button:text-is("Particularidades")').click();
+  await page.waitForSelector('input[data-dia]');
   const marcados = await page.locator('input[data-dia]:checked').evaluateAll((l) => l.map((i) => i.dataset.dia).join());
-  const desab = await page.locator('input[data-dia]:disabled').count();
+  const semAgenda = await page.locator('td:has-text("Sem agenda no Klingo")').count();
   const ini = await page.locator('input[type=time]').first().inputValue();
   await page.locator('input[data-dia="3"]').uncheck();
-  await page.locator('input[data-dia="4"]').uncheck();
-  await page.locator('input[type=time]').nth(1).fill('12:00');
-  await page.locator('button:text-is("Salvar")').click();
+  await page.locator('tr:has(> td > b:text-is("Terça-feira")) button:text-is("+ turno")').click();
+  await page.locator('tr:has(> td > b:text-is("Terça-feira")) input[type=time]').nth(1).fill('12:00');
+  await page.locator('tr:has(> td > b:text-is("Terça-feira")) input[type=time]').nth(2).fill('14:00');
+  await page.locator('button:text-is("Salvar grade")').click();
   await page.waitForTimeout(400);
-  const s = reg.rpcs.find((r) => r.rpc === 'salvar');
+  const s = reg.rpcs.find((r) => r.rpc === 'medico_turnos_salvar');
+  const t = s && s.p_turnos.map((x) => `${x.dia}:${x.hora_ini}-${x.hora_fim}`).join();
   await ctx.close();
-  return { ok: marcados === '2,3,4' && desab === 4 && ini === '08:20' && s && s.p_dados.dias.join() === '2' && s.p_dados.hora_fim === '12:00' && s.p_dados.hora_ini === '08:20', detalhe: `${marcados} | ${desab} | ${ini} | ${JSON.stringify(s)}` };
+  return { ok: marcados === '2,3,4' && semAgenda === 4 + 1 && ini === '08:20' && t === '2:08:20-12:00,2:14:00-17:00,4:08:20-17:00', detalhe: `${marcados} | ${semAgenda} | ${ini} | ${t}` };
+});
+
+await caso('convênios: liga/desliga grava na hora, convênio desligado na clínica fica travado, 100% particular e restrição por exame', async () => {
+  const { page, ctx, reg } = await pagina(browser);
+  await page.goto(`${base}/painel/`);
+  await page.click('.nav button[data-aba=medicos]');
+  await page.waitForSelector('.pagina table');
+  await page.locator('tr:has-text("Alexandre") button:text-is("Particularidades")').click();
+  await page.locator('button[data-sub=conv]').click();
+  await page.waitForSelector('input[data-conv]');
+  const estados = await page.locator('input[data-conv]').evaluateAll((l) => l.map((i) => `${i.dataset.conv}:${i.checked ? 1 : 0}${i.disabled ? 'x' : ''}`).join());
+  await page.locator('input[data-conv=AMIL]').uncheck();
+  await page.waitForTimeout(300);
+  await page.locator('input[data-particular]').check();
+  await page.waitForTimeout(300);
+  const c = reg.rpcs.filter((r) => r.rpc === 'medico_convenio_salvar')[0], pt = reg.rpcs.find((r) => r.rpc === 'medico_particular_salvar');
+  await ctx.close();
+  return { ok: estados === 'AMIL:1,SULAMERICA:0,HAPVIDA:0x' && c && c.p_operadora === 'AMIL' && c.p_proc === 0 && c.p_aceita === false && pt && pt.p_valor === true, detalhe: `${estados} | ${JSON.stringify(c)} | ${JSON.stringify(pt)}` };
+});
+
+await caso('convênios: "Não aceitar neste exame" manda o exame escolhido', async () => {
+  const { page, ctx, reg } = await pagina(browser);
+  await page.goto(`${base}/painel/`);
+  await page.click('.nav button[data-aba=medicos]');
+  await page.waitForSelector('.pagina table');
+  await page.locator('tr:has-text("Alexandre") button:text-is("Particularidades")').click();
+  await page.locator('button[data-sub=conv]').click();
+  await page.waitForSelector('input[data-conv=AMIL]');
+  await page.locator('div:has(> label > input[data-conv=AMIL]) select').selectOption('3');
+  await page.locator('div:has(> label > input[data-conv=AMIL]) button:text-is("Não aceitar neste exame")').click();
+  await page.waitForTimeout(300);
+  const c = reg.rpcs.find((r) => r.rpc === 'medico_convenio_salvar');
+  await ctx.close();
+  return { ok: c && c.p_operadora === 'AMIL' && c.p_proc === 3 && c.p_aceita === false, detalhe: JSON.stringify(c) };
+});
+
+await caso('folgas: mostra as datas, adiciona e remove', async () => {
+  const { page, ctx, reg } = await pagina(browser);
+  await page.goto(`${base}/painel/`);
+  await page.click('.nav button[data-aba=medicos]');
+  await page.waitForSelector('.pagina table');
+  await page.locator('tr:has-text("Alexandre") button:text-is("Particularidades")').click();
+  await page.locator('button[data-sub=exc]').click();
+  const lista = await page.locator('li').allInnerTexts();
+  await page.locator('input[type=date]').first().fill('2027-01-15');
+  await page.locator('input[placeholder^="Motivo"]').fill('Congresso');
+  await page.locator('button:text-is("Bloquear datas")').click();
+  await page.waitForTimeout(300);
+  await page.locator('button:text-is("Remover")').click();
+  await page.waitForTimeout(300);
+  const a = reg.rpcs.find((r) => r.rpc === 'medico_excecao_salvar'), r = reg.rpcs.find((x) => x.rpc === 'medico_excecao_remover');
+  await ctx.close();
+  return { ok: /24\/12\/2026 a 26\/12\/2026 · Recesso/.test(lista.join()) && a && a.p_ini === '2027-01-15' && a.p_fim === '2027-01-15' && a.p_motivo === 'Congresso' && r && r.p_id === 5, detalhe: `${lista} | ${JSON.stringify(a)} | ${JSON.stringify(r)}` };
+});
+
+await caso('Pendência de Validação: mostra a frase pedida, Confirmar e Ativar chama o banco e Ajustar abre o médico', async () => {
+  const { page, ctx, reg } = await pagina(browser);
+  await page.goto(`${base}/painel/`);
+  await page.click('.nav button[data-aba=medicos]');
+  await page.waitForSelector('#medicosPendencia');
+  const txt = await page.locator('#medicosPendencia').innerText();
+  const selo = await page.locator('tr:has-text("Daniela") .selo:text-is("validar exames")').count();
+  await page.locator('#medicosPendencia button:text-is("Ajustar Regras Antes de Ativar")').click();
+  await page.waitForSelector('button[data-sub=hor]');
+  await page.locator('#medicosPendencia button:text-is("Confirmar e Ativar")').click();
+  await page.waitForTimeout(300);
+  const r = reg.rpcs.find((x) => x.rpc === 'medico_proc_resolver');
+  await ctx.close();
+  return { ok: /Pendência de Validação/.test(txt) && /O médico Daniela Ladeia aceitou realizar o exame Ultrassom de Joelho via Klingo\. Deseja validar esta regra para os próximos agendamentos\?/i.test(txt) && selo === 1 && r && r.p_ids.join() === '31', detalhe: `${txt.replace(/\n/g, ' ')} | ${selo} | ${JSON.stringify(r)}` };
 });
 
 await caso('aceitar e manter chamam o banco com a ação certa', async () => {
