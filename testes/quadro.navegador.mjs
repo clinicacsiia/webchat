@@ -97,8 +97,8 @@ await caso('o quadro do Atendimento continua sendo um modo do Atendimento, e a a
 await caso('Lista é o modo padrão e o quadro não é carregado antes de pedir', async () => {
   const { page, ctx, reg } = await abrir();
   const emLista = await page.locator('.modo button[aria-pressed=true]').innerText();
-  // O selo de avisos da aba Jornada só CONTA (sem trazer linhas, sem nome de paciente): conta como "pediu" apenas quem lê os cartões.
-  const pediu = reg.pedidos.some((p) => p.includes('v_jornada_quadro') && p.includes('paciente_nome'));
+  // A consulta de avisos (selo e barra de atenção) só traz quem tem aviso nas últimas 48 h; conta como "pediu o quadro" apenas a leitura dos cartões (select=id,paciente_nome,...).
+  const pediu = reg.pedidos.some((p) => p.includes('v_jornada_quadro') && p.includes('select=id%2Cpaciente_nome'));
   await ctx.close();
   return { ok: emLista === 'Lista' && !pediu, detalhe: `modo=${emLista}, pediu quadro=${pediu}` };
 });
@@ -108,7 +108,7 @@ await caso('Quadro: mostra as colunas com os cartões das conversas e só pede c
   await page.click('.modo button:has-text("Quadro")');
   await page.waitForSelector('.q-col', { timeout: 5000 });
   const c1 = await nomesNaColuna(page, 'contato'), c2 = await nomesNaColuna(page, 'orcamento'), c3 = await nomesNaColuna(page, 'agendado');
-  const pedido = reg.pedidos.find((p) => p.includes('v_jornada_quadro') && p.includes('paciente_nome')) ?? '';
+  const pedido = reg.pedidos.find((p) => p.includes('v_jornada_quadro') && p.includes('select=id%2Cpaciente_nome')) ?? '';
   const salvo = await page.evaluate(() => localStorage.getItem('painel.modo'));
   await ctx.close();
   const ok = c1.join() === 'Maria Souza' && c2.join() === 'João Lima' && c3.join() === 'Ana Paula' && /conversa_id=not\.is\.null/.test(pedido) && salvo === 'quadro' && !reg.excecoes.length;

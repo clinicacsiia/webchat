@@ -222,6 +222,16 @@
   .j-status.ruim .ponto { background: var(--erro); }
   .j-atencao { background: var(--csi-danger-bg); border-bottom: 1px solid var(--csi-danger); padding: 8px 12px; max-height: 32vh; overflow-y: auto; }
   .j-atencao h3 { margin: 0 0 4px; font-size: 14px; color: var(--erro); }
+  .j-atencao:not(.aberto) { padding-top: 0; padding-bottom: 0; } .j-atencao:not(.aberto) h3 { margin: 0; }
+  .j-atencao-bt { all: unset; box-sizing: border-box; display: block; width: 100%; padding: 8px 0; cursor: pointer; font: inherit; font-weight: 700; color: var(--erro); }
+  .j-atencao-bt:focus-visible { outline: 2px solid var(--csi-primary); outline-offset: 2px; }
+  .j-barra { display: flex; align-items: center; gap: 8px; padding: 4px 12px; font-size: 12.5px; background: var(--csi-danger-bg); color: var(--erro); border-bottom: 1px solid var(--linha); overflow: hidden; }
+  .j-barra[hidden] { display: none; }
+  .j-barra-rot { flex: none; font-weight: 700; }
+  .j-barra-via { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; }
+  .j-barra-txt { display: inline-block; padding-left: 100%; animation: j-passa 22s linear infinite; }
+  @keyframes j-passa { to { transform: translateX(-100%); } }
+  @media (prefers-reduced-motion: reduce) { .j-barra-via { white-space: normal; } .j-barra-txt { padding-left: 0; animation: none; } }
   .j-aviso { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 6px 0; border-top: 1px solid #f6dcd8; font-size: 13.5px; }
   .j-aviso .quem { flex: 1; min-width: 200px; }
   .j-aviso .quem span { display: block; color: var(--suave); font-size: 12.5px; }
@@ -383,6 +393,7 @@
   .nav button { justify-content: flex-start; }
   .coluna { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
   .coluna > .conteudo { flex: 1; }
+  .sel-unidade { flex: none; max-width: 200px; padding: 8px 10px; font-size: 14px; font-weight: 600; border: 1px solid var(--csi-border-strong); border-radius: var(--radius-md); background: var(--csi-surface); }
   .topo { display: flex; align-items: center; gap: 16px; padding: 10px 20px; background: var(--csi-surface); border-bottom: 1px solid var(--csi-border); flex: none; }
   .busca-geral { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; border: 1px solid var(--csi-border-strong); border-radius: var(--radius-md); padding: 0 14px; background: var(--csi-surface); color: var(--csi-text-secondary); transition: border-color var(--csi-ease), box-shadow var(--csi-ease); }
   .busca-geral:focus-within { border-color: var(--csi-primary); box-shadow: var(--csi-focus); }
@@ -428,7 +439,7 @@
     .app { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; }
     .conteudo { grid-row: 1; }
     .coluna { grid-row: 1; }
-    .topo { padding: 8px 12px; gap: 8px; } .usuario { border-left: 0; padding-left: 0; } .usuario > div { display: none; }
+    .topo { padding: 8px 12px; gap: 8px; } .sel-unidade { max-width: 142px; font-size: 12.5px; padding: 7px 4px; } .usuario { border-left: 0; padding-left: 0; } .usuario > div { display: none; }
     .painel-cab { padding: 8px 12px 0; } .painel-cab p.sub, .kpis { display: none; } .painel-cab h2 { font-size: 18px; } .data-hoje { padding: 5px 9px; font-size: 13px; }
     .conteudo:has(.inbox.aberta) .painel-cab { display: none; }
     .nav button .nav-rot { flex: none; }
@@ -817,6 +828,7 @@
       h('label', { class: 'busca-geral' }, icone('busca'),
         h('input', { type: 'search', id: 'buscaGeral', placeholder: 'Buscar paciente…', 'aria-label': 'Buscar paciente ou conversa', autocomplete: 'off',
           oninput: (ev) => buscarGeral(ev.target.value), onkeydown: (ev) => { if (ev.key === 'Enter' && podeAtender() && S.aba !== 'atendimento') { S.aba = 'atendimento'; renderAba(); } } })),
+      podeAtender() ? seletorUnidade() : null,
       podeAtender() ? h('button', { type: 'button', class: 'sino', id: 'btnSino', 'aria-label': 'Ver conversas aguardando', title: 'Conversas aguardando e alertas da Jornada',
         onclick: () => { S.busca = ''; S.buscaQ = ''; S.filtro = 'aguardando'; S.aba = 'atendimento'; const b = document.getElementById('buscaGeral'); if (b) b.value = ''; renderAba(); } },
         icone('sino'), h('i', { id: 'sinoPonto', hidden: true })) : null,
@@ -843,9 +855,35 @@
     if (ehAdmin()) { atualizarSeloConvenios(); atualizarSeloMedicos(); }
   }
 
+  /* ---------- filtro de unidade: vale para Atendimento, Jornada e Fila ---------- */
+  // Unidades da agenda dos médicos (CSI, RM/TC e Desenvoar). Os nomes variam conforme a origem (Klingo: "CSI 1", "CSI 2", "CSI Pediatria";
+  // agenda: "CLÍNICA DE SAÚDE E IMAGEM - RM/TC"; chat: "rmtc"), então tudo vira uma chave. Mesma regra de public.unidade_chave() no banco.
+  // Regra de ouro: se não dá para saber a unidade de alguém (ou de algo), aparece em TODAS as unidades.
+  const UNIDADES_PAINEL = [['csi', 'CSI'], ['rmtc', 'CSI RM/TC'], ['desenvoar', 'Desenvoar']];
+  const UN = { sel: (() => { try { const v = localStorage.getItem('painel.unidade'); return UNIDADES_PAINEL.some(([k]) => k === v) ? v : ''; } catch { return ''; } })() };
+  function chaveUnidade(nome) {
+    const t = String(nome || '').toLowerCase();
+    if (!t.trim()) return null;
+    if (/desenvoar|pediatria/.test(t)) return 'desenvoar';
+    if (/rm.?\/?.?tc|csi 2/.test(t)) return 'rmtc';
+    if (/csi/.test(t)) return 'csi';
+    return null;
+  }
+  const chavesDe = (nomes) => [...new Set((nomes || []).map(chaveUnidade).filter(Boolean))];
+  // chaves vazias = unidade desconhecida = aparece em todas
+  const passaUnidade = (chaves) => !UN.sel || !chaves || !chaves.length || chaves.includes(UN.sel);
+  function seletorUnidade() {
+    return h('select', { id: 'selUnidade', class: 'sel-unidade', 'aria-label': 'Filtrar tudo por unidade', title: 'Vale para Atendimento, Jornada e Fila',
+      onchange: (e) => { UN.sel = e.target.value; try { localStorage.setItem('painel.unidade', UN.sel); } catch {} aplicarUnidade(); } },
+      h('option', { value: '' }, 'Todas unidades'), UNIDADES_PAINEL.map(([k, r]) => h('option', { value: k, selected: k === UN.sel }, r)));
+  }
+  function aplicarUnidade() {
+    atualizarAtencao(true); atualizarSelo(); renderAba();
+  }
+
   /* ---------- aba Fila: quem chegou e quem é o próximo ---------- */
   // O banco calcula a posição e gera os avisos (chegou, perto, sua vez) para o celular do paciente; aqui a equipe só registra, chama e conclui.
-  const F = { itens: [], tRecarga: null, acesso: null, ident: {} };
+  const F = { itens: [], tRecarga: null, acesso: null, ident: {}, un: {} };
   const hojeFila = () => new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(new Date());
   async function carregarFila() {
     const { data, error } = await db.from('fila_chegada').select('id,nome,senha,status,origem,conta_id,chegou_em,chamado_em,email,telefone,pede_senha').in('status', ['aguardando', 'chamado']).order('chegou_em').order('id');
@@ -855,9 +893,14 @@
     // Identificação automática (paciente novo ou já cadastrado, conversas, exames em aberto, exames de hoje no Klingo). Sem o SQL novo, a fila segue sem ela.
     F.ident = {};
     try { const { data: ids, error: eId } = await db.rpc('fila_identificar_todos'); if (!eId && Array.isArray(ids)) for (const i of ids) F.ident[i.id] = i; } catch { /* sem identificação */ }
-    const n = F.itens.filter((x) => x.status === 'aguardando').length;
+    // Unidade provável de cada pessoa (exame de hoje no Klingo > pedido do chat > unidade do formulário). Sem resposta = aparece em todas.
+    F.un = {};
+    try { const { data: us, error: eU } = await db.rpc('fila_unidades_hoje'); if (!eU && Array.isArray(us)) for (const u of us) F.un[u.id] = u; } catch { /* sem unidade: aparece em todas */ }
+    const n = filaVisivel().filter((x) => x.status === 'aguardando').length;
     const sl = document.getElementById('seloFila'); if (sl) { sl.textContent = n; sl.hidden = n === 0; }
   }
+  const filaVisivel = () => F.itens.filter((x) => passaUnidade((F.un[x.id] || {}).unidades));
+  const ROT_FONTE_UN = { klingo: 'exame de hoje no Klingo', pedido: 'pedido no chat', formulario: 'escolhida no formulário do chat' };
   function agendarFila() { clearTimeout(F.tRecarga); F.tRecarga = setTimeout(async () => { try { await carregarFila(); if (S.aba === 'fila') renderFila(); } catch { /* tenta de novo no próximo evento */ } }, 250); }
   async function viewFila(c) {
     c.append(h('div', { class: 'pagina', id: 'paginaFila' }, h('h2', {}, 'Fila'), h('p', { class: 'sub' }, 'Carregando…')));
@@ -900,7 +943,7 @@
   }
   function renderFila() {
     const c = document.getElementById('conteudo'); if (!c || S.aba !== 'fila') return;
-    const espera = F.itens.filter((x) => x.status === 'aguardando'), chamados = F.itens.filter((x) => x.status === 'chamado');
+    const visiveis = filaVisivel(), espera = visiveis.filter((x) => x.status === 'aguardando'), chamados = visiveis.filter((x) => x.status === 'chamado');
     const hora = (t) => new Date(t).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
     const nome = h('input', { type: 'text', id: 'fNome', maxlength: '120', placeholder: 'Nome completo de quem chegou', 'aria-label': 'Nome de quem chegou' });
     const mail = h('input', { type: 'email', id: 'fEmail', maxlength: '200', placeholder: 'E-mail (opcional)', 'aria-label': 'E-mail' });
@@ -911,6 +954,7 @@
       h('td', {}, hora(x.chegou_em) + (x.origem === 'recepcao' ? ' · registrado pela recepção' : ' · avisou pelo celular') + (x.conta_id ? ' · com conta' : ' · sem conta'),
         x.pede_senha ? h('div', { class: 'selo erro', style: 'display:inline-block;margin-top:4px' }, 'Esqueceu a senha') : null,
         x.telefone || x.email ? h('div', { class: 'sub' }, [x.telefone, x.email].filter(Boolean).join(' · ')) : null,
+        (() => { const u = F.un[x.id]; return u && (u.unidades || []).length ? h('div', { class: 'sub' }, 'Unidade provável: ' + u.unidades.map((k) => (UNIDADES_PAINEL.find((z) => z[0] === k) || [k, k])[1]).join(' e ') + ' (' + (ROT_FONTE_UN[u.fonte] || u.fonte) + ')') : null; })(),
         identificacaoNos(x)),
       h('td', {},
         !x.conta_id && x.email && x.telefone ? h('button', { class: 'btn', type: 'button', onclick: () => acessoFila(x, 'criar') }, 'Criar conta') : null,
@@ -918,7 +962,7 @@
         h('button', { class: 'btn', type: 'button', onclick: () => acaoFila('chamar', () => db.rpc('fila_mudar', { p_id: x.id, p_para: 'chamado' }), x.status === 'chamado' ? 'Paciente chamado novamente.' : 'Paciente chamado.') }, x.status === 'chamado' ? 'Chamar novamente' : 'Chamar'),
         h('button', { class: 'btn prim', type: 'button', onclick: () => acaoFila('atendido', () => db.rpc('fila_mudar', { p_id: x.id, p_para: 'atendido' }), 'Atendimento concluído.') }, 'Atendido'),
         h('button', { class: 'btn perigo', type: 'button', onclick: () => { if (confirm('Tirar ' + x.nome + ' da fila?')) acaoFila('cancelar', () => db.rpc('fila_mudar', { p_id: x.id, p_para: 'cancelado' }), 'Removido da fila.'); } }, 'Tirar')));
-    const tabela = F.itens.length
+    const tabela = visiveis.length
       ? h('div', { class: 'tabela-wrap' }, h('table', {}, h('thead', {}, h('tr', {}, ['Posição', 'Senha', 'Nome', 'Chegada', 'Ações'].map((t) => h('th', {}, t)))),
           h('tbody', {}, [...chamados.map((x) => linha(x, 0)), ...espera.map((x, i) => linha(x, i))])))
       : h('p', { class: 'sub' }, 'Ninguém na fila agora.');
@@ -930,7 +974,7 @@
       h('div', { class: 'sub' }, 'Passe esta senha à pessoa. No primeiro acesso ela escolhe uma senha nova. Ela entra pelo celular, na tela de check-in.'),
       h('button', { class: 'btn', type: 'button', onclick: () => { F.acesso = null; renderFila(); } }, 'Entendi, fechar')) : null;
     c.replaceChildren(h('div', { class: 'pagina' }, h('h2', {}, 'Fila'),
-      h('p', { class: 'sub' }, espera.length + (espera.length === 1 ? ' pessoa aguardando' : ' pessoas aguardando') + (chamados.length ? ' · ' + chamados.length + ' chamada(s) em atendimento' : '') + '. O paciente é avisado no celular quando estiver perto e na vez dele.'),
+      h('p', { class: 'sub' }, (UN.sel ? 'Unidade ' + UNIDADES_PAINEL.find((z) => z[0] === UN.sel)[1] + ' (quem ainda não tem unidade definida aparece em todas): ' : '') + espera.length + (espera.length === 1 ? ' pessoa aguardando' : ' pessoas aguardando') + (chamados.length ? ' · ' + chamados.length + ' chamada(s) em atendimento' : '') + '. O paciente é avisado no celular quando estiver perto e na vez dele.'),
       h('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 14px' },
         h('button', { class: 'btn prim', type: 'button', disabled: !espera.length, onclick: () => acaoFila('proximo', () => db.rpc('fila_chamar_proximo'), 'Próximo chamado.') }, 'Chamar o próximo'),
         nome, mail, fone,
@@ -950,7 +994,7 @@
 
   /* ---------- aba Jornada: onde está cada paciente, ao vivo ---------- */
   // O banco lê o Klingo e vigia os prazos sozinho, a cada minuto (jornada_vigiar). O painel só mostra e avisa: não fala com o Klingo.
-  const J = { cards: [], colunas: [], trans: [], estado: null, ok: true, lente: 'hoje', filtro: 'todos', unidade: '', busca: '', aberto: null, nAtencao: 0, seq: 0, canal: null, tRecarga: null,
+  const J = { cards: [], colunas: [], trans: [], estado: null, ok: true, lente: 'hoje', filtro: 'todos', busca: '', atencao: [], ticker: null, atencaoAberta: false, aberto: null, nAtencao: 0, seq: 0, canal: null, tRecarga: null,
     pessoas: new Map(), junto: new Map(), agrupar: (() => { try { return localStorage.getItem('painel.jagrupar') !== '0'; } catch { return true; } })() };
   const LENTES_J = [['hoje', 'Hoje'], ['perto', 'Ontem a amanhã'], ['todos', 'Próximos 30 dias']];
   const COLS_J = 'id,paciente_nome,coluna,coluna_nome,etapa,origem,ordem,data_ref,unidade,coluna_desde,responsavel,prioridade,versao,conversa_id,primeiro_exame,n_ativos,atrasado,n_tarefas_abertas,n_tarefas_vencidas,proxima_hora,paciente_chave';
@@ -1000,12 +1044,28 @@
     }
     return { data: todas };
   }
-  async function atualizarAtencao() {
+  // Atenção: só quem está parado há no máximo 2 dias (mais velho que isso sai da lista), do mais recente (minutos, horas) ao mais antigo (ontem...).
+  const LIMITE_ATENCAO_MS = 48 * 3600 * 1000;
+  const noLimiteAtencao = (k) => Date.now() - new Date(k.coluna_desde).getTime() <= LIMITE_ATENCAO_MS;
+  const maisRecentePrimeiro = (a, b) => String(b.coluna_desde).localeCompare(String(a.coluna_desde));
+  const unidadeDoCartaoJ = (k) => chavesDe([k.unidade]);
+  const atencaoDe = (cards) => cards.filter((k) => k.n_tarefas_vencidas > 0 && noLimiteAtencao(k) && passaUnidade(unidadeDoCartaoJ(k))).sort(maisRecentePrimeiro);
+  // Texto da barra: os 3 primeiros da lista. Só é recalculado quando pedido (a cada 2 minutos, ou ao trocar a unidade).
+  function pintarBarraAtencao() {
+    const el = document.getElementById('jBarra'); if (!el) return;
+    const t = J.ticker || [];
+    el.hidden = !t.length;
+    el.replaceChildren(h('span', { class: 'j-barra-rot' }, '⚠ Atenção'), h('div', { class: 'j-barra-via' }, h('span', { class: 'j-barra-txt' }, t.join('   •   '))));
+  }
+  async function atualizarAtencao(forcar) {
     if (!S.me || !podeAtender()) return;
     try {
-      const r = await db.from('v_jornada_quadro').select('id', { count: 'exact', head: true }).gt('n_tarefas_vencidas', 0);
+      const desde = new Date(Date.now() - LIMITE_ATENCAO_MS).toISOString();
+      const r = await db.from('v_jornada_quadro').select('n_tarefas_vencidas,coluna_desde,coluna_nome,unidade,paciente_nome,id').gt('n_tarefas_vencidas', 0).gte('coluna_desde', desde).order('coluna_desde', { ascending: false }).limit(1000);
       if (r.error) return;
-      J.nAtencao = r.count || 0;
+      J.atencao = atencaoDe(r.data || []);
+      J.nAtencao = J.atencao.length;
+      if (forcar || !J.ticker) { J.ticker = J.atencao.slice(0, 3).map((k) => `${k.paciente_nome || 'Paciente sem nome'} (${k.coluna_nome || 'sem etapa'} · há ${duracao(k.coluna_desde)})`); pintarBarraAtencao(); }
     } catch { return; }
     const s = document.getElementById('seloJornada'); if (s) { s.textContent = J.nAtencao; s.hidden = J.nAtencao === 0; }
     atualizarSelo();
@@ -1064,7 +1124,7 @@
       if (J.filtro === 'meus' && k.responsavel !== S.me.id) return false;
       if (J.filtro === 'livres' && k.responsavel) return false;
       if (J.filtro === 'aviso' && !(k.n_tarefas_vencidas > 0 || k.atrasado)) return false;
-      if (J.unidade && k.unidade !== J.unidade) return false;
+      if (!passaUnidade(unidadeDoCartaoJ(k))) return false;
       if (q && !semAcento((k.paciente_nome || '') + ' ' + (k.primeiro_exame || '')).includes(q)) return false;
       return true;
     }));
@@ -1078,13 +1138,14 @@
     }
     const m = estadoMonitor();
     const status = h('div', { class: 'j-status ' + m.cls, role: 'status' }, h('h2', {}, 'Jornada'), h('i', { class: 'ponto' }), h('span', {}, m.txt));
-    const atencao = J.cards.filter((k) => k.n_tarefas_vencidas > 0).sort((a, b) => String(a.coluna_desde).localeCompare(String(b.coluna_desde)));
-    const painel = atencao.length ? h('div', { class: 'j-atencao', role: 'region', 'aria-label': 'Precisam de atenção' },
-      h('h3', {}, `Precisam de atenção agora (${atencao.length})`), atencao.map(avisoJ)) : null;
+    const atencao = atencaoDe(J.cards);
+    const barra = h('div', { class: 'j-barra', id: 'jBarra', role: 'status', 'aria-label': 'Primeiros pacientes que precisam de atenção', hidden: true });
+    // Recolhido por padrão: o título é um botão que abre e fecha a lista.
+    const painel = atencao.length ? h('div', { class: 'j-atencao' + (J.atencaoAberta ? ' aberto' : ''), role: 'region', 'aria-label': 'Precisam de atenção' },
+      h('h3', {}, h('button', { type: 'button', class: 'j-atencao-bt', 'aria-expanded': String(J.atencaoAberta), onclick: () => { J.atencaoAberta = !J.atencaoAberta; renderJornada(); } },
+        `Precisam de atenção agora (${atencao.length})`, h('span', { 'aria-hidden': 'true' }, J.atencaoAberta ? ' ▴' : ' ▾'))),
+      J.atencaoAberta ? atencao.map(avisoJ) : null) : null;
     const chip = (rot, ativo, fn) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(ativo), onclick: fn }, rot);
-    const unidades = [...new Set(J.cards.map((k) => k.unidade).filter(Boolean))].sort();
-    const selUn = unidades.length > 1 ? h('select', { 'aria-label': 'Unidade', onchange: (e) => { J.unidade = e.target.value; renderJornada(); } },
-      h('option', { value: '' }, 'Todas as unidades'), unidades.map((u) => h('option', { value: u, selected: u === J.unidade }, u))) : null;
     const busca = h('input', { type: 'search', placeholder: 'Buscar nome ou exame', 'aria-label': 'Buscar na Jornada', value: J.busca });
     busca.addEventListener('input', () => { J.busca = busca.value; clearTimeout(renderJornada.t); renderJornada.t = setTimeout(() => { renderJornada(); document.querySelector('#jornada input[type=search]')?.focus(); }, 200); });
     const topo = h('div', { class: 'q-topo' },
@@ -1092,13 +1153,14 @@
       h('span', { style: 'width:8px' }),
       [['todos', 'Todos'], ['meus', 'Meus'], ['livres', 'Sem responsável'], ['aviso', 'Com aviso']].map(([id, rot]) => chip(rot, J.filtro === id, () => { J.filtro = id; renderJornada(); })),
       J.pessoas.size ? chip('Um cartão por paciente', J.agrupar, () => { J.agrupar = !J.agrupar; try { localStorage.setItem('painel.jagrupar', J.agrupar ? '1' : '0'); } catch {} renderJornada(); }) : null,
-      selUn, busca);
+      busca);
     const lista = cartoesJ(), porColuna = new Map();
     lista.forEach((k) => { if (!porColuna.has(k.coluna)) porColuna.set(k.coluna, []); porColuna.get(k.coluna).push(k); });
     // O fluxo normal aparece sempre (mesmo vazio, para ver "onde está cada um"); pós-atendimento e exceções só quando houver cartão.
     const cols = J.colunas.filter((c) => porColuna.has(c.id) || ['antes', 'agendamento', 'depois'].includes(c.etapa));
     const quadro = h('div', { class: 'q-colunas' }, cols.map((c) => colunaJ(c, porColuna.get(c.id) || [])));
-    box.replaceChildren(status, painel, topo, quadro);
+    box.replaceChildren(status, barra, painel, topo, quadro);
+    pintarBarraAtencao();
   }
   function avisoJ(k) {
     const ag = k.responsavel ? S.agentes.get(k.responsavel) : null;
@@ -1238,6 +1300,8 @@
     if (S.aba === 'jornada' && (!J.vivo || tickAtencao % 4 === 0)) carregarJornada();
   }, 30000);
   setInterval(() => { if (S.me && S.aba === 'jornada' && !document.hidden) acordarKlingo(); }, 60000);
+  // A barra de atenção troca os nomes a cada 2 minutos.
+  setInterval(() => { if (S.me && podeAtender() && !document.hidden) atualizarAtencao(true); }, 120000);
 
   /* ---------- tempo real, som e avisos ---------- */
   let audioCtx = null, tRecarga = null, tLido = null;
@@ -1459,7 +1523,7 @@
     const vazio = () => ({ error: true, data: null });
     const [g, ab, rm, su, ad, ap] = await Promise.all([
       Promise.resolve(db.from('conversa_grupo').select('conversa_id,grupo_id,sinais,origem,confirmado_por')).then((r) => r, vazio),
-      Promise.resolve(db.from('v_agendamento_aberto').select('pre_id,conversa_id,chave,quando,exames,passou')).then((r) => r, vazio),
+      Promise.resolve(db.from('v_agendamento_aberto').select('pre_id,conversa_id,chave,quando,exames,passou,unidade')).then((r) => r, vazio),
       Promise.resolve(db.from('v_remarcacao_pendente').select('fechamento_id,conversa_id,exames,quando,desfecho,remarcacao')).then((r) => r, vazio),
       Promise.resolve(db.rpc('pessoa_sugestoes')).then((r) => r, vazio),
       Promise.resolve(db.rpc('pessoa_avisos_data')).then((r) => r, vazio),
@@ -1488,7 +1552,16 @@
       membros.forEach((m) => vistos.add(m.id));
       out.push({ rep: membros[0], membros });
     }
-    return out;
+    return out.filter((p) => passaUnidade(unidadesPessoa(p)));
+  }
+  // Unidade da pessoa: exame marcado pelo chat > cartão da Jornada > unidade escolhida no formulário. Sem nenhuma = todas.
+  function unidadesPessoa(p) {
+    const ids = p.membros.map((m) => m.id);
+    const a = chavesDe(S.abertos.filter((x) => ids.includes(x.conversa_id)).map((x) => x.unidade));
+    if (a.length) return a;
+    const q = chavesDe((S.quadro || []).filter((k) => ids.includes(k.conversa_id)).map((k) => k.unidade));
+    if (q.length) return q;
+    return chavesDe(p.membros.map((m) => m.unidade_inicial));
   }
   const statusPessoa = (p) => (p.membros.some((m) => m.status === 'aguardando') ? 'aguardando' : p.membros.some((m) => m.status === 'em_atendimento') ? 'em_atendimento' : 'encerrada');
   const abertosDe = (id) => { const ids = membrosDe(id); return S.abertos.filter((a) => ids.includes(a.conversa_id)); };
@@ -1776,6 +1849,7 @@
     const q = S.buscaQ.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
     return colapsarCartoes(S.quadro.filter((k) => {
       const c = conversaDoCartao(k);
+      if (!passaUnidade(chavesDe([k.unidade]).length ? chavesDe([k.unidade]) : chavesDe([c && c.unidade_inicial]))) return false;
       if (S.fq === 'meus' && !(k.responsavel === S.me.id || (c && c.agente_id === S.me.id))) return false;
       if (S.fq === 'atrasados' && !k.atrasado) return false;
       if (S.fq === 'aguardando' && !(c && c.status === 'aguardando')) return false;
