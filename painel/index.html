@@ -2197,8 +2197,31 @@
   const assumir = () => atualizarConversa({ status: 'em_atendimento', agente_id: S.me.id });
   async function encerrar() {
     if (abertosDe(S.abertaId).length) { toast('Há exame marcado sem desfecho. Registre se o paciente compareceu, faltou, cancelou ou remarcou antes de encerrar.'); document.getElementById('exameAberto')?.scrollIntoView?.({ block: 'center' }); return; }
-    if (!confirm('Encerrar este atendimento? O cliente será avisado.')) return;
-    await atualizarConversa({ status: 'encerrada' });
+    const ids = membrosDe(S.abertaId);
+    const k = S.quadroOk ? (S.quadro.find((x) => x.conversa_id === S.abertaId) || S.quadro.find((x) => ids.includes(x.conversa_id))) : null;
+    if (!k) { if (!confirm('Encerrar este atendimento? O cliente será avisado.')) return; await atualizarConversa({ status: 'encerrada' }); return; }
+    // Com cartão no quadro: escolhe já para onde ele vai ao encerrar.
+    const dest = destinosDe(k).map((id) => S.colunasQ.find((x) => x.id === id)).filter(Boolean);
+    const fechar = () => dlg.close();
+    const ir = async (acao) => {
+      fechar();
+      let nota = null;
+      if (acao === 'perdido') { nota = prompt('Por que este contato foi perdido? (mínimo 3 letras)'); if (nota == null) return; }
+      if (!(await atualizarConversa({ status: 'encerrada' }))) return;
+      const { error } = acao === 'tirar' ? await db.rpc('jornada_arquivar_card', { p_card: k.id, p_versao: k.versao, p_nota: null })
+        : acao ? await db.rpc('jornada_mover_card', { p_card: k.id, p_para: acao, p_versao: k.versao, p_nota: nota }) : {};
+      if (error) toast(/CONFLITO/.test(error.message || '') ? 'Conversa encerrada, mas outra pessoa mexeu no cartão. Atualizei o quadro.' : msgErro(error));
+      await carregarQuadro();
+    };
+    dlg.className = '';
+    dlg.replaceChildren(h('h3', {}, 'Encerrar atendimento'),
+      h('p', { class: 'dica', style: 'margin:-8px 0 12px' }, 'O cliente será avisado. Para qual etapa o cartão deve ir?'),
+      h('div', { style: 'display:grid;gap:8px' },
+        dest.map((d) => h('button', { class: 'btn', type: 'button', onclick: () => ir(d.id) }, d.nome)),
+        h('button', { class: 'btn', type: 'button', onclick: () => ir(null) }, 'Só encerrar (manter em ' + ((S.colunasQ.find((x) => x.id === k.coluna) || {}).nome || k.coluna) + ')'),
+        h('button', { class: 'btn perigo', type: 'button', onclick: () => ir('tirar') }, 'Encerrar e tirar do quadro')),
+      h('div', { class: 'rodape' }, h('button', { class: 'btn', type: 'button', onclick: fechar }, 'Cancelar')));
+    dlg.showModal();
   }
   async function transferir(agenteId) {
     const ag = S.agentes.get(agenteId);
