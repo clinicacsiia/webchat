@@ -798,7 +798,7 @@
       raiz.replaceChildren(h('div', { class: 'centro' }, h('div', { class: 'cartao' },
         h('h1', {}, 'Acesso aguardando liberação'),
         h('p', { class: 'sub' }, 'Sua conta foi criada. Se você é da equipe, peça a um administrador para adicionar o seu e-mail na equipe e liberar o acesso, e depois toque em Verificar de novo.'),
-        h('button', { class: 'btn prim', type: 'button', onclick: entrar }, 'Verificar de novo'),
+        h('button', { class: 'btn prim', type: 'button', onclick: async () => { try { await db.rpc('equipe_pedido_reforcar'); } catch { /* sem a função, só verifica */ } entrar(); } }, 'Verificar de novo'),
         h('div', { style: 'margin-top:8px;text-align:center' }, h('button', { class: 'link', type: 'button', onclick: sair }, 'Sair')))));
       return;
     }
@@ -1660,7 +1660,7 @@
     if (!lista.length) return null;
     return h('div', { id: 'avisosAcesso' }, lista.map((p) => h('div', { class: 'sug' },
       h('b', {}, 'Pedido de acesso à equipe'),
-      h('div', {}, `${p.nome || 'Sem nome'} (${p.email || 'sem e-mail'}) criou uma conta e confirmou o e-mail. Liberar o acesso ao painel?`),
+      h('div', {}, `${p.nome || 'Sem nome'} (${p.email || 'sem e-mail'}) criou uma conta e confirmou o e-mail. Liberar o acesso ao painel?` + (p.pedido_em ? ` Tocou em Verificar de novo em ${fmtDataHora(p.pedido_em)}.` : '')),
       h('div', { class: 'sug-acoes' },
         h('button', { class: 'btn prim', type: 'button', onclick: () => decidirAcesso(p, true) }, 'Aprovar'),
         h('button', { class: 'btn perigo', type: 'button', onclick: () => decidirAcesso(p, false) }, 'Recusar')))));
