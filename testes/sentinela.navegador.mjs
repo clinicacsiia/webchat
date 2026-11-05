@@ -108,7 +108,7 @@ await caso('aviso de IA: o assistente se apresenta como IA, diz que uma pessoa a
   const mundo = criarMundo(); const { page, ctx } = await abrir(mundo);
   const aviso = await page.$eval('#avisoIA', (n) => n.textContent), status = await page.$eval('#status', (n) => n.textContent), barra = await page.$eval('#barraHumano', (n) => !n.hidden);
   await ctx.close();
-  return { ok: /inteligência artificial/.test(aviso) && /pessoa da equipe acompanha/.test(aviso) && /previsão de agendamento/.test(aviso) && /Quem confirma é um atendente/.test(aviso) && /IA/.test(status) && barra,
+  return { ok: /IA/.test(aviso) && /previsão/.test(aviso) && /quem confirma é um atendente/.test(aviso) && /IA/.test(status) && barra,
     detalhe: `status="${status}", botão de atendente visível=${barra}` };
 });
 

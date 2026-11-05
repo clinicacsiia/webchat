@@ -812,8 +812,7 @@
       caixa.replaceChildren(h('p', {}, h('b', {}, 'Agora você está falando com uma pessoa da nossa equipe.'), ' Pode escrever à vontade, no campo aqui embaixo.'));
     } else if (motorAtivo) {
       caixa.replaceChildren(
-        h('p', {}, h('b', {}, 'Sou o assistente virtual (IA) da CSI.'), ' Vou te ajudar um passo de cada vez.'),
-        h('p', {}, 'Isto é uma ', h('b', {}, 'previsão de agendamento'), '. ', h('b', {}, 'Quem confirma é um atendente'), ': toque em “Falar com um atendente” quando quiser.'));
+        h('p', {}, h('b', {}, 'Sou o assistente virtual (IA) da CSI.'), ' Isto é uma ', h('b', {}, 'previsão'), ' de agendamento: ', h('b', {}, 'quem confirma é um atendente'), '.'));
     } else {
       caixa.replaceChildren(h('p', {}, h('b', {}, 'Recebemos o seu pedido.'), ' Uma pessoa da equipe vai responder aqui. O que você já escolheu fica registrado como ', h('b', {}, 'previsão'), ' de agendamento, e o atendente confirma com você.'));
     }
