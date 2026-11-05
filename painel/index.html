@@ -2535,20 +2535,21 @@
 * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 html, body { margin: 0; background: #e9eef4; font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif; color: #0b1f45; }
 .folha { width: 210mm; height: 297mm; margin: 10mm auto; background: #fff; position: relative; overflow: hidden; display: flex; flex-direction: column; align-items: center; box-shadow: 0 6px 30px rgba(0,0,0,.15); }
-.faixa { position: absolute; left: 0; right: 0; top: 0; height: 132mm; background: linear-gradient(135deg, #0c3682 0%, #0a5fb0 55%, #0a8ad0 100%); }
-.faixa::after { content: ''; position: absolute; left: -10%; right: -10%; bottom: -40mm; height: 80mm; background: #fff; border-radius: 50%; }
+.cabeca { position: relative; width: 100%; display: flex; flex-direction: column; align-items: center; padding: 14mm 0 34mm; background: linear-gradient(135deg, #0c3682 0%, #0a5fb0 55%, #0a8ad0 100%); overflow: hidden; }
+.cabeca::after { content: ''; position: absolute; left: -10%; right: -10%; bottom: -26mm; height: 48mm; background: #fff; border-radius: 50%; }
 .bolhas { position: absolute; inset: 0; pointer-events: none; }
 .bolhas i { position: absolute; border-radius: 50%; background: rgba(255,255,255,.10); }
-.topo { position: relative; z-index: 1; margin-top: 14mm; background: #fff; border-radius: 6mm; padding: 4mm 7mm; box-shadow: 0 2mm 6mm rgba(0,0,0,.12); }
+.topo { position: relative; z-index: 1; background: #fff; border-radius: 6mm; padding: 4mm 7mm; box-shadow: 0 2mm 6mm rgba(0,0,0,.12); }
 .topo img { display: block; height: 20mm; width: auto; }
 h1 { position: relative; z-index: 1; margin: 9mm 14mm 0; font-size: 17mm; line-height: 1.05; font-weight: 800; text-align: center; letter-spacing: -.3mm; color: #fff; text-shadow: 0 .6mm 2mm rgba(0,0,0,.18); }
+h1.longo { font-size: 14mm; }
 .sub { position: relative; z-index: 1; margin: 5mm 20mm 0; font-size: 6.2mm; text-align: center; color: #fff; font-weight: 500; opacity: .95; }
-.qr { position: relative; z-index: 1; margin-top: 10mm; width: 118mm; height: 118mm; padding: 9mm; background: #fff; border-radius: 8mm; border: 1.2mm solid #0a8ad0; box-shadow: 0 3mm 10mm rgba(12,54,130,.18); }
+.qr { position: relative; z-index: 1; margin-top: -24mm; width: 118mm; height: 118mm; padding: 9mm; background: #fff; border-radius: 8mm; border: 1.2mm solid #0a8ad0; box-shadow: 0 3mm 10mm rgba(12,54,130,.18); }
 .qr svg { display: block; width: 100%; height: 100%; }
 .qr::before, .qr::after { content: ''; position: absolute; width: 16mm; height: 16mm; border: 2.4mm solid #0c3682; }
 .qr::before { top: -5mm; left: -5mm; border-right: 0; border-bottom: 0; border-top-left-radius: 9mm; }
 .qr::after { bottom: -5mm; right: -5mm; border-left: 0; border-top: 0; border-bottom-right-radius: 9mm; }
-.passos { position: relative; z-index: 1; display: flex; gap: 6mm; margin: 12mm 14mm 0; padding: 0; list-style: none; width: calc(100% - 28mm); }
+.passos { position: relative; z-index: 1; display: flex; gap: 6mm; margin: 10mm 14mm 0; padding: 0; list-style: none; width: calc(100% - 28mm); }
 .passos li { flex: 1; text-align: center; font-size: 5mm; font-weight: 600; line-height: 1.25; color: #0b1f45; }
 .passos b { display: flex; align-items: center; justify-content: center; width: 12mm; height: 12mm; margin: 0 auto 3mm; border-radius: 50%; background: #0a8ad0; color: #fff; font-size: 6.5mm; }
 .rodape { margin-top: auto; width: 100%; background: #0c3682; color: #fff; text-align: center; padding: 6mm 10mm 7mm; }
@@ -2559,11 +2560,12 @@ h1 { position: relative; z-index: 1; margin: 9mm 14mm 0; font-size: 17mm; line-h
 </style></head><body>
 <p class="dica-tela">Na janela de impressão, escolha papel A4 e marque “Gráficos de fundo” para sair com as cores.</p>
 <div class="folha">
-  <div class="faixa"></div>
+  <div class="cabeca">
   <div class="bolhas"><i style="width:60mm;height:60mm;left:-18mm;top:-20mm"></i><i style="width:34mm;height:34mm;right:12mm;top:8mm"></i><i style="width:18mm;height:18mm;right:46mm;top:52mm"></i></div>
   <div class="topo"><img src="${esc(logo)}" alt="CSI - Clínica de Saúde e Imagem"></div>
-  <h1>${esc(legenda)}</h1>
+  <h1${String(legenda).length > 18 ? ' class="longo"' : ''}>${esc(legenda)}</h1>
   ${sub ? `<p class="sub">${esc(sub)}</p>` : ''}
+  </div>
   <div class="qr">${qrSvg(window.qrcode, link)}</div>
   <ol class="passos">${lista.map((t, i) => `<li><b>${i + 1}</b>${esc(t)}</li>`).join('')}</ol>
   <div class="rodape"><div class="url">${esc(curto)}</div><small>CSI · Clínica de Saúde e Imagem</small></div>
