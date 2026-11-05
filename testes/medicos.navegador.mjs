@@ -273,24 +273,31 @@ await caso('Pendência de Validação: mostra a frase pedida, Confirmar e Ativar
   return { ok: /Pendência de Validação/.test(txt) && /O médico Daniela Ladeia aceitou realizar o exame Ultrassom de Joelho via Klingo\. Deseja validar esta regra para os próximos agendamentos\?/i.test(txt) && selo === 1 && r && r.p_ids.join() === '31', detalhe: `${txt.replace(/\n/g, ' ')} | ${selo} | ${JSON.stringify(r)}` };
 });
 
-await caso('mapa de salas: mostra por consultório, manhã e tarde, avisa sobreposição sem bloquear e troca de unidade', async () => {
+await caso('mapa de salas: sem seletor próprio, segue a unidade do topo (todas = uma tabela por unidade)', async () => {
   const { page, ctx, reg } = await pagina(browser);
   await page.goto(`${base}/painel/`);
+  await page.waitForSelector('#selUnidade');
   await page.click('.nav button[data-aba=medicos]');
   await page.waitForSelector('.pagina table');
   await page.locator('button[data-vista=mapa]').click();
-  await page.waitForSelector('select[aria-label=Unidade]');
-  await page.locator('select[aria-label=Unidade]').selectOption('DESENVOAR');
-  await page.waitForSelector('#mapaAviso');
+  await page.waitForSelector('[data-mapa-unidade]');
+  const proprio = await page.locator('select[aria-label=Unidade]').count();
+  const todas = await page.locator('[data-mapa-unidade]').count();
+  const avisoTodas = await page.locator('#mapaAviso').innerText();
+  await page.locator('#selUnidade').selectOption('desenvoar');
+  await page.waitForSelector('[data-mapa-unidade="DESENVOAR"]');
+  const soDesenvoar = await page.locator('[data-mapa-unidade]').count();
   const aviso = await page.locator('#mapaAviso').innerText();
   const choques = await page.locator('[data-choque="1"]').count();
   const manha = await page.locator('tr:has(> td:text-is("Manhã")):has-text("Livia")').count();
   const tarde = await page.locator('tr:has(> td:text-is("Tarde")):has-text("Geanne Christina 13:00–17:40")').count();
-  await page.locator('select[aria-label=Unidade]').selectOption({ index: 0 });
+  await page.locator('#selUnidade').selectOption('csi');
+  await page.waitForFunction(() => document.querySelector('[data-mapa-unidade]') && /Dr Beto/.test(document.querySelector('.pagina').innerText));
   const csi = await page.locator('.pagina table').innerText();
+  const semAviso = await page.locator('#mapaAviso').count();
   const bloqueios = reg.rpcs.filter((x) => x.rpc === 'bloquear').length;
   await ctx.close();
-  return { ok: /2 horário\(s\) se sobrepõem/.test(aviso) && /nada foi bloqueado/.test(aviso) && choques === 2 && manha === 1 && tarde === 1 && /Dr Beto 08:00–12:00/.test(csi) && !/Livia/.test(csi) && bloqueios === 0, detalhe: `${aviso.replace(/\n/g, ' ')} | ${choques} | ${manha} | ${tarde} | ${csi.replace(/\n/g, ' ').slice(0, 120)}` };
+  return { ok: proprio === 0 && todas === 2 && /2 horário\(s\) se sobrepõem/.test(avisoTodas) && soDesenvoar === 1 && /nada foi bloqueado/.test(aviso) && choques === 2 && manha === 1 && tarde === 1 && /Dr Beto 08:00–12:00/.test(csi) && !/Livia/.test(csi) && semAviso === 0 && bloqueios === 0, detalhe: `proprio=${proprio} todas=${todas} so=${soDesenvoar} | ${aviso.replace(/\n/g, ' ')} | ${choques} | ${manha} | ${tarde} | ${csi.replace(/\n/g, ' ').slice(0, 100)} | semAviso=${semAviso}` };
 });
 
 await caso('aceitar e manter chamam o banco com a ação certa', async () => {
