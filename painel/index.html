@@ -2726,7 +2726,7 @@
     const selFiltro = h('select', { 'aria-label': 'Mostrar' }, [['', 'Todos os exames'], ['alerta', 'Só com alerta (!)'], ['previsao', 'Só com preço em previsão'], ['sem_preco', 'Só com linha sem preço'], ['ligado', 'Só com chat ligado'], ['nao_ligado', 'Só com preço ainda não ligado']].map(([v, t]) => h('option', { value: v }, t)));
     selFiltro.value = CD.filtro;
     c.append(h('p', { class: 'sub' }, 'Todos os serviços com o preço por operadora. Atualizado toda noite, às 03:00; os preços lançados no Klingo são relidos ao longo do dia.'),
-      h('div', { class: 'cd-aviso' }, 'Os valores são uma previsão. O preço final é o lançado pela recepção no Klingo. O "!" marca onde o Klingo lança um valor 10% ou mais diferente do catálogo, ou onde a referência mudou depois da sua confirmação. Em "Chat informa", ligue só os preços que você conferiu: com o preço ligado, o chat passa essa previsão ao paciente; desligado (padrão), o chat diz que o atendente informa o valor.'),
+      h('div', { class: 'cd-aviso' }, 'Os valores são uma previsão. O preço final é o lançado pela recepção no Klingo. O "!" marca onde o Klingo lança um valor 10% ou mais diferente do catálogo, ou onde a referência mudou depois da sua confirmação. Em "Chat informa", ligue só os preços que você conferiu: com o preço ligado, o chat passa essa previsão ao paciente; desligado (padrão), o chat diz que o atendente informa o valor. Com vários exames ou com os dois lados de um exame que cobra por lado, o chat soma e mostra o total; se não souber se o exame cobra por lado, deixa para o atendente.'),
       resumo, h('div', { class: 'cd-filtros' }, busca, selOp, selFiltro), lista, maisBox);
 
     // Referência atual de uma linha (o que o cardápio mostra sem revisão) e se o alerta "!" está valendo.
@@ -2805,7 +2805,7 @@
       const refresh = () => { const n = cartao(x); n.open = d.open; d.replaceWith(n); };
       const d = h('details', { class: 'cat-bloco' },
         h('summary', {}, nAlertas > 0 ? h('span', { class: 'cd-alerta', title: `${nAlertas} operadora(s) para revisar`, 'aria-label': 'Alerta' }, '!') : null, x.nome,
-          h('span', { class: 'sub-lista' }, ` · ${x.especialidade || 'sem especialidade'}${x.marcacoes_90d ? ` · ${x.marcacoes_90d} pedidos em 90 dias` : ''}${nLigadas ? ` · ${nLigadas} ligada(s) no chat` : ''}`)),
+          h('span', { class: 'sub-lista' }, ` · ${x.especialidade || 'sem especialidade'}${x.marcacoes_90d ? ` · ${x.marcacoes_90d} pedidos em 90 dias` : ''}${nLigadas ? ` · ${nLigadas} ligada(s) no chat` : ''}${/UNILATERAL|POR ARTICULA/i.test(x.nome) ? ' · preço por lado (os dois lados = 2×)' : ''}`)),
         h('div', { class: 'tabela-wrap', style: 'margin-top:8px' }, h('table', { class: 'cd-tabela' },
           h('thead', {}, h('tr', {}, ['Operadora', 'Preço previsto', 'Catálogo', 'Chat informa', 'Observação'].map((t) => h('th', {}, t)))), h('tbody', {}, linhas.map((l) => linhaPreco(x, l, refresh))))));
       if (nAlertas > 0) d.open = true;
