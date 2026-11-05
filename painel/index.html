@@ -190,6 +190,10 @@
   /* o leve levantar só vale com o mouse parado: não interfere no arrastar e soltar nem no clique */
   .q-card:hover:not(:active) { border-color: var(--csi-primary); box-shadow: var(--shadow-md); transform: translateY(-1px); }
   .q-card[aria-current=true] { border-color: var(--csi-primary); background: var(--csi-primary-soft); }
+  .q-item { position: relative; }
+  .q-x { position: absolute; top: 4px; right: 6px; border: 0; background: transparent; color: var(--suave); font-size: 18px; line-height: 1; width: 28px; height: 28px; border-radius: 50%; cursor: pointer; }
+  .q-x:hover { background: var(--csi-danger-bg); color: var(--csi-danger); }
+  .q-item .q-card b { padding-right: 22px; }
   .q-card.p2 { border-left: 4px solid #e08a00; } .q-card.p3 { border-left: 4px solid var(--csi-danger); }
   .q-card b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .q-card .q2 { color: var(--suave); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1881,6 +1885,13 @@
     if (error) { toast(/CONFLITO/.test(error.message || '') ? 'Outra pessoa mexeu neste cartão. Atualizei o quadro.' : msgErro(error)); }
     await carregarQuadro();
   }
+  async function arquivarCartao(k) {
+    if (!confirm('Tirar este cartão do quadro? A conversa continua na lista; só o cartão some daqui.')) return;
+    const { error } = await db.rpc('jornada_arquivar_card', { p_card: k.id, p_versao: k.versao, p_nota: null });
+    if (error) toast(/CONFLITO/.test(error.message || '') ? 'Outra pessoa mexeu neste cartão. Atualizei o quadro.' : msgErro(error));
+    else toast('Cartão tirado do quadro.');
+    await carregarQuadro();
+  }
   async function atribuirCartao(k, quem) {
     const { error } = await db.rpc('jornada_atribuir_card', { p_card: k.id, p_responsavel: quem || null, p_versao: k.versao });
     if (error) toast(/CONFLITO/.test(error.message || '') ? 'Outra pessoa mexeu neste cartão. Atualizei o quadro.' : msgErro(error));
@@ -1925,7 +1936,8 @@
         ag ? h('span', { class: 'q-chip' }, ag.nome) : null));
     el.addEventListener('dragstart', (e) => { S.arrasta = k; try { e.dataTransfer.setData('text/plain', String(k.id)); } catch {} });
     el.addEventListener('dragend', () => { S.arrasta = null; });
-    return el;
+    const x = h('button', { class: 'q-x', type: 'button', title: 'Tirar do quadro', 'aria-label': 'Tirar este cartão do quadro', onclick: (e) => { e.stopPropagation(); arquivarCartao(k); } }, '×');
+    return h('div', { class: 'q-item' }, el, x);
   }
   // Barra "Cartão" no alto da conversa: onde o atendente move e atribui (serve no celular, onde não se arrasta).
   function renderCartaoJ() {
@@ -1939,7 +1951,8 @@
     const pessoas = [...S.agentes.values()].filter((a) => a.ativo && (a.papel === 'admin' || a.papel === 'atendente'));
     const resp = h('select', { 'aria-label': 'Responsável pelo cartão', onchange: (e) => atribuirCartao(k, e.target.value) },
       h('option', { value: '' }, 'Sem responsável'), pessoas.map((a) => h('option', { value: a.id, selected: a.id === k.responsavel }, a.nome)));
-    box.replaceChildren(h('div', { class: 'cartaoJ' }, h('span', {}, h('b', {}, 'Etapa: '), col ? col.nome : k.coluna), sel, resp));
+    const tirar = h('button', { class: 'btn', type: 'button', onclick: () => arquivarCartao(k) }, 'Tirar do quadro');
+    box.replaceChildren(h('div', { class: 'cartaoJ' }, h('span', {}, h('b', {}, 'Etapa: '), col ? col.nome : k.coluna), sel, resp, tirar));
   }
   async function abrirConversa(id) {
     id = repDe(id);   // várias conversas da mesma pessoa abrem juntas, pela mais recente
@@ -2184,8 +2197,31 @@
   const assumir = () => atualizarConversa({ status: 'em_atendimento', agente_id: S.me.id });
   async function encerrar() {
     if (abertosDe(S.abertaId).length) { toast('Há exame marcado sem desfecho. Registre se o paciente compareceu, faltou, cancelou ou remarcou antes de encerrar.'); document.getElementById('exameAberto')?.scrollIntoView?.({ block: 'center' }); return; }
-    if (!confirm('Encerrar este atendimento? O cliente será avisado.')) return;
-    await atualizarConversa({ status: 'encerrada' });
+    const ids = membrosDe(S.abertaId);
+    const k = S.quadroOk ? (S.quadro.find((x) => x.conversa_id === S.abertaId) || S.quadro.find((x) => ids.includes(x.conversa_id))) : null;
+    if (!k) { if (!confirm('Encerrar este atendimento? O cliente será avisado.')) return; await atualizarConversa({ status: 'encerrada' }); return; }
+    // Com cartão no quadro: escolhe já para onde ele vai ao encerrar.
+    const dest = destinosDe(k).map((id) => S.colunasQ.find((x) => x.id === id)).filter(Boolean);
+    const fechar = () => dlg.close();
+    const ir = async (acao) => {
+      fechar();
+      let nota = null;
+      if (acao === 'perdido') { nota = prompt('Por que este contato foi perdido? (mínimo 3 letras)'); if (nota == null) return; }
+      if (!(await atualizarConversa({ status: 'encerrada' }))) return;
+      const { error } = acao === 'tirar' ? await db.rpc('jornada_arquivar_card', { p_card: k.id, p_versao: k.versao, p_nota: null })
+        : acao ? await db.rpc('jornada_mover_card', { p_card: k.id, p_para: acao, p_versao: k.versao, p_nota: nota }) : {};
+      if (error) toast(/CONFLITO/.test(error.message || '') ? 'Conversa encerrada, mas outra pessoa mexeu no cartão. Atualizei o quadro.' : msgErro(error));
+      await carregarQuadro();
+    };
+    dlg.className = '';
+    dlg.replaceChildren(h('h3', {}, 'Encerrar atendimento'),
+      h('p', { class: 'dica', style: 'margin:-8px 0 12px' }, 'O cliente será avisado. Para qual etapa o cartão deve ir?'),
+      h('div', { style: 'display:grid;gap:8px' },
+        dest.map((d) => h('button', { class: 'btn', type: 'button', onclick: () => ir(d.id) }, d.nome)),
+        h('button', { class: 'btn', type: 'button', onclick: () => ir(null) }, 'Só encerrar (manter em ' + ((S.colunasQ.find((x) => x.id === k.coluna) || {}).nome || k.coluna) + ')'),
+        h('button', { class: 'btn perigo', type: 'button', onclick: () => ir('tirar') }, 'Encerrar e tirar do quadro')),
+      h('div', { class: 'rodape' }, h('button', { class: 'btn', type: 'button', onclick: fechar }, 'Cancelar')));
+    dlg.showModal();
   }
   async function transferir(agenteId) {
     const ag = S.agentes.get(agenteId);
