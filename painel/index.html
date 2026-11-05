@@ -2540,8 +2540,68 @@
     for (let r = 0; r < n; r++) for (let c2 = 0; c2 < n; c2++) if (q.isDark(r, c2)) g.fillRect((c2 + margem) * cel, (r + margem) * cel, cel, cel);
     return cv;
   }
+  // QR code em SVG (vetor): fica nítido em qualquer tamanho de impressão.
+  function qrSvg(qrcode, texto) {
+    const q = qrcode(0, 'M'); q.addData(texto); q.make();
+    const n = q.getModuleCount(); let d = '';
+    for (let r = 0; r < n; r++) for (let c2 = 0; c2 < n; c2++) if (q.isDark(r, c2)) d += `M${c2} ${r}h1v1h-1z`;
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${n} ${n}" shape-rendering="crispEdges" role="img" aria-label="QR code"><rect width="${n}" height="${n}" fill="#fff"/><path d="${d}" fill="#0b1f45"/></svg>`;
+  }
+  // Cartaz A4 pronto para imprimir: logo, chamada, QR code grande, passo a passo e o endereço curto.
+  function abrirCartaz({ titulo, legenda, link, linkBase, sub, passos }) {
+    const esc = (t) => String(t ?? '').replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+    const logo = new URL('../img/logo-csi.svg', location.href).href;
+    const curto = linkBase.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    const lista = (passos && passos.length ? passos : ['Abra a câmera do celular', 'Aponte para o QR code', 'Toque no link que aparecer']);
+    const w = window.open('', '_blank'); if (!w) { toast('O navegador bloqueou a janela. Permita pop-ups para imprimir.'); return; }
+    w.document.open();
+    w.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${esc(titulo)}</title><style>
+@page { size: A4 portrait; margin: 0; }
+* { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+html, body { margin: 0; background: #e9eef4; font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif; color: #0b1f45; }
+.folha { width: 210mm; height: 297mm; margin: 10mm auto; background: #fff; position: relative; overflow: hidden; display: flex; flex-direction: column; align-items: center; box-shadow: 0 6px 30px rgba(0,0,0,.15); }
+.cabeca { position: relative; width: 100%; display: flex; flex-direction: column; align-items: center; padding: 14mm 0 34mm; background: linear-gradient(135deg, #0c3682 0%, #0a5fb0 55%, #0a8ad0 100%); overflow: hidden; }
+.cabeca::after { content: ''; position: absolute; left: -10%; right: -10%; bottom: -26mm; height: 48mm; background: #fff; border-radius: 50%; }
+.bolhas { position: absolute; inset: 0; pointer-events: none; }
+.bolhas i { position: absolute; border-radius: 50%; background: rgba(255,255,255,.10); }
+.topo { position: relative; z-index: 1; background: #fff; border-radius: 6mm; padding: 4mm 7mm; box-shadow: 0 2mm 6mm rgba(0,0,0,.12); }
+.topo img { display: block; height: 20mm; width: auto; }
+h1 { position: relative; z-index: 1; margin: 9mm 14mm 0; font-size: 17mm; line-height: 1.05; font-weight: 800; text-align: center; letter-spacing: -.3mm; color: #fff; text-shadow: 0 .6mm 2mm rgba(0,0,0,.18); }
+h1.longo { font-size: 14mm; }
+.sub { position: relative; z-index: 1; margin: 5mm 20mm 0; font-size: 6.2mm; text-align: center; color: #fff; font-weight: 500; opacity: .95; }
+.qr { position: relative; z-index: 1; margin-top: -24mm; width: 118mm; height: 118mm; padding: 9mm; background: #fff; border-radius: 8mm; border: 1.2mm solid #0a8ad0; box-shadow: 0 3mm 10mm rgba(12,54,130,.18); }
+.qr svg { display: block; width: 100%; height: 100%; }
+.qr::before, .qr::after { content: ''; position: absolute; width: 16mm; height: 16mm; border: 2.4mm solid #0c3682; }
+.qr::before { top: -5mm; left: -5mm; border-right: 0; border-bottom: 0; border-top-left-radius: 9mm; }
+.qr::after { bottom: -5mm; right: -5mm; border-left: 0; border-top: 0; border-bottom-right-radius: 9mm; }
+.passos { position: relative; z-index: 1; display: flex; gap: 6mm; margin: 10mm 14mm 0; padding: 0; list-style: none; width: calc(100% - 28mm); }
+.passos li { flex: 1; text-align: center; font-size: 5mm; font-weight: 600; line-height: 1.25; color: #0b1f45; }
+.passos b { display: flex; align-items: center; justify-content: center; width: 12mm; height: 12mm; margin: 0 auto 3mm; border-radius: 50%; background: #0a8ad0; color: #fff; font-size: 6.5mm; }
+.rodape { margin-top: auto; width: 100%; background: #0c3682; color: #fff; text-align: center; padding: 6mm 10mm 7mm; }
+.rodape .url { font-size: 5mm; font-weight: 700; letter-spacing: .2mm; }
+.rodape small { display: block; margin-top: 1.5mm; font-size: 3.8mm; opacity: .85; }
+.dica-tela { text-align: center; font-size: 14px; color: #445; margin: 14px 0 0; }
+@media print { html, body { background: #fff; } .folha { margin: 0; box-shadow: none; } .dica-tela { display: none; } }
+</style></head><body>
+<p class="dica-tela">Na janela de impressão, escolha papel A4 e marque “Gráficos de fundo” para sair com as cores.</p>
+<div class="folha">
+  <div class="cabeca">
+  <div class="bolhas"><i style="width:60mm;height:60mm;left:-18mm;top:-20mm"></i><i style="width:34mm;height:34mm;right:12mm;top:8mm"></i><i style="width:18mm;height:18mm;right:46mm;top:52mm"></i></div>
+  <div class="topo"><img src="${esc(logo)}" alt="CSI - Clínica de Saúde e Imagem"></div>
+  <h1${String(legenda).length > 18 ? ' class="longo"' : ''}>${esc(legenda)}</h1>
+  ${sub ? `<p class="sub">${esc(sub)}</p>` : ''}
+  </div>
+  <div class="qr">${qrSvg(window.qrcode, link)}</div>
+  <ol class="passos">${lista.map((t, i) => `<li><b>${i + 1}</b>${esc(t)}</li>`).join('')}</ol>
+  <div class="rodape"><div class="url">${esc(curto)}</div><small>CSI · Clínica de Saúde e Imagem</small></div>
+</div></body></html>`);
+    w.document.close(); w.focus();
+    const img = w.document.querySelector('.topo img');
+    let foi = false; const imprimirJa = () => { if (foi) return; foi = true; setTimeout(() => w.print(), 200); };
+    if (img.complete) imprimirJa(); else { img.onload = img.onerror = imprimirJa; setTimeout(imprimirJa, 2500); }
+  }
   // Cartão com um QR code: link editável (origem), pré-visualização, baixar e imprimir.
-  function cartaoQr(titulo, desc, linkBase, origemPadrao, legenda) {
+  function cartaoQr(titulo, desc, linkBase, origemPadrao, legenda, cartaz) {
     const origem = h('input', { type: 'text', maxlength: '30', value: origemPadrao, 'aria-label': 'Nome da origem', placeholder: 'ex.: recepcao' });
     const saida = h('div', { class: 'qr-img' }), linkTxt = h('input', { type: 'text', readonly: true, 'aria-label': 'Link do QR code' });
     let canvas = null;
@@ -2557,13 +2617,8 @@
       const a = document.createElement('a'); a.href = grande.toDataURL('image/png'); a.download = `qrcode-${(origem.value.trim() || 'link')}.png`; a.click();
     } }, 'Baixar imagem');
     const imprimir = h('button', { class: 'btn', type: 'button', onclick: () => {
-      if (!canvas) return; const grande = desenharQr(window.qrcode, linkTxt.value, 700);
-      const w = window.open('', '_blank'); if (!w) { toast('O navegador bloqueou a janela. Permita pop-ups para imprimir.'); return; }
-      const d = w.document; d.title = titulo;
-      const st = d.createElement('style'); st.textContent = 'body{font-family:system-ui,sans-serif;text-align:center;padding:40px}h1{font-size:34px;margin:0 0 8px}p{font-size:20px;color:#444}img{width:420px;height:420px;margin:24px 0}';
-      const h1 = d.createElement('h1'); h1.textContent = legenda; const im = d.createElement('img'); im.src = grande.toDataURL('image/png');
-      const p = d.createElement('p'); p.textContent = 'Aponte a câmera do celular para o QR code.';
-      d.head.append(st); d.body.append(h1, im, p); w.focus(); setTimeout(() => w.print(), 300);
+      if (!canvas) return;
+      abrirCartaz({ titulo, legenda, link: linkTxt.value, linkBase, sub: (cartaz || {}).sub, passos: (cartaz || {}).passos });
     } }, 'Imprimir cartaz');
     const copiar = h('button', { class: 'btn', type: 'button', onclick: async () => { try { await navigator.clipboard.writeText(linkTxt.value); toast('Link copiado.'); } catch { toast('Copie o link manualmente.'); } } }, 'Copiar link');
     atualizar();
@@ -2598,7 +2653,8 @@
     const grupoUi = (g) => {
       const corpo = [g.desc ? h('p', { class: 'cfg-desc' }, g.desc) : null, ...g.campos.map(campoUi)];
       if (g.qr === 'fila') corpo.push(h('div', { class: 'cfg-qr' },
-        cartaoQr('QR code da recepção', 'O paciente aponta a câmera, entra na fila e toca “Cheguei”. Imprima e deixe na recepção.', linkFila, 'recepcao', 'Chegou? Aponte a câmera aqui'),
+        cartaoQr('QR code da recepção', 'O paciente aponta a câmera, entra na fila e toca “Cheguei”. Imprima e deixe na recepção.', linkFila, 'recepcao', 'Chegou? Aponte a câmera aqui',
+          { sub: 'Entre na fila pelo celular e acompanhe a sua vez.', passos: ['Abra a câmera do celular', 'Aponte para o QR code', 'Toque em “Cheguei”'] }),
         ));
       const det = h('details', { class: 'cfg-grupo', id: 'cfg-' + g.id }, h('summary', {}, h('span', { class: 'cfg-icone' }, icone(g.icone)), h('span', { class: 'cfg-tit' }, g.titulo, g.avancado ? h('small', {}, ' avançado') : null)), h('div', { class: 'cfg-corpo' }, corpo));
       if (!g.avancado) det.open = true;
@@ -2620,7 +2676,8 @@
     });
     c.append(h('div', { class: 'pagina cfg' },
       h('div', { class: 'cfg-topo' }, h('div', {}, h('h2', {}, 'Configurações'), h('p', { class: 'sub' }, 'Tudo que você controla do chat, da fila e das integrações, num lugar só.')), h('div', { class: 'cfg-salvar' }, status, salvar)),
-      h('div', { class: 'cfg-qr cfg-destaque' }, cartaoQr('QR code do chat', 'Leva o cliente direto para o chat de atendimento.', linkChat, 'qrcode', 'Fale com a gente')),
+      h('div', { class: 'cfg-qr cfg-destaque' }, cartaoQr('QR code do chat', 'Leva o cliente direto para o chat de atendimento.', linkChat, 'qrcode', 'Fale com a gente',
+        { sub: 'Converse com a nossa equipe direto pelo celular.', passos: ['Abra a câmera do celular', 'Aponte para o QR code', 'Toque no link e comece a conversa'] })),
       h('div', { class: 'cat-bloco' }, h('b', {}, 'Convênios'), h('p', { class: 'dica' }, 'Desativar um convênio inteiro, escrever a mensagem de cada um e a regra "um exame por vez" ficam na aba Convênios.'),
         h('button', { type: 'button', class: 'btn', onclick: () => { S.aba = 'convenios'; renderAba(); } }, 'Abrir Convênios')),
       ...CFG_GRUPOS.map(grupoUi)));
