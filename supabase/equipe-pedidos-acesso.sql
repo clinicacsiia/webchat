@@ -1,13 +1,23 @@
 -- FLUXOGRAMA: entrada (pessoa da equipe criou conta e confirmou o e-mail -> linha INATIVA em agentes) -> validação (só administrador; só e-mail confirmado em auth.users) -> lógica (aba Avisos lista o pedido; administrador aprova = ativo true, ou recusa = apaga a conta) -> saída (equipe_pedidos, equipe_pedido_decidir)
--- Versão 1.0 — 05/11/2026 / Mudança: Implementação inicial
+-- Versão 1.1 — 05/11/2026 / Mudança: botão "Verificar de novo" da pessoa renova o pedido (coluna pedido_em, função equipe_pedido_reforcar)
 -- Nenhum comando destrutivo além da recusa (apaga a conta recusada, que ainda não tinha acesso). Pode ser aplicado mais de uma vez.
+
+alter table public.agentes add column if not exists pedido_em timestamptz;
+
+create or replace function public.equipe_pedido_reforcar() returns jsonb
+language plpgsql security definer set search_path to '' as $$
+declare v_ativo boolean;
+begin
+  update public.agentes set pedido_em = now() where id = (select auth.uid()) and not ativo returning ativo into v_ativo;
+  return jsonb_build_object('ok', true, 'renovado', found);
+end $$;
 
 create or replace function public.equipe_pedidos() returns jsonb
 language plpgsql stable security definer set search_path to '' as $$
 begin
   if coalesce((select public.papel_atual()), '') <> 'admin' then return '[]'::jsonb; end if;
   return coalesce((
-    select jsonb_agg(jsonb_build_object('id', a.id, 'nome', a.nome, 'email', a.email, 'papel', a.papel, 'criado_em', a.criado_em) order by a.criado_em)
+    select jsonb_agg(jsonb_build_object('id', a.id, 'nome', a.nome, 'email', a.email, 'papel', a.papel, 'criado_em', a.criado_em, 'pedido_em', a.pedido_em) order by coalesce(a.pedido_em, a.criado_em) desc)
       from public.agentes a join auth.users u on u.id = a.id
      where not a.ativo and u.email_confirmed_at is not null), '[]'::jsonb);
 end $$;
@@ -28,5 +38,5 @@ begin
   return jsonb_build_object('ok', true, 'aprovado', p_aprovar);
 end $$;
 
-revoke all on function public.equipe_pedidos(), public.equipe_pedido_decidir(uuid, boolean, text) from public, anon;
-grant execute on function public.equipe_pedidos(), public.equipe_pedido_decidir(uuid, boolean, text) to authenticated;
+revoke all on function public.equipe_pedido_reforcar(), public.equipe_pedidos(), public.equipe_pedido_decidir(uuid, boolean, text) from public, anon;
+grant execute on function public.equipe_pedido_reforcar(), public.equipe_pedidos(), public.equipe_pedido_decidir(uuid, boolean, text) to authenticated;
