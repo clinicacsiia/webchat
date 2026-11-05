@@ -37,7 +37,7 @@ Aba só do administrador no painel. Mostra cada médico por unidade com a agenda
   - Aceitar uma mudança de grade do Klingo apaga também os turnos por dia daquele médico/unidade.
 
 ## Mapa de salas (v1.2, só leitura)
-Botão **Mapa de salas** no topo da aba Médicos. Mostra, por unidade, cada consultório × dia da semana × Manhã/Tarde, com o médico e o horário **direto da agenda do Klingo** (muda sozinho quando o Klingo muda; nada é digitado à mão). Médico novo só aparece quando vem do Klingo e a equipe aceita no aviso, como já era.
+Botão **Mapa de salas** no topo da aba Médicos. **A unidade vem do seletor do topo da tela** (o mesmo de todas as abas; o mapa não tem seletor próprio). Com "Todas unidades" aparece uma tabela por unidade. Mostra, por unidade, cada consultório × dia da semana × Manhã/Tarde, com o médico e o horário **direto da agenda do Klingo** (muda sozinho quando o Klingo muda; nada é digitado à mão). Médico novo só aparece quando vem do Klingo e a equipe aceita no aviso, como já era.
 - **Só aviso, nada bloqueia.** Se dois médicos caem no mesmo consultório e horário, ou o mesmo médico em dois consultórios ao mesmo tempo, o bloco fica vermelho com ⚠ e a faixa no topo diz "olhe a tela". O chat continua oferecendo o que o Klingo manda.
 - Janelas repetidas ou coladas do mesmo médico viram uma só. Equipamentos (RM, TC, RX, eletro…) e linhas sem consultório não entram. Vale para todas as unidades.
 - Manhã/Tarde é só o jeito de desenhar (começa antes ou termina depois das 12:00); o horário exato aparece em cada bloco. Médico bloqueado no chat aparece riscado.
