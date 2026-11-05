@@ -728,7 +728,7 @@
         btn.disabled = true;
         try {
           if (modoCadastro) {
-            const { data, error } = await db.auth.signUp({ email: email.value.trim(), password: senha.value, options: { emailRedirectTo: PAINEL_URL, data: { nome: nome.value.trim() } } });
+            const { data, error } = await db.auth.signUp({ email: email.value.trim(), password: senha.value, options: { emailRedirectTo: PAINEL_URL, data: { nome: nome.value.trim(), origem: 'equipe' } } });
             if (error) throw error;
             if (!data.session) { erro.textContent = ''; raiz.replaceChildren(telaAviso('Confirme seu e-mail', 'Enviamos um link de confirmação para ' + email.value.trim() + '. Depois de confirmar, volte aqui e entre.', () => telaLoginMostrar(false))); return; }
           } else {
