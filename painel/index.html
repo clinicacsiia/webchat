@@ -260,8 +260,12 @@
   }
   /* Celular: cabeçalho e avisos mais enxutos para sobrar espaço para ler as mensagens */
   @media (max-width: 640px) {
-    .chat-topo { padding: 6px 10px; gap: 6px; }
-    .chat-topo .quem { min-width: 0; }
+    .chat-topo { padding: 8px 10px; gap: 6px 8px; }
+    .chat-topo .voltar { order: 0; padding: 4px 10px; }
+    .chat-topo .quem { order: 1; flex: 1 1 calc(100% - 90px); min-width: 0; overflow-wrap: anywhere; }
+    .chat-topo .btn:not(.voltar), .chat-topo select { order: 2; flex: 1 1 auto; text-align: center; }
+    .chat-topo .assumir-topo { display: none; }  /* o aviso logo abaixo já tem o botão Assumir */
+    .chat-topo .quem span { line-height: 1.5; }
     .chat-topo .quem b { font-size: 15px; }
     .chat-topo .quem span { font-size: 12px; }
     .chat-topo .btn, .chat-topo select { padding: 5px 10px; font-size: 13px; }
@@ -1946,7 +1950,7 @@
         h('span', {}, ct.telefone ? h('a', { href: 'https://wa.me/55' + soDigitos(ct.telefone), target: '_blank', rel: 'noopener noreferrer' }, fmtTel(ct.telefone)) : '', ct.email ? ' · ' + ct.email : '',
           ' · ', ROTULO_STATUS[c.status], ag && ag.nome ? ' com ' + ag.nome : ''),
         detalheInicio(c) ? h('span', { style: 'display:block;font-weight:600' }, detalheInicio(c)) : null),
-      !minha && c.status !== 'encerrada' ? h('button', { class: 'btn prim', type: 'button', onclick: () => assumir(true) }, 'Assumir') : null,
+      !minha && c.status !== 'encerrada' ? h('button', { class: 'btn prim assumir-topo', type: 'button', onclick: () => assumir(true) }, 'Assumir') : null,
       c.status === 'encerrada' ? h('button', { class: 'btn', type: 'button', onclick: () => assumir(true) }, 'Reabrir') : null,
       sel,
       c.status !== 'encerrada' ? h('button', { class: 'btn perigo', type: 'button', onclick: encerrar }, 'Encerrar') : null].filter(Boolean));
