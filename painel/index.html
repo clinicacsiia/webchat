@@ -129,6 +129,7 @@
   .inst b { display: block; color: #fff; font-size: 12px; margin-bottom: 6px; }
   .inst p { margin: 0 0 6px; overflow-wrap: anywhere; }
   .inst p:last-child { margin-bottom: 0; }
+  .inst .versao { margin-top: 8px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,.14); font-size: 11px; opacity: .75; }
   .conteudo { min-width: 0; min-height: 0; display: flex; flex-direction: column; background: var(--csi-background); }
   .pagina { flex: 1; min-height: 0; overflow-y: auto; padding: 24px; }
   .pagina h2 { margin: 0 0 4px; font-size: 24px; line-height: 1.25; }
@@ -837,7 +838,8 @@
         h('p', {}, 'Rua Teixeira de Barros, 27, Brotas. Salvador - Bahia'),
         h('p', {}, 'Tel: (71) 3181-7666 | WhatsApp: (71) 99980-3806'),
         h('p', {}, 'Seg a Sex: 7hs às 18h30 | Sáb: 8hs às 12hs'),
-        h('p', {}, 'Resp. Técnico: Dr. João Rafael Santos Carneiro | CRM 24778 - CBR')));
+        h('p', {}, 'Resp. Técnico: Dr. João Rafael Santos Carneiro | CRM 24778 - CBR'),
+        h('p', { class: 'versao', id: 'versaoSite' }, 'v1 beta')));
     const topo = h('header', { class: 'topo' },
       h('label', { class: 'busca-geral' }, icone('busca'),
         h('input', { type: 'search', id: 'buscaGeral', placeholder: 'Buscar paciente…', 'aria-label': 'Buscar paciente ou conversa', autocomplete: 'off',

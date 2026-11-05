@@ -132,8 +132,9 @@ await caso('administrador vê a aba Médicos com selo 1, aviso e médicos pré-p
   await page.waitForSelector('.pagina table');
   const tab = await page.locator('.pagina table').innerText();
   const aviso = await page.locator('.cv-ev:has-text("Antes: Seg")').innerText();
+  const versao = await page.locator('.inst #versaoSite').innerText();
   await ctx.close();
-  return { ok: reg.excecoes.length === 0 && selo === '1' && /Alexandre Magno Teixeira Medeiros/.test(tab) && /Ter, Qua, Qui · 08:20–17:00/.test(tab) && /Seg · 08:00–12:00/.test(tab) && !/\bRM\b/.test(tab) && /Antes: Seg/.test(aviso), detalhe: `${selo} | ${reg.excecoes.join(';')} | ${tab.replace(/\s+/g, ' ').slice(0, 220)}` };
+  return { ok: versao === 'v1 beta' && reg.excecoes.length === 0 && selo === '1' && /Alexandre Magno Teixeira Medeiros/.test(tab) && /Ter, Qua, Qui · 08:20–17:00/.test(tab) && /Seg · 08:00–12:00/.test(tab) && !/\bRM\b/.test(tab) && /Antes: Seg/.test(aviso), detalhe: `${selo} | ${reg.excecoes.join(';')} | ${tab.replace(/\s+/g, ' ').slice(0, 220)}` };
 });
 
 await caso('atendente não vê a aba Médicos', async () => {
