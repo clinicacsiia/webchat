@@ -139,14 +139,25 @@ await caso('cada paciente aparece na coluna certa; o fluxo normal aparece mesmo 
   return { ok, detalhe: JSON.stringify(c) + ' colunas=' + colunas.join() };
 });
 
-await caso('"Precisam de atenção agora" lista quem tem aviso vencido, do que espera há mais tempo', async () => {
+await caso('"Precisam de atenção agora" vem recolhido, abre ao tocar e lista do mais recente ao mais antigo', async () => {
   const { page, ctx } = await abrir();
   await page.waitForSelector('.j-atencao');
+  const fechado = await page.locator('.j-aviso').count();
   const titulo = await page.locator('.j-atencao h3').innerText();
+  await page.click('.j-atencao-bt');
   const nomes = await page.locator('.j-aviso .quem b').allInnerTexts();
-  const botoes = await page.locator('.j-aviso').first().locator('.btn').allInnerTexts();
+  const botoes = await page.locator('.j-aviso').nth(1).locator('.btn').allInnerTexts();
   await ctx.close();
-  return { ok: /\(2\)/.test(titulo) && nomes.join() === 'Carlos Klingo,Bia Chegou' && botoes.includes('Assumir') && botoes.includes('Resolver'), detalhe: `${titulo}|${nomes}|${botoes}` };
+  return { ok: fechado === 0 && /\(2\)/.test(titulo) && nomes.join() === 'Bia Chegou,Carlos Klingo' && botoes.includes('Assumir') && botoes.includes('Resolver'), detalhe: `${fechado}|${titulo}|${nomes}|${botoes}` };
+});
+
+await caso('barra de atenção mostra os primeiros pacientes mesmo com a lista recolhida', async () => {
+  const { page, ctx } = await abrir();
+  await page.waitForSelector('#jBarra:not([hidden])');
+  const txt = await page.locator('#jBarra').innerText();
+  const abertos = await page.locator('.j-aviso').count();
+  await ctx.close();
+  return { ok: abertos === 0 && txt.indexOf('Bia Chegou') > -1 && txt.indexOf('Bia Chegou') < txt.indexOf('Carlos Klingo'), detalhe: txt.replace(/\n/g, ' ') };
 });
 
 await caso('estado do monitor: normal, monitoramento parado e Klingo fora do ar', async () => {
@@ -168,13 +179,28 @@ await caso('filtros Meus, Sem responsável e Com aviso e a busca', async () => {
   return { ok: meus === 'Bia Chegou' && livres === 'Carlos Klingo,Elaine Unidade2,Maria Souza' && aviso === 'Bia Chegou,Carlos Klingo' && busca === 'Davi Atendido', detalhe: `${meus}|${livres}|${aviso}|${busca}` };
 });
 
-await caso('filtro por unidade aparece quando há mais de uma', async () => {
+await caso('filtro global de unidade: "CSI 2" é a unidade RM/TC; "CSI 1" é a CSI; e o painel de atenção acompanha', async () => {
   const { page, ctx } = await abrir();
   await page.waitForSelector('.q-card');
-  await page.locator('.q-topo select[aria-label=Unidade]').selectOption('CSI 2');
-  const nomes = (await page.locator('.q-colunas .q-card b').allInnerTexts()).join();
+  const lista = async () => (await page.locator('.q-colunas .q-card b').allInnerTexts()).sort().join();
+  await page.locator('#selUnidade').selectOption('rmtc'); await page.waitForSelector('.q-card'); const rm = await lista(); const selo = await page.locator('#seloJornada').isHidden();
+  await page.locator('#selUnidade').selectOption('csi'); await page.waitForSelector('.q-card'); const csi = await lista();
+  await page.locator('#selUnidade').selectOption('desenvoar'); await page.waitForTimeout(400); const des = await lista();
   await ctx.close();
-  return { ok: nomes === 'Elaine Unidade2', detalhe: nomes };
+  return { ok: rm === 'Elaine Unidade2' && selo && csi === 'Bia Chegou,Carlos Klingo,Davi Atendido,Maria Souza' && des === '', detalhe: `${rm}|${selo}|${csi}|${des}` };
+});
+
+await caso('o filtro de unidade vale também para Fila e Atendimento, sem erro (sem unidade definida = aparece)', async () => {
+  const { page, ctx, reg } = await abrir();
+  await page.waitForSelector('.q-card');
+  await page.locator('#selUnidade').selectOption('desenvoar');
+  await page.click('.nav button[data-aba=fila]'); await page.waitForSelector('#conteudo .pagina'); await page.waitForTimeout(300);
+  const fila = await page.locator('#conteudo .pagina .sub').first().innerText();
+  await page.click('.nav button[data-aba=atendimento]'); await page.waitForSelector('#itens'); await page.waitForTimeout(300);
+  const sel = await page.locator('#selUnidade').inputValue();
+  const lista = await page.locator('#itens').innerText();
+  await ctx.close();
+  return { ok: !reg.excecoes.length && /Unidade Desenvoar/.test(fila) && sel === 'desenvoar' && /Maria Souza/.test(lista), detalhe: reg.excecoes[0] ?? `${fila}|${sel}|${lista.slice(0, 60)}` };
 });
 
 await caso('trocar o período pede de novo ao banco (Próximos 30 dias não filtra por data)', async () => {
@@ -201,7 +227,7 @@ await caso('abrir o paciente mostra exames, aviso, histórico, e registra o aces
 
 await caso('Assumir chama jornada_atribuir_card com o usuário e a versão do cartão', async () => {
   const { page, ctx, reg } = await abrir();
-  await page.waitForSelector('.j-aviso');
+  await page.waitForSelector('.j-atencao-bt'); await page.click('.j-atencao-bt'); await page.waitForSelector('.j-aviso');
   await page.locator('.j-aviso:has-text("Carlos Klingo") button:has-text("Assumir")').click();
   await page.waitForTimeout(500);
   await ctx.close();

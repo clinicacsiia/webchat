@@ -84,3 +84,17 @@ Cada atendente com a aba aberta mantém uma conexão em tempo real (Realtime) e 
 4. Decidir o canal para avisar o **paciente** automaticamente.
 5. LGPD: o texto do aviso e a regra do dado de paciente do relatório #13825 (`docs/pendencias-e-dependencias.md`, A8). O painel guarda o nome vindo do Klingo (`config.jornada_identidade_klingo = sim`); só a equipe vê.
 6. Teste automático em banco embutido da função `jornada_vigiar` (hoje ela foi conferida só no banco real, com uma rodada).
+
+
+## Painel de atenção recolhido, barra de nomes e filtro de unidade (05/11/2026)
+
+- **"Precisam de atenção agora" vem recolhido**; o título (com o número) abre e fecha a lista.
+- **Ordem e limite:** do mais recente (minutos, horas) ao mais antigo; quem está parado há **mais de 2 dias sai** do painel, do selo vermelho da aba e do título da janela. Os cartões continuam no quadro.
+- **Barra de atenção** logo abaixo da linha "Jornada · Monitorando": mostra os 3 primeiros nomes da lista, deslizando, mesmo com a lista recolhida. Os nomes são recalculados a cada 2 minutos (e na hora, ao trocar a unidade). Sem ninguém com aviso, a barra some.
+- **Filtro de unidade no alto do painel** (Todas, CSI, CSI RM/TC, Desenvoar), guardado no aparelho, vale para **Jornada, Atendimento e Fila**, para o painel de atenção, a barra e os números das abas. As 3 unidades são as da agenda dos médicos.
+- **Nomes diferentes, mesma unidade** (dedução pelos dados, função `unidade_chave`): Klingo "CSI 1" = CSI; "CSI 2" = RM/TC (590 de 622 exames são RM/TC); "CSI Pediatria" = Desenvoar.
+- **Regra de ouro:** se não dá para saber a unidade, aparece em **todas**.
+  - *Jornada:* unidade do cartão.
+  - *Atendimento:* exame marcado pelo chat, depois cartão da Jornada, depois a unidade escolhida no formulário ("Ainda não sei" = todas).
+  - *Fila:* função `fila_unidades_hoje` (SQL em `supabase/fila-unidade.sql`, já aplicado): exame de hoje no Klingo, depois pedido do chat (3 dias), depois formulário. A linha da fila mostra "Unidade provável: … (de onde veio)".
+- Não depende dos relatórios pendentes do Klingo.
