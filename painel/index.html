@@ -1213,6 +1213,25 @@
     if (error) erroJ(error);
     await depoisDeMexer(k.id);
   }
+  async function statusJ(k, para) {
+    let nota = null;
+    if (para === 'cancelado' || para === 'perdido') { nota = prompt('Qual o motivo? (mínimo 3 letras)'); if (nota == null) return; }
+    else { nota = prompt('Observação (opcional):'); if (nota == null) return; }
+    const { error } = await db.rpc('jornada_definir_status', { p_card: k.id, p_para: para, p_versao: k.versao, p_nota: nota });
+    if (error) erroJ(error);
+    await depoisDeMexer(k.id);
+  }
+  async function anotarJ(k, texto) {
+    const { error } = await db.rpc('jornada_anotar_card', { p_card: k.id, p_nota: texto });
+    if (error) { toast(msgErro(error)); return false; }
+    toast('Observação salva.'); await depoisDeMexer(k.id); return true;
+  }
+  async function arquivarJ(k) {
+    if (!confirm('Tirar este cartão do quadro? O histórico fica guardado.')) return;
+    const { error } = await db.rpc('jornada_arquivar_card', { p_card: k.id, p_versao: k.versao, p_nota: null });
+    if (error) { erroJ(error); return; }
+    toast('Cartão tirado do quadro.'); dlg.close(); await carregarJornada();
+  }
   async function atribuirJ(k, quem) {
     const { error } = await db.rpc('jornada_atribuir_card', { p_card: k.id, p_responsavel: quem || null, p_versao: k.versao });
     if (error) erroJ(error);
@@ -1230,6 +1249,7 @@
     switch (e.tipo) {
       case 'criado': return `${quem}: cartão criado em ${nome(e.para_coluna)}`;
       case 'movido': return `${quem}: ${nome(e.de_coluna)} → ${nome(e.para_coluna)}${d.nota ? ' (' + d.nota + ')' : ''}${d.motivo ? ' · ' + d.motivo : ''}`;
+      case 'nota': return d.acao === 'arquivado' ? `${quem}: tirou do quadro` : `${quem}: observação · ${d.nota || ''}`;
       case 'divergencia': return `${quem}: o Klingo diz outra coisa do que o painel mostra. Conferir.`;
       case 'atribuido': return d.responsavel ? `${quem}: responsável ${(S.agentes.get(d.responsavel) || {}).nome || 'definido'}` : `${quem}: tirou o responsável`;
       case 'tarefa': return `${quem}: ${d.acao === 'alerta' ? 'aviso aberto' : d.acao === 'feita' ? 'tarefa concluída' : 'tarefa'}${d.titulo ? ' · ' + d.titulo : ''}`;
@@ -1285,7 +1305,9 @@
     const col = J.colunas.find((x) => x.id === k.coluna);
     const pess = J.pessoas.get(k.id) || {}, outros = irmaosDoCartao(k), conversaDoPaciente = k.conversa_id || pess.conversa_id || null;
     const dest = destinosJ(k).map((d) => J.colunas.find((x) => x.id === d)).filter(Boolean);
-    const sel = dest.length ? h('select', { 'aria-label': 'Mover o paciente para', onchange: (e) => { if (e.target.value) moverJ(k, e.target.value); } }, h('option', { value: '' }, 'Mover para…'), dest.map((d) => h('option', { value: d.id }, d.nome))) : null;
+    const todas = J.colunas.filter((x) => x.id !== k.coluna);
+    const sel = h('select', { 'aria-label': 'Mudar o status do paciente', onchange: (e) => { if (e.target.value) statusJ(k, e.target.value); } }, h('option', { value: '' }, 'Mudar status…'), todas.map((d) => h('option', { value: d.id }, d.nome)));
+    const obs = h('textarea', { rows: '2', maxlength: '1000', placeholder: 'Escreva uma observação sobre este cartão', 'aria-label': 'Observação', style: 'width:100%' });
     const pessoas = [...S.agentes.values()].filter((a) => a.ativo && (a.papel === 'admin' || a.papel === 'atendente'));
     const resp = h('select', { 'aria-label': 'Responsável', onchange: (e) => atribuirJ(k, e.target.value) }, h('option', { value: '' }, 'Sem responsável'), pessoas.map((a) => h('option', { value: a.id, selected: a.id === k.responsavel }, a.nome)));
     const exames = (ex.data || []).map((e) => h('li', {}, `${e.procedimento || 'Exame'} · ${e.status || 'sem situação'}${e.agendado_para ? ' · ' + fmtDataHora(e.agendado_para) : ''}${e.operadora ? ' · ' + e.operadora : ''}`));
@@ -1298,6 +1320,9 @@
       h('div', { class: 'j-acoes' }, sel, resp, !k.responsavel ? h('button', { class: 'btn', type: 'button', onclick: () => atribuirJ(k, S.me.id) }, 'Assumir') : null,
         conversaDoPaciente ? h('button', { class: 'btn', type: 'button', onclick: () => { dlg.close(); S.aba = 'atendimento'; renderAba(); abrirConversa(conversaDoPaciente); } }, 'Abrir conversa') : null),
       ...secoesPessoaJ(k, pess, outros),
+      h('div', { class: 'j-sec' }, h('h4', {}, 'Observação'), obs,
+        h('div', { class: 'j-acoes' }, h('button', { class: 'btn prim', type: 'button', onclick: () => anotarJ(k, obs.value) }, 'Salvar observação'),
+          h('button', { class: 'btn perigo', type: 'button', onclick: () => arquivarJ(k) }, 'Tirar do quadro'))),
       h('div', { class: 'j-sec' }, h('h4', {}, 'Exames'), exames.length ? h('ul', {}, exames) : h('div', { style: 'font-size:13.5px' }, 'Nenhum exame neste cartão.')),
       h('div', { class: 'j-sec' }, h('h4', {}, 'Avisos e tarefas'), tarefas.length ? h('ul', {}, tarefas) : h('div', { style: 'font-size:13.5px' }, 'Nada pendente.')),
       h('div', { class: 'j-sec' }, h('h4', {}, 'Histórico'), (ev.data || []).length ? h('ul', {}, (ev.data || []).map((e) => h('li', {}, fmtDataHora(e.quando) + ' · ' + textoEventoJ(e)))) : h('div', { style: 'font-size:13.5px' }, 'Sem registros.')),
