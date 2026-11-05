@@ -2443,6 +2443,7 @@
             h('td', {}, h('label', { style: 'display:flex;gap:6px;align-items:center' }, ativo, a.ativo ? 'Liberado' : 'Aguardando liberação')),
             h('td', {}, `${m.ativas} abertas · ${m.encerradas} encerradas`),
             h('td', { style: 'white-space:nowrap' },
+              h('button', { class: 'btn', type: 'button', 'aria-label': 'Corrigir o nome de ' + a.nome, onclick: () => corrigirNome(a) }, 'Corrigir nome'), ' ',
               h('button', { class: 'btn', type: 'button', onclick: () => (eu ? minhaSenha() : redefinirSenha(a)) }, eu ? 'Minha senha' : 'Redefinir senha'),
               eu ? '' : [' ', h('button', { class: 'btn perigo', type: 'button', onclick: () => removerAgente(a) }, 'Remover')]));
         }))))));
@@ -2508,6 +2509,20 @@
     const { error } = await db.from('agentes').update(campos).eq('id', a.id);
     if (error) { toast(msgErro(error)); viewEquipeRecarregar(); return; }
     Object.assign(a, campos); toast('Alteração salva.'); viewEquipeRecarregar();
+  }
+  /* Só o administrador corrige o nome de quem é da equipe (a pessoa pede, o administrador faz). Vale também para o próprio nome dele. */
+  async function corrigirNome(a) {
+    const novo = prompt(`Novo nome para ${a.nome || a.email || 'esta pessoa'}:`, a.nome || '');
+    if (novo === null) return;
+    const nome = novo.trim().replace(/\s+/g, ' ');
+    if (nome.length < 2 || nome.length > 60) { toast('O nome precisa ter entre 2 e 60 letras.'); return; }
+    if (nome === a.nome) return;
+    const { data, error } = await db.from('agentes').update({ nome }).eq('id', a.id).select('id');
+    if (error) { toast(msgErro(error)); return; }
+    if (!data || !data.length) { toast('Não foi possível alterar: só administrador pode corrigir o nome.'); return; }
+    a.nome = nome;
+    if (a.id === S.me.id) { S.me.nome = nome; montarApp(); }
+    toast('Nome corrigido.'); viewEquipeRecarregar();
   }
   function viewEquipeRecarregar() { const c = document.getElementById('conteudo'); c.replaceChildren(); viewEquipe(c); }
   async function removerAgente(a) {
