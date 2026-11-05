@@ -27,8 +27,12 @@ const EXAMES = [
     lin('BRADESCO', 'previsao', { exibido: 340.93, observado: 340.93, obs_min: 300, obs_max: 340.93, amostras: 3 })] },
   { id: 2, nome: 'MAMOGRAFIA BILATERAL', especialidade: 'MAMOGRAFIA', marcacoes_90d: 721, alertas: 0, previsoes: 0, sem_preco: 1, linhas: [
     lin('AMIL', 'ok', { catalogo: 65.16, exibido: 65.16 }), lin('MARINHA', 'sem_preco')] },
+  { id: 3, nome: 'RESSONANCIA DE JOELHO', especialidade: 'RESSONANCIA', marcacoes_90d: 460, alertas: 1, previsoes: 0, sem_preco: 0, ligadas: 2, linhas: [
+    lin('HAPVIDA', 'ok', { catalogo: 340, exibido: 340, observado: 340, amostras: 18, dif_pct: 0, revisao: { ligado: true, valor: 300, nota: 'Tabela antiga', em: agora, por: 'Maria', mudou: true } }),
+    lin('AMIL', 'ok', { catalogo: 340, exibido: 340, revisao: { ligado: true, valor: 340, nota: null, em: agora, por: 'Maria', mudou: false } })] },
 ];
 let ultimoPedido = null;
+const REVISOES = [];
 
 function servidor() {
   return new Promise((ok) => {
@@ -68,6 +72,7 @@ async function pagina(browser, { papel = 'admin' } = {}) {
       if (q.p_filtro === 'alerta') ex = ex.filter((x) => x.alertas > 0);
       corpo = { limite_pct: 10, exames_total: ex.length, exames_com_alerta: ex.filter((x) => x.alertas > 0).length, exames_com_previsao: ex.filter((x) => x.previsoes > 0).length, preco_lido_em: agora, catalogo_em: agora, exames: ex };
     }
+    else if (p.endsWith('/rpc/catalogo_preco_revisar')) { REVISOES.push(JSON.parse(req.postData() || '{}')); corpo = { ok: true }; }
     else if (p.endsWith('/rpc/catalogo_cardapio_operadoras')) corpo = ['AMIL', 'PARTICULAR', 'UNIMED'];
     else if (p.endsWith('/rpc/catalogo_limpeza')) corpo = { ativos: 2150, removidos: 0, sem_preparo: 2148, sem_agenda_vigente: { total: 3, exemplos: [] }, sem_preco_com_agenda: { total: 1, exemplos: [] }, mais_pedidos_sem_preparo: [], nomes_duplicados: [], agenda_teste: { linhas: 0, profissionais: [] } };
     else if (p.endsWith('/rpc/catalogo_mudancas')) corpo = [];
@@ -96,10 +101,10 @@ await caso('administrador abre o cardápio: aviso de previsão, exame com "!" ab
   const nomes = (await page.locator('.cat-bloco > summary').allInnerTexts()).map((t) => t.split('·')[0].trim());
   const aberto = await page.locator('.cat-bloco:has-text("USG TRANSVAGINAL")').evaluate((d) => d.open);
   const fechado = await page.locator('.cat-bloco:has-text("MAMOGRAFIA")').evaluate((d) => d.open);
-  const linhaDiv = await page.locator('tr.cd-div').innerText();
-  const alertas = await page.locator('.cd-tabela tr.cd-div .cd-alerta').count();
+  const linhaDiv = await page.locator('.cat-bloco:has-text("USG TRANSVAGINAL") tr.cd-div').innerText();
+  const alertas = await page.locator('.cat-bloco:has-text("USG TRANSVAGINAL") .cd-tabela tr.cd-div .cd-alerta').count();
   await ctx.close();
-  const ok = reg.excecoes.length === 0 && /previsão/.test(aviso) && nomes.length === 2 && /USG TRANSVAGINAL/.test(nomes[0]) && aberto && !fechado && alertas === 1
+  const ok = reg.excecoes.length === 0 && /previsão/.test(aviso) && nomes.length === 3 && /USG TRANSVAGINAL/.test(nomes[0]) && aberto && !fechado && alertas === 1
     && /1\.042,08/.test(linhaDiv) && /previsão/.test(linhaDiv) && /\+31,9%/.test(linhaDiv) && /790,00/.test(linhaDiv);
   return { ok, detalhe: `${nomes.join(' | ')} | aberto=${aberto} fechado=${fechado} | alertas=${alertas} | ${linhaDiv.replace(/\s+/g, ' ')} | ${reg.excecoes.join(';')}` };
 });
@@ -125,7 +130,7 @@ await caso('busca e filtro "só com alerta" chamam o banco com os parâmetros ce
   await page.click('.nav button[data-aba=catalogo]');
   await page.waitForSelector('.cat-bloco');
   await page.selectOption('select[aria-label="Mostrar"]', 'alerta');
-  await page.waitForFunction(() => document.querySelectorAll('.cat-bloco').length === 1);
+  await page.waitForFunction(() => document.querySelectorAll('.cat-bloco').length === 2);
   await page.fill('input[aria-label="Procurar exame"]', 'usg');
   await page.waitForFunction(() => /USG/.test(document.querySelector('.cat-bloco > summary')?.textContent || ''));
   await page.selectOption('select[aria-label="Operadora"]', 'UNIMED');
@@ -133,6 +138,104 @@ await caso('busca e filtro "só com alerta" chamam o banco com os parâmetros ce
   const ult = reg.chamadas[reg.chamadas.length - 1];
   await ctx.close();
   return { ok: ult.p_filtro === 'alerta' && ult.p_busca === 'usg' && ult.p_operadora === 'UNIMED', detalhe: JSON.stringify(ult) };
+});
+
+const abrir = async (page, nome) => {
+  await page.goto(`${base}/painel/`);
+  await page.click('.nav button[data-aba=catalogo]');
+  await page.waitForSelector('.cat-bloco');
+  const d = page.locator(`.cat-bloco:has-text("${nome}")`);
+  if (!(await d.evaluate((e) => e.open))) await d.locator('summary').click();
+  return d;
+};
+
+await caso('referência que mudou depois da confirmação: "!" e aviso; o chat segue com o valor confirmado', async () => {
+  const { page, ctx } = await pagina(browser);
+  const d = await abrir(page, 'RESSONANCIA');
+  const hap = d.locator('tr:has-text("HAPVIDA")'), amil = d.locator('tr:has-text("AMIL")');
+  const txt = await hap.innerText();
+  const aberto = await d.evaluate((e) => e.open);
+  const alertasAmil = await amil.locator('.cd-alerta').count();
+  const ligado = await hap.locator('input[role=switch]').isChecked();
+  await ctx.close();
+  return { ok: aberto && ligado && /300,00/.test(txt) && /referência mudou/.test(txt) && /até você revisar/.test(txt) && /Tabela antiga/.test(txt) && alertasAmil === 0, detalhe: txt.replace(/\s+/g, ' ') };
+});
+
+await caso('ligar pelo interruptor pede confirmação e grava o valor que a tela mostrava', async () => {
+  const { page, ctx } = await pagina(browser);
+  REVISOES.length = 0;
+  let aviso = '';
+  page.on('dialog', async (dl) => { aviso = dl.message(); await dl.accept(); });
+  const d = await abrir(page, 'USG TRANSVAGINAL');
+  await d.locator('tr:has-text("Particular") input[role=switch]').check();
+  await page.waitForFunction(() => true); await page.waitForTimeout(300);
+  const r = REVISOES[0] || {};
+  await ctx.close();
+  return { ok: /910,00/.test(aviso) && /previsão/.test(aviso) && r.p_procedimento === 1 && r.p_operadora === 'PARTICULAR' && r.p_ligado === true && r.p_valor === 910 && r.p_referencia === 910, detalhe: `${aviso} | ${JSON.stringify(r)}` };
+});
+
+await caso('cancelar na confirmação não grava nada e o interruptor volta', async () => {
+  const { page, ctx } = await pagina(browser);
+  REVISOES.length = 0;
+  page.on('dialog', (dl) => dl.dismiss());
+  const d = await abrir(page, 'USG TRANSVAGINAL');
+  const sw = d.locator('tr:has-text("Particular") input[role=switch]');
+  await sw.click();
+  await page.waitForTimeout(300);
+  const marcado = await sw.isChecked();
+  await ctx.close();
+  return { ok: REVISOES.length === 0 && marcado === false, detalhe: `chamadas=${REVISOES.length} marcado=${marcado}` };
+});
+
+await caso('desligar um preço ligado chama o banco com ligado:false', async () => {
+  const { page, ctx } = await pagina(browser);
+  REVISOES.length = 0;
+  const d = await abrir(page, 'RESSONANCIA');
+  await d.locator('tr:has-text("AMIL") input[role=switch]').uncheck();
+  await page.waitForTimeout(300);
+  const r = REVISOES[0] || {};
+  await ctx.close();
+  return { ok: r.p_ligado === false && r.p_operadora === 'AMIL' && r.p_procedimento === 3, detalhe: JSON.stringify(r) };
+});
+
+await caso('linha sem preço: ligar abre o campo de valor; corrigir e salvar grava o valor digitado', async () => {
+  const { page, ctx } = await pagina(browser);
+  REVISOES.length = 0;
+  page.on('dialog', (dl) => dl.accept());
+  await page.goto(`${base}/painel/`);
+  await page.click('.nav button[data-aba=catalogo]');
+  await page.waitForSelector('.cat-bloco');
+  const d = page.locator('.cat-bloco:has-text("MAMOGRAFIA")');
+  await d.locator('summary').click();
+  await d.locator('tr:has-text("MARINHA") input[role=switch]').click();
+  const campo = d.locator('tr:has-text("MARINHA") input[aria-label="Valor que o chat informa"]');
+  await campo.waitFor();
+  await campo.fill('123,45');
+  await d.locator('tr:has-text("MARINHA") input[aria-label="Nota"]').fill('Valor da tabela nova');
+  await d.locator('tr:has-text("MARINHA") button:text-is("Salvar e ligar")').click();
+  await page.waitForTimeout(300);
+  const r = REVISOES[0] || {};
+  const depois = await d.locator('tr:has-text("MARINHA")').innerText();
+  await ctx.close();
+  return { ok: r.p_valor === 123.45 && r.p_ligado === true && r.p_nota === 'Valor da tabela nova' && r.p_referencia === null && /123,45/.test(depois) && /Ligado/.test(depois), detalhe: `${JSON.stringify(r)} | ${depois.replace(/\s+/g, ' ')}` };
+});
+
+await caso('valor inválido não chega ao banco', async () => {
+  const { page, ctx } = await pagina(browser);
+  REVISOES.length = 0;
+  page.on('dialog', (dl) => dl.accept());
+  await page.goto(`${base}/painel/`);
+  await page.click('.nav button[data-aba=catalogo]');
+  await page.waitForSelector('.cat-bloco');
+  const d = page.locator('.cat-bloco:has-text("MAMOGRAFIA")');
+  await d.locator('summary').click();
+  await d.locator('tr:has-text("MARINHA") input[role=switch]').click();
+  const campo = d.locator('tr:has-text("MARINHA") input[aria-label="Valor que o chat informa"]');
+  await campo.fill('1');
+  await d.locator('tr:has-text("MARINHA") button:text-is("Salvar e ligar")').click();
+  await page.waitForTimeout(300);
+  await ctx.close();
+  return { ok: REVISOES.length === 0, detalhe: `chamadas=${REVISOES.length}` };
 });
 
 await caso('sub-aba "Limpeza e mudanças" continua mostrando o que já existia', async () => {

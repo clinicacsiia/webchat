@@ -2723,38 +2723,92 @@
     let seq = 0, offset = 0;
     const busca = h('input', { type: 'search', placeholder: 'Procurar exame', 'aria-label': 'Procurar exame', value: CD.busca });
     const selOp = h('select', { 'aria-label': 'Operadora' }, h('option', { value: '' }, 'Todas as operadoras'));
-    const selFiltro = h('select', { 'aria-label': 'Mostrar' }, [['', 'Todos os exames'], ['alerta', 'Só com alerta (!)'], ['previsao', 'Só com preço em previsão'], ['sem_preco', 'Só com linha sem preço']].map(([v, t]) => h('option', { value: v }, t)));
+    const selFiltro = h('select', { 'aria-label': 'Mostrar' }, [['', 'Todos os exames'], ['alerta', 'Só com alerta (!)'], ['previsao', 'Só com preço em previsão'], ['sem_preco', 'Só com linha sem preço'], ['ligado', 'Só com chat ligado'], ['nao_ligado', 'Só com preço ainda não ligado']].map(([v, t]) => h('option', { value: v }, t)));
     selFiltro.value = CD.filtro;
     c.append(h('p', { class: 'sub' }, 'Todos os serviços com o preço por operadora. Atualizado toda noite, às 03:00; os preços lançados no Klingo são relidos ao longo do dia.'),
-      h('div', { class: 'cd-aviso' }, 'Os valores são uma previsão. O preço final é o lançado pela recepção no Klingo. O "!" marca onde o Klingo está lançando um valor 10% ou mais diferente do catálogo.'),
+      h('div', { class: 'cd-aviso' }, 'Os valores são uma previsão. O preço final é o lançado pela recepção no Klingo. O "!" marca onde o Klingo lança um valor 10% ou mais diferente do catálogo, ou onde a referência mudou depois da sua confirmação. Em "Chat informa", ligue só os preços que você conferiu: com o preço ligado, o chat passa essa previsão ao paciente; desligado (padrão), o chat diz que o atendente informa o valor.'),
       resumo, h('div', { class: 'cd-filtros' }, busca, selOp, selFiltro), lista, maisBox);
 
-    const linhaPreco = (l) => {
-      const dif = l.estado === 'divergente';
+    // Referência atual de uma linha (o que o cardápio mostra sem revisão) e se o alerta "!" está valendo.
+    const refAtual = (l) => (l.estado === 'ok' ? l.catalogo : l.estado === 'sem_preco' ? null : l.observado);
+    const alertaAtivo = (l) => (l.estado === 'divergente' && (!l.revisao || l.revisao.mudou)) || !!(l.revisao && l.revisao.mudou);
+    const dia = (iso) => (iso ? new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '');
+
+    // Liga, desliga ou corrige o preço que o chat informa. Só o administrador chega aqui (a função do banco confere de novo).
+    const salvarRevisao = async (x, l, ligado, valor, nota) => {
+      const { error } = await db.rpc('catalogo_preco_revisar', { p_procedimento: x.id, p_operadora: l.operadora, p_ligado: ligado, p_valor: valor ?? null, p_nota: nota ?? null, p_referencia: refAtual(l) });
+      if (error) { toast(msgErro(error)); return false; }
+      const ant = l.revisao || {};
+      l.revisao = { ligado, valor: valor ?? ant.valor, nota: nota ?? ant.nota ?? null, em: new Date().toISOString(), por: ant.por || 'você', mudou: false };
+      toast(ligado ? 'Preço ligado: o chat passa a informar esta previsão.' : 'Preço desligado: o chat volta a dizer que o atendente informa.');
+      return true;
+    };
+
+    const linhaPreco = (x, l, refresh) => {
+      const dif = l.estado === 'divergente', rv = l.revisao, alerta = alertaAtivo(l);
+      const nomeOp = l.particular ? 'Particular' : l.operadora;
       let preco, nota = '';
       if (l.estado === 'ok') preco = brl(l.exibido);
-      else if (l.estado === 'sem_preco') { preco = '—'; nota = 'Sem preço confiável no catálogo e sem marcações recentes.'; }
+      else if (l.estado === 'sem_preco') { preco = rv ? brl(rv.valor) : '—'; nota = 'Sem preço confiável no catálogo e sem marcações recentes.'; }
       else {
-        preco = [dif ? h('span', { class: 'cd-alerta', title: 'Diferença com o Klingo', 'aria-label': 'Alerta' }, '!') : null, brl(l.exibido), h('span', { class: 'cd-tag' }, 'previsão')];
+        preco = [alerta ? h('span', { class: 'cd-alerta', title: 'Atenção neste preço', 'aria-label': 'Alerta' }, '!') : null, brl(l.exibido), h('span', { class: 'cd-tag' }, 'previsão')];
         const amostra = `${l.amostras} ${l.amostras === 1 ? 'marcação' : 'marcações'}`;
         const faixa = l.obs_min != null && l.obs_max != null && l.obs_min !== l.obs_max ? `, variou de ${brl(l.obs_min)} a ${brl(l.obs_max)}` : '';
         nota = dif ? `O Klingo está lançando ${brl(l.observado)} (${pctTxt(l.dif_pct)} sobre o catálogo, ${amostra}${faixa}). Confirme com a recepção qual está certo.`
           : `Sem preço confiável no catálogo; valor das marcações recentes (${amostra}${faixa}).`;
+        if (dif && rv && !rv.mudou) nota = `Diferença já conferida: o chat informa ${brl(rv.valor)}.`;
       }
-      return h('tr', { class: dif ? 'cd-div' : (l.estado === 'sem_preco' ? 'cd-mudo' : '') },
-        h('td', {}, l.particular ? 'Particular' : l.operadora, l.tabelas > 1 ? h('span', { class: 'cd-mudo' }, ` · ${l.tabelas} tabelas`) : null),
+      if (rv && rv.mudou) nota = `A referência mudou depois da última confirmação (hoje: ${l.exibido != null ? brl(l.exibido) : '—'}). O chat segue informando ${brl(rv.valor)} até você revisar.`;
+
+      const celChat = h('td', {});
+      const pintarChat = (editando = false) => {
+        if (editando) {
+          const inp = h('input', { type: 'text', inputmode: 'decimal', placeholder: '0,00', 'aria-label': 'Valor que o chat informa', style: 'width:110px' });
+          inp.value = rv ? String(rv.valor).replace('.', ',') : (l.exibido != null ? String(l.exibido).replace('.', ',') : '');
+          const nt = h('input', { type: 'text', maxlength: '200', placeholder: 'Nota (opcional)', 'aria-label': 'Nota', style: 'width:100%;margin-top:4px', value: rv && rv.nota ? rv.nota : '' });
+          celChat.replaceChildren(h('div', {}, inp, nt, h('div', { class: 'acoes', style: 'margin-top:6px' },
+            h('button', { class: 'btn', type: 'button', onclick: async () => {
+              const v = Number(String(inp.value).replace(',', '.'));
+              if (!Number.isFinite(v) || v < 5 || v >= 100000) { toast('Informe um valor entre R$ 5 e R$ 99.999,99.'); return; }
+              if (!confirm(`O chat vai informar ${brl(v)} (previsão) para ${x.nome} em ${nomeOp}. Confirmar?`)) return;
+              if (await salvarRevisao(x, l, true, v, nt.value.trim() || null)) refresh();
+            } }, 'Salvar e ligar'),
+            h('button', { class: 'btn', type: 'button', onclick: () => pintarChat(false) }, 'Cancelar'))));
+          inp.focus();
+          return;
+        }
+        const sw = h('input', { type: 'checkbox', role: 'switch', 'aria-label': `Chat informa o preço de ${x.nome} para ${nomeOp}` });
+        sw.checked = !!(rv && rv.ligado);
+        sw.addEventListener('change', async () => {
+          if (!sw.checked) { if (await salvarRevisao(x, l, false, null, null)) refresh(); else sw.checked = true; return; }
+          const sugerido = rv ? rv.valor : l.exibido;
+          if (sugerido == null) { sw.checked = false; pintarChat(true); return; }
+          if (!confirm(`O chat vai informar ${brl(sugerido)} (previsão) para ${x.nome} em ${nomeOp}. Confirmar?`)) { sw.checked = false; return; }
+          if (await salvarRevisao(x, l, true, sugerido, null)) refresh(); else sw.checked = false;
+        });
+        celChat.replaceChildren(h('div', {}, h('label', { style: 'display:inline-flex;gap:6px;align-items:center;cursor:pointer' }, sw, rv && rv.ligado ? 'Ligado' : 'Desligado'),
+          rv ? h('div', {}, h('b', {}, brl(rv.valor)), ' ', h('button', { class: 'btn', type: 'button', style: 'padding:1px 8px', onclick: () => pintarChat(true) }, 'Corrigir')) : h('div', {}, h('button', { class: 'btn', type: 'button', style: 'padding:1px 8px', onclick: () => pintarChat(true) }, 'Definir valor')),
+          rv ? h('div', { class: 'cd-mudo' }, `${rv.por ? 'Por ' + rv.por : 'Confirmado'}${rv.em ? ' em ' + dia(rv.em) : ''}${rv.nota ? ' · ' + rv.nota : ''}`) : null));
+      };
+      pintarChat();
+
+      return h('tr', { class: alerta ? 'cd-div' : (l.estado === 'sem_preco' && !rv ? 'cd-mudo' : '') },
+        h('td', {}, nomeOp, l.tabelas > 1 ? h('span', { class: 'cd-mudo' }, ` · ${l.tabelas} tabelas`) : null),
         h('td', { class: 'cd-valor' }, preco),
         h('td', { class: 'cd-mudo' }, l.catalogo != null ? brl(l.catalogo) : '—'),
+        celChat,
         h('td', {}, nota));
     };
     const cartao = (x) => {
       const linhas = (x.linhas || []).slice().sort((a, b) => (b.particular - a.particular) || (ORDEM_ESTADO[a.estado] - ORDEM_ESTADO[b.estado]) || String(a.operadora).localeCompare(String(b.operadora), 'pt-BR'));
+      const nAlertas = linhas.filter(alertaAtivo).length, nLigadas = linhas.filter((l) => l.revisao && l.revisao.ligado).length;
+      const refresh = () => { const n = cartao(x); n.open = d.open; d.replaceWith(n); };
       const d = h('details', { class: 'cat-bloco' },
-        h('summary', {}, x.alertas > 0 ? h('span', { class: 'cd-alerta', title: `${x.alertas} operadora(s) com diferença`, 'aria-label': 'Alerta' }, '!') : null, x.nome,
-          h('span', { class: 'sub-lista' }, ` · ${x.especialidade || 'sem especialidade'}${x.marcacoes_90d ? ` · ${x.marcacoes_90d} pedidos em 90 dias` : ''}`)),
+        h('summary', {}, nAlertas > 0 ? h('span', { class: 'cd-alerta', title: `${nAlertas} operadora(s) para revisar`, 'aria-label': 'Alerta' }, '!') : null, x.nome,
+          h('span', { class: 'sub-lista' }, ` · ${x.especialidade || 'sem especialidade'}${x.marcacoes_90d ? ` · ${x.marcacoes_90d} pedidos em 90 dias` : ''}${nLigadas ? ` · ${nLigadas} ligada(s) no chat` : ''}`)),
         h('div', { class: 'tabela-wrap', style: 'margin-top:8px' }, h('table', { class: 'cd-tabela' },
-          h('thead', {}, h('tr', {}, ['Operadora', 'Preço previsto', 'Catálogo', 'Observação'].map((t) => h('th', {}, t)))), h('tbody', {}, linhas.map(linhaPreco)))));
-      if (x.alertas > 0) d.open = true;
+          h('thead', {}, h('tr', {}, ['Operadora', 'Preço previsto', 'Catálogo', 'Chat informa', 'Observação'].map((t) => h('th', {}, t)))), h('tbody', {}, linhas.map((l) => linhaPreco(x, l, refresh))))));
+      if (nAlertas > 0) d.open = true;
       return d;
     };
 
@@ -2764,12 +2818,13 @@
       maisBox.replaceChildren();
       const { data, error } = await db.rpc('catalogo_cardapio', { p_busca: CD.busca || null, p_operadora: CD.operadora || null, p_filtro: CD.filtro || null, p_limite: PAG, p_deslocamento: offset });
       if (S.aba !== 'catalogo' || CD.aba !== 'cardapio' || minha !== seq) return;
-      if (error) { lista.replaceChildren(h('p', { class: 'erro' }, msgErro(error)), h('p', { class: 'dica' }, 'Se a mensagem fala de função inexistente, falta rodar supabase/catalogo-cardapio.sql.')); return; }
+      if (error) { lista.replaceChildren(h('p', { class: 'erro' }, msgErro(error)), h('p', { class: 'dica' }, 'Se a mensagem fala de função inexistente, falta rodar supabase/catalogo-cardapio.sql e supabase/catalogo-preco-revisao.sql.')); return; }
       const R = data || {}, ex = R.exames || [];
       resumo.replaceChildren(h('div', { class: 'numeros' },
         h('div', { class: 'num' }, h('b', {}, R.exames_total ?? 0), h('span', {}, CD.busca || CD.operadora || CD.filtro ? 'exames neste filtro' : 'exames no cardápio')),
         h('div', { class: 'num' }, h('b', {}, R.exames_com_alerta ?? 0), h('span', {}, 'com alerta (!)')),
-        h('div', { class: 'num' }, h('b', {}, R.exames_com_previsao ?? 0), h('span', {}, 'com preço só em previsão'))),
+        h('div', { class: 'num' }, h('b', {}, R.exames_com_previsao ?? 0), h('span', {}, 'com preço só em previsão')),
+        h('div', { class: 'num' }, h('b', {}, R.exames_com_chat_ligado ?? 0), h('span', {}, 'com preço ligado no chat'))),
         h('p', { class: 'dica' }, `Catálogo atualizado em ${R.catalogo_em ? fmtDataHora(R.catalogo_em) : '—'}. Preços lançados lidos em ${R.preco_lido_em ? fmtDataHora(R.preco_lido_em) : 'nenhuma leitura nas últimas 24 h (sem alertas por enquanto)'}.`));
       if (!maisUm) lista.replaceChildren();
       if (!ex.length && !maisUm) { lista.replaceChildren(h('p', { class: 'dica' }, 'Nenhum exame encontrado.')); return; }
