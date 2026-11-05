@@ -46,6 +46,14 @@ const DETALHE = { origem: 'klingo', nota: null, grade: { dias: [2, 3, 4], hora_i
   particular: false, excecoes: [{ id: 5, data_ini: '2026-12-24', data_fim: '2026-12-26', motivo: 'Recesso' }],
   convenios: [{ chave: 'AMIL', nome: 'AMIL', ativo_global: true, fora: false, restricoes: [] }, { chave: 'SULAMERICA', nome: 'Sulamerica', ativo_global: true, fora: true, restricoes: [] }, { chave: 'HAPVIDA', nome: 'HAPVIDA', ativo_global: false, fora: false, restricoes: [] }],
   procs: [{ id: 1, nome: 'CONSULTA PEDIATRICA', consulta: true }, { id: 3, nome: 'EXAME B', consulta: false }] };
+// Detalhe com a cobertura inferida das tabelas de preço (campos procs_medico / n_unidade), para os filtros de convênio.
+const DETALHE_COB = { ...DETALHE, n_procs_unidade: 28, convenios: [
+  { chave: 'AMIL', nome: 'AMIL', ativo_global: true, fora: false, restricoes: [], procs_medico: [1, 3], n_unidade: 2 },
+  { chave: 'BRADESCO', nome: 'BRADESCO', ativo_global: true, fora: false, restricoes: [{ procedimento_id: 3, nome: 'EXAME B' }], procs_medico: [1], n_unidade: 3 },
+  { chave: 'SULAMERICA', nome: 'Sulamerica', ativo_global: true, fora: true, restricoes: [], procs_medico: [], n_unidade: 0 },
+  { chave: 'HAPVIDA', nome: 'HAPVIDA', ativo_global: false, fora: false, restricoes: [], procs_medico: [], n_unidade: 2 },
+  { chave: 'SUS', nome: 'SUS', ativo_global: true, fora: false, restricoes: [], procs_medico: [], n_unidade: 0 }] };
+let DETALHE_ATUAL = DETALHE;
 const MAPA = [
   { unidade: 'DESENVOAR', local: 'CONSULTÓRIO 1', dia: 1, ini: '13:00', fim: '17:40', profissional: 'GEANNE CHRISTINA PINHEIRO', bloqueado: false, choque: ['CAMILA CARINE SANTOS'], duplo: false },
   { unidade: 'DESENVOAR', local: 'CONSULTÓRIO 1', dia: 1, ini: '14:00', fim: '17:30', profissional: 'CAMILA CARINE SANTOS', bloqueado: false, choque: ['GEANNE CHRISTINA PINHEIRO'], duplo: false },
@@ -93,7 +101,7 @@ async function pagina(browser, { papel = 'admin' } = {}) {
     else if (p.endsWith('/rpc/medicos_painel')) corpo = { medicos: MEDICOS, avisos: AVISOS, proc_avisos: PROC_AVISOS };
     else if (p.endsWith('/rpc/medico_aviso_contagem')) corpo = { novos: AVISOS.length };
     else if (p.endsWith('/rpc/medico_aviso_resolver')) { reg.rpcs.push({ rpc: 'resolver', ...JSON.parse(req.postData() || '{}') }); corpo = { ok: true }; }
-    else if (p.endsWith('/rpc/medico_detalhe')) corpo = DETALHE;
+    else if (p.endsWith('/rpc/medico_detalhe')) corpo = DETALHE_ATUAL;
     else if (p.endsWith('/rpc/medicos_mapa_salas')) corpo = MAPA;
     else if (/\/rpc\/medico_(turnos_salvar|convenio_salvar|particular_salvar|excecao_salvar|excecao_remover|proc_resolver)$/.test(p)) { reg.rpcs.push({ rpc: p.split('/').pop(), ...JSON.parse(req.postData() || '{}') }); corpo = { regra: true, ok: true }; }
     else if (p.endsWith('/rpc/medico_salvar')) { reg.rpcs.push({ rpc: 'salvar', ...JSON.parse(req.postData() || '{}') }); corpo = { regra: true }; }
@@ -191,6 +199,43 @@ await caso('convênios: "Não aceitar neste exame" manda o exame escolhido', asy
   const c = reg.rpcs.find((r) => r.rpc === 'medico_convenio_salvar');
   await ctx.close();
   return { ok: c && c.p_operadora === 'AMIL' && c.p_proc === 3 && c.p_aceita === false, detalhe: JSON.stringify(c) };
+});
+
+await caso('convênios: filtros por unidade, médico, situação e exame; o que a equipe já ajustou nunca some', async () => {
+  DETALHE_ATUAL = DETALHE_COB;
+  try {
+    const { page, ctx } = await pagina(browser);
+    await page.goto(`${base}/painel/`);
+    await page.click('.nav button[data-aba=medicos]');
+    await page.waitForSelector('.pagina table');
+    await page.locator('tr:has-text("Alexandre") button:text-is("Particularidades")').click();
+    await page.locator('button[data-sub=conv]').click();
+    await page.waitForSelector('input[data-conv]');
+    const lista = () => page.locator('input[data-conv]').evaluateAll((l) => l.map((i) => i.dataset.conv).join());
+    const resumo = () => page.locator('button[data-filtro=escopo-unidade]').locator('xpath=following::p[contains(@class,"dica")][1]').innerText();
+    const padrao = await lista();                                   // da unidade (padrão): SUS some; Sulamerica (desligado pela equipe) fica
+    const chipUn = await page.locator('button[data-filtro=escopo-unidade]').innerText();
+    const r1 = await resumo();
+    await page.locator('button[data-filtro=escopo-medico]').click();
+    const medico = await lista();                                   // HAPVIDA (só unidade) sai; Sulamerica fica por estar ajustado
+    await page.locator('button[data-filtro=escopo-todos]').click();
+    const todos = await lista();
+    await page.locator('button[data-filtro=situacao-aceitos]').click();
+    const aceitos = await lista();
+    await page.locator('button[data-filtro=situacao-restricao]').click();
+    const restr = await lista();
+    await page.locator('button[data-filtro=situacao-todos]').click();
+    await page.locator('select[data-filtro-exame]').selectOption('3');
+    const exame = await lista();
+    await page.locator('input[type=search][aria-label="Buscar convênio"]').fill('zzz');
+    const vazio = await page.locator('[data-sem-convenio]').count();
+    await page.locator('button[data-limpar-filtros]').click();
+    const limpo = await lista();
+    await ctx.close();
+    const esperado = { padrao: 'AMIL,BRADESCO,SULAMERICA,HAPVIDA', medico: 'AMIL,BRADESCO,SULAMERICA', todos: 'AMIL,BRADESCO,SULAMERICA,HAPVIDA,SUS', aceitos: 'AMIL,BRADESCO,SUS', restr: 'BRADESCO', exame: 'AMIL', limpo: 'AMIL,BRADESCO,SULAMERICA,HAPVIDA' };
+    const got = { padrao, medico, todos, aceitos, restr, exame, limpo };
+    return { ok: JSON.stringify(got) === JSON.stringify(esperado) && vazio === 1 && /\(4\)/.test(chipUn) && /^Mostrando 4 de 5 convênios\.\s*$/.test(r1), detalhe: `${JSON.stringify(got)} | ${chipUn} | ${r1} | vazio=${vazio}` };
+  } finally { DETALHE_ATUAL = DETALHE; }
 });
 
 await caso('folgas: mostra as datas, adiciona e remove', async () => {

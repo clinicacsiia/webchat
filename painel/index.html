@@ -3207,12 +3207,45 @@ h1.longo { font-size: 14mm; }
       }
 
       /* --- B. Convênios e particularidades --- */
-      const CVQ = { q: '' };
+      // Filtros para a recepção: escopo (deste médico / da unidade / todos), situação (aceitos, não aceitos, com restrição) e exame.
+      // Escopo = convênios que têm preço no Klingo para algum exame do médico/da unidade (campos procs_medico e n_unidade do banco).
+      // Convênio que a equipe já ajustou (desligado ou com restrição) aparece sempre, para nunca esconder uma regra existente.
+      const CVQ = { q: '', escopo: null, estado: 'todos', exame: '' };
       function pintarConvenios() {
-        const lista = h('div', {});
+        const lista = h('div', {}), barra = h('div', { class: 'filtros', style: 'padding:6px 0;border:0' }), resumo = h('p', { class: 'dica' });
+        const temCob = D.convenios.some((c) => Array.isArray(c.procs_medico));
+        const doMedico = (c) => (c.procs_medico || []).length > 0, daUnidade = (c) => Number(c.n_unidade || 0) > 0;
+        const ajustado = (c) => c.fora || c.restricoes.length > 0;
+        const aceitaC = (c) => !c.fora && c.ativo_global !== false && !D.particular;
+        const noEscopo = (c, e) => e === 'medico' ? doMedico(c) || ajustado(c) : e === 'unidade' ? daUnidade(c) || ajustado(c) : true;
+        const padrao = !temCob ? 'todos' : D.convenios.some(daUnidade) ? 'unidade' : 'todos';
+        if (!temCob) CVQ.escopo = 'todos'; else if (!CVQ.escopo) CVQ.escopo = padrao;
+        const doExame = (c) => !CVQ.exame || (c.procs_medico || []).includes(Number(CVQ.exame));
+        const situacoes = { todos: () => true, aceitos: aceitaC, naoaceitos: (c) => !aceitaC(c), restricao: (c) => c.restricoes.length > 0 };
+        const busca = h('input', { type: 'search', placeholder: 'Buscar convênio…', value: CVQ.q, 'aria-label': 'Buscar convênio', oninput: (ev) => { CVQ.q = ev.target.value; desenhar(); } });
+        const exameSel = temCob && D.procs.length ? h('select', { 'aria-label': 'Mostrar só convênios que têm preço para o exame', 'data-filtro-exame': '1', onchange: (ev) => { CVQ.exame = ev.target.value; desenhar(); } },
+          h('option', { value: '' }, 'Qualquer exame'), D.procs.map((pr) => h('option', { value: pr.id, selected: String(pr.id) === String(CVQ.exame) }, (pr.consulta ? '(consulta) ' : '') + nomeMedico(pr.nome)))) : null;
+        const chip = (rot, ativo, fn, dado) => h('button', { type: 'button', class: 'chip', 'aria-pressed': String(ativo), 'data-filtro': dado, onclick: fn }, rot);
         const desenhar = () => {
           const q = CVQ.q.trim().toLowerCase();
-          lista.replaceChildren(...D.convenios.filter((c) => !q || c.nome.toLowerCase().includes(q)).map((c) => {
+          const porBusca = D.convenios.filter((c) => !q || c.nome.toLowerCase().includes(q));
+          const base = porBusca.filter((c) => noEscopo(c, CVQ.escopo) && doExame(c));
+          const visiveis = base.filter(situacoes[CVQ.estado]);
+          const cont = (fn) => base.filter(fn).length;
+          barra.replaceChildren(
+            ...(temCob ? [
+              chip(`Deste médico (${D.convenios.filter((c) => noEscopo(c, 'medico')).length})`, CVQ.escopo === 'medico', () => { CVQ.escopo = 'medico'; desenhar(); }, 'escopo-medico'),
+              chip(`Da unidade ${nomeUnidade(m.unidade)} (${D.convenios.filter((c) => noEscopo(c, 'unidade')).length})`, CVQ.escopo === 'unidade', () => { CVQ.escopo = 'unidade'; desenhar(); }, 'escopo-unidade'),
+              chip(`Todos os convênios (${D.convenios.length})`, CVQ.escopo === 'todos', () => { CVQ.escopo = 'todos'; desenhar(); }, 'escopo-todos'),
+            ] : []));
+          const sit = h('div', { class: 'filtros', style: 'padding:6px 0;border:0' },
+            ...[['todos', 'Todos'], ['aceitos', 'Aceitos'], ['naoaceitos', 'Não aceitos'], ['restricao', 'Com restrição de exame']].map(([id, rot]) => chip(`${rot} (${cont(situacoes[id])})`, CVQ.estado === id, () => { CVQ.estado = id; desenhar(); }, 'situacao-' + id)),
+            exameSel);
+          barra.append(sit);
+          const filtrando = q || CVQ.estado !== 'todos' || CVQ.exame || CVQ.escopo !== padrao;
+          resumo.replaceChildren(`Mostrando ${visiveis.length} de ${D.convenios.length} convênios. `);
+          if (filtrando) resumo.append(h('button', { type: 'button', class: 'btn', 'data-limpar-filtros': '1', onclick: () => { CVQ.q = ''; busca.value = ''; CVQ.estado = 'todos'; CVQ.exame = ''; CVQ.escopo = padrao; if (exameSel) exameSel.value = ''; desenhar(); } }, 'Limpar filtros'));
+          lista.replaceChildren(...(visiveis.length ? visiveis.map((c) => {
             const bloqueadoGlobal = c.ativo_global === false;
             const aceita = !c.fora && !bloqueadoGlobal && !D.particular;
             const sel = h('select', { 'aria-label': `Exame que ${nomeMedico(m.profissional)} não faz pelo convênio ${c.nome}` },
@@ -3222,18 +3255,18 @@ h1.longo { font-size: 14mm; }
               if (falha(x)) { desenhar(); return; }
               if (await recarregarDetalhe()) pintarConvenios();
             };
+            const semPreco = temCob && !doMedico(c) ? ' · sem preço no Klingo para os exames deste médico' : '';
             return h('div', { style: 'padding:6px 0;border-top:1px solid var(--csi-border-strong,#ddd)' },
               h('label', { style: 'display:flex;gap:8px;align-items:center' },
                 h('input', { type: 'checkbox', 'data-conv': c.chave, checked: aceita, disabled: bloqueadoGlobal || D.particular, onchange: (ev) => mudar(0, ev.target.checked) }),
-                h('b', {}, nomeMedico(c.nome)), h('span', { class: 'dica' }, bloqueadoGlobal ? 'desligado para toda a clínica (aba Convênios)' : D.particular ? 'médico só particular' : c.fora ? 'não aceita' : 'aceita')),
+                h('b', {}, nomeMedico(c.nome)), h('span', { class: 'dica' }, (bloqueadoGlobal ? 'desligado para toda a clínica (aba Convênios)' : D.particular ? 'médico só particular' : c.fora ? 'não aceita' : 'aceita') + semPreco)),
               aceita ? h('div', { style: 'margin:4px 0 0 28px' },
                 c.restricoes.map((r) => h('span', { class: 'selo', style: 'margin-right:6px;display:inline-flex;gap:4px;align-items:center' }, `Não aceita para: ${nomeMedico(r.nome)}`,
                   h('button', { type: 'button', class: 'btn', 'aria-label': `Voltar a aceitar ${nomeMedico(r.nome)}`, title: 'Voltar a aceitar', onclick: () => mudar(r.procedimento_id, true) }, '×'))),
                 h('span', { style: 'display:inline-flex;gap:4px;align-items:center' }, sel,
                   h('button', { type: 'button', class: 'btn', onclick: () => { if (!sel.value) { toast('Escolha o exame.'); return; } mudar(Number(sel.value), false); } }, 'Não aceitar neste exame'))) : null);
-          }));
+          }) : [h('p', { class: 'dica', 'data-sem-convenio': '1' }, CVQ.escopo !== 'todos' ? 'Nenhum convênio com esse filtro. Para ver os outros, escolha "Todos os convênios" ou limpe os filtros.' : 'Nenhum convênio com esse filtro.')]));
         };
-        const busca = h('input', { type: 'search', placeholder: 'Buscar convênio…', value: CVQ.q, 'aria-label': 'Buscar convênio', oninput: (ev) => { CVQ.q = ev.target.value; desenhar(); } });
         const part = h('label', { style: 'display:flex;gap:8px;align-items:center;margin:4px 0' },
           h('input', { type: 'checkbox', 'data-particular': '1', checked: D.particular, onchange: async (ev) => {
             const x = await db.rpc('medico_particular_salvar', { p_prof: m.profissional, p_valor: ev.target.checked });
@@ -3243,7 +3276,8 @@ h1.longo { font-size: 14mm; }
         desenhar();
         abas.conv.replaceChildren(
           h('p', { class: 'dica' }, 'Chave ligada = o médico aceita o convênio. Cada clique já vale para os próximos agendamentos pelo chat. Para aceitar o convênio em geral mas não em um exame, use "Não aceitar neste exame". Quem escolhe Particular sempre vê o médico.'),
-          part, busca, lista);
+          temCob ? h('p', { class: 'dica' }, 'Os filtros "Deste médico" e "Da unidade" mostram os convênios que têm preço no Klingo para algum exame do médico (ou da unidade). É um palpite pelas tabelas de preço, não a lista oficial de cobertura. O convênio que você já ajustou aparece sempre. Faltou algum? Use "Todos os convênios".') : null,
+          part, busca, barra, resumo, lista);
       }
 
       /* --- C. Folgas e bloqueios por data --- */
