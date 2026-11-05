@@ -1,4 +1,4 @@
-# Aba Médicos (05/11/2026, v1.1)
+# Aba Médicos (05/11/2026, v1.2)
 
 Aba só do administrador no painel. Mostra cada médico por unidade com a agenda do Klingo (relatório #13984, já sincronizado) **já preenchida**, e deixa limitar dias e horário (ex.: só segunda e quarta; só das 8h às 12h).
 
@@ -29,11 +29,18 @@ Aba só do administrador no painel. Mostra cada médico por unidade com a agenda
   - *Folgas e bloqueios*: datas (um dia ou período) em que o médico não atende em nenhuma unidade (folga, congresso, feriado). O chat deixa de oferecer horários nelas. Quem já tem horário marcado nesse dia **não** é avisado automaticamente.
   - Aceitar uma mudança de grade do Klingo apaga também os turnos por dia daquele médico/unidade.
 
+## Mapa de salas (v1.2, só leitura)
+Botão **Mapa de salas** no topo da aba Médicos. Mostra, por unidade, cada consultório × dia da semana × Manhã/Tarde, com o médico e o horário **direto da agenda do Klingo** (muda sozinho quando o Klingo muda; nada é digitado à mão). Médico novo só aparece quando vem do Klingo e a equipe aceita no aviso, como já era.
+- **Só aviso, nada bloqueia.** Se dois médicos caem no mesmo consultório e horário, ou o mesmo médico em dois consultórios ao mesmo tempo, o bloco fica vermelho com ⚠ e a faixa no topo diz "olhe a tela". O chat continua oferecendo o que o Klingo manda.
+- Janelas repetidas ou coladas do mesmo médico viram uma só. Equipamentos (RM, TC, RX, eletro…) e linhas sem consultório não entram. Vale para todas as unidades.
+- Manhã/Tarde é só o jeito de desenhar (começa antes ou termina depois das 12:00); o horário exato aparece em cada bloco. Médico bloqueado no chat aparece riscado.
+- Função: `medicos_mapa_salas` (seção 6 do `supabase/medicos-regras.sql`).
+
 ## Como aplicar (SQL Editor ou migração em partes; o arquivo não tem `drop`)
 1. `supabase/agenda-medica-bloqueio.sql` (as partes 1, 2 e 3a já estão no banco; falta a **3b**: `profissional_bloquear` e `profissional_liberar`).
 2. `supabase/medicos-regras.sql`, seções 1, 2, 3 e 4, nessa ordem.
 3. Publicar o painel (`painel/index.html`).
 
-Para a v1.1 reaplique o `supabase/medicos-regras.sql` (seções 1, 2, 3 e 4, em partes; tudo é `create or replace`/`if not exists`) **antes** de publicar o painel. A seção 3 recria `agenda_horarios` (o chat passa a respeitar turnos, folgas e convênios) e a 4 traz as funções novas: `medico_detalhe`, `medico_turnos_salvar`, `medico_excecao_salvar/remover`, `medico_convenio_salvar`, `medico_particular_salvar`, `medico_proc_resolver`.
+Para a v1.1/v1.2 reaplique o `supabase/medicos-regras.sql` (seções 1, 1b, 2, 3, 4, 5 e 6, em partes; tudo é `create or replace`/`if not exists`) **antes** de publicar o painel. A seção 3 recria `agenda_horarios` (o chat passa a respeitar turnos, folgas e convênios) e a 4 traz as funções novas: `medico_detalhe`, `medico_turnos_salvar`, `medico_excecao_salvar/remover`, `medico_convenio_salvar`, `medico_particular_salvar`, `medico_proc_resolver`.
 
-Testes: `npm run test:medicos-sql` (69 casos, banco embutido) e `npm run test:medicos` (9 casos, navegador).
+Testes: `npm run test:medicos-sql` (76 casos, banco embutido) e `npm run test:medicos` (10 casos, navegador).

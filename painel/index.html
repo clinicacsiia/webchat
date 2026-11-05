@@ -3027,7 +3027,7 @@ h1.longo { font-size: 14mm; }
   // A regra (dias e faixa de horário) é um filtro sobre a grade do Klingo: o chat só oferece horário que passa nela. Sem regra, vale a grade do Klingo.
   // Quando a grade do Klingo muda (sincronização noturna), o banco abre um aviso até a equipe aceitar a grade nova ou manter a anterior.
   const DIAS_CURTO = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
-  const MD = { busca: '', filtro: 'todos', salas: false, aberto: null };
+  const MD = { busca: '', filtro: 'todos', salas: false, aberto: null, vista: 'lista', unidadeMapa: '' };
   const txtDias = (d) => (d && d.length ? (d.length === 7 ? 'todos os dias' : d.map((n) => DIAS_CURTO[n]).join(', ')) : '—');
   const txtGrade = (g) => g ? `${txtDias(g.dias)} · ${g.hora_ini}–${g.hora_fim}` : '—';
   const nomeUnidade = (u) => String(u || '').replace(/^CLÍNICA DE SAÚDE E IMAGEM - /i, '');
@@ -3037,6 +3037,42 @@ h1.longo { font-size: 14mm; }
     const s = document.getElementById('seloMedicos'); if (!s) return;
     const n = data && data.novos ? Number(data.novos) : 0;
     s.textContent = n > 99 ? '99+' : n; s.hidden = n === 0;
+  }
+  // Mapa de salas: só mostra. Vem da agenda do Klingo (muda sozinho com ele) e avisa quando horários se sobrepõem; não bloqueia nada.
+  async function viewMapaSalas(alvoMapa) {
+    alvoMapa.replaceChildren(h('p', { class: 'dica' }, 'Carregando o mapa…'));
+    const r = await db.rpc('medicos_mapa_salas');
+    if (S.aba !== 'medicos' || MD.vista !== 'mapa') return;
+    if (r.error) { alvoMapa.replaceChildren(h('p', { class: 'erro' }, msgErro(r.error)), h('p', { class: 'dica' }, 'Se a mensagem fala de função inexistente, falta rodar o SQL supabase/medicos-regras.sql (seção 6).')); return; }
+    const linhas = r.data || [];
+    const unidades = [...new Set(linhas.map((l) => l.unidade))].sort();
+    if (!unidades.includes(MD.unidadeMapa)) MD.unidadeMapa = unidades[0] || '';
+    const sel = h('select', { 'aria-label': 'Unidade', onchange: (ev) => { MD.unidadeMapa = ev.target.value; pintarMapa(); } }, unidades.map((u) => h('option', { value: u, selected: u === MD.unidadeMapa }, nomeUnidade(u))));
+    const corpo = h('div', {});
+    const curto = (n) => nomeMedico(n).split(' ').slice(0, 2).join(' ');
+    function pintarMapa() {
+      const doU = linhas.filter((l) => l.unidade === MD.unidadeMapa);
+      const dias = [1, 2, 3, 4, 5, 6, 0].filter((d) => d !== 0 || doU.some((l) => l.dia === 0));
+      const locais = [...new Set(doU.map((l) => l.local))].sort((a, b) => a.localeCompare(b, 'pt-BR', { numeric: true }));
+      const avisos = doU.filter((l) => (l.choque && l.choque.length) || l.duplo);
+      const chip = (l) => {
+        const choca = (l.choque && l.choque.length) || l.duplo;
+        const dica = [l.choque && l.choque.length ? `Mesmo consultório e horário de: ${l.choque.map(curto).join(', ')}` : null, l.duplo ? 'Este médico aparece em dois consultórios ao mesmo tempo' : null, l.bloqueado ? 'Bloqueado no chat' : null].filter(Boolean).join('. ');
+        return h('div', { 'data-choque': choca ? '1' : null, title: dica || null, style: `padding:2px 6px;margin:2px 0;border-radius:6px;border:1px solid ${choca ? '#c0392b' : 'var(--csi-border-strong,#ddd)'};${choca ? 'background:#fdecea;' : ''}${l.bloqueado ? 'text-decoration:line-through;opacity:.6;' : ''}` },
+          h('b', {}, curto(l.profissional)), ' ', `${l.ini}–${l.fim}`, choca ? ' ⚠' : null);
+      };
+      const faixa = (loc, dia, manha) => doU.filter((l) => l.local === loc && l.dia === dia && (manha ? l.ini < '12:00' : l.fim > '12:00'));
+      const linhasTab = locais.flatMap((loc) => [true, false].map((manha) => h('tr', {},
+        manha ? h('th', { rowspan: 2, scope: 'row' }, loc) : null, h('td', { class: 'dica' }, manha ? 'Manhã' : 'Tarde'),
+        dias.map((d) => h('td', {}, faixa(loc, d, manha).map(chip))))));
+      corpo.replaceChildren(
+        avisos.length ? h('div', { class: 'cat-bloco cv-ev', id: 'mapaAviso' }, h('b', {}, `⚠ ${avisos.length} horário(s) se sobrepõem. Olhe a tela.`),
+          h('div', { class: 'dica' }, 'É só um aviso: nada foi bloqueado. Confira no Klingo qual consultório está certo.')) : h('p', { class: 'dica' }, 'Nenhuma sobreposição de consultório nesta unidade.'),
+        locais.length ? h('div', { class: 'tabela-wrap' }, h('table', {}, h('thead', {}, h('tr', {}, h('th', {}, 'Consultório'), h('th', {}, ''), dias.map((d) => h('th', {}, DIAS_CURTO[d])))), h('tbody', {}, linhasTab))) : h('p', { class: 'dica' }, 'O Klingo não informa consultório para esta unidade.'));
+    }
+    pintarMapa();
+    alvoMapa.replaceChildren(h('p', { class: 'dica' }, 'Vem direto da agenda do Klingo e muda sozinho quando ele muda. Um médico que aparece em Manhã e Tarde atende nos dois turnos. Passe o mouse em um ⚠ para ver quem coincide.'),
+      h('div', { style: 'margin:8px 0' }, sel), corpo);
   }
   async function viewMedicos(c) {
     c.replaceChildren(h('div', { class: 'pagina' }, h('h2', {}, 'Médicos'), h('p', { class: 'sub' }, 'Carregando…')));
@@ -3242,9 +3278,14 @@ h1.longo { font-size: 14mm; }
         })))) : h('p', { class: 'dica' }, 'Nenhum médico encontrado.'));
     }
     pintar();
+    const alvoMapa = h('div', {});
+    const vistas = h('div', { class: 'ex-acoes', style: 'margin:12px 0' }, [['lista', 'Médicos'], ['mapa', 'Mapa de salas']].map(([v, t]) =>
+      h('button', { type: 'button', class: 'btn' + (MD.vista === v ? ' prim' : ''), 'data-vista': v, onclick: () => { MD.vista = v; recarregar(); } }, t)));
     c.replaceChildren(h('div', { class: 'pagina' }, h('h2', {}, 'Médicos'),
       h('p', { class: 'sub' }, 'A agenda de cada médico vem do Klingo e já aparece preenchida. Use "Particularidades" para ajustar os turnos de cada dia, os convênios aceitos (e o atendimento 100% particular) e as datas de folga. O chat só oferece horário que passa nas suas regras.'),
-      blocoProc, blocoAvisos, h('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;margin:12px 0' }, busca, filtro), salas, alvo));
+      blocoProc, blocoAvisos,
+      vistas, MD.vista === 'mapa' ? alvoMapa : h('div', {}, h('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;margin:12px 0' }, busca, filtro), salas, alvo)));
+    if (MD.vista === 'mapa') viewMapaSalas(alvoMapa);
   }
 
   /* ---------- aprendizado (Fase 5): onde a IA erra e o que corrigir ---------- */

@@ -46,6 +46,11 @@ const DETALHE = { origem: 'klingo', nota: null, grade: { dias: [2, 3, 4], hora_i
   particular: false, excecoes: [{ id: 5, data_ini: '2026-12-24', data_fim: '2026-12-26', motivo: 'Recesso' }],
   convenios: [{ chave: 'AMIL', nome: 'AMIL', ativo_global: true, fora: false, restricoes: [] }, { chave: 'SULAMERICA', nome: 'Sulamerica', ativo_global: true, fora: true, restricoes: [] }, { chave: 'HAPVIDA', nome: 'HAPVIDA', ativo_global: false, fora: false, restricoes: [] }],
   procs: [{ id: 1, nome: 'CONSULTA PEDIATRICA', consulta: true }, { id: 3, nome: 'EXAME B', consulta: false }] };
+const MAPA = [
+  { unidade: 'DESENVOAR', local: 'CONSULTÓRIO 1', dia: 1, ini: '13:00', fim: '17:40', profissional: 'GEANNE CHRISTINA PINHEIRO', bloqueado: false, choque: ['CAMILA CARINE SANTOS'], duplo: false },
+  { unidade: 'DESENVOAR', local: 'CONSULTÓRIO 1', dia: 1, ini: '14:00', fim: '17:30', profissional: 'CAMILA CARINE SANTOS', bloqueado: false, choque: ['GEANNE CHRISTINA PINHEIRO'], duplo: false },
+  { unidade: 'DESENVOAR', local: 'CONSULTÓRIO 2', dia: 2, ini: '08:00', fim: '16:20', profissional: 'LIVIA NASCIMENTO SENA', bloqueado: false, choque: [], duplo: false },
+  { unidade: 'CLÍNICA DE SAÚDE E IMAGEM - CSI', local: 'CONSULTÓRIO 1', dia: 3, ini: '08:00', fim: '12:00', profissional: 'DR BETO', bloqueado: false, choque: [], duplo: false }];
 const jwt = (sub) => { const b = (o) => Buffer.from(JSON.stringify(o)).toString('base64url'); return `${b({ alg: 'HS256', typ: 'JWT' })}.${b({ sub, role: 'authenticated', exp: Math.floor(Date.now() / 1000) + 86400 })}.x`; };
 
 function servidor() {
@@ -89,6 +94,7 @@ async function pagina(browser, { papel = 'admin' } = {}) {
     else if (p.endsWith('/rpc/medico_aviso_contagem')) corpo = { novos: AVISOS.length };
     else if (p.endsWith('/rpc/medico_aviso_resolver')) { reg.rpcs.push({ rpc: 'resolver', ...JSON.parse(req.postData() || '{}') }); corpo = { ok: true }; }
     else if (p.endsWith('/rpc/medico_detalhe')) corpo = DETALHE;
+    else if (p.endsWith('/rpc/medicos_mapa_salas')) corpo = MAPA;
     else if (/\/rpc\/medico_(turnos_salvar|convenio_salvar|particular_salvar|excecao_salvar|excecao_remover|proc_resolver)$/.test(p)) { reg.rpcs.push({ rpc: p.split('/').pop(), ...JSON.parse(req.postData() || '{}') }); corpo = { regra: true, ok: true }; }
     else if (p.endsWith('/rpc/medico_salvar')) { reg.rpcs.push({ rpc: 'salvar', ...JSON.parse(req.postData() || '{}') }); corpo = { regra: true }; }
     else if (p.endsWith('/rpc/profissional_bloquear')) { reg.rpcs.push({ rpc: 'bloquear', ...JSON.parse(req.postData() || '{}') }); corpo = { ok: true, conversas: 2 }; }
@@ -220,6 +226,26 @@ await caso('Pendência de Validação: mostra a frase pedida, Confirmar e Ativar
   const r = reg.rpcs.find((x) => x.rpc === 'medico_proc_resolver');
   await ctx.close();
   return { ok: /Pendência de Validação/.test(txt) && /O médico Daniela Ladeia aceitou realizar o exame Ultrassom de Joelho via Klingo\. Deseja validar esta regra para os próximos agendamentos\?/i.test(txt) && selo === 1 && r && r.p_ids.join() === '31', detalhe: `${txt.replace(/\n/g, ' ')} | ${selo} | ${JSON.stringify(r)}` };
+});
+
+await caso('mapa de salas: mostra por consultório, manhã e tarde, avisa sobreposição sem bloquear e troca de unidade', async () => {
+  const { page, ctx, reg } = await pagina(browser);
+  await page.goto(`${base}/painel/`);
+  await page.click('.nav button[data-aba=medicos]');
+  await page.waitForSelector('.pagina table');
+  await page.locator('button[data-vista=mapa]').click();
+  await page.waitForSelector('select[aria-label=Unidade]');
+  await page.locator('select[aria-label=Unidade]').selectOption('DESENVOAR');
+  await page.waitForSelector('#mapaAviso');
+  const aviso = await page.locator('#mapaAviso').innerText();
+  const choques = await page.locator('[data-choque="1"]').count();
+  const manha = await page.locator('tr:has(> td:text-is("Manhã")):has-text("Livia")').count();
+  const tarde = await page.locator('tr:has(> td:text-is("Tarde")):has-text("Geanne Christina 13:00–17:40")').count();
+  await page.locator('select[aria-label=Unidade]').selectOption({ index: 0 });
+  const csi = await page.locator('.pagina table').innerText();
+  const bloqueios = reg.rpcs.filter((x) => x.rpc === 'bloquear').length;
+  await ctx.close();
+  return { ok: /2 horário\(s\) se sobrepõem/.test(aviso) && /nada foi bloqueado/.test(aviso) && choques === 2 && manha === 1 && tarde === 1 && /Dr Beto 08:00–12:00/.test(csi) && !/Livia/.test(csi) && bloqueios === 0, detalhe: `${aviso.replace(/\n/g, ' ')} | ${choques} | ${manha} | ${tarde} | ${csi.replace(/\n/g, ' ').slice(0, 120)}` };
 });
 
 await caso('aceitar e manter chamam o banco com a ação certa', async () => {

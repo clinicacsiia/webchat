@@ -23,7 +23,7 @@ await db.exec(`
   create function public.convenio_chave(t text) returns text language sql immutable as $$ select upper(regexp_replace(btrim(coalesce(t, '')), '\s+', ' ', 'g')) $$;
   create function public.convenio_ativo(t text) returns boolean language sql as $$ select true $$;
   create table public.pre_agendamentos (conversa_id uuid primary key, plano text);
-  create table public.catalogo_agenda (id serial primary key, unidade text, profissional text, especialidade text, procedimento_id int, procedimento text, dia_num int, hora_ini text, hora_fim text, duracao_min int, vig_fim date);
+  create table public.catalogo_agenda (id serial primary key, unidade text, local text, profissional text, especialidade text, procedimento_id int, procedimento text, dia_num int, hora_ini text, hora_fim text, duracao_min int, vig_fim date);
   create table public.catalogo_meta (tipo text primary key, linhas int, atualizado_em timestamptz default now());
   create table public.profissional_bloqueio (profissional text primary key, nome text not null, motivo text, bloqueado_em timestamptz, bloqueado_por uuid, bloqueado_por_nome text);
   create function public.profissional_bloqueado(p text) returns boolean language sql as $$ select exists (select 1 from public.profissional_bloqueio where profissional = public.norm_nome(p)) $$;
@@ -206,6 +206,31 @@ ok('...nem depois de nova sincronização', (await q(`select count(*)::int n fro
 await db.exec(`delete from public.catalogo_agenda where profissional = 'DRA ANA' and procedimento_id = 3; update public.catalogo_agenda set procedimento_id = 3 where profissional = 'DRA ANA' and dia_num = 3 and procedimento_id = 1;
   insert into public.catalogo_meta (tipo, linhas) values ('agenda', 205) on conflict (tipo) do update set linhas = 205;`);
 ok('exame novo que o Klingo tira antes da validação some sozinho', true);
+
+// 12. v1.2: mapa de salas (só leitura).
+await db.exec(`delete from public.catalogo_agenda;
+  insert into public.catalogo_agenda (unidade, local, profissional, especialidade, procedimento_id, dia_num, hora_ini, hora_fim, duracao_min, vig_fim) values
+    ('DESENVOAR', 'CONSULTÓRIO 1', 'DRA GEANNE', 'NEURO', 1, 1, '13:00', '17:40', 20, current_date + 300),
+    ('DESENVOAR', 'CONSULTÓRIO 1', 'DRA CAMILA', 'PEDI', 1, 1, '14:00', '17:15', 15, current_date + 300),
+    ('DESENVOAR', 'CONSULTÓRIO 1', 'DRA CAMILA', 'PEDI', 2, 1, '17:10', '17:30', 15, current_date + 300),
+    ('DESENVOAR', 'CONSULTÓRIO 1', 'DRA CAMILA', 'PEDI', 2, 1, '14:00', '17:15', 15, current_date + 300),
+    ('DESENVOAR', 'CONSULTÓRIO 2', 'DRA LIVIA', 'PEDI', 1, 2, '08:00', '12:00', 20, current_date + 300),
+    ('DESENVOAR', 'CONSULTÓRIO 3', 'DRA LIVIA', 'PEDI', 1, 2, '10:00', '11:00', 20, current_date + 300),
+    ('CSI', 'CONSULTÓRIO 1', 'DR BETO', 'ORTO', 1, 1, '13:00', '17:00', 20, current_date + 300),
+    ('CSI', 'SALA DE RM', 'RM', null, 2, 1, '07:00', '18:00', 30, current_date + 300),
+    ('CSI', 'CONSULTÓRIO 4', 'TESTE', null, 1, 1, '07:00', '18:00', 30, current_date + 300),
+    ('CSI', null, 'DR SEM SALA', null, 1, 1, '07:00', '18:00', 30, current_date + 300);`);
+const mapa = (await q(`select public.medicos_mapa_salas() j`))[0].j;
+const lin = (prof, loc) => mapa.find((r) => r.profissional === prof && r.local === loc);
+ok('mapa: janelas repetidas ou coladas do mesmo médico viram uma só (Camila 14:00–17:30)', mapa.filter((r) => r.profissional === 'DRA CAMILA').length === 1 && lin('DRA CAMILA', 'CONSULTÓRIO 1').ini === '14:00' && lin('DRA CAMILA', 'CONSULTÓRIO 1').fim === '17:30');
+ok('mapa: dois médicos no mesmo consultório e horário se apontam (choque), só aviso', JSON.stringify(lin('DRA GEANNE', 'CONSULTÓRIO 1').choque) === '["DRA CAMILA"]' && JSON.stringify(lin('DRA CAMILA', 'CONSULTÓRIO 1').choque) === '["DRA GEANNE"]');
+ok('mapa: mesma sala em unidade diferente não é choque', JSON.stringify(lin('DR BETO', 'CONSULTÓRIO 1').choque) === '[]');
+ok('mapa: médico em dois consultórios ao mesmo tempo é marcado (duplo)', lin('DRA LIVIA', 'CONSULTÓRIO 2').duplo === true && lin('DRA LIVIA', 'CONSULTÓRIO 3').duplo === true && lin('DRA GEANNE', 'CONSULTÓRIO 1').duplo === false);
+ok('mapa: sem equipamento, sem teste e sem linha sem consultório', !mapa.some((r) => ['RM', 'TESTE', 'DR SEM SALA'].includes(r.profissional)));
+ok('mapa: não mexe nos horários do chat (nada bloqueado)', (await q(`select count(*)::int n from public.profissional_bloqueio`))[0].n === 1);
+await db.exec(`update public.config_teste set papel = 'atendente'`);
+ok('mapa: atendente não vê', (await erro(() => db.query(`select public.medicos_mapa_salas()`))) !== null);
+await db.exec(`update public.config_teste set papel = 'admin'`);
 
 const falhas = res.filter((x) => !x).length;
 console.log(falhas ? `\n${falhas} FALHA(S)` : `\nTudo certo (${res.length})`);

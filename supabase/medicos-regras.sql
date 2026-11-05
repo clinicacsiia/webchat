@@ -1,4 +1,5 @@
 -- FLUXOGRAMA: entrada (aba "Médicos" do painel; sincronização do Klingo que troca a grade de agenda) -> validação (só administrador mexe; o dia e a hora têm de estar dentro da grade do Klingo) -> lógica (a regra do médico é um FILTRO por cima da grade do Klingo: dias e faixa de horário permitidos; a grade que o Klingo mandou da última vez que a equipe conferiu fica em medico_base; quando a nova grade difere, nasce um aviso pendente até a equipe aceitar ou manter) -> saída (o chat só oferece horário que passa na regra; selo no menu enquanto houver aviso pendente)
+-- Versão 1.2 — 05/11/2026 / Mudança: mapa de salas (só leitura): consultório x dia x horário vindo da agenda do Klingo, com aviso quando horários se sobrepõem. Não bloqueia nada.
 -- Versão 1.1 — 05/11/2026 / Mudança: três módulos na aba Médicos — (A) pendência de validação quando o Klingo liga um exame novo a um médico, (B) convênios por médico (liga/desliga, restrição por exame, 100% particular), (C) grade por dia da semana com mais de um turno e exceções por data (folga, congresso, feriado). Motivo: a recepção precisa validar e ajustar cada médico sem depender do Klingo.
 -- Versão 1.0 — 05/11/2026 / Implementação inicial: dias e faixa de horário por médico (medico_regra).
 -- Depende também de (para a v1.1): convenios-e-foto.sql (convenio_chave, convenio_ativo), catalogo_plano e pre_agendamentos (plano da conversa; o chat grava a conversa em app.conversa antes de pedir horários).
@@ -577,3 +578,34 @@ grant execute on function public.medico_excecao_remover(bigint) to authenticated
 grant execute on function public.medico_convenio_salvar(text, text, integer, boolean) to authenticated;
 grant execute on function public.medico_particular_salvar(text, boolean) to authenticated;
 grant execute on function public.medico_proc_resolver(bigint[]) to authenticated;
+
+-- ===== 6. v1.2: mapa de salas (só leitura; nada é bloqueado) =====
+-- Janelas de cada médico em cada consultório, direto da agenda do Klingo (muda sozinho quando o Klingo muda). Janelas coladas ou repetidas do mesmo médico viram uma só.
+-- 'choque' = outros médicos no mesmo consultório, dia e horário; 'duplo' = o mesmo médico em dois consultórios ao mesmo tempo. É só aviso para a equipe olhar a tela.
+create or replace function public.medicos_mapa_salas() returns jsonb
+language plpgsql security definer set search_path to '' as $$
+begin
+  perform public.medico_admin();
+  return coalesce((
+    with w as (
+      select distinct a.unidade, a.local, a.profissional, a.dia_num, a.hora_ini, a.hora_fim
+      from public.catalogo_agenda a
+      where a.vig_fim >= current_date and a.profissional !~* 'teste' and nullif(btrim(a.local), '') is not null and a.dia_num is not null and a.hora_ini is not null and a.hora_fim is not null
+        and a.profissional !~* '^((rm|tc|rx)$|mamografia|densitometria|ultrassonografia|eletro)'
+    ), o as (
+      select w.*, max(w.hora_fim) over (partition by w.unidade, w.local, w.profissional, w.dia_num order by w.hora_ini, w.hora_fim rows between unbounded preceding and 1 preceding) as mx from w
+    ), g as (
+      select o.*, sum(case when o.mx is null or o.hora_ini > o.mx then 1 else 0 end) over (partition by o.unidade, o.local, o.profissional, o.dia_num order by o.hora_ini, o.hora_fim) as grp from o
+    ), m as (
+      select g.unidade, g.local, g.profissional, g.dia_num as dia, min(g.hora_ini) as ini, max(g.hora_fim) as fim from g group by g.unidade, g.local, g.profissional, g.dia_num, g.grp
+    )
+    select jsonb_agg(jsonb_build_object(
+      'unidade', m.unidade, 'local', m.local, 'dia', m.dia, 'ini', m.ini, 'fim', m.fim, 'profissional', m.profissional,
+      'bloqueado', public.profissional_bloqueado(m.profissional),
+      'choque', coalesce((select jsonb_agg(distinct x.profissional) from m x where x.unidade = m.unidade and x.local = m.local and x.dia = m.dia and x.profissional <> m.profissional and x.ini < m.fim and m.ini < x.fim), '[]'::jsonb),
+      'duplo', exists (select 1 from m x where x.unidade = m.unidade and x.profissional = m.profissional and x.dia = m.dia and x.local <> m.local and x.ini < m.fim and m.ini < x.fim))
+      order by m.unidade, m.local, m.dia, m.ini, m.profissional)
+    from m), '[]'::jsonb);
+end $$;
+revoke all on function public.medicos_mapa_salas() from public, anon;
+grant execute on function public.medicos_mapa_salas() to authenticated;
