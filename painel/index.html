@@ -869,7 +869,7 @@
     if (ehAdmin()) { atualizarSeloConvenios(); atualizarSeloMedicos(); }
   }
 
-  /* ---------- filtro de unidade: vale para Atendimento, Jornada e Fila ---------- */
+  /* ---------- filtro de unidade: vale para Atendimento, Fila, Avisos, Jornada, Contatos, Médicos e Aprendizado ---------- */
   // Unidades da agenda dos médicos (CSI, RM/TC e Desenvoar). Os nomes variam conforme a origem (Klingo: "CSI 1", "CSI 2", "CSI Pediatria";
   // agenda: "CLÍNICA DE SAÚDE E IMAGEM - RM/TC"; chat: "rmtc"), então tudo vira uma chave. Mesma regra de public.unidade_chave() no banco.
   // Regra de ouro: se não dá para saber a unidade de alguém (ou de algo), aparece em TODAS as unidades.
@@ -887,7 +887,7 @@
   // chaves vazias = unidade desconhecida = aparece em todas
   const passaUnidade = (chaves) => !UN.sel || !chaves || !chaves.length || chaves.includes(UN.sel);
   function seletorUnidade() {
-    return h('select', { id: 'selUnidade', class: 'sel-unidade', 'aria-label': 'Filtrar tudo por unidade', title: 'Vale para Atendimento, Jornada e Fila',
+    return h('select', { id: 'selUnidade', class: 'sel-unidade', 'aria-label': 'Filtrar tudo por unidade', title: 'Vale para Atendimento, Fila, Avisos, Jornada, Contatos, Médicos e Aprendizado',
       onchange: (e) => { UN.sel = e.target.value; try { localStorage.setItem('painel.unidade', UN.sel); } catch {} aplicarUnidade(); } },
       h('option', { value: '' }, 'Todas unidades'), UNIDADES_PAINEL.map(([k, r]) => h('option', { value: k, selected: k === UN.sel }, r)));
   }
@@ -1492,7 +1492,7 @@
       k('ve', 'ok', 'Encerradas hoje', nFim, 'Conversas encerradas hoje'),
       k('vm', 'alerta', 'Alertas', nAlerta, 'Pacientes que precisam de atenção na Jornada'));
   }
-  const totalAvisos = () => (S.sugestoes || []).length + (S.avisosData || []).length + (S.avisosPac || []).length + (S.pedidosAcesso || []).length;
+  const totalAvisos = () => avisosSug().length + avisosDat().length + avisosPacV().length + (S.pedidosAcesso || []).length;
   function atualizarSeloAvisos() { const s = document.getElementById('seloAvisos'), n = totalAvisos(); if (s) { s.textContent = n; s.hidden = n === 0; } }
   function atualizarSelo() {
     atualizarSeloAvisos();
@@ -1598,14 +1598,18 @@
     return out.filter((p) => passaUnidade(unidadesPessoa(p)));
   }
   // Unidade da pessoa: exame marcado pelo chat > cartão da Jornada > unidade escolhida no formulário. Sem nenhuma = todas.
-  function unidadesPessoa(p) {
-    const ids = p.membros.map((m) => m.id);
-    const a = chavesDe(S.abertos.filter((x) => ids.includes(x.conversa_id)).map((x) => x.unidade));
+  function unidadesConversas(ids) {
+    const a = chavesDe((S.abertos || []).filter((x) => ids.includes(x.conversa_id)).map((x) => x.unidade));
     if (a.length) return a;
     const q = chavesDe((S.quadro || []).filter((k) => ids.includes(k.conversa_id)).map((k) => k.unidade));
     if (q.length) return q;
-    return chavesDe(p.membros.map((m) => m.unidade_inicial));
+    return chavesDe((S.conversas || []).filter((c) => ids.includes(c.id)).map((c) => c.unidade_inicial));
   }
+  const unidadesPessoa = (p) => unidadesConversas(p.membros.map((m) => m.id));
+  // Avisos e contatos seguem a unidade escolhida no topo (quem não tem unidade conhecida aparece em todas).
+  const avisosSug = () => (S.sugestoes || []).filter((s) => passaUnidade(unidadesConversas([s.a, s.b])));
+  const avisosDat = () => (S.avisosData || []).filter((av) => passaUnidade(unidadesConversas([...(av.ids_a || []), ...(av.ids_b || [])])));
+  const avisosPacV = () => (S.avisosPac || []).filter((av) => passaUnidade(unidadesConversas([av.conversa_id])));
   const statusPessoa = (p) => (p.membros.some((m) => m.status === 'aguardando') ? 'aguardando' : p.membros.some((m) => m.status === 'em_atendimento') ? 'em_atendimento' : 'encerrada');
   const abertosDe = (id) => { const ids = membrosDe(id); return S.abertos.filter((a) => ids.includes(a.conversa_id)); };
   const remarcarDe = (id) => { const ids = membrosDe(id); return S.remarcar.filter((a) => ids.includes(a.conversa_id)); };
@@ -1666,7 +1670,7 @@
         h('button', { class: 'btn perigo', type: 'button', onclick: () => decidirAcesso(p, false) }, 'Recusar')))));
   }
   function renderAvisosData(tudo) {
-    const lista = S.avisosData || [];
+    const lista = avisosDat();
     if (!lista.length) return null;
     return h('div', { id: 'avisosData' }, (tudo ? lista : lista.slice(0, 3)).map((av) => h('div', { class: 'sug' },
       h('b', {}, 'Data de nascimento diferente'),
@@ -1684,7 +1688,7 @@
     await rpcPessoa('paciente_aviso_resolver', { p_id: av.id, p_aplicar: aplicar }, aplicar ? 'Cadastro atualizado.' : 'Aviso conferido.');
   }
   function renderAvisosPaciente(tudo) {
-    const lista = S.avisosPac || [];
+    const lista = avisosPacV();
     if (!lista.length) return null;
     const quem = (av) => nomeBonito(av.nome || 'Paciente');
     return h('div', { id: 'avisosPaciente' }, (tudo ? lista : lista.slice(0, 4)).map((av) => {
@@ -1709,7 +1713,8 @@
   function renderAvisos() {
     const c = document.getElementById('conteudo'); if (!c || S.aba !== 'avisos') return;
     const secao = (titulo, nos) => (nos ? h('section', { class: 'j-sec' }, h('h4', {}, titulo), nos) : null);
-    const sugs = (S.sugestoes || []).length ? h('div', {}, S.sugestoes.map((s) => h('div', { class: 'sug' },
+    const sugLista = avisosSug();
+    const sugs = sugLista.length ? h('div', {}, sugLista.map((s) => h('div', { class: 'sug' },
       h('b', {}, 'Parece a mesma pessoa'),
       h('div', {}, `${nomeBonito(s.nome_a)} e ${nomeBonito(s.nome_b)}: batem ${listaPt((s.sinais || []).map((x) => ROTULO_SINAL[x] || x))}. Falta uma confirmação sua.`),
       h('div', { class: 'sug-acoes' },
@@ -2310,7 +2315,10 @@
     const corte = { hoje: 1, '7d': 7, '30d': 30 }[S.periodo];
     const desde = corte ? new Date(Date.now() - (corte === 1 ? 0 : corte * 86400000)) : null;
     if (corte === 1) desde.setHours(0, 0, 0, 0);
+    const unPorContato = new Map();
+    if (UN.sel) for (const cv of S.conversas || []) { if (!cv.contato_id) continue; const k = unidadesConversas([cv.id]); if (k.length) unPorContato.set(cv.contato_id, [...new Set([...(unPorContato.get(cv.contato_id) || []), ...k])]); }
     return S.contatos.filter((x) => {
+      if (UN.sel && !passaUnidade(unPorContato.get(x.id))) return false;
       if (desde && new Date(x.criado_em) < desde) return false;
       if (S.tagFiltro && !(x.tags || []).includes(S.tagFiltro)) return false;
       if (!q) return true;
@@ -3046,7 +3054,7 @@ h1.longo { font-size: 14mm; }
     if (r.error) { alvoMapa.replaceChildren(h('p', { class: 'erro' }, msgErro(r.error)), h('p', { class: 'dica' }, 'Se a mensagem fala de função inexistente, falta rodar o SQL supabase/medicos-regras.sql (seção 6).')); return; }
     const linhas = r.data || [];
     const unidades = [...new Set(linhas.map((l) => l.unidade))].sort();
-    if (!unidades.includes(MD.unidadeMapa)) MD.unidadeMapa = unidades[0] || '';
+    if (!unidades.includes(MD.unidadeMapa)) MD.unidadeMapa = unidades.find((u) => UN.sel && chaveUnidade(u) === UN.sel) || unidades[0] || '';
     const sel = h('select', { 'aria-label': 'Unidade', onchange: (ev) => { MD.unidadeMapa = ev.target.value; pintarMapa(); } }, unidades.map((u) => h('option', { value: u, selected: u === MD.unidadeMapa }, nomeUnidade(u))));
     const corpo = h('div', {});
     const curto = (n) => nomeMedico(n).split(' ').slice(0, 2).join(' ');
@@ -3260,7 +3268,7 @@ h1.longo { font-size: 14mm; }
 
     function pintar() {
       const q = MD.busca.trim().toLowerCase();
-      const itens = lista.filter((m) => (MD.salas || !m.sala) && (!q || m.profissional.toLowerCase().includes(q) || (m.especialidade || '').toLowerCase().includes(q))
+      const itens = lista.filter((m) => passaUnidade(chavesDe([m.unidade])) && (MD.salas || !m.sala) && (!q || m.profissional.toLowerCase().includes(q) || (m.especialidade || '').toLowerCase().includes(q))
         && (MD.filtro === 'todos' || (MD.filtro === 'regra' && (m.regra || m.tem_turnos || m.particular || m.n_convenios_fora || m.n_excecoes)) || (MD.filtro === 'aviso' && (m.aviso_id || comPendencia.has(m.profissional))) || (MD.filtro === 'bloqueado' && m.bloqueado)));
       alvo.replaceChildren(itens.length ? h('div', { class: 'tabela-wrap' }, h('table', {},
         h('thead', {}, h('tr', {}, ['Médico', 'Unidade', 'Agenda no Klingo', 'Sua regra', 'No chat', ''].map((t) => h('th', {}, t)))),
@@ -3301,7 +3309,7 @@ h1.longo { font-size: 14mm; }
     const falha = r.error || p.error || e.error;
     if (falha) { c.replaceChildren(h('div', { class: 'pagina' }, h('h2', {}, 'Aprendizado da IA'), h('p', { class: 'erro' }, msgErro(falha)),
       h('p', { class: 'dica' }, 'Se a mensagem fala de função inexistente, falta rodar o SQL da Fase 5 (supabase/fase5-aprendizado.sql).'))); return; }
-    const R = r.data || {}, X = R.resumo || {}, P = p.data || {}, EX = e.data || [];
+    const R = r.data || {}, X = R.resumo || {}, P = p.data || {}, EX = (e.data || []).filter((x) => passaUnidade(chavesDe([x.unidade])));
     const tabela = (cab, linhas, vazio) => h('div', { class: 'tabela-wrap', style: 'margin-bottom:12px' }, h('table', {},
       h('thead', {}, h('tr', {}, cab.map((t) => h('th', {}, t)))),
       h('tbody', {}, linhas.length ? linhas.map((l) => h('tr', {}, l.map((v) => h('td', {}, v)))) : [h('tr', {}, h('td', { colspan: cab.length }, vazio))])));
@@ -3315,7 +3323,7 @@ h1.longo { font-size: 14mm; }
     const textoExemplos = EX.map((x) => '- [' + rotuloCaso(x.caso) + '] exames: ' + ((x.exames || []).join('; ') || '—')
       + ' | plano: ' + (x.plano || '—') + ' | unidade: ' + (x.unidade || '—') + ' | etapa: ' + (ROTULO_ETAPA[x.etapa] || x.etapa || '—') + (x.detalhe ? ' | ' + x.detalhe : '')).join('\n');
     c.replaceChildren(h('div', { class: 'pagina' }, h('h2', {}, 'Aprendizado da IA'),
-      h('p', { class: 'sub' }, 'Onde a IA acerta, onde o atendente ou o Klingo precisou corrigir e o que vale ajustar. Não mostra dado de paciente. ', R.observacao || ''), periodo,
+      h('p', { class: 'sub' }, 'Onde a IA acerta, onde o atendente ou o Klingo precisou corrigir e o que vale ajustar. Não mostra dado de paciente. ', R.observacao || '', UN.sel ? ' Os números do alto são da clínica toda; só a lista de casos segue a unidade escolhida.' : ''), periodo,
       h('div', { class: 'numeros', style: 'margin-top:10px' },
         h('div', { class: 'num' }, h('b', {}, X.criados ?? 0), h('span', {}, 'pré-agendamentos criados')),
         h('div', { class: 'num' }, h('b', {}, pct(X.agendados_auto_sem_alerta || 0, X.agendados_auto || 0)), h('span', {}, 'marcados sozinhos sem nenhum alerta')),

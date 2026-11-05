@@ -300,7 +300,7 @@ end $$;
 
 -- ===== 4. Próximo passo (decidido pelo que já está gravado) =====
 create or replace function public.fluxo_proximo(p_conversa uuid) returns text language plpgsql security definer set search_path to '' as $$
-declare d jsonb; pa public.pre_agendamentos; n_itens int; v_conf jsonb; v_hist jsonb; v_procs int[]; v_med text[];
+declare d jsonb; pa public.pre_agendamentos; n_itens int; v_conf jsonb; v_hist jsonb; v_procs int[]; v_med text[]; v_ja boolean;
 begin
   select dados into d from public.conversa_fluxo where conversa_id = p_conversa;
   d := coalesce(d, '{}'::jsonb);
@@ -341,11 +341,19 @@ begin
      and jsonb_array_length(coalesce(pa.escolha_horario, '[]'::jsonb)) < jsonb_array_length(public.agenda_grupos(v_procs)) then
     return 'horario';
   end if;
-  if pa.identidade in ('conferida', 'atualizar') and d ->> 'mudou' is null then return 'mudou'; end if;
-  if not coalesce((d ->> 'g_ident')::boolean, false) then return 'dados_ident'; end if;
-  if not coalesce((d ->> 'g_contato')::boolean, false) then return 'dados_contato'; end if;
-  if not coalesce((d ->> 'g_endereco')::boolean, false) then return 'dados_endereco'; end if;
-  if lower(coalesce(pa.plano, '')) <> 'particular' and not coalesce((d ->> 'g_carteira')::boolean, false) then return 'dados_carteira'; end if;
+  -- Dados já cadastrados alguma vez (paciente conhecido, com nascimento conferido): não pergunta de novo.
+  -- Se faltar algum dado essencial, ou se a pessoa escolher corrigir, os formulários voltam já preenchidos.
+  v_ja := pa.identidade in ('conferida', 'atualizar') and d ->> 'mudou' is distinct from 'mudou'
+          and nullif(btrim(coalesce(pa.paciente ->> 'nome', '')), '') is not null
+          and nullif(btrim(coalesce(pa.paciente ->> 'sexo', '')), '') is not null
+          and nullif(btrim(coalesce(pa.paciente ->> 'dt_nasc', '')), '') is not null
+          and nullif(btrim(coalesce(pa.paciente ->> 'celular', '')), '') is not null;
+  if pa.identidade in ('conferida', 'atualizar') and d ->> 'mudou' is null and not v_ja then return 'mudou'; end if;
+  if not v_ja and not coalesce((d ->> 'g_ident')::boolean, false) then return 'dados_ident'; end if;
+  if not v_ja and not coalesce((d ->> 'g_contato')::boolean, false) then return 'dados_contato'; end if;
+  -- O endereço não é mais pedido no chat: a recepção completa no Klingo.
+  if lower(coalesce(pa.plano, '')) <> 'particular' and nullif(btrim(coalesce(pa.paciente ->> 'matricula', '')), '') is null
+     and not coalesce((d ->> 'g_carteira')::boolean, false) then return 'dados_carteira'; end if;
   if not coalesce((d ->> 'confirmado')::boolean, false) then return 'confirmar'; end if;
   return 'pronto';
 end $$;
@@ -361,7 +369,7 @@ begin
   select * into c from public.conversas where id = p_conversa;
   select * into pa from public.pre_agendamentos where conversa_id = p_conversa;
   select dados into d from public.conversa_fluxo where conversa_id = p_conversa;
-  d := coalesce(d, '{}'::jsonb); v_dig := coalesce(d -> 'digitado', '{}'::jsonb);
+  d := coalesce(d, '{}'::jsonb); v_dig := coalesce(pa.paciente, '{}'::jsonb) || coalesce(d -> 'digitado', '{}'::jsonb);
 
   case p_passo
   when 'identidade' then
