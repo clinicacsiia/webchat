@@ -1389,10 +1389,10 @@
         if (c.valor) campo.value = String(c.valor).toUpperCase();
         ins[c.nome] = campo;
       } else {
-        const modo = { data: 'numeric', cpf: 'numeric', cep: 'numeric', tel: 'tel' }[c.tipo];
-        const ph = { data: 'dia/mês/ano', cpf: '000.000.000-00', cep: '00000-000', tel: '(71) 99999-9999' }[c.tipo] || '';
-        const ac = { nome: 'name', celular: 'tel-national', telefone: 'tel-national', cep: 'postal-code', endereco: 'address-line1', bairro: 'address-level3', cidade: 'address-level2' }[c.nome] || 'off';
-        campo = h('input', { id, type: c.tipo === 'tel' ? 'tel' : 'text', inputmode: modo, placeholder: ph, autocomplete: ac, maxlength: c.tipo === 'texto' ? '160' : '20' });
+        const modo = { data: 'numeric', cpf: 'numeric', cep: 'numeric', tel: 'tel', email: 'email' }[c.tipo];
+        const ph = { data: 'dia/mês/ano', cpf: '000.000.000-00', cep: '00000-000', tel: '(71) 99999-9999', email: 'nome@email.com' }[c.nome === 'email' ? 'email' : c.tipo] || '';
+        const ac = { nome: 'name', celular: 'tel-national', telefone: 'tel-national', email: 'email', cep: 'postal-code', endereco: 'address-line1', bairro: 'address-level3', cidade: 'address-level2' }[c.nome] || 'off';
+        campo = h('input', { id, type: c.tipo === 'tel' ? 'tel' : c.tipo === 'email' ? 'email' : 'text', inputmode: modo, placeholder: ph, autocomplete: ac, maxlength: c.tipo === 'texto' || c.tipo === 'email' ? '160' : '20' });
         const masc = { data: mascaraData, cpf: mascaraCpf, cep: mascaraCep, tel: mascaraTel }[c.tipo];
         if (c.valor) campo.value = masc ? masc(String(c.valor)) : String(c.valor);
         campo.addEventListener('input', () => {
@@ -1416,6 +1416,7 @@
         if (!v) { if (c.obrigatorio) msg = c.tipo === 'sexo' ? 'Toque em uma opção.' : 'Preencha este campo.'; }
         else if (c.tipo === 'data' && !dataOk(v)) msg = 'Data inválida. Use dia/mês/ano, por exemplo 25/03/1980.';
         else if (c.tipo === 'cpf' && !cpfOk(v)) msg = 'Os números do CPF não conferem. Confira, por favor.';
+        else if (c.tipo === 'email' && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)) msg = 'E-mail inválido. Confira, por favor.';
         else if (c.tipo === 'tel' && ![10, 11].includes(v.replace(/\D/g, '').length)) msg = 'Informe o DDD e o número.';
         else if (c.tipo === 'cep' && v.replace(/\D/g, '').length !== 8) msg = 'O CEP tem 8 números.';
         else if (c.nome === 'nome' && v.split(/\s+/).length < 2) msg = 'Escreva o nome completo (nome e sobrenome).';
