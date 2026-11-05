@@ -320,6 +320,16 @@
   .cat-bloco ul { margin: 8px 0 0; padding-left: 18px; }
   .cat-bloco li { margin: 2px 0; overflow-wrap: anywhere; }
   .cat-bloco .sub-lista { color: var(--suave); }
+  .cd-alerta { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; background: var(--csi-warning-soft); color: var(--aviso); border: 1px solid var(--aviso); font-weight: 700; font-size: 12px; line-height: 1; margin-right: 6px; }
+  .cd-tag { display: inline-block; border-radius: 999px; padding: 1px 8px; font-size: 12px; font-weight: 600; background: var(--csi-warning-soft); color: var(--aviso); margin-left: 6px; }
+  .cd-tabela td, .cd-tabela th { padding: 6px 10px; text-align: left; vertical-align: top; }
+  .cd-tabela td.cd-valor { font-weight: 650; white-space: nowrap; }
+  .cd-tabela tr.cd-div td { background: var(--csi-warning-soft); }
+  .cd-mudo { color: var(--suave); }
+  .cd-filtros { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+  .cd-filtros input[type=search] { flex: 1 1 220px; min-width: 0; }
+  .cd-aviso { background: var(--csi-warning-soft); color: var(--texto); border: 1px solid var(--aviso); border-radius: var(--radius-md); padding: 8px 12px; font-size: 13px; margin: 8px 0 12px; }
+  .cd-abas { display: flex; gap: 8px; margin: 10px 0 14px; }
   .anexo-aviso { border-color: var(--csi-primary); background: var(--csi-primary-soft); } .galeria-item { margin-top: 8px; } .galeria { display: grid; gap: 6px; }
   /* aba Convênios */
   .cv-busca { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 0 0 12px; } .cv-busca input[type=search] { flex: 1 1 220px; min-width: 0; }
@@ -2694,11 +2704,96 @@
   /* ---------- catálogo do Klingo (só administrador) ---------- */
   const ROTULO_EVENTO_CAT = { novo: 'Novo', alterado: 'Alterado', removido: 'Removido', reativado: 'Reativado', bloqueado: 'Bloqueado' };
   const ROTULO_TIPO_CAT = { procedimento: 'Procedimento', plano: 'Plano', agenda: 'Agenda', preco: 'Preço' };
+  // Cardápio: cada exame com o preço por operadora. O preço é uma PREVISÃO: o catálogo vem da tabela do Klingo e o "lançado" vem das marcações recentes.
+  // Se o Klingo lança um valor 10% ou mais diferente do catálogo, a linha ganha "!" e mostra o valor lançado; sem alerta, mostra o do catálogo.
+  const CD = { aba: 'cardapio', busca: '', operadora: '', filtro: '' };
+  const ORDEM_ESTADO = { divergente: 0, previsao: 1, ok: 2, sem_preco: 3 };
+  const pctTxt = (v) => (v > 0 ? '+' : '') + String(v).replace('.', ',') + '%';
   async function viewCatalogo(c) {
-    c.append(h('div', { class: 'pagina' }, h('h2', {}, 'Catálogo do Klingo'), h('p', { class: 'sub' }, 'Carregando…')));
+    const corpo = h('div', {});
+    const chip = (id, rotulo) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(CD.aba === id), onclick: () => { CD.aba = id; c.replaceChildren(); viewCatalogo(c); } }, rotulo);
+    c.replaceChildren(h('div', { class: 'pagina' }, h('h2', {}, 'Catálogo do Klingo'), h('div', { class: 'cd-abas' }, chip('cardapio', 'Cardápio de preços'), chip('limpeza', 'Limpeza e mudanças')), corpo));
+    if (CD.aba === 'limpeza') return viewCatalogoLimpeza(corpo);
+    return viewCardapio(corpo);
+  }
+
+  async function viewCardapio(c) {
+    const PAG = 40;
+    const lista = h('div', {}), resumo = h('div', {}), maisBox = h('div', { class: 'acoes' });
+    let seq = 0, offset = 0;
+    const busca = h('input', { type: 'search', placeholder: 'Procurar exame', 'aria-label': 'Procurar exame', value: CD.busca });
+    const selOp = h('select', { 'aria-label': 'Operadora' }, h('option', { value: '' }, 'Todas as operadoras'));
+    const selFiltro = h('select', { 'aria-label': 'Mostrar' }, [['', 'Todos os exames'], ['alerta', 'Só com alerta (!)'], ['previsao', 'Só com preço em previsão'], ['sem_preco', 'Só com linha sem preço']].map(([v, t]) => h('option', { value: v }, t)));
+    selFiltro.value = CD.filtro;
+    c.append(h('p', { class: 'sub' }, 'Todos os serviços com o preço por operadora. Atualizado toda noite, às 03:00; os preços lançados no Klingo são relidos ao longo do dia.'),
+      h('div', { class: 'cd-aviso' }, 'Os valores são uma previsão. O preço final é o lançado pela recepção no Klingo. O "!" marca onde o Klingo está lançando um valor 10% ou mais diferente do catálogo.'),
+      resumo, h('div', { class: 'cd-filtros' }, busca, selOp, selFiltro), lista, maisBox);
+
+    const linhaPreco = (l) => {
+      const dif = l.estado === 'divergente';
+      let preco, nota = '';
+      if (l.estado === 'ok') preco = brl(l.exibido);
+      else if (l.estado === 'sem_preco') { preco = '—'; nota = 'Sem preço confiável no catálogo e sem marcações recentes.'; }
+      else {
+        preco = [dif ? h('span', { class: 'cd-alerta', title: 'Diferença com o Klingo', 'aria-label': 'Alerta' }, '!') : null, brl(l.exibido), h('span', { class: 'cd-tag' }, 'previsão')];
+        const amostra = `${l.amostras} ${l.amostras === 1 ? 'marcação' : 'marcações'}`;
+        const faixa = l.obs_min != null && l.obs_max != null && l.obs_min !== l.obs_max ? `, variou de ${brl(l.obs_min)} a ${brl(l.obs_max)}` : '';
+        nota = dif ? `O Klingo está lançando ${brl(l.observado)} (${pctTxt(l.dif_pct)} sobre o catálogo, ${amostra}${faixa}). Confirme com a recepção qual está certo.`
+          : `Sem preço confiável no catálogo; valor das marcações recentes (${amostra}${faixa}).`;
+      }
+      return h('tr', { class: dif ? 'cd-div' : (l.estado === 'sem_preco' ? 'cd-mudo' : '') },
+        h('td', {}, l.particular ? 'Particular' : l.operadora, l.tabelas > 1 ? h('span', { class: 'cd-mudo' }, ` · ${l.tabelas} tabelas`) : null),
+        h('td', { class: 'cd-valor' }, preco),
+        h('td', { class: 'cd-mudo' }, l.catalogo != null ? brl(l.catalogo) : '—'),
+        h('td', {}, nota));
+    };
+    const cartao = (x) => {
+      const linhas = (x.linhas || []).slice().sort((a, b) => (b.particular - a.particular) || (ORDEM_ESTADO[a.estado] - ORDEM_ESTADO[b.estado]) || String(a.operadora).localeCompare(String(b.operadora), 'pt-BR'));
+      const d = h('details', { class: 'cat-bloco' },
+        h('summary', {}, x.alertas > 0 ? h('span', { class: 'cd-alerta', title: `${x.alertas} operadora(s) com diferença`, 'aria-label': 'Alerta' }, '!') : null, x.nome,
+          h('span', { class: 'sub-lista' }, ` · ${x.especialidade || 'sem especialidade'}${x.marcacoes_90d ? ` · ${x.marcacoes_90d} pedidos em 90 dias` : ''}`)),
+        h('div', { class: 'tabela-wrap', style: 'margin-top:8px' }, h('table', { class: 'cd-tabela' },
+          h('thead', {}, h('tr', {}, ['Operadora', 'Preço previsto', 'Catálogo', 'Observação'].map((t) => h('th', {}, t)))), h('tbody', {}, linhas.map(linhaPreco)))));
+      if (x.alertas > 0) d.open = true;
+      return d;
+    };
+
+    const carregar = async (maisUm) => {
+      const minha = ++seq;
+      if (!maisUm) { offset = 0; lista.replaceChildren(h('p', { class: 'dica' }, 'Carregando…')); }
+      maisBox.replaceChildren();
+      const { data, error } = await db.rpc('catalogo_cardapio', { p_busca: CD.busca || null, p_operadora: CD.operadora || null, p_filtro: CD.filtro || null, p_limite: PAG, p_deslocamento: offset });
+      if (S.aba !== 'catalogo' || CD.aba !== 'cardapio' || minha !== seq) return;
+      if (error) { lista.replaceChildren(h('p', { class: 'erro' }, msgErro(error)), h('p', { class: 'dica' }, 'Se a mensagem fala de função inexistente, falta rodar supabase/catalogo-cardapio.sql.')); return; }
+      const R = data || {}, ex = R.exames || [];
+      resumo.replaceChildren(h('div', { class: 'numeros' },
+        h('div', { class: 'num' }, h('b', {}, R.exames_total ?? 0), h('span', {}, CD.busca || CD.operadora || CD.filtro ? 'exames neste filtro' : 'exames no cardápio')),
+        h('div', { class: 'num' }, h('b', {}, R.exames_com_alerta ?? 0), h('span', {}, 'com alerta (!)')),
+        h('div', { class: 'num' }, h('b', {}, R.exames_com_previsao ?? 0), h('span', {}, 'com preço só em previsão'))),
+        h('p', { class: 'dica' }, `Catálogo atualizado em ${R.catalogo_em ? fmtDataHora(R.catalogo_em) : '—'}. Preços lançados lidos em ${R.preco_lido_em ? fmtDataHora(R.preco_lido_em) : 'nenhuma leitura nas últimas 24 h (sem alertas por enquanto)'}.`));
+      if (!maisUm) lista.replaceChildren();
+      if (!ex.length && !maisUm) { lista.replaceChildren(h('p', { class: 'dica' }, 'Nenhum exame encontrado.')); return; }
+      ex.forEach((x) => lista.append(cartao(x)));
+      offset += ex.length;
+      if (offset < (R.exames_total || 0)) maisBox.replaceChildren(h('button', { class: 'btn', type: 'button', onclick: () => carregar(true) }, `Mostrar mais (${offset} de ${R.exames_total})`));
+    };
+
+    let tempo;
+    busca.addEventListener('input', () => { clearTimeout(tempo); tempo = setTimeout(() => { CD.busca = busca.value.trim(); carregar(false); }, 300); });
+    selOp.addEventListener('change', () => { CD.operadora = selOp.value; carregar(false); });
+    selFiltro.addEventListener('change', () => { CD.filtro = selFiltro.value; carregar(false); });
+    db.rpc('catalogo_cardapio_operadoras').then(({ data }) => {
+      (Array.isArray(data) ? data : []).forEach((o) => selOp.append(h('option', { value: o }, o === 'PARTICULAR' ? 'Particular' : o)));
+      selOp.value = CD.operadora;
+    });
+    carregar(false);
+  }
+
+  async function viewCatalogoLimpeza(c) {
+    c.append(h('div', {}, h('p', { class: 'sub' }, 'Carregando…')));
     const [l, m] = await Promise.all([db.rpc('catalogo_limpeza'), db.rpc('catalogo_mudancas', { p_limite: 300 })]);
     if (S.aba !== 'catalogo') return;
-    if (l.error || m.error) { c.replaceChildren(h('div', { class: 'pagina' }, h('h2', {}, 'Catálogo do Klingo'), h('p', { class: 'erro' }, msgErro(l.error || m.error)))); return; }
+    if (l.error || m.error) { c.replaceChildren(h('div', {}, h('p', { class: 'erro' }, msgErro(l.error || m.error)))); return; }
     const L = l.data || {}, M = m.data || [];
     const bloco = (titulo, total, itens, dica) => h('details', { class: 'cat-bloco' }, h('summary', {}, `${titulo} (${total})`),
       dica ? h('p', { class: 'dica' }, dica) : null, itens.length ? h('ul', {}, itens) : h('p', { class: 'dica' }, 'Nada a listar.'));
@@ -2715,7 +2810,7 @@
         [h('tr', {}, h('td', { colspan: 5 }, 'Nenhuma mudança registrada ainda. A cada noite o sistema compara o Klingo com o catálogo e lista aqui o que entrou, saiu ou mudou de valor.'))]));
     };
     filtro.addEventListener('change', pintar); pintar();
-    c.replaceChildren(h('div', { class: 'pagina' }, h('h2', {}, 'Catálogo do Klingo'),
+    c.replaceChildren(h('div', {},
       h('p', { class: 'sub' }, 'O que a IA sabe hoje, o que vale limpar no cadastro do Klingo e o que mudou. Atualizado toda noite, às 03:00.'),
       h('div', { class: 'numeros' },
         h('div', { class: 'num' }, h('b', {}, L.ativos ?? 0), h('span', {}, 'procedimentos ativos')),

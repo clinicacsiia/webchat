@@ -17,6 +17,7 @@
     "test:sql9": "node sql-fase9.test.mjs",
     "test:convenio": "node sql-convenio.test.mjs",
     "test:convenios-painel": "node convenios.navegador.mjs",
+    "test:catalogo-painel": "node catalogo.navegador.mjs",
     "test:foto-pedido": "node foto-pedido.navegador.mjs",
     "test:assuntos": "node sql-assuntos.test.mjs",
     "test:contas": "node sql-contas.test.mjs",
