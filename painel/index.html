@@ -683,7 +683,8 @@
       const { error: e2 } = await db.rpc('ia_evento_motivo', { p_pre: S.pre.id, p_motivo: motivo });
       if (e2) toast('Cancelado, mas o motivo não foi registrado: ' + msgErro(e2));
     }
-    await db.from('conversas').update({ alerta_agenda: null }).eq('id', S.pre.conversa_id);
+    const { error: e3 } = await db.rpc('painel_alerta_agenda_limpar', { p_conversa: S.pre.conversa_id });
+    if (e3) toast('Conferência salva, mas o alerta da conversa não saiu: ' + msgErro(e3));
     S.pre.status = status; S.pre.conferencia_status = null; S.pre.conferencia_detalhe = null; S.preSig = null; renderPre();
     const c = conversaAberta(); if (c) { c.alerta_agenda = null; renderLista(); }
   }
