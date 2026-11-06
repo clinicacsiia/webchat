@@ -266,13 +266,21 @@
   #ctxToggle .seta { transition: transform .15s; } #ctxToggle[aria-expanded="true"] .seta { transform: rotate(180deg); }
   #contexto .galeria img, #contexto .anexo-caixa img { max-height: 70vh; object-fit: contain; background: #fff; border: 1px solid var(--linha); cursor: zoom-in; }
   @media (max-height: 720px) { #contexto.aberto { max-height: 40vh; } .chat-topo { padding: 6px 12px; } .proximo { padding: 6px 12px; } }
+  /* Contador de avisos no botão: vermelho, para ninguém esconder a área sem perceber que há algo a conferir */
+  .ctx-n { display: inline-block; min-width: 20px; padding: 1px 7px; margin-left: 8px; border-radius: 999px; background: #c0392b; color: #fff; font-size: 12.5px; font-weight: 700; text-align: center; animation: ctxPulsa 1.6s ease-in-out infinite; }
+  @keyframes ctxPulsa { 50% { box-shadow: 0 0 0 4px rgba(192, 57, 43, .25); } } @media (prefers-reduced-motion: reduce) { .ctx-n { animation: none; } }
   @media (min-width: 1280px) {
-    /* Tela larga: a área de apoio é uma coluna ao lado da conversa; o botão da faixa a esconde para a conversa ocupar a largura toda. */
+    /* Tela larga: a área de apoio é uma coluna à direita da conversa. Escondida, vira uma faixa fina na lateral (com o contador de avisos)
+       e a conversa ocupa o resto da largura. */
     .chat { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto auto auto minmax(0, 1fr) auto; }
     .chat > .chat-topo { grid-column: 1 / -1; grid-row: 1; } .chat > #proximo { grid-column: 1 / -1; grid-row: 2; }
-    .chat > #ctxToggle { grid-column: 1 / -1; grid-row: 3; }
+    .chat > #ctxToggle { grid-column: 2; grid-row: 3; width: 380px; border-left: 1px solid var(--linha); }
+    .chat > #ctxToggle[aria-expanded="false"] { grid-row: 3 / 6; width: 46px; flex-direction: column; justify-content: flex-start; padding: 12px 0; border-bottom: 0; }
+    .chat > #ctxToggle[aria-expanded="false"] .rot { writing-mode: vertical-rl; }
+    .chat > #ctxToggle[aria-expanded="false"] .seta { transform: rotate(90deg); } .chat > #ctxToggle[aria-expanded="true"] .seta { transform: rotate(-90deg); }
+    .chat > #ctxToggle[aria-expanded="false"] .ctx-n { margin: 8px 0 0; }
     .chat > #contexto.aberto { display: block; max-height: none; width: 380px; grid-column: 2; grid-row: 4 / 6; border-left: 1px solid var(--linha); border-bottom: 0; }
-    .chat > .msgs { grid-column: 1; grid-row: 4; } .chat > .compor { grid-column: 1; grid-row: 5; }
+    .chat > .msgs { grid-column: 1; grid-row: 3 / 5; } .chat > .compor { grid-column: 1; grid-row: 5; }
   }
   /* Celular: cabeçalho e avisos mais enxutos para sobrar espaço para ler as mensagens */
   @media (max-width: 640px) {
@@ -2043,6 +2051,7 @@
     // Escolha do atendente (botão da faixa) vale daqui em diante; sem escolha, fechada em tela pequena e aberta em tela larga.
     let pref = null; try { pref = localStorage.getItem('painel.ctx'); } catch {}
     abrirContexto(pref === null ? window.matchMedia('(min-width: 1280px)').matches : pref === '1');
+    S.ctxForcadoId = null; renderProximo();   // com avisos pendentes, abre a área uma vez por conversa, mesmo escondida
   }
   // Abre/fecha a área de detalhes (avisos, pré-agendamento, fotos). Fechada por padrão para não cobrir a conversa.
   function abrirContexto(abrir) {
@@ -2050,7 +2059,10 @@
     const ctx = document.getElementById('contexto'), tg = document.getElementById('ctxToggle'); if (!ctx || !tg) return;
     ctx.classList.toggle('aberto', S.ctxAberto);
     tg.setAttribute('aria-expanded', String(S.ctxAberto));
-    tg.replaceChildren(h('span', {}, S.ctxAberto ? 'Esconder detalhes e avisos' : 'Ver detalhes, avisos e fotos desta conversa'), h('span', { class: 'seta', 'aria-hidden': 'true' }, '▾'));
+    const n = S.ctxN || 0;
+    tg.replaceChildren(h('span', { class: 'rot' }, S.ctxAberto ? 'Esconder detalhes e avisos' : 'Ver detalhes, avisos e fotos desta conversa'),
+      n ? h('span', { class: 'ctx-n', role: 'status', 'aria-label': n + ' aviso(s) para conferir' }, n + (n === 1 ? ' aviso' : ' avisos')) : null,
+      h('span', { class: 'seta', 'aria-hidden': 'true' }, '▾'));
   }
   // "Próximo passo": escolhe, pela ordem do que é mais urgente, a única decisão que falta e leva o atendente até ela.
   // Só lê o que a tela já carregou; não grava nada. Os outros pontos continuam logo abaixo, na área de apoio.
@@ -2069,14 +2081,18 @@
       pontos = [{ tom: urgente ? 'alta' : 'media', titulo: dono ? `Esta conversa está com ${dono.nome || 'outro atendente'}` : (urgente ? 'Urgente: assuma esta conversa agora' : 'Assuma esta conversa para responder'),
         detalhe: dono ? 'Só assuma se combinar com essa pessoa.' : (c.triagem_resumo || 'Ninguém atende ainda. Leia o resumo e as mensagens abaixo.'), rot: dono ? 'Assumir mesmo assim' : 'Assumir', fn: () => assumir() }];
     } else {
-      if (al.length) pontos.push({ tom: 'alta', titulo: 'Confira o valor informado', detalhe: 'Está fora do valor de referência. Confirme no Klingo.', rot: 'Ver valor', fn: ir('alertaPreco') });
-      if (anexosDe(c.id).sem_conferir) pontos.push({ tom: 'media', titulo: 'Pedido com foto: confira no Klingo', detalhe: 'Veja a foto, confira o cadastro, o convênio e o exame no Klingo e marque como conferido.', rot: 'Ver fotos', fn: ir('anexosBox') });
+      if (al.length) pontos.push({ tom: 'alta', titulo: 'Confira o valor informado', detalhe: 'Está fora do valor de referência. Confirme no Klingo.', rot: 'Ver valor', fn: ir('alertaPreco'), noPainel: true });
+      if (anexosDe(c.id).sem_conferir) pontos.push({ tom: 'media', titulo: 'Pedido com foto: confira no Klingo', detalhe: 'Veja a foto, confira o cadastro, o convênio e o exame no Klingo e marque como conferido.', rot: 'Ver fotos', fn: ir('anexosBox'), noPainel: true });
       if (ab.length) pontos.push({ tom: ab.some((a) => a.passou) ? 'alta' : 'media', titulo: ab.some((a) => a.passou) ? 'O horário do exame já passou: registre o que aconteceu' : 'Exame marcado sem desfecho',
-        detalhe: 'Compareceu, faltou, cancelou ou remarcou. Sem isso a conversa não encerra.', rot: 'Fechar exame', fn: ir('exameAberto') });
-      if (rm.length) pontos.push({ tom: 'media', titulo: 'Falta remarcar o exame', detalhe: 'Peça ao paciente que remarque pelo chat ou registre que já foi remarcado.', rot: 'Remarcar', fn: ir('exameAberto') });
-      if (pre) pontos.push({ tom: 'media', titulo: 'Marque o horário no Klingo e depois avise o paciente', detalhe: 'O pré-agendamento está pronto para conferir.', rot: 'Ver pré-agendamento', fn: ir('pre') });
+        detalhe: 'Compareceu, faltou, cancelou ou remarcou. Sem isso a conversa não encerra.', rot: 'Fechar exame', fn: ir('exameAberto'), noPainel: true });
+      if (rm.length) pontos.push({ tom: 'media', titulo: 'Falta remarcar o exame', detalhe: 'Peça ao paciente que remarque pelo chat ou registre que já foi remarcado.', rot: 'Remarcar', fn: ir('exameAberto'), noPainel: true });
+      if (pre) pontos.push({ tom: 'media', titulo: 'Marque o horário no Klingo e depois avise o paciente', detalhe: 'O pré-agendamento está pronto para conferir.', rot: 'Ver pré-agendamento', fn: ir('pre'), noPainel: true });
       if (ultima && ultima.autor === 'cliente') pontos.push({ tom: 'media', titulo: 'O paciente está esperando a sua resposta', detalhe: String(ultima.texto || '').slice(0, 90), rot: 'Responder', fn: () => document.getElementById('caixa')?.focus() });
     }
+    // Avisos que moram na área de detalhes (valor, fotos, exame aberto, remarcação, pré-agendamento): contam no botão e abrem a área uma vez por conversa.
+    const n = minha ? pontos.filter((x) => x.noPainel).length : 0;
+    if (n !== (S.ctxN || 0)) { S.ctxN = n; abrirContexto(S.ctxAberto); }
+    if (n && S.ctxForcadoId !== c.id) { S.ctxForcadoId = c.id; abrirContexto(true); }
     if (!pontos.length) { box.replaceChildren(); return; }
     const p = pontos[0];
     box.replaceChildren(h('div', { class: 'proximo ' + p.tom },
