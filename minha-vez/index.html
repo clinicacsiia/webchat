@@ -260,7 +260,7 @@
   async function atualizar() {
     const { data, error } = await db.rpc('fila_minha_vez');
     if (error) {
-      if (error.code === '28000' || /JWT|Entre/i.test(error.message)) { await db.auth.signOut({ scope: 'local' }); return telaLogin('Sua sessão terminou. Entre de novo.'); }
+      if (error.code === '28000' || error.code === '42501' || error.status === 401 || /JWT|Entre/i.test(error.message)) { await db.auth.signOut({ scope: 'local' }); return telaLogin('Sua sessão terminou. Entre de novo.'); }
       return desenhar(null, 'Não foi possível atualizar agora. Tentando de novo…');
     }
     aoMudar(data); await carregarJornada(); desenhar(data);
