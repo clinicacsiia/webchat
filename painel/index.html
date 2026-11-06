@@ -883,7 +883,7 @@
     else if (S.aba === 'aprendizado') viewAprendizado(c);
     else if (S.aba === 'config') viewConfig(c);
     atualizarSelo();
-    if (ehAdmin()) { atualizarSeloConvenios(); atualizarSeloMedicos(); }
+    if (ehAdmin()) { atualizarSeloMedicos(); }
   }
 
   /* ---------- filtro de unidade (fica só no topo): vale para Atendimento, Fila, Avisos, Jornada, Contatos, Médicos (lista e mapa de salas) e Aprendizado ---------- */
@@ -2784,12 +2784,6 @@ h1.longo { font-size: 14mm; }
   // Liga/desliga cada convênio, escreve a mensagem e a regra de cada um e vê o que mudou de preço. Os números vêm do Klingo (agendamentos e preços); a previsão é uma tendência simples, não uma garantia.
   const CV_TIPO = { desativado: 'Desativado', ativado: 'Ativado', regra: 'Regra', mensagem: 'Mensagem', preco_convenio: 'Preço do convênio', preco_particular: 'Preço Particular', plano_novo: 'Plano novo', plano_removido: 'Plano removido', plano_alterado: 'Plano alterado' };
   const CV = { busca: '', filtro: 'todos' };
-  async function atualizarSeloConvenios() {
-    const { data } = await db.rpc('convenio_aviso_contagem');
-    const s = document.getElementById('seloConvenios'); if (!s) return;
-    const n = data && data.novos ? Number(data.novos) : 0;
-    s.textContent = n > 99 ? '99+' : n; s.hidden = n === 0; s.classList.toggle('erro', !!(data && data.relevantes));
-  }
   function dicaConvenio(x) {
     const d = x.demanda || {}, pr = x.precos || {};
     if (!x.ativo) return { tom: 'aviso', texto: `Desativado: o paciente não vê este convênio no chat.${d.ult_30d ? ` Teve ${d.ult_30d} agendamentos nos últimos 30 dias; confira se vale voltar.` : ''}` };
@@ -2808,18 +2802,12 @@ h1.longo { font-size: 14mm; }
   }
   async function viewConvenios(c) {
     c.replaceChildren(h('div', { class: 'pagina' }, h('h2', {}, 'Convênios'), h('p', { class: 'sub' }, 'Carregando…')));
-    const [p, ev] = await Promise.all([db.rpc('convenios_painel'), db.rpc('convenio_eventos', { p_limite: 40, p_so_novos: true })]);
+    const p = await db.rpc('convenios_painel');
     if (S.aba !== 'convenios') return;
-    if (p.error || ev.error) { c.replaceChildren(h('div', { class: 'pagina' }, h('h2', {}, 'Convênios'), h('p', { class: 'erro' }, msgErro(p.error || ev.error)))); return; }
-    const P = p.data || {}, lista = P.convenios || [], novos = ev.data || [], part = P.particular || {}, pad = P.padroes || {};
-    atualizarSeloConvenios();
+    if (p.error) { c.replaceChildren(h('div', { class: 'pagina' }, h('h2', {}, 'Convênios'), h('p', { class: 'erro' }, msgErro(p.error)))); return; }
+    const P = p.data || {}, lista = P.convenios || [], part = P.particular || {}, pad = P.padroes || {};
     const recarregar = () => viewConvenios(c);
 
-    const blocoEv = novos.length ? h('div', { class: 'cat-bloco cv-ev' },
-      h('b', {}, `O que mudou e você ainda não viu (${novos.length}${novos.length >= 40 ? '+' : ''})`),
-      h('ul', {}, novos.map((e) => h('li', { class: e.relevante ? 'rel' : '' }, `${fmtDataHora(e.criado_em)} · ${CV_TIPO[e.tipo] || e.tipo} · ${e.descricao}${e.antes != null && e.depois != null && e.tipo.startsWith('preco') ? ` (${e.antes} → ${e.depois}${e.variacao_pct != null ? `, ${e.variacao_pct > 0 ? '+' : ''}${e.variacao_pct}%` : ''})` : ''}`))),
-      h('div', { class: 'cv-acoes' }, h('button', { type: 'button', class: 'btn', onclick: async () => { const r = await db.rpc('convenio_eventos_visto', {}); if (r.error) toast(msgErro(r.error)); else { toast('Marcado como visto.'); recarregar(); } } }, 'Marcar tudo como visto')),
-      h('p', { class: 'dica' }, 'Vermelho = mudança grande (10% ou mais) ou algo que saiu. Mudou o preço de um exame? Confira o valor que o atendente informa.')) : null;
 
     const pintarDetalhe = async (x, alvo, botao) => {
       if (alvo.childElementCount) { alvo.replaceChildren(); botao.textContent = 'Ver preços'; return; }
@@ -2905,9 +2893,7 @@ h1.longo { font-size: 14mm; }
       h('div', { class: 'numeros' },
         h('div', { class: 'num' }, h('b', {}, lista.length - off), h('span', {}, 'convênios ativos')),
         h('div', { class: 'num' }, h('b', {}, off), h('span', {}, 'desativados')),
-        h('div', { class: 'num' }, h('b', {}, comRegra), h('span', {}, 'com regra ou aviso')),
-        h('div', { class: 'num' }, h('b', {}, P.avisos_novos || 0), h('span', {}, 'mudanças não vistas'))),
-      blocoEv,
+        h('div', { class: 'num' }, h('b', {}, comRegra), h('span', {}, 'com regra ou aviso'))),
       h('div', { class: 'cv-busca' }, busca, ...chips),
       caixa, vazio,
       h('h3', {}, 'Particular'),
