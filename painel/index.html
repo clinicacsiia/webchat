@@ -267,11 +267,12 @@
   #contexto .galeria img, #contexto .anexo-caixa img { max-height: 70vh; object-fit: contain; background: #fff; border: 1px solid var(--linha); cursor: zoom-in; }
   @media (max-height: 720px) { #contexto.aberto { max-height: 40vh; } .chat-topo { padding: 6px 12px; } .proximo { padding: 6px 12px; } }
   @media (min-width: 1280px) {
-    .chat { display: grid; grid-template-columns: minmax(0, 1fr) 380px; grid-template-rows: auto auto minmax(0, 1fr) auto; }
+    /* Tela larga: a área de apoio é uma coluna ao lado da conversa; o botão da faixa a esconde para a conversa ocupar a largura toda. */
+    .chat { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto auto auto minmax(0, 1fr) auto; }
     .chat > .chat-topo { grid-column: 1 / -1; grid-row: 1; } .chat > #proximo { grid-column: 1 / -1; grid-row: 2; }
-    .chat > #ctxToggle { display: none; }
-    .chat > #contexto, .chat > #contexto.aberto { display: block; max-height: none; grid-column: 2; grid-row: 3 / 5; border-left: 1px solid var(--linha); border-bottom: 0; }
-    .chat > .msgs { grid-column: 1; grid-row: 3; } .chat > .compor { grid-column: 1; grid-row: 4; }
+    .chat > #ctxToggle { grid-column: 1 / -1; grid-row: 3; }
+    .chat > #contexto.aberto { display: block; max-height: none; width: 380px; grid-column: 2; grid-row: 4 / 6; border-left: 1px solid var(--linha); border-bottom: 0; }
+    .chat > .msgs { grid-column: 1; grid-row: 4; } .chat > .compor { grid-column: 1; grid-row: 5; }
   }
   /* Celular: cabeçalho e avisos mais enxutos para sobrar espaço para ler as mensagens */
   @media (max-width: 640px) {
@@ -2035,11 +2036,13 @@
     area.addEventListener('input', () => { area.style.height = 'auto'; area.style.height = Math.min(area.scrollHeight, 140) + 'px'; });
     area.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); enviarMsg(); } });
     box.replaceChildren(h('div', { class: 'chat-topo', id: 'chatTopo' }), h('div', { id: 'proximo', 'aria-live': 'polite' }),
-      h('button', { type: 'button', id: 'ctxToggle', 'aria-expanded': 'false', 'aria-controls': 'contexto', onclick: () => abrirContexto(!S.ctxAberto) }),
+      h('button', { type: 'button', id: 'ctxToggle', 'aria-expanded': 'false', 'aria-controls': 'contexto', onclick: () => { abrirContexto(!S.ctxAberto); try { localStorage.setItem('painel.ctx', S.ctxAberto ? '1' : '0'); } catch {} } }),
       h('div', { id: 'contexto' }, h('div', { id: 'pessoa' }), h('div', { id: 'historicoPaciente' }), h('div', { id: 'exameAberto' }), h('div', { id: 'triagem' }), h('div', { id: 'alertaPreco' }), h('div', { id: 'anexosBox' }), h('div', { id: 'cartaoJ' }), h('div', { id: 'pre' })),
       h('div', { class: 'msgs', id: 'msgs', 'aria-live': 'polite' }), h('div', { class: 'compor' }, area, enviar));
     renderTopoChat(); renderPessoaChat(); renderAlertaPreco(); renderAnexosBox(); renderCartaoJ(); desenharMsgs(true);
-    abrirContexto(false);
+    // Escolha do atendente (botão da faixa) vale daqui em diante; sem escolha, fechada em tela pequena e aberta em tela larga.
+    let pref = null; try { pref = localStorage.getItem('painel.ctx'); } catch {}
+    abrirContexto(pref === null ? window.matchMedia('(min-width: 1280px)').matches : pref === '1');
   }
   // Abre/fecha a área de detalhes (avisos, pré-agendamento, fotos). Fechada por padrão para não cobrir a conversa.
   function abrirContexto(abrir) {
