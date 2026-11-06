@@ -149,6 +149,11 @@
   .item[aria-current=true] { background: var(--csi-primary-soft); box-shadow: inset 3px 0 0 var(--csi-primary); }
   .item .l1 { display: flex; justify-content: space-between; gap: 8px; font-weight: 650; }
   .item .l1 span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* Paciente esperando resposta humana há mais de 2 minutos: fundo vermelho e cronômetro. */
+  .item.espera { background: var(--csi-danger-bg); box-shadow: inset 4px 0 0 var(--csi-danger); }
+  .item.espera:hover { background: #fbe4e0; }
+  .cron { font-weight: 700; font-variant-numeric: tabular-nums; border-radius: 999px; padding: 1px 8px; background: var(--csi-danger-bg); color: var(--csi-danger-strong); border: 1px solid var(--csi-danger); }
+  .item.espera .cron { background: var(--csi-danger); color: #fff; }
   .item .hora { font-weight: 400; font-size: 12px; color: var(--suave); flex: none; }
   .item .l2 { display: flex; justify-content: space-between; gap: 8px; color: var(--suave); font-size: 13.5px; margin-top: 2px; }
   .item .l2 .prev { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1516,7 +1521,7 @@
 
   /* ---------- conversas ---------- */
   async function carregarConversas() {
-    const base = 'id,status,agente_id,ultima_mensagem,nao_lidas_agente,criado_em,atualizado_em,contato_id,ia_ativa,motor,triagem_resumo,triagem_urgencia,alerta_agenda,nome_informado,email_informado,contatos(id,nome,telefone,email)';
+    const base = 'id,status,agente_id,ultima_mensagem,nao_lidas_agente,criado_em,atualizado_em,contato_id,ia_ativa,motor,triagem_resumo,triagem_urgencia,alerta_agenda,cliente_aguarda_desde,nome_informado,email_informado,contatos(id,nome,telefone,email)';
     // Fase 6 (unidade, médico, criança): colunas novas; se o SQL ainda não foi aplicado, volta para a lista antiga em vez de quebrar o painel.
     const consulta = (cols) => db.from('conversas').select(cols).order('atualizado_em', { ascending: false }).limit(300);
     let { data, error } = await consulta(base.replace('email_informado,', 'email_informado,paciente_tipo,paciente_nome,unidade_inicial,medico_preferido,'));
@@ -1877,7 +1882,8 @@
       const naoLidas = p.membros.reduce((n, m) => n + (m.nao_lidas_agente || 0), 0);
       const nAb = abertosDe(c.id).length, nRem = remarcarDe(c.id).length;
       const comAlerta = p.membros.some((m) => alertasDe(m.id).length);
-      return h('button', { class: 'item', type: 'button', 'aria-current': String(p.membros.some((m) => m.id === S.abertaId)), onclick: () => abrirConversa(c.id) },
+      const desde = desdeEspera(p), seg = desde ? (Date.now() - desde) / 1000 : 0;
+      return h('button', { class: 'item' + (desde && seg >= LIMITE_ESPERA ? ' espera' : ''), 'data-desde': desde || '', type: 'button', 'aria-current': String(p.membros.some((m) => m.id === S.abertaId)), onclick: () => abrirConversa(c.id) },
         h('span', { class: 'av-i', 'aria-hidden': 'true' }, iniciais(nomeLista(c))),
         h('div', { class: 'l1' }, h('span', {}, nomeLista(c)), h('span', { class: 'hora' }, fmtHoraLista(c.atualizado_em))),
         h('div', { class: 'l2' }, h('span', { class: 'prev' }, c.ultima_mensagem || 'Sem mensagens'), naoLidas > 0 ? h('span', { class: 'nl' }, naoLidas) : null),
@@ -1890,9 +1896,35 @@
           comAlerta ? h('span', { class: 'urg alta', title: 'Valor informado fora da referência (só a equipe vê)' }, 'Conferir valor') : null,
           anexosDe(c.id).total ? h('span', { class: 'urg ' + (anexosDe(c.id).sem_conferir ? 'media' : ''), title: 'Foto do pedido médico anexada' + (anexosDe(c.id).sem_conferir ? ': falta conferir no Klingo' : ' (conferida)') }, `Anexo: ${anexosDe(c.id).total} foto${anexosDe(c.id).total > 1 ? 's' : ''}`) : null,
           c.ia_ativa && st === 'aguardando' ? h('span', { style: 'color:var(--suave)' }, c.motor === 'fluxo' ? 'Assistente automático' : 'IA atendendo') : null,
-          ag ? h('span', { style: 'color:var(--suave)' }, ag.nome) : null));
+          ag ? h('span', { style: 'color:var(--suave)' }, ag.nome) : null,
+          desde && seg >= LIMITE_ESPERA ? h('span', { class: 'cron', title: 'Tempo que o paciente espera uma resposta' }, '⏱ ' + fmtCron(seg)) : null));
     }));
   }
+  // Cronômetro de resposta: desde quando o paciente espera alguém da equipe (coluna cliente_aguarda_desde).
+  const LIMITE_ESPERA = 120;
+  function desdeEspera(p) {
+    let min = 0;
+    for (const m of p.membros) {
+      if (m.status === 'encerrada' || !m.cliente_aguarda_desde) continue;
+      if (m.ia_ativa && m.status === 'aguardando') continue;   // o assistente ainda está respondendo
+      const t = Date.parse(m.cliente_aguarda_desde);
+      if (t && (!min || t < min)) min = t;
+    }
+    return min;
+  }
+  const fmtCron = (s) => { s = Math.max(0, Math.floor(s)); const h2 = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), x = s % 60; return (h2 ? h2 + ':' + String(m).padStart(2, '0') : String(m).padStart(2, '0')) + ':' + String(x).padStart(2, '0'); };
+  // A cada segundo atualiza os cronômetros; quando uma conversa passa de 2 minutos, redesenha a lista para ela ficar vermelha.
+  setInterval(() => {
+    if (document.hidden || !S.me || S.aba !== 'atendimento') return;
+    let redesenhar = false;
+    for (const el of document.querySelectorAll('.item[data-desde]')) {
+      const d = Number(el.dataset.desde); if (!d) continue;
+      const seg = (Date.now() - d) / 1000;
+      if (seg >= LIMITE_ESPERA && !el.classList.contains('espera')) { redesenhar = true; break; }
+      const c = el.querySelector('.cron'); if (c) c.textContent = '⏱ ' + fmtCron(seg);
+    }
+    if (redesenhar) renderLista();
+  }, 1000);
 
   /* ---------- quadro das conversas (dentro do Atendimento) ---------- */
   // Só entram cartões ligados a uma conversa do chat: os dados do Klingo sem conversa nunca são carregados aqui.
