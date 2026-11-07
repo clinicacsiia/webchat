@@ -2205,7 +2205,7 @@
       out.push(h('div', { class: 'msg ' + m.autor + (m.excluida_em ? ' apagada' : ''), 'data-anexo': m.opcoes && m.opcoes.tipo === 'anexo' ? String(m.opcoes.id) : null },
         m.autor === 'agente' && quem !== ultimoQuem ? h('span', { class: 'quem' }, quem) : null,
         editando ? editorMsg(m) : h('span', {}, linkificar(m.texto)),
-        m.opcoes && m.opcoes.tipo === 'anexo' ? h('div', {}, h('button', { class: 'btn', type: 'button', style: 'margin-top:6px', onclick: (ev) => verAnexo(m.opcoes.id, ev.currentTarget) }, 'Ver foto do pedido médico')) : null,
+        m.opcoes && m.opcoes.tipo === 'anexo' ? h('div', {}, h('button', { class: 'btn', type: 'button', style: 'margin-top:6px', onclick: (ev) => verAnexo(m.opcoes.id, ev.currentTarget, !!m.opcoes.geral) }, m.opcoes.geral ? 'Ver foto enviada pelo paciente' : 'Ver foto do pedido médico')) : null,
         h('span', { class: 'hora' }, fmtHora(m.criado_em) + (m.editada_em && !m.excluida_em ? ' · editada' : '')),
         editando ? null : acoesMsg(m)));
       ultimoQuem = m.autor === 'agente' ? quem : '';
@@ -2240,7 +2240,7 @@
   }
   // Foto do pedido médico enviada pelo paciente, com o que foi lido (celular e IA), o que o paciente marcou
   // e a conferência da equipe. Conferir ensina o sistema: a mesma escrita, da próxima vez, já vem com o exame certo.
-  async function verAnexo(id, botao) {
+  async function verAnexo(id, botao, geral) {
     botao.disabled = true;
     try {
       const { data, error } = await db.rpc('painel_anexo', { p_id: id });
@@ -2249,6 +2249,7 @@
       const img = h('img', { src: `data:${data.mime};base64,${data.base64}`, alt: 'Foto do pedido médico', style: 'display:block;max-width:100%;margin-top:6px;border-radius:8px' });
       const nomes = new Map((data.itens || []).map((i) => [i.procedimento_id, i.procedimento]));
       for (const g of (data.ia && data.ia.grupos) || []) for (const o of g.opcoes || []) nomes.set(o.exame.id, o.exame.nome);
+      if (geral) { img.alt = 'Foto enviada pelo paciente'; botao.replaceWith(h('div', { class: 'anexo-caixa' }, h('a', { href: img.src, target: '_blank', rel: 'noopener' }, img))); return; }
       botao.replaceWith(h('div', { class: 'anexo-caixa' }, h('a', { href: img.src, target: '_blank', rel: 'noopener' }, img), leituraDoAnexo(data, nomes), conferenciaDoAnexo(id, data, nomes)));
     } catch (e) { toast(msgErro(e)); botao.disabled = false; }
   }
