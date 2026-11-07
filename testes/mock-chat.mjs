@@ -102,7 +102,7 @@ export function criarMundo(opcoes = {}) {
         m.ocultos.clear();
         return { body: { id: cli.id, respostas } };
       }
-      case 'chat_acompanhar': return { body: { agora: agora(), conversa: m.status, agente: null, equipe_online: true, pedido: 'pronto', tipo: 'exame', conferencia: null, enviado_em: agora(), confirmado: false, horarios: [] } };
+      case 'chat_acompanhar': return { body: { agora: agora(), conversa: m.status, agente: null, em_horario: true, espera_longa: false, pedido: 'pronto', tipo: 'exame', conferencia: null, confirmado: false, horarios: [] } };
       case 'chat_corpo': return { body: CONFIG_CORPO };
       case 'chat_pedido_salvar': return { body: { ok: true, itens: (corpo.p_itens || []).length, mensagem_id: 999 } };
       case 'chat_exames': return { body: EXAMES[corpo.p_regiao] || [] };

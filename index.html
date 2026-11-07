@@ -805,7 +805,7 @@
       if (ult && ult.texto) registrarHistorico(conv, { ultima: String(ult.texto).replace(/\s+/g, ' ').slice(0, 90) });
     }, 300);
   }
-  // Aviso fixo no começo da conversa: quem fala (uma IA), que uma pessoa acompanha e que o resultado é uma PREVISÃO.
+  // Aviso fixo no começo da conversa: quem fala (uma IA), que dá para chamar uma pessoa e que o resultado é uma PREVISÃO.
   function preencherAvisoIA(caixa) {
     caixa = caixa || document.getElementById('avisoIA'); if (!caixa) return;
     if (statusAtual === 'em_atendimento') {
@@ -915,7 +915,7 @@
     } else if (status === 'encerrada') {
       el.ponto.className = 'ponto'; el.status.textContent = 'Atendimento encerrado';
     } else if (motorAtivo) {
-      el.ponto.className = 'ponto atendendo'; el.status.textContent = 'Assistente virtual (IA) · equipe acompanhando';
+      el.ponto.className = 'ponto atendendo'; el.status.textContent = 'Assistente virtual (IA) · atendente pelo botão abaixo';
     } else {
       el.ponto.className = 'ponto aguardando'; el.status.textContent = 'Aguardando um atendente';
     }
@@ -1431,35 +1431,31 @@
     w.append(form);
   }
 
-  /* acompanhamento ao vivo: há quanto tempo o pedido foi enviado, se já foi confirmado e se a equipe está online */
-  let acompBox = null, acompDados = null, acompDelta = 0, acompT = null, acompP = null;
+  /* acompanhamento: se já foi confirmado, quem atende e se estamos em horário de trabalho (sem relógio de espera) */
+  let acompBox = null, acompDados = null, acompP = null;
   function widgetAcompanhar(w) {
     const box = h('div', { class: 'acomp', 'aria-live': 'polite' }, h('b', {}, 'Solicitação registrada'), h('p', {}, 'Carregando…'));
     w.append(box);
     acompBox = box;
     if (acompDados) desenharAcomp();
     if (!acompP) acompP = setInterval(atualizarAcomp, 30000);
-    if (!acompT) acompT = setInterval(desenharAcomp, 1000);
     setTimeout(atualizarAcomp, 50);
   }
-  function pararAcompanhar() { clearInterval(acompT); clearInterval(acompP); acompT = acompP = null; acompBox = null; acompDados = null; }
+  function pararAcompanhar() { clearInterval(acompP); acompP = null; acompBox = null; acompDados = null; }
   async function atualizarAcomp() {
     if (!conv || !acompBox || document.hidden) return;
     try {
       const { data, error } = await db.rpc('chat_acompanhar', { p_conversa: conv.id, p_token: conv.token });
       if (error || !data) return;
-      acompDados = data; acompDelta = Date.now() - new Date(data.agora).getTime();
+      acompDados = data;
       desenharAcomp();
-      // Confirmado ou encerrado: o dado não muda mais, então para de consultar (o relógio de 1 s é só local).
+      // Confirmado ou encerrado: o dado não muda mais, então para de consultar.
       if (data.confirmado || data.conversa === 'encerrada') { clearInterval(acompP); acompP = null; }
     } catch { /* tenta de novo no próximo ciclo */ }
   }
   function desenharAcomp() {
     const b = acompBox, d = acompDados;
     if (!b || !d || !b.isConnected) return;
-    const envio = d.enviado_em ? new Date(d.enviado_em).getTime() : null;
-    const seg = envio ? Math.max(0, Math.floor((Date.now() - acompDelta - envio) / 1000)) : 0;
-    const relogio = `${String(Math.floor(seg / 3600)).padStart(2, '0')}:${String(Math.floor(seg / 60) % 60).padStart(2, '0')}:${String(seg % 60).padStart(2, '0')}`;
     const horarios = (d.horarios || []).map((x) => { const dt = dataLocal(x.data); return `${DIAS_SEMANA[dt.getDay()]}, ${dt.getDate()}/${String(dt.getMonth() + 1).padStart(2, '0')} às ${x.hora}${x.unidade ? ' — ' + x.unidade : ''}`; });
     const filhos = [];
     if (d.confirmado) {
@@ -1474,11 +1470,15 @@
         h('p', { class: 'nota-previsao' }, d.pedido === 'pronto'
           ? 'Isto é uma previsão de agendamento e ainda NÃO está confirmado. Um atendente (uma pessoa da equipe) vai conferir tudo e enviar a confirmação de data, horário e valor aqui neste chat.'
           : 'Um atendente (uma pessoa da equipe) vai continuar com você aqui neste chat.'),
-        h('div', { class: 'relogio', 'aria-label': 'Tempo desde o envio' }, relogio),
         ...(horarios.length ? [h('p', {}, 'Horário escolhido (previsão, a confirmar): ' + horarios.join('; '))] : []),
-        h('p', {}, d.equipe_online ? 'A equipe está online, acompanhando esta conversa e já recebeu a sua solicitação.'
-          : 'No momento não estamos online, mas a sua solicitação está registrada. Um atendente vai responder assim que possível, já sabendo de tudo.'),
-        h('p', {}, 'Se quiser falar com a equipe agora, escreva no campo de mensagem aqui embaixo, a qualquer momento.'));
+        // Sem relógio e sem promessa de presença: só o estado real. O aviso de fila vem do banco (uma vez, depois de 20 min sem resposta de uma pessoa).
+        h('p', {}, d.em_horario === false
+          ? 'No momento não estamos em horário de trabalho, mas a sua solicitação está registrada. Assim que a equipe iniciar o atendimento, entraremos em contato com você por aqui.'
+          : 'A sua solicitação já está com a equipe. Um atendente responde por aqui assim que possível, já sabendo de tudo.'),
+        ...(d.espera_longa ? [h('p', { class: 'nota-previsao' }, d.em_horario === false
+          ? 'Seu pedido segue na fila e já foi sinalizado à equipe.'
+          : 'Estamos com muitas conversas, seu pedido segue na fila e já foi sinalizado à equipe.')] : []),
+        h('p', {}, 'Se quiser falar com a equipe, escreva no campo de mensagem aqui embaixo, a qualquer momento.'));
     }
     b.replaceChildren(...filhos);
   }
