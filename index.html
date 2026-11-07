@@ -173,6 +173,7 @@
   .msg a { color: #0b5cad; }
   .msg.sistema { align-self: center; background: rgba(15,42,74,.08); box-shadow: none; color: var(--texto-suave); font-size: calc(15.5px * var(--esc)); text-align: center; max-width: 90%; padding: 5px 12px; }
   .msg.sistema .hora { display: none; }
+  .msg.apagada > span:not(.hora):not(.quem) { font-style: italic; opacity: .75; }
   .boas-vindas { align-self: center; max-width: 88%; text-align: center; color: var(--texto-suave); font-size: calc(15.5px * var(--esc)); margin: 6px 0 10px; }
 
   .compor { flex: none; display: flex; gap: 8px; align-items: flex-end; padding: 8px 10px calc(8px + env(safe-area-inset-bottom)); background: var(--csi-surface); border-top: 1px solid var(--linha); }
@@ -836,7 +837,7 @@
       ultimoDia = dia; ultimoAutor = '';
     }
     const n = document.createElement('div');
-    n.className = 'msg ' + m.autor + (pendente ? ' pendente' : '') + (m.opcoes && WIDGET_LARGO.has(m.opcoes.tipo) ? ' com-widget' : '');
+    n.className = 'msg ' + m.autor + (m.excluida_em ? ' apagada' : '') + (pendente ? ' pendente' : '') + (m.opcoes && WIDGET_LARGO.has(m.opcoes.tipo) ? ' com-widget' : '');
     if (m.id != null) { n.dataset.id = String(m.id); if (m.id > maiorDesenhado) maiorDesenhado = m.id; }
     if (m.opcoes && m.opcoes.tipo === 'anexo') n.dataset.anexo = '1';
     if (m.autor === 'agente' && m.agente && ultimoAutor !== 'agente:' + m.agente) {
@@ -844,7 +845,7 @@
     }
     const t = document.createElement('span'); linkificar(t, m.texto); n.appendChild(t);
     if (m.opcoes) renderWidget(n, m);
-    const h = document.createElement('span'); h.className = 'hora'; h.textContent = hora(m.criado_em); n.appendChild(h);
+    const h = document.createElement('span'); h.className = 'hora'; h.textContent = hora(m.criado_em) + (m.editada_em && !m.excluida_em ? ' · editada' : ''); n.appendChild(h);
     ultimoAutor = m.autor === 'agente' ? 'agente:' + (m.agente || '') : m.autor;
     el.msgs.appendChild(n);
     return n;
@@ -860,7 +861,7 @@
     atualizarWidgets(); atualizarCompor();
   }
   function inserirNoCache(m) {
-    const reg = { id: m.id, autor: m.autor, texto: m.texto, opcoes: m.opcoes || null, criado_em: m.criado_em, agente: m.agente || null };
+    const reg = { id: m.id, autor: m.autor, texto: m.texto, opcoes: m.opcoes || null, criado_em: m.criado_em, agente: m.agente || null, editada_em: m.editada_em || null, excluida_em: m.excluida_em || null };
     let i = cacheMsgs.length;
     while (i > 0 && cacheMsgs[i - 1].id > reg.id) i--;
     cacheMsgs.splice(i, 0, reg);
@@ -884,6 +885,16 @@
     n.classList.remove('pendente'); n.dataset.id = String(m.id); delete n.dataset.temp;
     const hr = n.querySelector('.hora'); if (hr && m.criado_em) hr.textContent = hora(m.criado_em);
     if (m.id > maiorDesenhado) maiorDesenhado = m.id;
+  }
+  // Mensagem da equipe editada ou apagada depois de enviada.
+  function aplicarAlteracoes(lista) {
+    let mudou = false;
+    for (const a of lista || []) {
+      const r = cacheMsgs.find((x) => x.id === a.id);
+      if (!r || (r.texto === a.texto && (r.editada_em || null) === (a.editada_em || null) && (r.excluida_em || null) === (a.excluida_em || null))) continue;
+      r.texto = a.texto; r.editada_em = a.editada_em || null; r.excluida_em = a.excluida_em || null; mudou = true;
+    }
+    if (mudou) { redesenhar(); guardarMsgs(); }
   }
   function adicionar(m, dePolling) {
     if (m.id == null || vistos.has(m.id)) return false;
@@ -961,6 +972,7 @@
       let novas = 0, novasDaEquipe = 0;
       for (const m of lista) if (adicionar(m, true)) { novas++; if (m.autor !== 'cliente') novasDaEquipe++; }
       if (novas) semNovidade = 0;
+      aplicarAlteracoes(data.alteradas);
       for (const m of lista) if (m.id > baseServidor) baseServidor = m.id;   // o cursor só anda pelo que o servidor entregou
       if (novasDaEquipe) recebeuBroadcast = false;
       atualizarStatus(data.status, data.agente);
@@ -1002,6 +1014,7 @@
   function assinar() {
     fecharCanal();
     canal = db.channel('conversa:' + conv.token)
+      .on('broadcast', { event: 'alt' }, ({ payload }) => aplicarAlteracoes([payload]))
       .on('broadcast', { event: 'msg' }, ({ payload }) => {
         adicionar(payload, false);
         if (payload.autor !== 'cliente') { recebeuBroadcast = true; carregar(); }
