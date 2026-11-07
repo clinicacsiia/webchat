@@ -318,6 +318,10 @@
   .msg .quem { display: block; font-size: 12.5px; font-weight: 650; color: var(--verde); margin-bottom: 2px; }
   .msg .hora { display: block; text-align: right; font-size: 11px; color: var(--suave); margin-top: 2px; }
   .msg.sistema .hora { display: none; }
+  .msg .acoes-msg { display: flex; gap: 10px; justify-content: flex-end; margin-top: 4px; }
+  .msg .acoes-msg button { background: none; border: 0; padding: 2px 4px; font: inherit; font-size: 12px; color: rgba(255,255,255,.9); text-decoration: underline; cursor: pointer; }
+  .msg .editando { width: 100%; min-width: 220px; font: inherit; color: var(--csi-text-main); border-radius: 8px; padding: 6px; border: 1px solid var(--csi-border, #ccc); }
+  .msg.apagada > span:not(.hora):not(.quem) { font-style: italic; opacity: .75; }
   .msg a { color: var(--azul); }
   .compor { display: flex; gap: 8px; align-items: flex-end; padding: 12px; background: var(--csi-surface); border-top: 1px solid var(--linha); }
   .compor textarea { resize: none; min-height: 44px; max-height: 140px; border-radius: 22px; padding: 11px 16px; }
@@ -1417,6 +1421,7 @@
     desligarTempoReal();
     S.canal = db.channel('painel-atendimento')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'mensagens' }, (p) => aoNovaMensagem(p.new))
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'mensagens' }, (p) => aplicarAlteracao(p.new))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'conversas' }, (p) => {
         if (p.eventType === 'INSERT') avisar('Nova conversa', 'Um cliente iniciou um atendimento.');
         agendarRecarga();
@@ -1461,6 +1466,32 @@
   }
   function desligarTempoReal() { if (S.canal) { db.removeChannel(S.canal); S.canal = null; } }
   function agendarRecarga() { clearTimeout(tRecarga); tRecarga = setTimeout(async () => { await carregarConversas(); if (S.aba === 'atendimento') { renderLista(); renderTopoChat(); renderPessoaChat(); renderAlertaPreco(); renderAnexosBox(); carregarPre(); if (S.modo === 'quadro') carregarQuadro(); } atualizarSelo(); }, 250); }
+  function aplicarAlteracao(m) {
+    const i = S.msgs.findIndex((x) => x.id === m.id); if (i < 0) return;
+    Object.assign(S.msgs[i], { texto: m.texto, editada_em: m.editada_em, excluida_em: m.excluida_em });
+    if (S.editandoId !== m.id) desenharMsgs(false);
+  }
+  async function alterarMsg(m, texto, excluir) {
+    const { data, error } = await db.rpc('painel_mensagem_alterar', { p_id: m.id, p_texto: texto || null, p_excluir: !!excluir });
+    if (error) { toast(msgErro(error)); return false; }
+    aplicarAlteracao({ id: m.id, texto: data.texto, editada_em: data.editada_em || null, excluida_em: data.excluida_em || null });
+    agendarRecarga();
+    return true;
+  }
+  function podeAlterar(m) { return m.autor === 'agente' && m.agente_id && !m.opcoes && !m.excluida_em && m.id != null && (m.agente_id === S.me.id || S.me.papel === 'admin'); }
+  function acoesMsg(m) {
+    if (!podeAlterar(m)) return null;
+    return h('div', { class: 'acoes-msg' },
+      h('button', { type: 'button', onclick: () => { S.editandoId = m.id; desenharMsgs(false); const t = document.querySelector('#msgs .editando'); if (t) { t.focus(); t.setSelectionRange(t.value.length, t.value.length); } } }, 'Editar'),
+      h('button', { type: 'button', onclick: async () => { if (confirm('Excluir esta mensagem? O paciente verá "Mensagem apagada".')) await alterarMsg(m, null, true); } }, 'Excluir'));
+  }
+  function editorMsg(m) {
+    const t = h('textarea', { class: 'editando', rows: '2', maxlength: '4000' }); t.value = m.texto;
+    const fim = () => { S.editandoId = null; desenharMsgs(false); };
+    const salvar = async () => { const v = t.value.trim(); if (!v) { toast('Escreva a mensagem.'); return; } if (v === m.texto) { fim(); return; } if (await alterarMsg(m, v, false)) fim(); };
+    t.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); salvar(); } else if (e.key === 'Escape') fim(); });
+    return h('div', {}, t, h('div', { class: 'acoes-msg' }, h('button', { type: 'button', onclick: salvar }, 'Salvar'), h('button', { type: 'button', onclick: fim }, 'Cancelar')));
+  }
   function aoNovaMensagem(m) {
     if (m.autor === 'cliente') {
       const c = S.conversas.find((x) => x.id === m.conversa_id);
@@ -2059,7 +2090,7 @@
   const carregarMensagensAbertas = () => (S.abertaId ? carregarMensagens(S.abertaId) : Promise.resolve());
   async function carregarMensagens(id) {
     const ids = membrosDe(id);
-    const q = db.from('mensagens').select('id,conversa_id,autor,agente_id,texto,criado_em,opcoes');
+    const q = db.from('mensagens').select('id,conversa_id,autor,agente_id,texto,criado_em,opcoes,editada_em,excluida_em');
     const { data, error } = await (ids.length === 1 ? q.eq('conversa_id', id) : q.in('conversa_id', ids)).order('criado_em').order('id').limit(1000);
     if (S.abertaId !== id) return;
     if (error) { toast(msgErro(error)); return; }
@@ -2170,11 +2201,13 @@
       ultimaConv = m.conversa_id;
       const ag = m.agente_id ? S.agentes.get(m.agente_id) : null;
       const quem = m.autor === 'agente' ? (ag ? ag.nome : 'Assistente virtual') : '';
-      out.push(h('div', { class: 'msg ' + m.autor, 'data-anexo': m.opcoes && m.opcoes.tipo === 'anexo' ? String(m.opcoes.id) : null },
+      const editando = S.editandoId === m.id;
+      out.push(h('div', { class: 'msg ' + m.autor + (m.excluida_em ? ' apagada' : ''), 'data-anexo': m.opcoes && m.opcoes.tipo === 'anexo' ? String(m.opcoes.id) : null },
         m.autor === 'agente' && quem !== ultimoQuem ? h('span', { class: 'quem' }, quem) : null,
-        h('span', {}, linkificar(m.texto)),
-        m.opcoes && m.opcoes.tipo === 'anexo' ? h('div', {}, h('button', { class: 'btn', type: 'button', style: 'margin-top:6px', onclick: (ev) => verAnexo(m.opcoes.id, ev.currentTarget) }, 'Ver foto do pedido médico')) : null,
-        h('span', { class: 'hora' }, fmtHora(m.criado_em))));
+        editando ? editorMsg(m) : h('span', {}, linkificar(m.texto)),
+        m.opcoes && m.opcoes.tipo === 'anexo' ? h('div', {}, h('button', { class: 'btn', type: 'button', style: 'margin-top:6px', onclick: (ev) => verAnexo(m.opcoes.id, ev.currentTarget, !!m.opcoes.geral) }, m.opcoes.geral ? 'Ver foto enviada pelo paciente' : 'Ver foto do pedido médico')) : null,
+        h('span', { class: 'hora' }, fmtHora(m.criado_em) + (m.editada_em && !m.excluida_em ? ' · editada' : '')),
+        editando ? null : acoesMsg(m)));
       ultimoQuem = m.autor === 'agente' ? quem : '';
     });
     box.replaceChildren(...out);
@@ -2207,7 +2240,7 @@
   }
   // Foto do pedido médico enviada pelo paciente, com o que foi lido (celular e IA), o que o paciente marcou
   // e a conferência da equipe. Conferir ensina o sistema: a mesma escrita, da próxima vez, já vem com o exame certo.
-  async function verAnexo(id, botao) {
+  async function verAnexo(id, botao, geral) {
     botao.disabled = true;
     try {
       const { data, error } = await db.rpc('painel_anexo', { p_id: id });
@@ -2216,6 +2249,7 @@
       const img = h('img', { src: `data:${data.mime};base64,${data.base64}`, alt: 'Foto do pedido médico', style: 'display:block;max-width:100%;margin-top:6px;border-radius:8px' });
       const nomes = new Map((data.itens || []).map((i) => [i.procedimento_id, i.procedimento]));
       for (const g of (data.ia && data.ia.grupos) || []) for (const o of g.opcoes || []) nomes.set(o.exame.id, o.exame.nome);
+      if (geral) { img.alt = 'Foto enviada pelo paciente'; botao.replaceWith(h('div', { class: 'anexo-caixa' }, h('a', { href: img.src, target: '_blank', rel: 'noopener' }, img))); return; }
       botao.replaceWith(h('div', { class: 'anexo-caixa' }, h('a', { href: img.src, target: '_blank', rel: 'noopener' }, img), leituraDoAnexo(data, nomes), conferenciaDoAnexo(id, data, nomes)));
     } catch (e) { toast(msgErro(e)); botao.disabled = false; }
   }
@@ -2339,7 +2373,7 @@
     try {
       if (c.status !== 'em_atendimento' || !c.agente_id) { if (!(await assumir())) return; }
       const { data, error } = await db.from('mensagens').insert({ conversa_id: alvoResposta(), autor: 'agente', agente_id: S.me.id, texto })
-        .select('id,conversa_id,autor,agente_id,texto,criado_em,opcoes').single();
+        .select('id,conversa_id,autor,agente_id,texto,criado_em,opcoes,editada_em,excluida_em').single();
       if (error) throw error;
       caixa.value = ''; caixa.style.height = 'auto';
       if (!S.vistos.has(data.id)) { S.vistos.add(data.id); S.msgs.push(data); desenharMsgs(true); }
