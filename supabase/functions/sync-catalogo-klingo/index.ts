@@ -235,7 +235,9 @@ async function agendaOcupacao(supabase: Supa, token: string) {
     }
     await dorme(300);
   }
-  if (lidas === 0) throw new Error("A agenda marcada veio vazia: nada foi alterado");
+  // Relatório vazio não é erro da função (o Klingo às vezes devolve vazio de madrugada): não grava nada, mantém os
+  // dados anteriores e responde 200 com aviso. O 502 fica só para falha de verdade (HTTP do Klingo, formato, banco).
+  if (lidas === 0) return { vazia: true, aviso: "A agenda marcada veio vazia: nada foi alterado", marcacoes_lidas: 0 };
   const linhas = [...agrupado.values()];
   let gravadas = 0;
   for (let i = 0; i < linhas.length; i += 1500) {
