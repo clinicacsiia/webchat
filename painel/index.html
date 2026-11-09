@@ -660,6 +660,10 @@
   // O status "Agendado" muda sozinho (conferência automática a cada 15 s): reler enquanto uma conversa está aberta.
   // Reserva de 30 s: o tempo real não cobre a conferência automática, mas 15 s era mais do que a tela precisa.
   setInterval(() => { if (S.abertaId && S.aba === 'atendimento' && !document.hidden) carregarPre(); }, 30000);
+  // WC-03 (decisão D1): motivos de encerramento. O código vai para o banco (conversas.motivo_encerramento); o rótulo é só da tela.
+  const MOTIVOS_ENC = [['agendado', 'Agendado'], ['apenas_informacoes', 'Apenas informações'], ['nao_respondido', 'Não respondido'], ['desistiu', 'Paciente desistiu'], ['outro', 'Outro motivo']];
+  const ROTULO_MOTIVO = Object.fromEntries(MOTIVOS_ENC);
+  const rotuloEncerrada = (c) => (c && c.status === 'encerrada' ? (ROTULO_MOTIVO[c.motivo_encerramento] || 'sem motivo registrado') : '');
   const MOTIVOS_CANCELAMENTO = ['Paciente desistiu', 'Horário indisponível', 'Exame errado ou faltando', 'Plano ou convênio', 'Preço', 'Duplicado ou teste', 'Outro motivo'];
   // Janela de confirmação do cancelamento, com o motivo numa lista fixa. Devolve undefined (voltou), null (cancelar sem motivo) ou o motivo.
   function pedirMotivo() {
@@ -1556,7 +1560,10 @@
     const base = 'id,status,agente_id,ultima_mensagem,nao_lidas_agente,criado_em,atualizado_em,contato_id,ia_ativa,motor,triagem_resumo,triagem_urgencia,alerta_agenda,cliente_aguarda_desde,nome_informado,email_informado,contatos(id,nome,telefone,email)';
     // Fase 6 (unidade, médico, criança): colunas novas; se o SQL ainda não foi aplicado, volta para a lista antiga em vez de quebrar o painel.
     const consulta = (cols) => db.from('conversas').select(cols).order('atualizado_em', { ascending: false }).limit(300);
-    let { data, error } = await consulta(base.replace('email_informado,', 'email_informado,paciente_tipo,paciente_nome,unidade_inicial,medico_preferido,'));
+    const fase6 = 'paciente_tipo,paciente_nome,unidade_inicial,medico_preferido,', motivo = 'motivo_encerramento,encerramento_origem,';
+    let { data, error } = await consulta(base.replace('email_informado,', 'email_informado,' + fase6 + motivo));
+    // WC-03: se o SQL do motivo ainda não foi aplicado, volta para a lista sem ele em vez de quebrar o painel.
+    if (error && /motivo_encerramento|encerramento_origem/.test(error.message || '')) ({ data, error } = await consulta(base.replace('email_informado,', 'email_informado,' + fase6)));
     if (error && /paciente_tipo|paciente_nome|unidade_inicial|medico_preferido/.test(error.message || '')) ({ data, error } = await consulta(base));
     if (error) { toast(msgErro(error)); return; }
     S.conversas = data || [];
@@ -1920,6 +1927,7 @@
         h('div', { class: 'l1' }, h('span', {}, nomeLista(c)), h('span', { class: 'hora' }, fmtHoraLista(c.atualizado_em))),
         h('div', { class: 'l2' }, h('span', { class: 'prev' }, c.ultima_mensagem || 'Sem mensagens'), naoLidas > 0 ? h('span', { class: 'nl' }, naoLidas) : null),
         h('div', { class: 'l3' }, h('span', { class: 'tag ' + st }, ROTULO_STATUS[st]),
+          st === 'encerrada' ? h('span', { class: 'urg', title: 'Motivo do encerramento' }, rotuloEncerrada(c)) : null,
           p.membros.length > 1 ? h('span', { class: 'urg', title: 'Conversas da mesma pessoa, unidas' }, `${p.membros.length} conversas unidas`) : null,
           nAb ? h('span', { class: 'urg alta', title: 'Exame marcado que ninguém fechou ainda' }, 'Exame em aberto') : null,
           nRem ? h('span', { class: 'urg media', title: 'Faltou e ainda falta marcar o novo horário' }, 'Remarcar') : null,
@@ -2181,7 +2189,7 @@
       h('button', { class: 'btn voltar', type: 'button', onclick: () => { S.abertaId = null; document.getElementById('inbox')?.classList.remove('aberta'); renderLista(); renderChat(); if (S.modo === 'quadro') renderQuadro(); } }, 'Voltar'),
       h('div', { class: 'quem' }, h('b', {}, nomeLista(c)),
         h('span', {}, ct.telefone ? h('a', { href: 'https://wa.me/55' + soDigitos(ct.telefone), target: '_blank', rel: 'noopener noreferrer' }, fmtTel(ct.telefone)) : '', ct.email ? ' · ' + ct.email : '',
-          ' · ', ROTULO_STATUS[c.status], ag && ag.nome ? ' com ' + ag.nome : ''),
+          ' · ', ROTULO_STATUS[c.status], c.status === 'encerrada' ? ' (' + rotuloEncerrada(c) + ')' : '', ag && ag.nome ? ' com ' + ag.nome : ''),
         detalheInicio(c) ? h('span', { style: 'display:block;font-weight:600' }, detalheInicio(c)) : null),
       !minha && c.status !== 'encerrada' ? h('button', { class: 'btn prim assumir-topo', type: 'button', onclick: () => assumir(true) }, 'Assumir') : null,
       c.status === 'encerrada' ? h('button', { class: 'btn', type: 'button', onclick: () => assumir(true) }, 'Reabrir') : null,
@@ -2322,11 +2330,15 @@
   async function atualizarConversa(campos) {
     // Todas as conversas da mesma pessoa mudam juntas (assumir, transferir, encerrar).
     const ids = membrosDe(S.abertaId);
-    const q = db.from('conversas').update(campos);
-    const { error } = await (ids.length === 1 ? q.eq('id', S.abertaId) : q.in('id', ids));
+    const gravar = (c) => { const q = db.from('conversas').update(c); return ids.length === 1 ? q.eq('id', S.abertaId) : q.in('id', ids); };
+    let { error } = await gravar(campos);
+    // WC-03: SQL do motivo ainda não aplicado: encerra sem o motivo em vez de travar o atendente.
+    if (error && 'motivo_encerramento' in campos && /motivo_encerramento|encerrada_por|encerramento_origem/.test(error.message || '')) {
+      const { motivo_encerramento, ...resto } = campos; ({ error } = await gravar(resto));
+    }
     if (error) {
       if (/EXAME_EM_ABERTO/.test(error.message || '')) { toast(msgErro(error).replace(/^EXAME_EM_ABERTO: /, '')); document.getElementById('exameAberto')?.scrollIntoView?.({ block: 'center' }); await recarregarPessoas(); }
-      else toast(msgErro(error));
+      else toast(msgErro(error).replace(/^MOTIVO_OBRIGATORIO: /, ''));
       return false;
     }
     ids.forEach((i) => Object.assign(S.conversas.find((c) => c.id === i) || {}, campos));
@@ -2338,29 +2350,39 @@
     if (abertosDe(S.abertaId).length) { toast('Há exame marcado sem desfecho. Registre se o paciente compareceu, faltou, cancelou ou remarcou antes de encerrar.'); document.getElementById('exameAberto')?.scrollIntoView?.({ block: 'center' }); return; }
     const ids = membrosDe(S.abertaId);
     const k = S.quadroOk ? (S.quadro.find((x) => x.conversa_id === S.abertaId) || S.quadro.find((x) => ids.includes(x.conversa_id))) : null;
-    if (!k) { if (!confirm('Encerrar este atendimento? O cliente será avisado.')) return; await atualizarConversa({ status: 'encerrada' }); return; }
-    // Com cartão no quadro: escolhe já para onde ele vai ao encerrar.
-    const dest = destinosDe(k).map((id) => S.colunasQ.find((x) => x.id === id)).filter(Boolean);
+    // O motivo é sempre pedido (lista fixa). Com cartão no quadro, a mesma janela pergunta também para onde o cartão vai.
+    const dest = k ? destinosDe(k).map((id) => S.colunasQ.find((x) => x.id === id)).filter(Boolean) : [];
+    const sel = h('select', { id: 'motivoEnc', 'aria-required': 'true', 'aria-describedby': 'motivoEncAviso' }, [h('option', { value: '' }, 'Escolha o motivo…'), ...MOTIVOS_ENC.map(([v, r]) => h('option', { value: v }, r))]);
+    const aviso = h('p', { id: 'motivoEncAviso', class: 'erro', role: 'alert', hidden: true }, 'Escolha o motivo para encerrar.');
     const fechar = () => dlg.close();
+    let ocupado = false;
     const ir = async (acao) => {
-      fechar();
+      if (!sel.value) { aviso.hidden = false; sel.focus(); return; }
+      if (ocupado) return; ocupado = true;
+      const motivo = sel.value; fechar();
       let nota = null;
-      if (acao === 'perdido') { nota = prompt('Por que este contato foi perdido? (mínimo 3 letras)'); if (nota == null) return; }
-      if (!(await atualizarConversa({ status: 'encerrada' }))) return;
-      const { error } = acao === 'tirar' ? await db.rpc('jornada_arquivar_card', { p_card: k.id, p_versao: k.versao, p_nota: null })
-        : acao ? await db.rpc('jornada_mover_card', { p_card: k.id, p_para: acao, p_versao: k.versao, p_nota: nota }) : {};
-      if (error) toast(/CONFLITO/.test(error.message || '') ? 'Conversa encerrada, mas outra pessoa mexeu no cartão. Atualizei o quadro.' : msgErro(error));
-      await carregarQuadro();
+      if (acao === 'perdido') { nota = prompt('Por que este contato foi perdido? (mínimo 3 letras)'); if (nota == null) { ocupado = false; return; } }
+      if (!(await atualizarConversa({ status: 'encerrada', motivo_encerramento: motivo }))) { ocupado = false; return; }
+      if (k && acao !== 'simples') {
+        const { error } = acao === 'tirar' ? await db.rpc('jornada_arquivar_card', { p_card: k.id, p_versao: k.versao, p_nota: null })
+          : acao ? await db.rpc('jornada_mover_card', { p_card: k.id, p_para: acao, p_versao: k.versao, p_nota: nota }) : {};
+        if (error) toast(/CONFLITO/.test(error.message || '') ? 'Conversa encerrada, mas outra pessoa mexeu no cartão. Atualizei o quadro.' : msgErro(error));
+        await carregarQuadro();
+      }
     };
+    sel.addEventListener('change', () => { aviso.hidden = true; });
     dlg.className = '';
     dlg.replaceChildren(h('h3', {}, 'Encerrar atendimento'),
-      h('p', { class: 'dica', style: 'margin:-8px 0 12px' }, 'O cliente será avisado. Para qual etapa o cartão deve ir?'),
+      h('p', { class: 'dica', style: 'margin:-8px 0 12px' }, k ? 'O cliente será avisado. Escolha o motivo e para qual etapa o cartão deve ir.' : 'O cliente será avisado. Escolha o motivo do encerramento.'),
+      h('div', { class: 'campo' }, h('label', { class: 'rot', for: 'motivoEnc' }, 'Motivo do encerramento'), sel, aviso),
       h('div', { style: 'display:grid;gap:8px' },
-        dest.map((d) => h('button', { class: 'btn', type: 'button', onclick: () => ir(d.id) }, d.nome)),
-        h('button', { class: 'btn', type: 'button', onclick: () => ir(null) }, 'Só encerrar (manter em ' + ((S.colunasQ.find((x) => x.id === k.coluna) || {}).nome || k.coluna) + ')'),
-        h('button', { class: 'btn perigo', type: 'button', onclick: () => ir('tirar') }, 'Encerrar e tirar do quadro')),
+        k ? [dest.map((d) => h('button', { class: 'btn', type: 'button', onclick: () => ir(d.id) }, d.nome)),
+          h('button', { class: 'btn', type: 'button', onclick: () => ir(null) }, 'Só encerrar (manter em ' + ((S.colunasQ.find((x) => x.id === k.coluna) || {}).nome || k.coluna) + ')'),
+          h('button', { class: 'btn perigo', type: 'button', onclick: () => ir('tirar') }, 'Encerrar e tirar do quadro')]
+          : h('button', { class: 'btn perigo', type: 'button', onclick: () => ir('simples') }, 'Encerrar atendimento')),
       h('div', { class: 'rodape' }, h('button', { class: 'btn', type: 'button', onclick: fechar }, 'Cancelar')));
     dlg.showModal();
+    sel.focus();
   }
   async function transferir(agenteId) {
     const ag = S.agentes.get(agenteId);
@@ -2632,6 +2654,9 @@
     { id: 'motor', icone: 'livro', titulo: 'Motor de atendimento', desc: 'Quem conduz a conversa com o paciente.', campos: [
       { k: 'motor', tipo: 'escolha', rot: 'Motor', opcoes: [['fluxo', 'Fluxo guiado (sem IA)'], ['ia', 'Inteligência artificial']], dica: 'Fluxo guiado segue um roteiro fixo; IA conversa livremente.' },
       { k: 'motor_telefones_teste', tipo: 'texto', rot: 'Telefones de teste', dica: 'Só esses números usam o motor novo (separe por vírgula). Vazio = ninguém em teste.' },
+    ] },
+    { id: 'atualizacao', icone: 'livro', titulo: 'Encerramento e avaliação', desc: 'Chaves da Atualização do WebChat. Ligue uma por vez e confira o dia seguinte; desligar volta ao comportamento anterior na hora.', campos: [
+      { k: 'encerramento_exige_motivo', tipo: 'sim', rot: 'Exigir motivo ao encerrar', dica: 'Ligado: o painel só encerra a conversa com um motivo escolhido. Desligado: o motivo fica opcional.' },
     ] },
     { id: 'fila', icone: 'pessoas', titulo: 'Fila e recepção', desc: 'Fila de chegada, avisos e QR code da recepção.', campos: [
       { k: 'fila_autochegada', tipo: 'sim', rot: 'Paciente pode tocar “Cheguei”', dica: 'Desligado: só a recepção registra a chegada.' },
