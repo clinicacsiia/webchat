@@ -1,19 +1,19 @@
-# WC-02: reconhecer agendamentos feitos no Klingo (09/11/2026)
+# WC-02: reconhecer agendamentos feitos no Klingo (09/11/2026; regra v2 de 10/11)
 
-**No ar desde 09/11/2026** (SQL aplicado; chave `agendamento_reconhecer = sim`). Arquivo: `supabase/agendamento-reconhecer.sql`. Teste: `npm run test:reconhecer-sql` (14 verificações).
+**No ar desde 09/11/2026** (SQL aplicado; chave `agendamento_reconhecer = sim`). Arquivo: `supabase/agendamento-reconhecer.sql`. Teste: `npm run test:reconhecer-sql` (16 verificações).
 
-## O que estava errado
+## O que estava errado (antes)
 O pedido do chat só virava "Agendado" quando a conferência automática achava no Klingo uma marcação com **mesmo horário, mesmo profissional e mesma unidade** (ou quando alguém tocava "Marcar como agendado"). Se a recepção marcasse o mesmo horário com **outro profissional**, ou outra data, o pedido ficava para sempre em "pronto"/"divergente" e não contava.
 
-## O que passou a acontecer
-A cada 5 minutos, para os pedidos em "pronto" ou "rascunho" dos últimos 14 dias, o banco compara com o que a Jornada já leu do Klingo (relatório #14359), sem nova chamada ao Klingo:
-- O paciente precisa bater em **telefone e nome** (a mesma regra do fechamento do exame; telefone igual com nome diferente, como família, não vale) e a marcação precisa ter sido **feita depois que a conversa começou**.
-- **Mesma data e horário** (até 30 min; por ordem de chegada basta o dia): o pedido vira **Agendado**, **sem mensagem ao paciente** (quem marcou foi a recepção).
-- **Só em outras datas**: o status **não muda**; o pedido mostra o aviso "O paciente já tem marcação no Klingo em outras datas: …" para a equipe decidir (Marcar como agendado). Conversa ainda aberta também recebe o alerta.
-- Quem já tem veredito da conferência automática não tem o texto trocado. Unidade e profissional não são comparados; a conferência de 10 em 10 minutos continua avisando se o profissional for diferente.
-
-## Resultado na primeira rodada
-Agendados passaram de **2 para 4**. Os dois pacientes pedidos: **Flora Juriti de Oliveira Cordeiro** (Klingo 02/12 08:00, mesmo horário escolhido no chat, outro profissional) virou **Agendado**; **Anthony Kauã Nogueira Machado** tem 2 marcações no Klingo em datas diferentes da escolhida (14/11 e 24/11) e o pedido estava incompleto, então ficou com o **aviso** para a equipe.
+## Regra atual (versão 2, decidida pelo dono em 09/11/2026)
+A cada 5 minutos, para os pedidos em "pronto" (ou "rascunho" com atendente na conversa) **cuja conversa está aberta**, o banco procura o paciente no que a Jornada já leu do Klingo (relatório #14359):
+- **Basta o nome completo** do paciente do pedido aparecer no Klingo (igual depois de tirar acento e caixa; o telefone **não** é exigido).
+- O pedido vira **Agendado** com a **data, hora e unidade reais do Klingo**: o que veio do chat era só previsão, e a previsão original fica guardada em `escolha_horario_chat`.
+- O paciente recebe no chat a **mensagem de confirmação** com os dados do Klingo (exame, dia, horário, unidade e, quando conhecido, o médico).
+- **Nada é bloqueado por divergência.** Se data, horário, exame ou médico diferem do pedido, a conversa recebe o alerta "Agendado conforme o Klingo… Confirme com o paciente; estando certo, pode encerrar a conversa."
+- Conversa **encerrada** não é tocada. Dois cadastros com o mesmo nome completo: não escolhe, só alerta a atendente.
+- **Guarda mantida:** só conta marcação **feita depois que a conversa começou** (menos 1 hora) e ainda por vir. Sem isso, uma consulta antiga do mesmo paciente viraria "agendado" de um pedido novo: em 09/11/2026 três pedidos abertos tinham o nome no Klingo, mas com marcações feitas em agosto, setembro e outubro, de outros atendimentos.
+- O médico só entra na mensagem quando a conferência automática já guardou "marcado em DD/MM HH:MM (MÉDICO, UNIDADE)" para o mesmo dia e horário (o relatório da Jornada não traz o médico).
 
 ## Chave e rotina
 - Configurações > Encerramento e avaliação > "Reconhecer agendamentos feitos no Klingo" (`config.agendamento_reconhecer`).
