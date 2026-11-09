@@ -10,7 +10,7 @@
     "test:delta": "node sql-delta.test.mjs",
     "test:sw": "node sw.test.mjs",
     "test:navegador": "node navegador.smoke.mjs",
-    "test:edge": "node --experimental-strip-types --test ../supabase/functions/sync-catalogo-klingo/conferencia.test.ts ../supabase/functions/sync-catalogo-klingo/precos.test.ts ../supabase/functions/fila-validar-assinatura/avaliacao.test.ts ../supabase/functions/fila-emitir-link/email.test.ts ../supabase/functions/klingo-paciente/mapa.test.ts",
+    "test:edge": "node --experimental-strip-types --test ../supabase/functions/sync-catalogo-klingo/conferencia.test.ts ../supabase/functions/sync-catalogo-klingo/precos.test.ts ../supabase/functions/fila-validar-assinatura/avaliacao.test.ts ../supabase/functions/fila-emitir-link/email.test.ts ../supabase/functions/klingo-paciente/mapa.test.ts ../supabase/functions/klingo-reconhecer/casar.test.ts",
     "test:python": "python3 -m pytest -q ../biometria",
     "test:sentinela": "node sentinela.test.mjs",
     "test:paciente-status": "node paciente-status.test.mjs",
