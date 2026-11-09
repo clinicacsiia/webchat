@@ -2338,7 +2338,7 @@
     }
     if (error) {
       if (/EXAME_EM_ABERTO/.test(error.message || '')) { toast(msgErro(error).replace(/^EXAME_EM_ABERTO: /, '')); document.getElementById('exameAberto')?.scrollIntoView?.({ block: 'center' }); await recarregarPessoas(); }
-      else toast(msgErro(error).replace(/^MOTIVO_OBRIGATORIO: /, ''));
+      else toast(msgErro(error).replace(/^(MOTIVO_OBRIGATORIO|AGENDADO_[A-Z_]+): /, ''));
       return false;
     }
     ids.forEach((i) => Object.assign(S.conversas.find((c) => c.id === i) || {}, campos));
@@ -2347,12 +2347,14 @@
   }
   const assumir = () => atualizarConversa({ status: 'em_atendimento', agente_id: S.me.id });
   async function encerrar() {
-    if (abertosDe(S.abertaId).length) { toast('Há exame marcado sem desfecho. Registre se o paciente compareceu, faltou, cancelou ou remarcou antes de encerrar.'); document.getElementById('exameAberto')?.scrollIntoView?.({ block: 'center' }); return; }
+    // D2 (WC-04): exame que já passou continua bloqueando. Exame ainda futuro só deixa encerrar como Agendado; o exame segue na Jornada.
+    const abertos = abertosDe(S.abertaId), soAgendado = abertos.length > 0;
+    if (abertos.some((a) => a.passou)) { toast('Há exame marcado sem desfecho. Registre se o paciente compareceu, faltou, cancelou ou remarcou antes de encerrar.'); document.getElementById('exameAberto')?.scrollIntoView?.({ block: 'center' }); return; }
     const ids = membrosDe(S.abertaId);
     const k = S.quadroOk ? (S.quadro.find((x) => x.conversa_id === S.abertaId) || S.quadro.find((x) => ids.includes(x.conversa_id))) : null;
     // O motivo é sempre pedido (lista fixa). Com cartão no quadro, a mesma janela pergunta também para onde o cartão vai.
     const dest = k ? destinosDe(k).map((id) => S.colunasQ.find((x) => x.id === id)).filter(Boolean) : [];
-    const sel = h('select', { id: 'motivoEnc', 'aria-required': 'true', 'aria-describedby': 'motivoEncAviso' }, [h('option', { value: '' }, 'Escolha o motivo…'), ...MOTIVOS_ENC.map(([v, r]) => h('option', { value: v }, r))]);
+    const sel = h('select', { id: 'motivoEnc', 'aria-required': 'true', 'aria-describedby': 'motivoEncAviso' }, [h('option', { value: '' }, 'Escolha o motivo…'), ...MOTIVOS_ENC.filter(([v]) => !soAgendado || v === 'agendado').map(([v, r]) => h('option', { value: v }, r))]);
     const aviso = h('p', { id: 'motivoEncAviso', class: 'erro', role: 'alert', hidden: true }, 'Escolha o motivo para encerrar.');
     const fechar = () => dlg.close();
     let ocupado = false;
@@ -2373,7 +2375,8 @@
     sel.addEventListener('change', () => { aviso.hidden = true; });
     dlg.className = '';
     dlg.replaceChildren(h('h3', {}, 'Encerrar atendimento'),
-      h('p', { class: 'dica', style: 'margin:-8px 0 12px' }, k ? 'O cliente será avisado. Escolha o motivo e para qual etapa o cartão deve ir.' : 'O cliente será avisado. Escolha o motivo do encerramento.'),
+      h('p', { class: 'dica', style: 'margin:-8px 0 12px' }, (k ? 'O cliente será avisado. Escolha o motivo e para qual etapa o cartão deve ir.' : 'O cliente será avisado. Escolha o motivo do encerramento.')
+        + (soAgendado ? ' Há exame marcado ainda por vir: só dá para encerrar como Agendado (o exame continua acompanhado na Jornada).' : '')),
       h('div', { class: 'campo' }, h('label', { class: 'rot', for: 'motivoEnc' }, 'Motivo do encerramento'), sel, aviso),
       h('div', { style: 'display:grid;gap:8px' },
         k ? [dest.map((d) => h('button', { class: 'btn', type: 'button', onclick: () => ir(d.id) }, d.nome)),
@@ -2657,6 +2660,7 @@
     ] },
     { id: 'atualizacao', icone: 'livro', titulo: 'Encerramento e avaliação', desc: 'Chaves da Atualização do WebChat. Ligue uma por vez e confira o dia seguinte; desligar volta ao comportamento anterior na hora.', campos: [
       { k: 'encerramento_exige_motivo', tipo: 'sim', rot: 'Exigir motivo ao encerrar', dica: 'Ligado: o painel só encerra a conversa com um motivo escolhido. Desligado: o motivo fica opcional.' },
+      { k: 'encerramento_valida_agendado', tipo: 'sim', rot: 'Conferir a agenda ao encerrar como Agendado', dica: 'Ligado: só encerra como Agendado se houver agendamento vigente (chat ou Klingo), e exame ainda futuro deixa de bloquear o encerramento. Ligue depois de “Exigir motivo”.' },
     ] },
     { id: 'fila', icone: 'pessoas', titulo: 'Fila e recepção', desc: 'Fila de chegada, avisos e QR code da recepção.', campos: [
       { k: 'fila_autochegada', tipo: 'sim', rot: 'Paciente pode tocar “Cheguei”', dica: 'Desligado: só a recepção registra a chegada.' },

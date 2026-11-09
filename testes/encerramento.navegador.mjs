@@ -42,7 +42,7 @@ function servidor() {
   });
 }
 
-async function pagina(browser, { quadroIndisponivel = false, patchModo = 'ok' } = {}) {
+async function pagina(browser, { quadroIndisponivel = false, patchModo = 'ok', abertos = [] } = {}) {
   const ctx = await browser.newContext();
   await ctx.addInitScript(([id, token, email]) => {
     localStorage.setItem('sb-nrvuynjwcgwpjdptkiay-auth-token', JSON.stringify({ access_token: token, refresh_token: 'x', token_type: 'bearer', expires_in: 86400, expires_at: Math.floor(Date.now() / 1000) + 86400,
@@ -66,9 +66,11 @@ async function pagina(browser, { quadroIndisponivel = false, patchModo = 'ok' } 
     else if (p.startsWith('/rest/v1/conversas') && req.method() === 'PATCH') {
       const b = JSON.parse(req.postData() || '{}'); reg.patches.push(b);
       if (patchModo === 'sem_coluna' && 'motivo_encerramento' in b) { status = 400; corpo = { code: '42703', message: 'column "motivo_encerramento" of relation "conversas" does not exist' }; }
+      else if (patchModo === 'agendado_recusado' && b.motivo_encerramento === 'agendado') { status = 400; corpo = { code: 'P0001', message: 'AGENDADO_SEM_AGENDAMENTO: Não encontrei agendamento vigente para este paciente. Confira o horário no Klingo ou escolha outro motivo.' }; }
       else if (patchModo === 'obrigatorio' && b.status === 'encerrada') { status = 400; corpo = { code: 'P0001', message: 'MOTIVO_OBRIGATORIO: escolha o motivo do encerramento.' }; }
       else { return rota.fulfill({ status: 204, headers: CORS }); }
     }
+    else if (p.startsWith('/rest/v1/v_agendamento_aberto')) corpo = abertos;
     else if (p.startsWith('/rest/v1/conversas')) corpo = CONVERSAS;
     else if (p.startsWith('/rest/v1/jornada_coluna')) corpo = COLUNAS;
     else if (p.startsWith('/rest/v1/jornada_transicao')) corpo = TRANS;
@@ -148,6 +150,35 @@ await caso('o banco exige o motivo (painel antigo): o aviso aparece sem o códig
   const topo = await page.locator('#chatTopo .quem').innerText();
   await ctx.close();
   return { ok: /escolha o motivo/i.test(toast) && !/MOTIVO_OBRIGATORIO/.test(toast) && !/Encerrada/.test(topo), detalhe: toast };
+});
+
+const aberto = (passou) => [{ pre_id: 'p1', conversa_id: 'c2', chave: 'p1|2026-11-20T10:00', quando: '2026-11-20T10:00:00', exames: 'Ressonância de joelho', passou, unidade: 'CSI' }];
+
+await caso('exame ainda futuro: a janela só oferece Agendado e explica; o envio leva motivo agendado', async () => {
+  const { page, ctx, reg } = await abrir({ quadroIndisponivel: true, abertos: aberto(false) });
+  await abrirConversa(page); await page.waitForTimeout(500); await page.click('#chatTopo button:has-text("Encerrar")'); await page.waitForSelector('#motivoEnc');
+  const ops = await motivosNoDialogo(page); const dica = await page.locator('dialog .dica').first().innerText();
+  await page.selectOption('#motivoEnc', 'agendado'); await page.click('dialog button:has-text("Encerrar atendimento")'); await page.waitForTimeout(500);
+  await ctx.close();
+  const p = patchesStatus(reg);
+  return { ok: ops.join('|') === 'Escolha o motivo…|Agendado' && /exame marcado ainda por vir/.test(dica) && p.length === 1 && p[0].motivo_encerramento === 'agendado', detalhe: ops.join('|') };
+});
+
+await caso('exame que já passou: o Encerrar é barrado antes da janela, sem chamar o banco', async () => {
+  const { page, ctx, reg } = await abrir({ quadroIndisponivel: true, abertos: aberto(true) });
+  await abrirConversa(page); await page.waitForTimeout(500); await page.click('#chatTopo button:has-text("Encerrar")'); await page.waitForTimeout(400);
+  const toast = await page.locator('#toast').innerText(); const dialogo = await page.evaluate(() => document.getElementById('dlg').open);
+  await ctx.close();
+  return { ok: /exame marcado sem desfecho/.test(toast) && !dialogo && patchesStatus(reg).length === 0, detalhe: toast.slice(0, 60) };
+});
+
+await caso('o servidor recusa o Agendado sem agendamento: o aviso aparece sem o código técnico', async () => {
+  const { page, ctx } = await abrir({ quadroIndisponivel: true, patchModo: 'agendado_recusado' });
+  await abrirConversa(page); await page.click('#chatTopo button:has-text("Encerrar")'); await page.waitForSelector('#motivoEnc');
+  await page.selectOption('#motivoEnc', 'agendado'); await page.click('dialog button:has-text("Encerrar atendimento")'); await page.waitForTimeout(500);
+  const toast = await page.locator('#toast').innerText(); const topo = await page.locator('#chatTopo .quem').innerText();
+  await ctx.close();
+  return { ok: /Não encontrei agendamento vigente/.test(toast) && !/AGENDADO_/.test(toast) && !/Encerrada/.test(topo), detalhe: toast };
 });
 
 await browser.close(); srv.close();
