@@ -43,8 +43,8 @@ Desfazer: voltar a chave para `nao` (imediato). As funções antigas estão em `
   - se o agendamento aparecer depois do aviso, o aviso some sozinho; para de acompanhar em 7 dias, ou depois do dia do exame.
 - O push é genérico (sem nome) e só sai em horário de trabalho; o que ficou para depois sai na primeira rodada dentro do horário. O aviso na conversa aparece sempre.
 - Reabrir a conversa apaga a conferência e o aviso que a rotina tinha posto.
-- Exame **ainda futuro** deixa de bloquear o encerramento, **só** com o motivo Agendado. Exame que **já passou** e os outros motivos continuam bloqueados (`EXAME_EM_ABERTO`: é outra regra, não a do Agendado). O exame segue na Jornada e o Klingo fecha o desfecho sozinho.
-- No painel, com exame futuro a janela mostra só "Agendado" e explica.
+- **Nenhuma regra de exame ou de Klingo barra o encerramento pela equipe** (decisão do dono, 09/11/2026: a escolha da atendente é prioridade). Exame marcado, em aberto ou já passado não impede nenhum motivo; a regra antiga `EXAME_EM_ABERTO` foi desligada no banco e no painel. O exame segue na Jornada e o Klingo fecha o desfecho sozinho. Única exigência que sobrou: escolher um **motivo** (`encerramento_exige_motivo`).
+- No painel, a janela de encerrar sempre mostra os 5 motivos.
 
 ## Limite conhecido
 A **unidade não é comparada** (o chat usa CSI/DESENVOAR e o Klingo usa CSI 1, CSI 2, CSI Pediatria). Quem protege contra cruzar pacientes é a identidade: pessoa unida, prontuário confirmado ou nome + telefone.
@@ -61,3 +61,6 @@ Ao encerrar com motivo, o painel mostrou esse erro. Causa: o atendente só pode 
 
 ## Ajuste de 09/11/2026 (tarde): Agendado não é mais recusado
 Uma atendente não conseguia encerrar como Agendado (a paciente tinha só um exame já atendido em 04/11 e nenhum exame futuro). O dono pediu que a mensagem saísse. Aplicado no banco (migrações `agendado_conferencia_parte1`, `parte2`, `parte4`, `parte5`) e a Edge Function `avisar-equipe` foi para a versão 1.2 (`tipo: 'agenda'`). As mensagens `AGENDADO_SEM_AGENDAMENTO`, `AGENDADO_AMBIGUO` e `AGENDADO_AGENDA_INDISPONIVEL` agora só viram o texto do aviso da conferência.
+
+## Ajuste de 09/11/2026 (noite): a escolha da atendente é prioridade
+O dono pediu que o atendente humano encerre sem cair em nenhuma regra por dados do Klingo. Além do Agendado, saiu o bloqueio `EXAME_EM_ABERTO` (banco: `conversa_exame_aberto_trg` só devolve a linha; painel: sem a trava antes da janela e sem a restrição de motivo; `painel/sw.js` v12). A conferência de Agendado continua em segundo plano, só avisando. Para voltar a barrar exame em aberto: definição antiga em `supabase/pessoa-unica.sql`.

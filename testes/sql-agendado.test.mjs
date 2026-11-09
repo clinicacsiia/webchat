@@ -1,4 +1,5 @@
-// FLUXOGRAMA: entrada (supabase/encerramento-motivo.sql + encerramento-agendado.sql e as funções reais papel_atual, nome_confere, pessoa_membros e conversa_exame_aberto_trg, num Postgres embutido) -> validação (chave config.encerramento_valida_agendado desligada e ligada; usuário do painel x sistema) -> lógica (Agendado NUNCA é recusado; a conferência de agendamento vigente pelo chat ou pelo Klingo roda depois: confirma, avisa se não achou no prazo, se o Klingo está com problema, se o exame sumiu ou mudou de data; exame futuro só deixa encerrar com o motivo Agendado) -> saída (PASS/FAIL por caso).
+// FLUXOGRAMA: entrada (supabase/encerramento-motivo.sql + encerramento-agendado.sql e as funções reais papel_atual, nome_confere, pessoa_membros e conversa_exame_aberto_trg, num Postgres embutido) -> validação (chave config.encerramento_valida_agendado desligada e ligada; usuário do painel x sistema) -> lógica (Agendado NUNCA é recusado; a conferência de agendamento vigente pelo chat ou pelo Klingo roda depois: confirma, avisa se não achou no prazo, se o Klingo está com problema, se o exame sumiu ou mudou de data; exame marcado nunca barra o encerramento) -> saída (PASS/FAIL por caso).
+// Versão 1.2 — 09/11/2026 / Mudança: nenhuma regra de exame em aberto barra mais o encerramento pela equipe
 // Versão 1.1 — 09/11/2026 / Mudança: encerrar como Agendado nunca é recusado; testes da conferência em segundo plano e do aviso
 // Versão 1.0 — 09/11/2026 / Mudança: Implementação inicial (WC-04)
 import { readFileSync } from 'node:fs';
@@ -70,27 +71,29 @@ const pushes = async () => (await db.query(`select body from net.chamadas order 
 const horario = (v) => db.query(`update public.config set valor = $1 where chave = 'horario_teste'`, [v]);
 const sem = /Não achei o agendamento|não achei o agendamento/;
 
-await caso('chave desligada: tudo como hoje (exame em aberto bloqueia até o motivo Agendado; Agendado sem agendamento fecha) e nada é conferido', async () => {
+await caso('exame em aberto (futuro ou já passado) NUNCA barra: a atendente encerra com qualquer motivo, com a chave ligada ou desligada', async () => {
+  await painel(); const r = [];
+  for (const ch of ['nao', 'sim']) {
+    await chave(ch); await limpar();
+    for (const [passou, motivo] of [[false, 'agendado'], [false, 'desistiu'], [true, 'agendado'], [true, 'apenas_informacoes'], [true, 'outro']]) {
+      const a = await nova(); await db.query(`insert into public.v_agendamento_aberto values ($1, $2)`, [a, passou]);
+      const e = await tenta(() => fechar(a, motivo)); r.push(e === '' && (await estado(a)) === 'encerrada');
+    }
+  }
+  return { ok: r.every(Boolean) && r.length === 10, detalhe: r.join() };
+});
+
+await caso('chave desligada: Agendado sem agendamento fecha e nada é conferido', async () => {
   await painel(); await chave('nao'); await limpar();
-  const a = await nova(); await db.query(`insert into public.v_agendamento_aberto values ($1, false)`, [a]);
-  const e1 = await tenta(() => fechar(a, 'agendado'));
   const b = await nova(); await fechar(b, 'agendado');
-  return { ok: /EXAME_EM_ABERTO/.test(e1) && (await estado(a)) === 'em_atendimento' && (await estado(b)) === 'encerrada' && !(await linha(b)) };
+  return { ok: (await estado(b)) === 'encerrada' && !(await linha(b)) };
 });
 
-await caso('chave ligada: exame FUTURO + Agendado encerra; os outros motivos continuam bloqueados', async () => {
+await caso('chave ligada, exame marcado pelo chat + Agendado: encerra e fica confirmado (fonte chat)', async () => {
   await painel(); await chave('sim'); await limpar();
   const a = await nova(); await db.query(`insert into public.v_agendamento_aberto values ($1, false)`, [a]);
-  const outro = await tenta(() => fechar(a, 'desistiu'));
   await fechar(a, 'agendado');
-  return { ok: /EXAME_EM_ABERTO/.test(outro) && (await estado(a)) === 'encerrada' && (await linha(a)).situacao === 'confirmado' && (await linha(a)).fonte === 'chat' };
-});
-
-await caso('chave ligada: exame que JÁ PASSOU continua bloqueando, mesmo como Agendado', async () => {
-  await painel(); await chave('sim'); await limpar();
-  const a = await nova(); await db.query(`insert into public.v_agendamento_aberto values ($1, true)`, [a]);
-  const e = await tenta(() => fechar(a, 'agendado'));
-  return { ok: /EXAME_EM_ABERTO/.test(e) && (await estado(a)) === 'em_atendimento' };
+  return { ok: (await estado(a)) === 'encerrada' && (await linha(a)).situacao === 'confirmado' && (await linha(a)).fonte === 'chat' };
 });
 
 await caso('SEM agendamento nenhum: Agendado ENCERRA (não recusa mais), fica "verificando" e ainda não avisa', async () => {

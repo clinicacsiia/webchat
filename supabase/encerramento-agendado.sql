@@ -1,4 +1,5 @@
--- FLUXOGRAMA: entrada (a equipe encerra uma conversa pelo painel com o motivo Agendado) -> validação (NADA é recusado: o encerramento sempre vale; o servidor só confere se há agendamento vigente da pessoa: pré-agendamento 'agendado' em aberto, ou cartão do Klingo ligado por prontuário confirmado ou por nome + telefone) -> lógica (grava a conferência em conversa_agendado_conferencia; a rotina agendado_vigiar, a cada 5 min, continua conferindo: achou = confirmado; não achou depois do prazo, leitura do Klingo com problema ou exame que mudou = aviso na conversa e push à equipe; exame futuro deixa de bloquear o encerramento SÓ quando o motivo é Agendado) -> saída (conversa encerrada + alerta_agenda quando algo não bate).
+-- FLUXOGRAMA: entrada (a equipe encerra uma conversa pelo painel com o motivo Agendado) -> validação (NADA é recusado: o encerramento sempre vale; o servidor só confere se há agendamento vigente da pessoa: pré-agendamento 'agendado' em aberto, ou cartão do Klingo ligado por prontuário confirmado ou por nome + telefone) -> lógica (grava a conferência em conversa_agendado_conferencia; a rotina agendado_vigiar, a cada 5 min, continua conferindo: achou = confirmado; não achou depois do prazo, leitura do Klingo com problema ou exame que mudou = aviso na conversa e push à equipe; exame marcado nunca bloqueia o encerramento) -> saída (conversa encerrada + alerta_agenda quando algo não bate).
+-- Versão 1.2 — 09/11/2026 / Mudança: NENHUMA regra de exame ou de Klingo barra mais o encerramento pela equipe (some também o EXAME_EM_ABERTO); a escolha da atendente é prioridade.
 -- Versão 1.1 — 09/11/2026 / Mudança: o encerramento como Agendado NUNCA mais é recusado (some AGENDADO_SEM_AGENDAMENTO / AGENDADO_AMBIGUO / AGENDADO_AGENDA_INDISPONIVEL); a conferência passa a rodar depois, em segundo plano, com aviso. Pedido do dono: a atendente não conseguia encerrar.
 -- Versão 1.0 — 09/11/2026 / Mudança: Implementação inicial (WC-04 da Atualização do WebChat). Decisão D2 aprovada.
 -- Pré-requisitos: encerramento-motivo.sql (motivo_encerramento), pessoa-unica.sql (v_agendamento_aberto, pessoa_membros, conversa_exame_aberto_trg), pessoa-unica-jornada.sql (pessoa_klingo_vinculo), jornada (jornada_card, jornada_exame, jornada_paciente, jornada_sync_estado), espera-longa.sql (horario_trabalho_agora). Aditivo e idempotente. Nenhum comando destrutivo.
@@ -6,7 +7,7 @@
 -- LIGAR: Configurações > Encerramento e avaliação > "Conferir a agenda ao encerrar como Agendado" (config.encerramento_valida_agendado = 'sim'). Desligado ('nao'): nada é conferido e tudo continua como antes.
 -- Prazo: config.agendado_conferir_prazo_min (minutos, padrão 120): quanto tempo a conferência espera o agendamento aparecer no Klingo antes de avisar a equipe.
 -- Limite conhecido: a UNIDADE não é comparada, porque os nomes diferem entre o chat (CSI, DESENVOAR…) e o Klingo (CSI 1, CSI 2, CSI Pediatria). A identidade (pessoa unida, prontuário confirmado, nome + telefone) é o que protege contra cruzar pacientes.
--- ROLLBACK: update public.config set valor = 'nao' where chave = 'encerramento_valida_agendado';  (efeito imediato) e select cron.unschedule('agendado-vigia'); Para voltar a função: definição anterior de conversa_exame_aberto_trg em pessoa-unica.sql.
+-- ROLLBACK: update public.config set valor = 'nao' where chave = 'encerramento_valida_agendado';  (efeito imediato) e select cron.unschedule('agendado-vigia'); Para voltar a barrar exame em aberto: definição anterior de conversa_exame_aberto_trg em pessoa-unica.sql.
 
 -- ===== PARTE 1: chave =====
 insert into public.config (chave, valor) values ('encerramento_valida_agendado', 'nao') on conflict (chave) do nothing;
@@ -80,23 +81,12 @@ end $$;
 revoke all on function public.agendamento_valido_para_encerrar(uuid) from public, anon;
 grant execute on function public.agendamento_valido_para_encerrar(uuid) to authenticated;
 
--- ===== PARTE 3: exame futuro deixa de bloquear só para o motivo Agendado (parte da definição atual do banco) =====
+-- ===== PARTE 3: exame marcado (futuro, em aberto ou já passado) NUNCA barra o encerramento =====
+-- Decisão do dono (09/11/2026): a escolha da atendente é prioridade. Antes (pessoa-unica.sql) a função recusava com EXAME_EM_ABERTO.
+-- A função e o gatilho continuam existindo (a ordem dos gatilhos não muda), mas a função só devolve a linha.
 create or replace function public.conversa_exame_aberto_trg() returns trigger
 language plpgsql security definer set search_path to '' as $$
-declare v_n integer; v_passou integer;
 begin
-  if new.status = 'encerrada' and old.status is distinct from 'encerrada' and coalesce((select public.papel_atual()), '') <> '' then
-    select count(*), count(*) filter (where v.passou) into v_n, v_passou
-      from public.v_agendamento_aberto v where v.conversa_id = any (public.pessoa_membros(new.id));
-    if v_n > 0 then
-      -- D2: com a chave ligada, Agendado encerra enquanto o exame ainda é futuro; ele segue na Jornada e o Klingo fecha o desfecho depois.
-      if new.motivo_encerramento = 'agendado' and v_passou = 0
-         and coalesce((select valor from public.config where chave = 'encerramento_valida_agendado'), 'nao') = 'sim' then
-        return new;
-      end if;
-      raise exception 'EXAME_EM_ABERTO: há % exame(s) marcado(s) sem desfecho. Registre se o paciente compareceu, faltou, cancelou ou remarcou antes de encerrar.', v_n using errcode = 'P0001';
-    end if;
-  end if;
   return new;
 end $$;
 revoke all on function public.conversa_exame_aberto_trg() from public, anon, authenticated;

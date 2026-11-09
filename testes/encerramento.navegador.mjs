@@ -160,22 +160,24 @@ await caso('o banco exige o motivo (painel antigo): o aviso aparece sem o códig
 
 const aberto = (passou) => [{ pre_id: 'p1', conversa_id: 'c2', chave: 'p1|2026-11-20T10:00', quando: '2026-11-20T10:00:00', exames: 'Ressonância de joelho', passou, unidade: 'CSI' }];
 
-await caso('exame ainda futuro: a janela só oferece Agendado e explica; o envio leva motivo agendado', async () => {
+await caso('exame ainda futuro: a janela oferece TODOS os motivos, sem restrição; o envio leva o motivo escolhido', async () => {
   const { page, ctx, reg } = await abrir({ quadroIndisponivel: true, abertos: aberto(false) });
   await abrirConversa(page); await page.waitForTimeout(500); await page.click('#chatTopo button:has-text("Encerrar")'); await page.waitForSelector('#motivoEnc');
   const ops = await motivosNoDialogo(page); const dica = await page.locator('dialog .dica').first().innerText();
-  await page.selectOption('#motivoEnc', 'agendado'); await page.click('dialog button:has-text("Encerrar atendimento")'); await page.waitForTimeout(500);
+  await page.selectOption('#motivoEnc', 'desistiu'); await page.click('dialog button:has-text("Encerrar atendimento")'); await page.waitForTimeout(500);
   await ctx.close();
   const p = patchesStatus(reg);
-  return { ok: ops.join('|') === 'Escolha o motivo…|Agendado' && /exame marcado ainda por vir/.test(dica) && p.length === 1 && p[0].motivo_encerramento === 'agendado', detalhe: ops.join('|') };
+  return { ok: ops.length === 6 && !/só dá para encerrar/.test(dica) && p.length === 1 && p[0].motivo_encerramento === 'desistiu', detalhe: ops.join('|') };
 });
 
-await caso('exame que já passou: o Encerrar é barrado antes da janela, sem chamar o banco', async () => {
+await caso('exame que já passou: o Encerrar NÃO é barrado; abre a janela e envia o motivo escolhido', async () => {
   const { page, ctx, reg } = await abrir({ quadroIndisponivel: true, abertos: aberto(true) });
-  await abrirConversa(page); await page.waitForTimeout(500); await page.click('#chatTopo button:has-text("Encerrar")'); await page.waitForTimeout(400);
-  const toast = await page.locator('#toast').innerText(); const dialogo = await page.evaluate(() => document.getElementById('dlg').open);
+  await abrirConversa(page); await page.waitForTimeout(500); await page.click('#chatTopo button:has-text("Encerrar")'); await page.waitForSelector('#motivoEnc');
+  const ops = await motivosNoDialogo(page);
+  await page.selectOption('#motivoEnc', 'apenas_informacoes'); await page.click('dialog button:has-text("Encerrar atendimento")'); await page.waitForTimeout(500);
   await ctx.close();
-  return { ok: /exame marcado sem desfecho/.test(toast) && !dialogo && patchesStatus(reg).length === 0, detalhe: toast.slice(0, 60) };
+  const p = patchesStatus(reg);
+  return { ok: ops.length === 6 && p.length === 1 && p[0].motivo_encerramento === 'apenas_informacoes', detalhe: ops.join('|') };
 });
 
 await caso('o servidor recusa o Agendado sem agendamento: o aviso aparece sem o código técnico', async () => {

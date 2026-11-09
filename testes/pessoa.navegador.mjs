@@ -187,7 +187,7 @@ await caso('assumir muda TODAS as conversas da pessoa de uma vez', async () => {
   return { ok: !!p && /id=in\./.test(decodeURIComponent(p.url)) && /m1/.test(p.url) && /m2/.test(p.url) && p.corpo.status === 'em_atendimento', detalhe: JSON.stringify(reg.patches) };
 });
 
-await caso('exame em aberto: aparece na conversa com os 4 desfechos e a pergunta ao paciente; o Encerrar é barrado sem chamar o banco', async () => {
+await caso('exame em aberto: aparece na conversa com os 4 desfechos e a pergunta ao paciente; o Encerrar NÃO é barrado (abre a janela do motivo e não grava nada até escolher)', async () => {
   const { page, ctx, reg } = await abrir();
   await filtro(page, 'Abertas');
   await page.click('.itens .item:has-text("Maria Souza")'); await page.waitForSelector('.ex-caixa');
@@ -196,10 +196,11 @@ await caso('exame em aberto: aparece na conversa com os 4 desfechos e a pergunta
   await page.waitForTimeout(600);
   const antes = reg.patches.length;
   await page.click('#chatTopo button:has-text("Encerrar")'); await page.waitForTimeout(400);
+  const janela = await page.evaluate(() => !!document.getElementById('motivoEnc') && document.getElementById('dlg').open);
   const toast = await page.locator('#toast, .toast').allInnerTexts().catch(() => []);
   await ctx.close();
   return { ok: /Exame em aberto/.test(caixa) && /RESSONANCIA DO JOELHO/.test(caixa) && /30\/10 às 09:00/.test(caixa) && /o horário já passou/.test(caixa)
-           && botoes.join('|') === 'Compareceu|Faltou|Cancelou|Remarcou|Perguntar ao paciente pelo chat' && reg.patches.length === antes && !reg.patches.some((x) => x.corpo.status === 'encerrada') && toast.join(' ').includes('sem desfecho'),
+           && botoes.join('|') === 'Compareceu|Faltou|Cancelou|Remarcou|Perguntar ao paciente pelo chat' && reg.patches.length === antes && !reg.patches.some((x) => x.corpo.status === 'encerrada') && janela && !toast.join(' ').includes('sem desfecho'),
            detalhe: `${botoes.join('|')} patches=${reg.patches.length - antes} toast=${toast.join('|')}` };
 });
 
