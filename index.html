@@ -198,6 +198,7 @@
   }
 
   /* Widgets dentro das mensagens */
+  .desp-img { display: block; max-width: 100%; max-height: 260px; margin-top: 4px; border-radius: 12px; }
   .widget { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--linha); white-space: normal; }
   .widget .w-titulo { font-weight: 650; font-size: calc(15.5px * var(--esc)); margin: 0 0 6px; }
   .widget fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
@@ -1334,12 +1335,25 @@
     } else if (o.tipo === 'calendario') {
       w.append(h('button', { class: 'btn-w', type: 'button', onclick: () => abrirCalendario(o.grupo || 1) }, o.rotulo || 'Escolher data e horário'),
         h('p', { class: 'w-nota' }, 'Os horários são uma previsão; o atendente confirma o dia e o horário.'));
+    } else if (o.tipo === 'despedida') {
+      // WC-06: a despedida é uma mensagem de sistema; se tiver imagem, ela é buscada com o token desta conversa (nunca de outra).
+      if (!(o.imagem && o.versao)) return;
+      widgetDespedida(w, o);
     } else return;
     if (Array.isArray(o.acoes) && o.acoes.length && o.passo) {
       w.append(h('div', { class: 'acoes-w' }, o.acoes.map((a) => h('button', { class: 'btn-w sec', type: 'button',
         onclick: (ev) => responder(o.passo, a.valor, a.rotulo, ev.currentTarget) }, a.rotulo))));
     }
     pai.append(w);
+  }
+
+  function widgetDespedida(w, o) {
+    w.style.borderTop = '0'; w.style.paddingTop = '0';
+    const img = h('img', { class: 'desp-img', alt: 'Imagem enviada pela clínica na despedida', hidden: true });
+    w.append(img);
+    db.rpc('chat_despedida_imagem', { p_conversa: conv.id, p_token: conv.token, p_versao: o.versao }).then(({ data }) => {
+      if (data && data.base64) { img.src = `data:${data.mime};base64,${data.base64}`; img.hidden = false; }
+    }, () => {});
   }
 
   /* escolha: botões grandes (um toque já responde), com filtro que vai estreitando a lista enquanto digita */

@@ -2197,6 +2197,15 @@
       c.status !== 'encerrada' ? h('button', { class: 'btn perigo', type: 'button', onclick: encerrar }, 'Encerrar') : null].filter(Boolean));
     renderProximo();
   }
+  // WC-06: imagem da despedida entregue ao paciente (a versão fica guardada; a equipe vê a mesma imagem). Carrega sob demanda e guarda em memória.
+  const IMG_DESPEDIDA = new Map();
+  function imagemDespedida(versao) {
+    const img = h('img', { alt: 'Imagem da despedida enviada ao paciente', style: 'display:block;max-width:220px;max-height:220px;margin-top:6px;border-radius:8px', hidden: true });
+    const pronto = (r) => { if (r && r.base64) { img.src = `data:${r.mime};base64,${r.base64}`; img.hidden = false; } };
+    if (IMG_DESPEDIDA.has(versao)) pronto(IMG_DESPEDIDA.get(versao));
+    else db.rpc('despedida_imagem', { p_versao: versao }).then(({ data }) => { IMG_DESPEDIDA.set(versao, data || null); pronto(data); }, () => {});
+    return img;
+  }
   function desenharMsgs(rolar) {
     const box = document.getElementById('msgs'); if (!box) return;
     const perto = box.scrollHeight - box.scrollTop - box.clientHeight < 180;
@@ -2214,6 +2223,7 @@
       out.push(h('div', { class: 'msg ' + m.autor + (m.excluida_em ? ' apagada' : ''), 'data-anexo': m.opcoes && m.opcoes.tipo === 'anexo' ? String(m.opcoes.id) : null },
         m.autor === 'agente' && quem !== ultimoQuem ? h('span', { class: 'quem' }, quem) : null,
         editando ? editorMsg(m) : h('span', {}, linkificar(m.texto)),
+        m.opcoes && m.opcoes.tipo === 'despedida' && m.opcoes.imagem && m.opcoes.versao ? imagemDespedida(m.opcoes.versao) : null,
         m.opcoes && m.opcoes.tipo === 'anexo' ? h('div', {}, h('button', { class: 'btn', type: 'button', style: 'margin-top:6px', onclick: (ev) => verAnexo(m.opcoes.id, ev.currentTarget, !!m.opcoes.geral) }, m.opcoes.geral ? 'Ver foto enviada pelo paciente' : 'Ver foto do pedido médico')) : null,
         h('span', { class: 'hora' }, fmtHora(m.criado_em) + (m.editada_em && !m.excluida_em ? ' · editada' : '')),
         editando ? null : acoesMsg(m)));
@@ -2662,6 +2672,9 @@
       { k: 'encerramento_exige_motivo', tipo: 'sim', rot: 'Exigir motivo ao encerrar', dica: 'Ligado: o painel só encerra a conversa com um motivo escolhido. Desligado: o motivo fica opcional.' },
       { k: 'encerramento_valida_agendado', tipo: 'sim', rot: 'Conferir a agenda ao encerrar como Agendado', dica: 'Ligado: só encerra como Agendado se houver agendamento vigente (chat ou Klingo), e exame ainda futuro deixa de bloquear o encerramento. Ligue depois de “Exigir motivo”.' },
     ] },
+    { id: 'despedida', icone: 'livro', titulo: 'Despedida do atendimento', desc: 'O que o paciente recebe quando a conversa é encerrada. Texto e imagem são opcionais; os dois vazios usam a frase padrão. Cada alteração vale só para os próximos encerramentos.', custom: 'despedida', campos: [
+      { k: 'despedida_configurada', tipo: 'sim', rot: 'Usar a despedida configurada', dica: 'Desligado: continua a frase padrão de sempre.' },
+    ] },
     { id: 'fila', icone: 'pessoas', titulo: 'Fila e recepção', desc: 'Fila de chegada, avisos e QR code da recepção.', campos: [
       { k: 'fila_autochegada', tipo: 'sim', rot: 'Paciente pode tocar “Cheguei”', dica: 'Desligado: só a recepção registra a chegada.' },
       { k: 'fila_aviso_antes', tipo: 'numero', rot: 'Avisar “está perto” quando restarem', min: 0, max: 20, sufixo: 'pessoas à frente' },
@@ -2788,6 +2801,61 @@ h1.longo { font-size: 14mm; }
       h('label', { class: 'rot', style: 'margin-top:8px' }, 'Link'), linkTxt,
       h('div', { class: 'qr-acoes' }, copiar, baixar, imprimir)));
   }
+  // WC-05: texto e imagem da despedida (só administrador salva; cada salvamento cria uma versão nova no banco).
+  const DESPEDIDA_PADRAO = 'Atendimento encerrado. Se precisar, é só mandar uma nova mensagem.';
+  function blocoDespedida() {
+    const caixa = h('div', { class: 'cfg-desp' });
+    const txt = h('textarea', { id: 'despTexto', rows: '3', maxlength: '600', placeholder: 'Vazio = “' + DESPEDIDA_PADRAO + '”' });
+    const arq = h('input', { type: 'file', id: 'despArq', accept: 'image/jpeg,image/png,image/webp' });
+    const previa = h('div', { class: 'cfg-desp-previa', 'aria-live': 'polite' });
+    const aviso = h('span', { class: 'dica', 'aria-live': 'polite' });
+    const salvar = h('button', { class: 'btn prim', type: 'button' }, 'Salvar despedida');
+    const tirar = h('button', { class: 'btn', type: 'button' }, 'Remover imagem');
+    let img = null;   // { mime, base64 } ou null
+    const desenhar = () => {
+      previa.replaceChildren(h('div', { class: 'msg sistema', style: 'max-width:360px' }, h('span', {}, txt.value.trim() || DESPEDIDA_PADRAO),
+        img ? h('img', { src: `data:${img.mime};base64,${img.base64}`, alt: 'Prévia da imagem da despedida', style: 'display:block;max-width:100%;margin-top:6px;border-radius:8px' }) : null));
+      tirar.hidden = !img;
+    };
+    // Reduz a imagem no aparelho (lado maior 1280 px, JPEG) para caber no limite do banco.
+    const reduzir = (arquivo) => new Promise((ok, falha) => {
+      const fr = new FileReader();
+      fr.onerror = () => falha(new Error('Não consegui ler o arquivo.'));
+      fr.onload = () => { const im = new Image(); im.onerror = () => falha(new Error('Esse arquivo não é uma imagem.')); im.onload = () => {
+        const f = Math.min(1, 1280 / Math.max(im.width, im.height)), c = document.createElement('canvas'); c.width = Math.round(im.width * f); c.height = Math.round(im.height * f);
+        const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); x.drawImage(im, 0, 0, c.width, c.height);
+        ok({ mime: 'image/jpeg', base64: c.toDataURL('image/jpeg', 0.85).split(',')[1] }); }; im.src = fr.result; };
+      fr.readAsDataURL(arquivo);
+    });
+    arq.addEventListener('change', async () => {
+      if (!arq.files[0]) return;
+      aviso.textContent = 'Preparando a imagem…';
+      try { img = await reduzir(arq.files[0]); aviso.textContent = ''; } catch (e) { aviso.textContent = e.message; img = null; arq.value = ''; }
+      desenhar();
+    });
+    tirar.addEventListener('click', () => { img = null; arq.value = ''; desenhar(); });
+    txt.addEventListener('input', desenhar);
+    salvar.addEventListener('click', async () => {
+      salvar.disabled = true; aviso.textContent = 'Salvando…';
+      const { error } = await db.rpc('despedida_salvar', { p_texto: txt.value, p_mime: img ? img.mime : null, p_base64: img ? img.base64 : null });
+      salvar.disabled = false;
+      if (error) { aviso.textContent = ''; toast(msgErro(error)); return; }
+      aviso.textContent = ''; toast('Despedida salva. Vale para os próximos encerramentos.');
+    });
+    caixa.append(h('div', { class: 'cfg-linha' }, h('label', { class: 'rot', for: 'despTexto' }, 'Texto da despedida'), txt, h('p', { class: 'dica' }, 'Até 600 caracteres. É mostrado como texto simples.')),
+      h('div', { class: 'cfg-linha' }, h('label', { class: 'rot', for: 'despArq' }, 'Imagem (opcional)'), h('div', { class: 'cfg-ctrl' }, arq, tirar), h('p', { class: 'dica' }, 'JPG, PNG ou WebP. A imagem é reduzida automaticamente.')),
+      h('div', { class: 'cfg-linha' }, h('span', { class: 'rot' }, 'Prévia (como o paciente recebe)'), previa),
+      h('div', { class: 'cfg-ctrl' }, salvar, aviso));
+    desenhar();
+    // Carrega o que está salvo. Sem o SQL da despedida aplicado, o bloco avisa em vez de quebrar a tela.
+    db.rpc('despedida_atual').then(async ({ data, error }) => {
+      if (error || !data) { caixa.replaceChildren(h('p', { class: 'dica' }, 'Disponível depois de aplicar o SQL da despedida (supabase/despedida.sql).')); return; }
+      txt.value = data.texto || '';
+      if (data.versao && data.tem_imagem) { const r = await db.rpc('despedida_imagem', { p_versao: data.versao }); if (r.data && r.data.base64) img = { mime: r.data.mime, base64: r.data.base64 }; }
+      desenhar();
+    }, () => {});
+    return caixa;
+  }
   async function viewConfig(c) {
     const { data, error } = await db.from('config').select('chave,valor');
     if (error) { c.replaceChildren(h('div', { class: 'pagina' }, h('p', { class: 'erro' }, msgErro(error)))); return; }
@@ -2813,6 +2881,7 @@ h1.longo { font-size: 14mm; }
     const urlBase = new URL('../', location.href), linkChat = urlBase.href, linkFila = new URL('../minha-vez/', location.href).href;
     const grupoUi = (g) => {
       const corpo = [g.desc ? h('p', { class: 'cfg-desc' }, g.desc) : null, ...g.campos.map(campoUi)];
+      if (g.custom === 'despedida') corpo.push(blocoDespedida());
       if (g.qr === 'fila') corpo.push(h('div', { class: 'cfg-qr' },
         cartaoQr('QR code da recepção', 'O paciente aponta a câmera, entra na fila e toca “Cheguei”. Imprima e deixe na recepção.', linkFila, 'recepcao', 'Chegou? Aponte a câmera aqui',
           { sub: 'Entre na fila pelo celular e acompanhe a sua vez.', passos: ['Abra a câmera do celular', 'Aponte para o QR code', 'Toque em “Cheguei”'] }),
