@@ -2,6 +2,7 @@
 -- Versão 1.0 — 09/11/2026 / Mudança: Implementação inicial (WC-03 da Atualização do WebChat). Decisão D1: 5 motivos.
 -- Pré-requisitos: 00-base-snapshot.sql, cronometro-resposta.sql (conversa_antes_update atual), pessoa-unica.sql / aplicar-automacao.sql (conversa_encerrar_se_resolvida). Aditivo e idempotente. Nenhum comando destrutivo.
 -- LIGAR: Configurações > Atualização do WebChat > "Exigir motivo ao encerrar" (config.encerramento_exige_motivo = 'sim'). Começa 'nao': o painel antigo em cache continua fechando conversas.
+-- CORREÇÃO 09/11/2026 (mesmo dia): faltavam o grant da coluna motivo_encerramento e o SECURITY DEFINER do gatilho (o atendente via "permission denied for table conversas"). Já aplicado no banco.
 -- ROLLBACK: update public.config set valor = 'nao' where chave = 'encerramento_exige_motivo';  (efeito imediato). Para voltar as funções: use as definições antigas de cronometro-resposta.sql (conversa_antes_update) e 00-base-snapshot.sql (conversa_status_mudou); as colunas e a tabela novas podem ficar.
 
 -- ===== PARTE 1: colunas, tabela de histórico e chave =====
@@ -48,7 +49,7 @@ insert into public.conversa_encerramento (conversa_id, encerrada_em)
 
 -- ===== PARTE 2: gatilho antes do update (parte da definição atual do banco, com o bloco do motivo) =====
 create or replace function public.conversa_antes_update() returns trigger
-language plpgsql set search_path to '' as $$
+language plpgsql security definer set search_path to '' as $$
 begin
   if new.status is distinct from old.status then
     new.encerrada_em := case when new.status = 'encerrada' then now() else null end;
@@ -77,6 +78,11 @@ begin
   end if;
   return new;
 end $$;
+-- SECURITY DEFINER de propósito: o atendente não tem permissão de ler public.config; sem isso a chave "exigir motivo" seria lida como desligada.
+revoke all on function public.conversa_antes_update() from public, anon, authenticated;
+-- Quem usa o painel só pode alterar algumas colunas de conversas (status, agente_id, nao_lidas_agente). O motivo precisa da sua própria permissão;
+-- autor e origem são preenchidos pelo gatilho, não pelo painel.
+grant update (motivo_encerramento) on public.conversas to authenticated;
 
 -- ===== PARTE 3: depois do update (mensagem de sistema como hoje + histórico do fechamento) =====
 create or replace function public.conversa_status_mudou() returns trigger

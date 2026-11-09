@@ -31,6 +31,15 @@ await db.exec(`
 `);
 const velho = (await db.query(`insert into public.conversas (status, encerrada_em) values ('encerrada', now() - interval '3 days') returning id`)).rows[0].id;
 
+// Permissões como no banco real: quem usa o painel (papel authenticated) só atualiza algumas colunas e NÃO lê a tabela config.
+await db.exec(`
+  alter table public.conversas add column nome_informado text;
+  alter table public.config enable row level security;
+  create policy config_admin on public.config for select using ((select public.papel_atual()) = 'admin');
+  grant select on public.config to authenticated;
+  grant select on public.conversas to authenticated; grant update (status, agente_id) on public.conversas to authenticated;
+  grant usage on schema public to authenticated;
+`);
 await caso('o arquivo aplica sem erro e pode ser aplicado de novo', async () => { await db.exec(sql); await db.exec(sql); return { ok: true }; });
 await db.exec(`
   create trigger conversas_antes_update before update on public.conversas for each row execute function public.conversa_antes_update();
@@ -145,6 +154,20 @@ await caso('resumo por motivo para a aba Indicadores: conta por motivo e os sem 
   await db.query(`select set_config('request.jwt.claims', $1, false)`, [JSON.stringify({ sub: '55555555-5555-5555-5555-555555555555' })]);
   let negado = false; try { await db.query(`select public.encerramentos_resumo(30)`); } catch { negado = true; }
   return { ok: r.total >= 10 && r.por_motivo.outro >= 1 && r.por_motivo.desistiu >= 1 && r.por_motivo.sem_motivo >= 1 && negado, detalhe: JSON.stringify(r.por_motivo) };
+});
+
+await caso('como atendente de verdade (papel authenticated, sem ler config): sem motivo é recusado, com motivo fecha, e outras colunas seguem bloqueadas', async () => {
+  await painel(); await exige('sim');
+  const c = await nova();
+  await db.exec(`set role authenticated`);
+  let semMotivo = '', outra = '';
+  try { await db.query(`update public.conversas set status = 'encerrada' where id = $1`, [c]); } catch (e) { semMotivo = e.message; }
+  let comMotivo = '';
+  try { await db.query(`update public.conversas set status = 'encerrada', motivo_encerramento = 'apenas_informacoes' where id = $1`, [c]); } catch (e) { comMotivo = e.message; }
+  try { await db.query(`update public.conversas set nome_informado = 'x' where id = $1`, [c]); } catch (e) { outra = e.message; }
+  await db.exec(`reset role`);
+  const r = await ler(c);
+  return { ok: /MOTIVO_OBRIGATORIO/.test(semMotivo) && comMotivo === '' && r.status === 'encerrada' && r.m === 'apenas_informacoes' && r.por === ana && /permission denied/.test(outra), detalhe: `${semMotivo.slice(0, 30)} | ${comMotivo} | ${outra.slice(0, 30)}` };
 });
 
 const falhas = resultados.filter((r) => !r).length;
