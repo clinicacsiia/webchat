@@ -8,6 +8,9 @@ Só na aba **Abertas** do Atendimento (modo Lista). Aguardando, Meus, Encerradas
 2. **Sem atendente**: ninguém assumiu; vale para todo mundo.
 3. **Minhas conversas**.
 4. Um grupo por atendente, em ordem alfabética.
+5. **Aguardando resposta do paciente** (sempre por último): conversas em atendimento em que a equipe já respondeu e o paciente ainda não voltou. Saem do grupo do atendente para não poluir a fila dele, mostram "Sem resposta há X" e voltam ao grupo do atendente quando o paciente responde. Usa `aguarda_paciente_desde`.
+
+**Ordem dentro de cada grupo:** quem espera há mais tempo vem primeiro (a mensagem mais antiga a resolver). No grupo "Aguardando resposta do paciente" vale a última mensagem da equipe; nos demais, a espera do paciente. Conversas sem espera ficam por último, na ordem de sempre.
 
 Clicar no título do grupo recolhe/expande. Cada conversa aparece uma vez só (a que está em "Precisam de atenção" não repete no grupo do dono).
 
@@ -21,7 +24,7 @@ Obs.: o banco não guarda "quando a conversa foi assumida"; por isso a regra olh
 
 ## Teste
 
-`cd testes && npm run test:lista-agrupada` (4 verificações em navegador, Supabase simulado).
+`cd testes && npm run test:lista-agrupada` (5 verificações em navegador, Supabase simulado).
 
 ## Quadrado "Aguardando paciente" (09/11/2026)
 

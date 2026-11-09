@@ -29,6 +29,12 @@ const CONVERSAS = [
   com(conversa('c3', 'Ana Paula', 'em_atendimento', OUTRO.id), h(0.2)),
   com(conversa('c4', 'Pedro Alves', 'em_atendimento', OUTRO.id), h(2.5)),
   conversa('c5', 'Lia Nunes', 'encerrada', OUTRO.id),
+  // Equipe já respondeu e o paciente demora (aguarda_paciente_desde): vão para o grupo "Aguardando resposta do paciente", da mais antiga (c8, 9 h) para a mais nova (c7, 1 h).
+  { ...conversa('c6', 'Rita Dias', 'em_atendimento', OUTRO.id), cliente_aguarda_desde: null, aguarda_paciente_desde: h(5) },
+  { ...conversa('c7', 'Zé Costa', 'em_atendimento', EU.id), cliente_aguarda_desde: null, aguarda_paciente_desde: h(1) },
+  { ...conversa('c8', 'Bia Sol', 'em_atendimento', OUTRO.id), cliente_aguarda_desde: null, aguarda_paciente_desde: h(9) },
+  // Paciente esperando a equipe há 30 min (mais antigo que a Ana Paula, 12 min): deve vir antes dela no grupo do atendente.
+  com(conversa('c9', 'Caio Reis', 'em_atendimento', OUTRO.id), h(0.5)),
 ];
 const COLUNAS = [['contato', 'Em conversa no chat', 1, 'manual'], ['orcamento', 'Pedido pronto', 2, 'manual'], ['autorizacao', 'Aguardando autorização', 3, 'manual'], ['agendado', 'Agendado (veio do chat)', 4, 'klingo'], ['perdido', 'Perdido', 23, 'manual']]
   .map(([id, nome, ordem, origem]) => ({ id, nome, ordem, origem }));
@@ -102,7 +108,7 @@ await caso('Abertas: agrupa por atendente, com "Precisam de atenção" e "Sem at
   const { page, ctx, reg } = await abrir('Abertas');
   const g = await grupos(page);
   await ctx.close();
-  return { ok: g.join('|') === 'Precisam de atenção:1|Sem atendente:1|Minhas conversas:1|Outra Pessoa:1' && !reg.excecoes.length, detalhe: reg.excecoes[0] ?? g.join('|') };
+  return { ok: g.join('|') === 'Precisam de atenção:1|Sem atendente:1|Minhas conversas:1|Outra Pessoa:2|Aguardando resposta do paciente:3' && !reg.excecoes.length, detalhe: reg.excecoes[0] ?? g.join('|') };
 });
 
 await caso('Conversa assumida há mais de 2 h aparece em "Precisam de atenção" com o aviso de quem assumiu, e não repete no grupo do atendente', async () => {
@@ -111,6 +117,17 @@ await caso('Conversa assumida há mais de 2 h aparece em "Precisam de atenção"
   const total = await page.locator('.item:has-text("Pedro Alves")').count();
   await ctx.close();
   return { ok: /Pedro Alves/.test(dentro) && /Outra Pessoa assumiu e ainda não resolveu/.test(dentro) && total === 1, detalhe: dentro.replace(/\n/g, ' ') };
+});
+
+await caso('"Aguardando resposta do paciente": fica no fim, tira a conversa do grupo do atendente e ordena da mais antiga para a mais nova', async () => {
+  const { page, ctx, reg } = await abrir('Abertas');
+  const nomes = (g) => page.locator(`.grupo-cab[data-grupo=${g}]`).evaluate((b) => { const o = []; for (let e = b.nextElementSibling; e && e.classList.contains('item'); e = e.nextElementSibling) o.push(e.querySelector('.l1 span').textContent); return o; });
+  const pac = await nomes('aguardapac'), outro = await nomes('ag-22222222-2222-4222-8222-222222222222'), meus = await nomes('ag-11111111-1111-4111-8111-111111111111');
+  const ultimo = (await grupos(page)).at(-1);
+  const tag = await page.locator('.grupo-cab[data-grupo=aguardapac] ~ .item').first().innerText();
+  await ctx.close();
+  return { ok: pac.join() === 'Bia Sol,Rita Dias,Zé Costa' && outro.join() === 'Caio Reis,Ana Paula' && meus.join() === 'João Lima' && /Aguardando resposta/.test(ultimo) && /Sem resposta há 9 h/.test(tag) && !reg.excecoes.length,
+    detalhe: `${pac} | ${outro} | ${meus} | ${tag.replace(/\n/g, ' ')}` + (reg.excecoes[0] ?? '') };
 });
 
 await caso('Só a aba Abertas é agrupada (Aguardando, Meus e a busca continuam em lista simples)', async () => {
@@ -129,7 +146,7 @@ await caso('Clicar no título do grupo recolhe e expande as conversas dele', asy
   await page.click('.grupo-cab[data-grupo=livres]');
   const volta = await page.locator('.item').count();
   await ctx.close();
-  return { ok: antes === 4 && depois === 3 && volta === 4, detalhe: `${antes}/${depois}/${volta}` };
+  return { ok: antes === 8 && depois === 7 && volta === 8, detalhe: `${antes}/${depois}/${volta}` };
 });
 
 await browser.close(); srv.close();

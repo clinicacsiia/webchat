@@ -1556,7 +1556,12 @@
   const fmtDiaSP = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' });
   // A equipe respondeu por último e o paciente ainda não voltou (aguarda_paciente_desde, o mesmo marco do encerramento automático).
   // Se alguma conversa da mesma pessoa tem o paciente esperando a equipe, ela não conta aqui.
-  const aguardaPaciente = (p) => p.membros.some((m) => m.status === 'em_atendimento' && m.aguarda_paciente_desde) && !desdeEspera(p);
+  function desdeAguardaPac(p) {   // quando a equipe falou (a mais antiga, entre as conversas da pessoa) e o paciente ainda não voltou; 0 = não está aguardando
+    let min = 0;
+    for (const m of p.membros) { const t = m.status === 'em_atendimento' && m.aguarda_paciente_desde ? Date.parse(m.aguarda_paciente_desde) : 0; if (t && (!min || t < min)) min = t; }
+    return min;
+  }
+  const aguardaPaciente = (p) => !!desdeAguardaPac(p) && !desdeEspera(p);
   const mediaTxt = (n) => (n == null ? '—' : Number(n).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
   function atualizarKpis() {
     const box = document.getElementById('kpis'), sino = document.getElementById('sinoPonto');
@@ -1962,16 +1967,21 @@
   const emAtencao = (p) => { if (!donoDe(p)) return false; const d = desdeEspera(p); return !!d && (Date.now() - d) / 1000 >= LIMITE_ATENCAO; };
   const nomeAgente = (id) => { const a = S.agentes.get(id); return a ? a.nome : 'Outro atendente'; };
   function itensAgrupados(lista) {
-    const atencao = [], livres = [], porDono = new Map();
+    const atencao = [], livres = [], aguardaPac = [], porDono = new Map();
     for (const p of lista) {
       const dono = donoDe(p);
       if (emAtencao(p)) atencao.push(p);
       else if (!dono) livres.push(p);
+      else if (aguardaPaciente(p)) aguardaPac.push(p);   // equipe já respondeu e o paciente demora: sai da fila de cada atendente para não poluir
       else { if (!porDono.has(dono)) porDono.set(dono, []); porDono.get(dono).push(p); }
     }
     const donos = [...porDono.keys()].sort((a, b) => (a === S.me.id ? -1 : b === S.me.id ? 1 : nomeAgente(a).localeCompare(nomeAgente(b), 'pt-BR')));
     const grupos = [['atencao', 'Precisam de atenção', atencao, 'Assumidas há mais de 2 h e ainda sem resposta. Aparecem para todos até alguém resolver.'], ['livres', 'Sem atendente', livres, 'Ninguém assumiu ainda. Qualquer pessoa pode pegar.'],
-      ...donos.map((id) => ['ag-' + id, id === S.me.id ? 'Minhas conversas' : nomeAgente(id), porDono.get(id), ''])];
+      ...donos.map((id) => ['ag-' + id, id === S.me.id ? 'Minhas conversas' : nomeAgente(id), porDono.get(id), '']),
+      ['aguardapac', 'Aguardando resposta do paciente', aguardaPac, 'A equipe já respondeu e o paciente ainda não voltou. Ficam aqui, da mais antiga para a mais recente, para não poluir a fila de cada atendente. Voltam ao grupo do atendente quando o paciente responde.']];
+    // Dentro de cada grupo: quem espera há mais tempo primeiro (a mensagem mais antiga a resolver); sem espera ficam por último, na ordem de sempre.
+    const chaveOrdem = (chave, p) => (chave === 'aguardapac' ? desdeAguardaPac(p) : desdeEspera(p)) || Infinity;
+    for (const g of grupos) { const chave = g[0]; g[2] = g[2].map((p, i) => [p, i]).sort((a, b) => { const x = chaveOrdem(chave, a[0]), y = chaveOrdem(chave, b[0]); return x === y ? a[1] - b[1] : x < y ? -1 : 1; }).map((e) => e[0]); }
     const out = [];
     for (const [chave, titulo, itens, dica] of grupos) {
       if (!itens.length) continue;
@@ -2007,7 +2017,8 @@
           c.ia_ativa && st === 'aguardando' ? h('span', { style: 'color:var(--suave)' }, c.motor === 'fluxo' ? 'Assistente automático' : 'IA atendendo') : null,
           ag ? h('span', { style: 'color:var(--suave)' }, ag.nome) : null,
           destacarDono ? h('span', { class: 'urg alta', title: 'Conversa assumida há mais de 2 h, com o paciente esperando resposta' }, `⚠ ${nomeAgente(donoDe(p))} assumiu e ainda não resolveu`) : null,
-          desde && seg >= LIMITE_ESPERA ? h('span', { class: 'cron', title: 'Tempo que o paciente espera uma resposta' }, '⏱ ' + fmtCron(seg)) : null));
+          desde && seg >= LIMITE_ESPERA ? h('span', { class: 'cron', title: 'Tempo que o paciente espera uma resposta' }, '⏱ ' + fmtCron(seg)) : null,
+          aguardaPaciente(p) ? h('span', { class: 'urg', 'data-pac': desdeAguardaPac(p), title: 'Tempo desde a última mensagem da equipe, sem resposta do paciente' }, '💬 Sem resposta há ' + fmtHa((Date.now() - desdeAguardaPac(p)) / 1000)) : null));
     }
   }
   // Cronômetro de resposta: desde quando o paciente espera alguém da equipe (coluna cliente_aguarda_desde).
@@ -2022,6 +2033,7 @@
     }
     return min;
   }
+  const fmtHa = (s) => { const m = Math.max(0, Math.floor(s / 60)); return m < 60 ? m + ' min' : Math.floor(m / 60) + ' h' + (m % 60 ? ' ' + String(m % 60).padStart(2, '0') + ' min' : ''); };
   const fmtCron = (s) => { s = Math.max(0, Math.floor(s)); const h2 = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), x = s % 60; return (h2 ? h2 + ':' + String(m).padStart(2, '0') : String(m).padStart(2, '0')) + ':' + String(x).padStart(2, '0'); };
   // A cada segundo atualiza os cronômetros; quando uma conversa passa de 2 minutos, redesenha a lista para ela ficar vermelha.
   setInterval(() => {
@@ -2034,6 +2046,7 @@
       if (el.dataset.dono === '1' && (seg >= LIMITE_ATENCAO) !== (el.dataset.atencao === '1')) { redesenhar = true; break; }   // cruzou as 2 h: muda de grupo
       const c = el.querySelector('.cron'); if (c) c.textContent = '⏱ ' + fmtCron(seg);
     }
+    for (const el of document.querySelectorAll('[data-pac]')) el.textContent = '💬 Sem resposta há ' + fmtHa((Date.now() - Number(el.dataset.pac)) / 1000);
     if (redesenhar) renderLista();
   }, 1000);
 
