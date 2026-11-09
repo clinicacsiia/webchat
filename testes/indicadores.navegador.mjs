@@ -18,11 +18,14 @@ const TIPOS = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '
 const CORS = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' };
 const agora = new Date().toISOString();
 const conversa = (id, nome, status, unidade) => ({ id, status, agente_id: null, ultima_mensagem: 'oi', nao_lidas_agente: 0, criado_em: agora, atualizado_em: agora, contato_id: 'ct-' + id, ia_ativa: false, motor: 'fluxo',
-  triagem_resumo: null, triagem_urgencia: null, alerta_agenda: null, nome_informado: nome, email_informado: null, unidade_inicial: unidade, cliente_aguarda_desde: null,
+  triagem_resumo: null, triagem_urgencia: null, alerta_agenda: null, nome_informado: nome, email_informado: null, unidade_inicial: unidade, cliente_aguarda_desde: null, aguarda_paciente_desde: null,
   contatos: { id: 'ct-' + id, nome, telefone: '7190000' + id.slice(1), email: null } });
 // c1 e c2 são a mesma pessoa; c4 é da CSI; c5 já foi encerrada.
 const CONVERSAS = [conversa('c1', 'Maria Souza', 'aguardando', 'desenvoar'), conversa('c2', 'Maria Souza', 'em_atendimento', 'desenvoar'), conversa('c3', 'Ana Paula', 'em_atendimento', 'desenvoar'),
   conversa('c4', 'Pedro Alves', 'em_atendimento', 'csi'), conversa('c5', 'Lia Nunes', 'encerrada', 'desenvoar')];
+// c3 (Desenvoar): a equipe respondeu e o paciente não voltou -> conta. c4 (CSI): também respondida, mas o paciente já mandou outra mensagem sem resposta -> NÃO conta.
+const antes = new Date(Date.now() - 3600e3).toISOString();
+CONVERSAS[2].aguarda_paciente_desde = antes; CONVERSAS[3].aguarda_paciente_desde = antes; CONVERSAS[3].cliente_aguarda_desde = antes;
 const GRUPOS = [{ conversa_id: 'c1', grupo_id: 'g1', sinais: ['nome'], origem: 'auto', confirmado_por: null }, { conversa_id: 'c2', grupo_id: 'g1', sinais: ['nome'], origem: 'auto', confirmado_por: null }];
 const RESUMO = (total, pessoas, media, fin) => ({ periodo_dias: 1, unidade: null, desde: agora, gerado_em: agora,
   conversas: { total, pessoas, finalizadas: fin, em_andamento: total - fin, media_por_pessoa: media },
@@ -96,6 +99,16 @@ await caso('Cartões do topo (todas as unidades): 5 conversas, 4 pessoas, média
   if (process.env.FOTO) await page.screenshot({ path: process.env.FOTO + '/topo.png', clip: { x: 256, y: 0, width: 1184, height: 190 } });
   await ctx.close();
   return { ok: k['Conversas hoje'] === '5' && k['Pessoas hoje'] === '4' && k['Conversas por pessoa'] === '1,25' && k['Encerradas hoje'] === '1' && !reg.excecoes.length, detalhe: JSON.stringify(k) + (reg.excecoes[0] ?? '') };
+});
+
+await caso('Quadrado "Aguardando paciente": conta quem a equipe já respondeu e não voltou (1), e o filtro de unidade vale', async () => {
+  const { page, ctx, reg } = await abrir(); await esperaCartao(page, 'Aguardando paciente', '1');
+  const todas = await cartoes(page);
+  await page.selectOption('#selUnidade', 'csi'); await esperaCartao(page, 'Aguardando paciente', '0');
+  await page.selectOption('#selUnidade', 'desenvoar'); await esperaCartao(page, 'Aguardando paciente', '1');
+  if (process.env.FOTO) await page.screenshot({ path: process.env.FOTO + '/topo-aguardando.png', clip: { x: 256, y: 0, width: 1184, height: 190 } });
+  await ctx.close();
+  return { ok: todas['Aguardando paciente'] === '1' && todas['Em espera'] === '1' && !reg.excecoes.length, detalhe: JSON.stringify(todas) + (reg.excecoes[0] ?? '') };
 });
 
 await caso('Filtro de unidade Desenvoar vale para os cartões: some a conversa da CSI (4 conversas, 3 pessoas, média 1,33)', async () => {

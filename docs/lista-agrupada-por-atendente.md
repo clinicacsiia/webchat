@@ -15,8 +15,14 @@ Clicar no título do grupo recolhe/expande. Cada conversa aparece uma vez só (a
 
 Usa o cronômetro que já existe (`cliente_aguarda_desde`): tempo desde a última mensagem do paciente sem resposta de uma pessoa. Quando a conversa cruza as 2 h, a lista se redesenha sozinha e ela sobe. Se o atendente responder, o cronômetro zera e ela volta para o grupo dele. O limite é `LIMITE_ATENCAO` em `painel/index.html`.
 
+**Conversas unidas (correção de 09/11/2026, `supabase/cronometro-grupo.sql`):** a resposta de uma pessoa da equipe zera o cronômetro de **todas** as conversas abertas da mesma pessoa (mesmo grupo ou mesmo contato), não só a da mensagem. Antes, o atendente respondia na conversa mais recente e o relógio da antiga continuava rodando; como a lista usa a espera mais antiga do grupo, o contador não parava e a conversa ficava em "Precisam de atenção". O mesmo arquivo conserta as conversas que já estavam com o relógio atrasado. Teste: `npm run test:cronometro-grupo`.
+
 Obs.: o banco não guarda "quando a conversa foi assumida"; por isso a regra olha o tempo de espera do paciente, não o tempo desde a assunção.
 
 ## Teste
 
 `cd testes && npm run test:lista-agrupada` (4 verificações em navegador, Supabase simulado).
+
+## Quadrado "Aguardando paciente" (09/11/2026)
+
+Novo cartão nos indicadores do topo, entre "Em espera" e "Encerradas hoje". Conta **pessoas** com conversa em atendimento em que a equipe já respondeu e o paciente ainda não voltou (usa `aguarda_paciente_desde`, o mesmo marco do encerramento automático). Sai da conta quando o paciente responde ou a conversa é encerrada, e não conta se outra conversa da mesma pessoa tem o paciente esperando a equipe. Respeita o filtro de unidade do topo. Teste: `npm run test:indicadores`.
