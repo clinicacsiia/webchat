@@ -1,6 +1,6 @@
 # Motivo no encerramento (WC-03, 09/11/2026)
 
-**Estado: pronto no repositório e testado. O SQL ainda NÃO foi aplicado no Supabase.**
+**Estado: pronto no repositório e testado. SQL aplicado no Supabase em 09/11/2026 (tudo desligado).**
 
 ## O que muda
 - Ao tocar **Encerrar** no painel, a janela pede o **motivo** (lista fixa): Agendado, Apenas informações, Não respondido, Paciente desistiu, Outro motivo. Com cartão no quadro, a mesma janela pergunta também para onde o cartão vai.
@@ -15,7 +15,7 @@ Configurações > **Encerramento e avaliação** > "Exigir motivo ao encerrar" (
 - `sim`: o banco recusa encerrar pelo painel sem motivo (erro `MOTIVO_OBRIGATORIO`). Sistema e motor não são barrados.
 
 ## Como colocar no ar
-1. Aplicar `supabase/encerramento-motivo.sql` (4 partes; cada uma roda em menos de 60 s).
+1. ~~Aplicar `supabase/encerramento-motivo.sql`~~ (feito em 09/11/2026).
 2. Publicar o site (painel novo, `painel/sw.js` v6).
 3. Usar por um dia e conferir a aba **Indicadores** e o **quadro**.
 4. Ligar a chave.
@@ -29,7 +29,7 @@ Desfazer: voltar a chave para `nao` (imediato). As funções antigas estão em `
 
 # Agendado confere a agenda (WC-04, 09/11/2026)
 
-**Estado: pronto no repositório e testado. O SQL ainda NÃO foi aplicado.** Arquivo: `supabase/encerramento-agendado.sql`. Depende do SQL do motivo acima.
+**Estado: pronto no repositório e testado. SQL aplicado no Supabase em 09/11/2026 (tudo desligado).** Arquivo: `supabase/encerramento-agendado.sql`. Depende do SQL do motivo acima.
 
 ## O que muda (decisão D2 aprovada)
 - Ao encerrar como **Agendado**, o servidor procura um **agendamento vigente** da pessoa:

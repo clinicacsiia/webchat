@@ -1,6 +1,6 @@
 # Avaliação voluntária do atendimento (WC-09 e WC-10, 09/11/2026)
 
-**Estado: pronto no repositório e testado. O SQL ainda NÃO foi aplicado. NÃO ligue antes de o jurídico revisar a privacidade (D5).** Arquivo: `supabase/avaliacao.sql` (depois de `encerramento-motivo.sql` e `despedida.sql`).
+**Estado: pronto no repositório e testado. SQL aplicado no Supabase em 09/11/2026 (tudo desligado). NÃO ligue antes de o jurídico revisar a privacidade (D5).** Arquivo: `supabase/avaliacao.sql` (depois de `encerramento-motivo.sql` e `despedida.sql`).
 
 ## O que o paciente vê
 Abaixo da despedida aparece o botão **Avaliar o atendimento**. Ele é opcional: ao tocar, abre um formulário com

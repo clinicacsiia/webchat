@@ -1,6 +1,6 @@
 # Encerramento automático após 24 h sem resposta do paciente (WC-08, 09/11/2026)
 
-**Estado: pronto no repositório e testado. O SQL ainda NÃO foi aplicado.** Arquivo: `supabase/autoencerrar.sql` (depois de `encerramento-motivo.sql` e `despedida.sql`). Começa **desligado**.
+**Estado: pronto no repositório e testado. SQL aplicado no Supabase em 09/11/2026 (tudo desligado).** Arquivo: `supabase/autoencerrar.sql` (depois de `encerramento-motivo.sql` e `despedida.sql`). Começa **desligado**.
 
 ## Regra (decisão D3)
 - O relógio começa quando uma **pessoa da equipe** escreve numa conversa **em atendimento** e o paciente não responde. Mensagem do **assistente automático** e mensagens de sistema **não contam**. Nova mensagem da equipe **reinicia** as 24 h. Mensagem do paciente **zera**.

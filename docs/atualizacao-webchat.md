@@ -30,7 +30,7 @@ Legenda: **[Claude]** eu faço no repositório; **[Você]** só você consegue.
 | 6 | WC-07 Topo da conversa mais baixo (só tela) | Claude | **Pronto e testado** |
 | 7 | WC-08 Encerramento automático 24 h (`supabase/autoencerrar.sql`), começa desligado | Claude | **Código e testes prontos** |
 | 8 | WC-09/10 Avaliação voluntária (`supabase/avaliacao.sql`) | Claude | **Código e testes prontos** |
-| 9 | **Aplicar os 5 SQL no Supabase**, nesta ordem: motivo, agendado, despedida, autoencerrar, avaliação (editor: https://supabase.com/dashboard/project/nrvuynjwcgwpjdptkiay/sql/new). Tudo entra desligado | Você autoriza, Claude aplica | **Aguardando o seu "pode aplicar"** |
+| 9 | **Aplicar os 5 SQL no Supabase**, nesta ordem: motivo, agendado, despedida, autoencerrar, avaliação (editor: https://supabase.com/dashboard/project/nrvuynjwcgwpjdptkiay/sql/new). Tudo entra desligado | Claude | **Feito em 09/11/2026** (tudo desligado; conferido no banco real e testado em transação desfeita) |
 | 10 | **Publicar o site** (GitHub Pages: unir a branch na `main`) e testar no celular | Você | Depois do 9 |
 | 11 | WC-02 Correção do reconhecimento de agendamento | Claude | Depois dos passos 1 e 2 |
 

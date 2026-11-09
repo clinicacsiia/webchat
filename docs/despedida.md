@@ -1,6 +1,6 @@
 # Despedida configurável (WC-05 e WC-06, 09/11/2026)
 
-**Estado: pronto no repositório e testado. O SQL ainda NÃO foi aplicado no Supabase.** Arquivo: `supabase/despedida.sql` (depende de `encerramento-motivo.sql`).
+**Estado: pronto no repositório e testado. SQL aplicado no Supabase em 09/11/2026 (tudo desligado).** Arquivo: `supabase/despedida.sql` (depende de `encerramento-motivo.sql`).
 
 ## O que muda
 - Em **Configurações > Despedida do atendimento** o **administrador** escreve um texto (até 600 caracteres) e/ou escolhe uma imagem (JPG, PNG ou WebP, reduzida no aparelho), vê a **prévia** e salva. Os dois vazios = a frase de sempre ("Atendimento encerrado. Se precisar, é só mandar uma nova mensagem.").
