@@ -1,5 +1,7 @@
 # Atualização do WebChat: lista para não esquecer (09/11/2026)
 
+**Situação final de 09/11/2026:** site publicado na `main` (PR #104; chat v14, painel v9), SQL aplicado e **todas as chaves ligadas** (motivo, Agendado com agenda, despedida com a frase padrão, encerramento automático em modo *ligado*, avaliação). Falta o que está em "Pendências" abaixo.
+
 Planilha de origem: `Backlog_Atualizacao_WebChat` (ajustada ao programa). Esta lista é o **controle**: cada item tem quem faz e o link de onde. Marque aqui quando terminar.
 
 Projeto Supabase: `nrvuynjwcgwpjdptkiay`. Editor de SQL: https://supabase.com/dashboard/project/nrvuynjwcgwpjdptkiay/sql/new
@@ -52,3 +54,11 @@ Para desfazer qualquer uma: volte a chave para `nao` (ou `desligado`). Efeito im
 - [ ] Depois de ligar o WC-03, conferir a aba **Indicadores** e o **quadro** (contagens iguais).
 - [ ] Rodar `cd testes && npm test` antes de cada publicação.
 - [ ] Atualizar o `LEIAME.md` a cada etapa concluída.
+
+## Pendências (09/11/2026, depois de ligar tudo)
+- [ ] **WC-02** (reconhecimento de agendamento): precisa de 1 ou 2 pacientes reais já marcados no Klingo que aparecem como `pronto`, e do relatório do Klingo "Marcações por Data do Exame".
+- [ ] Escrever o **texto e a imagem da despedida** em Configurações > Despedida (hoje usa a frase padrão).
+- [ ] **Jurídico** revisar a `privacidade.html` (a avaliação foi incluída como texto-base, em revisão).
+- [ ] Amanhã (10/11): conferir em Configurações o "Encerramento automático" (quantas encerrou) e, se algo foi encerrado indevido, usar Reabrir (lista em `autoencerramento_fechada`).
+- [ ] Conferir a aba Indicadores e o quadro com o motivo ligado, e testar o chat no celular (despedida e avaliação).
+- [ ] Falhas antigas dos testes (convenio, assuntos, login, pessoa, jornada), que já existiam antes desta atualização.
