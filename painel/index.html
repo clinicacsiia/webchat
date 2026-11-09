@@ -472,7 +472,7 @@
   .kpi .ic-k.az { background: var(--csi-primary-soft); color: var(--csi-primary-strong); } .kpi .ic-k.la { background: var(--csi-warning-soft); color: var(--csi-warning-strong); }
   .kpi .ic-k.ve { background: var(--csi-success-soft); color: var(--csi-success-strong); } .kpi .ic-k.vm { background: var(--csi-danger-bg); color: var(--csi-danger-strong); }
   .kpi small { display: block; color: var(--csi-text-secondary); font-weight: 600; font-size: 13px; } .kpi strong { font-size: 28px; line-height: 1.1; }
-  @media (min-width: 1240px) { .kpis { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; } .kpi { padding: 10px 12px; gap: 10px; } .kpi .ic-k { width: 38px; height: 38px; } .kpi strong { font-size: 24px; } .kpi small { font-size: 12px; } }
+  @media (min-width: 1240px) { .kpis { grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 10px; } .kpi { padding: 10px 12px; gap: 10px; } .kpi .ic-k { width: 38px; height: 38px; } .kpi strong { font-size: 24px; } .kpi small { font-size: 12px; } }
   .item { display: grid; grid-template-columns: 40px minmax(0, 1fr); column-gap: 12px; align-items: start; }
   .item > .av-i { grid-row: 1 / span 3; align-self: center; width: 40px; height: 40px; }
   .item > div { grid-column: 2; min-width: 0; }
@@ -571,6 +571,7 @@
     sino: '<path d="M6 17v-6a6 6 0 0 1 12 0v6l1.5 2h-15zM10 21h4"/>',
     calendario: '<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/>',
     ampulheta: '<path d="M7 3h10M7 21h10M8 3c0 5 8 5 8 9s-8 4-8 9M16 3c0 5-8 5-8 9s8 4 8 9"/>',
+    relogio: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
     ok: '<path d="m5 12 5 5 9-10"/>',
     alerta: '<path d="M12 3 2 20h20zM12 10v4M12 17v.5"/>'
   };
@@ -1553,6 +1554,9 @@
   }
   // Dia de hoje no fuso de São Paulo (o mesmo do banco e da aba Indicadores), não o do aparelho.
   const fmtDiaSP = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' });
+  // A equipe respondeu por último e o paciente ainda não voltou (aguarda_paciente_desde, o mesmo marco do encerramento automático).
+  // Se alguma conversa da mesma pessoa tem o paciente esperando a equipe, ela não conta aqui.
+  const aguardaPaciente = (p) => p.membros.some((m) => m.status === 'em_atendimento' && m.aguarda_paciente_desde) && !desdeEspera(p);
   const mediaTxt = (n) => (n == null ? '—' : Number(n).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
   function atualizarKpis() {
     const box = document.getElementById('kpis'), sino = document.getElementById('sinoPonto');
@@ -1563,6 +1567,7 @@
     const nConv = doDia.reduce((t, ms) => t + ms.length, 0), nHoje = doDia.length;
     const nFim = doDia.reduce((t, ms) => t + ms.filter((m) => m.status === 'encerrada').length, 0);
     const nEspera = todas.filter((p) => statusPessoa(p) === 'aguardando').length;
+    const nAguardaPac = todas.filter(aguardaPaciente).length;
     const nAlerta = (typeof J !== 'undefined' && J.nAtencao) || 0;
     if (sino) sino.hidden = !(nEspera || nAlerta);
     if (!box) return;
@@ -1573,6 +1578,7 @@
       k('az', 'pessoas', 'Pessoas hoje', nHoje, 'Pessoas diferentes que abriram conversa hoje. Conversas da mesma pessoa contam uma vez.' + un),
       k('az', 'barras', 'Conversas por pessoa', mediaTxt(nHoje ? nConv / nHoje : null), 'Média de hoje: conversas ÷ pessoas.' + un),
       k('la', 'ampulheta', 'Em espera', nEspera, 'Esperando alguém da equipe assumir.' + un),
+      k('az', 'relogio', 'Aguardando paciente', nAguardaPac, 'Conversas abertas em que a equipe já respondeu e o paciente ainda não retornou. Sai daqui quando o paciente responde ou a conversa é encerrada.' + un),
       k('ve', 'ok', 'Encerradas hoje', nFim, 'Das conversas que começaram hoje, quantas já foram encerradas (mesma conta de "Finalizadas" em Indicadores).' + un),
       k('vm', 'alerta', 'Alertas', nAlerta, 'Pacientes que precisam de atenção na Jornada.' + un));
   }
@@ -1591,10 +1597,10 @@
     const base = 'id,status,agente_id,ultima_mensagem,nao_lidas_agente,criado_em,atualizado_em,contato_id,ia_ativa,motor,triagem_resumo,triagem_urgencia,alerta_agenda,cliente_aguarda_desde,nome_informado,email_informado,contatos(id,nome,telefone,email)';
     // Fase 6 (unidade, médico, criança): colunas novas; se o SQL ainda não foi aplicado, volta para a lista antiga em vez de quebrar o painel.
     const consulta = (cols) => db.from('conversas').select(cols).order('atualizado_em', { ascending: false }).limit(300);
-    const fase6 = 'paciente_tipo,paciente_nome,unidade_inicial,medico_preferido,', motivo = 'motivo_encerramento,encerramento_origem,';
+    const fase6 = 'paciente_tipo,paciente_nome,unidade_inicial,medico_preferido,', motivo = 'motivo_encerramento,encerramento_origem,aguarda_paciente_desde,';
     let { data, error } = await consulta(base.replace('email_informado,', 'email_informado,' + fase6 + motivo));
     // WC-03: se o SQL do motivo ainda não foi aplicado, volta para a lista sem ele em vez de quebrar o painel.
-    if (error && /motivo_encerramento|encerramento_origem/.test(error.message || '')) ({ data, error } = await consulta(base.replace('email_informado,', 'email_informado,' + fase6)));
+    if (error && /motivo_encerramento|encerramento_origem|aguarda_paciente_desde/.test(error.message || '')) ({ data, error } = await consulta(base.replace('email_informado,', 'email_informado,' + fase6)));
     if (error && /paciente_tipo|paciente_nome|unidade_inicial|medico_preferido/.test(error.message || '')) ({ data, error } = await consulta(base));
     if (error) { toast(msgErro(error)); return; }
     S.conversas = data || [];

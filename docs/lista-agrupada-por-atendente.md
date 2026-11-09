@@ -22,3 +22,7 @@ Obs.: o banco não guarda "quando a conversa foi assumida"; por isso a regra olh
 ## Teste
 
 `cd testes && npm run test:lista-agrupada` (4 verificações em navegador, Supabase simulado).
+
+## Quadrado "Aguardando paciente" (09/11/2026)
+
+Novo cartão nos indicadores do topo, entre "Em espera" e "Encerradas hoje". Conta **pessoas** com conversa em atendimento em que a equipe já respondeu e o paciente ainda não voltou (usa `aguarda_paciente_desde`, o mesmo marco do encerramento automático). Sai da conta quando o paciente responde ou a conversa é encerrada, e não conta se outra conversa da mesma pessoa tem o paciente esperando a equipe. Respeita o filtro de unidade do topo. Teste: `npm run test:indicadores`.
