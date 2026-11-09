@@ -1,5 +1,5 @@
 // FLUXOGRAMA: entrada (POST do pg_cron com x-sync-key e {"modo":"rapido"|"completo"}) -> validação (chave = config.ia_segredo; token KLINGO_APP_TOKEN; relatório e filtro vindos da config) -> lógica (lê o relatório do Klingo na janela do modo, mapeia, manda em lotes para jornada_klingo_lote e fecha com jornada_klingo_fechar) -> saída (resumo SEM dado de paciente; em erro, jornada_klingo_falha)
-// Versão 1.0 — 01/11/2026 / Mudança: Implementação inicial
+// Versão 1.1 — 09/11/2026 / Mudança: o filtro de período do relatório por data do exame (#14359) é periodo1; o #13825 segue periodo0
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { emLotes, filtroValido, hojeBrasilia, janelaLeitura, modoValido, prepararLinhas, relatorioValido, somaDias, CARTOES_ATRAS, CARTOES_FRENTE, type Row } from "./mapa.ts";
 
@@ -13,8 +13,9 @@ const TAMANHO_LOTE = 400;
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
 // O relatório em uma faixa de datas; se o Klingo cortar (limite de linhas), divide a faixa ao meio e junta.
-async function marcacoes(token: string, id: string, de: string, ate: string, nivel = 0): Promise<Row[]> {
-  const params = new URLSearchParams({ id, ":periodo0": "l", ":periodo0-from": de, ":periodo0-to": ate });
+// campo = id do filtro de período no relatório: o #13825 usa periodo0 (marcado_em); o relatório por data do exame (#14359) usa periodo1 (data_agendado_para).
+async function marcacoes(token: string, id: string, campo: string, de: string, ate: string, nivel = 0): Promise<Row[]> {
+  const params = new URLSearchParams({ id, [`:${campo}`]: "l", [`:${campo}-from`]: de, [`:${campo}-to`]: ate });
   const res = await fetch(`${KLINGO_URL}?${params}`, { headers: { "X-APP-TOKEN": token }, signal: AbortSignal.timeout(90_000) });
   if (!res.ok) throw new Error(`Klingo retornou HTTP ${res.status} nas marcações`);
   const payload = await res.json();
@@ -22,8 +23,8 @@ async function marcacoes(token: string, id: string, de: string, ate: string, niv
   if (payload?.limit) {
     if (de >= ate || nivel >= 4) throw new Error("O Klingo cortou as marcações mesmo em faixa curta");
     const meio = new Date((Date.parse(`${de}T00:00:00Z`) + Date.parse(`${ate}T00:00:00Z`)) / 2).toISOString().slice(0, 10);
-    const a = await marcacoes(token, id, de, meio, nivel + 1);
-    const b = await marcacoes(token, id, somaDias(meio, 1), ate, nivel + 1);
+    const a = await marcacoes(token, id, campo, de, meio, nivel + 1);
+    const b = await marcacoes(token, id, campo, somaDias(meio, 1), ate, nivel + 1);
     return [...a, ...b];
   }
   if (payload?.result === "") return [];
@@ -48,12 +49,13 @@ Deno.serve(async (req: Request) => {
   const modo = modoValido(corpo?.modo);
   const filtro = filtroValido(config.jornada_relatorio_filtro);
   const relatorio = relatorioValido(config.jornada_relatorio_id);
+  const campo = filtro === "exame" ? "periodo1" : "periodo0";
   const hoje = hojeBrasilia();
   const { de, ate } = janelaLeitura(modo, filtro, hoje);
   const inicio = Date.now();
 
   try {
-    const brutas = await marcacoes(token, relatorio, de, ate);
+    const brutas = await marcacoes(token, relatorio, campo, de, ate);
     // Uma leitura completa que volta vazia é quase sempre o Klingo fora do ar ou o relatório mudado: não finge que deu certo.
     if (modo === "completo" && brutas.length === 0) throw new Error("O relatório veio vazio na leitura completa");
     const { linhas, descartadas, descartes, fora, semProntuario } = await prepararLinhas(brutas, config.ia_segredo, hoje);
