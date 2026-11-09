@@ -198,6 +198,15 @@
   }
 
   /* Widgets dentro das mensagens */
+  .aval { margin-top: 10px; }
+  .aval-grupo { border: 0; padding: 0; margin: 0 0 14px; min-width: 0; }
+  .aval-grupo legend { font-weight: 650; font-size: calc(15.5px * var(--esc)); padding: 0; margin-bottom: 6px; }
+  .aval-notas, .aval-canais { display: flex; flex-wrap: wrap; gap: 6px; }
+  .aval-nota, .aval-canal { position: relative; }
+  .aval-nota input, .aval-canal input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+  .aval-nota span, .aval-canal span { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; padding: 0 12px; border: 1.5px solid var(--verde); border-radius: 10px; background: var(--papel); color: var(--verde); font-weight: 650; font-size: calc(15.5px * var(--esc)); }
+  .aval-nota input:checked + span, .aval-canal input:checked + span { background: var(--verde); color: #fff; }
+  .aval-nota input:focus-visible + span, .aval-canal input:focus-visible + span { outline: 3px solid #1d6fdc; outline-offset: 2px; }
   .desp-img { display: block; max-width: 100%; max-height: 260px; margin-top: 4px; border-radius: 12px; }
   .widget { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--linha); white-space: normal; }
   .widget .w-titulo { font-weight: 650; font-size: calc(15.5px * var(--esc)); margin: 0 0 6px; }
@@ -1337,7 +1346,6 @@
         h('p', { class: 'w-nota' }, 'Os horários são uma previsão; o atendente confirma o dia e o horário.'));
     } else if (o.tipo === 'despedida') {
       // WC-06: a despedida é uma mensagem de sistema; se tiver imagem, ela é buscada com o token desta conversa (nunca de outra).
-      if (!(o.imagem && o.versao)) return;
       widgetDespedida(w, o);
     } else return;
     if (Array.isArray(o.acoes) && o.acoes.length && o.passo) {
@@ -1348,11 +1356,55 @@
   }
 
   function widgetDespedida(w, o) {
-    w.style.borderTop = '0'; w.style.paddingTop = '0';
-    const img = h('img', { class: 'desp-img', alt: 'Imagem enviada pela clínica na despedida', hidden: true });
-    w.append(img);
-    db.rpc('chat_despedida_imagem', { p_conversa: conv.id, p_token: conv.token, p_versao: o.versao }).then(({ data }) => {
-      if (data && data.base64) { img.src = `data:${data.mime};base64,${data.base64}`; img.hidden = false; }
+    w.style.borderTop = '0'; w.style.paddingTop = '0'; w.hidden = true;   // só aparece se tiver imagem ou o convite para avaliar
+    if (o.imagem && o.versao) {
+      const img = h('img', { class: 'desp-img', alt: 'Imagem enviada pela clínica na despedida', hidden: true });
+      w.append(img);
+      db.rpc('chat_despedida_imagem', { p_conversa: conv.id, p_token: conv.token, p_versao: o.versao }).then(({ data }) => {
+        if (data && data.base64) { img.src = `data:${data.mime};base64,${data.base64}`; img.hidden = false; w.hidden = false; }
+      }, () => {});
+    }
+    if (o.encerrada_em) conviteAvaliacao(w, o);
+  }
+  // WC-10: convite voluntário para avaliar, logo abaixo da despedida. Ignorar, sair ou falhar nunca mexe na conversa encerrada.
+  function conviteAvaliacao(w, o) {
+    const id = conv.id, token = conv.token;
+    db.rpc('chat_avaliacao_estado', { p_conversa: id, p_token: token, p_encerrada_em: o.encerrada_em }).then(({ data, error }) => {
+      if (error || !data || !data.mostrar || !conv || conv.id !== id) return;
+      const area = h('div', { class: 'aval' });
+      const abrirBtn = h('button', { class: 'btn-w sec', type: 'button', 'aria-expanded': 'false' }, 'Avaliar o atendimento');
+      area.append(abrirBtn); w.append(area); w.hidden = false;
+      abrirBtn.addEventListener('click', () => {
+        abrirBtn.hidden = true; abrirBtn.setAttribute('aria-expanded', 'true');
+        const grupoNotas = (nome, legenda) => h('fieldset', { class: 'aval-grupo' }, h('legend', {}, legenda),
+          h('div', { class: 'aval-notas' }, Array.from({ length: 11 }, (_, n) => h('label', { class: 'aval-nota' }, h('input', { type: 'radio', name: nome, value: String(n) }), h('span', {}, String(n))))),
+          h('p', { class: 'w-nota' }, '0 = muito ruim · 10 = excelente'));
+        const canais = h('fieldset', { class: 'aval-grupo' }, h('legend', {}, 'Por onde você nos conheceu?'),
+          h('div', { class: 'aval-canais' }, ['WhatsApp', 'Instagram', 'Google'].map((c) => h('label', { class: 'aval-canal' }, h('input', { type: 'radio', name: 'canal', value: c }), h('span', {}, c)))));
+        const estado = h('p', { class: 'w-nota', role: 'status', 'aria-live': 'polite' });
+        const enviar = h('button', { class: 'btn-w', type: 'submit' }, 'Enviar avaliação');
+        const agoraNao = h('button', { class: 'btn-w sec', type: 'button' }, 'Agora não');
+        const form = h('form', { class: 'aval-form', novalidate: '' }, h('p', { class: 'w-nota' }, 'É rápido e totalmente opcional. Não pedimos seu nome nem seu telefone.'),
+          grupoNotas('atendimento', 'De 0 a 10, como foi o seu atendimento?'), grupoNotas('site', 'De 0 a 10, como você avalia o nosso site?'), canais, estado,
+          h('div', { class: 'acoes-w' }, enviar, agoraNao));
+        let enviando = false;
+        agoraNao.addEventListener('click', () => { form.remove(); abrirBtn.hidden = false; abrirBtn.setAttribute('aria-expanded', 'false'); abrirBtn.focus(); });
+        form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          if (enviando) return;
+          const v = (n) => { const x = form.querySelector(`input[name="${n}"]:checked`); return x ? x.value : null; };
+          const a = v('atendimento'), si = v('site'), c = v('canal');
+          if (a === null || si === null || !c) { estado.textContent = 'Escolha uma nota nas duas perguntas e por onde nos conheceu.'; return; }
+          enviando = true; enviar.disabled = true; estado.textContent = 'Enviando…';
+          try {
+            const { error } = await db.rpc('chat_avaliar', { p_conversa: id, p_token: token, p_nota_atendimento: Number(a), p_nota_site: Number(si), p_canal: c });
+            if (error) throw error;
+            area.replaceChildren(h('p', { class: 'w-nota', role: 'status' }, 'Obrigado pela sua avaliação!'));
+          } catch { enviando = false; enviar.disabled = false; estado.textContent = 'Não foi possível enviar agora. Suas respostas continuam aqui; toque em Enviar para tentar de novo.'; }
+        });
+        area.append(form);
+        const primeiro = form.querySelector('input'); if (primeiro) primeiro.focus();
+      });
     }, () => {});
   }
 

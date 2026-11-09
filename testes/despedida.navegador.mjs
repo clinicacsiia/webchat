@@ -50,7 +50,7 @@ await caso('despedida sem imagem: só o texto, nenhuma busca de imagem e nenhum 
   const { page, ctx, erros } = await novaPaginaChat(browser, mundo, { init: TESTE });
   await comecarConversa(page, base);
   await entregar(mundo, page, 'Atendimento encerrado. Se precisar, é só mandar uma nova mensagem.', { tipo: 'despedida', versao: null, imagem: false, encerrada_em: '2026-11-09T10:00:00Z' });
-  const dados = await page.evaluate(() => { const n = [...document.querySelectorAll('#msgs .msg.sistema')].pop(); return { texto: n.innerText, widgets: n.querySelectorAll('.widget').length, imgs: n.querySelectorAll('img').length }; });
+  const dados = await page.evaluate(() => { const n = [...document.querySelectorAll('#msgs .msg.sistema')].pop(); return { texto: n.innerText, widgets: [...n.querySelectorAll('.widget')].filter((w) => w.offsetHeight > 0).length, imgs: n.querySelectorAll('img').length }; });
   const buscou = mundo.chamadas.some((c) => c.nome === 'chat_despedida_imagem');
   await ctx.close();
   return { ok: /Atendimento encerrado/.test(dados.texto) && dados.widgets === 0 && dados.imgs === 0 && !buscou && !erros.excecoes.length, detalhe: JSON.stringify(dados) };

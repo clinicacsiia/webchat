@@ -79,6 +79,8 @@ async function pagina(browser, { quadroIndisponivel = false, patchModo = 'ok', a
     else if (p.endsWith('/rpc/jornada_mover_card')) { reg.rpcs.push(JSON.parse(req.postData() || '{}')); corpo = { ok: true, versao: 2 }; }
     else if (p.endsWith('/rpc/despedida_atual')) { if (despedida === 'sem_sql') { status = 404; corpo = { code: 'PGRST202', message: 'function despedida_atual does not exist' }; } else corpo = { ativa: true, versao: 5, texto: 'Obrigado pelo contato!', tem_imagem: false }; }
     else if (p.endsWith('/rpc/autoencerrar_resumo')) { if (despedida === 'sem_sql') { status = 404; corpo = { code: 'PGRST202', message: 'function autoencerrar_resumo does not exist' }; } else corpo = { modo: 'simulacao', horas: 24, elegiveis_agora: 3, aguardando_paciente: 11, ultimas: [{ em: '2026-11-09T10:00:00Z', modo: 'simulacao', elegiveis: 3, fechadas: 0 }] }; }
+    else if (p.endsWith('/rpc/encerramentos_resumo')) corpo = { dias: 30, total: 9, automaticos: 2, por_motivo: { agendado: 4, apenas_informacoes: 2, nao_respondido: 2, desistiu: 1, sem_motivo: 0 } };
+    else if (p.endsWith('/rpc/avaliacoes_resumo')) corpo = { dias: 30, total: 5, media_atendimento: 8.4, media_site: 7.2, por_canal: { WhatsApp: 3, Instagram: 1, Google: 1 } };
     else if (p.endsWith('/rpc/despedida_salvar')) { reg.rpcs.push({ rpc: 'despedida_salvar', ...JSON.parse(req.postData() || '{}') }); corpo = { ok: true, versao: 6 }; }
     else if (p.startsWith('/rest/v1/rpc/')) corpo = {};
     else if (p.startsWith('/rest/v1/')) corpo = objeto ? null : [];
@@ -213,6 +215,15 @@ await caso('Configurações: o encerramento automático mostra a contagem da sim
   const t = await page.locator('#cfg-atualizacao').innerText();
   await ctx.close();
   return { ok: /Aguardando resposta do paciente: 11|aguardando resposta do paciente: 11/i.test(t) && /Seriam encerradas agora: 3/.test(t) && /Última leitura: 3 elegível\(is\), 0 encerrada\(s\)/.test(t) && !reg.excecoes.length, detalhe: t.slice(-200).replace(/\n/g, ' ') };
+});
+
+await caso('Indicadores: mostra os motivos de encerramento e (administrador) as avaliações, só com contagens', async () => {
+  const { page, ctx, reg } = await abrir({ quadroIndisponivel: true, admin: true });
+  await page.click('nav.nav button[data-aba="indicadores"]'); await page.waitForFunction(() => /Motivos de encerramento/.test(document.body.innerText), null, { timeout: 8000 });
+  await page.waitForFunction(() => /Avaliações dos pacientes/.test(document.body.innerText), null, { timeout: 5000 });
+  const t = await page.locator('.pagina').innerText();
+  await ctx.close();
+  return { ok: /Agendado\s*\n?.*/.test(t) && /9 encerramentos no período, 2 automáticos/.test(t) && /8.4/.test(t) && /nota média do atendimento/.test(t) && !reg.excecoes.length, detalhe: t.slice(-160).replace(/\n/g, ' ') };
 });
 
 await browser.close(); srv.close();

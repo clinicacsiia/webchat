@@ -271,6 +271,16 @@
   #ctxToggle .seta { transition: transform .15s; } #ctxToggle[aria-expanded="true"] .seta { transform: rotate(180deg); }
   #contexto .galeria img, #contexto .anexo-caixa img { max-height: 70vh; object-fit: contain; background: #fff; border: 1px solid var(--linha); cursor: zoom-in; }
   @media (max-height: 720px) { #contexto.aberto { max-height: 40vh; } .chat-topo { padding: 6px 12px; } .proximo { padding: 6px 12px; } }
+  /* WC-07: telas de computador (a partir de 641 px): o topo da conversa fica mais baixo. Nome e contato em uma linha, com reticências quando não cabem
+     (o texto completo continua no title e no aria-label do bloco); paddings menores. Celular segue como antes: quebra a linha e mostra tudo. */
+  @media (min-width: 641px) {
+    .chat-topo .quem { min-width: 0; }
+    .chat-topo .quem b, .chat-topo .quem span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .chat-topo .quem span { display: block; }
+    .proximo .texto { min-width: 0; display: flex; align-items: baseline; gap: 10px; } .proximo .texto b { display: inline; flex: none; max-width: 60%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .proximo .texto span { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  }
+  @media (min-width: 641px) and (min-height: 721px) { .chat-topo { padding: 8px 16px; gap: 8px; } .proximo { padding: 6px 16px; } }
   /* Contador de avisos no botão: vermelho, para ninguém esconder a área sem perceber que há algo a conferir */
   .ctx-n { display: inline-block; min-width: 20px; padding: 1px 7px; margin-left: 8px; border-radius: 999px; background: #c0392b; color: #fff; font-size: 12.5px; font-weight: 700; text-align: center; animation: ctxPulsa 1.6s ease-in-out infinite; }
   @keyframes ctxPulsa { 50% { box-shadow: 0 0 0 4px rgba(192, 57, 43, .25); } } @media (prefers-reduced-motion: reduce) { .ctx-n { animation: none; } }
@@ -297,6 +307,8 @@
     .chat-topo .quem span { line-height: 1.5; }
     .chat-topo .quem b { font-size: 15px; }
     .chat-topo .quem span { font-size: 12px; }
+    /* WC-07: no celular a linha de contato mostra 2 linhas; tocar no nome mostra tudo (e de novo recolhe). */
+    .chat-topo .quem:not(.aberto) span { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
     .chat-topo .btn, .chat-topo select { padding: 5px 10px; font-size: 13px; }
     .proximo { padding: 6px 10px; gap: 6px; }
     .proximo .texto { min-width: 0; } .proximo .texto b { font-size: 14px; }
@@ -2169,7 +2181,7 @@
     if (!pontos.length) { box.replaceChildren(); return; }
     const p = pontos[0];
     box.replaceChildren(h('div', { class: 'proximo ' + p.tom },
-      h('div', { class: 'texto' }, h('b', {}, p.titulo), h('span', {}, p.detalhe + (pontos.length > 1 ? ` · mais ${pontos.length - 1} ponto(s) logo abaixo` : ''))),
+      h('div', { class: 'texto', title: p.titulo + '. ' + p.detalhe }, h('b', {}, p.titulo), h('span', {}, p.detalhe + (pontos.length > 1 ? ` · mais ${pontos.length - 1} ponto(s) logo abaixo` : ''))),
       h('button', { class: 'btn prim', type: 'button', onclick: p.fn }, p.rot)));
   }
   function renderTopoChat() {
@@ -2187,7 +2199,7 @@
       c.triagem_resumo ? h('div', {}, c.triagem_resumo) : null)] : []));
     t.replaceChildren(...[
       h('button', { class: 'btn voltar', type: 'button', onclick: () => { S.abertaId = null; document.getElementById('inbox')?.classList.remove('aberta'); renderLista(); renderChat(); if (S.modo === 'quadro') renderQuadro(); } }, 'Voltar'),
-      h('div', { class: 'quem' }, h('b', {}, nomeLista(c)),
+      h('div', { class: 'quem', tabindex: '0', 'aria-expanded': 'false', onclick: (ev) => { if (ev.target.closest('a')) return; const q = ev.currentTarget; q.classList.toggle('aberto'); q.setAttribute('aria-expanded', String(q.classList.contains('aberto'))); }, onkeydown: (ev) => { if ((ev.key === 'Enter' || ev.key === ' ') && ev.target === ev.currentTarget) { ev.preventDefault(); ev.currentTarget.click(); } }, title: [nomeLista(c), ct.telefone ? fmtTel(ct.telefone) : '', ct.email || ''].filter(Boolean).join(' · '), role: 'button', 'aria-label': 'Dados do paciente (tocar para ver tudo): ' + [nomeLista(c), ct.telefone ? fmtTel(ct.telefone) : '', ct.email || ''].filter(Boolean).join(', ') }, h('b', {}, nomeLista(c)),
         h('span', {}, ct.telefone ? h('a', { href: 'https://wa.me/55' + soDigitos(ct.telefone), target: '_blank', rel: 'noopener noreferrer' }, fmtTel(ct.telefone)) : '', ct.email ? ' · ' + ct.email : '',
           ' · ', ROTULO_STATUS[c.status], c.status === 'encerrada' ? ' (' + rotuloEncerrada(c) + ')' : '', ag && ag.nome ? ' com ' + ag.nome : ''),
         detalheInicio(c) ? h('span', { style: 'display:block;font-weight:600' }, detalheInicio(c)) : null),
@@ -2671,6 +2683,7 @@
     { id: 'atualizacao', icone: 'livro', titulo: 'Encerramento e avaliação', desc: 'Chaves da Atualização do WebChat. Ligue uma por vez e confira o dia seguinte; desligar volta ao comportamento anterior na hora.', custom: 'autoencerrar', campos: [
       { k: 'encerramento_exige_motivo', tipo: 'sim', rot: 'Exigir motivo ao encerrar', dica: 'Ligado: o painel só encerra a conversa com um motivo escolhido. Desligado: o motivo fica opcional.' },
       { k: 'autoencerrar_modo', tipo: 'escolha', rot: 'Encerramento automático (24 h sem resposta do paciente)', opcoes: [['desligado', 'Desligado'], ['simulacao', 'Simulação (só conta, não encerra nada)'], ['ligado', 'Ligado']], dica: 'Comece em Simulação e olhe a contagem abaixo por alguns dias. Só conta quando uma pessoa da equipe escreveu e o paciente não respondeu; exame em aberto nunca é encerrado.' },
+      { k: 'avaliacao_ativa', tipo: 'sim', rot: 'Convite para avaliar o atendimento', dica: 'Ligado: abaixo da despedida o paciente vê o botão “Avaliar o atendimento” (duas notas e por onde conheceu a clínica). Ligue só depois de o jurídico revisar a página de privacidade.' },
       { k: 'encerramento_valida_agendado', tipo: 'sim', rot: 'Conferir a agenda ao encerrar como Agendado', dica: 'Ligado: só encerra como Agendado se houver agendamento vigente (chat ou Klingo), e exame ainda futuro deixa de bloquear o encerramento. Ligue depois de “Exigir motivo”.' },
     ] },
     { id: 'despedida', icone: 'livro', titulo: 'Despedida do atendimento', desc: 'O que o paciente recebe quando a conversa é encerrada. Texto e imagem são opcionais; os dois vazios usam a frase padrão. Cada alteração vale só para os próximos encerramentos.', custom: 'despedida', campos: [
@@ -3542,6 +3555,26 @@ h1.longo { font-size: 14mm; }
   const pct = (a, b) => (b ? Math.round((a / b) * 100) + '%' : '—');
   /* ---------- indicadores (conversas, finalizadas, pedidos completos e agendados) ---------- */
   const IND = { dias: 0, t: null };
+  // WC-03/09: motivos de encerramento (equipe) e avaliações (só administrador). Só contagens e médias; sem dado de paciente. Se o SQL não foi aplicado, o bloco não aparece.
+  async function blocoMotivosAvaliacoes(dias) {
+    const admin = ehAdmin();
+    const [e, a] = await Promise.all([db.rpc('encerramentos_resumo', { p_dias: dias }), admin ? db.rpc('avaliacoes_resumo', { p_dias: dias > 0 ? dias : 365 }) : Promise.resolve({ error: true })]);
+    const num = (n, rot) => h('div', { class: 'num' }, h('b', {}, n ?? 0), h('span', {}, rot));
+    const partes = [];
+    if (!e.error && e.data) {
+      const pm = e.data.por_motivo || {};
+      partes.push(h('h3', {}, 'Motivos de encerramento'),
+        h('div', { class: 'numeros' }, [...MOTIVOS_ENC.map(([v, r]) => num(pm[v] || 0, r)), num(pm.sem_motivo || 0, 'sem motivo registrado')]),
+        h('p', { class: 'dica' }, `${e.data.total ?? 0} encerramentos no período, ${e.data.automaticos ?? 0} automáticos (sem resposta do paciente).`));
+    }
+    if (!a.error && a.data) {
+      const pc = a.data.por_canal || {};
+      partes.push(h('h3', {}, 'Avaliações dos pacientes'),
+        h('div', { class: 'numeros' }, num(a.data.total, 'avaliações'), num(a.data.media_atendimento ?? '—', 'nota média do atendimento (0 a 10)'), num(a.data.media_site ?? '—', 'nota média do site (0 a 10)'),
+          num(pc.WhatsApp || 0, 'conheceram pelo WhatsApp'), num(pc.Instagram || 0, 'pelo Instagram'), num(pc.Google || 0, 'pelo Google')));
+    }
+    return partes.length ? h('div', {}, partes) : null;
+  }
   async function viewIndicadores(c, dias = IND.dias, silencioso = false) {
     IND.dias = dias;
     const titulo = h('h2', {}, 'Indicadores');
@@ -3580,6 +3613,7 @@ h1.longo { font-size: 14mm; }
       h('div', { class: 'tabela-wrap', style: 'margin-bottom:12px' }, h('table', {},
         h('thead', {}, h('tr', {}, ['Dia', 'Conversas', 'Finalizadas', 'Pedidos completos', 'Agendados'].map((t) => h('th', {}, t)))),
         h('tbody', {}, dias_.length ? dias_.map((d) => h('tr', {}, [dia(d.dia), d.conversas, d.finalizadas, d.pedidos_completos, d.agendados].map((v) => h('td', {}, String(v))))) : [h('tr', {}, h('td', { colspan: 5 }, 'Sem conversas no período.'))])))));
+    blocoMotivosAvaliacoes(dias).then((b) => { const pag = c.querySelector('.pagina'); if (b && pag && S.aba === 'indicadores' && minha === viewIndicadores.seq) pag.append(b); }, () => {});
     clearTimeout(IND.t);
     IND.t = setTimeout(() => { if (S.aba === 'indicadores' && !document.hidden) viewIndicadores(c, IND.dias, true); }, 60000);
   }

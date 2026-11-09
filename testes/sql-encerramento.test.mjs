@@ -138,6 +138,15 @@ await caso('exame em aberto continua bloqueando o encerramento pelo painel, mesm
   return { ok: /EXAME_EM_ABERTO/.test(erro || '') && (await ler(c)).status === 'em_atendimento' };
 });
 
+await caso('resumo por motivo para a aba Indicadores: conta por motivo e os sem motivo; marketing não lê', async () => {
+  await painel();
+  const r = (await db.query(`select public.encerramentos_resumo(30) r`)).rows[0].r;
+  await db.query(`insert into public.agentes (id, nome, papel) values ('55555555-5555-5555-5555-555555555555', 'Mkt', 'marketing')`);
+  await db.query(`select set_config('request.jwt.claims', $1, false)`, [JSON.stringify({ sub: '55555555-5555-5555-5555-555555555555' })]);
+  let negado = false; try { await db.query(`select public.encerramentos_resumo(30)`); } catch { negado = true; }
+  return { ok: r.total >= 10 && r.por_motivo.outro >= 1 && r.por_motivo.desistiu >= 1 && r.por_motivo.sem_motivo >= 1 && negado, detalhe: JSON.stringify(r.por_motivo) };
+});
+
 const falhas = resultados.filter((r) => !r).length;
 console.log(`\n${resultados.length - falhas} de ${resultados.length} verificações passaram.`);
 process.exit(falhas ? 1 : 0);

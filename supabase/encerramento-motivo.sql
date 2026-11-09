@@ -118,3 +118,17 @@ begin
   return v_n;
 end $$;
 revoke all on function public.conversa_encerrar_se_resolvida(uuid) from public, anon, authenticated;
+
+-- ===== PARTE 5: resumo por motivo para a aba Indicadores (administrador e atendente; só contagens) =====
+create or replace function public.encerramentos_resumo(p_dias integer default 30) returns jsonb
+language plpgsql stable security definer set search_path to '' as $$
+declare v_desde timestamptz := case when coalesce(p_dias, 30) <= 0 then '-infinity'::timestamptz else now() - make_interval(days => least(p_dias, 3650)) end;
+begin
+  if coalesce((select public.papel_atual()), '') not in ('admin', 'atendente') then raise exception 'Não autorizado.' using errcode = '28000'; end if;
+  return jsonb_build_object('dias', coalesce(p_dias, 30),
+    'total', (select count(*) from public.conversa_encerramento where encerrada_em >= v_desde),
+    'automaticos', (select count(*) from public.conversa_encerramento where encerrada_em >= v_desde and origem = 'inatividade'),
+    'por_motivo', coalesce((select jsonb_object_agg(m, n) from (select coalesce(motivo, 'sem_motivo') m, count(*) n from public.conversa_encerramento where encerrada_em >= v_desde group by 1) x), '{}'::jsonb));
+end $$;
+revoke all on function public.encerramentos_resumo(integer) from public, anon;
+grant execute on function public.encerramentos_resumo(integer) to authenticated;
