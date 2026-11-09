@@ -837,8 +837,8 @@
   /* ---------- estrutura ---------- */
   function montarApp() {
     const abas = [];
-    const ICONE_ABA = { atendimento: 'fone', jornada: 'pin', fila: 'pessoas', avisos: 'sino', contatos: 'lista', equipe: 'pessoa', catalogo: 'barras', convenios: 'lista', medicos: 'pessoa', aprendizado: 'livro', config: 'engrenagem' };
-    if (podeAtender()) { abas.push(['atendimento', 'Atendimento']); abas.push(['jornada', 'Jornada']); abas.push(['fila', 'Fila']); abas.push(['avisos', 'Avisos']); }
+    const ICONE_ABA = { atendimento: 'fone', jornada: 'pin', fila: 'pessoas', avisos: 'sino', indicadores: 'barras', contatos: 'lista', equipe: 'pessoa', catalogo: 'barras', convenios: 'lista', medicos: 'pessoa', aprendizado: 'livro', config: 'engrenagem' };
+    if (podeAtender()) { abas.push(['atendimento', 'Atendimento']); abas.push(['jornada', 'Jornada']); abas.push(['fila', 'Fila']); abas.push(['avisos', 'Avisos']); abas.push(['indicadores', 'Indicadores']); }
     abas.push(['contatos', 'Contatos']);
     if (ehAdmin()) { abas.push(['equipe', 'Equipe']); abas.push(['convenios', 'Convênios']); abas.push(['medicos', 'Médicos']); abas.push(['catalogo', 'Catálogo']); abas.push(['aprendizado', 'Aprendizado']); abas.push(['config', 'Configurações']); }
     const nav = h('nav', { class: 'nav', 'aria-label': 'Seções' }, abas.map(([id, rot]) =>
@@ -878,6 +878,7 @@
     if (S.aba === 'atendimento') viewAtendimento(c);
     else if (S.aba === 'fila') viewFila(c);
     else if (S.aba === 'avisos') viewAvisos(c);
+    else if (S.aba === 'indicadores') viewIndicadores(c);
     else if (S.aba === 'jornada') viewJornada(c);
     else if (S.aba === 'contatos') viewContatos(c);
     else if (S.aba === 'equipe') viewEquipe(c);
@@ -3422,6 +3423,50 @@ h1.longo { font-size: 14mm; }
   const brl = (v) => Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   const rotuloCaso = (c) => CONF_ROTULO[c] || (c === 'cancelado' ? 'Cancelado' : c);
   const pct = (a, b) => (b ? Math.round((a / b) * 100) + '%' : '—');
+  /* ---------- indicadores (conversas, finalizadas, pedidos completos e agendados) ---------- */
+  const IND = { dias: 0, t: null };
+  async function viewIndicadores(c, dias = IND.dias, silencioso = false) {
+    IND.dias = dias;
+    const titulo = h('h2', {}, 'Indicadores');
+    if (!silencioso) c.replaceChildren(h('div', { class: 'pagina' }, titulo, h('p', { class: 'sub' }, 'Carregando…')));
+    const minha = viewIndicadores.seq = (viewIndicadores.seq || 0) + 1;   // só a última escolha pinta a tela
+    const { data, error } = await db.rpc('painel_indicadores', { p_dias: dias });
+    if (S.aba !== 'indicadores' || minha !== viewIndicadores.seq) return;
+    if (error) { c.replaceChildren(h('div', { class: 'pagina' }, titulo, h('p', { class: 'erro' }, msgErro(error)),
+      h('p', { class: 'dica' }, 'Se a mensagem fala de função inexistente, falta rodar o SQL supabase/indicadores-painel.sql.'))); return; }
+    const R = data || {}, V = R.conversas || {}, P = R.pedidos || {};
+    const pc = (a, b) => (b ? Math.round((a / b) * 100) + '%' : '—');
+    const periodo = h('select', { 'aria-label': 'Período', onchange: (ev) => viewIndicadores(c, Number(ev.target.value)) },
+      [[0, 'Desde o início'], [7, 'Últimos 7 dias'], [30, 'Últimos 30 dias'], [90, 'Últimos 90 dias']].map(([v, t]) => h('option', { value: v, selected: v === dias }, t)));
+    const num = (n, rot) => h('div', { class: 'num' }, h('b', {}, n ?? 0), h('span', {}, rot));
+    const dia = (d) => { const [, m, dd] = String(d).split('-'); return dd + '/' + m; };
+    const dias_ = (R.por_dia || []).slice().reverse();
+    c.replaceChildren(h('div', { class: 'pagina' }, titulo,
+      h('p', { class: 'sub' }, 'Resumo do chat. Atualiza sozinho a cada minuto. Não mostra dado de paciente. Inclui conversas de teste da equipe. ', R.desde ? `Primeira conversa em ${fmtDataHora(R.desde)}. ` : '', R.gerado_em ? `Atualizado às ${fmtDataHora(R.gerado_em)}.` : ''),
+      h('div', { class: 'acoes' }, periodo, h('button', { class: 'btn', type: 'button', onclick: () => viewIndicadores(c, IND.dias, true) }, 'Atualizar agora')),
+      h('h3', {}, 'Conversas'),
+      h('div', { class: 'numeros' },
+        num(V.total, 'conversas iniciadas'),
+        num(V.pessoas, 'pessoas diferentes'),
+        num(V.finalizadas, `conversas finalizadas (${pc(V.finalizadas, V.total)})`),
+        num(V.em_andamento, 'em andamento')),
+      h('h3', {}, 'Pedidos e agendamentos'),
+      h('div', { class: 'numeros' },
+        num(P.conversas_com_pedido_completo, `conversas com pedido completo (${pc(P.conversas_com_pedido_completo, V.total)} das conversas)`),
+        num(P.agendados, `agendados (${pc(P.agendados, P.conversas_com_pedido_completo)} dos pedidos completos)`),
+        num(P.prontos_esperando_recepcao, 'prontos, esperando a recepção marcar'),
+        num(P.cancelados, 'pedidos cancelados'),
+        num(P.rascunhos, 'pedidos não terminados')),
+      h('p', { class: 'dica' }, `Dos ${P.agendados ?? 0} agendados, ${P.agendados_pela_ia ?? 0} foram marcados sozinhos pela IA e ${P.agendados_pela_equipe ?? 0} pela equipe. `
+        + 'Pedido completo = o paciente terminou o pedido no chat. "Agendado" só conta o que o painel sabe: marcação feita direto no Klingo sem avisar o chat não entra.'),
+      h('h3', {}, 'Por dia'),
+      h('div', { class: 'tabela-wrap', style: 'margin-bottom:12px' }, h('table', {},
+        h('thead', {}, h('tr', {}, ['Dia', 'Conversas', 'Finalizadas', 'Pedidos completos', 'Agendados'].map((t) => h('th', {}, t)))),
+        h('tbody', {}, dias_.length ? dias_.map((d) => h('tr', {}, [dia(d.dia), d.conversas, d.finalizadas, d.pedidos_completos, d.agendados].map((v) => h('td', {}, String(v))))) : [h('tr', {}, h('td', { colspan: 5 }, 'Sem conversas no período.'))])))));
+    clearTimeout(IND.t);
+    IND.t = setTimeout(() => { if (S.aba === 'indicadores' && !document.hidden) viewIndicadores(c, IND.dias, true); }, 60000);
+  }
+
   async function viewAprendizado(c, dias = 28) {
     c.replaceChildren(h('div', { class: 'pagina' }, h('h2', {}, 'Aprendizado da IA'), h('p', { class: 'sub' }, 'Carregando…')));
     const minha = viewAprendizado.seq = (viewAprendizado.seq || 0) + 1;   // só a última escolha de período pinta a tela
