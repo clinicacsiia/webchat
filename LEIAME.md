@@ -34,6 +34,8 @@ Uma pessoa, uma conversa (01/11/2026): conversas da mesma pessoa (nome + 2 infor
 
 Próximo passo na conversa (01/11/2026): no alto de cada conversa, uma faixa mostra a única decisão que falta (assumir, conferir valor, fechar exame, remarcar, marcar no Klingo ou responder), com um botão que leva até ela. Os avisos de apoio ficam numa área que rola e se encolhe conforme a altura da tela, para as mensagens sempre terem espaço. Só mudou a tela (`painel/index.html`); não há SQL novo.
 
+Atualização do WebChat (09/11/2026): motivo no encerramento, Agendado conferindo a agenda, despedida configurável, encerramento automático após 24 h sem resposta do paciente, avaliação voluntária e topo da conversa mais baixo. **Pronto e testado. SQL aplicado no Supabase em 09/11/2026; falta publicar o site.** Tudo está desligado, com chaves em Configurações > "Encerramento e avaliação". Controle de etapas e links: `docs/atualizacao-webchat.md`. Detalhes: `docs/encerramento-motivo.md` (WC-03 e WC-04), `docs/despedida.md` (WC-05 e WC-06), `docs/autoencerramento.md` (WC-08), `docs/avaliacao.md` (WC-09 e WC-10), `docs/cabecalho-painel.md` (WC-07) e `docs/wc01-diagnostico.md` (por que só 2 pedidos viram "agendado").
+
 Lista completa do que falta, com a ordem de dependência: `docs/pendencias-e-dependencias.md` (conferida no banco real em 01/11/2026).
 
 Banco: projeto Supabase `webchat-atendimento` (sa-east-1), já com tabelas, regras de segurança e tempo real.
