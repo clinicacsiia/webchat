@@ -24,19 +24,20 @@ Legenda: **[Claude]** eu faço no repositório; **[Você]** só você consegue.
 | 0 | Diagnóstico WC-01 (`docs/wc01-diagnostico.md`) | Claude | **Feito** |
 | 1 | **[Você]** Escolher 1 ou 2 pacientes já marcados no Klingo que aparecem como `pronto` no painel (com autorização) para fechar o WC-02 | Você | Pendente |
 | 2 | **[Você]** Criar no Klingo o relatório **"Jornada do Paciente - Marcações por Data do Exame"** (duplicar o #13825; trocar o filtro de período para *Data Agendado Para*; anotar o número). Depois me passe o número para gravar em `config.jornada_relatorio_id` e `jornada_relatorio_filtro = 'exame'`. Passos completos na tabela `jornada_pendencia`, chave `relatorio_por_data_exame` | Você | Pendente |
-| 3 | WC-03 Motivo no encerramento: código, SQL e testes | Claude | Em andamento |
-| 4 | **[Você]** Aplicar `supabase/encerramento-motivo.sql` no Supabase (editor de SQL, uma parte por vez; tudo começa **desligado**) | Você | Depois do passo 3 |
-| 5 | WC-04 Agendado com validação da agenda | Claude | Depois do 3 |
-| 6 | WC-05/06 Despedida configurável e publicada | Claude | Depois do 3 |
-| 7 | WC-07 Cabeçalho mais baixo | Claude | Independente |
-| 8 | WC-08 Autoencerramento 24 h (começa em **simulação**) | Claude | Depois do 3 e do 6 |
-| 9 | WC-09/10 Avaliação opcional | Claude | Depois do 3 e do 6 |
-| 10 | WC-02 Correção do reconhecimento | Claude | Depois dos passos 1 e 2 |
+| 3 | WC-03 Motivo no encerramento (`supabase/encerramento-motivo.sql`) | Claude | **Código e testes prontos** |
+| 4 | WC-04 Agendado confere a agenda (`supabase/encerramento-agendado.sql`) | Claude | **Código e testes prontos** |
+| 5 | WC-05/06 Despedida configurável (`supabase/despedida.sql`) | Claude | **Código e testes prontos** |
+| 6 | WC-07 Topo da conversa mais baixo (só tela) | Claude | **Pronto e testado** |
+| 7 | WC-08 Encerramento automático 24 h (`supabase/autoencerrar.sql`), começa desligado | Claude | **Código e testes prontos** |
+| 8 | WC-09/10 Avaliação voluntária (`supabase/avaliacao.sql`) | Claude | **Código e testes prontos** |
+| 9 | **Aplicar os 5 SQL no Supabase**, nesta ordem: motivo, agendado, despedida, autoencerrar, avaliação (editor: https://supabase.com/dashboard/project/nrvuynjwcgwpjdptkiay/sql/new). Tudo entra desligado | Você autoriza, Claude aplica | **Aguardando o seu "pode aplicar"** |
+| 10 | **Publicar o site** (GitHub Pages: unir a branch na `main`) e testar no celular | Você | Depois do 9 |
+| 11 | WC-02 Correção do reconhecimento de agendamento | Claude | Depois dos passos 1 e 2 |
 
 ## Ordem para ligar (sempre uma chave por vez, com um dia de uso entre elas)
 
 1. Publicar o site (GitHub Pages) com o painel e o chat novos. Nada muda enquanto as chaves estiverem desligadas.
-2. `config.encerramento_exige_motivo = 'sim'` (WC-03).
+2. `config.encerramento_exige_motivo = 'sim'` (WC-03; no painel: Configurações > Encerramento e avaliação).
 3. `config.encerramento_valida_agendado = 'sim'` (WC-04).
 4. `config.despedida_configurada = 'sim'` (WC-06).
 5. `config.autoencerrar_modo = 'simulacao'`, olhar a contagem por alguns dias, depois `'ligado'` (WC-08).
