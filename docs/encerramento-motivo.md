@@ -46,3 +46,8 @@ A **unidade não é comparada** (o chat usa CSI/DESENVOAR e o Klingo usa CSI 1, 
 Configurações > Encerramento e avaliação > "Conferir a agenda ao encerrar como Agendado" (`config.encerramento_valida_agendado`). Ligue **depois** de "Exigir motivo". Desfazer: voltar para `nao`.
 
 Testes: `npm run test:agendado-sql` (14 verificações) e `npm run test:encerramento` (8).
+
+---
+
+## Correção de 09/11/2026 (mesmo dia): "permission denied for table conversas"
+Ao encerrar com motivo, o painel mostrou esse erro. Causa: o atendente só pode atualizar 3 colunas de `conversas` (status, agente_id, nao_lidas_agente) e a coluna nova `motivo_encerramento` não tinha permissão; além disso o gatilho não conseguia ler a chave `encerramento_exige_motivo` (o atendente não lê `config`), então a exigência de motivo estava, na prática, desligada para ele. Corrigido no banco (migração `encerramento_motivo_correcao_permissoes`) e em `supabase/encerramento-motivo.sql`. Novo teste: `sql-encerramento` agora roda como o papel `authenticated`, sem ler `config`. Conferido no banco real, como atendente e como paciente, em transação desfeita.
