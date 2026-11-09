@@ -78,6 +78,7 @@ async function pagina(browser, { quadroIndisponivel = false, patchModo = 'ok', a
     else if (p.startsWith('/rest/v1/v_jornada_quadro')) { if (quadroIndisponivel) { status = 404; corpo = { message: 'relation "v_jornada_quadro" does not exist' }; } else corpo = CARTOES; }
     else if (p.endsWith('/rpc/jornada_mover_card')) { reg.rpcs.push(JSON.parse(req.postData() || '{}')); corpo = { ok: true, versao: 2 }; }
     else if (p.endsWith('/rpc/despedida_atual')) { if (despedida === 'sem_sql') { status = 404; corpo = { code: 'PGRST202', message: 'function despedida_atual does not exist' }; } else corpo = { ativa: true, versao: 5, texto: 'Obrigado pelo contato!', tem_imagem: false }; }
+    else if (p.endsWith('/rpc/autoencerrar_resumo')) { if (despedida === 'sem_sql') { status = 404; corpo = { code: 'PGRST202', message: 'function autoencerrar_resumo does not exist' }; } else corpo = { modo: 'simulacao', horas: 24, elegiveis_agora: 3, aguardando_paciente: 11, ultimas: [{ em: '2026-11-09T10:00:00Z', modo: 'simulacao', elegiveis: 3, fechadas: 0 }] }; }
     else if (p.endsWith('/rpc/despedida_salvar')) { reg.rpcs.push({ rpc: 'despedida_salvar', ...JSON.parse(req.postData() || '{}') }); corpo = { ok: true, versao: 6 }; }
     else if (p.startsWith('/rest/v1/rpc/')) corpo = {};
     else if (p.startsWith('/rest/v1/')) corpo = objeto ? null : [];
@@ -203,6 +204,15 @@ await caso('Configurações sem o SQL da despedida: o bloco avisa e a tela não 
   await page.waitForFunction(() => /Disponível depois de aplicar/.test(document.querySelector('.cfg-desp').innerText), null, { timeout: 5000 });
   await ctx.close();
   return { ok: !reg.excecoes.length };
+});
+
+await caso('Configurações: o encerramento automático mostra a contagem da simulação e as 3 opções de modo', async () => {
+  const { page, ctx, reg } = await abrir({ quadroIndisponivel: true, admin: true });
+  await page.click('nav.nav button[data-aba="config"]'); await page.waitForSelector('#cfg-atualizacao', { timeout: 8000 });
+  await page.waitForFunction(() => /Seriam encerradas agora/.test(document.getElementById('cfg-atualizacao').innerText), null, { timeout: 5000 });
+  const t = await page.locator('#cfg-atualizacao').innerText();
+  await ctx.close();
+  return { ok: /Aguardando resposta do paciente: 11|aguardando resposta do paciente: 11/i.test(t) && /Seriam encerradas agora: 3/.test(t) && /Última leitura: 3 elegível\(is\), 0 encerrada\(s\)/.test(t) && !reg.excecoes.length, detalhe: t.slice(-200).replace(/\n/g, ' ') };
 });
 
 await browser.close(); srv.close();

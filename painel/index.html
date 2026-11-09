@@ -663,7 +663,7 @@
   // WC-03 (decisão D1): motivos de encerramento. O código vai para o banco (conversas.motivo_encerramento); o rótulo é só da tela.
   const MOTIVOS_ENC = [['agendado', 'Agendado'], ['apenas_informacoes', 'Apenas informações'], ['nao_respondido', 'Não respondido'], ['desistiu', 'Paciente desistiu'], ['outro', 'Outro motivo']];
   const ROTULO_MOTIVO = Object.fromEntries(MOTIVOS_ENC);
-  const rotuloEncerrada = (c) => (c && c.status === 'encerrada' ? (ROTULO_MOTIVO[c.motivo_encerramento] || 'sem motivo registrado') : '');
+  const rotuloEncerrada = (c) => (c && c.status === 'encerrada' ? (ROTULO_MOTIVO[c.motivo_encerramento] || 'sem motivo registrado') + (c.encerramento_origem === 'inatividade' ? ' · automático' : c.encerramento_origem === 'sistema' ? ' · pelo sistema' : '') : '');
   const MOTIVOS_CANCELAMENTO = ['Paciente desistiu', 'Horário indisponível', 'Exame errado ou faltando', 'Plano ou convênio', 'Preço', 'Duplicado ou teste', 'Outro motivo'];
   // Janela de confirmação do cancelamento, com o motivo numa lista fixa. Devolve undefined (voltou), null (cancelar sem motivo) ou o motivo.
   function pedirMotivo() {
@@ -2668,8 +2668,9 @@
       { k: 'motor', tipo: 'escolha', rot: 'Motor', opcoes: [['fluxo', 'Fluxo guiado (sem IA)'], ['ia', 'Inteligência artificial']], dica: 'Fluxo guiado segue um roteiro fixo; IA conversa livremente.' },
       { k: 'motor_telefones_teste', tipo: 'texto', rot: 'Telefones de teste', dica: 'Só esses números usam o motor novo (separe por vírgula). Vazio = ninguém em teste.' },
     ] },
-    { id: 'atualizacao', icone: 'livro', titulo: 'Encerramento e avaliação', desc: 'Chaves da Atualização do WebChat. Ligue uma por vez e confira o dia seguinte; desligar volta ao comportamento anterior na hora.', campos: [
+    { id: 'atualizacao', icone: 'livro', titulo: 'Encerramento e avaliação', desc: 'Chaves da Atualização do WebChat. Ligue uma por vez e confira o dia seguinte; desligar volta ao comportamento anterior na hora.', custom: 'autoencerrar', campos: [
       { k: 'encerramento_exige_motivo', tipo: 'sim', rot: 'Exigir motivo ao encerrar', dica: 'Ligado: o painel só encerra a conversa com um motivo escolhido. Desligado: o motivo fica opcional.' },
+      { k: 'autoencerrar_modo', tipo: 'escolha', rot: 'Encerramento automático (24 h sem resposta do paciente)', opcoes: [['desligado', 'Desligado'], ['simulacao', 'Simulação (só conta, não encerra nada)'], ['ligado', 'Ligado']], dica: 'Comece em Simulação e olhe a contagem abaixo por alguns dias. Só conta quando uma pessoa da equipe escreveu e o paciente não respondeu; exame em aberto nunca é encerrado.' },
       { k: 'encerramento_valida_agendado', tipo: 'sim', rot: 'Conferir a agenda ao encerrar como Agendado', dica: 'Ligado: só encerra como Agendado se houver agendamento vigente (chat ou Klingo), e exame ainda futuro deixa de bloquear o encerramento. Ligue depois de “Exigir motivo”.' },
     ] },
     { id: 'despedida', icone: 'livro', titulo: 'Despedida do atendimento', desc: 'O que o paciente recebe quando a conversa é encerrada. Texto e imagem são opcionais; os dois vazios usam a frase padrão. Cada alteração vale só para os próximos encerramentos.', custom: 'despedida', campos: [
@@ -2856,6 +2857,23 @@ h1.longo { font-size: 14mm; }
     }, () => {});
     return caixa;
   }
+  // WC-08: o que a rotina de encerramento automático está vendo (só administrador lê). Sem o SQL aplicado, o bloco fica em silêncio.
+  function blocoAutoencerrar() {
+    const caixa = h('div', { class: 'cfg-linha' });
+    const texto = h('p', { class: 'dica', 'aria-live': 'polite' }, 'Lendo…');
+    const atualizar = h('button', { class: 'btn', type: 'button', style: 'width:auto' }, 'Atualizar contagem');
+    const ler = async () => {
+      const { data, error } = await db.rpc('autoencerrar_resumo');
+      if (error || !data) { texto.textContent = 'Disponível depois de aplicar o SQL do encerramento automático (supabase/autoencerrar.sql).'; atualizar.hidden = true; return; }
+      const u = (data.ultimas || [])[0];
+      texto.textContent = `Modo: ${data.modo}. Prazo: ${data.horas} h. Conversas aguardando resposta do paciente: ${data.aguardando_paciente}. Seriam encerradas agora: ${data.elegiveis_agora}.`
+        + (u ? ` Última leitura: ${u.elegiveis} elegível(is), ${u.fechadas} encerrada(s).` : ' Nenhuma leitura ainda.');
+    };
+    atualizar.addEventListener('click', ler);
+    caixa.append(h('span', { class: 'rot' }, 'Situação do encerramento automático'), texto, atualizar);
+    ler().catch(() => {});
+    return caixa;
+  }
   async function viewConfig(c) {
     const { data, error } = await db.from('config').select('chave,valor');
     if (error) { c.replaceChildren(h('div', { class: 'pagina' }, h('p', { class: 'erro' }, msgErro(error)))); return; }
@@ -2882,6 +2900,7 @@ h1.longo { font-size: 14mm; }
     const grupoUi = (g) => {
       const corpo = [g.desc ? h('p', { class: 'cfg-desc' }, g.desc) : null, ...g.campos.map(campoUi)];
       if (g.custom === 'despedida') corpo.push(blocoDespedida());
+      if (g.custom === 'autoencerrar') corpo.push(blocoAutoencerrar());
       if (g.qr === 'fila') corpo.push(h('div', { class: 'cfg-qr' },
         cartaoQr('QR code da recepção', 'O paciente aponta a câmera, entra na fila e toca “Cheguei”. Imprima e deixe na recepção.', linkFila, 'recepcao', 'Chegou? Aponte a câmera aqui',
           { sub: 'Entre na fila pelo celular e acompanhe a sua vez.', passos: ['Abra a câmera do celular', 'Aponte para o QR code', 'Toque em “Cheguei”'] }),
