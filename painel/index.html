@@ -154,6 +154,12 @@
   .item.espera:hover { background: #fbe4e0; }
   .cron { font-weight: 700; font-variant-numeric: tabular-nums; border-radius: 999px; padding: 1px 8px; background: var(--csi-danger-bg); color: var(--csi-danger-strong); border: 1px solid var(--csi-danger); }
   .item.espera .cron { background: var(--csi-danger); color: #fff; }
+  .grupo-cab { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; border: 0; border-bottom: 1px solid var(--linha); background: var(--csi-background); padding: 8px 16px; font-size: 12.5px; font-weight: 700; color: var(--suave); text-transform: uppercase; letter-spacing: .03em; cursor: pointer; position: sticky; top: 0; z-index: 1; }
+  .grupo-cab:hover { color: var(--texto); }
+  .grupo-cab .gnome { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .grupo-cab .gn { background: var(--csi-primary-soft); color: var(--csi-primary-strong); border-radius: 999px; padding: 0 8px; font-size: 12px; }
+  .grupo-cab.atencao { background: var(--csi-danger-bg); color: var(--csi-danger-strong); }
+  .grupo-cab.atencao .gn { background: var(--csi-danger); color: #fff; }
   .item .hora { font-weight: 400; font-size: 12px; color: var(--suave); flex: none; }
   .item .l2 { display: flex; justify-content: space-between; gap: 8px; color: var(--suave); font-size: 13.5px; margin-top: 2px; }
   .item .l2 .prev { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -615,7 +621,7 @@
   const S = {
     me: null, agentes: new Map(), conversas: [], filtro: 'aguardando', abertaId: null, msgs: [], vistos: new Set(),
     aba: 'atendimento', canal: null, ao_vivo: false, contatos: [], mudo: localStorage.getItem('painel.mudo') === '1',
-    buscaContatos: '', busca: '', periodo: 'todos', tagFiltro: '', pre: null,
+    buscaContatos: '', busca: '', periodo: 'todos', tagFiltro: '', pre: null, gruposFechados: new Set(),
     modo: (() => { try { return localStorage.getItem('painel.modo') === 'quadro' ? 'quadro' : 'lista'; } catch { return 'lista'; } })(),
     quadro: [], colunasQ: [], transQ: [], fq: 'todos', buscaQ: '', quadroOk: true,
     grupos: new Map(), sugestoes: [], avisosData: [], avisosPac: [], abertos: [], remarcar: [], outrosQ: new Map()
@@ -1927,14 +1933,46 @@
       it.replaceChildren(...(sug ? [sug] : []), h('div', { class: 'vazio' }, h('b', {}, msgs[S.filtro][0]), msgs[S.filtro][1]));
       return;
     }
-    it.replaceChildren(...(sug ? [sug] : []), ...lista.map((p) => {
+    const agrupar = S.filtro === 'abertas' && !buscando;
+    it.replaceChildren(...(sug ? [sug] : []), ...(agrupar ? itensAgrupados(lista) : lista.map((p) => itemPessoa(p))));
+  }
+  // Aba Abertas agrupada por atendente. Conversa sem dono fica para todo mundo; conversa assumida cujo paciente espera há mais de 2 h
+  // sobe para "Precisam de atenção" (todos veem) com o aviso de quem assumiu e ainda não resolveu.
+  const LIMITE_ATENCAO = 7200;   // segundos (2 h)
+  const donoDe = (p) => { const m = p.membros.find((x) => x.status === 'em_atendimento' && x.agente_id); return m ? m.agente_id : null; };
+  const emAtencao = (p) => { if (!donoDe(p)) return false; const d = desdeEspera(p); return !!d && (Date.now() - d) / 1000 >= LIMITE_ATENCAO; };
+  const nomeAgente = (id) => { const a = S.agentes.get(id); return a ? a.nome : 'Outro atendente'; };
+  function itensAgrupados(lista) {
+    const atencao = [], livres = [], porDono = new Map();
+    for (const p of lista) {
+      const dono = donoDe(p);
+      if (emAtencao(p)) atencao.push(p);
+      else if (!dono) livres.push(p);
+      else { if (!porDono.has(dono)) porDono.set(dono, []); porDono.get(dono).push(p); }
+    }
+    const donos = [...porDono.keys()].sort((a, b) => (a === S.me.id ? -1 : b === S.me.id ? 1 : nomeAgente(a).localeCompare(nomeAgente(b), 'pt-BR')));
+    const grupos = [['atencao', 'Precisam de atenção', atencao, 'Assumidas há mais de 2 h e ainda sem resposta. Aparecem para todos até alguém resolver.'], ['livres', 'Sem atendente', livres, 'Ninguém assumiu ainda. Qualquer pessoa pode pegar.'],
+      ...donos.map((id) => ['ag-' + id, id === S.me.id ? 'Minhas conversas' : nomeAgente(id), porDono.get(id), ''])];
+    const out = [];
+    for (const [chave, titulo, itens, dica] of grupos) {
+      if (!itens.length) continue;
+      const fechado = S.gruposFechados.has(chave);
+      out.push(h('button', { class: 'grupo-cab' + (chave === 'atencao' ? ' atencao' : ''), type: 'button', 'aria-expanded': String(!fechado), 'data-grupo': chave, title: dica || undefined,
+        onclick: () => { if (S.gruposFechados.has(chave)) S.gruposFechados.delete(chave); else S.gruposFechados.add(chave); renderLista(); } },
+        h('span', { class: 'seta', 'aria-hidden': 'true' }, fechado ? '▸' : '▾'), h('span', { class: 'gnome' }, titulo), h('span', { class: 'gn' }, itens.length)));
+      if (!fechado) out.push(...itens.map((p) => itemPessoa(p, chave === 'atencao')));
+    }
+    return out;
+  }
+  function itemPessoa(p, destacarDono) {
+    {
       const c = p.rep, st = statusPessoa(p);
       const ag = (p.membros.find((m) => m.agente_id) || {}).agente_id ? S.agentes.get(p.membros.find((m) => m.agente_id).agente_id) : null;
       const naoLidas = p.membros.reduce((n, m) => n + (m.nao_lidas_agente || 0), 0);
       const nAb = abertosDe(c.id).length, nRem = remarcarDe(c.id).length;
       const comAlerta = p.membros.some((m) => alertasDe(m.id).length);
       const desde = desdeEspera(p), seg = desde ? (Date.now() - desde) / 1000 : 0;
-      return h('button', { class: 'item' + (desde && seg >= LIMITE_ESPERA ? ' espera' : ''), 'data-desde': desde || '', type: 'button', 'aria-current': String(p.membros.some((m) => m.id === S.abertaId)), onclick: () => abrirConversa(c.id) },
+      return h('button', { class: 'item' + (desde && seg >= LIMITE_ESPERA ? ' espera' : ''), 'data-desde': desde || '', 'data-atencao': emAtencao(p) ? '1' : '', 'data-dono': donoDe(p) ? '1' : '', type: 'button', 'aria-current': String(p.membros.some((m) => m.id === S.abertaId)), onclick: () => abrirConversa(c.id) },
         h('span', { class: 'av-i', 'aria-hidden': 'true' }, iniciais(nomeLista(c))),
         h('div', { class: 'l1' }, h('span', {}, nomeLista(c)), h('span', { class: 'hora' }, fmtHoraLista(c.atualizado_em))),
         h('div', { class: 'l2' }, h('span', { class: 'prev' }, c.ultima_mensagem || 'Sem mensagens'), naoLidas > 0 ? h('span', { class: 'nl' }, naoLidas) : null),
@@ -1949,8 +1987,9 @@
           anexosDe(c.id).total ? h('span', { class: 'urg ' + (anexosDe(c.id).sem_conferir ? 'media' : ''), title: 'Foto do pedido médico anexada' + (anexosDe(c.id).sem_conferir ? ': falta conferir no Klingo' : ' (conferida)') }, `Anexo: ${anexosDe(c.id).total} foto${anexosDe(c.id).total > 1 ? 's' : ''}`) : null,
           c.ia_ativa && st === 'aguardando' ? h('span', { style: 'color:var(--suave)' }, c.motor === 'fluxo' ? 'Assistente automático' : 'IA atendendo') : null,
           ag ? h('span', { style: 'color:var(--suave)' }, ag.nome) : null,
+          destacarDono ? h('span', { class: 'urg alta', title: 'Conversa assumida há mais de 2 h, com o paciente esperando resposta' }, `⚠ ${nomeAgente(donoDe(p))} assumiu e ainda não resolveu`) : null,
           desde && seg >= LIMITE_ESPERA ? h('span', { class: 'cron', title: 'Tempo que o paciente espera uma resposta' }, '⏱ ' + fmtCron(seg)) : null));
-    }));
+    }
   }
   // Cronômetro de resposta: desde quando o paciente espera alguém da equipe (coluna cliente_aguarda_desde).
   const LIMITE_ESPERA = 120;
@@ -1973,6 +2012,7 @@
       const d = Number(el.dataset.desde); if (!d) continue;
       const seg = (Date.now() - d) / 1000;
       if (seg >= LIMITE_ESPERA && !el.classList.contains('espera')) { redesenhar = true; break; }
+      if (el.dataset.dono === '1' && (seg >= LIMITE_ATENCAO) !== (el.dataset.atencao === '1')) { redesenhar = true; break; }   // cruzou as 2 h: muda de grupo
       const c = el.querySelector('.cron'); if (c) c.textContent = '⏱ ' + fmtCron(seg);
     }
     if (redesenhar) renderLista();
