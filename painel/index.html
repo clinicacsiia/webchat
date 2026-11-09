@@ -355,6 +355,10 @@
   .num { background: var(--csi-surface); border: 1px solid var(--csi-border); border-radius: var(--radius-md); box-shadow: var(--shadow-sm); padding: 14px 16px; }
   .num b { display: block; font-size: 28px; line-height: 1.1; }
   .num span { color: var(--suave); font-size: 13px; }
+  .barras-h { display: flex; align-items: flex-end; gap: 6px; padding: 10px 12px; background: var(--csi-surface); border: 1px solid var(--csi-border); border-radius: var(--radius-md); box-shadow: var(--shadow-sm); overflow-x: auto; }
+  .barras-h .bh { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 2px; min-width: 34px; flex: 1; }
+  .barras-h .bh i { display: block; width: 100%; max-width: 34px; background: var(--csi-primary-strong); border-radius: 4px 4px 0 0; }
+  .barras-h .bh b { font-size: 13px; } .barras-h .bh span { color: var(--suave); font-size: 12px; }
   .tabela-wrap { background: var(--papel); border: 1px solid var(--linha); border-radius: var(--radius-md); box-shadow: var(--shadow-sm); overflow-x: auto; }
   .cat-bloco { background: var(--papel); border: 1px solid var(--linha); border-radius: var(--radius-md); box-shadow: var(--shadow-sm); padding: 10px 14px; margin: 0 0 10px; }
   .cat-bloco summary { cursor: pointer; font-weight: 600; }
@@ -462,12 +466,13 @@
   .painel-cab p.sub { margin: 4px 0 0; color: var(--csi-text-secondary); }
   .data-hoje { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--csi-border-strong); border-radius: var(--radius-md); padding: 8px 12px; font-weight: 600; background: var(--csi-surface); }
   .data-hoje .ic-svg svg { width: 18px; height: 18px; }
-  .kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
+  .kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
   .kpi { display: flex; gap: 12px; align-items: center; padding: 12px 14px; background: var(--csi-surface); border: 1px solid var(--csi-border); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); min-width: 0; }
   .kpi .ic-k { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; flex: none; }
   .kpi .ic-k.az { background: var(--csi-primary-soft); color: var(--csi-primary-strong); } .kpi .ic-k.la { background: var(--csi-warning-soft); color: var(--csi-warning-strong); }
   .kpi .ic-k.ve { background: var(--csi-success-soft); color: var(--csi-success-strong); } .kpi .ic-k.vm { background: var(--csi-danger-bg); color: var(--csi-danger-strong); }
   .kpi small { display: block; color: var(--csi-text-secondary); font-weight: 600; font-size: 13px; } .kpi strong { font-size: 28px; line-height: 1.1; }
+  @media (min-width: 1240px) { .kpis { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; } .kpi { padding: 10px 12px; gap: 10px; } .kpi .ic-k { width: 38px; height: 38px; } .kpi strong { font-size: 24px; } .kpi small { font-size: 12px; } }
   .item { display: grid; grid-template-columns: 40px minmax(0, 1fr); column-gap: 12px; align-items: start; }
   .item > .av-i { grid-row: 1 / span 3; align-self: center; width: 40px; height: 40px; }
   .item > div { grid-column: 2; min-width: 0; }
@@ -1546,22 +1551,30 @@
     const q = semAcento(S.busca).trim(); if (!q) return true;
     return p.membros.some((m) => semAcento([nomeLista(m), m.ultima_mensagem, m.nome_informado, m.contatos && m.contatos.telefone, m.contatos && m.contatos.email].join(' ')).includes(q));
   }
+  // Dia de hoje no fuso de São Paulo (o mesmo do banco e da aba Indicadores), não o do aparelho.
+  const fmtDiaSP = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' });
+  const mediaTxt = (n) => (n == null ? '—' : Number(n).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
   function atualizarKpis() {
     const box = document.getElementById('kpis'), sino = document.getElementById('sinoPonto');
-    const todas = pessoas(), agora = new Date();
-    const hoje = (iso) => iso && mesmoDia(new Date(iso), agora);
-    const nHoje = todas.filter((p) => p.membros.some((m) => hoje(m.criado_em))).length;
+    // pessoas() já obedece o filtro de unidade do topo; os três primeiros cartões e a aba Indicadores usam a mesma conta.
+    const todas = pessoas(), hojeSP = fmtDiaSP.format(new Date());
+    const hoje = (iso) => !!iso && fmtDiaSP.format(new Date(iso)) === hojeSP;
+    const doDia = todas.map((p) => p.membros.filter((m) => hoje(m.criado_em))).filter((ms) => ms.length);
+    const nConv = doDia.reduce((t, ms) => t + ms.length, 0), nHoje = doDia.length;
+    const nFim = doDia.reduce((t, ms) => t + ms.filter((m) => m.status === 'encerrada').length, 0);
     const nEspera = todas.filter((p) => statusPessoa(p) === 'aguardando').length;
-    const nFim = todas.filter((p) => statusPessoa(p) === 'encerrada' && p.membros.some((m) => hoje(m.atualizado_em))).length;
     const nAlerta = (typeof J !== 'undefined' && J.nAtencao) || 0;
     if (sino) sino.hidden = !(nEspera || nAlerta);
     if (!box) return;
     const k = (cls, ic, rot, n, dica) => h('div', { class: 'kpi', title: dica }, h('div', { class: 'ic-k ' + cls }, icone(ic)), h('div', {}, h('small', {}, rot), h('strong', {}, String(n))));
+    const un = UN.sel ? ' Só da unidade escolhida no topo (quem não tem unidade conhecida aparece em todas).' : '';
     box.replaceChildren(
-      k('az', 'pessoas', 'Conversas hoje', nHoje, 'Conversas que começaram hoje'),
-      k('la', 'ampulheta', 'Em espera', nEspera, 'Esperando alguém da equipe assumir'),
-      k('ve', 'ok', 'Encerradas hoje', nFim, 'Conversas encerradas hoje'),
-      k('vm', 'alerta', 'Alertas', nAlerta, 'Pacientes que precisam de atenção na Jornada'));
+      k('az', 'lista', 'Conversas hoje', nConv, 'Conversas que começaram hoje.' + un),
+      k('az', 'pessoas', 'Pessoas hoje', nHoje, 'Pessoas diferentes que abriram conversa hoje. Conversas da mesma pessoa contam uma vez.' + un),
+      k('az', 'barras', 'Conversas por pessoa', mediaTxt(nHoje ? nConv / nHoje : null), 'Média de hoje: conversas ÷ pessoas.' + un),
+      k('la', 'ampulheta', 'Em espera', nEspera, 'Esperando alguém da equipe assumir.' + un),
+      k('ve', 'ok', 'Encerradas hoje', nFim, 'Das conversas que começaram hoje, quantas já foram encerradas (mesma conta de "Finalizadas" em Indicadores).' + un),
+      k('vm', 'alerta', 'Alertas', nAlerta, 'Pacientes que precisam de atenção na Jornada.' + un));
   }
   const totalAvisos = () => avisosSug().length + avisosDat().length + avisosPacV().length + (S.pedidosAcesso || []).length;
   function atualizarSeloAvisos() { const s = document.getElementById('seloAvisos'), n = totalAvisos(); if (s) { s.textContent = n; s.hidden = n === 0; } }
@@ -3595,11 +3608,16 @@ h1.longo { font-size: 14mm; }
   const rotuloCaso = (c) => CONF_ROTULO[c] || (c === 'cancelado' ? 'Cancelado' : c);
   const pct = (a, b) => (b ? Math.round((a / b) * 100) + '%' : '—');
   /* ---------- indicadores (conversas, finalizadas, pedidos completos e agendados) ---------- */
-  const IND = { dias: 0, t: null };
-  // WC-03/09: motivos de encerramento (equipe) e avaliações (só administrador). Só contagens e médias; sem dado de paciente. Se o SQL não foi aplicado, o bloco não aparece.
-  async function blocoMotivosAvaliacoes(dias) {
+  const IND = { dias: 1, t: null };
+  const rotuloUnidade = () => { const u = UNIDADES_PAINEL.find((z) => z[0] === UN.sel); return u ? u[1] : ''; };
+  // WC-03/09: motivos de encerramento (equipe) e avaliações (só administrador). Só contagens e médias; sem dado de paciente.
+  // Vêm na mesma chamada dos indicadores (já filtrados pela unidade). Se o SQL novo não foi aplicado, cai para as chamadas antigas (clínica toda).
+  async function blocoMotivosAvaliacoes(dias, R) {
     const admin = ehAdmin();
-    const [e, a] = await Promise.all([db.rpc('encerramentos_resumo', { p_dias: dias }), admin ? db.rpc('avaliacoes_resumo', { p_dias: dias > 0 ? dias : 365 }) : Promise.resolve({ error: true })]);
+    let e = { data: R && R.encerramentos, error: !(R && R.encerramentos) }, a = { data: R && R.avaliacoes, error: !(R && R.avaliacoes) };
+    if (!R || !R.encerramentos) {
+      [e, a] = await Promise.all([db.rpc('encerramentos_resumo', { p_dias: dias }), admin ? db.rpc('avaliacoes_resumo', { p_dias: dias > 0 ? dias : 365 }) : Promise.resolve({ error: true })]);
+    }
     const num = (n, rot) => h('div', { class: 'num' }, h('b', {}, n ?? 0), h('span', {}, rot));
     const partes = [];
     if (!e.error && e.data) {
@@ -3608,7 +3626,7 @@ h1.longo { font-size: 14mm; }
         h('div', { class: 'numeros' }, [...MOTIVOS_ENC.map(([v, r]) => num(pm[v] || 0, r)), num(pm.sem_motivo || 0, 'sem motivo registrado')]),
         h('p', { class: 'dica' }, `${e.data.total ?? 0} encerramentos no período, ${e.data.automaticos ?? 0} automáticos (sem resposta do paciente).`));
     }
-    if (!a.error && a.data) {
+    if (!a.error && a.data && admin) {
       const pc = a.data.por_canal || {};
       partes.push(h('h3', {}, 'Avaliações dos pacientes'),
         h('div', { class: 'numeros' }, num(a.data.total, 'avaliações'), num(a.data.media_atendimento ?? '—', 'nota média do atendimento (0 a 10)'), num(a.data.media_site ?? '—', 'nota média do site (0 a 10)'),
@@ -3621,24 +3639,34 @@ h1.longo { font-size: 14mm; }
     const titulo = h('h2', {}, 'Indicadores');
     if (!silencioso) c.replaceChildren(h('div', { class: 'pagina' }, titulo, h('p', { class: 'sub' }, 'Carregando…')));
     const minha = viewIndicadores.seq = (viewIndicadores.seq || 0) + 1;   // só a última escolha pinta a tela
-    const { data, error } = await db.rpc('painel_indicadores', { p_dias: dias });
+    const un = UN.sel || null;
+    let { data, error } = await db.rpc('painel_indicadores_unidade', { p_dias: dias, p_unidade: un });
+    let semFiltro = false;
+    // Se o SQL novo (supabase/indicadores-unidade.sql) ainda não foi aplicado, volta para o resumo antigo (clínica toda, sem filtro de unidade).
+    if (error && /painel_indicadores_unidade|function|could not find/i.test(error.message || '')) { semFiltro = true; ({ data, error } = await db.rpc('painel_indicadores', { p_dias: dias })); }
     if (S.aba !== 'indicadores' || minha !== viewIndicadores.seq) return;
     if (error) { c.replaceChildren(h('div', { class: 'pagina' }, titulo, h('p', { class: 'erro' }, msgErro(error)),
-      h('p', { class: 'dica' }, 'Se a mensagem fala de função inexistente, falta rodar o SQL supabase/indicadores-painel.sql.'))); return; }
+      h('p', { class: 'dica' }, 'Se a mensagem fala de função inexistente, falta rodar o SQL supabase/indicadores-unidade.sql.'))); return; }
     const R = data || {}, V = R.conversas || {}, P = R.pedidos || {};
     const pc = (a, b) => (b ? Math.round((a / b) * 100) + '%' : '—');
     const periodo = h('select', { 'aria-label': 'Período', onchange: (ev) => viewIndicadores(c, Number(ev.target.value)) },
-      [[0, 'Desde o início'], [7, 'Últimos 7 dias'], [30, 'Últimos 30 dias'], [90, 'Últimos 90 dias']].map(([v, t]) => h('option', { value: v, selected: v === dias }, t)));
+      [[1, 'Hoje'], [7, 'Últimos 7 dias (com hoje)'], [30, 'Últimos 30 dias'], [90, 'Últimos 90 dias'], [0, 'Desde o início']].map(([v, t]) => h('option', { value: v, selected: v === dias }, t)));
     const num = (n, rot) => h('div', { class: 'num' }, h('b', {}, n ?? 0), h('span', {}, rot));
     const dia = (d) => { const [, m, dd] = String(d).split('-'); return dd + '/' + m; };
     const dias_ = (R.por_dia || []).slice().reverse();
+    const horas = R.por_hora || [], maxH = Math.max(1, ...horas.map((x) => x.conversas));
+    const somaD = (k) => dias_.reduce((t, d) => t + (d[k] || 0), 0);
+    const escopo = semFiltro ? 'Clínica toda (falta aplicar o SQL novo para filtrar por unidade).' : (UN.sel ? `Unidade ${rotuloUnidade()}; quem ainda não tem unidade definida aparece em todas.` : 'Todas as unidades.');
+    const linha = (t, d, forte) => h('tr', forte ? { style: 'font-weight:700' } : {}, [t, d.conversas, d.pessoas ?? '—', mediaTxt(d.media_por_pessoa), d.finalizadas, d.pedidos_completos, d.agendados].map((v) => h('td', {}, String(v))));
     c.replaceChildren(h('div', { class: 'pagina' }, titulo,
       h('p', { class: 'sub' }, 'Resumo do chat. Atualiza sozinho a cada minuto. Não mostra dado de paciente. Inclui conversas de teste da equipe. ', R.desde ? `Primeira conversa em ${fmtDataHora(R.desde)}. ` : '', R.gerado_em ? `Atualizado às ${fmtDataHora(R.gerado_em)}.` : ''),
+      h('p', { class: 'dica', style: 'margin-top:4px' }, 'Filtro de unidade do topo: ' + escopo + ' "Pessoa" junta as conversas da mesma pessoa, igual à lista do Atendimento e aos cartões do topo.'),
       h('div', { class: 'acoes' }, periodo, h('button', { class: 'btn', type: 'button', onclick: () => viewIndicadores(c, IND.dias, true) }, 'Atualizar agora')),
       h('h3', {}, 'Conversas'),
       h('div', { class: 'numeros' },
         num(V.total, 'conversas iniciadas'),
-        num(V.pessoas, 'pessoas diferentes'),
+        num(V.pessoas ?? '—', 'pessoas diferentes'),
+        num(mediaTxt(V.media_por_pessoa), 'conversas por pessoa (média)'),
         num(V.finalizadas, `conversas finalizadas (${pc(V.finalizadas, V.total)})`),
         num(V.em_andamento, 'em andamento')),
       h('h3', {}, 'Pedidos e agendamentos'),
@@ -3650,11 +3678,20 @@ h1.longo { font-size: 14mm; }
         num(P.rascunhos, 'pedidos não terminados')),
       h('p', { class: 'dica' }, `Dos ${P.agendados ?? 0} agendados, ${P.agendados_pela_ia ?? 0} foram marcados sozinhos pela IA e ${P.agendados_pela_equipe ?? 0} pela equipe. `
         + 'Pedido completo = o paciente terminou o pedido no chat. "Agendado" só conta o que o painel sabe: marcação feita direto no Klingo sem avisar o chat não entra.'),
+      horas.length ? h('div', {},
+        h('h3', {}, 'Conversas por horário de início'),
+        h('div', { class: 'barras-h', role: 'img', 'aria-label': 'Conversas iniciadas por hora do dia' }, horas.map((x) => h('div', { class: 'bh', title: `${x.conversas} conversa(s) iniciadas entre ${x.hora}h e ${x.hora + 1}h` },
+          h('i', { style: `height:${Math.max(4, Math.round((x.conversas / maxH) * 70))}px` }), h('b', {}, String(x.conversas)), h('span', {}, String(x.hora).padStart(2, '0') + 'h')))),
+        h('p', { class: 'dica' }, 'Horário de Brasília. Mostra quando os pacientes mais abrem conversa, para ajustar a escala da equipe.')) : null,
       h('h3', {}, 'Por dia'),
       h('div', { class: 'tabela-wrap', style: 'margin-bottom:12px' }, h('table', {},
-        h('thead', {}, h('tr', {}, ['Dia', 'Conversas', 'Finalizadas', 'Pedidos completos', 'Agendados'].map((t) => h('th', {}, t)))),
-        h('tbody', {}, dias_.length ? dias_.map((d) => h('tr', {}, [dia(d.dia), d.conversas, d.finalizadas, d.pedidos_completos, d.agendados].map((v) => h('td', {}, String(v))))) : [h('tr', {}, h('td', { colspan: 5 }, 'Sem conversas no período.'))])))));
-    blocoMotivosAvaliacoes(dias).then((b) => { const pag = c.querySelector('.pagina'); if (b && pag && S.aba === 'indicadores' && minha === viewIndicadores.seq) pag.append(b); }, () => {});
+        h('thead', {}, h('tr', {}, ['Dia', 'Conversas', 'Pessoas', 'Conversas por pessoa', 'Finalizadas', 'Pedidos completos', 'Agendados'].map((t) => h('th', {}, t)))),
+        h('tbody', {}, dias_.length
+          ? [...(dias_.length > 1 ? [linha('Total do período', { conversas: somaD('conversas'), pessoas: V.pessoas, media_por_pessoa: V.media_por_pessoa, finalizadas: somaD('finalizadas'), pedidos_completos: somaD('pedidos_completos'), agendados: somaD('agendados') }, true)] : []),
+            ...dias_.map((d) => linha(dia(d.dia), d))]
+          : [h('tr', {}, h('td', { colspan: 7 }, 'Sem conversas no período.'))]))),
+      h('p', { class: 'dica' }, 'No total do período, "Pessoas" conta cada pessoa uma vez; na linha de cada dia, quem voltou em outro dia entra de novo, por isso a soma dos dias pode passar do total.')));
+    blocoMotivosAvaliacoes(dias, semFiltro ? null : R).then((b) => { const pag = c.querySelector('.pagina'); if (b && pag && S.aba === 'indicadores' && minha === viewIndicadores.seq) pag.append(b); }, () => {});
     clearTimeout(IND.t);
     IND.t = setTimeout(() => { if (S.aba === 'indicadores' && !document.hidden) viewIndicadores(c, IND.dias, true); }, 60000);
   }
