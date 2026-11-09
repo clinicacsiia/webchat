@@ -1,4 +1,5 @@
 // FLUXOGRAMA: entrada (pg_net chama de fluxo_transferir, ou da rotina espera_vigiar, com x-fila-aviso-segredo) -> validação (segredo bate com o do Vault; conversa é um UUID) -> lógica (acha os aparelhos da equipe ativa em push_inscricao, envia Web Push genérico e apaga aparelho expirado) -> saída (responde quantos aparelhos e quantos envios)
+// Versão 1.2 — 09/11/2026 / Mudança: novo aviso `tipo: 'agenda'` (conversa encerrada como Agendado que precisa de conferência no Klingo), sem conversa e sem nome; um push só com a contagem
 // Versão 1.1 — 07/11/2026 / Mudança: novo aviso `tipo: 'espera'` (paciente esperando uma pessoa há mais de 10 min), sem conversa; um push só com a contagem
 // Versão 1.0 — 03/11/2026 / Mudança: Implementação inicial (substitui o aviso à equipe que o n8n nunca chegou a fazer)
 //
@@ -25,8 +26,9 @@ Deno.serve(async (req) => {
   let corpo: { conversa?: unknown; urgencia?: unknown; tipo?: unknown; quantidade?: unknown } = {};
   try { corpo = await req.json(); } catch { /* corpo inválido */ }
   const espera = corpo.tipo === 'espera';   // rotina do banco: paciente(s) esperando uma pessoa há mais de 10 min (não leva conversa)
-  if (!espera && !UUID.test(String(corpo.conversa ?? ''))) return json({ erro: 'conversa inválida' }, 400);
-  const alta = !espera && corpo.urgencia === 'alta';
+  const agenda = corpo.tipo === 'agenda';   // rotina do banco: conversa(s) encerrada(s) como Agendado que precisam de conferência (não leva conversa)
+  if (!espera && !agenda && !UUID.test(String(corpo.conversa ?? ''))) return json({ erro: 'conversa inválida' }, 400);
+  const alta = !espera && !agenda && corpo.urgencia === 'alta';
   const qtd = Math.max(1, Math.min(99, Math.floor(Number(corpo.quantidade)) || 1));
 
   const privada = Deno.env.get('VAPID_PRIVADA');
@@ -42,7 +44,9 @@ Deno.serve(async (req) => {
   const { data: aparelhos, error: e2 } = await db.from('push_inscricao').select('id,endpoint,p256dh,auth').in('conta_id', ids);
   if (e2) return json({ erro: e2.message }, 500);
 
-  const carga = JSON.stringify(espera
+  const carga = JSON.stringify(agenda
+    ? { tipo: 'equipe', titulo: 'CSI · Conferir agendamento', corpo: qtd > 1 ? `${qtd} conversas encerradas como Agendado precisam de conferência. Abra o painel.` : 'Uma conversa encerrada como Agendado precisa de conferência. Abra o painel.' }
+    : espera
     ? { tipo: 'equipe', titulo: 'CSI · Paciente esperando', corpo: qtd > 1 ? `${qtd} pacientes esperam há mais de 10 minutos. Abra o painel.` : 'Um paciente espera há mais de 10 minutos. Abra o painel.' }
     : {
       tipo: 'equipe',
@@ -52,7 +56,7 @@ Deno.serve(async (req) => {
   let enviados = 0;
   for (const p of aparelhos ?? []) {
     try {
-      await webpush.sendNotification({ endpoint: p.endpoint, keys: { p256dh: p.p256dh, auth: p.auth } }, carga, { TTL: 1800, urgency: alta || espera ? 'high' : 'normal' });
+      await webpush.sendNotification({ endpoint: p.endpoint, keys: { p256dh: p.p256dh, auth: p.auth } }, carga, { TTL: 1800, urgency: alta || espera || agenda ? 'high' : 'normal' });
       enviados++;
     } catch (e) {
       const st = (e as { statusCode?: number }).statusCode;
