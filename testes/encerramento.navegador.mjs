@@ -79,6 +79,14 @@ async function pagina(browser, { quadroIndisponivel = false, patchModo = 'ok', a
     else if (p.endsWith('/rpc/jornada_mover_card')) { reg.rpcs.push(JSON.parse(req.postData() || '{}')); corpo = { ok: true, versao: 2 }; }
     else if (p.endsWith('/rpc/despedida_atual')) { if (despedida === 'sem_sql') { status = 404; corpo = { code: 'PGRST202', message: 'function despedida_atual does not exist' }; } else corpo = { ativa: true, versao: 5, texto: 'Obrigado pelo contato!', tem_imagem: false }; }
     else if (p.endsWith('/rpc/autoencerrar_resumo')) { if (despedida === 'sem_sql') { status = 404; corpo = { code: 'PGRST202', message: 'function autoencerrar_resumo does not exist' }; } else corpo = { modo: 'simulacao', horas: 24, elegiveis_agora: 3, aguardando_paciente: 11, ultimas: [{ em: '2026-11-09T10:00:00Z', modo: 'simulacao', elegiveis: 3, fechadas: 0 }] }; }
+    else if (p.endsWith('/rpc/painel_indicadores_v2')) {
+      const b = JSON.parse(req.postData() || '{}');
+      corpo = { periodo: { de: b.p_de, ate: b.p_ate, fechado_ate: null }, unidade: null, incluir_teste: false, gerado_em: new Date().toISOString(), pessoas: { unicas_no_periodo: 4, soma_dos_dias: 4 }, reentradas: { total: 0, pessoas_que_voltaram: 0 },
+        sem_atendimento_humano: { total: 0, ainda_sem_pessoa_agora: 0 }, conclusoes: { total: 9, por_origem: { equipe: 7, inatividade: 2 }, por_motivo: { agendado: 4, apenas_informacoes: 2, nao_respondido: 2, desistiu: 1 }, cruzaram_meia_noite: 0, mais_de_24h: 0, reencerradas: 0 },
+        transferencias: 0, agora: { aguardando: 0, em_atendimento: 0 }, testes: { conversas_criadas_no_periodo: 0 }, por_dia: [] };
+    }
+    else if (p.endsWith('/rpc/painel_indicadores_jornada_v2')) corpo = { periodo: {}, total: {}, por_dia: [] };
+    else if (p.endsWith('/rpc/painel_indicadores_extras_v2')) corpo = { por_hora: [], avaliacoes: { total: 5, media_atendimento: 8.4, media_site: 7.2, por_canal: { WhatsApp: 3, Instagram: 1, Google: 1 } } };
     else if (p.endsWith('/rpc/encerramentos_resumo')) corpo = { dias: 30, total: 9, automaticos: 2, por_motivo: { agendado: 4, apenas_informacoes: 2, nao_respondido: 2, desistiu: 1, sem_motivo: 0 } };
     else if (p.endsWith('/rpc/avaliacoes_resumo')) corpo = { dias: 30, total: 5, media_atendimento: 8.4, media_site: 7.2, por_canal: { WhatsApp: 3, Instagram: 1, Google: 1 } };
     else if (p.endsWith('/rpc/despedida_salvar')) { reg.rpcs.push({ rpc: 'despedida_salvar', ...JSON.parse(req.postData() || '{}') }); corpo = { ok: true, versao: 6 }; }
@@ -225,7 +233,7 @@ await caso('Indicadores: mostra os motivos de encerramento e (administrador) as 
   await page.waitForFunction(() => /Avaliações dos pacientes/.test(document.body.innerText), null, { timeout: 5000 });
   const t = await page.locator('.pagina').innerText();
   await ctx.close();
-  return { ok: /Agendado\s*\n?.*/.test(t) && /9 encerramentos no período, 2 automáticos/.test(t) && /8.4/.test(t) && /nota média do atendimento/.test(t) && !reg.excecoes.length, detalhe: t.slice(-160).replace(/\n/g, ' ') };
+  return { ok: /Agendado\s*\n?.*/.test(t) && /9 encerramentos no período: 7 pela equipe, 2 por inatividade/.test(t) && /8.4/.test(t) && /nota média do atendimento/.test(t) && !reg.excecoes.length, detalhe: t.slice(-160).replace(/\n/g, ' ') };
 });
 
 await browser.close(); srv.close();

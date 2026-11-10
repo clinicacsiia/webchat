@@ -58,3 +58,46 @@ test("dois cadastros com o mesmo nome completo: ambíguo, nada é escolhido", ()
 test("nome de uma palavra só nunca casa", () => {
   assert.equal(casar(alvo({ nome: "Maria" }), [linha({ col15: "MARIA" })]).marcacoes.length, 0);
 });
+
+// ---- Prontuário conferido (AGE-01, 10/11/2026) ----
+test("prontuário conferido: o nome digitado errado no chat não impede (corrigido só no Klingo), sem telefone igual", () => {
+  const a = alvo({ nome: "Maria Exmplo", fones: ["99999999"], prontuarios: ["129808"] });
+  const sem = casar({ ...a, prontuarios: [] }, [linha()]);
+  assert.equal(sem.marcacoes.length, 0, "sem prontuário conferido, nome errado e telefone diferente não casam (regra de sempre)");
+  const r = casar(a, [linha()]);
+  assert.equal(r.marcacoes.length, 1); assert.equal(r.identidade, "forte"); assert.equal(r.por_prontuario, true); assert.equal(r.ambiguo, false);
+});
+test("prontuário conferido: homônimo com outro prontuário é ignorado, e não vira ambíguo", () => {
+  const a = alvo({ prontuarios: ["129808"] });
+  const r = casar(a, [linha({ col0: "100", col2: "129808" }), linha({ col0: "200", col2: "555555", col3: "2026-11-09 10:30:00" })]);
+  assert.equal(r.ambiguo, false); assert.equal(r.marcacoes.length, 1); assert.equal(r.marcacoes[0].id, "100"); assert.equal(r.cadastros, 1);
+  const semConferido = casar(alvo(), [linha({ col0: "100", col2: "129808" }), linha({ col0: "200", col2: "555555" })]);
+  assert.equal(semConferido.ambiguo, true, "sem prontuário conferido, dois cadastros com o mesmo nome continuam ambíguos");
+});
+test("prontuário conferido: marcação de OUTRO prontuário com o mesmo nome e telefone não casa quando o conferido tem marcação", () => {
+  const r = casar(alvo({ prontuarios: ["129808"] }), [linha({ col0: "300", col2: "777777" }), linha({ col0: "100", col2: "129808" })]);
+  assert.deepEqual(r.marcacoes.map((m) => m.id), ["100"]);
+});
+test("prontuário conferido: sem marcação desse prontuário, volta à regra de nome e telefone", () => {
+  const r = casar(alvo({ prontuarios: ["000001"] }), [linha()]);
+  assert.equal(r.marcacoes.length, 1); assert.equal(r.por_prontuario, false); assert.equal(r.identidade, "forte");
+});
+test("prontuário conferido: marcação anterior à conversa, cancelada ou de outro exame continua não valendo", () => {
+  const a = alvo({ nome: "Fulano", prontuarios: ["129808"] });
+  assert.equal(casar(a, [linha({ col3: "2026-10-01 10:00:00" })]).marcacoes.length, 0);
+  assert.equal(casar(a, [linha({ col12: "Cancelada" })]).marcacoes.length, 0);
+  const o = casar(alvo({ itens: ["RM DE JOELHO"], prontuarios: ["129808"] }), [linha()]);
+  assert.equal(o.marcacoes.length, 0); assert.equal(o.outros_exames, 1);
+});
+test("prontuário conferido: dois prontuários conferidos com marcação na mesma pessoa viram ambíguo (mãe e filho, por exemplo)", () => {
+  const r = casar(alvo({ prontuarios: ["129808", "129809"] }), [linha({ col0: "1", col2: "129808" }), linha({ col0: "2", col2: "129809" })]);
+  assert.equal(r.ambiguo, true); assert.equal(r.marcacoes.length, 0);
+});
+test("prontuário conferido sem marcação útil (só uma antiga): cai na regra de sempre; dois cadastros de mesmo nome completo continuam ambíguos (a atendente decide)", () => {
+  const velha = linha({ col0: "10", col2: "129808", col3: "2026-10-01 10:00:00" });
+  const nova = linha({ col0: "20", col2: "888888" });   // cadastro duplicado no Klingo, nome e telefone iguais, feita depois da conversa
+  const r = casar(alvo({ prontuarios: ["129808"] }), [velha, nova]);
+  assert.equal(r.ambiguo, true); assert.equal(r.marcacoes.length, 0); assert.equal(r.por_prontuario, false);
+  const soNova = casar(alvo({ prontuarios: ["129808"] }), [nova]);
+  assert.deepEqual(soNova.marcacoes.map((m) => m.id), ["20"], "sem a marcação antiga do outro cadastro, a regra de sempre reconhece");
+});

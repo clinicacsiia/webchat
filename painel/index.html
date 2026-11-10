@@ -352,6 +352,10 @@
   .barra select { width: auto; }
   .barra .espaco { flex: 1; }
   .numeros { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .ind-ctl { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 8px 0 6px; }
+  .ind-ctl input[type=date] { width: auto; min-width: 150px; }
+  .ind-teste { display: inline-flex; gap: 6px; align-items: center; font-size: 14px; }
+  .ind-atalhos { margin: 6px 0; }
   .num { background: var(--csi-surface); border: 1px solid var(--csi-border); border-radius: var(--radius-md); box-shadow: var(--shadow-sm); padding: 14px 16px; }
   .num b { display: block; font-size: 28px; line-height: 1.1; }
   .num span { color: var(--suave); font-size: 13px; }
@@ -1565,15 +1569,17 @@
     return min;
   }
   const aguardaPaciente = (p) => !!desdeAguardaPac(p) && !desdeEspera(p);
-  const mediaTxt = (n) => (n == null ? '—' : Number(n).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
   function atualizarKpis() {
     const box = document.getElementById('kpis'), sino = document.getElementById('sinoPonto');
     // pessoas() já obedece o filtro de unidade do topo; os três primeiros cartões e a aba Indicadores usam a mesma conta.
     const todas = pessoas(), hojeSP = fmtDiaSP.format(new Date());
     const hoje = (iso) => !!iso && fmtDiaSP.format(new Date(iso)) === hojeSP;
-    const doDia = todas.map((p) => p.membros.filter((m) => hoje(m.criado_em))).filter((ms) => ms.length);
-    const nConv = doDia.reduce((t, ms) => t + ms.length, 0), nHoje = doDia.length;
-    const nFim = doDia.reduce((t, ms) => t + ms.filter((m) => m.status === 'encerrada').length, 0);
+    // Mesma regra dos Indicadores (10/11/2026): pessoa atendida = a equipe assumiu ou respondeu hoje; concluída = encerrada hoje (qualquer que seja o dia em que começou); conversas de teste ficam fora.
+    const temNovos = S.conversas.length ? ('primeiro_humano_em' in S.conversas[0]) : true;
+    const reais = (p) => p.membros.filter((m) => !m.teste);
+    const nConv = todas.reduce((t, p) => t + reais(p).filter((m) => hoje(m.criado_em)).length, 0);
+    const nHoje = todas.filter((p) => reais(p).some((m) => (temNovos ? hoje(m.primeiro_humano_em) : hoje(m.criado_em)))).length;
+    const nFim = todas.reduce((t, p) => t + reais(p).filter((m) => m.status === 'encerrada' && (temNovos ? hoje(m.encerrada_em) : hoje(m.criado_em))).length, 0);
     const nEspera = todas.filter((p) => statusPessoa(p) === 'aguardando').length;
     const nAguardaPac = todas.filter(aguardaPaciente).length;
     const nAlerta = (typeof J !== 'undefined' && J.nAtencao) || 0;
@@ -1582,12 +1588,11 @@
     const k = (cls, ic, rot, n, dica) => h('div', { class: 'kpi', title: dica }, h('div', { class: 'ic-k ' + cls }, icone(ic)), h('div', {}, h('small', {}, rot), h('strong', {}, String(n))));
     const un = UN.sel ? ' Só da unidade escolhida no topo (quem não tem unidade conhecida aparece em todas).' : '';
     box.replaceChildren(
-      k('az', 'lista', 'Conversas hoje', nConv, 'Conversas que começaram hoje.' + un),
-      k('az', 'pessoas', 'Pessoas hoje', nHoje, 'Pessoas diferentes que abriram conversa hoje. Conversas da mesma pessoa contam uma vez.' + un),
-      k('az', 'barras', 'Conversas por pessoa', mediaTxt(nHoje ? nConv / nHoje : null), 'Média de hoje: conversas ÷ pessoas.' + un),
+      k('az', 'lista', 'Conversas hoje', nConv, 'Conversas novas que começaram hoje (sem as de teste da TI).' + un),
+      k('az', 'pessoas', 'Pessoas atendidas hoje', nHoje, 'Pessoas diferentes que a equipe assumiu ou respondeu hoje. Conversas da mesma pessoa contam uma vez (mesma conta de "Pessoas atendidas" em Indicadores).' + un),
       k('la', 'ampulheta', 'Em espera', nEspera, 'Esperando alguém da equipe assumir.' + un),
       k('az', 'relogio', 'Aguardando paciente', nAguardaPac, 'Conversas abertas em que a equipe já respondeu e o paciente ainda não retornou. Sai daqui quando o paciente responde ou a conversa é encerrada.' + un),
-      k('ve', 'ok', 'Encerradas hoje', nFim, 'Das conversas que começaram hoje, quantas já foram encerradas (mesma conta de "Finalizadas" em Indicadores).' + un),
+      k('ve', 'ok', 'Concluídas hoje', nFim, 'Conversas encerradas hoje, mesmo as que começaram em outro dia (mesma conta de "Concluídas" em Indicadores).' + un),
       k('vm', 'alerta', 'Alertas', nAlerta, 'Pacientes que precisam de atenção na Jornada.' + un));
   }
   const totalAvisos = () => avisosSug().length + avisosDat().length + avisosPacV().length + (S.pedidosAcesso || []).length;
@@ -1606,7 +1611,9 @@
     // Fase 6 (unidade, médico, criança): colunas novas; se o SQL ainda não foi aplicado, volta para a lista antiga em vez de quebrar o painel.
     const consulta = (cols) => db.from('conversas').select(cols).order('atualizado_em', { ascending: false }).limit(300);
     const fase6 = 'paciente_tipo,paciente_nome,unidade_inicial,medico_preferido,', motivo = 'motivo_encerramento,encerramento_origem,aguarda_paciente_desde,';
-    let { data, error } = await consulta(base.replace('email_informado,', 'email_informado,' + fase6 + motivo));
+    const novos = 'teste,primeiro_humano_em,encerrada_em,';   // 10/11/2026: teste da TI, primeiro atendimento humano e hora real do encerramento
+    let { data, error } = await consulta(base.replace('email_informado,', 'email_informado,' + fase6 + motivo + novos));
+    if (error && /teste|primeiro_humano_em|encerrada_em/.test(error.message || '')) ({ data, error } = await consulta(base.replace('email_informado,', 'email_informado,' + fase6 + motivo)));
     // WC-03: se o SQL do motivo ainda não foi aplicado, volta para a lista sem ele em vez de quebrar o painel.
     if (error && /motivo_encerramento|encerramento_origem|aguarda_paciente_desde/.test(error.message || '')) ({ data, error } = await consulta(base.replace('email_informado,', 'email_informado,' + fase6)));
     if (error && /paciente_tipo|paciente_nome|unidade_inicial|medico_preferido/.test(error.message || '')) ({ data, error } = await consulta(base));
@@ -2009,6 +2016,7 @@
         h('div', { class: 'l1' }, h('span', {}, nomeLista(c)), h('span', { class: 'hora' }, fmtHoraLista(c.atualizado_em))),
         h('div', { class: 'l2' }, h('span', { class: 'prev' }, c.ultima_mensagem || 'Sem mensagens'), naoLidas > 0 ? h('span', { class: 'nl' }, naoLidas) : null),
         h('div', { class: 'l3' }, h('span', { class: 'tag ' + st }, ROTULO_STATUS[st]),
+          p.membros.every((m) => m.teste) ? h('span', { class: 'urg', title: 'Conversa de teste da TI: fica no histórico, mas não entra nos indicadores' }, 'Teste') : null,
           st === 'encerrada' ? h('span', { class: 'urg', title: 'Motivo do encerramento' }, rotuloEncerrada(c)) : null,
           p.membros.length > 1 ? h('span', { class: 'urg', title: 'Conversas da mesma pessoa, unidas' }, `${p.membros.length} conversas unidas`) : null,
           nAb ? h('span', { class: 'urg alta', title: 'Exame marcado que ninguém fechou ainda' }, 'Exame em aberto') : null,
@@ -3626,127 +3634,150 @@ h1.longo { font-size: 14mm; }
   const brl = (v) => Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   const rotuloCaso = (c) => CONF_ROTULO[c] || (c === 'cancelado' ? 'Cancelado' : c);
   const pct = (a, b) => (b ? Math.round((a / b) * 100) + '%' : '—');
-  /* ---------- indicadores (conversas, finalizadas, pedidos completos e agendados) ---------- */
-  const IND = { dias: 1, t: null };
+  /* ---------- indicadores (10/11/2026): período livre; pessoas atendidas, reentradas, sem atendimento humano e concluídas pela data real ---------- */
+  const IND = { preset: 'hoje', de: null, ate: null, teste: false, t: null };
   const rotuloUnidade = () => { const u = UNIDADES_PAINEL.find((z) => z[0] === UN.sel); return u ? u[1] : ''; };
-  // WC-03/09: motivos de encerramento (equipe) e avaliações (só administrador). Só contagens e médias; sem dado de paciente.
-  // Vêm na mesma chamada dos indicadores (já filtrados pela unidade). Se o SQL novo não foi aplicado, cai para as chamadas antigas (clínica toda).
-  async function blocoMotivosAvaliacoes(dias, R) {
-    const admin = ehAdmin();
-    let e = { data: R && R.encerramentos, error: !(R && R.encerramentos) }, a = { data: R && R.avaliacoes, error: !(R && R.avaliacoes) };
-    if ((!R || !R.encerramentos) && dias >= 0) {
-      [e, a] = await Promise.all([db.rpc('encerramentos_resumo', { p_dias: dias }), admin ? db.rpc('avaliacoes_resumo', { p_dias: dias > 0 ? dias : 365 }) : Promise.resolve({ error: true })]);
-    }
-    const num = (n, rot) => h('div', { class: 'num' }, h('b', {}, n ?? 0), h('span', {}, rot));
-    const partes = [];
-    if (!e.error && e.data) {
-      const pm = e.data.por_motivo || {};
-      partes.push(h('h3', {}, 'Motivos de encerramento'),
-        h('div', { class: 'numeros' }, [...MOTIVOS_ENC.map(([v, r]) => num(pm[v] || 0, r)), num(pm.sem_motivo || 0, 'sem motivo registrado')]),
-        h('p', { class: 'dica' }, `${e.data.total ?? 0} encerramentos no período, ${e.data.automaticos ?? 0} automáticos (sem resposta do paciente).`));
-    }
-    if (!a.error && a.data && admin) {
-      const pc = a.data.por_canal || {};
-      partes.push(h('h3', {}, 'Avaliações dos pacientes'),
-        h('div', { class: 'numeros' }, num(a.data.total, 'avaliações'), num(a.data.media_atendimento ?? '—', 'nota média do atendimento (0 a 10)'), num(a.data.media_site ?? '—', 'nota média do site (0 a 10)'),
-          num(pc.WhatsApp || 0, 'conheceram pelo WhatsApp'), num(pc.Instagram || 0, 'pelo Instagram'), num(pc.Google || 0, 'pelo Google')));
-    }
-    return partes.length ? h('div', {}, partes) : null;
+  const isoSP = () => new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(new Date());
+  const isoMais = (iso, n) => { const [a, m, d] = iso.split('-').map(Number); return new Date(Date.UTC(a, m - 1, d + n)).toISOString().slice(0, 10); };
+  const dmy = (iso) => { const [a, m, d] = String(iso).split('-'); return `${d}/${m}/${a}`; };
+  const PRESETS_IND = [['hoje', 'Hoje'], ['ontem', 'Ontem'], ['7', 'Últimos 7 dias'], ['30', 'Últimos 30 dias'], ['mes', 'Este mês'], ['mes_ant', 'Mês anterior']];
+  function periodoDe(k) {
+    const hoje = isoSP(), [a, m] = hoje.split('-').map(Number), p2 = (x) => String(x).padStart(2, '0');
+    if (k === 'ontem') { const o = isoMais(hoje, -1); return [o, o]; }
+    if (k === '7') return [isoMais(hoje, -6), hoje];
+    if (k === '30') return [isoMais(hoje, -29), hoje];
+    if (k === 'mes') return [`${a}-${p2(m)}-01`, hoje];
+    if (k === 'mes_ant') return [new Date(Date.UTC(a, m - 2, 1)).toISOString().slice(0, 10), new Date(Date.UTC(a, m - 1, 0)).toISOString().slice(0, 10)];
+    return [hoje, hoje];
   }
-  async function viewIndicadores(c, dias = IND.dias, silencioso = false) {
-    IND.dias = dias;
+  const ROT_ORIGEM = { equipe: 'pela equipe', inatividade: 'por inatividade (24 h sem resposta do paciente)', sistema: 'pelo sistema', paciente: 'pelo próprio paciente (nova conversa)', sem_origem: 'sem origem registrada' };
+  async function viewIndicadores(c, silencioso = false) {
+    if (IND.preset !== 'livre') [IND.de, IND.ate] = periodoDe(IND.preset);
     const titulo = h('h2', {}, 'Indicadores');
     if (!silencioso) c.replaceChildren(h('div', { class: 'pagina' }, titulo, h('p', { class: 'sub' }, 'Carregando…')));
     const minha = viewIndicadores.seq = (viewIndicadores.seq || 0) + 1;   // só a última escolha pinta a tela
-    const un = UN.sel || null;
-    const [princ, jr] = await Promise.all([db.rpc('painel_indicadores_unidade', { p_dias: dias, p_unidade: un }),
-      Promise.resolve(db.rpc('painel_indicadores_jornada', { p_dias: dias, p_unidade: un })).then((r) => r, () => ({ error: true, data: null }))]);
-    let { data, error } = princ;
-    let semFiltro = false;
-    // Se o SQL novo (supabase/indicadores-unidade.sql) ainda não foi aplicado, volta para o resumo antigo (clínica toda, sem filtro de unidade).
-    if (error && /painel_indicadores_unidade|function|could not find/i.test(error.message || '')) { semFiltro = true; ({ data, error } = dias < 0 ? { data: null, error: { message: 'O período "Ontem" precisa do SQL novo (supabase/indicadores-unidade.sql).' } } : await db.rpc('painel_indicadores', { p_dias: dias })); }
+    const un = UN.sel || null, args = { p_de: IND.de, p_ate: IND.ate, p_unidade: un, p_incluir_teste: IND.teste };
+    const [princ, clin, ext] = await Promise.all([db.rpc('painel_indicadores_v2', args),
+      Promise.resolve(db.rpc('painel_indicadores_jornada_v2', args)).then((r) => r, () => ({ error: true, data: null })),
+      Promise.resolve(db.rpc('painel_indicadores_extras_v2', args)).then((r) => r, () => ({ error: true, data: null }))]);
     if (S.aba !== 'indicadores' || minha !== viewIndicadores.seq) return;
-    if (error) { c.replaceChildren(h('div', { class: 'pagina' }, titulo, h('p', { class: 'erro' }, msgErro(error)),
-      h('p', { class: 'dica' }, 'Se a mensagem fala de função inexistente, falta rodar o SQL supabase/indicadores-unidade.sql.'))); return; }
-    const R = data || {}, V = R.conversas || {}, P = R.pedidos || {};
-    const pc = (a, b) => (b ? Math.round((a / b) * 100) + '%' : '—');
-    const periodo = h('select', { 'aria-label': 'Período', onchange: (ev) => viewIndicadores(c, Number(ev.target.value)) },
-      [[1, 'Hoje'], [-1, 'Ontem'], [7, 'Últimos 7 dias (com hoje)'], [30, 'Últimos 30 dias'], [90, 'Últimos 90 dias'], [0, 'Desde o início']].map(([v, t]) => h('option', { value: v, selected: v === dias }, t)));
-    const num = (n, rot) => h('div', { class: 'num' }, h('b', {}, n ?? 0), h('span', {}, rot));
-    const dia = (d) => { const [, m, dd] = String(d).split('-'); return dd + '/' + m; };
-    const dias_ = (R.por_dia || []).slice().reverse();
-    // Jornada na clínica (Klingo) só de quem veio do chat, pelo histórico desde o 1º contato. Se o SQL supabase/indicadores-jornada.sql não estiver aplicado, a tabela fica só com o chat.
-    const J = (!jr.error && jr.data && Array.isArray(jr.data.por_dia)) ? jr.data : null, JT = J?.total || {};
-    const horas = R.por_hora || [], maxH = Math.max(1, ...horas.map((x) => x.conversas));
-    const somaD = (k) => dias_.reduce((t, d) => t + (d[k] || 0), 0);
-    const escopo = semFiltro ? 'Clínica toda (falta aplicar o SQL novo para filtrar por unidade).' : (UN.sel ? `Unidade ${rotuloUnidade()}; quem ainda não tem unidade definida aparece em todas.` : 'Todas as unidades.');
-    const porDiaChat = new Map(dias_.map((x) => [x.dia, x])), porDiaCl = new Map((J?.por_dia || []).map((x) => [x.dia, x]));
-    const todosDias = [...new Set([...porDiaChat.keys(), ...porDiaCl.keys()])].sort().reverse();
-    const SEM_CHAT = { conversas: 0, pessoas: 0, media_por_pessoa: null, finalizadas: 0, pedidos_completos: 0, agendados: 0 };
-    const sep = 'border-left:1px solid var(--linha)';   // separa o lado do chat do lado da clínica
-    const linha = (t, d, j, forte) => {
-      const td = (v, st) => h('td', st ? { style: st } : {}, String(v ?? 0));
-      return h('tr', forte ? { style: 'font-weight:700' } : {}, [td(t), td(d.conversas), td(d.pessoas ?? '—'), td(mediaTxt(d.media_por_pessoa)), td(d.finalizadas), td(d.pedidos_completos), td(d.agendados),
-        ...(J ? [td(j.pessoas, sep), td(j.marcaram), td(j.confirmaram), td(j.atendidos), td(j.faltaram), td(j.cancelaram_remarcaram), td(j.por_vir)] : [])]);
+    if (princ.error || !princ.data) {
+      c.replaceChildren(h('div', { class: 'pagina' }, titulo, h('p', { class: 'erro' }, msgErro(princ.error || { message: 'Sem resposta do banco.' })),
+        h('p', { class: 'dica' }, 'Se a mensagem fala de função inexistente, falta rodar o SQL supabase/indicadores-v2.sql.'))); return;
+    }
+    const R = princ.data, P = R.pessoas || {}, RE = R.reentradas || {}, SH = R.sem_atendimento_humano || {}, CO = R.conclusoes || {}, AG = R.agora || {};
+    const J = (!clin.error && clin.data && Array.isArray(clin.data.por_dia)) ? clin.data : null, JT = J?.total || {}, X = (!ext.error && ext.data) || {};
+    const num = (n, rot, dica) => h('div', { class: 'num', title: dica || '' }, h('b', {}, n ?? 0), h('span', {}, rot));
+    const hojeISO = isoSP();
+    const atalhos = h('div', { class: 'chips ind-atalhos', role: 'group', 'aria-label': 'Período' },
+      PRESETS_IND.map(([k, t]) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(IND.preset === k), onclick: () => { IND.preset = k; viewIndicadores(c); } }, t)));
+    const campoDe = h('input', { type: 'date', value: IND.de, max: hojeISO, 'aria-label': 'Data inicial' }), campoAte = h('input', { type: 'date', value: IND.ate, max: hojeISO, 'aria-label': 'Data final' });
+    const verPeriodo = () => {
+      if (!campoDe.value || !campoAte.value) { toast('Escolha as duas datas.'); return; }
+      let de = campoDe.value, ate = campoAte.value; if (de > ate) [de, ate] = [ate, de];
+      IND.preset = 'livre'; IND.de = de; IND.ate = ate; viewIndicadores(c);
     };
-    const COL_CHAT = ['Conversas', 'Pessoas', 'Conversas por pessoa', 'Finalizadas', 'Pedidos completos', 'Agendados pelo chat'];
-    const COL_CLINICA = ['Pessoas novas no chat', 'Marcaram', 'Confirmaram', 'Atendidos', 'Faltaram', 'Cancelaram ou remarcaram', 'Ainda por vir'];
+    const caixaTeste = ehAdmin() ? h('label', { class: 'ind-teste', title: 'Conversas da conta de teste da TI. Por padrão ficam fora dos números.' },
+      h('input', { type: 'checkbox', checked: IND.teste, onchange: (ev) => { IND.teste = ev.target.checked; viewIndicadores(c); } }), ' Incluir conversas de teste') : null;
+    const escopo = UN.sel ? `Unidade ${rotuloUnidade()}; quem ainda não tem unidade definida aparece em todas.` : 'Todas as unidades.';
+    const mesmoDia = IND.de === IND.ate;
+    const titPeriodo = mesmoDia ? dmy(IND.de) : `${dmy(IND.de)} a ${dmy(IND.ate)}`;
+    const fechadoAte = R.periodo?.fechado_ate;
+    const horas = X.por_hora || [], maxH = Math.max(1, ...horas.map((x) => x.conversas));
+    const pm = CO.por_motivo || {}, po = CO.por_origem || {};
+
+    // Tabela por dia: chat à esquerda, clínica (só quem veio do chat) à direita.
+    const dias_ = (R.por_dia || []).slice().reverse();
+    const clDia = new Map((J?.por_dia || []).map((x) => [x.dia, x]));
+    const SEM_CL = { pessoas: 0, marcaram: 0, atendidos: 0, faltaram: 0, cancelaram_remarcaram: 0, por_vir: 0 };
+    const sep = 'border-left:1px solid var(--linha)';
+    const diaCurto = (d) => { const [, m, dd] = String(d).split('-'); return dd + '/' + m; };
+    const linha = (rot, d, j, forte, fechado) => {
+      const td = (v, st) => h('td', st ? { style: st } : {}, String(v ?? 0));
+      return h('tr', forte ? { style: 'font-weight:700' } : {}, [h('td', {}, rot, fechado ? h('small', { class: 'dica', title: 'Dia fechado: o número não muda mais.' }, ' fechado') : null),
+        td(d.pessoas), td(d.reentradas), td(d.sem_humano), td(d.concluidas), td(d.transferencias),
+        ...(J ? [td(j.pessoas, sep), td(j.marcaram), td(j.atendidos), td(j.faltaram), td(j.cancelaram_remarcaram), td(j.por_vir)] : [])]);
+    };
+    const COL_CHAT = ['Pessoas atendidas', 'Reentradas', 'Sem atendimento humano', 'Concluídas', 'Transferências'];
+    const COL_CLINICA = ['Pessoas novas', 'Marcaram', 'Atendidos', 'Faltaram', 'Cancelaram ou remarcaram', 'Ainda por vir'];
     const cabecalho = h('thead', {},
-      h('tr', {}, h('th', { rowspan: 2, style: 'vertical-align:bottom' }, 'Dia'), h('th', { colspan: 6 }, 'No chat (conversas que começaram no dia)'),
-        J ? h('th', { colspan: 7, style: sep }, 'Na clínica (só quem veio do chat, acompanhado no Klingo)') : null),
+      h('tr', {}, h('th', { rowspan: 2, style: 'vertical-align:bottom' }, 'Dia'), h('th', { colspan: 5 }, 'No chat (pela data real de cada fato)'),
+        J ? h('th', { colspan: 6, style: sep }, 'Na clínica (só quem veio do chat, acompanhado no Klingo)') : null),
       h('tr', {}, [...COL_CHAT.map((t) => h('th', {}, t)), ...(J ? COL_CLINICA.map((t, i) => h('th', i === 0 ? { style: sep } : {}, t)) : [])]));
-    const pcMarc = (a, b) => (b ? Math.round((a / b) * 100) + '%' : '—');
+    const total = { pessoas: P.unicas_no_periodo, reentradas: RE.total, sem_humano: SH.total, concluidas: CO.total, transferencias: R.transferencias };
+
     c.replaceChildren(h('div', { class: 'pagina' }, titulo,
-      h('p', { class: 'sub' }, 'Resumo do chat e da jornada do paciente na clínica. Atualiza sozinho a cada minuto. Não mostra dado de paciente. Inclui conversas de teste da equipe. ', R.desde ? `Primeira conversa em ${fmtDataHora(R.desde)}. ` : '', R.gerado_em ? `Atualizado às ${fmtDataHora(R.gerado_em)}.` : ''),
-      h('p', { class: 'dica', style: 'margin-top:4px' }, 'Filtro de unidade do topo: ' + escopo + ' "Pessoa" junta as conversas da mesma pessoa, igual à lista do Atendimento e aos cartões do topo.'),
-      h('div', { class: 'acoes' }, periodo, h('button', { class: 'btn', type: 'button', onclick: () => viewIndicadores(c, IND.dias, true) }, 'Atualizar agora')),
-      h('h3', {}, 'Conversas'),
+      h('p', { class: 'sub' }, `Período: ${titPeriodo}. Cada fato conta no dia em que realmente aconteceu (horário de Brasília). ${R.gerado_em ? 'Atualizado às ' + fmtDataHora(R.gerado_em) + '. ' : ''}Atualiza sozinho a cada minuto. Não mostra dado de paciente.`),
+      h('p', { class: 'dica', style: 'margin-top:4px' }, 'Filtro de unidade do topo: ' + escopo),
+      atalhos,
+      h('div', { class: 'ind-ctl' }, h('label', {}, 'De ', campoDe), h('label', {}, ' até ', campoAte), h('button', { class: 'btn', type: 'button', onclick: verPeriodo }, 'Ver período'),
+        h('button', { class: 'btn', type: 'button', onclick: () => viewIndicadores(c, true) }, 'Atualizar agora'), caixaTeste),
+      h('p', { class: 'dica' }, 'Para ver um dia só, escolha a mesma data nos dois campos.'),
+      h('h3', {}, 'Atendimento'),
       h('div', { class: 'numeros' },
-        num(V.total, 'conversas iniciadas'),
-        num(V.pessoas ?? '—', 'pessoas diferentes'),
-        num(mediaTxt(V.media_por_pessoa), 'conversas por pessoa (média)'),
-        num(V.finalizadas, `conversas finalizadas (${pc(V.finalizadas, V.total)})`),
-        num(V.em_andamento, 'em andamento')),
-      h('h3', {}, 'Pedidos e agendamentos'),
-      h('div', { class: 'numeros' },
-        num(P.conversas_com_pedido_completo, `conversas com pedido completo (${pc(P.conversas_com_pedido_completo, V.total)} das conversas)`),
-        num(P.agendados, `agendados (${pc(P.agendados, P.conversas_com_pedido_completo)} dos pedidos completos)`),
-        num(P.prontos_esperando_recepcao, 'prontos, esperando a recepção marcar'),
-        num(P.cancelados, 'pedidos cancelados'),
-        num(P.rascunhos, 'pedidos não terminados')),
-      h('p', { class: 'dica' }, `Dos ${P.agendados ?? 0} agendados, ${P.agendados_pela_ia ?? 0} foram marcados sozinhos pela IA e ${P.agendados_pela_equipe ?? 0} pela equipe. `
-        + 'Pedido completo = o paciente terminou o pedido no chat. "Agendado" só conta o que o painel sabe: marcação feita direto no Klingo sem avisar o chat não entra.'),
-      J ? h('div', {},
-        h('h3', {}, 'Na clínica: quem veio do chat, do agendamento ao atendimento'),
+        num(P.unicas_no_periodo, 'pessoas atendidas', 'Cada pessoa conta uma vez no período, no dia em que uma pessoa da equipe assumiu ou respondeu pela primeira vez. Conversas da mesma pessoa contam uma vez.'),
+        num(RE.total, `reentradas (${RE.pessoas_que_voltaram ?? 0} pessoa${RE.pessoas_que_voltaram === 1 ? '' : 's'} voltaram no mesmo dia)`, 'Vezes em que a mesma pessoa voltou no mesmo dia (conversa nova ou reaberta) depois do primeiro contato do dia.'),
+        num(SH.total, 'sem atendimento humano', 'Conversas do período que nenhuma pessoa da equipe atendeu até o fim do dia em que começaram.'),
+        num(CO.total, 'concluídas (pelo dia do encerramento)', 'Cada fechamento conta no dia e na hora em que realmente aconteceu, mesmo que a conversa tenha começado antes.'),
+        num((AG.aguardando || 0) + (AG.em_atendimento || 0), `em andamento agora (${AG.aguardando || 0} em espera)`, 'É a situação de agora, não do período escolhido.'),
+        num(R.transferencias, 'transferências', 'Transferências entre atendentes registradas no período (o registro começou em 10/11/2026).')),
+      h('p', { class: 'dica' }, `Pessoas atendidas: somando os dias dá ${P.soma_dos_dias ?? 0} (quem volta em outro dia conta de novo no dia dele). `
+        + `Sem atendimento humano: ${SH.ainda_sem_pessoa_agora ?? 0} ainda estão sem pessoa neste momento; as outras foram atendidas depois do fim do dia em que começaram, ou nunca. `
+        + `Reentradas: reaberturas de conversa só são contadas a partir de 10/11/2026.`),
+      h('p', { class: 'dica' }, fechadoAte ? `Dias fechados até ${dmy(fechadoAte)}: os números desses dias não mudam mais.` : 'Nenhum dia foi fechado ainda: os números dos dias que já passaram ainda podem mudar (por exemplo, se a equipe marcar uma conversa como teste).'),
+      R.testes?.conversas_criadas_no_periodo ? h('p', { class: 'dica' }, `${R.testes.conversas_criadas_no_periodo} conversa(s) de teste da TI no período ${R.incluir_teste ? 'estão incluídas nos números' : 'ficam fora dos números'}.`) : null,
+      X.pedidos ? h('div', {},
+        h('h3', {}, 'Pedidos e agendamentos'),
         h('div', { class: 'numeros' },
-          num(JT.pessoas, 'pessoas novas no chat (primeiro contato no período)'),
-          num(JT.marcaram, `marcaram exame no Klingo (${pc(JT.marcaram, JT.pessoas)} das pessoas novas)`),
-          num(JT.confirmaram, `confirmaram (${pc(JT.confirmaram, JT.marcaram)} dos que marcaram)`),
-          num(JT.atendidos, `atendidos (${pc(JT.atendidos, JT.marcaram)} dos que marcaram)`),
-          num(JT.faltaram, `faltaram (${pc(JT.faltaram, JT.marcaram)} dos que marcaram)`),
-          num(JT.cancelaram_remarcaram, 'cancelaram ou remarcaram algum exame'),
-          num(JT.por_vir, 'ainda por vir (exame futuro ou sem desfecho no Klingo)')),
-        h('p', { class: 'dica' }, 'Só entra quem veio do chat: a pessoa do chat é ligada ao Klingo pelo mesmo telefone e nome, ou por uma marcação que o chat reconheceu. '
-          + 'O histórico vale desde o primeiro contato: contam os exames marcados no Klingo depois que a pessoa falou com a clínica, em qualquer data. '
-          + 'Cada coluna diz "teve pelo menos um exame assim", então a mesma pessoa pode aparecer em mais de uma (ex.: faltou numa data e foi atendida em outra). '
-          + 'Quem deu telefone ou nome diferente no Klingo conta em "pessoas novas", mas não em "marcaram".')) : null,
+          num(X.pedidos.conversas_com_pedido_completo, `conversas com pedido completo (${pct(X.pedidos.conversas_com_pedido_completo, P.unicas_no_periodo)} das pessoas atendidas)`),
+          num(X.pedidos.agendados, `agendados (${X.pedidos.agendados_pelo_sistema ?? 0} pelo sistema · ${X.pedidos.agendados_pela_equipe ?? 0} pela atendente)`, 'Conta no dia em que o pedido virou "agendado". Pelo sistema = o sistema reconheceu a marcação no Klingo ou conferiu o horário; pela atendente = alguém da equipe tocou em "Marcar como agendado".'),
+          num(X.pedidos.prontos_esperando_recepcao, 'prontos, esperando a recepção marcar'),
+          num(X.pedidos.cancelados, 'pedidos cancelados'),
+          num(X.pedidos.rascunhos, 'pedidos não terminados')),
+        h('p', { class: 'dica' }, 'Pedido completo = o paciente terminou o pedido no chat. "Agendado" só conta o que o painel sabe: marcação feita direto no Klingo sem avisar o chat entra quando o sistema a reconhece (a cada 30 segundos).')) : null,
+      h('h3', {}, 'Conclusões'),
+      h('div', { class: 'numeros' },
+        num(CO.cruzaram_meia_noite, 'atravessaram a meia-noite', 'Concluídas em um dia diferente do dia em que começaram.'),
+        num(CO.mais_de_24h, 'duraram mais de 24 h'),
+        num(CO.reencerradas, 'fechadas de novo depois de reabertas'),
+        num(po.inatividade || 0, 'encerradas por inatividade')),
+      h('h3', {}, 'Motivos de encerramento'),
+      h('div', { class: 'numeros' }, [...MOTIVOS_ENC.map(([v, r]) => num(pm[v] || 0, r)), num(pm.sem_motivo || 0, 'sem motivo registrado')]),
+      h('p', { class: 'dica' }, `${CO.total ?? 0} encerramentos no período: ` + Object.entries(po).map(([k, v]) => `${v} ${ROT_ORIGEM[k] || k}`).join(', ') + '.'),
       horas.length ? h('div', {},
         h('h3', {}, 'Conversas por horário de início'),
         h('div', { class: 'barras-h', role: 'img', 'aria-label': 'Conversas iniciadas por hora do dia' }, horas.map((x) => h('div', { class: 'bh', title: `${x.conversas} conversa(s) iniciadas entre ${x.hora}h e ${x.hora + 1}h` },
           h('i', { style: `height:${Math.max(4, Math.round((x.conversas / maxH) * 70))}px` }), h('b', {}, String(x.conversas)), h('span', {}, String(x.hora).padStart(2, '0') + 'h')))),
         h('p', { class: 'dica' }, 'Horário de Brasília. Mostra quando os pacientes mais abrem conversa, para ajustar a escala da equipe.')) : null,
-      h('h3', {}, 'Por dia: da conversa ao atendimento'),
-      h('div', { class: 'tabela-wrap', style: 'margin-bottom:12px' }, h('table', { class: 'tab-jornada' },
-        cabecalho,
-        h('tbody', {}, todosDias.length
-          ? [...(todosDias.length > 1 ? [linha('Total do período', { conversas: somaD('conversas'), pessoas: V.pessoas, media_por_pessoa: V.media_por_pessoa, finalizadas: somaD('finalizadas'), pedidos_completos: somaD('pedidos_completos'), agendados: somaD('agendados') }, JT, true)] : []),
-            ...todosDias.map((d) => linha(dia(d), porDiaChat.get(d) || SEM_CHAT, porDiaCl.get(d) || {}, false))]
-          : [h('tr', {}, h('td', { colspan: J ? 14 : 7 }, 'Sem conversas no período.'))]))),
-      h('p', { class: 'dica' }, 'Leia da esquerda para a direita: conversa, pedido completo, agendado pelo chat e, na clínica, marcou, confirmou, foi atendido ou faltou. A linha é o dia do primeiro contato da pessoa no chat e o lado da clínica acompanha o histórico dela depois disso (inclusive em dias seguintes), por isso os números de dias recentes ainda crescem. '
-        + 'No total do período, "Pessoas" conta cada pessoa uma vez; na linha de cada dia, quem voltou em outro dia entra de novo, por isso a soma dos dias pode passar do total.')));
-    blocoMotivosAvaliacoes(dias, semFiltro ? null : R).then((b) => { const pag = c.querySelector('.pagina'); if (b && pag && S.aba === 'indicadores' && minha === viewIndicadores.seq) pag.append(b); }, () => {});
+      J ? h('div', {},
+        h('h3', {}, 'Na clínica: quem veio do chat, do agendamento ao atendimento'),
+        h('div', { class: 'numeros' },
+          num(JT.pessoas, 'pessoas novas atendidas no chat (1º atendimento no período)'),
+          num(JT.marcaram, `marcaram exame no Klingo (${pct(JT.marcaram, JT.pessoas)} das pessoas novas)`),
+          num(JT.atendidos, `atendidos (${pct(JT.atendidos, JT.marcaram)} dos que marcaram)`),
+          num(JT.faltaram, `faltaram (${pct(JT.faltaram, JT.marcaram)} dos que marcaram)`),
+          num(JT.cancelaram_remarcaram, 'cancelaram ou remarcaram algum exame'),
+          num(JT.por_vir, 'ainda por vir (exame futuro ou sem desfecho no Klingo)')),
+        h('p', { class: 'dica' }, 'Só entra quem veio do chat: a pessoa do chat é ligada ao Klingo pelo mesmo telefone e nome, ou por uma marcação que o chat reconheceu. '
+          + 'Conta no dia do primeiro atendimento humano da pessoa; o que acontece no Klingo depois (em qualquer data) é acompanhado, por isso os números de dias recentes ainda crescem. '
+          + 'Cada coluna diz "teve pelo menos um exame assim", então a mesma pessoa pode aparecer em mais de uma.')) : null,
+      h('h3', {}, 'Por dia'),
+      h('div', { class: 'tabela-wrap', style: 'margin-bottom:12px' }, h('table', { class: 'tab-jornada' }, cabecalho,
+        h('tbody', {}, dias_.length
+          ? [...(dias_.length > 1 ? [linha('Total do período', total, JT.pessoas == null ? SEM_CL : JT, true, false)] : []), ...dias_.map((d) => linha(diaCurto(d.dia), d, clDia.get(d.dia) || SEM_CL, false, d.fechado))]
+          : [h('tr', {}, h('td', { colspan: J ? 12 : 6 }, 'Sem dados no período.'))]))),
+      h('p', { class: 'dica' }, 'No total do período, "Pessoas atendidas" conta cada pessoa uma vez; na linha de cada dia, quem voltou em outro dia entra de novo, por isso a soma dos dias pode passar do total.')));
+    // Avaliações (só administrador): mesma regra de período, unidade e teste.
+    const av = X.avaliacoes;
+    if (av && ehAdmin()) {
+      const pc = av.por_canal || {};
+      const bloco = h('div', {}, h('h3', {}, 'Avaliações dos pacientes'),
+        h('div', { class: 'numeros' }, num(av.total, 'avaliações'), num(av.media_atendimento ?? '—', 'nota média do atendimento (0 a 10)'), num(av.media_site ?? '—', 'nota média do site (0 a 10)'),
+          num(pc.WhatsApp || 0, 'conheceram pelo WhatsApp'), num(pc.Instagram || 0, 'pelo Instagram'), num(pc.Google || 0, 'pelo Google')));
+      const pag = c.querySelector('.pagina'); if (pag) pag.append(bloco);
+    }
     clearTimeout(IND.t);
-    IND.t = setTimeout(() => { if (S.aba === 'indicadores' && !document.hidden) viewIndicadores(c, IND.dias, true); }, 60000);
+    IND.t = setTimeout(() => { if (S.aba === 'indicadores' && !document.hidden) viewIndicadores(c, true); }, 60000);
   }
 
   async function viewAprendizado(c, dias = 28) {
