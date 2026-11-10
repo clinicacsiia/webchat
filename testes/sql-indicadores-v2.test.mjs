@@ -23,7 +23,7 @@ await db.exec(`
   create table public.jornada_card (id bigint generated always as identity primary key, conversa_id uuid, arquivado_em timestamptz, unidade text, paciente_chave text);
   create table public.jornada_exame (id bigint generated always as identity primary key, card_id bigint, marcacao_id text, status text, agendado_em timestamptz);
   create table public.jornada_paciente (prontuario text primary key, nome text, fone_chave text);
-  create table public.pre_agendamentos (conversa_id uuid, klingo_marcacoes text[]);
+  create table public.pre_agendamentos (conversa_id uuid, klingo_marcacoes text[], status text, criado_em timestamptz default now(), atualizado_em timestamptz default now(), agendado_auto_em timestamptz, agendado_em timestamptz);
   create table public.conversa_encerramento (id bigint generated always as identity primary key, conversa_id uuid, encerrada_em timestamptz, motivo text, origem text, por uuid);
   create table public.avaliacao_atendimento (id bigint generated always as identity primary key, conversa_id uuid, nota_atendimento integer, nota_site integer, canal text, criado_em timestamptz not null default now());
   create table public.conversa_evento (id bigint generated always as identity primary key, conversa_id uuid, tipo text, em timestamptz not null default now());
@@ -169,6 +169,17 @@ await caso('extras: conversas por hora de início (Brasília) e avaliações só
   const a = (await db.query(`select public.painel_indicadores_extras_v2($1::date, $2::date, null, false) r`, [diaBR(1), diaBR(1)])).rows[0].r;
   await db.exec(`delete from public.avaliacao_atendimento`); await db.query(`delete from public.conversas where id = $1`, [c]);
   return { ok: h8 && h8.conversas >= 2 && r.avaliacoes.total === 1 && Number(r.avaliacoes.media_atendimento) === 10 && r.avaliacoes.por_canal.Instagram === 1 && a.avaliacoes === null && Array.isArray(a.por_hora), detalhe: JSON.stringify(r.avaliacoes) };
+});
+await caso('extras: pedidos e agendamentos — agendados separados em "pelo sistema" e "pela equipe", pela data real do agendamento; teste fora', async () => {
+  await jwt(ADMIN);
+  const c1 = await nova({ criada: ts(1, '08:00'), humano: ts(1, '08:05'), status: 'encerrada' }), c2 = await nova({ criada: ts(1, '08:30'), humano: ts(1, '08:35'), status: 'encerrada' });
+  const c3 = await nova({ criada: ts(1, '09:00'), humano: ts(1, '09:05'), status: 'encerrada' }), c4 = await nova({ criada: ts(1, '09:30'), humano: ts(1, '09:35'), status: 'encerrada', teste: true });
+  const pa = (c, st, extra = '') => db.query(`insert into public.pre_agendamentos (conversa_id, status, criado_em, atualizado_em ${extra ? ', ' + extra.split('=')[0] : ''}) values ($1, $2, $3, $3 ${extra ? ', ' + extra.split('=')[1] : ''})`, [c, st, ts(1, '10:00')]);
+  await pa(c1, 'agendado', `agendado_auto_em='${ts(1, '10:30')}'`); await pa(c2, 'agendado'); await pa(c3, 'pronto'); await pa(c4, 'agendado');
+  const r = (await db.query(`select public.painel_indicadores_extras_v2($1::date, $2::date, null, false) r`, [diaBR(1), diaBR(1)])).rows[0].r.pedidos;
+  const com = (await db.query(`select public.painel_indicadores_extras_v2($1::date, $2::date, null, true) r`, [diaBR(1), diaBR(1)])).rows[0].r.pedidos;
+  await db.exec(`delete from public.pre_agendamentos`);
+  return { ok: r.agendados === 2 && r.agendados_pelo_sistema === 1 && r.agendados_pela_equipe === 1 && r.prontos_esperando_recepcao === 1 && r.conversas_com_pedido_completo === 3 && com.agendados === 3, detalhe: JSON.stringify(r) };
 });
 await caso('permissão: atendente vê; quem não é da equipe é recusado (42501); anônimo não executa', async () => {
   await jwt(ATEND);

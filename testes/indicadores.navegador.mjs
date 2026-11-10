@@ -44,7 +44,8 @@ const PRINCIPAL = (a) => {
 const CLINICA = (a) => ({ periodo: { de: a.p_de, ate: a.p_ate }, unidade: a.p_unidade, gerado_em: agora,
   total: { pessoas: 6, marcaram: 4, atendidos: 2, faltaram: 1, cancelaram_remarcaram: 1, por_vir: 1 },
   por_dia: [{ dia: a.p_ate, pessoas: 6, marcaram: 4, atendidos: 2, faltaram: 1, cancelaram_remarcaram: 1, por_vir: 1 }] });
-const EXTRAS = (admin) => ({ por_hora: [{ hora: 9, conversas: 2 }, { hora: 10, conversas: 3 }], avaliacoes: admin ? { total: 2, media_atendimento: 9, media_site: 8.5, por_canal: { Instagram: 2 } } : null });
+const EXTRAS = (admin) => ({ por_hora: [{ hora: 9, conversas: 2 }, { hora: 10, conversas: 3 }],
+  pedidos: { conversas_com_pedido_completo: 3, agendados: 3, agendados_pelo_sistema: 2, agendados_pela_equipe: 1, prontos_esperando_recepcao: 1, cancelados: 0, rascunhos: 4 }, avaliacoes: admin ? { total: 2, media_atendimento: 9, media_site: 8.5, por_canal: { Instagram: 2 } } : null });
 const jwt = (sub) => { const b = (o) => Buffer.from(JSON.stringify(o)).toString('base64url'); return `${b({ alg: 'HS256', typ: 'JWT' })}.${b({ sub, role: 'authenticated', exp: Math.floor(Date.now() / 1000) + 86400 })}.x`; };
 
 function servidor() {
@@ -244,6 +245,13 @@ await caso('Gráfico por horário e avaliações (só administrador) aparecem; a
   const txt = await comum.page.locator('.pagina').first().innerText();
   await comum.ctx.close();
   return { ok: barras === 2 && !/Avaliações dos pacientes/.test(txt) };
+});
+await caso('Pedidos e agendamentos: agendados separados em "pelo sistema" e "pela atendente"', async () => {
+  const t = await abrir(); await abaInd(t);
+  await t.page.waitForFunction(() => /Pedidos e agendamentos/.test(document.querySelector('.pagina')?.innerText || ''));
+  const txt = (await t.page.locator('.pagina').first().innerText()).replace(/\n+/g, ' ');
+  await t.ctx.close();
+  return { ok: /agendados \(2 pelo sistema · 1 pela atendente\)/.test(txt) && /1 prontos, esperando a recepção marcar/.test(txt) && /4 pedidos não terminados/.test(txt), detalhe: txt.slice(0, 120) };
 });
 await caso('Motivos de encerramento e conclusões (atravessaram a meia-noite, mais de 24 h, inatividade) aparecem com os números do banco', async () => {
   const t = await abrir(); await abaInd(t);

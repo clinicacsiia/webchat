@@ -304,9 +304,21 @@ begin
          where (p_incluir_teste or not c.teste) and (c.criado_em at time zone 'America/Sao_Paulo')::date between v_de and v_ate group by 1),
   av as (select a.nota_atendimento, a.nota_site, a.canal
            from public.avaliacao_atendimento a join public.conversas c on c.id = a.conversa_id join pu on pu.conversa_id = c.id
-          where (p_incluir_teste or not c.teste) and (a.criado_em at time zone 'America/Sao_Paulo')::date between v_de and v_ate)
+          where (p_incluir_teste or not c.teste) and (a.criado_em at time zone 'America/Sao_Paulo')::date between v_de and v_ate),
+  pe as (select p.conversa_id, p.status, (p.criado_em at time zone 'America/Sao_Paulo')::date as d_cri,
+                (coalesce(p.agendado_em, p.agendado_auto_em, p.atualizado_em) at time zone 'America/Sao_Paulo')::date as d_ag, (p.agendado_auto_em is not null) as sistema
+           from public.pre_agendamentos p join public.conversas c on c.id = p.conversa_id join pu on pu.conversa_id = p.conversa_id
+          where (p_incluir_teste or not c.teste))
   select jsonb_build_object(
     'por_hora', coalesce((select jsonb_agg(jsonb_build_object('hora', h.hora, 'conversas', h.n) order by h.hora) from h), '[]'::jsonb),
+    'pedidos', jsonb_build_object(
+        'conversas_com_pedido_completo', (select count(distinct conversa_id) from pe where status in ('pronto', 'agendado') and d_cri between v_de and v_ate),
+        'agendados', (select count(*) from pe where status = 'agendado' and d_ag between v_de and v_ate),
+        'agendados_pelo_sistema', (select count(*) from pe where status = 'agendado' and sistema and d_ag between v_de and v_ate),
+        'agendados_pela_equipe', (select count(*) from pe where status = 'agendado' and not sistema and d_ag between v_de and v_ate),
+        'prontos_esperando_recepcao', (select count(*) from pe where status = 'pronto' and d_cri between v_de and v_ate),
+        'cancelados', (select count(*) from pe where status = 'cancelado' and d_cri between v_de and v_ate),
+        'rascunhos', (select count(*) from pe where status = 'rascunho' and d_cri between v_de and v_ate)),
     'avaliacoes', case when v_admin then jsonb_build_object(
         'total', (select count(*) from av),
         'media_atendimento', (select round(avg(nota_atendimento)::numeric, 1) from av),
