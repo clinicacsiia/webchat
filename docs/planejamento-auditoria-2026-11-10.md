@@ -484,6 +484,25 @@ Definições que o plano adota (a confirmar apenas o que estiver marcado):
 - Congelamento: as reentradas de um dia também ficam congeladas junto com o dia (Q-01).
 - Implementação: depende de `conversa_evento` (Etapa 0), que passa a registrar `criada`, `assumida`, `reaberta` e `encerrada`; o histórico anterior é reconstruído de `mensagens` (mensagem de pessoa) e `conversa_encerramento`.
 
-### E. Próxima pergunta (uma por vez)
+### E. Motivo da reentrada — DECIDIDO pelo dono (10/11/2026)
 
-**Como registrar o motivo da reentrada?** (decisão nova, necessária para o indicador 2)
+**Perguntar ao paciente; se ele não responder, vale a regra automática.** Quando o paciente volta, o chat mostra uma tela com:
+1. **"Não tive retorno"**;
+2. **"Outro assunto"**, com campo para ele digitar o motivo da nova conversa (ou só tocar em "outros assuntos");
+3. **"Ver a conversa anterior"** (lê o histórico e volta para a mesma tela);
+depois disso, **o atendimento continua normalmente** com o assunto dele.
+
+Regra automática (sempre calculada no servidor, vale quando não há resposta): se a conversa anterior do mesmo dia **terminou sem nenhuma resposta de pessoa da equipe** (ou foi encerrada por inatividade) → "sem retorno"; senão → "outro assunto".
+
+Como o plano trata isso (a confirmar no desenho):
+- **Guardar sempre os dois:** resposta do paciente (`motivo_informado`) e o que a regra automática diria (`motivo_automatico`). O indicador usa a resposta do paciente quando existe e mostra **quantos disseram "sem retorno" mas tinham resposta da equipe** (ajuda a achar aviso que não chegou).
+- **Texto digitado pelo paciente pode ter dado de saúde.** Proposta: ele vira a **primeira mensagem da conversa nova** (que já é protegida como qualquer mensagem) e o indicador guarda só a **categoria** e "texto informado: sim/não". Nenhum texto livre vai para tabela de indicador.
+- **Ver a conversa anterior** reaproveita o histórico por aparelho que o chat já tem (últimas 5, lidas do servidor com o token). Só aparece para quem tem a conversa neste aparelho.
+- **Sem a tela** (outro aparelho, telefone digitado de novo, cache limpo, ou reabertura por mensagem na conversa antiga até 7 dias): vale a regra automática e a reentrada é ligada pelo agrupamento de pessoa que já existe.
+- **Uma tela só com a Q-05:** quando a conversa anterior ainda está aberta, o mesmo aviso explica que ela será encerrada com o histórico salvo e pede a confirmação; a pergunta de motivo só aparece se a anterior for **do mesmo dia**.
+- **Congelamento (Q-01):** motivo e contagem congelam com o dia.
+- **Dependências:** `conversa_evento` (Etapa 0) com campos de motivo; mudança em `index.html` (tela nova) e `chat_iniciar` (parâmetros novos, opcionais por alguns dias por causa do cache do PWA).
+
+### F. Próxima pergunta (uma por vez)
+
+**C-5 (segurança):** a tela "você já falou conosco hoje" e o encerramento da conversa anterior devem aparecer **somente quando este aparelho já guarda essa conversa** (ou a conta estiver logada)? Quem digitar um telefone que tem conversa aberta em **outro aparelho** abre uma conversa nova **sem fechar nem revelar** a outra (o agrupamento de pessoa liga as duas depois).
