@@ -19,7 +19,7 @@ await db.exec(`
   create table public.conversas (id uuid primary key default gen_random_uuid(), contato_id uuid, unidade_inicial text, irmao_de uuid, irmaos_modo text);
   create table public.conversa_fluxo (conversa_id uuid primary key, passo text, dados jsonb not null default '{}'::jsonb, tentativas int not null default 0, atualizado_em timestamptz);
   create table public.pre_agendamentos (conversa_id uuid primary key, tipo text, procedimento text, plano text, unidade text, profissional text, status text default 'rascunho', etapa text,
-    escolha_horario jsonb, data_desejada text, hora_desejada text, identidade text, atualizado_em timestamptz);
+    escolha_horario jsonb, data_desejada text, hora_desejada text, identidade text, paciente jsonb, atualizado_em timestamptz);
   create table public.pre_agendamento_itens (id bigint generated always as identity primary key, conversa_id uuid, modalidade text, regiao text, regiao_nome text, lado text,
     procedimento_id int, procedimento text, quantidade int, ativo boolean default true);
   create table public.mensagens (id bigint generated always as identity primary key, conversa_id uuid, autor text, texto text, opcoes jsonb);

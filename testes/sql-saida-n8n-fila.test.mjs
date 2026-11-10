@@ -47,7 +47,7 @@ await afirmar('sem URL: entrar na fila não envia nada e informa link_agendado=f
 await db.exec(`update public.config set valor = 'https://projeto.supabase.co/functions/v1/fila-emitir-link' where chave = 'fila_link_url'`);
 let A1;
 await afirmar('sem o segredo no Vault nada é enviado (falha fechada)', async () => {
-  const r = await como('authenticated', staff, () => rpc('fila_entrar', 'Maria da Silva', 'maria@exemplo.com', '(71) 98871-0544'));
+  const r = await como('authenticated', staff, () => rpc('fila_entrar', 'Maria da Silva', 'maria@exemplo.com', '(71) 98000-1111'));
   A1 = r.atendimento_id;
   const n = (await db.query(`select count(*)::int as n from net.chamadas`)).rows[0].n;
   return { ok: Boolean(A1) && n === 0, detalhe: `chamadas=${n}` };

@@ -57,7 +57,7 @@ const q = async (sql, p = []) => (await db.query(sql, p)).rows;
 const cadastrar = async (email) => (await q(`insert into auth.users (email) values ($1) returning id`, [email]))[0].id;
 // uma conversa aberta por quem tem esse papel/login (o gatilho lê o JWT, como no chat_iniciar)
 const abrirConversa = async (papel, uid, { tipo = 'proprio', nome = 'Maria da Silva', email = 'maria@exemplo.com', forjar = null } = {}) => como(papel, uid, async () => {
-  const ct = (await q(`insert into public.contatos (nome, telefone, email) values ($1, '71988710544', $2) returning id`, [nome, email]))[0].id;
+  const ct = (await q(`insert into public.contatos (nome, telefone, email) values ($1, '71980001111', $2) returning id`, [nome, email]))[0].id;
   const cv = (await q(forjar
     ? `insert into public.conversas (contato_id, nome_informado, email_informado, paciente_tipo, conta_id) values ($1, $2, $3, $4, '${forjar}') returning id`
     : `insert into public.conversas (contato_id, nome_informado, email_informado, paciente_tipo) values ($1, $2, $3, $4) returning id`, [ct, nome, email, tipo]))[0].id;
@@ -68,7 +68,7 @@ const contaDe = async (cv) => (await q(`select conta_id from public.conversas wh
 const cadastroDaConta = async (uid) => (await q(`select paciente_id from public.contas_paciente where id = $1`, [uid]))[0]?.paciente_id ?? null;
 // o que ia_pre_agendar faz ao ficar "pronto" sem cadastro: cria o paciente a partir da conversa e grava o vínculo
 const finalizarComoNovo = async (cv, extra = {}) => {
-  const id = (await q(`insert into public.pacientes (nome, telefones, email, dt_nasc, origem_conversa) values ('Maria da Silva', array['7188710544'], 'maria@exemplo.com', '1980-03-25', $1) returning id`, [cv]))[0].id;
+  const id = (await q(`insert into public.pacientes (nome, telefones, email, dt_nasc, origem_conversa) values ('Maria da Silva', array['7180001111'], 'maria@exemplo.com', '1980-03-25', $1) returning id`, [cv]))[0].id;
   await q(`update public.pre_agendamentos set paciente_id = $1 where conversa_id = $2`, [extra.outroId ?? id, cv]);
   return id;
 };

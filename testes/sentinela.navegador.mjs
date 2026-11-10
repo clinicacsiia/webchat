@@ -112,11 +112,15 @@ await caso('aviso de IA: o assistente se apresenta como IA, diz que uma pessoa a
     detalhe: `status="${status}", botão de atendente visível=${barra}` };
 });
 
-await caso('formulário inicial: já avisa que é uma IA, que há uma pessoa acompanhando e que é uma previsão', async () => {
+await caso('formulário inicial: avisa que é uma PREVISÃO, que uma pessoa confirma, e exige o "estou ciente" (a menção à IA saiu da tela inicial de propósito)', async () => {
   const mundo = criarMundo(); const { page, ctx } = await novaPaginaChat(browser, mundo);
   await page.goto(`${base}/index.html`); await page.waitForSelector('#avisoForm', { state: 'visible', timeout: 8000 });
-  const t = await page.$eval('#avisoForm', (n) => n.textContent); await ctx.close();
-  return { ok: /inteligência artificial/.test(t) && /previsão de agendamento/.test(t) && /[Uu]ma pessoa/.test(t), detalhe: t.slice(0, 80) };
+  const t = await page.$eval('#avisoForm', (n) => n.textContent);
+  const caixa = (await page.$('#avisoForm #fPrevisao')) !== null;
+  await page.click('#fQuem .unidade >> nth=0'); await page.fill('#fNome', 'Ana'); await page.fill('#fTel', '71999998888'); await page.fill('#fEmail', 'a@b.co'); await page.check('#fAceite');
+  await page.click('#btnIniciar'); await page.waitForTimeout(300);
+  const erro = (await page.locator('#erroForm').innerText()).trim(); const iniciou = mundo.chamadas.some((c) => c.nome === 'chat_iniciar'); await ctx.close();
+  return { ok: /previsão de agendamento/.test(t) && /uma pessoa/.test(t) && caixa && /ciente/.test(erro) && !iniciou, detalhe: `${t.slice(0, 60)} | erro="${erro}"` };
 });
 
 await caso('mensagem final: deixa claro que é PREVISÃO, que ainda não está confirmado e que um atendente vai confirmar', async () => {
@@ -242,7 +246,7 @@ await caso('lado: o pedido enviado ao servidor leva o lado que o paciente confir
   await page.click('.btn-w >> text=Adicionar ao pedido'); await page.waitForSelector('.carrinho li', { timeout: 4000 });
   const resumo = await page.$eval('.carrinho', (n) => n.textContent);
   await page.click('#folhaRodape .btn-w'); await page.waitForTimeout(500);
-  const chamada = mundo.chamadas.find((c) => c.nome === 'chat_pedido_salvar'); await ctx.close();
+  const chamada = mundo.chamadas.find((c) => c.nome === 'chat_pedido_enviar'); await ctx.close();
   const item = chamada && chamada.corpo.p_itens[0];
   return { ok: /lado direito/.test(resumo) && !/unilateral/i.test(resumo) && item && item.lado === 'D' && item.regiao === 'punho_mao' && item.procedimento_id === 1001, detalhe: `resumo="${resumo.replace(/\s+/g, ' ').slice(0, 110)}" item=${JSON.stringify(item)}` };
 });

@@ -55,7 +55,7 @@ Ensaiado no banco real em transação desfeita (gatilho, vínculo e notas) e cha
 **Push (os dois, no ar):** equipe (`avisar-equipe`, `config.equipe_push_url` preenchida; testada: 2 aparelhos receberam) e paciente (`chat-avisar`). Cada atendente precisa abrir o painel uma vez e permitir os avisos.
 
 ## Pendências anotadas (03/11/2026)
-1. **Teste com paciente real** do `klingo-paciente`: o CPF do dono (86082026543) não foi achado no relatório A (0 linhas nos 3 formatos). Falta saber se o cadastro dele está sem CPF ou se o filtro "Apenas" de CPF não casa. Para fechar: nome completo e nascimento do cadastro, ou outro paciente que autorize.
+1. **Teste com paciente real** do `klingo-paciente`: o CPF do dono (omitido aqui por privacidade) não foi achado no relatório A (0 linhas nos 3 formatos). Falta saber se o cadastro dele está sem CPF ou se o filtro "Apenas" de CPF não casa. Para fechar: nome completo e nascimento do cadastro, ou outro paciente que autorize.
 2. **Resultado de exame: link e senha** serão passados pela equipe (decisão do dono). Falta definir o canal e a tela: sugestão é a atendente enviar pelo chat/painel, com a senha em mensagem separada. O relatório C só diz se o laudo está pronto.
 3. **Histórico do Klingo para o paciente ver no chat** (hoje só a equipe vê o resumo; o paciente que volta usa o histórico do próprio chat). `klingo-paciente` já tem as ações `historico` e `resultados` para isso.
 4. **Aviso na tela do painel** com o vínculo (selo "Klingo: cadastro incompleto"); hoje aparece só nas notas do resumo.

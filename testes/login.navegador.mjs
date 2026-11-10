@@ -111,20 +111,20 @@ await caso('Entrar com senha errada: mensagem clara e continua como convidado', 
   return { ok: !sair };
 });
 
-await caso('Entrar certo: mostra "Conta: e-mail", "Olá de novo, Ana!" com os dados da conta, sem "Não sou eu"; o telefone vem formatado', async () => {
+await caso('Entrar certo: mostra "Conta: e-mail", "Olá, Ana!" com nome e telefone (o e-mail fica na faixa da conta), sem "Não sou eu"; o telefone vem formatado', async () => {
   const x = await abrir({ contaDoBanco: conta() });
   await x.page.click('#btnContaEntrar'); await x.page.waitForSelector('#cEmail');
   await x.page.fill('#cEmail', 'ana@teste.local'); await x.page.fill('#cSenha', 'Senha1234'); await x.page.click('.conta-form button[type=submit]');
-  await x.page.waitForFunction(() => /Olá de novo, Ana/.test(document.querySelector('#tituloInicio')?.textContent || ''), null, { timeout: 5000 });
+  await x.page.waitForFunction(() => /Olá, Ana!/.test(document.querySelector('#tituloInicio')?.textContent || ''), null, { timeout: 5000 });
   const r = { faixa: await texto(x.page, '#faixaContaTxt'), dados: await texto(x.page, '#voltaDados'), naoSouEu: await visivel(x.page, '#btnNaoSouEu'), sair: await visivel(x.page, '#btnContaSair'), menu: await texto(x.page, '#btnSair') };
   await x.ctx.close();
-  return { ok: r.faixa === 'Conta: ana@teste.local' && /Ana Souza · \(71\) 99999-8888 · ana@teste\.local/.test(r.dados) && !r.naoSouEu && r.sair && r.menu === 'Sair da conta', detalhe: JSON.stringify(r) };
+  return { ok: r.faixa === 'Conta: ana@teste.local' && /^Ana Souza · \(71\) 99999-8888$/.test(r.dados) && !r.naoSouEu && r.sair && r.menu === 'Sair da conta', detalhe: JSON.stringify(r) };
 });
 
 await caso('Conta logada começa a conversa SEM redigitar nada e as chamadas seguem com o token da conta', async () => {
   const x = await abrir({ contaDoBanco: conta(), sessaoGuardada: true });
-  await x.page.waitForFunction(() => /Olá de novo/.test(document.querySelector('#tituloInicio')?.textContent || ''), null, { timeout: 5000 });
-  await x.page.click('#fQuem .unidade >> nth=0'); await x.page.click('#btnIniciar');
+  await x.page.waitForFunction(() => /Olá, /.test(document.querySelector('#tituloInicio')?.textContent || ''), null, { timeout: 5000 });
+  await x.page.click('#fQuem .unidade >> nth=0'); await x.page.check('#fPrevisao'); await x.page.click('#btnIniciar');
   await x.page.waitForSelector('#msgs .msg.agente .op', { timeout: 8000 });
   const ini = chamou(x.mundo, 'chat_iniciar')[0];
   await x.ctx.close();
@@ -136,7 +136,7 @@ await caso('Conta SEM perfil salvo: e-mail travado no da conta; depois de começ
   const x = await abrir({ contaDoBanco: conta({ nome: null, telefone: null }), sessaoGuardada: true });
   await x.page.waitForFunction(() => document.querySelector('#fEmail')?.readOnly === true, null, { timeout: 5000 });
   const email = await x.page.inputValue('#fEmail');
-  await x.page.click('#fQuem .unidade >> nth=0'); await x.page.fill('#fNome', 'Ana Souza'); await x.page.fill('#fTel', '71999998888'); await x.page.check('#fAceite'); await x.page.click('#btnIniciar');
+  await x.page.click('#fQuem .unidade >> nth=0'); await x.page.fill('#fNome', 'Ana Souza'); await x.page.fill('#fTel', '71999998888'); await x.page.check('#fAceite'); await x.page.check('#fPrevisao'); await x.page.click('#btnIniciar');
   await x.page.waitForSelector('#msgs .msg.agente .op', { timeout: 8000 }); await espera(300);
   const perfil = chamou(x.mundo, 'conta_paciente_perfil');
   await x.ctx.close();
@@ -152,7 +152,7 @@ await caso('Sessão que NÃO é de paciente (ex.: equipe): segue como convidado,
 
 await caso('Sair da conta: faz logout, limpa os dados do aparelho e volta ao formulário de convidado', async () => {
   const x = await abrir({ contaDoBanco: conta(), sessaoGuardada: true });
-  await x.page.waitForFunction(() => /Olá de novo/.test(document.querySelector('#tituloInicio')?.textContent || ''), null, { timeout: 5000 });
+  await x.page.waitForFunction(() => /Olá, /.test(document.querySelector('#tituloInicio')?.textContent || ''), null, { timeout: 5000 });
   x.page.once('dialog', (d) => d.accept());
   await x.page.click('#btnContaSair'); await espera(600);
   const r = { titulo: await texto(x.page, '#tituloInicio'), entrar: await visivel(x.page, '#btnContaEntrar'), logout: x.auth.chamadas.some((c) => c.caminho === '/auth/v1/logout'), sessao: await x.page.evaluate(() => localStorage.getItem('csi-paciente-auth')) };
@@ -255,7 +255,7 @@ await caso('Apagar a conta: o primeiro toque só pede confirmação (diz o que �
 
 await caso('Apagar a conta: confirmar chama o banco com a palavra de confirmação, sai da conta e limpa o aparelho', async () => {
   const x = await abrir({ contaDoBanco: conta(), sessaoGuardada: true });
-  await x.page.waitForFunction(() => /Olá de novo/.test(document.querySelector('#tituloInicio')?.textContent || ''), null, { timeout: 5000 });
+  await x.page.waitForFunction(() => /Olá, /.test(document.querySelector('#tituloInicio')?.textContent || ''), null, { timeout: 5000 });
   await abrirDados(x); await x.page.click('#btnApagarConta'); await x.page.waitForSelector('#btnApagarSim'); await x.page.click('#btnApagarSim');
   await x.page.waitForFunction(() => document.querySelector('#folha').hidden, null, { timeout: 5000 }); await espera(300);
   const c = chamou(x.mundo, 'conta_paciente_excluir');

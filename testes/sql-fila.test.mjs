@@ -63,7 +63,7 @@ await afirmar('sem fila_webhook_url: entrar na fila informa link_agendado=false 
 await db.exec(`insert into public.config (chave, valor) values ('fila_webhook_url', 'https://n8n.exemplo/webhook/fila-emitir-link')`);
 let A1, A2, P1;
 await afirmar('recepção coloca paciente na fila e o webhook do n8n recebe o payload do enunciado', async () => {
-  const r = await como('authenticated', staff, () => rpc('fila_entrar', 'Maria da Silva', ' Maria@Exemplo.com ', '(71) 98871-0544'));
+  const r = await como('authenticated', staff, () => rpc('fila_entrar', 'Maria da Silva', ' Maria@Exemplo.com ', '(71) 98000-1111'));
   A1 = r.atendimento_id; P1 = r.paciente_id;
   if (r.link_agendado !== true) throw new Error('link_agendado deveria ser true com a URL configurada');
   const c = (await db.query(`select url, body from net.chamadas order by 1 limit 1`)).rows[0];
@@ -73,7 +73,7 @@ await afirmar('recepção coloca paciente na fila e o webhook do n8n recebe o pa
 });
 await afirmar('paciente criado com telefone normalizado e e-mail em minúsculas (email_cadastro gerado)', async () => {
   const r = (await db.query(`select telefones, email, email_cadastro, nome_norm from public.pacientes where id = $1`, [P1])).rows[0];
-  return { ok: r.telefones[0] === '7188710544' && r.email === 'maria@exemplo.com' && r.email_cadastro === 'maria@exemplo.com', detalhe: JSON.stringify(r) };
+  return { ok: r.telefones[0] === '7180001111' && r.email === 'maria@exemplo.com' && r.email_cadastro === 'maria@exemplo.com', detalhe: JSON.stringify(r) };
 });
 await afirmar('mesma pessoa não entra duas vezes na fila aberta', async () => {
   const e = await como('authenticated', staff, () => erroDe(() => rpc('fila_entrar', 'Maria da Silva', 'maria@exemplo.com', null)));

@@ -53,7 +53,7 @@ test("marcação cancelada não conta como preço lançado", () => {
 });
 
 test("a saída não carrega nenhum campo de paciente", () => {
-  const r = agregarPrecos([l({ Paciente: "ANA MARIA SOUZA", Telefone: "71988710544", Prontuario: "123", Obs: "x" })], "a", "b");
+  const r = agregarPrecos([l({ Paciente: "ANA MARIA SOUZA", Telefone: "71980001111", Prontuario: "123", Obs: "x" })], "a", "b");
   assert.deepEqual(Object.keys(r[0]).sort(), ["amostras", "fim", "ini", "operadora", "procedimento", "valor_max", "valor_min", "valor_tipico"]);
   assert.ok(!JSON.stringify(r).match(/ANA|71988|123/));
 });

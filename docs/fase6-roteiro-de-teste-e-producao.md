@@ -64,7 +64,7 @@ Teste 12 e 13 são os mais importantes e os únicos sem prova em produção.
 
 ## Antes de abrir para pacientes de verdade
 
-- [ ] **Dados de teste**: hoje há 4 contatos (9 conversas, 90 mensagens) que parecem testes da equipe (`71992641845`, `71988710544`, `71999999999`, `71988780134`). Confirme quais apagar e peça: apagar o contato apaga conversas, mensagens e pedidos (cascata). O Supabase pede confirmação para `delete`.
+- [ ] **Dados de teste**: hoje há 4 contatos (9 conversas, 90 mensagens) que parecem testes da equipe (`71980002222`, `71980001111`, `71999999999`, `71980003333`). Confirme quais apagar e peça: apagar o contato apaga conversas, mensagens e pedidos (cascata). O Supabase pede confirmação para `delete`.
 - [ ] **Preços** (agora só referência para o alerta): a auditoria achou 18 de 104 preços do catálogo a 10% ou mais do Klingo (aba Aprendizado > "Preço x Klingo"). A recepção revisa antes de divulgar.
 - [ ] **n8n**: o nó de IA já repete em caso de erro e a falha não encerra mais o atendimento (31/10). Falta: credencial Anthropic própria (hoje usa créditos do n8n) e avisar a equipe quando a conversa é transferida (`docs/n8n-correcao-2026-10-31.md`).
 - [ ] **Segredo `ia_segredo`** digitado nos nós HTTP do n8n: mover para credencial Header Auth.
