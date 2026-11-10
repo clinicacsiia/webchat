@@ -124,7 +124,7 @@ await caso('Entrar certo: mostra "Conta: e-mail", "Olá, Ana!" com nome e telefo
 await caso('Conta logada começa a conversa SEM redigitar nada e as chamadas seguem com o token da conta', async () => {
   const x = await abrir({ contaDoBanco: conta(), sessaoGuardada: true });
   await x.page.waitForFunction(() => /Olá, /.test(document.querySelector('#tituloInicio')?.textContent || ''), null, { timeout: 5000 });
-  await x.page.click('#fQuem .unidade >> nth=0'); await x.page.click('#btnIniciar');
+  await x.page.click('#fQuem .unidade >> nth=0'); await x.page.check('#fPrevisao'); await x.page.click('#btnIniciar');
   await x.page.waitForSelector('#msgs .msg.agente .op', { timeout: 8000 });
   const ini = chamou(x.mundo, 'chat_iniciar')[0];
   await x.ctx.close();
@@ -136,7 +136,7 @@ await caso('Conta SEM perfil salvo: e-mail travado no da conta; depois de começ
   const x = await abrir({ contaDoBanco: conta({ nome: null, telefone: null }), sessaoGuardada: true });
   await x.page.waitForFunction(() => document.querySelector('#fEmail')?.readOnly === true, null, { timeout: 5000 });
   const email = await x.page.inputValue('#fEmail');
-  await x.page.click('#fQuem .unidade >> nth=0'); await x.page.fill('#fNome', 'Ana Souza'); await x.page.fill('#fTel', '71999998888'); await x.page.check('#fAceite'); await x.page.click('#btnIniciar');
+  await x.page.click('#fQuem .unidade >> nth=0'); await x.page.fill('#fNome', 'Ana Souza'); await x.page.fill('#fTel', '71999998888'); await x.page.check('#fAceite'); await x.page.check('#fPrevisao'); await x.page.click('#btnIniciar');
   await x.page.waitForSelector('#msgs .msg.agente .op', { timeout: 8000 }); await espera(300);
   const perfil = chamou(x.mundo, 'conta_paciente_perfil');
   await x.ctx.close();

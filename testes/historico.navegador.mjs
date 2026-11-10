@@ -19,7 +19,7 @@ function criarVarias() {
   return {
     mundos, chamadas: [],
     tratar: async (nome, corpo) => {
-      if (nome === 'chat_iniciar') {
+      if (nome === 'chat_iniciar' || nome === 'chat_nova_conversa') {
         n++;
         atual = criarMundo({ conversa: `aaaaaaaa-aaaa-4aaa-8aaa-${String(n).padStart(12, '0')}`, token: `token-${n}` });
         mundos[atual.conversa] = atual;
@@ -37,9 +37,10 @@ function criarVarias() {
 // Abre uma conversa nova a partir do menu (a primeira vem do formulário completo).
 async function novaDoMenu(page) {
   await page.click('#btnMenu'); await page.click('#btnNova');
+  await page.click('#escNova'); await page.click('#escContinuar');   // tela de escolha (C1): abrir uma nova conversa
   await page.waitForSelector('#formInicio', { state: 'visible' });
   await page.click('#fQuem .unidade >> nth=0');
-  await page.click('#btnIniciar');
+  await page.check('#fPrevisao'); await page.click('#btnIniciar');
   await page.waitForSelector('#msgs .msg.agente .op', { timeout: 8000 });
 }
 const lerHist = (page) => page.evaluate(() => JSON.parse(localStorage.getItem('webchat.historico.v1') || '[]'));
@@ -98,6 +99,7 @@ await caso('no formulário (depois de "Fazer um novo pedido") há o atalho para 
   page.on('dialog', (d) => d.accept());
   await comecarConversa(page, base);
   await page.click('#btnMenu'); await page.click('#btnNova');
+  await page.click('#escNova'); await page.click('#escContinuar');   // tela de escolha (C1)
   await page.waitForSelector('#formInicio', { state: 'visible' });
   const atalho = await page.isVisible('#btnHistoricoForm');
   await page.click('#btnHistoricoForm');

@@ -109,6 +109,9 @@ export function criarMundo(opcoes = {}) {
     if (falha && (falha.vezes == null || falha.vezes > 0)) { if (falha.vezes != null) falha.vezes--; return { status: falha.status ?? 400, body: falha.corpo ?? { code: 'XX000', message: 'falha simulada' } }; }
     switch (nome) {
       case 'chat_config': return { body: { nome_empresa: 'Clínica de Teste', boas_vindas: 'Olá!' } };
+      case 'chat_reentrada_estado': return { body: m.estadoReentrada || { status: 'aguardando', aberta: true, pode_voltar: true, mesmo_dia: false, janela_dias: 2, teve_resposta_humana: false, em_atendimento: false } };
+      case 'chat_previsao_aceitar': return { body: true };
+      case 'chat_nova_conversa': { m.msgs.length = 0; const q = m.perguntaMotivo(); return { body: { conversa_id: m.conversa, token: m.token, motor: 'fluxo', respostas: [q] } }; }
       case 'chat_iniciar': { m.msgs.length = 0; const q = m.perguntaMotivo(); return { body: { conversa_id: m.conversa, token: m.token, motor: 'fluxo', respostas: [q] } }; }
       case 'chat_listar': return { body: { status: m.status, agente: null, motor_ativo: m.motor, passo: m.passo, mensagens: m.lista(corpo.p_apos || 0) } };
       case 'chat_responder': case 'chat_enviar': {
@@ -215,7 +218,7 @@ export async function comecarConversa(page, base) {
   await page.fill('#fNome', 'Maria da Silva');
   await page.fill('#fTel', '71999998888');
   await page.fill('#fEmail', 'maria@teste.local');
-  await page.check('#fAceite');
+  await page.check('#fAceite'); await page.check('#fPrevisao');
   await page.click('#btnIniciar');
   await page.waitForSelector('#msgs .msg.agente .op', { timeout: 8000 });
 }

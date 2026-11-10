@@ -217,6 +217,14 @@
   .widget .w-outro { width: 100%; margin: 4px 0 8px; padding: 10px 12px; border: 1.5px solid var(--linha); border-radius: 10px; background: var(--papel); }
   .widget .w-outro:focus { border-color: var(--verde); outline: none; }
   .btn-w { background: var(--verde); color: #fff; border: 0; border-radius: 10px; padding: 11px 16px; font-weight: 650; cursor: pointer; }
+  .btn-w.sec { background: #fff; color: var(--verde); border: 1.5px solid var(--verde); }
+  .aviso-form { margin: 4px 0 12px; padding: 10px 12px; border-radius: 12px; background: #fff7e5; border: 1px solid #f0dfb8; color: var(--aviso); font-size: calc(15.5px * var(--esc)); }
+  .aviso-form p { margin: 0 0 8px; }
+  .aviso-form .aceite { margin: 0; }
+  .escolha-txt { margin: 0 0 12px; font-size: calc(16.5px * var(--esc)); line-height: 1.45; }
+  .escolha-txt.aviso { padding: 10px 12px; border-radius: 12px; background: #fff7e5; border: 1px solid #f0dfb8; color: var(--aviso); }
+  .escolha-op { display: flex; flex-direction: column; gap: 10px; }
+  .escolha-op textarea { width: 100%; min-height: 84px; border: 1.5px solid var(--linha); border-radius: 10px; padding: 10px; font: inherit; }
   .btn-w:hover { background: var(--csi-primary-strong-hover); }
   .btn-w:disabled { opacity: .5; cursor: default; }
   .hist-dica { margin: 0 0 12px; color: var(--texto-suave); font-size: calc(14px * var(--esc)); }
@@ -499,6 +507,13 @@
           <span id="aceiteTxt">Concordo que a clínica guarde meu nome, telefone, e-mail e a conversa para me atender e entrar em contato. Li a <a href="privacidade.html" target="_blank" rel="noopener">Política de Privacidade</a> e os <a href="termos.html" target="_blank" rel="noopener">Termos</a>.</span>
         </label>
       </div>
+      <div class="aviso-form" id="avisoForm">
+        <p>Importante: os dias e horários que mostramos aqui são uma <b>previsão de agendamento</b>. Quem confirma o seu agendamento é <b>uma pessoa da nossa equipe</b>.</p>
+        <label class="aceite">
+          <input type="checkbox" id="fPrevisao">
+          <span>Estou ciente de que os horários são uma previsão e que a equipe confirma o agendamento.</span>
+        </label>
+      </div>
       <p class="erro-form" id="erroForm" role="alert"></p>
       <button class="btn-primario" id="btnIniciar" type="submit">Começar</button>
     </form>
@@ -574,7 +589,7 @@
     telaInicio: $('#telaInicio'), telaChat: $('#telaChat'), boasForm: $('#boasVindasForm'), tituloInicio: $('#tituloInicio'),
     faixaConta: $('#faixaConta'), faixaContaTxt: $('#faixaContaTxt'), btnContaEntrar: $('#btnContaEntrar'), btnContaCriar: $('#btnContaCriar'), btnContaDados: $('#btnContaDados'), btnContaSair: $('#btnContaSair'),
     form: $('#formInicio'), fNome: $('#fNome'), fTel: $('#fTel'), fEmail: $('#fEmail'),
-    fAceite: $('#fAceite'), erroForm: $('#erroForm'), btnIniciar: $('#btnIniciar'),
+    fAceite: $('#fAceite'), fPrevisao: $('#fPrevisao'), erroForm: $('#erroForm'), btnIniciar: $('#btnIniciar'),
     blocoVolta: $('#blocoVolta'), voltaDados: $('#voltaDados'), btnNaoSouEu: $('#btnNaoSouEu'), blocoNome: $('#blocoNome'), blocoContato: $('#blocoContato'),
     blocoQuem: $('#blocoQuem'), fQuem: $('#fQuem'), lNome: $('#lNome'), blocoFilho: $('#blocoFilho'), fFilho: $('#fFilho'), btnOutroFilho: $('#btnOutroFilho'),
     listaIrmaos: $('#listaIrmaos'), btnAddIrmao: $('#btnAddIrmao'), blocoModoIrmaos: $('#blocoModoIrmaos'), fModoIrmaos: $('#fModoIrmaos'),
@@ -667,7 +682,7 @@
     el.ponto.className = 'ponto'; el.status.textContent = 'Online';
     const p = lerLocal(CHAVE_PERFIL) || {}, salvo = perfilSalvo();
     el.fNome.value = p.nome || ''; el.fTel.value = p.telefone || ''; el.fEmail.value = p.email || '';
-    el.fAceite.checked = !!salvo; el.erroForm.textContent = ''; el.fFilho.value = '';
+    el.fAceite.checked = !!salvo; el.fPrevisao.checked = false; el.erroForm.textContent = ''; el.fFilho.value = '';
     el.blocoVolta.hidden = !salvo; el.blocoNome.hidden = !!salvo; el.blocoContato.hidden = !!salvo;
     el.btnNaoSouEu.hidden = !!(salvo && salvo.conta);   // conta logada: quem sai é a conta ("Sair da conta")
     el.fEmail.readOnly = !!(conta && !salvo);           // conta logada sem perfil salvo: o e-mail é o da conta
@@ -1106,17 +1121,25 @@
     if (tel.length < 10) { el.erroForm.textContent = 'Informe o telefone com DDD.'; el.fTel.focus(); return; }
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { el.erroForm.textContent = 'Informe um e-mail válido.'; el.fEmail.focus(); return; }
     if (!salvo && !el.fAceite.checked) { el.erroForm.textContent = 'Marque a caixa de concordância para continuar.'; el.fAceite.focus(); return; }
+    if (!el.fPrevisao.checked) { el.erroForm.textContent = 'Marque que você está ciente de que os horários são uma previsão.'; el.fPrevisao.focus(); return; }
     const respostaAvisos = pedirAvisos();
     el.btnIniciar.disabled = true; el.btnIniciar.textContent = 'Começando…';
     const t0 = performance.now();
     try {
       const origem = new URLSearchParams(location.search).get('origem');
-      const { data, error } = await db.rpc('chat_iniciar', {
+      const corpoIni = {
         p_nome: nome, p_telefone: telTxt, p_email: email, p_aceite: true, p_origem: origem,
         p_paciente_tipo: escolha.tipo, p_paciente_nome: filho ? nomeFilho : null,
         ...(irmaos.length ? { p_irmaos: irmaos, p_irmaos_modo: modoIrmaos } : {})
-      });
+      };
+      // Com uma conversa anterior GUARDADA NESTE APARELHO, o servidor encerra a antiga e abre a nova numa chamada só (e guarda o motivo da volta).
+      const re = reentrada;
+      const { data, error } = re
+        ? await db.rpc('chat_nova_conversa', { ...corpoIni, p_conversa_anterior: re.id, p_token_anterior: re.token, p_aceite_previsao: true, p_motivo: re.motivo || null, p_motivo_texto: re.texto || null })
+        : await db.rpc('chat_iniciar', corpoIni);
       if (error) throw error;
+      reentrada = null;
+      if (!re) db.rpc('chat_previsao_aceitar', { p_conversa: data.conversa_id, p_token: data.token }).then(() => {}, () => {});
       conv = { id: data.conversa_id, token: data.token, tipo: filho ? 'filho' : 'proprio', nomeCrianca: filho ? nomeFilho : '', irmaos, irmaosModo: irmaos.length ? modoIrmaos : '' };
       gravarLocal(CHAVE_CONVERSA, conv); registrarHistorico(conv);
       gravarLocal(CHAVE_PERFIL, { nome, telefone: telTxt, email, aceite: true });
@@ -1226,10 +1249,66 @@
     if (i >= 0) provisorias.splice(i, 1);
   }
   function fecharMenu() { el.menu.hidden = true; el.btnMenu.setAttribute('aria-expanded', 'false'); }
-  function novaConversa(semPerguntar) {
+  /* ---------- nova conversa (C1): só vale para a conversa que ESTE aparelho guarda ---------- */
+  let reentrada = null;   // { id, token, motivo, texto }: a conversa anterior que o servidor encerra/liga quando a nova for criada
+  function irParaFormNovo(ant, motivo, texto) {
+    apagarLocal(CHAVE_CONVERSA); apagarLocal(CHAVE_MSGS); conv = null;
+    reentrada = ant ? { id: ant.id, token: ant.token, motivo: motivo || null, texto: texto || null } : null;
+    mostrarForm();
+  }
+  async function novaConversa() {
     fecharMenu();
-    if (semPerguntar !== true && !confirm('Fazer um novo pedido? Este continua em "Conversas anteriores" e fica guardado com a equipe.')) return;
-    apagarLocal(CHAVE_CONVERSA); apagarLocal(CHAVE_MSGS); conv = null; mostrarForm();
+    if (!conv) { irParaFormNovo(null); return; }
+    const ant = { id: conv.id, token: conv.token };
+    let est = null;
+    try {
+      const { data, error } = await db.rpc('chat_reentrada_estado', { p_conversa: ant.id, p_token: ant.token });
+      if (error) throw error;
+      est = data;
+    } catch (e) {
+      if (e && e.code === '28000') { irParaFormNovo(null); return; }   // o servidor não conhece mais essa conversa
+      irParaFormNovo(null); return;                                    // sem rede/servidor antigo: segue como antes (a antiga continua com a equipe)
+    }
+    if (!est || !est.pode_voltar) { irParaFormNovo(ant); return; }     // encerrada há mais de 2 dias (ou fechada por nova conversa): vai direto para a nova
+    telaEscolha(est, ant);
+  }
+  function telaEscolha(est, ant) {
+    const f = abrirFolha(est.aberta ? 'Você já tem uma conversa aberta' : 'Sua conversa terminou há pouco');
+    const dias = est.janela_dias || 2;
+    const fechar = () => fecharFolha();
+    function passo1() {
+      f.corpo.replaceChildren(h('p', { class: 'escolha-txt' }, est.aberta
+        ? 'Quer continuar nela ou abrir uma nova conversa?'
+        : `Você pode voltar ao assunto de antes (até ${dias} dias depois do encerramento) ou abrir uma nova conversa.`));
+      f.rodape.replaceChildren(
+        h('button', { class: 'btn-w', type: 'button', id: 'escVoltar', onclick: fechar }, 'Voltar ao tema anterior'),
+        h('button', { class: 'btn-w sec', type: 'button', id: 'escNova', onclick: passo2 }, 'Abrir uma nova conversa'));
+    }
+    function passo2() {
+      const aviso = h('p', { class: 'escolha-txt aviso' }, est.aberta
+        ? 'A conversa anterior será encerrada e vamos abrir outra. Seu histórico fica salvo.'
+        : 'Vamos abrir uma nova conversa. Seu histórico fica salvo.');
+      if (!est.mesmo_dia) {
+        f.corpo.replaceChildren(aviso); f.rodape.replaceChildren(
+          h('button', { class: 'btn-w', type: 'button', id: 'escContinuar', onclick: () => { fechar(); irParaFormNovo(ant); } }, 'Continuar'),
+          h('button', { class: 'btn-w sec', type: 'button', onclick: fechar }, 'Voltar ao tema anterior'));
+        return;
+      }
+      f.corpo.replaceChildren(aviso, h('p', { class: 'escolha-txt' }, h('b', {}, 'Por que você está voltando?')));
+      f.rodape.replaceChildren(
+        h('button', { class: 'btn-w', type: 'button', id: 'escSemRetorno', onclick: () => { fechar(); irParaFormNovo(ant, 'sem_retorno'); } }, 'Não tive retorno'),
+        h('button', { class: 'btn-w', type: 'button', id: 'escOutro', onclick: passoOutro }, 'Outro assunto'),
+        h('button', { class: 'btn-w sec', type: 'button', id: 'escVer', onclick: fechar }, 'Ver a conversa anterior'));
+    }
+    function passoOutro() {
+      const ta = h('textarea', { id: 'escTexto', maxlength: '500', placeholder: 'Se quiser, conte em poucas palavras o assunto (pode deixar em branco)', 'aria-label': 'Assunto da nova conversa' });
+      f.corpo.replaceChildren(h('p', { class: 'escolha-txt' }, h('b', {}, 'Qual é o outro assunto?')), h('div', { class: 'escolha-op' }, ta));
+      f.rodape.replaceChildren(
+        h('button', { class: 'btn-w', type: 'button', id: 'escOutroOk', onclick: () => { const t = ta.value.trim(); fechar(); irParaFormNovo(ant, 'outro_assunto', t); } }, 'Continuar'),
+        h('button', { class: 'btn-w sec', type: 'button', onclick: passo2 }, 'Voltar'));
+      ta.focus();
+    }
+    passo1();
   }
   async function sair() {
     fecharMenu();
