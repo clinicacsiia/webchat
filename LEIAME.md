@@ -36,7 +36,7 @@ Próximo passo na conversa (01/11/2026): no alto de cada conversa, uma faixa mos
 
 Atualização do WebChat (09/11/2026): motivo no encerramento, Agendado conferindo a agenda, despedida configurável, encerramento automático após 24 h sem resposta do paciente, avaliação voluntária e topo da conversa mais baixo. **No ar desde 09/11/2026 (PR #104): SQL aplicado, site publicado e todas as chaves ligadas.** Pendências em `docs/atualizacao-webchat.md`, com chaves em Configurações > "Encerramento e avaliação". Controle de etapas e links: `docs/atualizacao-webchat.md`. Detalhes: `docs/encerramento-motivo.md` (WC-03 e WC-04), `docs/despedida.md` (WC-05 e WC-06), `docs/autoencerramento.md` (WC-08), `docs/avaliacao.md` (WC-09 e WC-10), `docs/cabecalho-painel.md` (WC-07) e `docs/wc01-diagnostico.md` (por que só 2 pedidos viram "agendado").
 
-Lista completa do que falta, com a ordem de dependência: `docs/pendencias-e-dependencias.md` (conferida no banco real em 01/11/2026).
+Lista completa do que falta, com a ordem de dependência: `docs/pendencias-e-dependencias.md` (conferida no banco real em 01/11/2026). **Pendências mais recentes (10/11/2026): `docs/pendencias-2026-11-10.md`; o que está no ar e como desligar: `docs/aplicacao-2026-11-10.md`.**
 
 Banco: projeto Supabase `webchat-atendimento` (sa-east-1), já com tabelas, regras de segurança e tempo real.
 

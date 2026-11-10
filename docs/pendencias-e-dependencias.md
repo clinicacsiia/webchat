@@ -1,5 +1,7 @@
 # Pendências e dependências (01/11/2026)
 
+> **Atualização de 10/11/2026:** a lista mais recente de pendências está em `docs/pendencias-2026-11-10.md`. Este arquivo é de 01/11/2026.
+
 Lista única do que falta, na ordem em que as coisas dependem umas das outras. Reúne o `LEIAME.md`, os documentos em `docs/`, os resumos das sessões anteriores e uma conferência feita no banco real em 01/11/2026.
 
 Legenda de quem faz: **[Claude]** faz aqui no webchat (código, SQL, n8n, Edge Function pelos conectores); **[Você]** só você consegue (painéis do Supabase/n8n, decisões, chaves, testes com pessoas); **[Terceiro]** jurídico ou Klingo.
