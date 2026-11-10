@@ -521,6 +521,14 @@ Como o plano trata isso (a confirmar no desenho):
 
 **Ponto ainda ambíguo (a pergunta abaixo):** a frase do dono diz "ela **já esteja encerrada**" e, em seguida, "a antiga **será encerrada**".
 
-### G. Próxima pergunta (uma por vez)
+### G. Conversa ABERTA no aparelho — DECIDIDO pelo dono (10/11/2026)
 
-A tela de escolha vale para quais estados da conversa guardada no aparelho?
+Se o paciente pede uma conversa nova e o aparelho guarda uma conversa **que não está encerrada**, o programa identifica e oferece:
+1. **Voltar para a conversa antiga**; ou
+2. **Encerrar a antiga e abrir uma nova** (com o aviso de que o histórico fica salvo e a pergunta do motivo da reentrada, seção E, quando for do mesmo dia).
+
+**Ainda NÃO decidido (não será implementado até resposta):** conversa guardada que já está **encerrada** — encerrada há até 7 dias e há mais de 7 dias.
+
+### H. Próxima pergunta (uma por vez)
+
+Para conversa guardada **já encerrada**, vale a mesma tela de duas opções quando foi encerrada há **até 7 dias** ("voltar ao tema anterior", que reabre, ou "nova conversa", sem precisar encerrar nada), e vai **direto para a conversa nova**, sem tela, quando passou de 7 dias?
