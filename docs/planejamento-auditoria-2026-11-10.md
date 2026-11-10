@@ -538,8 +538,12 @@ Com isso o **C-5 está fechado**: só no aparelho que guarda a conversa; aberta 
 
 **Conflito com a Q-04 (não resolvido em silêncio):** a Q-04 diz que mensagem do paciente após o **encerramento automático** reabre a conversa por até **7 dias**. A janela nova é de **2 dias**. Entre 2 e 7 dias o paciente ainda poderia reabrir a antiga se escrever nela (por "Conversas anteriores", por aviso ou por link).
 
-### I. Próxima pergunta (uma por vez)
+### I. Janela única de reabertura — DECIDIDO pelo dono (10/11/2026): opção B
 
-Qual janela de reabertura vale daqui para frente?
-- **A.** Duas janelas: **2 dias** para a tela de escolha no aparelho e **7 dias** (Q-04) para reabrir ao escrever numa conversa antiga encerrada automaticamente.
-- **B (recomendo).** **Uma janela única de 2 dias** para tudo: passou disso, a conversa antiga fica encerrada de vez e escrever exige uma conversa nova (com a opção "ver a conversa anterior"). Regra única, e os indicadores ficam mais simples (menos reabertura de conversa de dias congelados).
+**Janela única de 2 dias** para tudo. Isso **altera a Q-04** (era 7 dias): mensagem do paciente após o encerramento reabre a conversa por até **2 dias**; passou disso, a conversa antiga fica encerrada de vez e escrever exige conversa nova (com a opção "ver a conversa anterior"). A mesma janela vale para a tela de escolha no aparelho (seção H).
+
+Efeitos no plano: `chat_enviar`/`chat_responder` passam a recusar reabertura após 2 dias com mensagem clara; configuração única `config.reabrir_dias = 2` (em vez de dois valores); nenhum dia congelado é reaberto depois de 2 dias, o que simplifica o fechamento diário dos indicadores.
+
+### J. Próxima pergunta (uma por vez)
+
+**C-3 (conversas de teste, Etapa 0):** a regra "conversa atendida ou encerrada pelo Alisson é teste" deve valer **só para as conversas antigas**, com a lista das 29 que ela pega (só códigos técnicos, sem dados de paciente) **entregue a você para conferir antes de eu gravar qualquer marca**? Daqui para frente, a marcação seria manual por TI/gerência (hoje, até existirem esses papéis, só os administradores Alisson e Jonathan).
