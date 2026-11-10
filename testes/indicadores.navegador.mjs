@@ -33,6 +33,11 @@ const RESUMO = (total, pessoas, media, fin) => ({ periodo_dias: 1, unidade: null
   por_dia: [{ dia: '2026-11-09', conversas: total, pessoas, finalizadas: fin, media_por_pessoa: media, pedidos_completos: 2, agendados: 1 }],
   por_hora: [{ hora: 9, conversas: 2 }, { hora: 10, conversas: total - 2 }],
   encerramentos: { total: 1, automaticos: 0, por_motivo: { agendado: 1 } }, avaliacoes: null });
+// Jornada na clínica (Klingo) só de quem veio do chat, por dia do primeiro contato (pessoas novas e o que aconteceu com elas depois). 07/11 não tem conversa na lista do chat do teste.
+const JORNADA = { periodo_dias: 7, unidade: null, desde: agora, gerado_em: agora,
+  total: { pessoas: 6, marcaram: 4, confirmaram: 3, atendidos: 2, faltaram: 1, cancelaram_remarcaram: 1, por_vir: 1 },
+  por_dia: [{ dia: '2026-11-07', pessoas: 2, marcaram: 1, confirmaram: 1, atendidos: 1, faltaram: 0, cancelaram_remarcaram: 0, por_vir: 0 },
+    { dia: '2026-11-09', pessoas: 4, marcaram: 3, confirmaram: 2, atendidos: 1, faltaram: 1, cancelaram_remarcaram: 1, por_vir: 1 }] };
 const jwt = (sub) => { const b = (o) => Buffer.from(JSON.stringify(o)).toString('base64url'); return `${b({ alg: 'HS256', typ: 'JWT' })}.${b({ sub, role: 'authenticated', exp: Math.floor(Date.now() / 1000) + 86400 })}.x`; };
 
 function servidor() {
@@ -46,7 +51,7 @@ function servidor() {
   });
 }
 
-async function pagina(browser, { semSqlNovo = false } = {}) {
+async function pagina(browser, { semSqlNovo = false, semJornada = false } = {}) {
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 } });   // cartões do topo somem em telas baixas (<= 820 px)
   await ctx.addInitScript(([id, token, email]) => {
     localStorage.setItem('sb-nrvuynjwcgwpjdptkiay-auth-token', JSON.stringify({ access_token: token, refresh_token: 'x', token_type: 'bearer', expires_in: 86400, expires_at: Math.floor(Date.now() / 1000) + 86400,
@@ -68,6 +73,10 @@ async function pagina(browser, { semSqlNovo = false } = {}) {
     else if (p.startsWith('/rest/v1/agentes')) corpo = url.searchParams.get('id') ? (objeto ? EU : [EU]) : [EU];
     else if (p.startsWith('/rest/v1/conversas')) corpo = CONVERSAS;
     else if (p.startsWith('/rest/v1/conversa_grupo')) corpo = GRUPOS;
+    else if (p.endsWith('/rpc/painel_indicadores_jornada')) {
+      reg.rpcs.push(['jornada', JSON.parse(req.postData() || '{}')]);
+      if (semJornada) { status = 404; corpo = { code: 'PGRST202', message: 'Could not find the function public.painel_indicadores_jornada(p_dias, p_unidade) in the schema cache' }; } else corpo = JORNADA;
+    }
     else if (p.endsWith('/rpc/painel_indicadores_unidade')) {
       const b = JSON.parse(req.postData() || '{}'); reg.rpcs.push(['unidade', b]);
       if (semSqlNovo) { status = 404; corpo = { code: 'PGRST202', message: 'Could not find the function public.painel_indicadores_unidade(p_dias, p_unidade) in the schema cache' }; }
@@ -146,6 +155,56 @@ await caso('Sem o SQL novo no banco, Indicadores cai para o resumo antigo e avis
   const txt = await page.locator('.pagina').first().innerText();
   await ctx.close();
   return { ok: reg.rpcs.some((r) => r[0] === 'antiga') && /Clínica toda/.test(txt) && !reg.excecoes.length, detalhe: reg.excecoes[0] ?? '' };
+});
+
+await caso('Por dia segue a jornada: chat (conversas, pedido, agendado) e clínica só de quem veio do chat (marcaram, confirmaram, atendidos, faltaram), com total', async () => {
+  const { page, ctx, reg } = await abrir(); await esperaCartao(page, 'Pessoas hoje', '4');
+  await page.click('.nav button[data-aba=indicadores]'); await page.waitForSelector('tbody tr');
+  const cab = (await page.locator('thead tr').nth(1).locator('th').allInnerTexts()).map((t) => t.trim());
+  const linhas = await page.locator('tbody tr').evaluateAll((l) => l.map((r) => [...r.querySelectorAll('td')].map((c) => c.textContent.trim())));
+  const cartoes = (await page.locator('.numeros').nth(2).innerText()).replace(/\n+/g, ' ');
+  if (process.env.FOTO) await page.locator('.tabela-wrap').first().screenshot({ path: process.env.FOTO + '/jornada.png' });
+  const jr = reg.rpcs.filter((r) => r[0] === 'jornada').map((r) => r[1]);
+  await ctx.close();
+  const esperadoCab = ['Conversas', 'Pessoas', 'Conversas por pessoa', 'Finalizadas', 'Pedidos completos', 'Agendados pelo chat', 'Pessoas novas no chat', 'Marcaram', 'Confirmaram', 'Atendidos', 'Faltaram', 'Cancelaram ou remarcaram', 'Ainda por vir'];
+  const total = linhas.find((l) => l[0] === 'Total do período'), d07 = linhas.find((l) => l[0] === '07/11'), d09 = linhas.find((l) => l[0] === '09/11');
+  return { ok: JSON.stringify(cab) === JSON.stringify(esperadoCab)
+    && total && total.slice(7).join() === '6,4,3,2,1,1,1'              // pessoas novas, marcaram, confirmaram, atendidos, faltaram, cancelaram+remarcaram, ainda por vir
+    && d07 && d07.slice(1, 7).join() === '0,0,—,0,0,0' && d07.slice(7).join() === '2,1,1,1,0,0,0'   // dia sem conversa na lista do chat, mas com pessoas novas acompanhadas
+    && d09 && d09[1] === '5' && d09.slice(7).join() === '4,3,2,1,1,1,1'
+    && /2 atendidos \(50% dos que marcaram\)/.test(cartoes) && /1 faltaram \(25% dos que marcaram\)/.test(cartoes) && /4 marcaram exame no Klingo \(67% das pessoas novas\)/.test(cartoes)
+    && jr.length >= 1 && jr[0].p_dias === 1 && jr[0].p_unidade === null, detalhe: `${cab} | ${JSON.stringify(linhas)} | ${cartoes}` };
+});
+
+await caso('Filtro de unidade do topo também vai para a jornada da clínica', async () => {
+  const { page, ctx, reg } = await abrir(); await esperaCartao(page, 'Pessoas hoje', '4');
+  await page.click('.nav button[data-aba=indicadores]'); await page.waitForSelector('tbody tr');
+  await page.selectOption('#selUnidade', 'csi'); await page.waitForFunction(() => /Unidade CSI/i.test(document.querySelector('.pagina')?.innerText || ''));
+  const un = reg.rpcs.filter((r) => r[0] === 'jornada').map((r) => r[1].p_unidade);
+  await ctx.close();
+  return { ok: un[0] === null && un.at(-1) === 'csi', detalhe: String(un) };
+});
+
+await caso('Sem o SQL da jornada no banco, a tabela mostra só o chat (sem coluna da clínica) e sem erro', async () => {
+  const { page, ctx, reg } = await abrir({ semJornada: true }); await esperaCartao(page, 'Pessoas hoje', '4');
+  await page.click('.nav button[data-aba=indicadores]'); await page.waitForSelector('tbody tr');
+  const cab = (await page.locator('thead tr').nth(1).locator('th').allInnerTexts()).map((t) => t.trim());
+  const txt = await page.locator('.pagina').first().innerText();
+  await ctx.close();
+  return { ok: cab.length === 6 && !cab.includes('Atendidos') && !/Na clínica: do agendamento/.test(txt) && !reg.excecoes.length, detalhe: `${cab} ${reg.excecoes[0] ?? ''}` };
+});
+
+await caso('Filtro de período tem "Ontem" (entre Hoje e 7 dias) e pede p_dias = -1 ao resumo e à jornada', async () => {
+  const { page, ctx, reg } = await abrir(); await esperaCartao(page, 'Pessoas hoje', '4');
+  await page.click('.nav button[data-aba=indicadores]'); await page.waitForSelector('.pagina select');
+  const opcoes = await page.locator('.pagina select option').allInnerTexts();
+  await page.selectOption('.pagina select', '-1'); await page.waitForFunction(() => document.querySelector('.pagina select')?.value === '-1');
+  await page.waitForFunction(() => document.querySelector('.numeros .num'));
+  await new Promise((r) => setTimeout(r, 400));
+  const un = reg.rpcs.filter((r) => r[0] === 'unidade').map((r) => r[1].p_dias), jo = reg.rpcs.filter((r) => r[0] === 'jornada').map((r) => r[1].p_dias);
+  const sel = await page.locator('.pagina select').inputValue();
+  await ctx.close();
+  return { ok: opcoes[0] === 'Hoje' && opcoes[1] === 'Ontem' && un.at(-1) === -1 && jo.at(-1) === -1 && sel === '-1' && !reg.excecoes.length, detalhe: `${opcoes} | unidade=${un} jornada=${jo} select=${sel}` };
 });
 
 await browser.close(); srv.close();

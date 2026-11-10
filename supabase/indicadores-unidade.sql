@@ -3,7 +3,7 @@
 --   * painel_indicadores_unidade(p_dias, p_unidade): o mesmo resumo de antes, mas obedecendo o filtro de unidade do topo do painel
 --     ('csi' | 'rmtc' | 'desenvoar'; nulo = todas), e contando PESSOAS como o painel conta (conversas da mesma pessoa viram uma só).
 --     Acrescenta: média de conversas por pessoa, pessoas e média por dia, conversas por hora, motivos de encerramento e avaliações (já filtrados).
---   * Período em dias de calendário (fuso de São Paulo): 1 = hoje, 7 = hoje e os 6 dias anteriores; 0 ou nulo = desde o começo.
+--   * Período em dias de calendário (fuso de São Paulo): 1 = hoje, 7 = hoje e os 6 dias anteriores; -1 = ONTEM (só o dia anterior); 0 ou nulo = desde o começo.
 --   * painel_indicadores(p_dias) continua existindo (painel antigo aberto no navegador não quebra) e chama a nova sem filtro.
 -- Regra de unidade da pessoa (igual à do painel): 1) pedido já agendado e ainda aberto; 2) cartão da Jornada; 3) unidade escolhida no formulário do chat.
 --   Sem nenhuma = unidade desconhecida = a pessoa aparece em TODAS as unidades (regra de ouro do painel).
@@ -34,8 +34,9 @@ create or replace function public.painel_indicadores_unidade(p_dias integer defa
 language plpgsql stable security definer set search_path to '' as $$
 declare
   v_hoje date := (now() at time zone 'America/Sao_Paulo')::date;
-  v_ini timestamptz := case when coalesce(p_dias, 0) > 0
-    then ((v_hoje - (least(p_dias, 3650) - 1))::timestamp at time zone 'America/Sao_Paulo') else '-infinity'::timestamptz end;
+  v_ini timestamptz := case when p_dias = -1 then ((v_hoje - 1)::timestamp at time zone 'America/Sao_Paulo')   -- -1 = ontem (de 00:00 de ontem até 00:00 de hoje)
+    when coalesce(p_dias, 0) > 0 then ((v_hoje - (least(p_dias, 3650) - 1))::timestamp at time zone 'America/Sao_Paulo') else '-infinity'::timestamptz end;
+  v_fim timestamptz := case when p_dias = -1 then (v_hoje::timestamp at time zone 'America/Sao_Paulo') else 'infinity'::timestamptz end;
   v_un text := case when lower(coalesce(p_unidade, '')) in ('csi', 'rmtc', 'desenvoar') then lower(p_unidade) end;
   v_admin boolean := coalesce((select public.papel_atual()), '') = 'admin';
   v_out jsonb;
@@ -51,16 +52,16 @@ begin
     select c.id, c.status, c.criado_em, pu.pessoa,
            (c.criado_em at time zone 'America/Sao_Paulo')::date as dia,
            extract(hour from c.criado_em at time zone 'America/Sao_Paulo')::integer as hora
-      from public.conversas c join pu on pu.conversa_id = c.id where c.criado_em >= v_ini),
+      from public.conversas c join pu on pu.conversa_id = c.id where c.criado_em >= v_ini and c.criado_em < v_fim),
   pe as (
     select p.conversa_id, p.status, p.agendado_auto_em, (p.criado_em at time zone 'America/Sao_Paulo')::date as dia
-      from public.pre_agendamentos p join pu on pu.conversa_id = p.conversa_id where p.criado_em >= v_ini),
+      from public.pre_agendamentos p join pu on pu.conversa_id = p.conversa_id where p.criado_em >= v_ini and p.criado_em < v_fim),
   en as (
-    select e.motivo, e.origem from public.conversa_encerramento e join pu on pu.conversa_id = e.conversa_id where e.encerrada_em >= v_ini),
+    select e.motivo, e.origem from public.conversa_encerramento e join pu on pu.conversa_id = e.conversa_id where e.encerrada_em >= v_ini and e.encerrada_em < v_fim),
   av as (
     select a.nota_atendimento, a.nota_site, a.canal
       from public.avaliacao_atendimento a left join pu on pu.conversa_id = a.conversa_id
-     where a.criado_em >= v_ini and (v_un is null or pu.conversa_id is not null))
+     where a.criado_em >= v_ini and a.criado_em < v_fim and (v_un is null or pu.conversa_id is not null))
   select jsonb_build_object(
     'periodo_dias', coalesce(p_dias, 0), 'unidade', v_un,
     'desde', (select min(c.criado_em) from public.conversas c), 'gerado_em', now(),
