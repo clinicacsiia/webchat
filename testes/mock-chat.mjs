@@ -79,6 +79,29 @@ export function criarMundo(opcoes = {}) {
   m.seguinte = () => (m.passo === 'motivo' ? m.perguntaPlano() : m.passo === 'plano' ? m.final() : m.inserir('agente', 'Certo.', null));
   m.lista = (apos) => m.msgs.filter((x) => x.id > apos && !m.ocultos.has(x.id));
 
+  // Agenda de mentira (calendário do chat). livres: { 'AAAA-MM-DD': ['08:00', ...] }. aoVivo: o que a "leitura do Klingo" revela a cada chamada.
+  const dataMais = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+  m.dia = dataMais;
+  m.agenda = { livres: { [dataMais(2)]: ['08:00', '08:30', '09:00'], [dataMais(20)]: ['10:00'] },
+    aoVivo: { falha: false, motivo: null, status: null, atraso: 0, retira: {}, libera: {} } };
+  m.chamadasFuncao = [];
+  m.tratarFuncao = async (nome, corpo) => {
+    m.chamadasFuncao.push({ nome, corpo, t: Date.now() });
+    m.chamadas.push({ nome: 'fn:' + nome, corpo, t: Date.now() });
+    if (nome !== 'chat-agenda-ao-vivo') return { body: {} };
+    const a = m.agenda.aoVivo;
+    if (a.atraso) await espera(a.atraso);
+    if (a.status) return { status: a.status, body: { error: 'falha simulada' } };
+    if (a.motivo) return { body: { ok: false, motivo: a.motivo } };
+    const dias = []; for (let d = new Date(`${corpo.de}T12:00:00`); d <= new Date(`${corpo.ate}T12:00:00`); d.setDate(d.getDate() + 1)) dias.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
+    if (a.falha) return { body: { ok: false, lido_em: null, lidos: 0, reaproveitados: 0, falhas: dias, ms: 5 } };
+    for (const dia of dias) {   // só os dias lidos mostram o que mudou no Klingo
+      if (a.retira[dia]) { m.agenda.livres[dia] = (m.agenda.livres[dia] || []).filter((x) => !a.retira[dia].includes(x)); delete a.retira[dia]; }
+      if (a.libera[dia]) { m.agenda.livres[dia] = [...new Set([...(m.agenda.livres[dia] || []), ...a.libera[dia]])].sort(); delete a.libera[dia]; }
+    }
+    return { body: { ok: true, lido_em: agora(), lidos: dias.length, reaproveitados: 0, falhas: [], ms: 5 } };
+  };
+
   m.tratar = async (nome, corpo, cabecalhos = {}) => {
     m.chamadas.push({ nome, corpo, t: Date.now(), autorizacao: cabecalhos.authorization || null });
     if (m.atraso[nome]) await espera(m.atraso[nome]);
@@ -104,6 +127,18 @@ export function criarMundo(opcoes = {}) {
       }
       case 'chat_acompanhar': return { body: { agora: agora(), conversa: m.status, agente: null, em_horario: true, espera_longa: false, pedido: 'pronto', tipo: 'exame', conferencia: null, confirmado: false, horarios: [] } };
       case 'chat_corpo': return { body: CONFIG_CORPO };
+      case 'chat_horarios': {
+        const dias = Object.entries(m.agenda.livres).filter(([, hs]) => hs.length).sort(([a], [b]) => (a < b ? -1 : 1))
+          .map(([data, hs]) => ({ data, slots: hs.map((hora) => ({ hora, unidade: 'CLÍNICA DE SAÚDE E IMAGEM - CSI', profissional: 'DRA ANA', local: null, min: 30, chegada: false })) }));
+        const janelas = {}; for (let i = 0; i < 7; i++) janelas[String(i)] = { ini: '08:00', fim: '12:00', passo: 30 };
+        return { body: { janelas, grupos: [{ indice: 1, procs: [1], nomes: ['CONSULTA'] }], grupo: 1, de: corpo.p_de, ate: corpo.p_ate, dias,
+          unidades: ['CLÍNICA DE SAÚDE E IMAGEM - CSI'], escolhas: [], sem_exame: 0, atualizado_em: agora(), aviso: null } };
+      }
+      case 'chat_horario_escolher': {
+        if (!(m.agenda.livres[corpo.p_data] || []).includes(corpo.p_hora)) return { status: 400, body: { code: 'P0002', message: 'Esse horário acabou de ficar indisponível. Escolha outro, por favor.' } };
+        m.escolhido = { data: corpo.p_data, hora: corpo.p_hora };
+        return { body: { ok: true, restantes: 0, escolha: m.escolhido, mensagem_id: 1 } };
+      }
       case 'chat_pedido_salvar': return { body: { ok: true, itens: (corpo.p_itens || []).length, mensagem_id: 999 } };
       case 'chat_exames': return { body: EXAMES[corpo.p_regiao] || [] };
       case 'chat_incidente': m.incidentes.push(corpo); return { body: { ok: true } };
@@ -154,6 +189,12 @@ export async function novaPaginaChat(browser, mundo, { init = [], auth = null } 
       let corpoAuth = {}; try { corpoAuth = JSON.parse(req.postData() || '{}'); } catch { /* sem corpo */ }
       const r = await auth({ metodo: req.method(), caminho: url.pathname, busca: url.searchParams, corpo: corpoAuth, cabecalhos: req.headers() });
       return rota.fulfill({ status: r.status ?? 200, headers: CORS, contentType: 'application/json', body: r.body === undefined ? '' : JSON.stringify(r.body) });
+    }
+    const fnome = (/\/functions\/v1\/([a-z0-9-]+)/.exec(url.pathname) || [])[1];
+    if (fnome) {   // Edge Functions simuladas (ex.: chat-agenda-ao-vivo)
+      let corpoF = {}; try { corpoF = JSON.parse(req.postData() || '{}'); } catch { /* sem corpo */ }
+      const rf = mundo.tratarFuncao ? await mundo.tratarFuncao(fnome, corpoF, req.headers()) : { body: {} };
+      return rota.fulfill({ status: rf.status ?? 200, headers: CORS, contentType: 'application/json', body: JSON.stringify(rf.body) });
     }
     const nome = (/\/rest\/v1\/rpc\/([a-z0-9_]+)/.exec(url.pathname) || [])[1];
     if (!nome) return rota.fulfill({ status: 200, headers: CORS, contentType: 'application/json', body: '[]' });
