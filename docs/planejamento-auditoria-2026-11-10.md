@@ -647,6 +647,15 @@ Como será feito (**nada foi gravado**; a marca entra na Etapa 0, depois da apro
 - Toda conversa nova desse contato nasce com `conversas.teste = true`; as 21 antigas recebem a marca na carga inicial, **conferidas com o dono antes**.
 - Os 4 cadastros em `pacientes` e a conta de paciente ficam **fora dos indicadores** (os indicadores partem das conversas), mas ganham a mesma marca para não aparecerem em listas de pacientes reais nem em buscas de duplicidade. Confirmar na Etapa 0.
 
-### 9.6 Próxima pergunta (uma por vez)
+### 9.6 C-23b — DECIDIDO pelo dono (10/11/2026): sem "modo teste"
 
-**C-23b:** se o Alisson precisar atender **um paciente real** com a conta dele, essa conversa também vira teste (pela regra da seção J) e some dos indicadores. Você quer uma chave **"modo teste" no perfil dele**, ligada por padrão, que ele desliga quando for atender de verdade (e as conversas atendidas com ela desligada contam como reais)?
+Não haverá chave de modo teste. **O Alisson é TI e só faz teste; não atende paciente real.** Tudo que ele assume, responde ou encerra é teste, sempre (seção J). Consequência assumida: se algum dia ele atender um paciente real, essa conversa some dos indicadores; quem precisar desmarcar é TI/gerência (log de quem e quando). O item C-23 está **fechado**.
+
+### 9.7 Próxima pergunta (uma por vez)
+
+**C-6 / C-26 (Klingo):** conferir o Klingo ao vivo dentro do chat não cabe nos 3 segundos (leituras de 2,5 a 8,6 s). Você aprova esta alternativa?
+1. O chat reserva o horário escolhido por **2 minutos** no banco.
+2. Uma rotina relê a ocupação do Klingo a cada **30 s**, só dos dias e médicos que estão em jogo, **inclusive à noite** (com intervalo maior).
+3. A Jornada passa de 1 minuto para **30 s**.
+4. Nunca duas leituras ao mesmo tempo; se der erro, tenta de novo **30 s depois**.
+5. Antes de ligar, um **piloto medido** (a carga no Klingo dobra, mais ou menos).
