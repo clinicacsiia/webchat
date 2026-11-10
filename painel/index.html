@@ -1326,8 +1326,13 @@
       out.push(h('div', { class: 'j-sec' }, h('h4', {}, 'Parece a mesma pessoa do chat'),
         h('div', { style: 'font-size:13.5px' }, 'O nome e o telefone batem com uma conversa do chat. Falta uma confirmação sua para unir os dois.'),
         h('div', { class: 'j-acoes' }, h('button', { class: 'btn prim', type: 'button', onclick: async () => {
-          const { error } = await db.rpc('pessoa_klingo_confirmar', { p_prontuario: k.paciente_chave, p_conversa: pess.sugestao });
-          if (error) { toast(msgErro(error)); return; }
+          // AGE-02: a função nova avisa se já existe um vínculo diferente (nada é trocado em silêncio) e grava quem/quando/antes/depois.
+          let r = await db.rpc('pessoa_klingo_confirmar_sup', { p_prontuario: k.paciente_chave, p_conversa: pess.sugestao, p_substituir: false });
+          if (!r.error && r.data && r.data.ok === false) {
+            if (!confirm((r.data.mensagem || 'Já existe um vínculo diferente.') + '\n\nTrocar mesmo assim? (Só a supervisão consegue; fica registrado quem trocou.)')) return;
+            r = await db.rpc('pessoa_klingo_confirmar_sup', { p_prontuario: k.paciente_chave, p_conversa: pess.sugestao, p_substituir: true });
+          }
+          if (r.error) { toast(msgErro(r.error)); return; }
           toast('Unidos.'); await depoisDeMexer(k.id); } }, 'É a mesma pessoa'))));
     } else if (pess.pessoa && pess.pessoa.startsWith('g:') && !k.conversa_id && k.paciente_chave) {
       out.push(h('div', { class: 'j-sec' }, h('div', { style: 'font-size:13px;color:var(--suave)' }, 'Unido à conversa do chat desta pessoa. ',
@@ -2764,7 +2769,7 @@
   async function carregarEstrutura(box) {
     const { data, error } = await db.rpc('org_estrutura');
     const cab = h('h3', {}, 'Estrutura');
-    if (error || !data) { box.replaceChildren(cab, h('p', { class: 'sub' }, 'Esta seção aparece só para TI, gerência e supervisão.')); return; }
+    if (error || !data || !Array.isArray(data.equipes)) { box.replaceChildren(cab, h('p', { class: 'sub' }, 'Esta seção aparece só para TI, gerência e supervisão.')); return; }
     const recarregar = () => carregarEstrutura(box);
     const ehTI = data.nivel === 'ti', podeEquipe = data.nivel === 'ti' || data.nivel === 'gerente';
     const modoSel = ehTI ? h('select', { id: 'modoPermissao', 'aria-label': 'Modo das permissões', onchange: async (e) => {
@@ -2777,7 +2782,7 @@
       const { data: r, error: e } = await db.rpc('permissao_simular'); if (e) { toast(msgErro(e)); return; }
       simulacao.replaceChildren(h('p', { class: 'sub' }, `Se o modo estivesse "ligado", cada pessoa veria: (conversas abertas sem unidade: ${r.sem_unidade_abertas}, vão para a triagem do Call Center)`),
         h('table', { class: 'tab' }, h('thead', {}, h('tr', {}, ['Pessoa', 'Nível', 'Abertas', 'Histórico'].map((t) => h('th', {}, t)))),
-          h('tbody', {}, r.pessoas.map((x) => h('tr', {}, h('td', {}, x.nome), h('td', {}, x.nivel ? (ROTULO_FUNCAO[x.nivel] || x.nivel) : 'sem equipe'), h('td', {}, `${x.abertas_visiveis} de ${x.abertas}`), h('td', {}, `${x.total_visiveis} de ${x.total}`))))));
+          h('tbody', {}, (r.pessoas || []).map((x) => h('tr', {}, h('td', {}, x.nome), h('td', {}, x.nivel ? (ROTULO_FUNCAO[x.nivel] || x.nivel) : 'sem equipe'), h('td', {}, `${x.abertas_visiveis} de ${x.abertas}`), h('td', {}, `${x.total_visiveis} de ${x.total}`))))));
     } }, 'Simular o que cada pessoa veria') : null;
     const unidades = data.unidades || [];
     const blocoEquipe = (e) => h('div', { class: 'equipe-bloco', style: 'border:1px solid var(--linha,#e3e8ef);border-radius:12px;padding:10px 12px;margin:10px 0' },
@@ -2786,7 +2791,7 @@
           ? h('select', { 'aria-label': 'Unidade da equipe ' + e.nome, style: 'width:auto', onchange: async (ev) => { const r = await db.rpc('org_equipe_salvar', { p_id: e.id, p_nome: e.nome, p_unidade: ev.target.value || null, p_transversal: false, p_ativa: e.ativa }); toast(r.error ? msgErro(r.error) : 'Unidade da equipe salva.'); recarregar(); } },
               h('option', { value: '' }, 'Unidade a definir'), unidades.map((u) => h('option', { value: u.chave, selected: u.chave === e.unidade }, u.rotulo)))
           : h('span', { class: 'q-chip' }, e.unidade || 'Unidade a definir'))),
-      h('ul', { style: 'list-style:none;padding:0;margin:8px 0 0' }, e.membros.map((m) => h('li', { style: 'display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:4px 0' },
+      h('ul', { style: 'list-style:none;padding:0;margin:8px 0 0' }, (e.membros || []).map((m) => h('li', { style: 'display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:4px 0' },
         h('span', { style: 'min-width:170px' }, m.agente || m.rotulo, m.agente ? '' : h('small', { style: 'color:var(--suave)' }, ' (nome provisório)')),
         h('span', { class: 'q-chip' }, ROTULO_FUNCAO[m.funcao] || m.funcao),
         h('select', { 'aria-label': 'Ligar a uma conta', style: 'width:auto', onchange: async (ev) => { const r = await db.rpc('org_membro_vincular', { p_membro: m.id, p_agente: ev.target.value || null }); toast(r.error ? msgErro(r.error) : 'Conta ligada.'); recarregar(); } },
@@ -2796,9 +2801,9 @@
       const { data: r, error: e } = await db.rpc('painel_indicadores_equipe'); if (e) { toast(msgErro(e)); return; }
       indic.replaceChildren(h('p', { class: 'sub' }, `Últimos 30 dias (${r.de} a ${r.ate}). Cada pessoa conta as conversas em que participou; o total geral não soma duas vezes. Agendados pelo sistema: ${r.agendados_pelo_sistema}.`),
         h('table', { class: 'tab' }, h('thead', {}, h('tr', {}, ['Pessoa', 'Participou', 'Mensagens', 'Assumidas', 'Encerradas', 'Agendou', 'Transferiu', 'Recebeu'].map((t) => h('th', {}, t)))),
-          h('tbody', {}, r.pessoas.map((x) => h('tr', {}, [x.nome, x.conversas_participou, x.mensagens, x.assumidas, x.encerradas, x.agendados, x.transferiu, x.recebeu].map((v) => h('td', {}, String(v))))))),
-        r.equipes.length ? h('table', { class: 'tab' }, h('thead', {}, h('tr', {}, ['Equipe', 'Pessoas', 'Participou', 'Mensagens', 'Encerradas', 'Agendados', 'Transferências'].map((t) => h('th', {}, t)))),
-          h('tbody', {}, r.equipes.map((x) => h('tr', {}, [x.equipe, x.pessoas, x.conversas_participou, x.mensagens, x.encerradas, x.agendados, x.transferencias].map((v) => h('td', {}, String(v))))))) : h('p', { class: 'sub' }, 'Ligue as contas às equipes para ver os números por equipe.'));
+          h('tbody', {}, (r.pessoas || []).map((x) => h('tr', {}, [x.nome, x.conversas_participou, x.mensagens, x.assumidas, x.encerradas, x.agendados, x.transferiu, x.recebeu].map((v) => h('td', {}, String(v))))))),
+        (r.equipes || []).length ? h('table', { class: 'tab' }, h('thead', {}, h('tr', {}, ['Equipe', 'Pessoas', 'Participou', 'Mensagens', 'Encerradas', 'Agendados', 'Transferências'].map((t) => h('th', {}, t)))),
+          h('tbody', {}, (r.equipes || []).map((x) => h('tr', {}, [x.equipe, x.pessoas, x.conversas_participou, x.mensagens, x.encerradas, x.agendados, x.transferencias].map((v) => h('td', {}, String(v))))))) : h('p', { class: 'sub' }, 'Ligue as contas às equipes para ver os números por equipe.'));
     } }, 'Ver indicadores por pessoa e equipe');
     box.replaceChildren(cab,
       h('p', { class: 'sub' }, 'Equipes e quem é de cada uma. Os nomes "Atendente 1…" são provisórios: ligue cada um à conta real. Nenhuma conta é criada aqui e nenhum papel é alterado.'),
@@ -3149,7 +3154,7 @@ h1.longo { font-size: 14mm; }
   function secaoSuspensos(convenios, recarregar) {
     const box = h('div', { class: 'cat-bloco', id: 'secSuspensos', style: 'margin:10px 0' }, h('b', {}, 'Suspensão temporária'), h('p', { class: 'sub' }, 'Carregando…'));
     db.rpc('convenios_suspensos').then(({ data, error }) => {
-      if (error) { box.replaceChildren(h('b', {}, 'Suspensão temporária'), h('p', { class: 'sub' }, 'Só TI e gerência suspendem convênios.')); return; }
+      if (error || !Array.isArray(data)) { box.replaceChildren(h('b', {}, 'Suspensão temporária'), h('p', { class: 'sub' }, 'Só TI e gerência suspendem convênios.')); return; }
       const sel = h('select', { id: 'suspConv', 'aria-label': 'Convênio a suspender' }, h('option', { value: '' }, 'Escolha o convênio…'), convenios.map((x) => h('option', { value: x.operadora }, x.operadora)));
       const mot = h('input', { type: 'text', id: 'suspMotivo', maxlength: '300', placeholder: 'Motivo (só a equipe vê)', 'aria-label': 'Motivo da suspensão' });
       const ir = async (rpc, args, ok) => { const r = await db.rpc(rpc, args); toast(r.error ? msgErro(r.error) : ok); if (!r.error) recarregar(); };

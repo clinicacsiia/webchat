@@ -447,6 +447,7 @@
   </header>
   <div class="menu" id="menu" hidden>
     <button type="button" id="btnAtendente" hidden>Falar com um atendente</button>
+    <button type="button" id="btnSino" hidden></button>
     <button type="button" id="btnOutroFilho" hidden>Agendar para outro filho(a)</button>
     <button type="button" id="btnLetra">Letra maior</button>
     <button type="button" id="btnLetraMenor" hidden>Letra menor</button>
@@ -1247,6 +1248,31 @@
     promover(n, { id, criado_em: new Date().toISOString() });
     const i = provisorias.findIndex((p) => p.n === n);
     if (i >= 0) provisorias.splice(i, 1);
+  }
+  /* ---------- sino dos avisos (NOT-01): ligado / silenciado / bloqueado no aparelho / desligado ---------- */
+  const TEXTO_SINO = { ligado: '🔔 Avisos no celular: ligados (toque para silenciar)', silenciado: '🔕 Avisos silenciados (toque para ligar de novo)', bloqueado: '🔕 Avisos bloqueados neste aparelho (como liberar)', desligado: '🔔 Ativar avisos no celular' };
+  async function atualizarSino() {
+    const b = $('#btnSino'); if (!b) return;
+    if (!pushPossivel() || !conv || !conv.id || !conv.token) { b.hidden = true; return; }
+    const perm = Notification.permission; let silenciado = false;
+    if (perm === 'granted') {
+      try { const { data, error } = await db.rpc('chat_push_estado', { p_conversa: conv.id, p_token: conv.token }); if (!error && data) silenciado = !!data.silenciado; } catch { /* sem rede: mostra como ligado */ }
+    }
+    const estado = perm === 'denied' ? 'bloqueado' : perm !== 'granted' ? 'desligado' : silenciado ? 'silenciado' : 'ligado';
+    b.dataset.estado = estado; b.textContent = TEXTO_SINO[estado]; b.hidden = false;
+  }
+  async function tocarSino() {
+    fecharMenu();
+    const estado = ($('#btnSino') || {}).dataset ? $('#btnSino').dataset.estado : '';
+    if (estado === 'bloqueado') { alert('Os avisos estão bloqueados neste aparelho.\n\nPara liberar: toque no cadeado (ou nos três pontinhos) ao lado do endereço do site, abra "Permissões" ou "Notificações" e escolha "Permitir". Depois volte aqui.'); return; }
+    if (estado === 'desligado') { await pedirAvisos(); await assinarPush(); toast(Notification.permission === 'granted' ? 'Avisos ligados.' : 'Os avisos não foram permitidos.'); return atualizarSino(); }
+    const silenciar = estado === 'ligado';
+    try {
+      const { error } = await db.rpc('chat_push_silenciar', { p_conversa: conv.id, p_token: conv.token, p_silenciar: silenciar });
+      if (error) throw error;
+      toast(silenciar ? 'Avisos silenciados nesta conversa.' : 'Avisos ligados de novo.');
+    } catch (e) { toast(mensagemErro(e)); }
+    atualizarSino();
   }
   function fecharMenu() { el.menu.hidden = true; el.btnMenu.setAttribute('aria-expanded', 'false'); }
   /* ---------- nova conversa (C1): só vale para a conversa que ESTE aparelho guarda ---------- */
@@ -2690,11 +2716,13 @@
   el.btnMenu.addEventListener('click', () => {
     if (el.menu.hidden) atualizarAcessoHistorico();
     el.menu.hidden = !el.menu.hidden; el.btnMenu.setAttribute('aria-expanded', String(!el.menu.hidden));
+    if (!el.menu.hidden) atualizarSino();
   });
   el.btnHistorico.addEventListener('click', abrirHistorico);
   el.btnHistoricoForm.addEventListener('click', abrirHistorico);
   document.addEventListener('click', (e) => { if (!el.menu.hidden && !el.menu.contains(e.target) && e.target !== el.btnMenu) el.menu.hidden = true; });
   el.btnNova.addEventListener('click', novaConversa);
+  $('#btnSino').addEventListener('click', tocarSino);
   el.btnAtendente.addEventListener('click', pedirAtendente);
   el.btnHumano.addEventListener('click', pedirAtendente);
   // Letra: três tamanhos, guardados neste aparelho.

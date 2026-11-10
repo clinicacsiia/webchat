@@ -105,7 +105,7 @@ async function pagina(browser, { semSql = false, perguntaCanal = 'botoes' } = {}
       const conversaSo = /conversa_id=not\.is\.null/.test(decodeURIComponent(url.search));
       corpo = conversaSo ? CARTOES_CHAT : [...CARTOES_CHAT, ...CARTOES_J];
     }
-    else if (/\/rpc\/(pessoa_confirmar|pessoa_recusar|pessoa_separar|agendamento_fechar|agendamento_remarcacao_resolver|pessoa_klingo_confirmar|pessoa_klingo_desfazer|jornada_remarcar_pelo_chat)$/.test(p)) {
+    else if (/\/rpc\/(pessoa_confirmar|pessoa_recusar|pessoa_separar|agendamento_fechar|agendamento_remarcacao_resolver|pessoa_klingo_confirmar_sup|pessoa_klingo_confirmar|pessoa_klingo_desfazer|jornada_remarcar_pelo_chat)$/.test(p)) {
       reg.rpcs.push({ rpc: p.split('/').pop(), ...JSON.parse(req.postData() || '{}') }); corpo = { ok: true, canal: perguntaCanal };
     }
     else if (p.endsWith('/rpc/agendamento_perguntar')) { reg.rpcs.push({ rpc: 'agendamento_perguntar', ...JSON.parse(req.postData() || '{}') }); corpo = { ok: true, canal: perguntaCanal }; }
@@ -367,13 +367,13 @@ await caso('Jornada: falta de quem NÃO tem chat manda ligar (não oferece o bot
   return { ok: /Ligue para oferecer a nova data/.test(txt) && tem === 0, detalhe: txt.replace(/\n/g, ' ') };
 });
 
-await caso('Jornada: cartão do Klingo com nome + telefone iguais a uma conversa mostra a sugestão e a confirmação chama pessoa_klingo_confirmar', async () => {
+await caso('Jornada: cartão do Klingo com nome + telefone iguais a uma conversa mostra a sugestão e a confirmação chama pessoa_klingo_confirmar_sup', async () => {
   const { page, ctx, reg } = await abrirJornada();
   const chip = await page.locator('.q-card:has-text("Nara Costa")').innerText();
   await page.click('.q-card:has-text("Nara Costa")'); await page.waitForSelector('dialog[open] .j-sec:has-text("Parece a mesma pessoa do chat")');
   await page.click('dialog[open] button:has-text("É a mesma pessoa")'); await page.waitForTimeout(500);
   await ctx.close();
-  const r = reg.rpcs.find((x) => x.rpc === 'pessoa_klingo_confirmar');
+  const r = reg.rpcs.find((x) => x.rpc === 'pessoa_klingo_confirmar_sup');
   return { ok: /Mesma pessoa do chat\?/.test(chip) && !!r && r.p_prontuario === 'P103' && r.p_conversa === 'k1', detalhe: JSON.stringify(reg.rpcs) };
 });
 

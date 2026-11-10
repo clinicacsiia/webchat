@@ -58,6 +58,12 @@ await caso('1 mês depois: a rotina AVISA TI e gerência uma vez, e o convênio 
   const lista = (await como(GER, () => db.query(`select public.convenios_suspensos() r`))).rows[0].r;
   return { ok: n1 === 1 && n2 === 0 && avisos.includes(TI) && avisos.includes(GER) && !avisos.includes(AT) && (await ativo('amil')) === false && lista[0].revisar_agora === true };
 });
+await caso('quem não é TI/gerência (atendente, sem login) NÃO reativa nem renova', async () => {
+  const e1 = await como(AT, () => erro(() => db.query(`select public.convenio_reativar('amil')`)));
+  const e2 = await como(AT, () => erro(() => db.query(`select public.convenio_renovar('amil')`)));
+  const e3 = await como('00000000-0000-0000-0000-000000000000', () => erro(() => db.query(`select public.convenio_reativar('amil')`)));
+  return { ok: e1 && e1.code === '42501' && e2 && e2.code === '42501' && e3 && e3.code === '42501' && (await ativo('amil')) === false };
+});
 await caso('renovar dá mais 1 mês e rearma o aviso; reativar libera o convênio e grava no log', async () => {
   const ate = (await como(GER, () => db.query(`select public.convenio_renovar('amil') d`))).rows[0].d;
   const r = (await como(GER, () => db.query(`select public.convenio_reativar('amil') ok`))).rows[0].ok;

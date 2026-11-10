@@ -111,6 +111,8 @@ export function criarMundo(opcoes = {}) {
       case 'chat_config': return { body: { nome_empresa: 'Clínica de Teste', boas_vindas: 'Olá!' } };
       case 'chat_reentrada_estado': return { body: m.estadoReentrada || { status: 'aguardando', aberta: true, pode_voltar: true, mesmo_dia: false, janela_dias: 2, teve_resposta_humana: false, em_atendimento: false } };
       case 'chat_previsao_aceitar': return { body: true };
+      case 'chat_push_estado': return { body: { inscrito: true, silenciado: !!m.silenciado } };
+      case 'chat_push_silenciar': m.silenciado = !!corpo.p_silenciar; return { body: m.silenciado };
       case 'chat_nova_conversa': { m.msgs.length = 0; const q = m.perguntaMotivo(); return { body: { conversa_id: m.conversa, token: m.token, motor: 'fluxo', respostas: [q] } }; }
       case 'chat_iniciar': { m.msgs.length = 0; const q = m.perguntaMotivo(); return { body: { conversa_id: m.conversa, token: m.token, motor: 'fluxo', respostas: [q] } }; }
       case 'chat_listar': return { body: { status: m.status, agente: null, motor_ativo: m.motor, passo: m.passo, mensagens: m.lista(corpo.p_apos || 0) } };
