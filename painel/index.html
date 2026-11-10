@@ -1958,7 +1958,8 @@
       abertas: (p) => statusPessoa(p) !== 'encerrada', encerradas: (p) => statusPessoa(p) === 'encerrada' };
     const cont = (g) => todas.filter(g).length;
     const defs = [['aguardando', 'Aguardando', cont(fn.aguardando)], ['meus', 'Meus', cont(fn.meus)], ['abertas', 'Abertas', cont(fn.abertas)], ['encerradas', 'Encerradas', null]];
-    f.replaceChildren(seletorModo(), ...defs.map(([id, rot, n]) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(S.filtro === id), onclick: () => { S.filtro = id; renderLista(); } }, n != null ? `${rot} (${n})` : rot)));
+    f.replaceChildren(seletorModo(), ...defs.map(([id, rot, n]) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(S.filtro === id), onclick: () => { S.filtro = id; renderLista(); } }, n != null ? `${rot} (${n})` : rot)),
+      h('button', { class: 'chip', type: 'button', id: 'btnLote', title: 'Transferir várias conversas de uma vez', onclick: abrirLote }, 'Transferir em lote'));
     const buscando = S.busca.trim() !== '';
     const lista = buscando ? todas.filter(combinaBusca) : todas.filter(fn[S.filtro]);   // com busca, procura em todas as conversas
     const sug = renderSugestoes();
@@ -2273,7 +2274,9 @@
     const minha = c.status === 'em_atendimento' && c.agente_id === S.me.id;
     const atendentes = [...S.agentes.values()].filter((a) => a.ativo && (a.papel === 'admin' || a.papel === 'atendente') && a.id !== c.agente_id);
     const sel = atendentes.length ? h('select', { 'aria-label': 'Transferir para', style: 'width:auto', onchange: (e) => { if (e.target.value) transferir(e.target.value); } },
-      h('option', { value: '' }, 'Transferir…'), atendentes.map((a) => h('option', { value: a.id }, a.nome))) : null;
+      h('option', { value: '' }, 'Transferir…'),
+      h('optgroup', { label: 'Para uma pessoa' }, atendentes.map((a) => h('option', { value: a.id }, a.nome))),
+      h('optgroup', { label: 'Para a fila de uma unidade' }, UNIDADES_PAINEL.map(([k, r]) => h('option', { value: 'un:' + k }, r)))) : null;
     const tri = document.getElementById('triagem');
     if (tri) tri.replaceChildren(...(c.triagem_resumo || (c.ia_ativa && c.status === 'aguardando') ? [h('div', { class: 'triagem' },
       h('b', {}, c.ia_ativa && c.status === 'aguardando' ? (c.motor === 'fluxo' ? 'Assistente automático atendendo' : 'Assistente virtual atendendo')
@@ -2489,10 +2492,54 @@
     dlg.showModal();
     sel.focus();
   }
-  async function transferir(agenteId) {
-    const ag = S.agentes.get(agenteId);
-    if (!confirm(`Transferir esta conversa para ${ag && ag.nome ? ag.nome : 'outro atendente'}?`)) { renderTopoChat(); return; }
-    await atualizarConversa({ agente_id: agenteId, status: 'em_atendimento' });
+  // Transferência pela função do servidor (registra quem/quando/de/para/motivo, avisa quem recebe e reinicia as 24 h). Vale para as conversas unidas da mesma pessoa.
+  async function transferir(destino) {
+    const unidade = String(destino).startsWith('un:') ? String(destino).slice(3) : null;
+    const ag = unidade ? null : S.agentes.get(destino);
+    const nomeDestino = unidade ? `a fila da unidade ${(UNIDADES_PAINEL.find((u) => u[0] === unidade) || [0, unidade])[1]}` : (ag && ag.nome ? ag.nome : 'outro atendente');
+    if (!confirm(`Transferir esta conversa para ${nomeDestino}?`)) { renderTopoChat(); return; }
+    const motivo = prompt('Motivo da transferência (opcional):');
+    if (motivo === null) { renderTopoChat(); return; }
+    const ids = membrosDe(S.abertaId);
+    const { data, error } = await db.rpc('conversa_transferir', { p_conversas: ids, p_para_agente: unidade ? null : destino, p_para_unidade: unidade, p_motivo: motivo || null });
+    if (error) { toast(msgErro(error)); renderTopoChat(); return; }
+    if (!data || data.ok === false) { toast((data && data.mensagem) || 'Não foi possível transferir.'); renderTopoChat(); return; }
+    ids.forEach((i) => { const c = S.conversas.find((x) => x.id === i); if (c) Object.assign(c, unidade ? { agente_id: null, status: 'aguardando', unidade_responsavel: unidade } : { agente_id: destino, status: c.status === 'aguardando' ? 'em_atendimento' : c.status }); });
+    toast(unidade ? 'Conversa devolvida à fila da unidade.' : 'Conversa transferida.');
+    renderTopoChat(); renderLista(); atualizarSelo();
+  }
+  // Transferência em lote: escolhe várias conversas abertas e um destino (pessoa ou fila de unidade). Tudo ou nada, até 50, com resumo.
+  function abrirLote() {
+    const abertas = pessoas().filter((p) => statusPessoa(p) !== 'encerrada');
+    const marcadas = new Set();
+    const nomeP = (p) => (p.rep && (p.rep.nome_informado || (p.rep.contatos && p.rep.contatos.nome))) || 'Sem nome';
+    const dono = (p) => { const m = p.membros.find((x) => x.agente_id); const a = m ? S.agentes.get(m.agente_id) : null; return a && a.nome ? a.nome : 'sem responsável'; };
+    const atendentes = [...S.agentes.values()].filter((a) => a.ativo && (a.papel === 'admin' || a.papel === 'atendente'));
+    const destino = h('select', { id: 'loteDestino', 'aria-label': 'Destino' }, h('option', { value: '' }, 'Escolha o destino…'),
+      h('optgroup', { label: 'Para uma pessoa' }, atendentes.map((a) => h('option', { value: a.id }, a.nome))),
+      h('optgroup', { label: 'Para a fila de uma unidade' }, UNIDADES_PAINEL.map(([k, r]) => h('option', { value: 'un:' + k }, r))));
+    const motivo = h('input', { type: 'text', id: 'loteMotivo', maxlength: '300', placeholder: 'Motivo (opcional)', 'aria-label': 'Motivo' });
+    const resumo = h('p', { id: 'loteResumo', style: 'font-size:14px;margin:8px 0', role: 'status' }, '0 selecionadas (máximo 50).');
+    const atualizar = () => { resumo.textContent = `${marcadas.size} selecionada(s) (máximo 50).`; };
+    const linhas = abertas.map((p) => h('label', { class: 'lote-linha', style: 'display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--linha,#e3e8ef)' },
+      h('input', { type: 'checkbox', 'aria-label': 'Selecionar ' + nomeP(p), onchange: (e) => { const ids = p.membros.filter((m) => m.status !== 'encerrada').map((m) => m.id); ids.forEach((i) => (e.target.checked ? marcadas.add(i) : marcadas.delete(i))); atualizar(); } }),
+      h('span', {}, h('b', {}, nomeP(p)), h('span', { style: 'color:var(--suave);font-size:13px' }, ' · ' + dono(p)))));
+    const enviar = h('button', { class: 'btn prim', type: 'button', id: 'loteEnviar', onclick: async () => {
+      if (!marcadas.size) { toast('Selecione ao menos uma conversa.'); return; }
+      if (marcadas.size > 50) { toast('No máximo 50 conversas por vez.'); return; }
+      if (!destino.value) { toast('Escolha o destino.'); destino.focus(); return; }
+      const unidade = destino.value.startsWith('un:') ? destino.value.slice(3) : null;
+      enviar.disabled = true;
+      const { data, error } = await db.rpc('conversa_transferir', { p_conversas: [...marcadas], p_para_agente: unidade ? null : destino.value, p_para_unidade: unidade, p_motivo: motivo.value.trim() || null });
+      enviar.disabled = false;
+      if (error) { toast(msgErro(error)); return; }
+      if (!data || data.ok === false) { resumo.textContent = (data && data.mensagem) || 'Não foi possível transferir.'; resumo.style.color = 'var(--erro,#b3261e)'; return; }
+      dlg.close(); toast(`${data.transferidas} conversa(s) transferida(s).`); await carregarConversas(); renderLista(); atualizarSelo();
+    } }, 'Transferir');
+    dlg.className = ''; dlg.replaceChildren(h('h3', {}, 'Transferir em lote'), h('p', { style: 'font-size:14px' }, 'Marque as conversas e escolha o destino. Se alguma não puder ser transferida, nada é transferido e o aviso diz o motivo.'),
+      h('div', { style: 'max-height:42vh;overflow:auto' }, linhas.length ? linhas : h('p', {}, 'Nenhuma conversa aberta.')), resumo, destino, motivo,
+      h('div', { class: 'j-acoes' }, enviar, h('button', { class: 'btn', type: 'button', onclick: () => dlg.close() }, 'Cancelar')));
+    dlg.showModal();
   }
   async function enviarMsg() {
     const caixa = document.getElementById('caixa'), btn = document.getElementById('btnEnviar');
@@ -2643,6 +2690,7 @@
     c.replaceChildren(h('div', { class: 'pagina' }, h('h2', {}, 'Equipe'),
       h('p', { class: 'sub' }, 'Adicione pessoas, defina o papel de cada uma e acompanhe a carga de atendimento.'),
       formAdicionarPessoa(),
+      secaoEstrutura(),
       h('div', { class: 'numeros' },
         h('div', { class: 'num' }, h('b', {}, aguardando), h('span', {}, 'na fila agora')),
         h('div', { class: 'num' }, h('b', {}, emAtend), h('span', {}, 'em atendimento')),
@@ -2705,6 +2753,57 @@
       ok = !!(r && r.length); if (!ok) await new Promise((res) => setTimeout(res, 400));
     }
     if (!ok) throw new Error('Conta criada, mas não foi possível liberar o acesso. Libere na lista abaixo.');
+  }
+  /* ---------- Estrutura (unidades, equipes, quem é quem) + modo das permissões + indicadores por pessoa/equipe ---------- */
+  function secaoEstrutura() {
+    const box = h('div', { class: 'pagina-sec', id: 'secEstrutura', style: 'margin-top:24px' }, h('h3', {}, 'Estrutura'), h('p', { class: 'sub' }, 'Carregando…'));
+    carregarEstrutura(box);
+    return box;
+  }
+  const ROTULO_FUNCAO = { ti: 'TI', gerente: 'Gerência', supervisor: 'Supervisão', atendente: 'Atendente' };
+  async function carregarEstrutura(box) {
+    const { data, error } = await db.rpc('org_estrutura');
+    const cab = h('h3', {}, 'Estrutura');
+    if (error || !data) { box.replaceChildren(cab, h('p', { class: 'sub' }, 'Esta seção aparece só para TI, gerência e supervisão.')); return; }
+    const recarregar = () => carregarEstrutura(box);
+    const ehTI = data.nivel === 'ti', podeEquipe = data.nivel === 'ti' || data.nivel === 'gerente';
+    const modoSel = ehTI ? h('select', { id: 'modoPermissao', 'aria-label': 'Modo das permissões', onchange: async (e) => {
+      const novo = e.target.value;
+      if (novo === 'ligado' && !confirm('Ligar de verdade? Cada pessoa passa a ver só as conversas da unidade da equipe dela. Confira a simulação antes.')) { e.target.value = data.modo; return; }
+      const r = await db.rpc('permissao_modo_definir', { p_modo: novo }); toast(r.error ? msgErro(r.error) : 'Modo das permissões: ' + novo); recarregar();
+    } }, ['desligado', 'observacao', 'ligado'].map((m) => h('option', { value: m, selected: m === data.modo }, { desligado: 'Desligado', observacao: 'Observação (não bloqueia, só mostra)', ligado: 'Ligado (bloqueia no servidor)' }[m]))) : null;
+    const simulacao = h('div', { id: 'simulacao' });
+    const btnSim = ehTI ? h('button', { class: 'btn', type: 'button', id: 'btnSimular', onclick: async () => {
+      const { data: r, error: e } = await db.rpc('permissao_simular'); if (e) { toast(msgErro(e)); return; }
+      simulacao.replaceChildren(h('p', { class: 'sub' }, `Se o modo estivesse "ligado", cada pessoa veria: (conversas abertas sem unidade: ${r.sem_unidade_abertas}, vão para a triagem do Call Center)`),
+        h('table', { class: 'tab' }, h('thead', {}, h('tr', {}, ['Pessoa', 'Nível', 'Abertas', 'Histórico'].map((t) => h('th', {}, t)))),
+          h('tbody', {}, r.pessoas.map((x) => h('tr', {}, h('td', {}, x.nome), h('td', {}, x.nivel ? (ROTULO_FUNCAO[x.nivel] || x.nivel) : 'sem equipe'), h('td', {}, `${x.abertas_visiveis} de ${x.abertas}`), h('td', {}, `${x.total_visiveis} de ${x.total}`))))));
+    } }, 'Simular o que cada pessoa veria') : null;
+    const unidades = data.unidades || [];
+    const blocoEquipe = (e) => h('div', { class: 'equipe-bloco', style: 'border:1px solid var(--linha,#e3e8ef);border-radius:12px;padding:10px 12px;margin:10px 0' },
+      h('div', { style: 'display:flex;gap:8px;align-items:center;flex-wrap:wrap' }, h('b', {}, e.nome),
+        e.transversal ? h('span', { class: 'q-chip' }, 'Todas as unidades (triagem)') : (podeEquipe
+          ? h('select', { 'aria-label': 'Unidade da equipe ' + e.nome, style: 'width:auto', onchange: async (ev) => { const r = await db.rpc('org_equipe_salvar', { p_id: e.id, p_nome: e.nome, p_unidade: ev.target.value || null, p_transversal: false, p_ativa: e.ativa }); toast(r.error ? msgErro(r.error) : 'Unidade da equipe salva.'); recarregar(); } },
+              h('option', { value: '' }, 'Unidade a definir'), unidades.map((u) => h('option', { value: u.chave, selected: u.chave === e.unidade }, u.rotulo)))
+          : h('span', { class: 'q-chip' }, e.unidade || 'Unidade a definir'))),
+      h('ul', { style: 'list-style:none;padding:0;margin:8px 0 0' }, e.membros.map((m) => h('li', { style: 'display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:4px 0' },
+        h('span', { style: 'min-width:170px' }, m.agente || m.rotulo, m.agente ? '' : h('small', { style: 'color:var(--suave)' }, ' (nome provisório)')),
+        h('span', { class: 'q-chip' }, ROTULO_FUNCAO[m.funcao] || m.funcao),
+        h('select', { 'aria-label': 'Ligar a uma conta', style: 'width:auto', onchange: async (ev) => { const r = await db.rpc('org_membro_vincular', { p_membro: m.id, p_agente: ev.target.value || null }); toast(r.error ? msgErro(r.error) : 'Conta ligada.'); recarregar(); } },
+          h('option', { value: '' }, m.agente ? 'Trocar de conta…' : 'Ligar a uma conta…'), (data.agentes || []).map((a) => h('option', { value: a.id, selected: a.id === m.agente_id }, a.nome)))))));
+    const indic = h('div', { id: 'indicEquipe' });
+    const btnInd = h('button', { class: 'btn', type: 'button', id: 'btnIndEquipe', onclick: async () => {
+      const { data: r, error: e } = await db.rpc('painel_indicadores_equipe'); if (e) { toast(msgErro(e)); return; }
+      indic.replaceChildren(h('p', { class: 'sub' }, `Últimos 30 dias (${r.de} a ${r.ate}). Cada pessoa conta as conversas em que participou; o total geral não soma duas vezes. Agendados pelo sistema: ${r.agendados_pelo_sistema}.`),
+        h('table', { class: 'tab' }, h('thead', {}, h('tr', {}, ['Pessoa', 'Participou', 'Mensagens', 'Assumidas', 'Encerradas', 'Agendou', 'Transferiu', 'Recebeu'].map((t) => h('th', {}, t)))),
+          h('tbody', {}, r.pessoas.map((x) => h('tr', {}, [x.nome, x.conversas_participou, x.mensagens, x.assumidas, x.encerradas, x.agendados, x.transferiu, x.recebeu].map((v) => h('td', {}, String(v))))))),
+        r.equipes.length ? h('table', { class: 'tab' }, h('thead', {}, h('tr', {}, ['Equipe', 'Pessoas', 'Participou', 'Mensagens', 'Encerradas', 'Agendados', 'Transferências'].map((t) => h('th', {}, t)))),
+          h('tbody', {}, r.equipes.map((x) => h('tr', {}, [x.equipe, x.pessoas, x.conversas_participou, x.mensagens, x.encerradas, x.agendados, x.transferencias].map((v) => h('td', {}, String(v))))))) : h('p', { class: 'sub' }, 'Ligue as contas às equipes para ver os números por equipe.'));
+    } }, 'Ver indicadores por pessoa e equipe');
+    box.replaceChildren(cab,
+      h('p', { class: 'sub' }, 'Equipes e quem é de cada uma. Os nomes "Atendente 1…" são provisórios: ligue cada um à conta real. Nenhuma conta é criada aqui e nenhum papel é alterado.'),
+      ehTI ? h('div', { style: 'display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0' }, h('label', { for: 'modoPermissao' }, 'Permissões no servidor:'), modoSel, btnSim) : null, simulacao,
+      ...data.equipes.map(blocoEquipe), h('div', { style: 'margin-top:12px' }, btnInd), indic);
   }
   async function redefinirSenha(a) {
     const nova = prompt(`Nova senha provisória para ${a.nome || a.email || 'esta pessoa'} (mínimo 8 caracteres).\nNo próximo acesso a pessoa vai escolher uma senha só dela.`);
@@ -3205,6 +3304,11 @@ h1.longo { font-size: 14mm; }
           : `Sem preço confiável no catálogo; valor das marcações recentes (${amostra}${faixa}).`;
         if (dif && rv && !rv.mudou) nota = `Diferença já conferida: o chat informa ${brl(rv.valor)}.`;
       }
+      // CAT-02 (Q-18): o cardápio mostra só o PARTICULAR. Vale o preço revisado por uma pessoa; sem ele, "Sob consulta" (o chat não informa valor).
+      if (l.particular) {
+        preco = rv ? brl(rv.valor) : h('span', { class: 'cd-mudo' }, 'Sob consulta');
+        if (!rv) nota = 'Sem preço revisado: o chat não informa valor. Use "Definir valor" para liberar.';
+      }
       if (rv && rv.mudou) nota = `A referência mudou depois da última confirmação (hoje: ${l.exibido != null ? brl(l.exibido) : '—'}). O chat segue informando ${brl(rv.valor)} até você revisar.`;
 
       const celChat = h('td', {});
@@ -3247,14 +3351,19 @@ h1.longo { font-size: 14mm; }
         h('td', {}, nota));
     };
     const cartao = (x) => {
-      const linhas = (x.linhas || []).slice().sort((a, b) => (b.particular - a.particular) || (ORDEM_ESTADO[a.estado] - ORDEM_ESTADO[b.estado]) || String(a.operadora).localeCompare(String(b.operadora), 'pt-BR'));
+      const todasLinhas = (x.linhas || []).slice().sort((a, b) => (b.particular - a.particular) || (ORDEM_ESTADO[a.estado] - ORDEM_ESTADO[b.estado]) || String(a.operadora).localeCompare(String(b.operadora), 'pt-BR'));
+      const linhas = todasLinhas;   // alertas e contagens continuam olhando todas as operadoras (uso interno)
+      const particulares = todasLinhas.filter((l) => l.particular), outros = todasLinhas.filter((l) => !l.particular);
       const nAlertas = linhas.filter(alertaAtivo).length, nLigadas = linhas.filter((l) => l.revisao && l.revisao.ligado).length;
-      const refresh = () => { const n = cartao(x); n.open = d.open; d.replaceWith(n); };
+      const refresh = () => { const n = cartao(x); n.open = d.open; const o = d.querySelector('.cd-outros'), no = n.querySelector('.cd-outros'); if (o && no) no.open = o.open; d.replaceWith(n); };
       const d = h('details', { class: 'cat-bloco' },
         h('summary', {}, nAlertas > 0 ? h('span', { class: 'cd-alerta', title: `${nAlertas} operadora(s) para revisar`, 'aria-label': 'Alerta' }, '!') : null, x.nome,
           h('span', { class: 'sub-lista' }, ` · ${x.especialidade || 'sem especialidade'}${x.marcacoes_90d ? ` · ${x.marcacoes_90d} pedidos em 90 dias` : ''}${nLigadas ? ` · ${nLigadas} ligada(s) no chat` : ''}${/UNILATERAL|POR ARTICULA/i.test(x.nome) ? ' · preço por lado (os dois lados = 2×)' : ''}`)),
         h('div', { class: 'tabela-wrap', style: 'margin-top:8px' }, h('table', { class: 'cd-tabela' },
-          h('thead', {}, h('tr', {}, ['Operadora', 'Preço previsto', 'Catálogo', 'Chat informa', 'Observação'].map((t) => h('th', {}, t)))), h('tbody', {}, linhas.map((l) => linhaPreco(x, l, refresh))))));
+          h('thead', {}, h('tr', {}, ['Operadora', 'Preço previsto', 'Catálogo', 'Chat informa', 'Observação'].map((t) => h('th', {}, t)))), h('tbody', {}, particulares.length ? particulares.map((l) => linhaPreco(x, l, refresh)) : [h('tr', { class: 'cd-mudo' }, h('td', {}, 'Particular'), h('td', { class: 'cd-valor' }, 'Sob consulta'), h('td', {}, '—'), h('td', {}, '—'), h('td', {}, 'Sem preço particular no catálogo: o chat não informa valor.'))]))),
+        outros.length ? h('details', { class: 'cd-outros', style: 'margin-top:8px' }, h('summary', { class: 'cd-mudo' }, `Convênios (${outros.length}) — só para conferência interna; o paciente nunca vê estes valores`),
+          h('div', { class: 'tabela-wrap' }, h('table', { class: 'cd-tabela' },
+            h('thead', {}, h('tr', {}, ['Operadora', 'Preço previsto', 'Catálogo', 'Chat informa', 'Observação'].map((t) => h('th', {}, t)))), h('tbody', {}, outros.map((l) => linhaPreco(x, l, refresh)))))) : null);
       if (nAlertas > 0) d.open = true;
       return d;
     };

@@ -19,6 +19,7 @@ const CORS = { 'access-control-allow-origin': '*', 'access-control-allow-headers
 const agora = new Date().toISOString();
 const jwt = (sub) => { const b = (o) => Buffer.from(JSON.stringify(o)).toString('base64url'); return `${b({ alg: 'HS256', typ: 'JWT' })}.${b({ sub, role: 'authenticated', exp: Math.floor(Date.now() / 1000) + 86400 })}.x`; };
 
+const abrirOutros = async (page) => { await page.waitForSelector('.cd-outros', { state: 'attached', timeout: 8000 }); return page.evaluate(() => document.querySelectorAll('.cd-outros').forEach((d) => { d.open = true; })); };   // convênios ficam num bloco recolhido (CAT-02)
 const lin = (operadora, estado, extra = {}) => ({ operadora, particular: operadora === 'PARTICULAR', tabela: null, tabelas: 1, estado, catalogo: null, exibido: null, observado: null, obs_min: null, obs_max: null, amostras: null, dif_pct: null, ...extra });
 const EXAMES = [
   { id: 1, nome: 'USG TRANSVAGINAL', especialidade: 'ULTRASSONOGRAFIA', marcacoes_90d: 1794, alertas: 1, previsoes: 1, sem_preco: 0, linhas: [
@@ -96,7 +97,7 @@ await caso('administrador abre o cardápio: aviso de previsão, exame com "!" ab
   const { page, ctx, reg } = await pagina(browser);
   await page.goto(`${base}/painel/`);
   await page.click('.nav button[data-aba=catalogo]');
-  await page.waitForSelector('.cat-bloco');
+  await page.waitForSelector('.cat-bloco'); await abrirOutros(page);
   const aviso = await page.locator('.cd-aviso').innerText();
   const nomes = (await page.locator('.cat-bloco > summary').allInnerTexts()).map((t) => t.split('·')[0].trim());
   const aberto = await page.locator('.cat-bloco:has-text("USG TRANSVAGINAL")').evaluate((d) => d.open);
@@ -113,8 +114,8 @@ await caso('linha sem alerta mostra o preço do catálogo; previsão e sem preç
   const { page, ctx } = await pagina(browser);
   await page.goto(`${base}/painel/`);
   await page.click('.nav button[data-aba=catalogo]');
-  await page.waitForSelector('.cat-bloco');
-  await page.locator('.cat-bloco:has-text("MAMOGRAFIA") summary').click();
+  await page.waitForSelector('.cat-bloco'); await abrirOutros(page);
+  await page.locator('.cat-bloco:has-text("MAMOGRAFIA") > summary').click();
   const amil = await page.locator('.cat-bloco:has-text("MAMOGRAFIA") tr:has-text("AMIL")').innerText();
   const marinha = await page.locator('.cat-bloco:has-text("MAMOGRAFIA") tr:has-text("MARINHA")').innerText();
   const brad = await page.locator('.cat-bloco:has-text("USG") tr:has-text("BRADESCO")').innerText();
@@ -128,7 +129,7 @@ await caso('busca e filtro "só com alerta" chamam o banco com os parâmetros ce
   const { page, ctx, reg } = await pagina(browser);
   await page.goto(`${base}/painel/`);
   await page.click('.nav button[data-aba=catalogo]');
-  await page.waitForSelector('.cat-bloco');
+  await page.waitForSelector('.cat-bloco'); await abrirOutros(page);
   await page.selectOption('select[aria-label="Mostrar"]', 'alerta');
   await page.waitForFunction(() => document.querySelectorAll('.cat-bloco').length === 2);
   await page.fill('input[aria-label="Procurar exame"]', 'usg');
@@ -143,9 +144,9 @@ await caso('busca e filtro "só com alerta" chamam o banco com os parâmetros ce
 const abrir = async (page, nome) => {
   await page.goto(`${base}/painel/`);
   await page.click('.nav button[data-aba=catalogo]');
-  await page.waitForSelector('.cat-bloco');
+  await page.waitForSelector('.cat-bloco'); await abrirOutros(page);
   const d = page.locator(`.cat-bloco:has-text("${nome}")`);
-  if (!(await d.evaluate((e) => e.open))) await d.locator('summary').click();
+  if (!(await d.evaluate((e) => e.open))) await d.locator(':scope > summary').click();
   return d;
 };
 
@@ -204,9 +205,9 @@ await caso('linha sem preço: ligar abre o campo de valor; corrigir e salvar gra
   page.on('dialog', (dl) => dl.accept());
   await page.goto(`${base}/painel/`);
   await page.click('.nav button[data-aba=catalogo]');
-  await page.waitForSelector('.cat-bloco');
+  await page.waitForSelector('.cat-bloco'); await abrirOutros(page);
   const d = page.locator('.cat-bloco:has-text("MAMOGRAFIA")');
-  await d.locator('summary').click();
+  await d.locator(':scope > summary').click();
   await d.locator('tr:has-text("MARINHA") input[role=switch]').click();
   const campo = d.locator('tr:has-text("MARINHA") input[aria-label="Valor que o chat informa"]');
   await campo.waitFor();
@@ -226,9 +227,9 @@ await caso('valor inválido não chega ao banco', async () => {
   page.on('dialog', (dl) => dl.accept());
   await page.goto(`${base}/painel/`);
   await page.click('.nav button[data-aba=catalogo]');
-  await page.waitForSelector('.cat-bloco');
+  await page.waitForSelector('.cat-bloco'); await abrirOutros(page);
   const d = page.locator('.cat-bloco:has-text("MAMOGRAFIA")');
-  await d.locator('summary').click();
+  await d.locator(':scope > summary').click();
   await d.locator('tr:has-text("MARINHA") input[role=switch]').click();
   const campo = d.locator('tr:has-text("MARINHA") input[aria-label="Valor que o chat informa"]');
   await campo.fill('1');
@@ -242,7 +243,7 @@ await caso('sub-aba "Limpeza e mudanças" continua mostrando o que já existia',
   const { page, ctx, reg } = await pagina(browser);
   await page.goto(`${base}/painel/`);
   await page.click('.nav button[data-aba=catalogo]');
-  await page.waitForSelector('.cat-bloco');
+  await page.waitForSelector('.cat-bloco'); await abrirOutros(page);
   await page.click('button.chip:text-is("Limpeza e mudanças")');
   await page.waitForSelector('.numeros .num');
   const txt = await page.locator('.pagina').innerText();

@@ -299,9 +299,9 @@ await caso('próximo passo: a conversa com exame em aberto mostra UMA decisão n
   await page.click('.itens .item:has-text("Maria Souza")'); await page.waitForSelector('.ex-caixa'); await page.waitForSelector('.proximo');
   const texto = await page.locator('#proximo').innerText();
   const botao = await page.locator('#proximo button').allInnerTexts();
-  const alturas = await page.evaluate(() => ({ msgs: document.getElementById('msgs').clientHeight, ctxMax: document.getElementById('contexto').clientHeight, janela: innerHeight }));
+  const alturas = await page.evaluate(() => ({ msgs: document.getElementById('msgs').clientHeight, ctxMax: document.getElementById('contexto').clientHeight, lado: document.getElementById('contexto').clientWidth >= 300, janela: innerHeight }));   // em tela larga o contexto vira coluna ao lado (CSS ~linha 303): só em tela estreita ele fica no alto e precisa ser baixo
   await ctx.close();
-  return { ok: botao.length === 1 && texto.length > 10 && alturas.msgs >= 90 && alturas.ctxMax <= alturas.janela * 0.2 && !reg.excecoes.length,
+  return { ok: botao.length === 1 && texto.length > 10 && alturas.msgs >= 90 && (alturas.lado || alturas.ctxMax <= alturas.janela * 0.2) && !reg.excecoes.length,
            detalhe: reg.excecoes[0] ?? `${texto.replace(/\n/g, ' / ')} | botão=${botao} | ${JSON.stringify(alturas)}` };
 });
 
