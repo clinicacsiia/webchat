@@ -75,6 +75,7 @@ async function pagina(browser, { papel = 'admin' } = {}) {
     else if (p.startsWith('/rest/v1/jornada_transicao')) corpo = TRANS;
     else if (p.startsWith('/rest/v1/v_jornada_quadro')) { if (false) { status = 404; corpo = { message: 'relation "v_jornada_quadro" does not exist' }; } else corpo = CARTOES; }
     else if (p.endsWith('/rpc/convenios_painel')) corpo = PAINEL;
+    else if (p.endsWith('/rpc/convenios_suspensos')) corpo = [];
     else if (p.endsWith('/rpc/convenio_eventos')) corpo = EVENTOS;
     else if (p.endsWith('/rpc/convenio_aviso_contagem')) corpo = { novos: EVENTOS.length, relevantes: 1 };
     else if (p.endsWith('/rpc/convenio_salvar')) { reg.rpcs.push({ rpc: 'convenio_salvar', ...JSON.parse(req.postData() || '{}') }); corpo = { ok: true, ativo: false, em_andamento: 2 }; }
@@ -100,7 +101,7 @@ const srv = await servidor();
 const base = `http://127.0.0.1:${srv.address().port}`;
 const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH, args: ['--no-sandbox'] } : {});
 
-await caso('administrador vê a aba Convênios com selo, avisos e os dois convênios', async () => {
+await caso('administrador vê a aba Convênios, a suspensão temporária e os dois convênios (o selo de novidades saiu com o bloco "O que mudou", #96)', async () => {
   const { page, ctx, reg } = await pagina(browser);
   await page.goto(`${base}/painel/`);
   await page.waitForSelector('.nav button[data-aba=convenios]');
@@ -109,9 +110,9 @@ await caso('administrador vê a aba Convênios com selo, avisos e os dois convê
   await page.click('.nav button[data-aba=convenios]');
   await page.waitForSelector('.cv-cartao');
   const nomes = (await page.locator('.cv-cartao h3').allInnerTexts()).join();
-  const aviso = await page.locator('.cv-ev').innerText();
+  const susp = await page.locator('#secSuspensos').innerText();   // o bloco "O que mudou…" foi removido de propósito (#96); entrou a suspensão temporária
   await ctx.close();
-  return { ok: reg.excecoes.length === 0 && nomes === 'HAPVIDA,AMIL,Particular' && /CONSULTA/.test(aviso) && selo === '1', detalhe: `${nomes} | selo=${selo} | ${reg.excecoes.join(';')}` };
+  return { ok: reg.excecoes.length === 0 && nomes === 'HAPVIDA,AMIL,Particular' && /Suspensão temporária/.test(susp) && /Suspender por 1 mês/.test(susp), detalhe: `${nomes} | selo=${selo} | ${reg.excecoes.join(';')}` };
 });
 
 await caso('atendente não vê a aba Convênios', async () => {

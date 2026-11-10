@@ -3145,6 +3145,26 @@ h1.longo { font-size: 14mm; }
     if (data && data.ativo === false && data.em_andamento) toast(`${data.em_andamento} conversa(s) em andamento já tinham escolhido este convênio: o atendente confere.`);
     return true;
   }
+  // CAT-01: suspensão temporária (1 mês para revisar; não reativa sozinha). TI e gerência. Nada é gravado no Klingo.
+  function secaoSuspensos(convenios, recarregar) {
+    const box = h('div', { class: 'cat-bloco', id: 'secSuspensos', style: 'margin:10px 0' }, h('b', {}, 'Suspensão temporária'), h('p', { class: 'sub' }, 'Carregando…'));
+    db.rpc('convenios_suspensos').then(({ data, error }) => {
+      if (error) { box.replaceChildren(h('b', {}, 'Suspensão temporária'), h('p', { class: 'sub' }, 'Só TI e gerência suspendem convênios.')); return; }
+      const sel = h('select', { id: 'suspConv', 'aria-label': 'Convênio a suspender' }, h('option', { value: '' }, 'Escolha o convênio…'), convenios.map((x) => h('option', { value: x.operadora }, x.operadora)));
+      const mot = h('input', { type: 'text', id: 'suspMotivo', maxlength: '300', placeholder: 'Motivo (só a equipe vê)', 'aria-label': 'Motivo da suspensão' });
+      const ir = async (rpc, args, ok) => { const r = await db.rpc(rpc, args); toast(r.error ? msgErro(r.error) : ok); if (!r.error) recarregar(); };
+      box.replaceChildren(h('b', {}, 'Suspensão temporária'),
+        h('p', { class: 'sub' }, 'O paciente não consegue escolher o convênio suspenso e recebe o aviso de "temporariamente suspenso por decisão administrativa", com a oferta de outro. Depois de 1 mês a gestão recebe um aviso para revisar; a suspensão não termina sozinha.'),
+        (data || []).length ? h('ul', { style: 'list-style:none;padding:0' }, data.map((x) => h('li', { style: 'padding:6px 0;display:flex;gap:8px;flex-wrap:wrap;align-items:center' },
+          h('b', {}, x.operadora), x.revisar_agora ? h('span', { class: 'cv-tag av' }, 'Revisar agora') : h('span', { class: 'q-chip' }, 'revisar em ' + fmtDataHora(x.revisar_em)),
+          h('span', { class: 'sub-lista' }, `${x.motivo || 'sem motivo'}${x.por ? ' · por ' + x.por : ''}`),
+          h('button', { class: 'btn', type: 'button', onclick: () => ir('convenio_renovar', { p_operadora: x.operadora }, 'Suspensão renovada por mais 1 mês.') }, 'Renovar 1 mês'),
+          h('button', { class: 'btn prim', type: 'button', onclick: () => { if (confirm(`Reativar ${x.operadora}? O paciente volta a poder escolher este convênio.`)) ir('convenio_reativar', { p_operadora: x.operadora }, 'Convênio reativado.'); } }, 'Reativar')))) : h('p', { class: 'sub' }, 'Nenhum convênio suspenso.'),
+        h('div', { class: 'cv-acoes', style: 'display:flex;gap:8px;flex-wrap:wrap' }, sel, mot,
+          h('button', { class: 'btn perigo', type: 'button', id: 'btnSuspender', onclick: () => { if (!sel.value) { toast('Escolha o convênio.'); return; } if (confirm(`Suspender ${sel.value} por 1 mês?`)) ir('convenio_suspender', { p_operadora: sel.value, p_motivo: mot.value.trim() || null }, 'Convênio suspenso.'); } }, 'Suspender por 1 mês')));
+    });
+    return box;
+  }
   async function viewConvenios(c) {
     c.replaceChildren(h('div', { class: 'pagina' }, h('h2', {}, 'Convênios'), h('p', { class: 'sub' }, 'Carregando…')));
     const p = await db.rpc('convenios_painel');
@@ -3235,6 +3255,7 @@ h1.longo { font-size: 14mm; }
     const off = lista.filter((x) => !x.ativo).length, comRegra = lista.filter((x) => x.um_por_vez || x.aviso).length;
     c.replaceChildren(h('div', { class: 'pagina' }, h('h2', {}, 'Convênios'),
       h('p', { class: 'sub' }, 'Ligue ou desligue um convênio inteiro, escreva a mensagem e a regra de cada um e acompanhe preço e procura. Vale na hora para quem ainda vai escolher o convênio no chat.'),
+      secaoSuspensos(lista.filter((x) => !/^particular/i.test(x.operadora)), recarregar),
       h('div', { class: 'numeros' },
         h('div', { class: 'num' }, h('b', {}, lista.length - off), h('span', {}, 'convênios ativos')),
         h('div', { class: 'num' }, h('b', {}, off), h('span', {}, 'desativados')),
