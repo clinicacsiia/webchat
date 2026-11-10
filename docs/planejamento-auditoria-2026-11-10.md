@@ -388,3 +388,84 @@ Testes de regressão obrigatórios em cada etapa: `test:encerramento*`, `test:au
 - Estrutura: `information_schema.columns`, `pg_policies`, `pg_trigger`, `pg_roles`, `cron.job`, `pg_get_functiondef` de `conversa_antes_update`, `conversa_status_mudou`, `papel_atual`, `chat_iniciar`, `agenda_horarios`.
 - Contagens: `conversas` por status, datas de abertura/fechamento; `conversa_encerramento` por motivo/origem; `autoencerramento_execucao`; `incidente_chat` por tipo/chamada/código; `pre_agendamentos` × motivo de encerramento; `paciente_klingo_vinculo` por situação; conversas por atendente (nomes da equipe, não de pacientes).
 - Incidente AGE-06: `incidente_chat` filtrado pelo código (campos técnicos: chamada, status, tempo, código do erro).
+
+---
+
+## FASE 8 (atualização) — Decisões do dono e conflitos encontrados (10/11/2026, versão 1.1)
+
+Somente o que o dono preencheu vale como decisão. Esta seção confronta cada decisão com o código e o banco real (leituras e contagens; nenhum dado de paciente lido). **Nada foi implementado.**
+
+### A. Decisões registradas (como entendidas)
+
+| Q | Decisão | Efeito no plano |
+|---|---|---|
+| Q-01 | Entrada = data do **primeiro atendimento humano**. Conclusão = data/hora **real** do encerramento. Dia já apurado: **congelado, sem ajustes**. Dia concluído não pode "perder" ou "ganhar" conclusão depois; o que reabriu volta a **em andamento** | IND-01/04/05, MON-02 |
+| Q-02 | Remover **coluna e cartão** "Confirmaram" | IND-03 |
+| Q-03 | **No máximo 1 conversa por paciente/dia**; pessoas = pacientes únicos | IND-05 (ver C-1) |
+| Q-04 | Transferência **reinicia** as 24 h; sem novo estado "aguardando processo interno"; mensagem do paciente depois do fechamento **reabre até 7 dias**, depois cria nova; atendente avisado por **notificação no painel + registro na conversa**; exceção de exame/remarcação: **"escolha a melhor"** (ver C-4) | CONV-01/02 |
+| Q-05 | **Sempre** encerrar a anterior e abrir outra, **com texto de confirmação** ao paciente | CONV-03 (ver C-5) |
+| Q-06 | Falha foi no Atendimento **e** na Jornada (sem ligação). Atualização do Klingo → **30 s**; nunca duas leituras ao mesmo tempo; erro → tenta de novo após 30 s | AGE-01/03, CONV-06 (ver C-6) |
+| Q-07 | Correção foi **no Klingo**; autorizada análise só por **ID técnico** | AGE-01 (falta o ID) |
+| Q-08 | Antes de oferecer horários, conferir que estão livres; **reserva de 2 min**; horário marcado no Klingo some em **≤ 30 s**; ler ocupação **também à noite** | AGE-04 (ver C-6) |
+| Q-09 | Marcar teste: **só TI e gerência**. Antigas: **por regra automática** — "conversas atendidas ou encerradas por Alisson" | Etapa 0 (ver C-2, C-3) |
+| Q-10 | No início do atendimento, **caixa separada** em que o paciente declara estar ciente de que os horários são **previsão** e que a equipe confirma | AGE-07 (ver C-10) |
+| Q-11 | Supervisora = **Carla Adrielle (admin)**; criar contas para **Juliana e Luzia**; Jonathan = **administrador técnico geral**; distribuição das atendentes: **sem resposta útil** (ver C-7) | PERF-01 |
+| Q-12 | Pediatria = **Desenvoar**; Luzia = **CSI**; Call Center = **equipe transversal** | PERF-01 |
+| Q-13 | Atendente vê **só as unidades dela**; "Precisam de atenção" = **visão geral para todos**; sem unidade → **triagem do Call Center**; Marketing **como hoje** | PERF-02 (ver C-8) |
+| Q-14 | Nova seção **"Estrutura"** dentro da aba **Equipe** (a aba "Guia" não existe) | PERF-03 |
+| Q-15 | Reconhecimento automático: origens **separadas** (sistema × atendente), ambas nos indicadores | MON-01/03 (ver C-9) |
+| Q-16 | **Parcial.** Trava no **chat do paciente** na escolha de horário (time out) ou depois de muito tempo parado; Windows, Chrome/Edge. Falta nº de conversas | MON-04 (ver C-11) |
+| Q-17 | Gerência e administrativo suspendem; **1 mês**, depois **aviso de revisão**; convênio aparece esmaecido com o aviso entre parênteses, **não selecionável**; oferecer outro | CAT-01 |
+| Q-18 | Preço particular = **tabela fixa revisada manualmente**; sem preço → **"sob consulta"** | CAT-02 (ver C-13) |
+| Q-19 / Q-20 | **Não desenvolver** lembretes anuais nem aniversário | **REL-01 e REL-02 saem do plano** |
+| Q-21 | **Manter 3 s**, otimizar; o chat **aguarda a chamada anterior** antes de pedir outra; **pode-se criar mais consultas/índices** para acelerar | AGE-06 |
+
+### B. Conflitos e riscos (nada foi decidido em silêncio)
+
+**C-1 — Q-03 × Q-05 × Q-01 (contagem).** Q-05 cria, de propósito, várias conversas do mesmo paciente no mesmo dia; hoje já há **29** combinações contato+dia com 2 ou mais conversas. Q-03 pede 1 por paciente/dia. E "entrada = primeiro atendimento humano" deixa de fora **39 de 196 conversas (20%)** que nunca tiveram mensagem de pessoa (4 abertas, 35 encerradas). *Recomendação:* "entrada" = 1 por paciente por dia (dia do primeiro atendimento humano); mostrar **separado, só informativo**: conversas brutas abertas, conversas sem atendimento humano e reaberturas.
+
+**C-2 — Q-01 (congelamento) × Q-09 (teste retroativo).** Marcar testes depois de congelar mudaria dias fechados. *Recomendação:* classificar os testes **antes** do primeiro congelamento (a "linha de base" já sai limpa) e, depois dele, marcação de teste **não altera** dia fechado (fica só o registro). Erro de regra descoberto depois só corrige com exceção registrada por TI + gerência (guardando `versao_regra`). "Sem ajustes" integral impede qualquer correção; confirmar se a exceção é aceita.
+
+**C-3 — Q-09 (regra "Alisson").** A regra pega **29 de 196** conversas (dono/encerrou 26, respondeu 10, encerrou algum fechamento 9). **3** têm também mensagens de outras pessoas e **1** está unida a uma conversa de outra pessoa (testes e atendimento real misturados). Dúvidas: (a) vale só para o passado ou **daqui para frente** também? (b) conversa mista é teste inteira? (c) "TI e gerência" **ainda não existem como papel** — até PERF-01, quem marca? *Recomendação:* aplicar a regra só ao passado, **conferindo a lista de 29 com você antes de gravar**, e marcação futura manual por TI/gerência.
+
+**C-4 — Q-04 (exceção a escolher).** *Recomendação:* o **exame em aberto deixa de impedir** o fechamento por inatividade (o exame vive na Jornada, e desde 09/11 a equipe já encerra com exame aberto); **remarcação pendente continua impedindo** (o paciente está no meio de um fluxo). Hoje só 1 conversa aberta tem exame em aberto. Também conflita com Q-05: o fluxo de remarcação **abre conversa nova de propósito** (`agendamento_preparar_remarcacao`), e "sempre encerrar a anterior" não pode quebrar isso.
+
+**C-5 — Q-05 × "uma pessoa, uma conversa" e segurança.**
+1. Hoje o sistema **une** conversas da mesma pessoa; Q-05 passa a **encerrar**. As encerradas continuam ligadas no histórico (sem mover mensagem).
+2. **Risco de segurança:** `chat_iniciar` só sabe o telefone digitado. Perguntar/encerrar "a conversa anterior" por telefone permitiria a qualquer pessoa **fechar o atendimento de outra** (e revelaria que há atendimento). *Recomendação:* a confirmação só aparece se **este aparelho** já guarda a conversa aberta (o chat já guarda as últimas 5 por aparelho) ou se a conta estiver logada. Fora disso, abre conversa nova sem tocar na do telefone.
+3. Conversa **em atendimento por pessoa** fechada pelo paciente: o atendente precisa ser avisado; motivo/origem novos (`nova_conversa`, origem `paciente`).
+4. Sem confirmar → continua na conversa atual (a palavra "sempre" fica condicionada à confirmação, como você pediu).
+
+**C-6 — Q-08 × Q-21 × Q-06 (Klingo em 30 s e checagem antes de oferecer).**
+- Conferir no **Klingo ao vivo** dentro do chat é **inviável em 3 s**: nas últimas 4 h as leituras do Klingo levaram em média **2,5–3,6 s** e no máximo **8,6 s** (≈1.000 chamadas da conferência).
+- Hoje: ocupação a cada **10 min** (05h–22h); Jornada a cada **1 min** no expediente; conferência de alvos a cada 15 s.
+- *Recomendação:* (a) reserva provisória de **2 min** no banco entre oferecer e escolher; (b) releitura da ocupação a cada **30 s** só dos dias/profissionais em jogo, 24 h por dia com intervalo maior à noite; (c) Jornada de 1 min para 30 s; (d) trava persistente de "leitura em andamento" (o `pg_try_advisory_xact_lock` atual só protege o disparo, não a Edge Function que demora vários segundos), com nova tentativa 30 s depois do erro. **Efeito:** cerca do dobro de chamadas ao Klingo; medir antes de ligar. "Até 30 s depois de Agendado" só vale se a releitura for de 30 s; marcações feitas direto no Klingo dependem dela.
+
+**C-7 — Q-11 (hierarquia).** "Distribuição das atendentes: Supervisora" não traz nomes: **falta quem atende sob Carla Adrielle e sob Luzia**, e quem é do Call Center. Hoje existem só 5 contas (Alisson, Jonathan e Carla Adrielle = admin; Carla Fernandes e Aimê Brito = atendente). **Carla Adrielle é `admin`**: para a supervisão valer, o papel dela teria de deixar de ser administrador — **alteração de permissão que só faço com sua autorização**. Juliana e Luzia não têm conta; criação só com seu aval e e-mails.
+
+**C-8 — Q-13 (visibilidade).**
+- "Precisam de atenção" para todos **expõe conversa de outra unidade**. *Recomendação:* outras unidades aparecem só como **contagem/alerta sem nome nem mensagem**; abrir exige pertencer à unidade.
+- Marketing "como hoje": hoje a regra de leitura de `conversas` libera **qualquer papel ativo, inclusive Marketing**. Manter contatos e exportação, mas **tirar a leitura de conversas** do Marketing? Confirmar.
+- Dados: **40 conversas sem unidade** (5 abertas) irão para a triagem do Call Center; as outras são Desenvoar (149) e CSI (7). Se a restrição ligar antes dos vínculos, **ninguém vê nada** → entra em **modo observação** primeiro.
+
+**C-9 — Q-15.** Hoje: 29 pedidos agendados com marca automática (`agendado_auto_em`) e 4 sem. O **nome de quem confirmou manualmente não é gravado em lugar nenhum**. Passa a ser gravado daqui para frente; o passado fica como "equipe (sem nome)".
+
+**C-10 — Q-10.** Já existem avisos de "previsão" no chat (`index.html` ~linhas 834, 1346), mas **sem aceite**. O aceite novo vira coluna nova em `conversas` com data/hora e parâmetro novo em `chat_iniciar`. Como o chat é PWA com cache, o servidor aceita a ausência por alguns dias para não quebrar aparelho com versão antiga. O texto exato precisa de aprovação.
+
+**C-11 — Q-16.** O relato descreve o **chat do paciente** (time out na escolha de horário; demora) e não o "travamento da visualização por atendente" da solicitação original — **esse segue sem reprodução**. O time out é o mesmo do AGE-06. "Muito tempo parado" é compatível com aba em segundo plano e chamadas sobrepostas (houve `chat_listar` de 8 a 35 s); não encontrei no `index.html` trava que impeça nova chamada com outra em andamento (verificar na implementação).
+
+**C-12 — Q-17.** "Administrativo" não é papel hoje (existe `admin`). Interpretei "1 mês + aviso de revisão" como: aos 30 dias **vira alerta** para revisar, **não reativa sozinho**.
+
+**C-13 — Q-18.** A tabela revisada à mão existe (`catalogo_preco_revisao`), mas tem **1 linha em 2.152 procedimentos**: quase tudo apareceria "sob consulta" até a equipe revisar. Falta saber **onde** aparece (para o paciente ou só na aba Catálogo da equipe). Hoje a IA/motor não informa preço; quem informa é o atendente.
+
+### C. Ajustes no plano
+
+- **Sai do plano:** REL-01 e REL-02 (Etapa E reduzida a CAT-01 e CAT-02).
+- **Etapa 0 (nova):** eventos da conversa + marcador de teste + **classificação conferida de teste antes do primeiro congelamento**.
+- **Etapa A:** ganha a trava de leitura única do Klingo, a releitura de 30 s e o "aguardar a chamada anterior" no chat.
+- **Etapa B:** começa com **modo observação** das permissões; só liga depois de conferir os vínculos.
+- **Pedido de dado:** para AGE-01 falta o **ID técnico** do caso real (código `CSI-...` ou id da conversa; não é dado pessoal).
+
+### D. Próxima pergunta (uma por vez)
+
+**C-1:** aceita "entrada = 1 por paciente por dia (dia do primeiro atendimento humano)" e as conversas **sem atendimento humano** (20% hoje) aparecendo **separadas, só informativas**?
