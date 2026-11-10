@@ -529,6 +529,17 @@ Se o paciente pede uma conversa nova e o aparelho guarda uma conversa **que não
 
 **Ainda NÃO decidido (não será implementado até resposta):** conversa guardada que já está **encerrada** — encerrada há até 7 dias e há mais de 7 dias.
 
-### H. Próxima pergunta (uma por vez)
+### H. Conversa ENCERRADA no aparelho — DECIDIDO pelo dono (10/11/2026)
 
-Para conversa guardada **já encerrada**, vale a mesma tela de duas opções quando foi encerrada há **até 7 dias** ("voltar ao tema anterior", que reabre, ou "nova conversa", sem precisar encerrar nada), e vai **direto para a conversa nova**, sem tela, quando passou de 7 dias?
+- **Encerrada há até 2 dias:** o chat mostra a mesma tela de duas opções ("voltar ao tema anterior", que reabre, ou "nova conversa", sem encerrar nada porque já está encerrada).
+- **Encerrada há mais de 2 dias:** a conversa antiga **fica encerrada**; o paciente vai direto para a conversa nova (a antiga continua consultável em "Conversas anteriores").
+
+Com isso o **C-5 está fechado**: só no aparelho que guarda a conversa; aberta → voltar ou encerrar e abrir nova; encerrada ≤ 2 dias → voltar ou nova; encerrada > 2 dias → nova.
+
+**Conflito com a Q-04 (não resolvido em silêncio):** a Q-04 diz que mensagem do paciente após o **encerramento automático** reabre a conversa por até **7 dias**. A janela nova é de **2 dias**. Entre 2 e 7 dias o paciente ainda poderia reabrir a antiga se escrever nela (por "Conversas anteriores", por aviso ou por link).
+
+### I. Próxima pergunta (uma por vez)
+
+Qual janela de reabertura vale daqui para frente?
+- **A.** Duas janelas: **2 dias** para a tela de escolha no aparelho e **7 dias** (Q-04) para reabrir ao escrever numa conversa antiga encerrada automaticamente.
+- **B (recomendo).** **Uma janela única de 2 dias** para tudo: passou disso, a conversa antiga fica encerrada de vez e escrever exige uma conversa nova (com a opção "ver a conversa anterior"). Regra única, e os indicadores ficam mais simples (menos reabertura de conversa de dias congelados).
