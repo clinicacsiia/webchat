@@ -503,6 +503,24 @@ Como o plano trata isso (a confirmar no desenho):
 - **Congelamento (Q-01):** motivo e contagem congelam com o dia.
 - **Dependências:** `conversa_evento` (Etapa 0) com campos de motivo; mudança em `index.html` (tela nova) e `chat_iniciar` (parâmetros novos, opcionais por alguns dias por causa do cache do PWA).
 
-### F. Próxima pergunta (uma por vez)
+### F. C-5 RESOLVIDO em parte pelo dono (10/11/2026): só vale no aparelho que guarda a conversa
 
-**C-5 (segurança):** a tela "você já falou conosco hoje" e o encerramento da conversa anterior devem aparecer **somente quando este aparelho já guarda essa conversa** (ou a conta estiver logada)? Quem digitar um telefone que tem conversa aberta em **outro aparelho** abre uma conversa nova **sem fechar nem revelar** a outra (o agrupamento de pessoa liga as duas depois).
+**Decidido:** a tela de escolha só aparece quando **este aparelho já guarda a conversa** anterior. Quem digita um telefone de conversa que está em outro aparelho **não** vê nada dela e não a fecha.
+
+**Fluxo descrito pelo dono:** se o paciente tenta iniciar uma conversa nova, ele **volta para a antiga** e lá escolhe entre (1) **voltar ao tema anterior** ou (2) **seguir para uma nova**. Ao escolher a nova, o chat **informa que a antiga será encerrada e que vamos abrir outra**.
+
+**O que existe hoje (FATO, `index.html`):**
+- O aparelho guarda a conversa em `localStorage` (`CHAVE_CONVERSA`) e **já abre direto nela** (inclusive encerrada, mostrando "Atendimento encerrado" e a despedida). O formulário inicial só aparece quando não há conversa guardada.
+- O menu "Nova conversa" (`novaConversa`, linha ~1227) só pergunta `confirm('Fazer um novo pedido? Este continua em "Conversas anteriores"...')`, **apaga a conversa do aparelho e abre o formulário**. **Nenhuma chamada ao servidor e a conversa antiga NÃO é encerrada.** É daí que vêm os casos de 2 conversas abertas da mesma pessoa (hoje 4 contatos).
+- A mesma ação existe em "Fazer um novo pedido" (botão dentro da conversa) e em `proximoFilho` (outro filho).
+
+**Mudança proposta (substitui o `confirm` por uma tela de duas opções):**
+- **Voltar ao tema anterior** → continua na conversa antiga (se estiver encerrada há até 7 dias, é reaberta por mensagem, como na Q-04).
+- **Nova conversa** → aviso "a conversa anterior será encerrada e vamos abrir uma nova; o histórico fica salvo" → pergunta do motivo da reentrada (seção E) quando for do mesmo dia → formulário. O servidor encerra a antiga (motivo `nova_conversa`, origem `paciente`) **na mesma chamada que cria a nova** (uma instrução só, sem deixar as duas abertas), e avisa o atendente se ela estava em atendimento.
+- Outro filho (`proximoFilho`) **fica de fora**: é a mesma pessoa agendando para outra criança, não uma reentrada.
+
+**Ponto ainda ambíguo (a pergunta abaixo):** a frase do dono diz "ela **já esteja encerrada**" e, em seguida, "a antiga **será encerrada**".
+
+### G. Próxima pergunta (uma por vez)
+
+A tela de escolha vale para quais estados da conversa guardada no aparelho?
