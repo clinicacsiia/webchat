@@ -11,7 +11,7 @@
 --   * Dia FECHADO (ind_fechamento) vem das tabelas congeladas; nada altera ou apaga (gatilho). Enquanto config.indicadores_fechar = 'nao', nenhum dia é congelado e tudo é calculado ao vivo.
 -- Unidade desconhecida (sem unidade para a pessoa) aparece em TODAS as unidades (regra de ouro do painel).
 -- ROLLBACK: drop function public.painel_indicadores_v2(date, date, text, boolean), public.painel_indicadores_jornada_v2(date, date, text, boolean), public.ind_fechar_pendentes(), public.ind_fechar_dia(date),
---           public.ind_calc_pessoas(date, date), public.ind_calc_conclusoes(date, date), public.ind_calc_semhumano(date, date); (as tabelas ind_* podem ficar)
+--           public.ind_calc_pessoas(date, date), public.ind_calc_conclusoes(date, date), public.ind_calc_semhumano(date, date), public.painel_indicadores_extras_v2(date, date, text, boolean); (as tabelas ind_* podem ficar)
 
 insert into public.config (chave, valor) values ('indicadores_fechar', 'nao') on conflict (chave) do nothing;
 
@@ -281,6 +281,42 @@ begin
 end $$;
 revoke all on function public.painel_indicadores_jornada_v2(date, date, text, boolean) from public, anon;
 grant execute on function public.painel_indicadores_jornada_v2(date, date, text, boolean) to authenticated;
+
+-- ===== Extras do painel: conversas por hora de início e avaliações (só administrador), com o mesmo período, unidade e regra de teste =====
+create or replace function public.painel_indicadores_extras_v2(p_de date default null, p_ate date default null, p_unidade text default null, p_incluir_teste boolean default false) returns jsonb
+language plpgsql stable security definer set search_path to '' as $$
+declare
+  v_ate date := least(coalesce(p_ate, (now() at time zone 'America/Sao_Paulo')::date), (now() at time zone 'America/Sao_Paulo')::date);
+  v_de date;
+  v_un text := case when lower(coalesce(p_unidade, '')) in ('csi', 'rmtc', 'desenvoar') then lower(p_unidade) end;
+  v_admin boolean := coalesce((select public.papel_atual()), '') = 'admin';
+  v_out jsonb;
+begin
+  if coalesce((select public.papel_atual()), '') not in ('admin', 'atendente') then
+    raise exception 'Somente administrador e atendente veem os indicadores.' using errcode = '42501';
+  end if;
+  v_de := greatest(coalesce(p_de, v_ate - 6), v_ate - 400);
+  if v_de > v_ate then v_de := v_ate; end if;
+  with pu as (select x.conversa_id from public.painel_conversa_pessoa_un() x
+               where v_un is null or x.chaves is null or cardinality(x.chaves) = 0 or v_un = any (x.chaves)),
+  h as (select extract(hour from c.criado_em at time zone 'America/Sao_Paulo')::integer as hora, count(*) as n
+          from public.conversas c join pu on pu.conversa_id = c.id
+         where (p_incluir_teste or not c.teste) and (c.criado_em at time zone 'America/Sao_Paulo')::date between v_de and v_ate group by 1),
+  av as (select a.nota_atendimento, a.nota_site, a.canal
+           from public.avaliacao_atendimento a join public.conversas c on c.id = a.conversa_id join pu on pu.conversa_id = c.id
+          where (p_incluir_teste or not c.teste) and (a.criado_em at time zone 'America/Sao_Paulo')::date between v_de and v_ate)
+  select jsonb_build_object(
+    'por_hora', coalesce((select jsonb_agg(jsonb_build_object('hora', h.hora, 'conversas', h.n) order by h.hora) from h), '[]'::jsonb),
+    'avaliacoes', case when v_admin then jsonb_build_object(
+        'total', (select count(*) from av),
+        'media_atendimento', (select round(avg(nota_atendimento)::numeric, 1) from av),
+        'media_site', (select round(avg(nota_site)::numeric, 1) from av),
+        'por_canal', coalesce((select jsonb_object_agg(m.canal, m.n) from (select canal, count(*) as n from av group by canal) m), '{}'::jsonb)) end
+  ) into v_out;
+  return v_out;
+end $$;
+revoke all on function public.painel_indicadores_extras_v2(date, date, text, boolean) from public, anon;
+grant execute on function public.painel_indicadores_extras_v2(date, date, text, boolean) to authenticated;
 
 -- ===== Rotina diária (00:10 de Brasília = 03:10 UTC): só fecha dias quando config.indicadores_fechar = 'sim' =====
 do $$ begin

@@ -25,6 +25,7 @@ await db.exec(`
   create table public.jornada_paciente (prontuario text primary key, nome text, fone_chave text);
   create table public.pre_agendamentos (conversa_id uuid, klingo_marcacoes text[]);
   create table public.conversa_encerramento (id bigint generated always as identity primary key, conversa_id uuid, encerrada_em timestamptz, motivo text, origem text, por uuid);
+  create table public.avaliacao_atendimento (id bigint generated always as identity primary key, conversa_id uuid, nota_atendimento integer, nota_site integer, canal text, criado_em timestamptz not null default now());
   create table public.conversa_evento (id bigint generated always as identity primary key, conversa_id uuid, tipo text, em timestamptz not null default now());
   create function public.pessoa_ficha(p uuid) returns jsonb language sql as $$ select jsonb_build_object('nome', 'Maria Exemplo') $$;
   ${arq('fila-unidade.sql', 'unidade_chave').replace(/create or replace function public\.unidade_chave\(p text\)/, 'create or replace function public.unidade_chave(p text)')}
@@ -157,6 +158,17 @@ await caso('as tabelas congeladas não aceitam alterar, apagar nem esvaziar', as
 await caso('o resumo do fechamento guarda os números do dia (para comparar depois)', async () => {
   const r = (await db.query(`select resumo from public.ind_fechamento where dia = $1::date`, [diaBR(1)])).rows[0].resumo;
   return { ok: r.pessoas === 3 && r.reentradas === 2 && r.sem_humano === 1, detalhe: JSON.stringify(r) };
+});
+await caso('extras: conversas por hora de início (Brasília) e avaliações só para administrador, sem teste', async () => {
+  await jwt(ADMIN);
+  const c = await nova({ criada: ts(1, '08:15'), humano: ts(1, '08:20'), status: 'encerrada' });
+  await db.query(`insert into public.avaliacao_atendimento (conversa_id, nota_atendimento, nota_site, canal, criado_em) values ($1, 10, 8, 'Instagram', $2), ($3, 2, 2, 'Google', $2)`, [c, ts(1, '09:00'), t1]);
+  const r = (await db.query(`select public.painel_indicadores_extras_v2($1::date, $2::date, null, false) r`, [diaBR(1), diaBR(1)])).rows[0].r;
+  const h8 = r.por_hora.find((x) => x.hora === 8);
+  await jwt(ATEND);
+  const a = (await db.query(`select public.painel_indicadores_extras_v2($1::date, $2::date, null, false) r`, [diaBR(1), diaBR(1)])).rows[0].r;
+  await db.exec(`delete from public.avaliacao_atendimento`); await db.query(`delete from public.conversas where id = $1`, [c]);
+  return { ok: h8 && h8.conversas >= 2 && r.avaliacoes.total === 1 && Number(r.avaliacoes.media_atendimento) === 10 && r.avaliacoes.por_canal.Instagram === 1 && a.avaliacoes === null && Array.isArray(a.por_hora), detalhe: JSON.stringify(r.avaliacoes) };
 });
 await caso('permissão: atendente vê; quem não é da equipe é recusado (42501); anônimo não executa', async () => {
   await jwt(ATEND);
