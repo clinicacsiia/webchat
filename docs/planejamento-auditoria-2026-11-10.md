@@ -544,6 +544,98 @@ Com isso o **C-5 está fechado**: só no aparelho que guarda a conversa; aberta 
 
 Efeitos no plano: `chat_enviar`/`chat_responder` passam a recusar reabertura após 2 dias com mensagem clara; configuração única `config.reabrir_dias = 2` (em vez de dois valores); nenhum dia congelado é reaberto depois de 2 dias, o que simplifica o fechamento diário dos indicadores.
 
-### J. Próxima pergunta (uma por vez)
+### J. Conversas de teste — DECIDIDO pelo dono (10/11/2026) e revisão pedida
 
-**C-3 (conversas de teste, Etapa 0):** a regra "conversa atendida ou encerrada pelo Alisson é teste" deve valer **só para as conversas antigas**, com a lista das 29 que ela pega (só códigos técnicos, sem dados de paciente) **entregue a você para conferir antes de eu gravar qualquer marca**? Daqui para frente, a marcação seria manual por TI/gerência (hoje, até existirem esses papéis, só os administradores Alisson e Jonathan).
+**Regra de teste (vale para o passado e para o futuro):** é teste toda conversa que o **Alisson assumiu, respondeu, encerrou ou vier a assumir**, mais as marcadas manualmente por TI/gerência. O Alisson usa a conta dele para **testes e treinamento**.
+
+Como o plano trata (a confirmar no desenho):
+- Marca **permanente** (`conversas.teste`), gravada por gatilho quando o agente da conversa, o autor de uma mensagem de pessoa ou quem encerrou for um agente da lista `config.teste_agentes` (hoje só o Alisson; assim a regra não depende do nome e pode incluir outras contas de treinamento).
+- Só **TI e gerência** desmarcam (Q-09); toda marcação/desmarcação grava log (quem, quando).
+- Conversa de teste **fica no histórico** e some dos indicadores (aparece num contador "testes" à parte).
+- **Antes de gravar a marca no passado**, a lista das conversas pegas (só códigos técnicos) é conferida pelo dono; a marca nas antigas entra **antes do primeiro congelamento** (C-2).
+
+---
+
+## FASE 9 — Revisão de completude e conflitos (todas as mensagens, em ordem) — 10/11/2026
+
+Revisei, uma a uma: (1) o pedido original (seções 3 a 17), (2) as 21 decisões da Fase 8, (3) as respostas posteriores (modelo de reentrada, motivo, C-5, janela de 2 dias, teste). **Resposta direta: o plano ainda NÃO está completo.** Está sólido para as Etapas 0 e A; as Etapas B, C, D e E têm decisões e detalhes faltando. Nada abaixo foi implementado.
+
+### 9.1 Cobertura de cada requisito do pedido original
+
+Legenda: **Decidido** (resposta do dono) · **Parcial** (decidido com ponto em aberto) · **Pendente** (precisa decisão ou dado) · **Fora** (retirado pelo dono).
+
+| ID | Situação | O que falta |
+|---|---|---|
+| IND-01 | Parcial | C-1 resolvido; faltam C-14, C-15 e C-24 (abaixo) |
+| IND-02 | Decidido (por padrão) | Remover cartão e coluna "conversas por pessoa (média)": não houve pergunta; o pedido original já era explícito |
+| IND-03 | Decidido | Q-02 |
+| IND-04 | Parcial | Intervalo livre/dia/mês anterior: sem decisão contrária; depende de C-15 (pessoas únicas no intervalo) |
+| IND-05 | Parcial | "Novas jornadas" não foi definido; alinhar tabela da clínica (C-24) |
+| CONV-01 | Parcial | Q-04 decidida; exceção de exame/remarcação está **delegada a mim** (C-30); falta registro "só da equipe" (C-18) |
+| CONV-02 | Pendente | Texto da mensagem de inatividade **não existe**; precisa aprovar (C-25) |
+| CONV-03 | Parcial | Fluxo fechado (seções F a I); faltam C-20 e C-21 |
+| CONV-04 | Parcial | Sem decisão de tela; transferências antigas **não existem** no banco (só valem após a Etapa 0) |
+| CONV-05 | Pendente | Ao vivo × histórico: sem decisão de tela (não bloqueante) |
+| CONV-06 | Parcial | Q-06 respondida; causa ainda hipótese (ver Fase 3) |
+| AGE-01 | Parcial | **Falta o ID técnico do caso real** (Q-07 autorizou, mas o ID não veio) |
+| AGE-02 | Pendente | Quem pode vincular manualmente: **nunca perguntado** |
+| AGE-03 | Parcial | Estados "aguardando Klingo / confirmado / divergente" propostos, não aprovados |
+| AGE-04 | Parcial | Q-08 respondida, mas minha alternativa (C-6) **não foi confirmada** |
+| AGE-05 | Pendente | Sem decisão de tela |
+| AGE-06 | Decidido | Q-21 (manter 3 s, otimizar, uma chamada por vez, índices permitidos) |
+| AGE-07 | Decidido | Q-10 (aceite de "previsão"); texto a aprovar |
+| PERF-01 | Parcial | **Faltam os vínculos das atendentes** (C-7) e contas de Juliana e Luzia |
+| PERF-02 | Parcial | Q-13 decidida; matriz 4.5 **nunca foi aprovada**; conflitos C-16, C-17, C-22 |
+| PERF-03 | Decidido | Q-14 ("Estrutura" dentro de Equipe) |
+| PERF-04 | Parcial | Depende da matriz; "supervisor delega permissões" nunca perguntado |
+| MON-01 | Pendente | Lista de indicadores por nível não foi decidida (Etapa D) |
+| MON-02 | Parcial | Fechamento diário decidido (Q-01); estratégia ao vivo sem objeção |
+| MON-03 | Parcial | Q-15 (origem sistema × atendente); regra de atribuição 4.4 não aprovada |
+| MON-04 | Parcial | Q-16 só em parte; o travamento por atendente segue sem reprodução |
+| NOT-01 / NOT-02 | Pendente | **Nunca perguntado** (sino, silenciar, eventos de aviso) |
+| CAT-01 | Parcial | Q-17 (quem, 1 mês, aviso); "administrativo" não é papel hoje |
+| CAT-02 | Parcial | Q-18; falta onde aparece o preço e o impacto (1 de 2.152 revisados) |
+| TRANS-01 / TRANS-02 | Pendente | **Nunca perguntado** (quem autoriza, fila da unidade, regras do lote) |
+| REL-01 / REL-02 | Fora | Q-19 e Q-20 |
+| TEST (seção 12) | Parcial | Regra decidida (seção J); faltam contatos de teste e modo real (C-23) |
+
+### 9.2 Conflitos e lacunas novos encontrados na revisão
+
+| # | Achado | Recomendação |
+|---|---|---|
+| C-14 | **"Sem atendimento humano" × congelamento.** Conversa aberta às 23h50 e atendida às 08h do dia seguinte entra no indicador 3 do dia anterior (foto de fim de dia) e na entrada do dia seguinte | Rotular o indicador 3 como "sem atendimento humano até o fim do dia" (foto, não definitivo) |
+| C-15 | **Pessoas únicas no intervalo × fechamento diário.** Somar dias conta duas vezes quem veio em dois dias. Para "pacientes únicos no período" o fechamento precisa guardar **uma chave de pessoa por dia**, não só totais. Isso conflita com apagamento (LGPD) se a chave for imutável | Guardar chave **pseudonimizada** por dia; exclusão de conta/pedido de apagamento troca a chave por nulo sem mudar os totais |
+| C-16 | **Papéis.** `agentes.papel` só aceita `admin`, `atendente`, `marketing`; **59 funções e 43 políticas** dependem de `papel_atual()` (34 funções testam admin+atendente). Criar papéis novos mexe em tudo | **Manter o `papel` atual** e acrescentar o escopo em tabelas novas (`org_membro`). Carla Adrielle teria de passar de `admin` para `atendente` + função de supervisora: **só com sua autorização** |
+| C-17 | A aba **Equipe é só de administrador**. Gerente e supervisora precisam usar "Estrutura" | Abrir a seção "Estrutura" por escopo, mantendo o resto da aba como admin |
+| C-18 | **"Registro na conversa" para o atendente:** não há nota só da equipe. As mensagens `sistema` parecem seguir para o paciente (`chat_listar` não filtra por esse autor; confirmar na implementação) | Coluna de visibilidade em `mensagens` (equipe × paciente) |
+| C-19 | **Constraints:** `encerramento_origem` só aceita `equipe/sistema/inatividade` e `motivo_encerramento` só 5 valores (também em `conversa_encerramento`). "Paciente/nova conversa" exige alterar os `CHECK` | Migração aditiva dos `CHECK` |
+| C-20 | **Aba velha reabre conversa já fechada pelo paciente** (duas abas no mesmo aparelho) | Conversa encerrada por "nova conversa" não reabre por mensagem do paciente; só a equipe reabre |
+| C-21 | **Remarcação pendente/exame em aberto** ao escolher "nova conversa": a ligação (`remarcacao_conversa`) aponta para a conversa antiga | A conversa nova herda o pendente (reaproveitar `agendamento_preparar_remarcacao`) |
+| C-22 | **Transferência para outra unidade × visibilidade (Q-13):** a conversa some para quem transferiu | Aviso claro na tela e registro do destino; quem transferiu continua vendo no histórico próprio |
+| C-23 | **Testes que ninguém assumiu** (o Alisson só abriu como paciente) não pegam a regra e viram "sem atendimento humano". E se ele precisar atender **um paciente real**, a conversa vira teste e some | (a) "contato de teste" marcado por TI/gerência; (b) chave "modo teste" no perfil dele, ligada por padrão |
+| C-24 | A tabela da clínica ("pessoas novas no chat, primeiro contato") usa o **primeiro contato**; a nova entrada é o **primeiro atendimento humano** | Alinhar as duas tabelas à mesma data |
+| C-25 | Faltam textos: mensagem de inatividade (CONV-02), aviso de "previsão", telas de escolha, aviso do convênio suspenso | Redigir e submeter à aprovação antes de publicar |
+| C-26 | Klingo a cada 30 s ainda não foi confirmado como cabível (carga: ≈ o dobro de chamadas; leituras de 2,5 a 8,6 s) | Piloto medido antes de ligar (seção C-6) |
+| C-27 | **LGPD/retenção:** `incidente_chat` guarda aparelho e últimas chamadas; `conversa_evento` guardará todo o ciclo. Nenhum prazo de retenção definido | Definir prazo (sugiro 12 meses para incidentes) — não bloqueia |
+| C-28 | **Índices:** nenhum por data em `conversas`, `conversa_encerramento` e `mensagens`. Hoje o volume é pequeno; indicadores e fechamento diário vão filtrar por data | Criar `conversas(criado_em)`, `conversa_encerramento(encerrada_em)`, `mensagens(criado_em) where agente_id is not null` (Q-21 autoriza) |
+| C-29 | O pedido (seções 13.2 e 15) exige, por requisito, 10 campos e, por etapa, módulos/riscos/testes/conclusão. As Etapas B a E e a matriz estão resumidas | Completar depois das decisões pendentes |
+| C-30 | Q-04, exceção de exame/remarcação: o dono delegou ("ache a melhor solução") | Adoto minha recomendação (C-4: remarcação pendente impede; exame em aberto não) e confirmo na aprovação final |
+
+### 9.3 Testes que faltam no plano
+Jornada que não encerra após atualização do cadastro; formulário/pedido que não acompanha o encerramento; travamento por atendente (perfil de desempenho); aba velha reabrindo conversa (C-20); duas abas ao mesmo tempo; conversa de teste (Alisson assume, transfere para outra pessoa, desmarcar); fechamento diário com virada de dia; apagamento LGPD com chave pseudonimizada.
+
+### 9.4 Perguntas que ainda dependem de você (ordem de bloqueio)
+1. **Contatos de teste** (C-23a) ← próxima.
+2. Modo real do Alisson (C-23b).
+3. Confirmar a alternativa do Klingo (C-6 / C-26).
+4. Vínculos das atendentes e das contas de Juliana e Luzia (C-7); autorizar mudança de papel da Carla Adrielle (C-16).
+5. Quem vincula paciente manualmente (AGE-02); quem transfere e regras do lote (TRANS).
+6. Sino e avisos do paciente (NOT).
+7. ID técnico do caso do nome corrigido (AGE-01).
+8. Onde aparece o preço particular (CAT-02).
+9. Lista de indicadores por nível (MON-01).
+10. Textos (C-25).
+
+### 9.5 Próxima pergunta (uma por vez)
+
+**C-23a:** você quer marcar os telefones/e-mails que usa como **paciente de teste** como "contato de teste" (marcação feita por TI ou gerência), para que toda conversa iniciada por eles já nasça como teste, mesmo que ninguém assuma?
