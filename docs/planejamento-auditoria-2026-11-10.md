@@ -466,6 +466,24 @@ Somente o que o dono preencheu vale como decisão. Esta seção confronta cada d
 - **Etapa B:** começa com **modo observação** das permissões; só liga depois de conferir os vínculos.
 - **Pedido de dado:** para AGE-01 falta o **ID técnico** do caso real (código `CSI-...` ou id da conversa; não é dado pessoal).
 
-### D. Próxima pergunta (uma por vez)
+### D. C-1 RESOLVIDO pelo dono (10/11/2026) — modelo de três indicadores
 
-**C-1:** aceita "entrada = 1 por paciente por dia (dia do primeiro atendimento humano)" e as conversas **sem atendimento humano** (20% hoje) aparecendo **separadas, só informativas**?
+Nem "sim" nem "não": o dono definiu o modelo abaixo, que **substitui** a recomendação do C-1.
+
+| # | Indicador | Regra |
+|---|---|---|
+| 1 | **Pessoas únicas por dia** (principal) | 1 entrada por paciente/dia, no dia do **1º atendimento humano** |
+| 2 | **Reentradas** | Quantas vezes o mesmo paciente voltou **no mesmo dia** (conversa reaberta ou nova), e **o motivo**: falta de retorno ou outro assunto |
+| 3 | **Sem atendimento humano** | Painel/indicador **separado** (hoje 39 de 196 conversas, ≈20%); não entra no principal |
+
+Definições que o plano adota (a confirmar apenas o que estiver marcado):
+- **Reentrada** = toda conversa do mesmo paciente no mesmo dia **depois da primeira atendida por pessoa**, seja reabertura (Q-04, até 7 dias) ou conversa nova (Q-05). Não infla o indicador 1.
+- **Paciente cujas conversas do dia nunca tiveram pessoa:** vão inteiras para o indicador 3. Se a 1ª não teve pessoa e a 2ª teve, o paciente entra no indicador 1 e a 1ª fica no 3.
+- O nome "Robô" não é exato: as 39 incluem conversas que o paciente abandonou antes de qualquer resposta e 4 ainda em atendimento sem mensagem de pessoa. Sugiro o rótulo **"Sem atendimento humano"**.
+- **Motivo da reentrada:** não existe hoje em nenhum campo (o banco só sabe que houve outra conversa). Precisa de uma regra de captura (ver pergunta abaixo).
+- Congelamento: as reentradas de um dia também ficam congeladas junto com o dia (Q-01).
+- Implementação: depende de `conversa_evento` (Etapa 0), que passa a registrar `criada`, `assumida`, `reaberta` e `encerrada`; o histórico anterior é reconstruído de `mensagens` (mensagem de pessoa) e `conversa_encerramento`.
+
+### E. Próxima pergunta (uma por vez)
+
+**Como registrar o motivo da reentrada?** (decisão nova, necessária para o indicador 2)
