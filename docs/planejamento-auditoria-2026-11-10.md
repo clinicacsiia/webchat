@@ -659,3 +659,18 @@ Não haverá chave de modo teste. **O Alisson é TI e só faz teste; não atende
 3. A Jornada passa de 1 minuto para **30 s**.
 4. Nunca duas leituras ao mesmo tempo; se der erro, tenta de novo **30 s depois**.
 5. Antes de ligar, um **piloto medido** (a carga no Klingo dobra, mais ou menos).
+
+
+---
+
+## ERRATA (10/11/2026) — correção de uma afirmação minha
+
+**O que eu afirmei, e estava errado:** na Fase 1, na Fase 3 (AGE-04) e na pergunta C-6 eu disse que "escolhas de outros pacientes no chat ainda não marcadas no Klingo **não bloqueiam** o horário" e propus criar uma "reserva de 2 minutos".
+
+**O que realmente existe (conferido na definição de `agenda_horarios_klingo` e `agenda_reservas_provisorias` no banco real em 10/11/2026):** já há **reservas provisórias**. O horário escolhido no chat por **outro** paciente segura o horário (profissional e sala) enquanto o pedido está em: `pronto` até **48 h**; `rascunho` até **90 min** sem atividade; `agendado` mais **20 min** (até o relatório do Klingo mostrar a marcação). A trava `pg_advisory_xact_lock` não é a reserva; a reserva está na função de horários.
+
+**Consequências para o plano:**
+- **Não** será criada reserva de 2 minutos nem se encurtam as atuais (isso seria regressão). A "janela de 2 minutos" do Q-08 vale como tolerância de atraso do Klingo, que agora é coberta pela **leitura ao vivo**.
+- A causa provável do horário que continuava livre fica sendo: marcação feita **direto no Klingo** (pela recepção) que só chegava ao chat na rodada de 10 min, ou pedido que passou das janelas acima. A leitura ao vivo resolve os dois.
+- Os conflitos C-6 e C-26 são substituídos pela decisão do dono de **10/11/2026**: tudo o que o paciente vê de **dia, horário e médico é lido ao vivo no Klingo quando ele chega ao passo**, aceitando o maior número de chamadas; fora isso, só o **cadastro/confirmação** pelo atendente precisa ser ao vivo.
+- Observação: o dono escreveu "Tasy" na frase da confirmação; **não há Tasy no código**, tratei como Klingo.
