@@ -152,6 +152,37 @@ await caso('depois da primeira tela, os dias seguintes são conferidos em segund
   return { ok: faixas.length === 4 && nova && nova.slots.some((s) => s.hora === '11:00') && faixas[1] === `${mundo.dia(14)}..${mundo.dia(27)}`, detalhe: faixas.join(' ; ') };
 });
 
+await caso('na pergunta de médico, confere o Klingo e mostra o próximo horário de cada um (e quem está sem horário)', async () => {
+  const mundo = criarMundo();
+  mundo.medicos = [{ nome: 'DRA ANA', proximo: `${mundo.dia(2)} 08:30`, livres: 10 }, { nome: 'DR PEDRO', proximo: null, livres: 0 }];
+  const { page, ctx, erros } = await novaPaginaChat(browser, mundo, { init: TESTE() });
+  await comecarConversa(page, base);
+  mundo.inserir('agente', 'Tem preferência de médico?', { tipo: 'escolha', passo: 'medico', itens: [
+    { valor: '', rotulo: 'Tanto faz (qualquer médico)' }, { valor: 'DRA ANA', rotulo: 'Dra Ana' }, { valor: 'DR PEDRO', rotulo: 'Dr Pedro' }] });
+  await page.evaluate(() => dispatchEvent(new Event('online')));
+  await page.waitForFunction(() => [...document.querySelectorAll('#msgs .op')].some((b) => /Sem horário livre/.test(b.textContent)), null, { timeout: 8000 });
+  const textos = await page.$$eval('#msgs .op[data-valor]', (bs) => Object.fromEntries(bs.map((b) => [b.dataset.valor, b.textContent.replace(/\s+/g, ' ').trim()])));
+  const ordem = nomesChamadas(mundo);
+  await ctx.close();
+  return { ok: /Dra Ana.*Próximo horário: \w{3}, \d{2}\/\d{2} às 08:30/.test(textos['DRA ANA']) && /Dr Pedro.*Sem horário livre nos próximos dias/.test(textos['DR PEDRO'])
+      && !/Próximo|Sem horário|conferindo/.test(textos['']) && ordem.indexOf('fn:chat-agenda-ao-vivo') < ordem.indexOf('chat_medicos_disponiveis') && erros.excecoes.length === 0,
+    detalhe: JSON.stringify(textos) };
+});
+
+await caso('se a lista de médicos não puder ser conferida, os nomes ficam sem anotação (nada de texto "conferindo" preso)', async () => {
+  const mundo = criarMundo();
+  mundo.falhas.chat_medicos_disponiveis = { status: 500, corpo: { code: 'XX000', message: 'falha simulada' } };
+  const { page, ctx } = await novaPaginaChat(browser, mundo, { init: TESTE() });
+  await comecarConversa(page, base);
+  mundo.inserir('agente', 'Tem preferência de médico?', { tipo: 'escolha', passo: 'medico', itens: [{ valor: '', rotulo: 'Tanto faz' }, { valor: 'DRA ANA', rotulo: 'Dra Ana' }] });
+  await page.evaluate(() => dispatchEvent(new Event('online')));
+  await page.waitForFunction(() => !!document.querySelector('#msgs .op[data-valor="DRA ANA"]'), null, { timeout: 8000 });
+  await espera(1500);
+  const texto = await page.$eval('#msgs .op[data-valor="DRA ANA"]', (b) => b.textContent.trim());
+  await ctx.close();
+  return { ok: texto === 'Dra Ana', detalhe: texto };
+});
+
 await caso('o token e a conversa vão no corpo; nenhum dado de paciente é enviado à função', async () => {
   const mundo = criarMundo();
   const { page, ctx } = await novaPaginaChat(browser, mundo, { init: TESTE() });

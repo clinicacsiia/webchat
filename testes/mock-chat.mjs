@@ -127,6 +127,7 @@ export function criarMundo(opcoes = {}) {
       }
       case 'chat_acompanhar': return { body: { agora: agora(), conversa: m.status, agente: null, em_horario: true, espera_longa: false, pedido: 'pronto', tipo: 'exame', conferencia: null, confirmado: false, horarios: [] } };
       case 'chat_corpo': return { body: CONFIG_CORPO };
+      case 'chat_medicos_disponiveis': return { body: m.medicos || [] };
       case 'chat_horarios': {
         const dias = Object.entries(m.agenda.livres).filter(([, hs]) => hs.length).sort(([a], [b]) => (a < b ? -1 : 1))
           .map(([data, hs]) => ({ data, slots: hs.map((hora) => ({ hora, unidade: 'CLÍNICA DE SAÚDE E IMAGEM - CSI', profissional: 'DRA ANA', local: null, min: 30, chegada: false })) }));
