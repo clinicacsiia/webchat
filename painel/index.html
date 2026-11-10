@@ -3675,7 +3675,7 @@ h1.longo { font-size: 14mm; }
     const num = (n, rot) => h('div', { class: 'num' }, h('b', {}, n ?? 0), h('span', {}, rot));
     const dia = (d) => { const [, m, dd] = String(d).split('-'); return dd + '/' + m; };
     const dias_ = (R.por_dia || []).slice().reverse();
-    // Jornada na clínica (Klingo), por dia do exame. Se o SQL supabase/indicadores-jornada.sql não estiver aplicado, a tabela fica só com o chat.
+    // Jornada na clínica (Klingo) só de quem veio do chat, pelo histórico desde o 1º contato. Se o SQL supabase/indicadores-jornada.sql não estiver aplicado, a tabela fica só com o chat.
     const J = (!jr.error && jr.data && Array.isArray(jr.data.por_dia)) ? jr.data : null, JT = J?.total || {};
     const horas = R.por_hora || [], maxH = Math.max(1, ...horas.map((x) => x.conversas));
     const somaD = (k) => dias_.reduce((t, d) => t + (d[k] || 0), 0);
@@ -3687,13 +3687,13 @@ h1.longo { font-size: 14mm; }
     const linha = (t, d, j, forte) => {
       const td = (v, st) => h('td', st ? { style: st } : {}, String(v ?? 0));
       return h('tr', forte ? { style: 'font-weight:700' } : {}, [td(t), td(d.conversas), td(d.pessoas ?? '—'), td(mediaTxt(d.media_por_pessoa)), td(d.finalizadas), td(d.pedidos_completos), td(d.agendados),
-        ...(J ? [td(j.marcados, sep), td(j.confirmaram), td(j.atendidos), td(j.faltaram), td((j.cancelaram || 0) + (j.remarcaram || 0)), td(j.sem_desfecho)] : [])]);
+        ...(J ? [td(j.pessoas, sep), td(j.marcaram), td(j.confirmaram), td(j.atendidos), td(j.faltaram), td(j.cancelaram_remarcaram), td(j.por_vir)] : [])]);
     };
     const COL_CHAT = ['Conversas', 'Pessoas', 'Conversas por pessoa', 'Finalizadas', 'Pedidos completos', 'Agendados pelo chat'];
-    const COL_CLINICA = ['Marcados', 'Confirmaram', 'Atendidos', 'Faltaram', 'Cancelaram ou remarcaram', 'Sem desfecho'];
+    const COL_CLINICA = ['Pessoas novas no chat', 'Marcaram', 'Confirmaram', 'Atendidos', 'Faltaram', 'Cancelaram ou remarcaram', 'Ainda por vir'];
     const cabecalho = h('thead', {},
       h('tr', {}, h('th', { rowspan: 2, style: 'vertical-align:bottom' }, 'Dia'), h('th', { colspan: 6 }, 'No chat (conversas que começaram no dia)'),
-        J ? h('th', { colspan: 6, style: sep }, 'Na clínica (pacientes marcados para o dia, Klingo)') : null),
+        J ? h('th', { colspan: 7, style: sep }, 'Na clínica (só quem veio do chat, acompanhado no Klingo)') : null),
       h('tr', {}, [...COL_CHAT.map((t) => h('th', {}, t)), ...(J ? COL_CLINICA.map((t, i) => h('th', i === 0 ? { style: sep } : {}, t)) : [])]));
     const pcMarc = (a, b) => (b ? Math.round((a / b) * 100) + '%' : '—');
     c.replaceChildren(h('div', { class: 'pagina' }, titulo,
@@ -3717,16 +3717,19 @@ h1.longo { font-size: 14mm; }
       h('p', { class: 'dica' }, `Dos ${P.agendados ?? 0} agendados, ${P.agendados_pela_ia ?? 0} foram marcados sozinhos pela IA e ${P.agendados_pela_equipe ?? 0} pela equipe. `
         + 'Pedido completo = o paciente terminou o pedido no chat. "Agendado" só conta o que o painel sabe: marcação feita direto no Klingo sem avisar o chat não entra.'),
       J ? h('div', {},
-        h('h3', {}, 'Na clínica: do agendamento ao atendimento'),
+        h('h3', {}, 'Na clínica: quem veio do chat, do agendamento ao atendimento'),
         h('div', { class: 'numeros' },
-          num(JT.marcados, 'pacientes com exame marcado'),
-          num(JT.confirmaram, `confirmaram (${pc(JT.confirmaram, (JT.marcados || 0) - (JT.cancelaram || 0) - (JT.remarcaram || 0))} dos que não cancelaram nem remarcaram)`),
-          num(JT.atendidos, `atendidos (${pc(JT.atendidos, JT.marcados)} dos marcados)`),
-          num(JT.faltaram, `faltaram (${pc(JT.faltaram, (JT.atendidos || 0) + (JT.faltaram || 0))} de quem tinha desfecho)`),
-          num((JT.cancelaram || 0) + (JT.remarcaram || 0), `cancelaram ou remarcaram (${JT.cancelaram || 0} cancelaram, ${JT.remarcaram || 0} remarcaram)`),
-          num(JT.sem_desfecho, 'sem desfecho (ainda por vir ou sem registro no Klingo)')),
-        h('p', { class: 'dica' }, 'Cada paciente conta uma vez por dia, mesmo com vários exames. Desfecho do dia: atendido se fez algum exame; senão faltou; senão ainda sem desfecho; senão remarcou; senão cancelou. '
-          + 'Vem do Klingo, por dia do exame (inclui quem não passou pelo chat)' + (J.desde ? `, a partir de ${dia(J.desde)}` : '') + '. Dias futuros não entram.')) : null,
+          num(JT.pessoas, 'pessoas novas no chat (primeiro contato no período)'),
+          num(JT.marcaram, `marcaram exame no Klingo (${pc(JT.marcaram, JT.pessoas)} das pessoas novas)`),
+          num(JT.confirmaram, `confirmaram (${pc(JT.confirmaram, JT.marcaram)} dos que marcaram)`),
+          num(JT.atendidos, `atendidos (${pc(JT.atendidos, JT.marcaram)} dos que marcaram)`),
+          num(JT.faltaram, `faltaram (${pc(JT.faltaram, JT.marcaram)} dos que marcaram)`),
+          num(JT.cancelaram_remarcaram, 'cancelaram ou remarcaram algum exame'),
+          num(JT.por_vir, 'ainda por vir (exame futuro ou sem desfecho no Klingo)')),
+        h('p', { class: 'dica' }, 'Só entra quem veio do chat: a pessoa do chat é ligada ao Klingo pelo mesmo telefone e nome, ou por uma marcação que o chat reconheceu. '
+          + 'O histórico vale desde o primeiro contato: contam os exames marcados no Klingo depois que a pessoa falou com a clínica, em qualquer data. '
+          + 'Cada coluna diz "teve pelo menos um exame assim", então a mesma pessoa pode aparecer em mais de uma (ex.: faltou numa data e foi atendida em outra). '
+          + 'Quem deu telefone ou nome diferente no Klingo conta em "pessoas novas", mas não em "marcaram".')) : null,
       horas.length ? h('div', {},
         h('h3', {}, 'Conversas por horário de início'),
         h('div', { class: 'barras-h', role: 'img', 'aria-label': 'Conversas iniciadas por hora do dia' }, horas.map((x) => h('div', { class: 'bh', title: `${x.conversas} conversa(s) iniciadas entre ${x.hora}h e ${x.hora + 1}h` },
@@ -3738,8 +3741,8 @@ h1.longo { font-size: 14mm; }
         h('tbody', {}, todosDias.length
           ? [...(todosDias.length > 1 ? [linha('Total do período', { conversas: somaD('conversas'), pessoas: V.pessoas, media_por_pessoa: V.media_por_pessoa, finalizadas: somaD('finalizadas'), pedidos_completos: somaD('pedidos_completos'), agendados: somaD('agendados') }, JT, true)] : []),
             ...todosDias.map((d) => linha(dia(d), porDiaChat.get(d) || SEM_CHAT, porDiaCl.get(d) || {}, false))]
-          : [h('tr', {}, h('td', { colspan: J ? 13 : 7 }, 'Sem conversas no período.'))]))),
-      h('p', { class: 'dica' }, 'Leia da esquerda para a direita: conversa, pedido completo, agendado pelo chat e, na clínica, marcado, confirmou, atendido ou faltou. O lado do chat conta o dia em que a conversa começou; o da clínica conta o dia do exame, por isso uma mesma linha pode ter pessoas diferentes nos dois lados. '
+          : [h('tr', {}, h('td', { colspan: J ? 14 : 7 }, 'Sem conversas no período.'))]))),
+      h('p', { class: 'dica' }, 'Leia da esquerda para a direita: conversa, pedido completo, agendado pelo chat e, na clínica, marcou, confirmou, foi atendido ou faltou. A linha é o dia do primeiro contato da pessoa no chat e o lado da clínica acompanha o histórico dela depois disso (inclusive em dias seguintes), por isso os números de dias recentes ainda crescem. '
         + 'No total do período, "Pessoas" conta cada pessoa uma vez; na linha de cada dia, quem voltou em outro dia entra de novo, por isso a soma dos dias pode passar do total.')));
     blocoMotivosAvaliacoes(dias, semFiltro ? null : R).then((b) => { const pag = c.querySelector('.pagina'); if (b && pag && S.aba === 'indicadores' && minha === viewIndicadores.seq) pag.append(b); }, () => {});
     clearTimeout(IND.t);

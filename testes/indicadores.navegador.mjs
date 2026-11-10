@@ -33,11 +33,11 @@ const RESUMO = (total, pessoas, media, fin) => ({ periodo_dias: 1, unidade: null
   por_dia: [{ dia: '2026-11-09', conversas: total, pessoas, finalizadas: fin, media_por_pessoa: media, pedidos_completos: 2, agendados: 1 }],
   por_hora: [{ hora: 9, conversas: 2 }, { hora: 10, conversas: total - 2 }],
   encerramentos: { total: 1, automaticos: 0, por_motivo: { agendado: 1 } }, avaliacoes: null });
-// Jornada na clínica (Klingo), por dia do exame: 10/11 (hoje, ainda sem desfecho) e 07/11 (sem nenhuma conversa no chat).
-const JORNADA = { periodo_dias: 7, unidade: null, desde: '2026-10-30', gerado_em: agora,
-  total: { marcados: 104, confirmaram: 70, atendidos: 55, faltaram: 9, cancelaram: 3, remarcaram: 5, sem_desfecho: 32 },
-  por_dia: [{ dia: '2026-11-07', marcados: 20, confirmaram: 14, atendidos: 14, faltaram: 3, cancelaram: 1, remarcaram: 2, sem_desfecho: 0 },
-    { dia: '2026-11-09', marcados: 84, confirmaram: 56, atendidos: 41, faltaram: 6, cancelaram: 2, remarcaram: 3, sem_desfecho: 32 }] };
+// Jornada na clínica (Klingo) só de quem veio do chat, por dia do primeiro contato (pessoas novas e o que aconteceu com elas depois). 07/11 não tem conversa na lista do chat do teste.
+const JORNADA = { periodo_dias: 7, unidade: null, desde: agora, gerado_em: agora,
+  total: { pessoas: 6, marcaram: 4, confirmaram: 3, atendidos: 2, faltaram: 1, cancelaram_remarcaram: 1, por_vir: 1 },
+  por_dia: [{ dia: '2026-11-07', pessoas: 2, marcaram: 1, confirmaram: 1, atendidos: 1, faltaram: 0, cancelaram_remarcaram: 0, por_vir: 0 },
+    { dia: '2026-11-09', pessoas: 4, marcaram: 3, confirmaram: 2, atendidos: 1, faltaram: 1, cancelaram_remarcaram: 1, por_vir: 1 }] };
 const jwt = (sub) => { const b = (o) => Buffer.from(JSON.stringify(o)).toString('base64url'); return `${b({ alg: 'HS256', typ: 'JWT' })}.${b({ sub, role: 'authenticated', exp: Math.floor(Date.now() / 1000) + 86400 })}.x`; };
 
 function servidor() {
@@ -157,7 +157,7 @@ await caso('Sem o SQL novo no banco, Indicadores cai para o resumo antigo e avis
   return { ok: reg.rpcs.some((r) => r[0] === 'antiga') && /Clínica toda/.test(txt) && !reg.excecoes.length, detalhe: reg.excecoes[0] ?? '' };
 });
 
-await caso('Por dia segue a jornada: chat (conversas, pedido, agendado) e clínica (marcados, confirmaram, atendidos, faltaram), com total e dia só da clínica', async () => {
+await caso('Por dia segue a jornada: chat (conversas, pedido, agendado) e clínica só de quem veio do chat (marcaram, confirmaram, atendidos, faltaram), com total', async () => {
   const { page, ctx, reg } = await abrir(); await esperaCartao(page, 'Pessoas hoje', '4');
   await page.click('.nav button[data-aba=indicadores]'); await page.waitForSelector('tbody tr');
   const cab = (await page.locator('thead tr').nth(1).locator('th').allInnerTexts()).map((t) => t.trim());
@@ -166,13 +166,13 @@ await caso('Por dia segue a jornada: chat (conversas, pedido, agendado) e clíni
   if (process.env.FOTO) await page.locator('.tabela-wrap').first().screenshot({ path: process.env.FOTO + '/jornada.png' });
   const jr = reg.rpcs.filter((r) => r[0] === 'jornada').map((r) => r[1]);
   await ctx.close();
-  const esperadoCab = ['Conversas', 'Pessoas', 'Conversas por pessoa', 'Finalizadas', 'Pedidos completos', 'Agendados pelo chat', 'Marcados', 'Confirmaram', 'Atendidos', 'Faltaram', 'Cancelaram ou remarcaram', 'Sem desfecho'];
+  const esperadoCab = ['Conversas', 'Pessoas', 'Conversas por pessoa', 'Finalizadas', 'Pedidos completos', 'Agendados pelo chat', 'Pessoas novas no chat', 'Marcaram', 'Confirmaram', 'Atendidos', 'Faltaram', 'Cancelaram ou remarcaram', 'Ainda por vir'];
   const total = linhas.find((l) => l[0] === 'Total do período'), d07 = linhas.find((l) => l[0] === '07/11'), d09 = linhas.find((l) => l[0] === '09/11');
   return { ok: JSON.stringify(cab) === JSON.stringify(esperadoCab)
-    && total && total.slice(7).join() === '104,70,55,9,8,32'          // marcados, confirmaram, atendidos, faltaram, cancelaram+remarcaram, sem desfecho
-    && d07 && d07.slice(1, 7).join() === '0,0,—,0,0,0' && d07.slice(7).join() === '20,14,14,3,3,0'   // dia sem conversa no chat, mas com exames na clínica
-    && d09 && d09[1] === '5' && d09.slice(7).join() === '84,56,41,6,5,32'
-    && /55 atendidos \(53% dos marcados\)/.test(cartoes) && /9 faltaram \(14% de quem tinha desfecho\)/.test(cartoes)
+    && total && total.slice(7).join() === '6,4,3,2,1,1,1'              // pessoas novas, marcaram, confirmaram, atendidos, faltaram, cancelaram+remarcaram, ainda por vir
+    && d07 && d07.slice(1, 7).join() === '0,0,—,0,0,0' && d07.slice(7).join() === '2,1,1,1,0,0,0'   // dia sem conversa na lista do chat, mas com pessoas novas acompanhadas
+    && d09 && d09[1] === '5' && d09.slice(7).join() === '4,3,2,1,1,1,1'
+    && /2 atendidos \(50% dos que marcaram\)/.test(cartoes) && /1 faltaram \(25% dos que marcaram\)/.test(cartoes) && /4 marcaram exame no Klingo \(67% das pessoas novas\)/.test(cartoes)
     && jr.length >= 1 && jr[0].p_dias === 1 && jr[0].p_unidade === null, detalhe: `${cab} | ${JSON.stringify(linhas)} | ${cartoes}` };
 });
 

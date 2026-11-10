@@ -24,18 +24,18 @@ Conferido ao vivo contra a consulta direta: 64 conversas, 51 pessoas e 27 encerr
 
 `cd testes && npm run test:indicadores` (5 verificações: cartões, filtro de unidade, aba Indicadores, período padrão e queda para o resumo antigo).
 
-## Jornada do paciente na clínica (10/11/2026)
+## Jornada na clínica de quem veio do chat (10/11/2026)
 
-A tabela **Por dia** da aba Indicadores agora segue a jornada, da esquerda para a direita: **No chat** (Conversas, Pessoas, Conversas por pessoa, Finalizadas, Pedidos completos, Agendados pelo chat) e **Na clínica** (Marcados, Confirmaram, Atendidos, Faltaram, Cancelaram ou remarcaram, Sem desfecho). Acima da tabela há um bloco de cartões "Na clínica: do agendamento ao atendimento" com as porcentagens.
+A tabela **Por dia** da aba Indicadores segue a jornada, da esquerda para a direita: **No chat** (Conversas, Pessoas, Conversas por pessoa, Finalizadas, Pedidos completos, Agendados pelo chat) e **Na clínica, só de quem veio do chat** (Pessoas novas no chat, Marcaram, Confirmaram, Atendidos, Faltaram, Cancelaram ou remarcaram, Ainda por vir). Acima da tabela há cartões com as porcentagens.
 
-- **Fonte:** `jornada_exame` e `jornada_card`, lidos do Klingo pelo relatório **#14359** (filtro por data do exame). Nenhum relatório novo foi preciso. Só números: nenhum dado de paciente sai.
-- **Dia da clínica = dia do exame** (e não o dia da conversa). Não dá para ligar cada conversa ao exame do Klingo (hoje só 100 cartões têm conversa e nenhum com exame do Klingo), então os dois lados da mesma linha podem ser de pessoas diferentes. A tabela inclui pacientes que nunca passaram pelo chat.
-- **Paciente** = um cartão da Jornada (paciente + dia + unidade): quem tem 2 exames no mesmo dia conta uma vez.
-- **Desfecho do dia:** atendido (algum exame feito) > faltou > sem desfecho (ainda agendado/confirmado: hoje é "ainda por vir"; em dia passado é "o Klingo não registrou") > remarcou > cancelou.
-- **Confirmaram** = algum exame com confirmação "Confirmado" no Klingo, entre quem não terminou cancelado nem remarcado.
-- Filtro de unidade do topo vale (cartão sem unidade conhecida aparece em todas). Dias futuros não entram. O histórico do Klingo no painel começa em 30/10/2026.
-- Conferido ao vivo em 10/11/2026 (transação desfeita): 09/11 = 383 marcados, 249 confirmaram, 254 atendidos, 55 faltaram, 32 cancelaram, 42 remarcaram (254+55+32+42 = 383).
+- **Só entra quem veio do chat.** Quem marcou direto no Klingo fica de fora (decisão do dono em 10/11/2026).
+- **Histórico da pessoa.** A linha é o dia do **primeiro contato** da pessoa no chat. O lado da clínica acompanha tudo o que ela fez no Klingo **depois** desse contato, em qualquer data (inclusive dias seguintes e datas futuras). Por isso os números de dias recentes ainda crescem. Exame marcado antes de a pessoa falar no chat não entra.
+- **Ligação chat → Klingo:** mesmo telefone (marca de 8 últimos dígitos + segredo, a de `jornada_paciente.fone_chave`) **e** nome que confere (`nome_confere`); ou marcação reconhecida pelo chat (`pre_agendamentos.klingo_marcacoes`). Quem deu telefone ou nome diferente no Klingo conta em "pessoas novas", mas não em "marcaram": os números de "marcaram" são o **mínimo** garantido.
+- **Cada coluna é "a pessoa teve pelo menos um exame assim"**, então a mesma pessoa pode aparecer em mais de uma (ex.: faltou numa data e foi atendida em outra). Confirmaram = algum exame confirmado que não foi cancelado nem remarcado. Ainda por vir = exame futuro ou que o Klingo não atualizou.
+- Filtro de unidade do topo vale (mesma regra de unidade da pessoa). Pedidos do chat sem marcação no Klingo (status `pedido`) não contam como marcação.
+- **Números reais em 10/11/2026** (transação desfeita): 105 pessoas novas no chat, 23 marcaram, 4 confirmaram, 3 atendidas, 0 faltaram, 1 cancelou/remarcou, 20 ainda por vir. São poucos porque o chat é novo (primeira conversa em 29/10) e só 98 contatos têm telefone.
+- Fonte: `jornada_exame`/`jornada_card` (Klingo, relatório #14359). Nenhum relatório novo foi preciso. Só números: nenhum dado de paciente sai.
 
 Banco: `supabase/indicadores-jornada.sql` (aplicado em 10/11/2026; só `create or replace` da função `painel_indicadores_jornada(p_dias, p_unidade)`). Se não estiver aplicado, o painel mostra só o lado do chat, sem erro. ROLLBACK: `drop function public.painel_indicadores_jornada(integer, text);`.
 
-Teste: `cd testes && npm run test:indicadores` (agora 9 verificações: ordem das colunas, totais, dia só da clínica, filtro de unidade e queda sem o SQL).
+Teste: `cd testes && npm run test:indicadores` (9 verificações: ordem das colunas, totais, filtro de unidade e queda sem o SQL).
