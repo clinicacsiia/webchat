@@ -636,6 +636,17 @@ Jornada que não encerra após atualização do cadastro; formulário/pedido que
 9. Lista de indicadores por nível (MON-01).
 10. Textos (C-25).
 
-### 9.5 Próxima pergunta (uma por vez)
+### 9.5 C-23a — DECIDIDO pelo dono (10/11/2026): contato de teste da TI
 
-**C-23a:** você quer marcar os telefones/e-mails que usa como **paciente de teste** como "contato de teste" (marcação feita por TI ou gerência), para que toda conversa iniciada por eles já nasça como teste, mesmo que ninguém assuma?
+O dono autorizou marcar como **"teste da TI"** o telefone e o e-mail do próprio Alisson Oliveira da Cruz. **O telefone e o e-mail não são escritos neste documento** (o repositório é público); ficam só no banco, quando a marca for criada.
+
+Conferência feita (somente contagens, em 10/11/2026): o contato existe e tem **21 conversas, todas encerradas**; **20 já são pegas pela regra do Alisson** (seção J) e **1 só seria pega pelo contato**. O mesmo e-mail/telefone aparece em **1 conta de paciente** e em **4 cadastros em `pacientes`**.
+
+Como será feito (**nada foi gravado**; a marca entra na Etapa 0, depois da aprovação do plano):
+- Campo novo `contatos.teste` + `teste_motivo` ("teste da TI") + quem marcou e quando; só TI/gerência marcam.
+- Toda conversa nova desse contato nasce com `conversas.teste = true`; as 21 antigas recebem a marca na carga inicial, **conferidas com o dono antes**.
+- Os 4 cadastros em `pacientes` e a conta de paciente ficam **fora dos indicadores** (os indicadores partem das conversas), mas ganham a mesma marca para não aparecerem em listas de pacientes reais nem em buscas de duplicidade. Confirmar na Etapa 0.
+
+### 9.6 Próxima pergunta (uma por vez)
+
+**C-23b:** se o Alisson precisar atender **um paciente real** com a conta dele, essa conversa também vira teste (pela regra da seção J) e some dos indicadores. Você quer uma chave **"modo teste" no perfil dele**, ligada por padrão, que ele desliga quando for atender de verdade (e as conversas atendidas com ela desligada contam como reais)?
