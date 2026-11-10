@@ -194,6 +194,19 @@ await caso('Sem o SQL da jornada no banco, a tabela mostra só o chat (sem colun
   return { ok: cab.length === 6 && !cab.includes('Atendidos') && !/Na clínica: do agendamento/.test(txt) && !reg.excecoes.length, detalhe: `${cab} ${reg.excecoes[0] ?? ''}` };
 });
 
+await caso('Filtro de período tem "Ontem" (entre Hoje e 7 dias) e pede p_dias = -1 ao resumo e à jornada', async () => {
+  const { page, ctx, reg } = await abrir(); await esperaCartao(page, 'Pessoas hoje', '4');
+  await page.click('.nav button[data-aba=indicadores]'); await page.waitForSelector('.pagina select');
+  const opcoes = await page.locator('.pagina select option').allInnerTexts();
+  await page.selectOption('.pagina select', '-1'); await page.waitForFunction(() => document.querySelector('.pagina select')?.value === '-1');
+  await page.waitForFunction(() => document.querySelector('.numeros .num'));
+  await new Promise((r) => setTimeout(r, 400));
+  const un = reg.rpcs.filter((r) => r[0] === 'unidade').map((r) => r[1].p_dias), jo = reg.rpcs.filter((r) => r[0] === 'jornada').map((r) => r[1].p_dias);
+  const sel = await page.locator('.pagina select').inputValue();
+  await ctx.close();
+  return { ok: opcoes[0] === 'Hoje' && opcoes[1] === 'Ontem' && un.at(-1) === -1 && jo.at(-1) === -1 && sel === '-1' && !reg.excecoes.length, detalhe: `${opcoes} | unidade=${un} jornada=${jo} select=${sel}` };
+});
+
 await browser.close(); srv.close();
 const ok = resultados.filter(Boolean).length;
 console.log(`\n${ok}/${resultados.length} verificações passaram`);

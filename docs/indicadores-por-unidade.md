@@ -39,3 +39,7 @@ A tabela **Por dia** da aba Indicadores segue a jornada, da esquerda para a dire
 Banco: `supabase/indicadores-jornada.sql` (aplicado em 10/11/2026; só `create or replace` da função `painel_indicadores_jornada(p_dias, p_unidade)`). Se não estiver aplicado, o painel mostra só o lado do chat, sem erro. ROLLBACK: `drop function public.painel_indicadores_jornada(integer, text);`.
 
 Teste: `cd testes && npm run test:indicadores` (9 verificações: ordem das colunas, totais, filtro de unidade e queda sem o SQL).
+
+## Filtro "Ontem" (10/11/2026)
+
+O filtro de período da aba Indicadores ganhou **Ontem** (entre Hoje e Últimos 7 dias). No banco ele é `p_dias = -1`: do começo de ontem até o começo de hoje, no fuso de São Paulo, nas funções `painel_indicadores_unidade` e `painel_indicadores_jornada` (aplicado em 10/11/2026; só `create or replace`, ver `supabase/indicadores-unidade.sql` e `supabase/indicadores-jornada.sql`). Conferido ao vivo: ontem (09/11) = 83 conversas, 67 pessoas, 54 finalizadas, 27 pedidos completos e 13 agendados, igual à linha daquele dia na tabela "Por dia". Os cartões do topo continuam sendo de hoje. Sem o SQL novo, escolher "Ontem" mostra um aviso em vez de números errados.

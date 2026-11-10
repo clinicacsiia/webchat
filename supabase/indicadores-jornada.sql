@@ -11,7 +11,7 @@
 --   * Cada coluna é "a pessoa teve pelo menos um exame assim", então uma pessoa pode aparecer em mais de uma coluna (ex.: faltou numa data e foi atendida em outra).
 --     marcaram = tem exame marcado | confirmaram = algum exame confirmado que não foi cancelado nem remarcado | atendidos = algum exame feito | faltaram = faltou em algum
 --     cancelaram ou remarcaram = algum exame cancelado/remarcado | por vir = algum exame ainda agendado/confirmado (data futura, ou o Klingo não registrou o desfecho).
---   * Período em dias de calendário (São Paulo): 1 = hoje, 7 = hoje e os 6 anteriores, 0 = desde o começo (dia do primeiro contato).
+--   * Período em dias de calendário (São Paulo): 1 = hoje, 7 = hoje e os 6 anteriores, -1 = ontem, 0 = desde o começo (dia do primeiro contato).
 --   * Unidade: 'csi' | 'rmtc' | 'desenvoar'; nulo = todas (mesma regra do painel: pessoa sem unidade conhecida aparece em todas).
 --   * Pedidos do chat ainda sem marcação no Klingo (status 'pedido') não contam como marcação.
 -- ROLLBACK: drop function public.painel_indicadores_jornada(integer, text);
@@ -20,8 +20,9 @@ create or replace function public.painel_indicadores_jornada(p_dias integer defa
 language plpgsql stable security definer set search_path to '' as $$
 declare
   v_hoje date := (now() at time zone 'America/Sao_Paulo')::date;
-  v_ini timestamptz := case when coalesce(p_dias, 0) > 0
-    then ((v_hoje - (least(p_dias, 3650) - 1))::timestamp at time zone 'America/Sao_Paulo') else '-infinity'::timestamptz end;
+  v_ini timestamptz := case when p_dias = -1 then ((v_hoje - 1)::timestamp at time zone 'America/Sao_Paulo')   -- -1 = ontem
+    when coalesce(p_dias, 0) > 0 then ((v_hoje - (least(p_dias, 3650) - 1))::timestamp at time zone 'America/Sao_Paulo') else '-infinity'::timestamptz end;
+  v_fim timestamptz := case when p_dias = -1 then (v_hoje::timestamp at time zone 'America/Sao_Paulo') else 'infinity'::timestamptz end;
   v_un text := case when lower(coalesce(p_unidade, '')) in ('csi', 'rmtc', 'desenvoar') then lower(p_unidade) end;
   v_out jsonb;
 begin
@@ -39,7 +40,7 @@ begin
       join public.painel_conversa_pessoa_un() pu on pu.conversa_id = c.id
      where v_un is null or pu.chaves is null or cardinality(pu.chaves) = 0 or v_un = any (pu.chaves)),
   pf as (
-    select pessoa, min(criado_em) as pri, (min(criado_em) at time zone 'America/Sao_Paulo')::date as dia from cv group by pessoa having min(criado_em) >= v_ini),
+    select pessoa, min(criado_em) as pri, (min(criado_em) at time zone 'America/Sao_Paulo')::date as dia from cv group by pessoa having min(criado_em) >= v_ini and min(criado_em) < v_fim),
   lig as (
     select cv.pessoa, p.prontuario, false as por_marcacao
       from cv join public.jornada_paciente p on p.fone_chave = cv.fh and public.nome_confere(p.nome, cv.nome)
