@@ -29,7 +29,7 @@ await db.exec(`
 `);
 
 // uma conversa nova de alguém que digita nome, telefone, e-mail e uma data de nascimento
-const conversa = async ({ nome = 'Maria da Silva', tel = '71988710544', email = 'maria@exemplo.com', dt = '1980-03-25' } = {}) => {
+const conversa = async ({ nome = 'Maria da Silva', tel = '71980001111', email = 'maria@exemplo.com', dt = '1980-03-25' } = {}) => {
   const ct = (await db.query(`insert into public.contatos (nome, telefone, email) values ($1, $2, $3) returning id`, [nome, tel, email])).rows[0].id;
   const cv = (await db.query(`insert into public.conversas (contato_id, nome_informado, email_informado) values ($1, $2, $3) returning id`, [ct, nome, email])).rows[0].id;
   await db.query(`insert into public.pre_agendamentos (conversa_id, paciente) values ($1, $2::jsonb)`, [cv, JSON.stringify(dt ? { dt_nasc: dt } : {})]);
@@ -37,7 +37,7 @@ const conversa = async ({ nome = 'Maria da Silva', tel = '71988710544', email = 
 };
 const conferir = async (cv) => (await db.query(`select public.paciente_conferir($1) r`, [cv])).rows[0].r;
 const novoPaciente = async (o = {}) => (await db.query(`insert into public.pacientes (nome, telefones, email, dt_nasc, validado, revisar, atualizado_em) values ($1, $2, $3, $4, $5, $6, $7) returning id`,
-  [o.nome ?? 'Maria da Silva', o.telefones ?? ['7188710544'], o.email ?? 'maria@exemplo.com', o.dt ?? '1980-03-25', o.validado ?? false, o.revisar ?? false, o.em ?? new Date().toISOString()])).rows[0].id;
+  [o.nome ?? 'Maria da Silva', o.telefones ?? ['7180001111'], o.email ?? 'maria@exemplo.com', o.dt ?? '1980-03-25', o.validado ?? false, o.revisar ?? false, o.em ?? new Date().toISOString()])).rows[0].id;
 
 await novoPaciente({ validado: true });
 
@@ -84,7 +84,7 @@ await caso('ABERTO: só telefone igual (nome ou e-mail diferentes) = novo; nome 
   return { ok: a.situacao === 'novo' && b.situacao === 'novo', detalhe: `outro nome=${a.situacao}, outro e-mail=${b.situacao}` };
 });
 await caso('ABERTO: telefone com e sem o 9º dígito é o mesmo telefone', async () => {
-  const r = await conferir(await conversa({ tel: '7188710544' }));
+  const r = await conferir(await conversa({ tel: '7180001111' }));
   return { ok: r.situacao === 'completo' };
 });
 

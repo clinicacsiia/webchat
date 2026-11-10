@@ -247,16 +247,17 @@ await caso('marcar a tarefa como feita chama jornada_marcar_tarefa', async () =>
   return { ok: !!r && r.p_tarefa === 77 && r.p_feita === true, detalhe: JSON.stringify(r) };
 });
 
-await caso('mover pelo detalhe só oferece colunas permitidas e chama jornada_mover_card', async () => {
+await caso('mudar status pelo detalhe oferece todas as outras colunas, pergunta a observação e chama jornada_definir_status', async () => {
   const { page, ctx, reg } = await abrir();
+  page.on('dialog', (d) => d.accept(''));   // "Observação (opcional):"
   await page.waitForSelector('.q-card');
   await page.click('.q-card:has-text("Bia Chegou")'); await page.waitForSelector('dialog[open] .j-acoes');
   const opcoes = await page.locator('dialog[open] .j-acoes select').first().locator('option').allInnerTexts();
   await page.locator('dialog[open] .j-acoes select').first().selectOption('finalizado');
   await page.waitForTimeout(500);
   await ctx.close();
-  const r = reg.rpcs.find((x) => x.rpc === 'jornada_mover_card');
-  return { ok: opcoes.join() === 'Mover para…,Finalizado' && !!r && r.p_card === 3 && r.p_para === 'finalizado' && r.p_versao === 1, detalhe: `${opcoes}|${JSON.stringify(r)}` };
+  const r = reg.rpcs.find((x) => x.rpc === 'jornada_definir_status');
+  return { ok: opcoes[0] === 'Mudar status…' && opcoes.includes('Finalizado') && !opcoes.includes('Chegou') && !!r && r.p_card === 3 && r.p_para === 'finalizado' && r.p_versao === 1, detalhe: `${opcoes}|${JSON.stringify(r)}` };
 });
 
 await caso('paciente do Klingo não tem "Abrir conversa"; o do chat tem e leva ao Atendimento', async () => {

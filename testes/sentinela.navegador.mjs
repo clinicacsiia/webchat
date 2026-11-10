@@ -242,7 +242,7 @@ await caso('lado: o pedido enviado ao servidor leva o lado que o paciente confir
   await page.click('.btn-w >> text=Adicionar ao pedido'); await page.waitForSelector('.carrinho li', { timeout: 4000 });
   const resumo = await page.$eval('.carrinho', (n) => n.textContent);
   await page.click('#folhaRodape .btn-w'); await page.waitForTimeout(500);
-  const chamada = mundo.chamadas.find((c) => c.nome === 'chat_pedido_salvar'); await ctx.close();
+  const chamada = mundo.chamadas.find((c) => c.nome === 'chat_pedido_enviar'); await ctx.close();
   const item = chamada && chamada.corpo.p_itens[0];
   return { ok: /lado direito/.test(resumo) && !/unilateral/i.test(resumo) && item && item.lado === 'D' && item.regiao === 'punho_mao' && item.procedimento_id === 1001, detalhe: `resumo="${resumo.replace(/\s+/g, ' ').slice(0, 110)}" item=${JSON.stringify(item)}` };
 });

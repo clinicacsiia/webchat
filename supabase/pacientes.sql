@@ -40,7 +40,7 @@ create or replace function public.norm_nome(t text) returns text language sql st
   select nullif(btrim(regexp_replace(regexp_replace(upper(extensions.unaccent(coalesce(t, ''))), '[^A-Z ]', ' ', 'g'), '\s+', ' ', 'g')), '')
 $$;
 
--- DDD + número sem o nono dígito e sem o 55: "5571988710544", "(71) 98871-0544" e "7188710544" dão a mesma chave.
+-- DDD + número sem o nono dígito e sem o 55: "5571980001111", "(71) 98000-1111" e "7180001111" dão a mesma chave.
 create or replace function public.fone_chave(t text) returns text language sql immutable set search_path to '' as $$
   select case when d = '' then null
               when length(d) = 11 and substr(d, 3, 1) = '9' then substr(d, 1, 2) || substr(d, 4)

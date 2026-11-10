@@ -5,13 +5,13 @@ import assert from "node:assert/strict";
 import { avaliar, escolherAlvos, fonesDaLinha, linhaDe, nomeConfere, normNome, type Alvo } from "./conferencia.ts";
 
 const alvo = (extra: Partial<Alvo> = {}): Alvo => ({
-  id: "pre-1", status: "pronto", conf: null, fones: ["88710544"], nomes: ["ANA MARIA SOUZA"], procs: ["RESSONANCIA MAGNETICA DE JOELHO DIREITO"],
+  id: "pre-1", status: "pronto", conf: null, fones: ["80001111"], nomes: ["ANA MARIA SOUZA"], procs: ["RESSONANCIA MAGNETICA DE JOELHO DIREITO"],
   slots: [{ idx: 0, data: "2026-11-06", hora: "10:00", prof: "DR JOAO LIMA", unidade: "CLINICA DE SAUDE E IMAGEM UNIDADE A", chegada: false, min: 30 }],
   ...extra,
 });
 const linha = (o: Record<string, unknown> = {}) => linhaDe({
   Data_Atendimento: "2026-11-06T10:00:00", Medico: "Dr Joao Lima", Unidade: "CLÍNICA DE SAÚDE E IMAGEM - UNIDADE A",
-  Procedimento: "RESSONÂNCIA MAGNÉTICA DE JOELHO DIREITO", Paciente: "Ana Maria Souza", Telefone: "(71) 98871-0544", ...o,
+  Procedimento: "RESSONÂNCIA MAGNÉTICA DE JOELHO DIREITO", Paciente: "Ana Maria Souza", Telefone: "(71) 98000-1111", ...o,
 })!;
 
 test("normNome tira acento, número e pontuação", () => {
@@ -19,11 +19,11 @@ test("normNome tira acento, número e pontuação", () => {
 });
 
 test("telefones: máscara, DDI, vários números e sem DDD", () => {
-  assert.deepEqual(fonesDaLinha("(71) 98871-0544"), ["88710544"]);
-  assert.deepEqual(fonesDaLinha("+55 71 98871-0544 / 71 3333-4444"), ["88710544", "33334444"]);
-  assert.deepEqual(fonesDaLinha("98871-0544"), ["88710544"]);
+  assert.deepEqual(fonesDaLinha("(71) 98000-1111"), ["80001111"]);
+  assert.deepEqual(fonesDaLinha("+55 71 98000-1111 / 71 3333-4444"), ["80001111", "33334444"]);
+  assert.deepEqual(fonesDaLinha("98000-1111"), ["80001111"]);
   assert.deepEqual(fonesDaLinha("123"), []);
-  assert.ok(fonesDaLinha("7198871054471333344449").includes("88710544"));
+  assert.ok(fonesDaLinha("7198000111171333344449").includes("80001111"));
 });
 
 test("nomeConfere igual ao do banco", () => {
@@ -96,7 +96,7 @@ test("vários horários: só confirma se todos baterem, e usa o vínculo mais fr
   const a = alvo({ slots: [
     { idx: 0, data: "2026-11-06", hora: "10:00", prof: "DR JOAO LIMA", unidade: "CLINICA DE SAUDE E IMAGEM UNIDADE A", chegada: false, min: 30 },
     { idx: 1, data: "2026-11-06", hora: "11:00", prof: "DR JOAO LIMA", unidade: "CLINICA DE SAUDE E IMAGEM UNIDADE A", chegada: false, min: 30 }] });
-  const r = avaliar(a, [linha(), linha({ Data_Atendimento: "2026-11-06T11:00:00", Paciente: "Outro", Telefone: "(71) 98871-0544" })]);
+  const r = avaliar(a, [linha(), linha({ Data_Atendimento: "2026-11-06T11:00:00", Paciente: "Outro", Telefone: "(71) 98000-1111" })]);
   assert.deepEqual(r.slots.map((s) => s.r), ["ok", "ok"]);
   assert.equal(r.via, "telefone");
   assert.deepEqual(avaliar(a, [linha()]).slots.map((s) => s.r), ["ok", "livre"]);
