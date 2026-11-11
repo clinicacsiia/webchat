@@ -3427,7 +3427,7 @@ h1.longo { font-size: 14mm; }
     const busca = h('input', { type: 'search', placeholder: 'Procurar exame', 'aria-label': 'Procurar exame', value: CD.busca });
     const selFiltro = h('select', { 'aria-label': 'Mostrar' }, [['', 'Todos os exames'], ['sem_valor', 'Só sem valor'], ['com_valor', 'Só com valor']].map(([v, t]) => h('option', { value: v }, t)));
     selFiltro.value = CD.filtro === 'sem_valor' || CD.filtro === 'com_valor' ? CD.filtro : '';
-    c.append(h('p', { class: 'sub' }, 'Digite o valor Particular ao lado do exame e clique em Salvar. Com valor, o chat informa esse preço (previsão); sem valor, o chat diz que o atendente informa. Os preços de convênio não são mostrados.'),
+    c.append(h('p', { class: 'sub' }, 'Digite o valor Particular ao lado do exame e clique em Salvar. A sugestão é o último valor Particular lançado no Klingo: clique nela para colocar no campo, confira e só então salve; nada vai para o chat sem o seu Salvar. Com valor, o chat informa esse preço (previsão); sem valor, o chat diz que o atendente informa. Os preços de convênio não são mostrados.'),
       resumo, h('div', { class: 'cd-filtros' }, busca, selFiltro), lista, maisBox);
 
     const linha = (x) => {
@@ -3435,6 +3435,12 @@ h1.longo { font-size: 14mm; }
       const ini = x.valor != null ? String(x.valor).replace('.', ',') : '';
       inp.value = ini;
       const st = h('span', { class: 'cd-mudo' }, x.valor != null ? 'Chat informa' : '');
+      // Sugestão = último valor Particular lançado no Klingo. Só preenche o campo: a pessoa confere e clica em Salvar (o chat só usa o que for salvo).
+      const sg = x.sugestao, brl = (n) => Number(n).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+      const dtSg = sg && sg.data ? sg.data.split('-').reverse().join('/') : '';
+      const sugestao = sg ? h('button', { class: 'btn', type: 'button', title: `Último valor Particular lançado no Klingo${dtSg ? ` em ${dtSg}` : ''}${sg.amostras ? ` (${sg.amostras} ${sg.amostras > 1 ? 'marcações' : 'marcação'} em 90 dias)` : ''}. Clique para colocar no campo; depois confira e salve.`,
+        onclick: () => { inp.value = String(sg.valor).replace('.', ','); inp.focus(); st.textContent = 'Sugestão no campo: confira e clique em Salvar'; } },
+        `Sugestão: ${brl(sg.valor)}${dtSg ? ` (${dtSg})` : ''}${sg.confianca === 'baixa' ? ' · só 1 marcação' : ''}`) : h('span', { class: 'cd-mudo' }, 'Sem sugestão');
       const btn = h('button', { class: 'btn', type: 'button', onclick: async () => {
         const txt = inp.value.trim();
         const v = txt === '' ? null : Number(txt.replace(/\./g, '').replace(',', '.'));
@@ -3447,7 +3453,7 @@ h1.longo { font-size: 14mm; }
         st.textContent = v == null ? 'Sem valor: o atendente informa' : 'Salvo. O chat informa'; toast(v == null ? 'Valor removido.' : 'Valor salvo.');
       } }, 'Salvar');
       inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') btn.click(); });
-      return h('tr', {}, h('td', {}, x.nome, x.especialidade ? h('span', { class: 'cd-mudo' }, ` · ${x.especialidade}`) : null), h('td', {}, inp), h('td', {}, btn), h('td', {}, st));
+      return h('tr', {}, h('td', {}, x.nome, x.especialidade ? h('span', { class: 'cd-mudo' }, ` · ${x.especialidade}`) : null), h('td', {}, inp), h('td', {}, sugestao), h('td', {}, btn), h('td', {}, st));
     };
     let corpo = null;
     const carregar = async (maisUm) => {
@@ -3462,7 +3468,7 @@ h1.longo { font-size: 14mm; }
       if (!maisUm) {
         if (!it.length) { lista.replaceChildren(h('p', { class: 'dica' }, 'Nenhum exame encontrado.')); return; }
         corpo = h('tbody', {});
-        lista.replaceChildren(h('div', { class: 'tabela-wrap' }, h('table', { class: 'cd-tabela' }, h('thead', {}, h('tr', {}, ['Exame', 'Valor Particular', '', ''].map((t) => h('th', {}, t)))), corpo)));
+        lista.replaceChildren(h('div', { class: 'tabela-wrap' }, h('table', { class: 'cd-tabela' }, h('thead', {}, h('tr', {}, ['Exame', 'Valor Particular', 'Sugestão do Klingo', '', ''].map((t) => h('th', {}, t)))), corpo)));
       }
       it.forEach((x) => corpo.append(linha(x)));
       offset += it.length;
