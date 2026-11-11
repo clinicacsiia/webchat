@@ -1127,7 +1127,8 @@
     el.btnIniciar.disabled = true; el.btnIniciar.textContent = 'Começando…';
     const t0 = performance.now();
     try {
-      const origem = new URLSearchParams(location.search).get('origem');
+      // Só letras, números, - e _ (até 40): link copiado com formatação markdown vinha com "**](https://…" junto.
+      const origem = ((new URLSearchParams(location.search).get('origem') || '').trim().match(/^[A-Za-z0-9_-]+/) || [''])[0].slice(0, 40) || null;
       const corpoIni = {
         p_nome: nome, p_telefone: telTxt, p_email: email, p_aceite: true, p_origem: origem,
         p_paciente_tipo: escolha.tipo, p_paciente_nome: filho ? nomeFilho : null,
