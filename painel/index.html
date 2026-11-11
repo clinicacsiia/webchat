@@ -2293,12 +2293,14 @@
     if (!c) { box.replaceChildren(h('div', { class: 'chat-vazio' }, h('div', {}, h('b', {}, 'Escolha uma conversa'), h('br'), 'Selecione alguém na lista para responder.'))); return; }
     const area = h('textarea', { id: 'caixa', rows: '1', maxlength: '4000', placeholder: 'Digite sua resposta', 'aria-label': 'Resposta' });
     const enviar = h('button', { class: 'btn prim', type: 'button', id: 'btnEnviar', onclick: enviarMsg }, 'Enviar');
+    const arq = h('input', { type: 'file', id: 'arquivoEnviar', accept: 'image/jpeg,image/png,image/webp,application/pdf,.pdf', hidden: true, onchange: (e) => { const f = e.target.files[0]; e.target.value = ''; if (f) enviarArquivo(f); } });
+    const clipe = h('button', { class: 'btn', type: 'button', id: 'btnAnexar', title: 'Enviar foto ou PDF ao paciente', 'aria-label': 'Anexar foto ou PDF', onclick: () => arq.click() }, '📎');
     area.addEventListener('input', () => { area.style.height = 'auto'; area.style.height = Math.min(area.scrollHeight, 140) + 'px'; });
     area.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); enviarMsg(); } });
     box.replaceChildren(h('div', { class: 'chat-topo', id: 'chatTopo' }), h('div', { id: 'proximo', 'aria-live': 'polite' }),
       h('button', { type: 'button', id: 'ctxToggle', 'aria-expanded': 'false', 'aria-controls': 'contexto', onclick: () => { abrirContexto(!S.ctxAberto); try { localStorage.setItem('painel.ctx', S.ctxAberto ? '1' : '0'); } catch {} } }),
       h('div', { id: 'contexto' }, h('div', { id: 'pessoa' }), h('div', { id: 'historicoPaciente' }), h('div', { id: 'exameAberto' }), h('div', { id: 'triagem' }), h('div', { id: 'alertaPreco' }), h('div', { id: 'anexosBox' }), h('div', { id: 'cartaoJ' }), h('div', { id: 'pre' })),
-      h('div', { class: 'msgs', id: 'msgs', 'aria-live': 'polite' }), h('div', { class: 'compor' }, area, enviar));
+      h('div', { class: 'msgs', id: 'msgs', 'aria-live': 'polite' }), h('div', { class: 'compor' }, clipe, arq, area, enviar));
     renderTopoChat(); renderPessoaChat(); renderAlertaPreco(); renderAnexosBox(); renderCartaoJ(); desenharMsgs(true);
     // Escolha do atendente (botão da faixa) vale daqui em diante; sem escolha, fechada em tela pequena e aberta em tela larga.
     let pref = null; try { pref = localStorage.getItem('painel.ctx'); } catch {}
@@ -2413,6 +2415,7 @@
         m.autor === 'agente' && quem !== ultimoQuem ? h('span', { class: 'quem' }, quem) : null,
         editando ? editorMsg(m) : h('span', {}, linkificar(m.texto)),
         m.opcoes && m.opcoes.tipo === 'despedida' && m.opcoes.imagem && m.opcoes.versao ? imagemDespedida(m.opcoes.versao) : null,
+        m.opcoes && m.opcoes.tipo === 'arquivo' && !m.excluida_em ? h('div', {}, h('button', { class: 'btn', type: 'button', style: 'margin-top:6px', onclick: (ev) => verArquivoEnviado(m.opcoes, ev.currentTarget) }, m.opcoes.mime === 'application/pdf' ? 'Abrir o PDF enviado' : 'Ver a foto enviada')) : null,
         m.opcoes && m.opcoes.tipo === 'anexo' ? h('div', {}, h('button', { class: 'btn', type: 'button', style: 'margin-top:6px', onclick: (ev) => verAnexo(m.opcoes.id, ev.currentTarget, !!m.opcoes.geral) }, m.opcoes.geral ? 'Ver foto enviada pelo paciente' : 'Ver foto do pedido médico')) : null,
         h('span', { class: 'hora' }, fmtHora(m.criado_em) + (m.editada_em && !m.excluida_em ? ' · editada' : '')),
         editando ? null : acoesMsg(m)));
@@ -2631,6 +2634,55 @@
       h('div', { style: 'max-height:42vh;overflow:auto' }, linhas.length ? linhas : h('p', {}, 'Nenhuma conversa aberta.')), resumo, destino, motivo,
       h('div', { class: 'j-acoes' }, enviar, h('button', { class: 'btn', type: 'button', onclick: () => dlg.close() }, 'Cancelar')));
     dlg.showModal();
+  }
+  // Atendente envia foto (JPG, PNG, WebP) ou PDF ao paciente. Foto é reduzida no aparelho; PDF vai como está (até 5 MB).
+  const ARQ_MAX_PDF = 5 * 1024 * 1024;
+  const lerBase64 = (arquivo) => new Promise((ok, falha) => { const fr = new FileReader(); fr.onerror = () => falha(new Error('Não consegui ler o arquivo.')); fr.onload = () => ok(String(fr.result).split(',')[1] || ''); fr.readAsDataURL(arquivo); });
+  const reduzirFoto = (arquivo) => new Promise((ok, falha) => {
+    const url = URL.createObjectURL(arquivo), im = new Image();
+    im.onerror = () => { URL.revokeObjectURL(url); falha(new Error('Esse arquivo não é uma imagem.')); };
+    im.onload = () => {
+      const f = Math.min(1, 1600 / Math.max(im.width, im.height)), c = document.createElement('canvas'); c.width = Math.round(im.width * f); c.height = Math.round(im.height * f);
+      const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); x.drawImage(im, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
+      ok(c.toDataURL('image/jpeg', 0.85).split(',')[1]);
+    };
+    im.src = url;
+  });
+  async function enviarArquivo(arquivo) {
+    const c = conversaAberta(); if (!c) return;
+    const ehPdf = arquivo.type === 'application/pdf' || /\.pdf$/i.test(arquivo.name);
+    const ehImg = /^image\/(jpeg|png|webp)$/.test(arquivo.type);
+    if (!ehPdf && !ehImg) { toast('Envie uma foto (JPG, PNG) ou um PDF.'); return; }
+    if (ehPdf && arquivo.size > ARQ_MAX_PDF) { toast('O PDF é grande demais (máximo 5 MB).'); return; }
+    if (!window.confirm(`Enviar "${arquivo.name}" ao paciente?`)) return;
+    const btn = document.getElementById('btnAnexar'); if (btn) btn.disabled = true;
+    try {
+      if (c.status !== 'em_atendimento' || !c.agente_id) { if (!(await assumir())) return; }
+      const base64 = ehPdf ? await lerBase64(arquivo) : await reduzirFoto(arquivo);
+      const nome = ehPdf ? arquivo.name : arquivo.name.replace(/\.[^.]*$/, '') + '.jpg';
+      const { data, error } = await db.rpc('painel_arquivo_enviar', { p_conversa: alvoResposta(), p_nome: nome, p_mime: ehPdf ? 'application/pdf' : 'image/jpeg', p_base64: base64 });
+      if (error) throw error;
+      toast(ehPdf ? 'PDF enviado.' : 'Foto enviada.');
+      if (data && data.mensagem_id && !S.vistos.has(data.mensagem_id)) await carregarMensagensAbertas();
+    } catch (e) { toast(msgErro(e)); }
+    finally { if (btn) btn.disabled = false; }
+  }
+  // Mostra para o atendente o arquivo que ele mandou (foto na tela; PDF abre em outra aba).
+  async function verArquivoEnviado(o, botao) {
+    botao.disabled = true;
+    try {
+      const { data, error } = await db.rpc('painel_anexo', { p_id: o.id });
+      if (error) throw error;
+      if (!data) { toast('Arquivo não encontrado.'); return; }
+      if (data.mime === 'application/pdf') {
+        const bin = atob(data.base64), bytes = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
+        botao.replaceWith(h('a', { href: url, target: '_blank', rel: 'noopener', class: 'btn', style: 'margin-top:6px;display:inline-block' }, 'Abrir ' + (o.nome || 'o PDF')));
+      } else {
+        const src = `data:${data.mime};base64,${data.base64}`;
+        botao.replaceWith(h('a', { href: src, target: '_blank', rel: 'noopener' }, h('img', { src, alt: 'Foto enviada ao paciente', style: 'display:block;max-width:100%;margin-top:6px;border-radius:8px' })));
+      }
+    } catch (e) { toast(msgErro(e)); botao.disabled = false; }
   }
   async function enviarMsg() {
     const caixa = document.getElementById('caixa'), btn = document.getElementById('btnEnviar');
