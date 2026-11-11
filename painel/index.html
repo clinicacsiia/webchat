@@ -2874,6 +2874,7 @@
     { id: 'despedida', icone: 'livro', titulo: 'Despedida do atendimento', desc: 'O que o paciente recebe quando a conversa é encerrada. Texto e imagem são opcionais; os dois vazios usam a frase padrão. Cada alteração vale só para os próximos encerramentos.', custom: 'despedida', campos: [
       { k: 'despedida_configurada', tipo: 'sim', rot: 'Usar a despedida configurada', dica: 'Desligado: continua a frase padrão de sempre.' },
     ] },
+    { id: 'consultas', icone: 'pessoa', titulo: 'Consultas oferecidas no chat', desc: 'Escolha quais consultas o paciente vê ao pedir uma consulta e com que nome. Esconder só tira a opção do chat: nada muda no Klingo nem na agenda.', custom: 'consultas', campos: [] },
     { id: 'fila', icone: 'pessoas', titulo: 'Fila e recepção', desc: 'Fila de chegada, avisos e QR code da recepção.', campos: [
       { k: 'fila_autochegada', tipo: 'sim', rot: 'Paciente pode tocar “Cheguei”', dica: 'Desligado: só a recepção registra a chegada.' },
       { k: 'fila_aviso_antes', tipo: 'numero', rot: 'Avisar “está perto” quando restarem', min: 0, max: 20, sufixo: 'pessoas à frente' },
@@ -3072,6 +3073,48 @@ h1.longo { font-size: 14mm; }
     ler().catch(() => {});
     return caixa;
   }
+  // Consultas do chat: a equipe esconde uma consulta ou muda o nome que o paciente vê. Cada linha salva sozinha.
+  function blocoConsultas() {
+    const caixa = h('div', { class: 'cfg-linha' });
+    const lista = h('div', {}, h('p', { class: 'dica' }, 'Lendo…'));
+    const bonito = (t) => String(t || '').toLowerCase().replace(/(^|\s)\S/g, (m) => m.toUpperCase());
+    const linha = (x) => {
+      const idc = 'cons_' + x.id;
+      const chave = h('input', { type: 'checkbox', id: idc, role: 'switch', class: 'chave' }); chave.checked = !x.oculta;
+      const nome = h('input', { type: 'text', maxlength: '80', value: x.rotulo || '', placeholder: x.rotulo_automatico, autocomplete: 'off', 'aria-label': 'Nome que o paciente vê para ' + x.nome_klingo });
+      const salvar = h('button', { class: 'btn', type: 'button', style: 'width:auto' }, 'Salvar nome'); salvar.hidden = true;
+      const aviso = h('span', { class: 'dica', 'aria-live': 'polite' });
+      let ultimo = nome.value.trim();
+      const gravar = async () => {
+        chave.disabled = salvar.disabled = true;
+        const { error } = await db.rpc('consulta_config_salvar', { p_id: x.id, p_oculta: !chave.checked, p_rotulo: nome.value.trim() });
+        chave.disabled = salvar.disabled = false;
+        if (error) { toast(msgErro(error)); return false; }
+        ultimo = nome.value.trim(); salvar.hidden = true;
+        aviso.textContent = chave.checked ? 'Aparece no chat.' : 'Escondida do chat.';
+        toast('Consulta salva.'); return true;
+      };
+      chave.addEventListener('change', async () => { if (!(await gravar())) chave.checked = !chave.checked; });
+      nome.addEventListener('input', () => { salvar.hidden = nome.value.trim() === ultimo; });
+      nome.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); if (!salvar.hidden) salvar.click(); } });
+      salvar.addEventListener('click', gravar);
+      const meds = (x.medicos || []).map(bonito);
+      return h('div', { class: 'cfg-linha cfg-consulta' },
+        h('div', { class: 'cfg-sim' },
+          h('label', { for: idc }, h('span', { class: 'rot-forte' }, x.rotulo || x.rotulo_automatico),
+            h('span', { class: 'dica' }, 'No Klingo: ' + bonito(x.nome_klingo) + ' · ' + (x.unidades || []).join(', ') + ' · ' + (meds.length > 3 ? meds.slice(0, 3).join(', ') + ' e mais ' + (meds.length - 3) : meds.join(', ')))),
+          chave),
+        h('div', { class: 'cfg-ctrl' }, nome, salvar), aviso);
+    };
+    const ler = async () => {
+      const { data, error } = await db.rpc('consultas_config_listar');
+      if (error) { lista.replaceChildren(h('p', { class: 'erro' }, msgErro(error))); return; }
+      lista.replaceChildren(...((data || []).length ? data.map(linha) : [h('p', { class: 'dica' }, 'Nenhuma consulta com agenda vigente.')]));
+    };
+    caixa.append(h('span', { class: 'rot' }, 'Consultas'), h('p', { class: 'dica' }, 'Ligado = aparece para o paciente. Para trocar o nome, escreva o novo e toque em Salvar nome (vazio = nome automático). Vale para as próximas conversas.'), lista);
+    ler().catch((e) => lista.replaceChildren(h('p', { class: 'erro' }, msgErro(e))));
+    return caixa;
+  }
   async function viewConfig(c) {
     const { data, error } = await db.from('config').select('chave,valor');
     if (error) { c.replaceChildren(h('div', { class: 'pagina' }, h('p', { class: 'erro' }, msgErro(error)))); return; }
@@ -3099,6 +3142,7 @@ h1.longo { font-size: 14mm; }
       const corpo = [g.desc ? h('p', { class: 'cfg-desc' }, g.desc) : null, ...g.campos.map(campoUi)];
       if (g.custom === 'despedida') corpo.push(blocoDespedida());
       if (g.custom === 'autoencerrar') corpo.push(blocoAutoencerrar());
+      if (g.custom === 'consultas') corpo.push(blocoConsultas());
       if (g.qr === 'fila') corpo.push(h('div', { class: 'cfg-qr' },
         cartaoQr('QR code da recepção', 'O paciente aponta a câmera, entra na fila e toca “Cheguei”. Imprima e deixe na recepção.', linkFila, 'recepcao', 'Chegou? Aponte a câmera aqui',
           { sub: 'Entre na fila pelo celular e acompanhe a sua vez.', passos: ['Abra a câmera do celular', 'Aponte para o QR code', 'Toque em “Cheguei”'] }),
