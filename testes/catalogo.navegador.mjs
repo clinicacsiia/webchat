@@ -21,7 +21,7 @@ const jwt = (sub) => { const b = (o) => Buffer.from(JSON.stringify(o)).toString(
 
 const EXAMES = [
   { id: 1, nome: 'USG TRANSVAGINAL', especialidade: 'ULTRASSONOGRAFIA', valor: 910 },
-  { id: 2, nome: 'MAMOGRAFIA BILATERAL', especialidade: 'MAMOGRAFIA', valor: null },
+  { id: 2, nome: 'MAMOGRAFIA BILATERAL', especialidade: 'MAMOGRAFIA', valor: null, sugestao: { valor: 380, data: '2026-11-05', amostras: 4, confianca: 'alta' } },
   { id: 3, nome: 'RESSONANCIA DE JOELHO', especialidade: 'RESSONANCIA', valor: null },
 ];
 let ultimoPedido = null;
@@ -111,6 +111,21 @@ await caso('digitar o valor e salvar chama o banco com o exame e o número', asy
   await page.waitForTimeout(300);
   await ctx.close();
   return { ok: SALVOS.length === 1 && SALVOS[0].p_procedimento === 2 && SALVOS[0].p_valor === 1250.5, detalhe: JSON.stringify(SALVOS) };
+});
+
+await caso('sugestão do Klingo só preenche o campo; salvar exige o clique da pessoa', async () => {
+  const { page, ctx } = await abrir(browser);
+  SALVOS.length = 0;
+  const linha = page.locator('.cd-tabela tbody tr', { hasText: 'MAMOGRAFIA' });
+  const txtSug = await linha.getByRole('button', { name: /Sugestão/ }).innerText();
+  const semSug = await page.locator('.cd-tabela tbody tr', { hasText: 'RESSONANCIA' }).innerText();
+  await linha.getByRole('button', { name: /Sugestão/ }).click();
+  const campo = await linha.locator('input').inputValue();
+  const salvouSozinho = SALVOS.length;
+  await linha.getByRole('button', { name: 'Salvar' }).click();
+  await page.waitForTimeout(300);
+  await ctx.close();
+  return { ok: /380/.test(txtSug) && /05\/11\/2026/.test(txtSug) && /Sem sugestão/.test(semSug) && campo === '380' && salvouSozinho === 0 && SALVOS.length === 1 && SALVOS[0].p_valor === 380, detalhe: `${txtSug} | campo=${campo} | ${JSON.stringify(SALVOS)}` };
 });
 
 await caso('campo vazio remove o valor (manda nulo)', async () => {
