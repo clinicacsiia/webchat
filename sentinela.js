@@ -1,4 +1,5 @@
 /* FLUXOGRAMA: entrada (eventos do chat + DOM da conversa + chamadas ao Supabase + erros de JavaScript) -> validação (regras: ordem das mensagens, mensagem pendente, resposta que não vem, tela travada, erro de chamada, paciente parado, conversa antiga) -> lógica (cura sozinha o que dá, fala com o paciente numa faixa acima do campo de mensagem, aprende os tempos deste aparelho) -> saída (aviso com botões, código de rastreio CSI-AAMMDD-HHMM-TIPO-XXXX e incidente enviado ao Supabase)
+   Versão 1.1 — 11/11/2026 / Mudança: falha de rede numa consulta de ROTINA (a que o chat repete sozinho) só vira aviso na 3ª seguida, e como aviso de conexão, não como erro com código (eram 30 alarmes falsos em 5 dias); texto do aviso "Atualizei a conversa" corrigido (também acontece quando a equipe assume)
    Versão 1.0 — 31/10/2026 / Mudança: Implementação inicial
 
    Sentinela do chat: fica de olho na conversa, ajuda quem trava e deixa um código para a equipe rastrear o problema.
@@ -13,7 +14,7 @@
   if (raiz && raiz.document) raiz.Sentinela = S;
 })(typeof window !== 'undefined' ? window : globalThis, function (janela) {
   'use strict';
-  const VERSAO = '1.0';
+  const VERSAO = '1.1';
   const ALFABETO = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';   // sem 0/O/1/I/L: o código é lido e ditado por telefone
   // erro = gera código de rastreio e vai para a equipe; os demais só ajudam o paciente.
   const TIPOS = {
@@ -74,7 +75,15 @@
     if (cod === '54000') return { tipo: 'LIM', cod, msg: mascarar(msg) };
     return { tipo: 'RPC', cod, msg: mascarar(msg) };
   }
-  const PURO = { gerarCodigo, codigoValido, percentil, mediana, limiarLento, limiarParado, ordemOk, mascarar, limpar, classificarRpc, TIPOS, versao: VERSAO };
+  // Consultas que o chat faz sozinho, sem toque do paciente, e repete em seguida: uma falha de rede isolada nelas não é notícia.
+  const ROTINA = new Set(['chat_listar', 'chat_acompanhar', 'chat_push_estado', 'chat_push_config', 'chat_avaliacao_estado', 'login_paciente_ativo', 'conta_paciente_resumo', 'chat_config']);
+  const FALHAS_ROTINA_PARA_AVISAR = 3;
+  // O que fazer com uma falha SEM resposta do servidor (status 0): 'ignorar' (rotina, ainda poucas seguidas), 'instavel' (rotina, 3ª seguida) ou 'erro' (ação do paciente).
+  function decidirFalhaDeRede(nome, seguidas) {
+    if (!ROTINA.has(nome)) return 'erro';
+    return seguidas >= FALHAS_ROTINA_PARA_AVISAR ? 'instavel' : 'ignorar';
+  }
+  const PURO = { gerarCodigo, codigoValido, percentil, mediana, limiarLento, limiarParado, ordemOk, mascarar, limpar, classificarRpc, decidirFalhaDeRede, ROTINA, TIPOS, versao: VERSAO };
   if (!janela.document) return PURO;   // Node: só as funções puras
 
   /* ---------- navegador ---------- */
@@ -152,8 +161,10 @@
     janela.fetch = novo;
   }
   const amostrasEnvio = () => [].concat(mem.rpc.chat_responder || [], mem.rpc.chat_enviar || []);
+  let falhasRotina = 0, instavelAvisada = false;   // falhas de rede seguidas nas consultas de rotina
   function aoTerminarRpc(nome, status, ms, corpo) {
     guardar(rpcs, { n: nome, s: status, ms, t: Date.now() }, 15);
+    if (status > 0 && ROTINA.has(nome)) { falhasRotina = 0; if (instavelAvisada) { instavelAvisada = false; fechar('net'); } }   // o servidor respondeu: a conexão voltou
     if (status >= 200 && status < 300) {
       if (/^chat_/.test(nome)) { guardar(mem.rpc[nome] = mem.rpc[nome] || [], ms, 40); salvarMem(); }
       // O aviso de erro só some quando a MESMA chamada que falhou volta a funcionar (a consulta de rotina que deu certo não prova nada).
@@ -165,6 +176,17 @@
       }
       return;
     }
+    if (!status && ROTINA.has(nome)) {
+      // Consulta de rotina sem resposta (rede do celular, aba que voltou do segundo plano): o chat repete sozinho em segundos.
+      falhasRotina++;
+      const oQue = decidirFalhaDeRede(nome, falhasRotina);
+      if (oQue === 'instavel' && !instavelAvisada) {
+        instavelAvisada = true;
+        registrar('RPC', { chamada: nome, status, erro: mascarar(corpo && corpo.message), ms, seguidas: falhasRotina });   // fica para a equipe, sem assustar o paciente
+        mostrar({ id: 'net', nivel: 'aviso', titulo: 'A conexão está instável', texto: 'Estou com dificuldade para atualizar a conversa. O que você já fez está guardado; assim que a conexão firmar eu atualizo sozinho.' });
+      }
+      return;
+    }
     if (SILENCIOSAS.has(nome)) return;
     const c = classificarRpc(nome, status, corpo, janela.navigator.onLine);
     const detalhe = { chamada: nome, status, codigo_pg: c.cod, erro: c.msg, ms };
@@ -173,7 +195,7 @@
     } else if (c.tipo === 'DES') {
       const codigo = registrar('DES', detalhe);
       if (cfg.acoes.recarregar) cfg.acoes.recarregar();
-      mostrar({ id: 'des', nivel: 'info', titulo: 'Atualizei a conversa', texto: 'A pergunta já tinha sido respondida. A mais recente está logo acima, é só continuar a partir dela.', codigo, auto: T(10000) });
+      mostrar({ id: 'des', nivel: 'info', titulo: 'Atualizei a conversa', texto: 'Essa pergunta não vale mais: já foi respondida ou uma pessoa da equipe entrou na conversa. Veja a mensagem mais recente logo acima.', codigo, auto: T(10000) });
     } else if (c.tipo === 'ANT') {
       mostrar({ id: 'ant', nivel: 'aviso', titulo: 'Esta conversa não está mais disponível', texto: 'Acontece quando a conversa é antiga. Vamos começar um pedido novo, é rapidinho.',
         botoes: [{ rotulo: 'Começar um pedido novo', principal: true, fn: () => cfg.acoes.novoPedido && cfg.acoes.novoPedido() }] });

@@ -9,6 +9,18 @@ sentinela.js          monitor do chat: ajuda quem trava e gera o código de rast
 painel/index.html     painel da equipe       -> https://SEU-USUARIO.github.io/SEU-REPO/painel/
 ```
 
+## Comece por aqui (estado em 11/11/2026)
+
+| Quero… | Abra |
+|---|---|
+| Entender o sistema inteiro (pastas, banco, rotinas, testes) | [`docs/DOCUMENTACAO.md`](docs/DOCUMENTACAO.md) |
+| Saber o que depende do dono | [`docs/pendencias-do-dono.md`](docs/pendencias-do-dono.md) |
+| Ver o que foi auditado, corrigido e medido | [`docs/auditoria-2026-11-11.md`](docs/auditoria-2026-11-11.md) |
+| Ler uma função do banco como ela está de verdade | [`supabase/producao/funcoes/`](supabase/producao/LEIAME.md) |
+| Rodar os testes | `cd testes && npm install && npm test` ([`testes/README.md`](testes/README.md)) |
+
+**O texto abaixo é histórico**: cada parágrafo conta uma mudança na data em que foi feita, e alguns "ainda não aplicado" já foram aplicados depois. Para o estado atual, valem os documentos da tabela acima.
+
 Fase 9 (31/10/2026): correções do teste da paciente, Sentinela e mensagens empáticas. Veja `docs/fase9-sentinela.md`. SQL aplicado no Supabase em 31/10/2026.
 
 Convênios e foto do pedido (02/11/2026): aba **Convênios** do painel (ligar/desligar convênio, mensagem e regra por convênio, avisos de preço, previsão), chat com a foto primeiro e depois tipo/parte/lado, fotos separadas para o atendente com pendência do Klingo. Veja `docs/convenios-e-foto.md`; SQL `supabase/convenios-e-foto.sql` aplicado no Supabase em 02/11/2026.
