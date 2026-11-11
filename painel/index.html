@@ -4114,13 +4114,47 @@ h1.longo { font-size: 14mm; }
     const ordem = { ruim: 0, atencao: 1, bom: 2 };
     return out.sort((x, y) => ordem[x.nivel] - ordem[y.nivel]).slice(0, 7);
   }
+  // Seção 3: cada atendente, com barras para ver quem atendeu/agendou mais e quem tem a melhor nota.
+  function secaoEquipe(eq) {
+    const cab = [h('h3', { class: 'ind-sec' }, '3. Equipe: quem atende e agenda mais'),
+      h('p', { class: 'dica' }, 'Cada atendente no período. "Agendou" conta só o que a pessoa marcou como agendado; o que o sistema confirmou sozinho não tem dono. A nota é a das avaliações dos pacientes nas conversas em que a pessoa mais escreveu.')];
+    const E = !eq.error && eq.data && Array.isArray(eq.data.pessoas) ? eq.data : null;
+    if (!E) return h('div', {}, ...cab, h('p', { class: 'dica' }, 'Para ver esta parte falta rodar o SQL supabase/indicadores-atendentes.sql.'));
+    const P = E.pessoas;
+    if (!P.length) return h('div', {}, ...cab, h('p', { class: 'dica' }, 'Nenhum atendente com dados neste período.'));
+    const rank = (campo) => P.slice().sort((x, y) => (y[campo] || 0) - (x[campo] || 0) || x.nome.localeCompare(y.nome));
+    const bloco = (tit, dica, campo, un) => {
+      const l = rank(campo), max = Math.max(1, ...l.map((x) => x[campo] || 0));
+      return painel(tit, dica, l.map((x, i) => barra(x.nome, x[campo] || 0, max, `${nf(x[campo])}${un ? ' ' + un : ''}`, i === 0 && (x[campo] || 0) > 0 ? 'verde' : 'azul', i === 0 && (x[campo] || 0) > 0)));
+    };
+    const comNota = P.filter((x) => x.nota_media != null).sort((x, y) => y.nota_media - x.nota_media);
+    const notas = painel('Nota média do atendimento (0 a 10)', E.nota_media_geral != null ? `Média geral: ${String(E.nota_media_geral).replace('.', ',')}. Poucas avaliações (menos de 5) deixam a nota instável.` : 'Ainda não há avaliações no período.',
+      comNota.length ? comNota.map((x) => h('div', { class: 'ind-linha' }, h('span', { class: 'ind-rot' }, x.nome), h('span', { class: 'ind-trilho' }, h('i', { class: Number(x.nota_media) < 7 ? 'verm' : Number(x.nota_media) >= 9 ? 'verde' : '', style: `width:${Math.max(2, Number(x.nota_media) * 10)}%` })),
+        h('span', { class: 'ind-val' }, `${String(x.nota_media).replace('.', ',')} · ${nf(x.avaliacoes)} aval.${x.avaliacoes < 5 ? ' (poucas)' : ''}`))) : null);
+    return h('div', {}, ...cab, h('div', { class: 'ind-grade' },
+      bloco('Conversas atendidas', 'Conversas em que a pessoa escreveu no período.', 'conversas'),
+      bloco('Agendamentos feitos', 'Marcados como agendado pela própria pessoa.', 'agendados'), notas));
+  }
+  // Seção 4: avaliações dos pacientes (só administrador; a consulta já devolve vazio para os outros).
+  function secaoAvaliacoes(ext) {
+    const av = !ext.error && ext.data ? ext.data.avaliacoes : null;
+    if (!av || !ehAdmin()) return null;
+    const pc = av.por_canal || {}, num = (v) => (v == null ? '—' : String(v).replace('.', ','));
+    return h('div', {}, h('h3', { class: 'ind-sec' }, '4. Avaliações dos pacientes'),
+      h('div', { class: 'ind-minis' }, h('div', { class: 'ind-mini' }, h('b', {}, nf(av.total)), h('span', {}, 'avaliações')), h('div', { class: 'ind-mini' }, h('b', {}, num(av.media_atendimento)), h('span', {}, 'nota do atendimento (0 a 10)')),
+        h('div', { class: 'ind-mini' }, h('b', {}, num(av.media_site)), h('span', {}, 'nota do site (0 a 10)')), h('div', { class: 'ind-mini' }, h('b', {}, nf(pc.WhatsApp)), h('span', {}, 'conheceram pelo WhatsApp')),
+        h('div', { class: 'ind-mini' }, h('b', {}, nf(pc.Instagram)), h('span', {}, 'pelo Instagram')), h('div', { class: 'ind-mini' }, h('b', {}, nf(pc.Google)), h('span', {}, 'pelo Google'))));
+  }
   async function viewIndicadores(c, silencioso = false) {
     if (IND.preset !== 'livre') [IND.de, IND.ate] = periodoDe(IND.preset);
     const titulo = h('h2', {}, 'Indicadores');
     if (!silencioso) c.replaceChildren(h('div', { class: 'pagina' }, titulo, h('p', { class: 'sub' }, 'Carregando…')));
     const minha = viewIndicadores.seq = (viewIndicadores.seq || 0) + 1;   // só a última escolha pinta a tela
     const un = UN.sel || null;
-    const r = await db.rpc('painel_indicadores_decisao', { p_de: IND.de, p_ate: IND.ate, p_unidade: un, p_incluir_teste: IND.teste });
+    const args = { p_de: IND.de, p_ate: IND.ate, p_unidade: un, p_incluir_teste: IND.teste };
+    const [r, eq, ext] = await Promise.all([db.rpc('painel_indicadores_decisao', args),
+      Promise.resolve(db.rpc('painel_indicadores_atendentes', args)).then((x) => x, () => ({ error: true, data: null })),
+      Promise.resolve(db.rpc('painel_indicadores_extras_v2', args)).then((x) => x, () => ({ error: true, data: null }))]);
     if (S.aba !== 'indicadores' || minha !== viewIndicadores.seq) return;
     if (r.error || !r.data) {
       c.replaceChildren(h('div', { class: 'pagina' }, titulo, h('p', { class: 'erro' }, msgErro(r.error || { message: 'Sem resposta do banco.' })),
@@ -4203,6 +4237,8 @@ h1.longo { font-size: 14mm; }
         painelFalta('Faltas por unidade', null, KA.falta_unidade, tFA),
         painelFalta('Faltas por tipo de atendimento', null, KA.falta_plano, tFA)),
       painel('Motivos dos cancelamentos', 'Lidos do texto que a recepção digita no Klingo, então a classificação é aproximada. Remarcações não entram aqui.', canc.length ? canc.map(([k, v]) => barra(ROT_CANCEL[k] || k, v, maxC, `${nf(v)} · ${pTxt(taxa(v, totC))}`, k === 'erro_duplicidade' || k === 'sem_motivo' ? 'cinza' : 'azul')) : h('p', { class: 'dica' }, 'Nenhum cancelamento neste período.')),
+      secaoEquipe(eq),
+      secaoAvaliacoes(ext),
       h('details', { class: 'ind-como' }, h('summary', {}, 'Como ler estes números'),
         h('ul', {},
           h('li', {}, 'Cada pessoa conta uma vez, mesmo que tenha aberto mais de uma conversa. Conversas de teste da TI ficam de fora.'),

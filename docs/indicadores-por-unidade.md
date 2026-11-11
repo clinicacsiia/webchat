@@ -57,3 +57,9 @@ Saíram da tela: tabela Por dia, reentradas, transferências, concluídas atrave
 Banco: `supabase/indicadores-decisao.sql` (aplicado em 11/11/2026; só `create or replace`): `painel_indicadores_decisao(p_de, p_ate, p_unidade, p_incluir_teste)` e a interna `ind_decisao_periodo`. ROLLBACK: ver o cabeçalho do arquivo. Nenhum relatório novo do Klingo foi preciso (usa `jornada_exame`, relatório #14359).
 Teste: `cd testes && npm run test:indicadores` (16 verificações).
 Atenção: o id da marcação no Klingo tem "m" na frente (`m22544`), diferente do guardado em `pre_agendamentos.klingo_marcacoes` (`22544`).
+
+### Equipe e avaliações na aba Indicadores (11/11/2026)
+- **3. Equipe:** três gráficos de barras por atendente: conversas atendidas (escreveu no período), agendamentos feitos (só os que a pessoa marcou como agendado; o que o sistema confirma sozinho não tem dono) e nota média do atendimento (avaliação dada à pessoa que mais escreveu na conversa; menos de 5 avaliações = "poucas"). Quem vê quem segue `painel_indicadores_equipe`: TI e gerência veem todos, supervisão a própria equipe, atendente só a si.
+- **4. Avaliações dos pacientes** (só administrador): total, nota do atendimento, nota do site e canal de origem. Voltaram a pedido do dono.
+- Banco: `supabase/indicadores-atendentes.sql` (aplicado em 11/11/2026; `painel_indicadores_atendentes`; ROLLBACK no cabeçalho). Sem ele a seção avisa qual arquivo rodar.
+- Teste: `npm run test:indicadores` (19 verificações).

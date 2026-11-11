@@ -45,6 +45,9 @@ const DECISAO = (a) => {
     clinica: { novas_marcacoes: 250, novas_pelo_chat: 30, previstos: 300, atendidos: 220, faltaram: 30, cancelados: 10, remarcados: 10, por_vir: 30, falta_confirmacao: [], falta_antecedencia: [], falta_unidade: [], falta_plano: [], cancel_motivos: {} } };
   return { periodo: { de: a.p_de, ate: a.p_ate }, anterior_periodo: { de: mais(a.p_de, -1), ate: mais(a.p_de, -1) }, unidade: un, incluir_teste: !!a.p_incluir_teste, gerado_em: agora, atual, anterior };
 };
+const ATENDENTES = (a) => ({ periodo: { de: a.p_de, ate: a.p_ate }, unidade: a.p_unidade, gerado_em: agora, nota_media_geral: 8.5,
+  pessoas: [{ nome: 'Ana', conversas: 40, agendados: 12, avaliacoes: 8, nota_media: 9.4 }, { nome: 'Bia', conversas: 25, agendados: 3, avaliacoes: 2, nota_media: 6.5 }, { nome: 'Caio', conversas: 10, agendados: 0, avaliacoes: 0, nota_media: null }] });
+const EXTRAS = (admin) => ({ por_hora: [], pedidos: {}, avaliacoes: admin ? { total: 10, media_atendimento: 8.5, media_site: 7.9, por_canal: { WhatsApp: 4, Instagram: 5, Google: 1 } } : null });
 const jwt = (sub) => { const b = (o) => Buffer.from(JSON.stringify(o)).toString('base64url'); return `${b({ alg: 'HS256', typ: 'JWT' })}.${b({ sub, role: 'authenticated', exp: Math.floor(Date.now() / 1000) + 86400 })}.x`; };
 
 function servidor() {
@@ -58,7 +61,7 @@ function servidor() {
   });
 }
 
-async function pagina(browser, { semSql = false, admin = false } = {}) {
+async function pagina(browser, { semSql = false, admin = false, semAtend = false } = {}) {
   const eu = admin ? ADM : EU;
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 } });   // cartões do topo somem em telas baixas (<= 820 px)
   await ctx.addInitScript(([id, token, email]) => {
@@ -81,6 +84,8 @@ async function pagina(browser, { semSql = false, admin = false } = {}) {
     else if (p.startsWith('/rest/v1/agentes')) corpo = url.searchParams.get('id') ? (objeto ? eu : [eu]) : [eu];
     else if (p.startsWith('/rest/v1/conversas')) corpo = CONVERSAS;
     else if (p.startsWith('/rest/v1/conversa_grupo')) corpo = GRUPOS;
+    else if (p.endsWith('/rpc/painel_indicadores_atendentes')) { const b = JSON.parse(req.postData() || '{}'); reg.rpcs.push(['atendentes', b]); if (semAtend) { status = 404; corpo = { code: 'PGRST202', message: 'function not found' }; } else corpo = ATENDENTES(b); }
+    else if (p.endsWith('/rpc/painel_indicadores_extras_v2')) { const b = JSON.parse(req.postData() || '{}'); reg.rpcs.push(['extras', b]); corpo = EXTRAS(admin); }
     else if (p.endsWith('/rpc/painel_indicadores_decisao')) {
       const b = JSON.parse(req.postData() || '{}'); reg.rpcs.push(['decisao', b]);
       if (semSql) { status = 404; corpo = { code: 'PGRST202', message: 'Could not find the function public.painel_indicadores_decisao in the schema cache' }; } else corpo = DECISAO(b);
@@ -138,7 +143,7 @@ await caso('Aba Indicadores: período padrão é Hoje e pede só a consulta nova
   const t = await abrir(); await abaInd(t);
   const a = ultimo(t.reg, 'decisao'), ctrl = await t.page.locator('.ind-ctl input[type=date]').evaluateAll((l) => l.map((i) => i.value));
   await t.ctx.close();
-  return { ok: a.p_de === HOJE && a.p_ate === HOJE && a.p_unidade === null && a.p_incluir_teste === false && ctrl.join() === `${HOJE},${HOJE}` && t.reg.rpcs.every((r) => r[0] === 'decisao') && !t.reg.excecoes.length, detalhe: JSON.stringify(a) + (t.reg.excecoes[0] ?? '') };
+  return { ok: a.p_de === HOJE && a.p_ate === HOJE && a.p_unidade === null && a.p_incluir_teste === false && ctrl.join() === `${HOJE},${HOJE}` && !t.reg.excecoes.length, detalhe: JSON.stringify(a) + (t.reg.excecoes[0] ?? '') };
 });
 await caso('Quatro cartões, cada um comparado com o período anterior (taxa em pontos, contagem em %, falta subir é ruim)', async () => {
   const t = await abrir(); await abaInd(t);
@@ -237,6 +242,29 @@ await caso('"Incluir conversas de teste": só o administrador vê a caixa; marca
   const a = ultimo(t.reg, 'decisao');
   await t.ctx.close();
   return { ok: vistaComum === 0 && vistaAdm === 1 && a.p_incluir_teste === true, detalhe: `comum=${vistaComum} adm=${vistaAdm} ${a.p_incluir_teste}` };
+});
+await caso('Equipe: barras por atendente (conversas, agendamentos, nota) com o melhor em destaque e aviso de poucas avaliações', async () => {
+  const t = await abrir(); await abaInd(t);
+  const secao = t.page.locator('h3', { hasText: '3. Equipe' }); await secao.waitFor();
+  const paineis = await t.page.locator('.ind-painel').evaluateAll((l) => l.map((p) => ({ tit: p.querySelector('h4').textContent, linhas: [...p.querySelectorAll('.ind-linha')].map((x) => x.innerText.replace(/\n/g, ' ')) })));
+  const por = (t0) => paineis.find((x) => x.tit.startsWith(t0)) || { linhas: [] };
+  const forte = await t.page.locator('.ind-linha.forte', { hasText: 'Ana' }).count();
+  await t.ctx.close();
+  return { ok: por('Conversas atendidas').linhas[0].startsWith('Ana') && /40/.test(por('Conversas atendidas').linhas[0]) && por('Agendamentos feitos').linhas.map((l) => l.split(' ')[0]).join() === 'Ana,Bia,Caio'
+    && /9,4 · 8 aval\./.test(por('Nota média').linhas[0]) && /6,5 · 2 aval\. \(poucas\)/.test(por('Nota média').linhas[1]) && por('Nota média').linhas.length === 2 && forte >= 2, detalhe: JSON.stringify(paineis.slice(-3)) };
+});
+await caso('Avaliações dos pacientes voltaram: só o administrador vê; atendente comum não', async () => {
+  const adm = await abrir({ admin: true }); await abaInd(adm);
+  await adm.page.waitForFunction(() => /4\. Avaliações dos pacientes/.test(document.querySelector('.pagina')?.innerText || ''));
+  const ta = await textoAba(adm); await adm.ctx.close();
+  const c = await abrir(); await abaInd(c); await new Promise((r) => setTimeout(r, 300));
+  const tc = await textoAba(c); await c.ctx.close();
+  return { ok: /10 avaliações/.test(ta) && /8,5 nota do atendimento/.test(ta) && /5 pelo Instagram/.test(ta) && !/Avaliações dos pacientes/.test(tc) && /3\. Equipe/.test(tc) };
+});
+await caso('Sem o SQL dos atendentes, a parte da equipe avisa qual arquivo rodar e o resto da tela funciona', async () => {
+  const t = await abrir({ semAtend: true }); await abaInd(t);
+  const txt = await textoAba(t); await t.ctx.close();
+  return { ok: /supabase\/indicadores-atendentes\.sql/.test(txt) && /Por que não estão agendando/.test(txt) && !t.reg.excecoes.length };
 });
 await caso('Sem o SQL novo no banco, mostra a mensagem com o arquivo a aplicar e não quebra', async () => {
   const t = await abrir({ semSql: true });
