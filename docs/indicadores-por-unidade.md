@@ -64,3 +64,5 @@ Atenção: o id da marcação no Klingo tem "m" na frente (`m22544`), diferente 
 - Banco: `supabase/indicadores-atendentes.sql` (aplicado em 11/11/2026; `painel_indicadores_atendentes`; ROLLBACK no cabeçalho). Sem ele a seção avisa qual arquivo rodar.
 - Teste: `npm run test:indicadores` (19 verificações).
 - **Quem respondeu primeiro (11/11/2026):** sem registro novo: a primeira mensagem de atendente de cada conversa abre o "primeiro a responder" (vale também para o histórico). A aba mostra, por atendente, quantas conversas respondeu primeiro e a **mediana de minutos** até essa resposta (verde = mais rápido, vermelho > 30 min). Conversas contadas pelo dia em que abriram. Mesmo arquivo `supabase/indicadores-atendentes.sql` (reaplicado).
+
+> Publicação (11/11/2026): a publicação do GitHub Pages do PR #142 travou na fila sem iniciar (0 etapas) e não pôde ser cancelada. Este commit só de documentação existe para gerar uma publicação nova, como em 09/11/2026 (#110 e #111 travaram e o merge seguinte, #112, publicou).
