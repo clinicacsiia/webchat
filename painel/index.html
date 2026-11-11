@@ -2731,10 +2731,10 @@
       nome: primeiroNome(quem), paciente: primeiroNome(pac), nome_completo: bonito(quem), atendente: primeiroNome(S.me && S.me.nome),
       saudacao: hora < 12 ? 'Bom dia' : hora < 18 ? 'Boa tarde' : 'Boa noite',
       exame: itens.length ? listaPt(itens) : (ab && ab.exames) || '',
-      data: hor ? dataBR(hor.data) : (ab && ab.quando ? String(ab.quando).slice(8, 10) + '/' + String(ab.quando).slice(5, 7) : ''),
-      hora: hor ? String(hor.hora || '') : (ab && ab.quando ? String(ab.quando).slice(11, 16) : ''),
-      unidade: hor && hor.unidade ? curtaUnidade(hor.unidade) : (p && p.unidade ? curtaUnidade(p.unidade) : ''),
-      plano: (p && p.plano) || '', medico: (p && p.profissional) || ''
+      data: hor && hor.data ? dataBR(hor.data) : (p && p.data_desejada ? dataBR(String(p.data_desejada).slice(0, 10)) : (ab && ab.quando ? String(ab.quando).slice(8, 10) + '/' + String(ab.quando).slice(5, 7) : '')),
+      hora: hor && hor.hora ? String(hor.hora).slice(0, 5) : (p && p.hora_desejada ? String(p.hora_desejada).slice(0, 5) : (ab && ab.quando ? String(ab.quando).slice(11, 16) : '')),
+      unidade: hor && hor.unidade ? curtaUnidade(hor.unidade) : (p && p.unidade ? curtaUnidade(p.unidade) : (c.unidade_inicial ? (UNIDADES_ROTULO[c.unidade_inicial] || c.unidade_inicial) : '')),
+      plano: (p && p.plano) || '', medico: (p && p.profissional) || (hor && hor.profissional ? bonito(hor.profissional) : '') || (c.medico_preferido ? nomeBonito(c.medico_preferido) : '')
     };
   }
   function aplicarVariaveis(texto) {
