@@ -2316,6 +2316,8 @@
     const unidas = S.abertaId && membrosDe(S.abertaId).length > 1;
     if (unidas) S.msgs.sort((a, b) => String(a.criado_em).localeCompare(String(b.criado_em)) || a.id - b.id);
     S.msgs.forEach((m) => {
+      // Assumir muda todas as conversas unidas e cada uma grava o seu "entrou na conversa": mostra só o da conversa aberta (o paciente só vê esse).
+      if (unidas && m.autor === 'sistema' && m.conversa_id !== S.abertaId && /entrou na conversa\.$/.test(m.texto || '')) return;
       const d = rotuloDia(m.criado_em);
       if (d !== dia) { out.push(h('div', { class: 'dia' }, d)); dia = d; ultimoQuem = ''; }
       if (unidas && ultimaConv !== null && m.conversa_id !== ultimaConv) { out.push(h('div', { class: 'msg-outra' }, 'Outra conversa da mesma pessoa · ' + fmtHora(m.criado_em))); ultimoQuem = ''; }
