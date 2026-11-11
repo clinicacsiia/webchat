@@ -2409,7 +2409,7 @@
       if (unidas && ultimaConv !== null && m.conversa_id !== ultimaConv) { out.push(h('div', { class: 'msg-outra' }, 'Outra conversa da mesma pessoa · ' + fmtHora(m.criado_em))); ultimoQuem = ''; }
       ultimaConv = m.conversa_id;
       const ag = m.agente_id ? S.agentes.get(m.agente_id) : null;
-      const quem = m.autor === 'agente' ? (ag ? ag.nome : 'Assistente virtual') : '';
+      const quem = m.autor === 'agente' ? (ag ? ag.nome : 'Assistente automático') : '';
       const editando = S.editandoId === m.id;
       out.push(h('div', { class: 'msg ' + m.autor + (m.excluida_em ? ' apagada' : ''), 'data-anexo': m.opcoes && m.opcoes.tipo === 'anexo' ? String(m.opcoes.id) : null },
         m.autor === 'agente' && quem !== ultimoQuem ? h('span', { class: 'quem' }, quem) : null,
