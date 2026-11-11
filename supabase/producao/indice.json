@@ -1,0 +1,8957 @@
+{
+ "gerado_em": "2026-11-11T10:44:44.301076+00:00",
+ "postgres": "17.11",
+ "tabelas": [
+  {
+   "nome": "agenda_ao_vivo",
+   "colunas": [
+    "dia",
+    "lendo_desde",
+    "lido_em",
+    "ok",
+    "erro",
+    "atualizado_em"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "agenda_ao_vivo_pedido",
+   "colunas": [
+    "conversa_id",
+    "em"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "agenda_modalidade_local",
+   "colunas": [
+    "modalidade",
+    "local_padrao"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "agenda_ocupacao",
+   "colunas": [
+    "inicio",
+    "profissional",
+    "unidade",
+    "fonte",
+    "qtd",
+    "procedimento",
+    "reserva_min",
+    "local",
+    "visto_em",
+    "primeira_vez"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "agenda_ocupacao_meta",
+   "colunas": [
+    "id",
+    "valido_desde",
+    "atualizado_em",
+    "linhas",
+    "conferindo_ate"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "agenda_regra_duracao",
+   "colunas": [
+    "modalidade",
+    "minutos"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "agendamento_fechamento",
+   "colunas": [
+    "id",
+    "pre_id",
+    "conversa_id",
+    "chave",
+    "exames",
+    "quando",
+    "desfecho",
+    "origem",
+    "por",
+    "nota",
+    "remarcacao",
+    "remarcacao_conversa",
+    "fechado_em",
+    "atualizado_em"
+   ],
+   "rls": true,
+   "politicas": 1
+  },
+  {
+   "nome": "agendamento_reconhecer_estado",
+   "colunas": [
+    "id",
+    "iniciou_em",
+    "terminou_em",
+    "proximo_em",
+    "falhas",
+    "erro"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "agentes",
+   "colunas": [
+    "id",
+    "nome",
+    "email",
+    "papel",
+    "ativo",
+    "criado_em",
+    "visto_em",
+    "pedido_em"
+   ],
+   "rls": true,
+   "politicas": 3
+  },
+  {
+   "nome": "alerta_preco",
+   "colunas": [
+    "id",
+    "conversa_id",
+    "mensagem_id",
+    "agente_id",
+    "valor_informado",
+    "tipo",
+    "referencia",
+    "criado_em",
+    "conferido_em",
+    "conferido_por"
+   ],
+   "rls": true,
+   "politicas": 1
+  },
+  {
+   "nome": "assinatura_tentativas",
+   "colunas": [
+    "id",
+    "atendimento_id",
+    "numero",
+    "score_similaridade",
+    "ip_origem",
+    "user_agent",
+    "created_at"
+   ],
+   "rls": true,
+   "politicas": 1
+  },
+  {
+   "nome": "atendimento_tipo",
+   "colunas": [
+    "chave",
+    "instrucao"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "atendimentos",
+   "colunas": [
+    "id",
+    "paciente_id",
+    "email_informado",
+    "status",
+    "documento_texto",
+    "documento_hash",
+    "tentativas_falhas",
+    "bloqueado_em",
+    "links_enviados",
+    "created_at",
+    "atualizado_em"
+   ],
+   "rls": true,
+   "politicas": 2
+  },
+  {
+   "nome": "autoencerramento_execucao",
+   "colunas": [
+    "id",
+    "em",
+    "modo",
+    "elegiveis",
+    "fechadas"
+   ],
+   "rls": true,
+   "politicas": 1
+  },
+  {
+   "nome": "autoencerramento_fechada",
+   "colunas": [
+    "conversa_id",
+    "fechada_em",
+    "aguarda_paciente_desde"
+   ],
+   "rls": true,
+   "politicas": 1
+  },
+  {
+   "nome": "avaliacao_atendimento",
+   "colunas": [
+    "id",
+    "conversa_id",
+    "encerrada_em",
+    "nota_atendimento",
+    "nota_site",
+    "canal",
+    "criado_em"
+   ],
+   "rls": true,
+   "politicas": 1
+  },
+  {
+   "nome": "catalogo_agenda",
+   "colunas": [
+    "id",
+    "unidade",
+    "local",
+    "profissional_id",
+    "profissional",
+    "especialidade",
+    "procedimento_id",
+    "procedimento",
+    "dia_num",
+    "dia",
+    "hora_ini",
+    "hora_fim",
+    "duracao_min",
+    "operadoras",
+    "tele",
+    "vagas_extras",
+    "vig_ini",
+    "vig_fim",
+    "hash"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "catalogo_foto",
+   "colunas": [
+    "id",
+    "tipo",
+    "motivo",
+    "referencia",
+    "tirada_em",
+    "linhas",
+    "dados"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "catalogo_meta",
+   "colunas": [
+    "tipo",
+    "linhas",
+    "atualizado_em"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "catalogo_mudanca",
+   "colunas": [
+    "id",
+    "lote",
+    "detectada_em",
+    "tipo",
+    "evento",
+    "chave",
+    "descricao",
+    "campo",
+    "antes",
+    "depois"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "catalogo_plano",
+   "colunas": [
+    "id",
+    "operadora",
+    "plano",
+    "produto",
+    "busca",
+    "ativo",
+    "visto_em",
+    "removido_em"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "catalogo_preco",
+   "colunas": [
+    "id",
+    "chave",
+    "fonte",
+    "operadora_id",
+    "operadora",
+    "tabela_id",
+    "tabela",
+    "procedimento_id",
+    "procedimento",
+    "item_codigo",
+    "item_descricao",
+    "valor",
+    "moeda",
+    "amostras",
+    "valor_min",
+    "valor_max",
+    "ultima_marcacao",
+    "confianca",
+    "status",
+    "vigente_desde",
+    "visto_em",
+    "removido_em"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "catalogo_preco_revisao",
+   "colunas": [
+    "procedimento_id",
+    "opn",
+    "operadora",
+    "ligado",
+    "valor",
+    "nota",
+    "revisado_por",
+    "revisado_em",
+    "referencia"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "catalogo_preco_revisao_log",
+   "colunas": [
+    "id",
+    "procedimento_id",
+    "opn",
+    "operadora",
+    "ligado_antes",
+    "ligado_depois",
+    "valor_antes",
+    "valor_depois",
+    "nota",
+    "por",
+    "criado_em"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "catalogo_procedimento",
+   "colunas": [
+    "id",
+    "nome",
+    "tuss",
+    "especialidade",
+    "classe",
+    "idade_min",
+    "idade_max",
+    "sexo",
+    "preparo",
+    "busca",
+    "ativo",
+    "visto_em",
+    "removido_em",
+    "demanda_90d",
+    "modalidade"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "catalogo_regiao",
+   "colunas": [
+    "codigo",
+    "nome",
+    "grupo",
+    "tem_lado",
+    "ordem",
+    "padrao"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "chat_push_inscricao",
+   "colunas": [
+    "id",
+    "conversa_id",
+    "endpoint",
+    "p256dh",
+    "auth",
+    "criado_em"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "config",
+   "colunas": [
+    "chave",
+    "valor"
+   ],
+   "rls": true,
+   "politicas": 2
+  },
+  {
+   "nome": "conta_paciente_evento",
+   "colunas": [
+    "id",
+    "tipo",
+    "tinha_cadastro",
+    "conversas",
+    "criado_em"
+   ],
+   "rls": true,
+   "politicas": 1
+  },
+  {
+   "nome": "contas_paciente",
+   "colunas": [
+    "id",
+    "email",
+    "paciente_id",
+    "criado_em",
+    "ultimo_acesso_em",
+    "nome",
+    "telefone",
+    "aceitou_lgpd_em",
+    "vinculo_tentativas",
+    "vinculo_ultima_em",
+    "vinculado_em",
+    "vinculo_metodo",
+    "senha_provisoria",
+    "identidade_conferida_em"
+   ],
+   "rls": true,
+   "politicas": 1
+  },
+  {
+   "nome": "contatos",
+   "colunas": [
+    "id",
+    "nome",
+    "telefone",
+    "email",
+    "origem",
+    "tags",
+    "observacoes",
+    "aceitou_lgpd_em",
+    "criado_em",
+    "ultimo_contato_em",
+    "teste",
+    "teste_motivo"
+   ],
+   "rls": true,
+   "politicas": 3
+  },
+  {
+   "nome": "convenio_config",
+   "colunas": [
+    "operadora",
+    "ativo",
+    "mensagem_inativo",
+    "aviso",
+    "um_por_vez",
+    "msg_varios",
+    "motivo",
+    "atualizado_em",
+    "atualizado_por",
+    "suspenso_em",
+    "suspenso_ate",
+    "suspenso_por",
+    "suspenso_motivo",
+    "revisao_avisada_em"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "convenio_evento",
+   "colunas": [
+    "id",
+    "criado_em",
+    "operadora",
+    "tipo",
+    "descricao",
+    "antes",
+    "depois",
+    "variacao_pct",
+    "relevante",
+    "origem",
+    "visto_em",
+    "visto_por"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "conversa_agendado_conferencia",
+   "colunas": [
+    "conversa_id",
+    "situacao",
+    "fonte",
+    "codigo",
+    "exame_em",
+    "encerrada_em",
+    "verificada_em",
+    "tentativas",
+    "aviso_texto",
+    "avisada_em",
+    "push_em"
+   ],
+   "rls": true,
+   "politicas": 1
+  },
+  {
+   "nome": "conversa_anexo",
+   "colunas": [
+    "id",
+    "conversa_id",
+    "tipo",
+    "mime",
+    "dados",
+    "ocr_texto",
+    "criado_em",
+    "largura",
+    "altura",
+    "ocr_motor",
+    "ocr_linhas",
+    "ia_leitura",
+    "ia_modelo",
+    "ia_ms",
+    "ia_erro",
+    "ia_em",
+    "escolha",
+    "escolha_em",
+    "gabarito",
+    "gabarito_por",
+    "gabarito_em",
+    "klingo_conferido_em",
+    "klingo_conferido_por"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "conversa_encerramento",
+   "colunas": [
+    "id",
+    "conversa_id",
+    "encerrada_em",
+    "motivo",
+    "origem",
+    "por"
+   ],
+   "rls": true,
+   "politicas": 1
+  },
+  {
+   "nome": "conversa_evento",
+   "colunas": [
+    "id",
+    "conversa_id",
+    "tipo",
+    "em",
+    "de_agente",
+    "para_agente",
+    "por",
+    "motivo",
+    "detalhe"
+   ],
+   "rls": true,
+   "politicas": 1
+  },
+  {
+   "nome": "conversa_fluxo",
+   "colunas": [
+    "conversa_id",
+    "passo",
+    "tentativas",
+    "dados",
+    "iniciado_em",
+    "atualizado_em"
+   ],
+   "rls": true,
+   "politicas": 1
+  },
+  {
+   "nome": "conversa_grupo",
+   "colunas": [
+    "conversa_id",
+    "grupo_id",
+    "sinais",
+    "origem",
+    "confirmado_por",
+    "criado_em"
+   ],
+   "rls": true,
+   "politicas": 1
+  },
+  {
+   "nome": "conversa_grupo_recusa",
+   "colunas": [
+    "a",
+    "b",
+    "por",
+    "em"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "conversa_segredo",
+   "colunas": [
+    "conversa_id",
+    "token"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "conversas",
+   "colunas": [
+    "id",
+    "contato_id",
+    "status",
+    "agente_id",
+    "ultima_mensagem",
+    "nao_lidas_agente",
+    "criado_em",
+    "atualizado_em",
+    "encerrada_em",
+    "ia_ativa",
+    "triagem_resumo",
+    "triagem_urgencia",
+    "alerta_agenda",
+    "nome_informado",
+    "email_informado",
+    "unidade_inicial",
+    "medico_preferido",
+    "paciente_tipo",
+    "paciente_nome",
+    "irmaos",
+    "irmaos_modo",
+    "irmao_de",
+    "motor",
+    "conta_id",
+    "cliente_aguarda_desde",
+    "espera_alerta_em",
+    "espera_aviso_paciente_em",
+    "motivo_encerramento",
+    "encerrada_por",
+    "encerramento_origem",
+    "aguarda_paciente_desde",
+    "teste",
+    "teste_motivo",
+    "teste_manual",
+    "primeiro_humano_em",
+    "previsao_aceita_em",
+    "reentrada_de",
+    "reentrada_motivo",
+    "reentrada_motivo_auto",
+    "reentrada_texto_informado",
+    "unidade_responsavel",
+    "push_silenciado_em"
+   ],
+   "rls": true,
+   "politicas": 2
+  },
+  {
+   "nome": "despedida_versao",
+   "colunas": [
+    "id",
+    "texto",
+    "mime",
+    "dados",
+    "criado_em",
+    "criado_por"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "equipe_convites",
+   "colunas": [
+    "email",
+    "papel",
+    "criado_por",
+    "criado_em",
+    "usado_em"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "equipe_notificacao",
+   "colunas": [
+    "id",
+    "agente_id",
+    "tipo",
+    "conversa_id",
+    "detalhe",
+    "criado_em",
+    "lida_em"
+   ],
+   "rls": true,
+   "politicas": 1
+  },
+  {
+   "nome": "fila_aviso",
+   "colunas": [
+    "id",
+    "fila_id",
+    "conta_id",
+    "tipo",
+    "titulo",
+    "corpo",
+    "criado_em",
+    "enviado_em"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "fila_chegada",
+   "colunas": [
+    "id",
+    "conta_id",
+    "paciente_id",
+    "nome",
+    "senha",
+    "status",
+    "origem",
+    "chegou_em",
+    "chamado_em",
+    "concluido_em",
+    "email",
+    "telefone",
+    "pede_senha",
+    "ticket"
+   ],
+   "rls": true,
+   "politicas": 1
+  },
+  {
+   "nome": "fluxo_evento",
+   "colunas": [
+    "id",
+    "conversa_id",
+    "passo",
+    "entrada",
+    "entendido",
+    "ms",
+    "ms_cliente",
+    "criado_em"
+   ],
+   "rls": true,
+   "politicas": 1
+  },
+  {
+   "nome": "fluxo_texto",
+   "colunas": [
+    "chave",
+    "texto",
+    "descricao"
+   ],
+   "rls": true,
+   "politicas": 2
+  },
+  {
+   "nome": "ia_evento",
+   "colunas": [
+    "id",
+    "pre_agendamento_id",
+    "conversa_id",
+    "tipo",
+    "de",
+    "para",
+    "por",
+    "agente_id",
+    "detalhe",
+    "contexto",
+    "criado_em"
+   ],
+   "rls": true,
+   "politicas": 1
+  },
+  {
+   "nome": "incidente_chat",
+   "colunas": [
+    "id",
+    "codigo",
+    "tipo",
+    "conversa_id",
+    "passo",
+    "versao",
+    "detalhe",
+    "criado_em"
+   ],
+   "rls": true,
+   "politicas": 1
+  },
+  {
+   "nome": "ind_conclusao_dia",
+   "colunas": [
+    "dia",
+    "ordem",
+    "pessoa",
+    "teste",
+    "unidades",
+    "origem",
+    "motivo",
+    "cruzou",
+    "mais24",
+    "reencerrada"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "ind_fechamento",
+   "colunas": [
+    "dia",
+    "fechado_em",
+    "regra_versao",
+    "resumo"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "ind_pessoa_dia",
+   "colunas": [
+    "dia",
+    "pessoa",
+    "teste",
+    "unidades",
+    "contatos",
+    "entrou",
+    "reentradas",
+    "transferencias"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "ind_semhumano_dia",
+   "colunas": [
+    "dia",
+    "ordem",
+    "pessoa",
+    "teste",
+    "unidades"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "jornada_acesso",
+   "colunas": [
+    "id",
+    "card_id",
+    "usuario",
+    "quando"
+   ],
+   "rls": true,
+   "politicas": 1
+  },
+  {
+   "nome": "jornada_card",
+   "colunas": [
+    "id",
+    "paciente_chave",
+    "data_ref",
+    "unidade",
+    "coluna",
+    "coluna_desde",
+    "responsavel",
+    "prioridade",
+    "versao",
+    "conversa_id",
+    "arquivado_em",
+    "criado_em",
+    "atualizado_em"
+   ],
+   "rls": true,
+   "politicas": 1
+  },
+  {
+   "nome": "jornada_checklist_modelo",
+   "colunas": [
+    "id",
+    "coluna",
+    "ordem",
+    "titulo",
+    "ativa"
+   ],
+   "rls": true,
+   "politicas": 1
+  },
+  {
+   "nome": "jornada_coluna",
+   "colunas": [
+    "id",
+    "nome",
+    "ordem",
+    "etapa",
+    "origem",
+    "sla_min",
+    "ativa"
+   ],
+   "rls": true,
+   "politicas": 1
+  },
+  {
+   "nome": "jornada_escala",
+   "colunas": [
+    "coluna",
+    "usuario",
+    "ativa"
+   ],
+   "rls": true,
+   "politicas": 1
+  },
+  {
+   "nome": "jornada_evento",
+   "colunas": [
+    "id",
+    "card_id",
+    "quando",
+    "tipo",
+    "origem",
+    "usuario",
+    "de_coluna",
+    "para_coluna",
+    "detalhe"
+   ],
+   "rls": true,
+   "politicas": 1
+  },
+  {
+   "nome": "jornada_exame",
+   "colunas": [
+    "id",
+    "card_id",
+    "marcacao_id",
+    "atendimento_id",
+    "procedimento",
+    "operadora",
+    "unidade",
+    "agendado_em",
+    "agendado_para",
+    "status",
+    "confirm_status",
+    "cancelamento_motivo",
+    "atualizado_em"
+   ],
+   "rls": true,
+   "politicas": 1
+  },
+  {
+   "nome": "jornada_mensagem",
+   "colunas": [
+    "id",
+    "card_id",
+    "autor",
+    "autor_nome",
+    "texto",
+    "criado_em"
+   ],
+   "rls": true,
+   "politicas": 1
+  },
+  {
+   "nome": "jornada_paciente",
+   "colunas": [
+    "prontuario",
+    "nome",
+    "fone_chave",
+    "atualizado_em"
+   ],
+   "rls": true,
+   "politicas": 1
+  },
+  {
+   "nome": "jornada_pendencia",
+   "colunas": [
+    "chave",
+    "ordem",
+    "titulo",
+    "texto",
+    "nivel",
+    "passos",
+    "criada_em",
+    "resolvida_em",
+    "resolvida_por",
+    "resolucao"
+   ],
+   "rls": true,
+   "politicas": 1
+  },
+  {
+   "nome": "jornada_regra",
+   "colunas": [
+    "chave",
+    "nome",
+    "descricao",
+    "ativa",
+    "parametros"
+   ],
+   "rls": true,
+   "politicas": 1
+  },
+  {
+   "nome": "jornada_sync_estado",
+   "colunas": [
+    "id",
+    "klingo_em",
+    "klingo_resultado",
+    "chat_em",
+    "chat_resultado",
+    "klingo_modo",
+    "klingo_proximo_em",
+    "klingo_tentativa_em",
+    "klingo_completo_em",
+    "klingo_movimento_em",
+    "klingo_erro",
+    "klingo_falhas",
+    "vigia_em",
+    "vigia_resultado",
+    "vigia_erro",
+    "klingo_fim_em"
+   ],
+   "rls": true,
+   "politicas": 1
+  },
+  {
+   "nome": "jornada_tarefa",
+   "colunas": [
+    "id",
+    "card_id",
+    "titulo",
+    "origem",
+    "chave",
+    "criada_por",
+    "vence_em",
+    "criada_em",
+    "feita_em",
+    "feita_por"
+   ],
+   "rls": true,
+   "politicas": 1
+  },
+  {
+   "nome": "jornada_transicao",
+   "colunas": [
+    "de",
+    "para"
+   ],
+   "rls": true,
+   "politicas": 1
+  },
+  {
+   "nome": "medico_aviso",
+   "colunas": [
+    "id",
+    "criado_em",
+    "profissional",
+    "unidade",
+    "tipo",
+    "antes",
+    "depois",
+    "status",
+    "resolvido_em",
+    "resolvido_por"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "medico_base",
+   "colunas": [
+    "profissional",
+    "unidade",
+    "dias",
+    "hora_ini",
+    "hora_fim",
+    "conferido_em"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "medico_convenio_bloqueio",
+   "colunas": [
+    "profissional",
+    "operadora",
+    "procedimento_id",
+    "criado_em",
+    "criado_por"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "medico_excecao",
+   "colunas": [
+    "id",
+    "profissional",
+    "data_ini",
+    "data_fim",
+    "motivo",
+    "criado_em",
+    "criado_por"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "medico_particular",
+   "colunas": [
+    "profissional",
+    "criado_em",
+    "criado_por"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "medico_proc_aviso",
+   "colunas": [
+    "id",
+    "criado_em",
+    "profissional",
+    "procedimento_id",
+    "procedimento",
+    "especialidade",
+    "status",
+    "resolvido_em",
+    "resolvido_por"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "medico_proc_base",
+   "colunas": [
+    "profissional",
+    "procedimento_id",
+    "conferido_em"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "medico_regra",
+   "colunas": [
+    "profissional",
+    "unidade",
+    "dias",
+    "hora_ini",
+    "hora_fim",
+    "nota",
+    "atualizado_em",
+    "atualizado_por"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "medico_turno",
+   "colunas": [
+    "profissional",
+    "unidade",
+    "dia",
+    "hora_ini",
+    "hora_fim",
+    "atualizado_em"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "mensagens",
+   "colunas": [
+    "id",
+    "conversa_id",
+    "autor",
+    "agente_id",
+    "texto",
+    "criado_em",
+    "opcoes",
+    "editada_em",
+    "excluida_em"
+   ],
+   "rls": true,
+   "politicas": 2
+  },
+  {
+   "nome": "ocr_aprendido",
+   "colunas": [
+    "texto_norm",
+    "procedimento_id",
+    "vezes",
+    "exemplo",
+    "atualizado_em"
+   ],
+   "rls": true,
+   "politicas": 1
+  },
+  {
+   "nome": "org_alteracao_log",
+   "colunas": [
+    "id",
+    "em",
+    "por",
+    "acao",
+    "alvo",
+    "antes",
+    "depois"
+   ],
+   "rls": true,
+   "politicas": 1
+  },
+  {
+   "nome": "org_equipe",
+   "colunas": [
+    "id",
+    "nome",
+    "unidade",
+    "transversal",
+    "ativa",
+    "criado_em"
+   ],
+   "rls": true,
+   "politicas": 1
+  },
+  {
+   "nome": "org_membro",
+   "colunas": [
+    "id",
+    "equipe_id",
+    "agente_id",
+    "rotulo",
+    "funcao",
+    "ativo",
+    "inicio",
+    "fim"
+   ],
+   "rls": true,
+   "politicas": 1
+  },
+  {
+   "nome": "paciente_aviso",
+   "colunas": [
+    "id",
+    "conversa_id",
+    "tipo",
+    "detalhe",
+    "criado_em",
+    "resolvido_em",
+    "resolvido_por"
+   ],
+   "rls": true,
+   "politicas": 1
+  },
+  {
+   "nome": "paciente_historico",
+   "colunas": [
+    "id",
+    "paciente_id",
+    "pre_agendamento_id",
+    "conversa_id",
+    "ocorreu_em",
+    "unidade",
+    "profissional",
+    "plano",
+    "exames",
+    "horarios",
+    "origem",
+    "cancelado",
+    "criado_em"
+   ],
+   "rls": true,
+   "politicas": 1
+  },
+  {
+   "nome": "paciente_klingo_vinculo",
+   "colunas": [
+    "conversa_id",
+    "situacao",
+    "prontuario",
+    "cadastro_faltando",
+    "historico",
+    "chave",
+    "verificado_em"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "pacientes",
+   "colunas": [
+    "id",
+    "nome",
+    "nome_norm",
+    "telefones",
+    "email",
+    "dt_nasc",
+    "cpf",
+    "dados",
+    "validado",
+    "validado_em",
+    "revisar",
+    "origem_conversa",
+    "criado_em",
+    "atualizado_em",
+    "ultima_visita_em",
+    "email_cadastro",
+    "perfil_biometrico_historico",
+    "assinatura_papel_path"
+   ],
+   "rls": true,
+   "politicas": 2
+  },
+  {
+   "nome": "permissao_observacao",
+   "colunas": [
+    "id",
+    "em",
+    "agente_id",
+    "acao",
+    "conversa_id",
+    "unidade",
+    "detalhe"
+   ],
+   "rls": true,
+   "politicas": 1
+  },
+  {
+   "nome": "pessoa_klingo_vinculo",
+   "colunas": [
+    "prontuario",
+    "conversa_id",
+    "por",
+    "em"
+   ],
+   "rls": true,
+   "politicas": 1
+  },
+  {
+   "nome": "pre_agendamento_itens",
+   "colunas": [
+    "id",
+    "conversa_id",
+    "modalidade",
+    "regiao",
+    "regiao_nome",
+    "lado",
+    "procedimento_id",
+    "procedimento",
+    "quantidade",
+    "ativo",
+    "criado_em"
+   ],
+   "rls": true,
+   "politicas": 1
+  },
+  {
+   "nome": "pre_agendamentos",
+   "colunas": [
+    "id",
+    "conversa_id",
+    "tipo",
+    "especialidade",
+    "procedimento",
+    "plano",
+    "unidade",
+    "profissional",
+    "preferencia_horario",
+    "paciente",
+    "status",
+    "klingo_paciente_id",
+    "criado_em",
+    "atualizado_em",
+    "paciente_id",
+    "identidade",
+    "etapa",
+    "data_desejada",
+    "hora_desejada",
+    "escolha_horario",
+    "agendado_auto_em",
+    "conferencia_status",
+    "conferencia_detalhe",
+    "conferencia_via",
+    "conferencia_em",
+    "conferencia_falhas",
+    "confirmacao_enviada_em",
+    "escolha_horario_chat",
+    "klingo_marcacoes",
+    "agendado_em",
+    "agendado_por"
+   ],
+   "rls": true,
+   "politicas": 3
+  },
+  {
+   "nome": "preco_observado",
+   "colunas": [
+    "procedimento_norm",
+    "operadora_norm",
+    "procedimento",
+    "operadora",
+    "valor_tipico",
+    "valor_min",
+    "valor_max",
+    "amostras",
+    "janela_ini",
+    "janela_fim",
+    "atualizado_em"
+   ],
+   "rls": true,
+   "politicas": 1
+  },
+  {
+   "nome": "profissional_bloqueio",
+   "colunas": [
+    "profissional",
+    "nome",
+    "motivo",
+    "bloqueado_em",
+    "bloqueado_por",
+    "bloqueado_por_nome"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "profissional_bloqueio_log",
+   "colunas": [
+    "id",
+    "profissional",
+    "nome",
+    "acao",
+    "motivo",
+    "por",
+    "por_nome",
+    "conversas_afetadas",
+    "em"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "push_inscricao",
+   "colunas": [
+    "id",
+    "conta_id",
+    "endpoint",
+    "p256dh",
+    "auth",
+    "criado_em"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "registro_assinaturas",
+   "colunas": [
+    "id",
+    "atendimento_id",
+    "email_confirmado_transacao",
+    "hash_documento",
+    "consentimento_biometrico",
+    "tipo_validacao",
+    "score_similaridade",
+    "vetor_traco_bruto",
+    "caracteristicas",
+    "ip_origem",
+    "user_agent",
+    "created_at"
+   ],
+   "rls": true,
+   "politicas": 1
+  },
+  {
+   "nome": "unidade_config",
+   "colunas": [
+    "chave",
+    "catalogo",
+    "rotulo",
+    "descricao",
+    "fluxo",
+    "instrucao",
+    "ordem",
+    "ativo"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "vinculo_log",
+   "colunas": [
+    "id",
+    "em",
+    "por",
+    "acao",
+    "prontuario",
+    "conversa_id",
+    "antes",
+    "depois"
+   ],
+   "rls": true,
+   "politicas": 1
+  },
+  {
+   "nome": "vinculo_solicitacoes",
+   "colunas": [
+    "id",
+    "conta_id",
+    "paciente_id",
+    "tipo",
+    "batem",
+    "diferem",
+    "conta_nome",
+    "conta_telefone",
+    "status",
+    "criado_em",
+    "decidido_em",
+    "decidido_por",
+    "novo_email",
+    "novo_telefone"
+   ],
+   "rls": true,
+   "politicas": 0
+  }
+ ],
+ "visoes": [
+  "fluxo_exames",
+  "ocr_treino",
+  "v_agendamento_aberto",
+  "v_jornada_quadro",
+  "v_remarcacao_pendente"
+ ],
+ "rotinas": [
+  {
+   "nome": "agenda-conferir",
+   "quando": "15 seconds",
+   "ativa": true,
+   "comando": "select net.http_post( url := 'https://nrvuynjwcgwpjdptkiay.supabase.co/functions/v1/sync-catalogo-klingo', headers := jsonb_build_object('Content-Type', 'application/json', 'x-sync-key', (select valor from public.config where chave = 'ia_segredo')), body := '{\"agenda\":\"conferir\"}'::jsonb, timeout_milliseconds := 40000) where public.agenda_conferencia_ha_trabalho(false);"
+  },
+  {
+   "nome": "agenda-ocupacao",
+   "quando": "*/10 8-23,0,1 * * *",
+   "ativa": true,
+   "comando": "select net.http_post( url := 'https://nrvuynjwcgwpjdptkiay.supabase.co/functions/v1/sync-catalogo-klingo', headers := jsonb_build_object('Content-Type', 'application/json', 'x-sync-key', (select valor from public.config where chave = 'ia_segredo')), body := '{\"agenda\":\"ocupacao\"}'::jsonb, timeout_milliseconds := 120000);"
+  },
+  {
+   "nome": "agenda-ocupacao-noite",
+   "quando": "*/30 2-7 * * *",
+   "ativa": true,
+   "comando": "select net.http_post( url := 'https://nrvuynjwcgwpjdptkiay.supabase.co/functions/v1/sync-catalogo-klingo', headers := jsonb_build_object('Content-Type', 'application/json', 'x-sync-key', (select valor from public.config where chave = 'ia_segredo')), body := '{\"agenda\":\"ocupacao\"}'::jsonb, timeout_milliseconds := 120000);"
+  },
+  {
+   "nome": "agenda-revisar",
+   "quando": "*/10 * * * *",
+   "ativa": true,
+   "comando": "select net.http_post( url := 'https://nrvuynjwcgwpjdptkiay.supabase.co/functions/v1/sync-catalogo-klingo', headers := jsonb_build_object('Content-Type', 'application/json', 'x-sync-key', (select valor from public.config where chave = 'ia_segredo')), body := '{\"agenda\":\"conferir\",\"lento\":true}'::jsonb, timeout_milliseconds := 100000) where public.agenda_conferencia_ha_trabalho(true);"
+  },
+  {
+   "nome": "agendado-vigia",
+   "quando": "*/5 * * * *",
+   "ativa": true,
+   "comando": "select public.agendado_vigiar()"
+  },
+  {
+   "nome": "agendamento-klingo",
+   "quando": "*/10 * * * *",
+   "ativa": true,
+   "comando": "select public.agendamento_conferir_klingo()"
+  },
+  {
+   "nome": "agendamento-reconhecer-klingo",
+   "quando": "30 seconds",
+   "ativa": true,
+   "comando": "select public.agendamento_reconhecer_disparar()"
+  },
+  {
+   "nome": "autoencerrar-vigia",
+   "quando": "*/5 * * * *",
+   "ativa": true,
+   "comando": "select public.autoencerrar_vigiar()"
+  },
+  {
+   "nome": "catalogo-precos-convenio",
+   "quando": "10 6 * * *",
+   "ativa": true,
+   "comando": "select net.http_post( url := 'https://nrvuynjwcgwpjdptkiay.supabase.co/functions/v1/sync-catalogo-klingo', headers := jsonb_build_object('Content-Type', 'application/json', 'x-sync-key', (select valor from public.config where chave = 'ia_segredo')), body := '{\"precos\":\"convenio\"}'::jsonb, timeout_milliseconds := 150000);"
+  },
+  {
+   "nome": "catalogo-precos-particular",
+   "quando": "25 6 * * *",
+   "ativa": true,
+   "comando": "select net.http_post( url := 'https://nrvuynjwcgwpjdptkiay.supabase.co/functions/v1/sync-catalogo-klingo', headers := jsonb_build_object('Content-Type', 'application/json', 'x-sync-key', (select valor from public.config where chave = 'ia_segredo')), body := '{\"precos\":\"particular\"}'::jsonb, timeout_milliseconds := 150000);"
+  },
+  {
+   "nome": "convenios-revisar",
+   "quando": "5 11 * * *",
+   "ativa": true,
+   "comando": "select public.convenios_revisar()"
+  },
+  {
+   "nome": "espera-vigia",
+   "quando": "* * * * *",
+   "ativa": true,
+   "comando": "select public.espera_vigiar()"
+  },
+  {
+   "nome": "fluxo-exames",
+   "quando": "40 6 * * *",
+   "ativa": true,
+   "comando": "refresh materialized view concurrently public.fluxo_exames"
+  },
+  {
+   "nome": "indicadores-fechar-dia",
+   "quando": "10 3 * * *",
+   "ativa": true,
+   "comando": "select public.ind_fechar_pendentes()"
+  },
+  {
+   "nome": "jornada-klingo-30s",
+   "quando": "30 seconds",
+   "ativa": true,
+   "comando": "select public.jornada_klingo_agendar()"
+  },
+  {
+   "nome": "jornada-vigia",
+   "quando": "* * * * *",
+   "ativa": true,
+   "comando": "select public.jornada_vigiar()"
+  },
+  {
+   "nome": "pessoa-agrupar",
+   "quando": "*/5 * * * *",
+   "ativa": true,
+   "comando": "select public.pessoa_agrupar_pendentes()"
+  },
+  {
+   "nome": "sync-catalogo-klingo",
+   "quando": "0 6 * * *",
+   "ativa": true,
+   "comando": "select net.http_post( url := 'https://nrvuynjwcgwpjdptkiay.supabase.co/functions/v1/sync-catalogo-klingo', headers := jsonb_build_object('Content-Type', 'application/json', 'x-sync-key', (select valor from public.config where chave = 'ia_segredo')), body := '{}'::jsonb, timeout_milliseconds := 120000);"
+  }
+ ],
+ "gatilhos": [
+  "CREATE TRIGGER agendamento_remarcacao_feita AFTER UPDATE OF status ON public.pre_agendamentos FOR EACH ROW EXECUTE FUNCTION agendamento_remarcacao_feita_trg()",
+  "CREATE TRIGGER assinatura_tentativas_imutavel BEFORE DELETE OR UPDATE ON public.assinatura_tentativas FOR EACH ROW EXECUTE FUNCTION registro_imutavel_trg()",
+  "CREATE TRIGGER assinatura_tentativas_sem_truncate BEFORE TRUNCATE ON public.assinatura_tentativas FOR EACH STATEMENT EXECUTE FUNCTION registro_imutavel_trg()",
+  "CREATE TRIGGER atendimentos_fila_avisar AFTER INSERT OR DELETE OR UPDATE OF status, bloqueado_em ON public.atendimentos FOR EACH ROW EXECUTE FUNCTION fila_avisar_trg()",
+  "CREATE TRIGGER atendimentos_transicao BEFORE UPDATE ON public.atendimentos FOR EACH ROW EXECUTE FUNCTION atendimentos_transicao_trg()",
+  "CREATE TRIGGER catalogo_agenda_hash BEFORE INSERT ON public.catalogo_agenda FOR EACH ROW EXECUTE FUNCTION catalogo_agenda_hash_trg()",
+  "CREATE TRIGGER catalogo_preco_confianca BEFORE INSERT OR UPDATE ON public.catalogo_preco FOR EACH ROW EXECUTE FUNCTION catalogo_preco_confianca_trg()",
+  "CREATE TRIGGER convenio_evento_catalogo AFTER INSERT ON public.catalogo_mudanca FOR EACH ROW EXECUTE FUNCTION convenio_evento_catalogo_trg()",
+  "CREATE TRIGGER conversa_exame_aberto BEFORE UPDATE OF status ON public.conversas FOR EACH ROW EXECUTE FUNCTION conversa_exame_aberto_trg()",
+  "CREATE TRIGGER conversa_fluxo_klingo_trg AFTER INSERT OR UPDATE OF dados ON public.conversa_fluxo FOR EACH ROW EXECUTE FUNCTION conversa_fluxo_klingo_trg()",
+  "CREATE TRIGGER conversa_limpa_aguarda_paciente BEFORE UPDATE OF status ON public.conversas FOR EACH ROW EXECUTE FUNCTION conversa_limpa_aguarda_paciente_trg()",
+  "CREATE TRIGGER conversa_valida_agendado BEFORE UPDATE OF status ON public.conversas FOR EACH ROW EXECUTE FUNCTION conversa_valida_agendado_trg()",
+  "CREATE TRIGGER conversas_antes_update BEFORE UPDATE ON public.conversas FOR EACH ROW EXECUTE FUNCTION conversa_antes_update()",
+  "CREATE TRIGGER conversas_apos_update AFTER UPDATE ON public.conversas FOR EACH ROW EXECUTE FUNCTION conversa_status_mudou()",
+  "CREATE TRIGGER conversas_conta BEFORE INSERT ON public.conversas FOR EACH ROW EXECUTE FUNCTION conversas_conta_trg()",
+  "CREATE TRIGGER conversas_motor BEFORE INSERT ON public.conversas FOR EACH ROW EXECUTE FUNCTION conversas_motor_trg()",
+  "CREATE TRIGGER conversas_zz_evento AFTER INSERT OR UPDATE ON public.conversas FOR EACH ROW EXECUTE FUNCTION conversas_evento_trg()",
+  "CREATE TRIGGER conversas_zz_teste BEFORE INSERT OR UPDATE ON public.conversas FOR EACH ROW EXECUTE FUNCTION conversas_teste_trg()",
+  "CREATE TRIGGER conversas_zz_transferencia BEFORE UPDATE OF agente_id ON public.conversas FOR EACH ROW EXECUTE FUNCTION conversa_transferida_reinicia_trg()",
+  "CREATE TRIGGER fila_chegada_aviso AFTER INSERT OR UPDATE OF status, conta_id ON public.fila_chegada FOR EACH STATEMENT EXECUTE FUNCTION fila_chegada_trg()",
+  "CREATE TRIGGER ia_evento_pre AFTER INSERT OR UPDATE OF status, conferencia_status ON public.pre_agendamentos FOR EACH ROW EXECUTE FUNCTION ia_evento_trg()",
+  "CREATE TRIGGER ind_conclusao_dia_imutavel BEFORE DELETE OR UPDATE ON public.ind_conclusao_dia FOR EACH ROW EXECUTE FUNCTION ind_imutavel_trg()",
+  "CREATE TRIGGER ind_conclusao_dia_imutavel_t BEFORE TRUNCATE ON public.ind_conclusao_dia FOR EACH STATEMENT EXECUTE FUNCTION ind_imutavel_trg()",
+  "CREATE TRIGGER ind_fechamento_imutavel BEFORE DELETE OR UPDATE ON public.ind_fechamento FOR EACH ROW EXECUTE FUNCTION ind_imutavel_trg()",
+  "CREATE TRIGGER ind_fechamento_imutavel_t BEFORE TRUNCATE ON public.ind_fechamento FOR EACH STATEMENT EXECUTE FUNCTION ind_imutavel_trg()",
+  "CREATE TRIGGER ind_pessoa_dia_imutavel BEFORE DELETE OR UPDATE ON public.ind_pessoa_dia FOR EACH ROW EXECUTE FUNCTION ind_imutavel_trg()",
+  "CREATE TRIGGER ind_pessoa_dia_imutavel_t BEFORE TRUNCATE ON public.ind_pessoa_dia FOR EACH STATEMENT EXECUTE FUNCTION ind_imutavel_trg()",
+  "CREATE TRIGGER ind_semhumano_dia_imutavel BEFORE DELETE OR UPDATE ON public.ind_semhumano_dia FOR EACH ROW EXECUTE FUNCTION ind_imutavel_trg()",
+  "CREATE TRIGGER ind_semhumano_dia_imutavel_t BEFORE TRUNCATE ON public.ind_semhumano_dia FOR EACH STATEMENT EXECUTE FUNCTION ind_imutavel_trg()",
+  "CREATE TRIGGER jornada_card_checklist_muda AFTER UPDATE OF coluna ON public.jornada_card FOR EACH ROW WHEN ((old.coluna IS DISTINCT FROM new.coluna)) EXECUTE FUNCTION jornada_checklist_gatilho()",
+  "CREATE TRIGGER jornada_card_checklist_novo AFTER INSERT ON public.jornada_card FOR EACH ROW EXECUTE FUNCTION jornada_checklist_gatilho()",
+  "CREATE TRIGGER jornada_card_tr_upd AFTER UPDATE ON public.jornada_card REFERENCING OLD TABLE AS o NEW TABLE AS n FOR EACH STATEMENT EXECUTE FUNCTION jornada_avisar_card_upd()",
+  "CREATE TRIGGER jornada_evento_imutavel BEFORE UPDATE ON public.jornada_evento FOR EACH ROW EXECUTE FUNCTION jornada_imutavel()",
+  "CREATE TRIGGER jornada_exame_conferir_ins AFTER INSERT ON public.jornada_exame REFERENCING NEW TABLE AS n FOR EACH STATEMENT EXECUTE FUNCTION jornada_exame_conferir_ins()",
+  "CREATE TRIGGER jornada_exame_conferir_upd AFTER UPDATE ON public.jornada_exame REFERENCING OLD TABLE AS o NEW TABLE AS n FOR EACH STATEMENT EXECUTE FUNCTION jornada_exame_conferir_upd()",
+  "CREATE TRIGGER jornada_exame_tr_ins AFTER INSERT ON public.jornada_exame REFERENCING NEW TABLE AS n FOR EACH STATEMENT EXECUTE FUNCTION jornada_avisar_exame_ins()",
+  "CREATE TRIGGER jornada_exame_tr_upd AFTER UPDATE ON public.jornada_exame REFERENCING OLD TABLE AS o NEW TABLE AS n FOR EACH STATEMENT EXECUTE FUNCTION jornada_avisar_exame_upd()",
+  "CREATE TRIGGER jornada_mensagem_imutavel BEFORE UPDATE ON public.jornada_mensagem FOR EACH ROW EXECUTE FUNCTION jornada_imutavel()",
+  "CREATE TRIGGER medico_detectar_meta AFTER INSERT OR UPDATE ON public.catalogo_meta FOR EACH ROW EXECUTE FUNCTION medico_detectar_trg()",
+  "CREATE TRIGGER mensagem_aguarda_paciente AFTER INSERT ON public.mensagens FOR EACH ROW EXECUTE FUNCTION mensagem_aguarda_paciente_trg()",
+  "CREATE TRIGGER mensagens_apos_insert AFTER INSERT ON public.mensagens FOR EACH ROW EXECUTE FUNCTION mensagem_inserida()",
+  "CREATE TRIGGER mensagens_chat_push AFTER INSERT ON public.mensagens FOR EACH ROW EXECUTE FUNCTION chat_push_trg()",
+  "CREATE TRIGGER mensagens_conferir_preco AFTER INSERT ON public.mensagens FOR EACH ROW EXECUTE FUNCTION mensagens_conferir_preco_trg()",
+  "CREATE TRIGGER mensagens_motor_fluxo AFTER INSERT ON public.mensagens FOR EACH ROW EXECUTE FUNCTION fluxo_mensagem_trg()",
+  "CREATE TRIGGER mensagens_zz_teste AFTER INSERT ON public.mensagens FOR EACH ROW EXECUTE FUNCTION mensagens_teste_trg()",
+  "CREATE TRIGGER org_alteracao_log_imutavel BEFORE DELETE OR UPDATE ON public.org_alteracao_log FOR EACH ROW EXECUTE FUNCTION org_log_imutavel_trg()",
+  "CREATE TRIGGER pessoa_agrupar_conversa AFTER INSERT OR UPDATE OF nome_informado, email_informado, paciente_nome, conta_id ON public.conversas FOR EACH ROW EXECUTE FUNCTION pessoa_agrupar_conversa_trg()",
+  "CREATE TRIGGER pessoa_agrupar_pre AFTER INSERT OR UPDATE OF paciente ON public.pre_agendamentos FOR EACH ROW EXECUTE FUNCTION pessoa_agrupar_pre_trg()",
+  "CREATE TRIGGER pessoa_klingo_vinculo_log AFTER INSERT OR DELETE OR UPDATE ON public.pessoa_klingo_vinculo FOR EACH ROW EXECUTE FUNCTION vinculo_log_trg()",
+  "CREATE TRIGGER pre_agendamento_historico AFTER UPDATE OF status ON public.pre_agendamentos FOR EACH ROW EXECUTE FUNCTION pre_agendamento_historico_trg()",
+  "CREATE TRIGGER pre_agendamento_valida_paciente AFTER UPDATE ON public.pre_agendamentos FOR EACH ROW EXECUTE FUNCTION pre_agendamento_valida_paciente_trg()",
+  "CREATE TRIGGER pre_agendamento_vincula_conta AFTER INSERT OR UPDATE OF paciente_id ON public.pre_agendamentos FOR EACH ROW EXECUTE FUNCTION pre_agendamento_vincula_conta_trg()",
+  "CREATE TRIGGER pre_agendamentos_zz_autoria BEFORE UPDATE OF status ON public.pre_agendamentos FOR EACH ROW EXECUTE FUNCTION pre_agendamento_autoria_trg()",
+  "CREATE TRIGGER registro_assinaturas_imutavel BEFORE DELETE OR UPDATE ON public.registro_assinaturas FOR EACH ROW EXECUTE FUNCTION registro_imutavel_trg()",
+  "CREATE TRIGGER registro_assinaturas_sem_truncate BEFORE TRUNCATE ON public.registro_assinaturas FOR EACH STATEMENT EXECUTE FUNCTION registro_imutavel_trg()",
+  "CREATE TRIGGER vinculo_log_imutavel BEFORE DELETE OR UPDATE ON public.vinculo_log FOR EACH ROW EXECUTE FUNCTION org_log_imutavel_trg()"
+ ],
+ "tempo_real": [
+  "public.atendimentos",
+  "public.conversas",
+  "public.fila_chegada",
+  "public.jornada_card",
+  "public.jornada_exame",
+  "public.jornada_mensagem",
+  "public.jornada_tarefa",
+  "public.mensagens"
+ ],
+ "config_chaves": [
+  "agenda_ao_vivo",
+  "agenda_ao_vivo_max_dias",
+  "agenda_ao_vivo_trava_s",
+  "agenda_ao_vivo_validade_s",
+  "agendado_conferir_prazo_min",
+  "agendamento_reconhecer",
+  "agendamento_reconhecer_msg_encerradas",
+  "autoencerrar_horas",
+  "autoencerrar_modo",
+  "avaliacao_ativa",
+  "boas_vindas",
+  "cadastro_equipe_sem_convite",
+  "chat_push_url",
+  "checkin_sem_login_max_dia",
+  "convenio_suspenso_texto",
+  "despedida_configurada",
+  "despedida_inatividade_ativa",
+  "despedida_inatividade_texto",
+  "despedida_versao_atual",
+  "encerramento_exige_motivo",
+  "encerramento_valida_agendado",
+  "equipe_push_url",
+  "fila_autochegada",
+  "fila_aviso_antes",
+  "fila_push_url",
+  "fila_vapid_publica",
+  "horario_trabalho",
+  "ia_ativa",
+  "ia_segredo",
+  "indicadores_fechar",
+  "jornada_identidade_klingo",
+  "jornada_relatorio_filtro",
+  "jornada_relatorio_id",
+  "klingo_paciente_url",
+  "login_paciente",
+  "motor",
+  "motor_telefones_teste",
+  "nome_empresa",
+  "permissao_modo",
+  "previsao_texto",
+  "reabrir_dias",
+  "reaproveitar_cadastro_convidado",
+  "teste_agentes",
+  "teste_marcadores",
+  "vinculo_manual_quem"
+ ],
+ "funcoes": [
+  {
+   "nome": "admin_redefinir_senha",
+   "args": [
+    {
+     "nome": "p_agente",
+     "padrao": false
+    },
+    {
+     "nome": "p_senha",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "2351b65d9826e8dc0f3de35e1cd6dae6"
+  },
+  {
+   "nome": "agenda_ao_vivo_gravar",
+   "args": [
+    {
+     "nome": "p_de",
+     "padrao": false
+    },
+    {
+     "nome": "p_ate",
+     "padrao": false
+    },
+    {
+     "nome": "p_dias",
+     "padrao": false
+    },
+    {
+     "nome": "p_iniciado",
+     "padrao": false
+    },
+    {
+     "nome": "p_linhas",
+     "padrao": false
+    },
+    {
+     "nome": "p_ok",
+     "padrao": false
+    },
+    {
+     "nome": "p_erro",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "150bc9ef6360a9d93a2c4ca1744ef4e4"
+  },
+  {
+   "nome": "agenda_ao_vivo_inteiro",
+   "args": [
+    {
+     "nome": "p_chave",
+     "padrao": false
+    },
+    {
+     "nome": "p_padrao",
+     "padrao": false
+    },
+    {
+     "nome": "p_min",
+     "padrao": false
+    },
+    {
+     "nome": "p_max",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "4877e710cfe2965e09d0e184a5b37455"
+  },
+  {
+   "nome": "agenda_ao_vivo_pedir",
+   "args": [
+    {
+     "nome": "p_dias",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "a0bafa695e1b19c047da17c631681d99"
+  },
+  {
+   "nome": "agenda_cobre",
+   "args": [
+    {
+     "nome": "p_procs",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "06698c71f2b766286c1e55f2c603f823"
+  },
+  {
+   "nome": "agenda_conferencia_alvos",
+   "args": [
+    {
+     "nome": "p_lento",
+     "padrao": true
+    },
+    {
+     "nome": "p_so_ver",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "c0d2d98245bdf8873a57fdf75fdfe3e4"
+  },
+  {
+   "nome": "agenda_conferencia_aplicar",
+   "args": [
+    {
+     "nome": "p_resultados",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "f0be7a5dd1926306f88e9a8e12f3fade"
+  },
+  {
+   "nome": "agenda_conferencia_ha_trabalho",
+   "args": [
+    {
+     "nome": "p_lento",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "1fa6b462e860dab9bf986d796ce4fdbf"
+  },
+  {
+   "nome": "agenda_conferencia_liberar",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "6dd273dc7bf482f7f4375ab2be335f85"
+  },
+  {
+   "nome": "agenda_grupos",
+   "args": [
+    {
+     "nome": "p_procs",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "3ec08190108f1f46b592701112c4a7a3"
+  },
+  {
+   "nome": "agenda_horarios",
+   "args": [
+    {
+     "nome": "p_procs",
+     "padrao": false
+    },
+    {
+     "nome": "p_de",
+     "padrao": false
+    },
+    {
+     "nome": "p_ate",
+     "padrao": false
+    },
+    {
+     "nome": "p_unidade",
+     "padrao": true
+    },
+    {
+     "nome": "p_profissional",
+     "padrao": true
+    },
+    {
+     "nome": "p_periodo",
+     "padrao": true
+    },
+    {
+     "nome": "p_excluir",
+     "padrao": true
+    },
+    {
+     "nome": "p_antecedencia_min",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "a167968902dcec8b2fa8b754d157a27f"
+  },
+  {
+   "nome": "agenda_horarios_klingo",
+   "args": [
+    {
+     "nome": "p_procs",
+     "padrao": false
+    },
+    {
+     "nome": "p_de",
+     "padrao": false
+    },
+    {
+     "nome": "p_ate",
+     "padrao": false
+    },
+    {
+     "nome": "p_unidade",
+     "padrao": true
+    },
+    {
+     "nome": "p_profissional",
+     "padrao": true
+    },
+    {
+     "nome": "p_periodo",
+     "padrao": true
+    },
+    {
+     "nome": "p_excluir",
+     "padrao": true
+    },
+    {
+     "nome": "p_antecedencia_min",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "ac95a64b68728cf35224233e83e6bccd"
+  },
+  {
+   "nome": "agenda_horarios_klingo_v1",
+   "args": [
+    {
+     "nome": "p_procs",
+     "padrao": false
+    },
+    {
+     "nome": "p_de",
+     "padrao": false
+    },
+    {
+     "nome": "p_ate",
+     "padrao": false
+    },
+    {
+     "nome": "p_unidade",
+     "padrao": true
+    },
+    {
+     "nome": "p_profissional",
+     "padrao": true
+    },
+    {
+     "nome": "p_periodo",
+     "padrao": true
+    },
+    {
+     "nome": "p_excluir",
+     "padrao": true
+    },
+    {
+     "nome": "p_antecedencia_min",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "3abf1e06224309c42971c142de3dd94a"
+  },
+  {
+   "nome": "agenda_horarios_klingo_v2",
+   "args": [
+    {
+     "nome": "p_procs",
+     "padrao": false
+    },
+    {
+     "nome": "p_de",
+     "padrao": false
+    },
+    {
+     "nome": "p_ate",
+     "padrao": false
+    },
+    {
+     "nome": "p_unidade",
+     "padrao": true
+    },
+    {
+     "nome": "p_profissional",
+     "padrao": true
+    },
+    {
+     "nome": "p_periodo",
+     "padrao": true
+    },
+    {
+     "nome": "p_excluir",
+     "padrao": true
+    },
+    {
+     "nome": "p_antecedencia_min",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "46a1d4ea44c53ac04da77c34018f2dc5"
+  },
+  {
+   "nome": "agenda_medica_painel",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "254da31c152521de57030e5a9f0b80cc"
+  },
+  {
+   "nome": "agenda_ocupacao_atualizar",
+   "args": [
+    {
+     "nome": "p_linhas",
+     "padrao": false
+    },
+    {
+     "nome": "p_execucao",
+     "padrao": true
+    },
+    {
+     "nome": "p_finalizar",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "f04c7bebea3d1d7cbd45454da1dbb7e0"
+  },
+  {
+   "nome": "agenda_reservas_provisorias",
+   "args": [
+    {
+     "nome": "p_ignorar",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "1e8360ab53b82c67b2a8c721046eaa36"
+  },
+  {
+   "nome": "agendado_vigiar",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "33fa94558f1b81ad217661e87c054062"
+  },
+  {
+   "nome": "agendamento_conferir_klingo",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "d0e11e43615a52ed7b9540b7f5c3feeb"
+  },
+  {
+   "nome": "agendamento_fechar",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_desfecho",
+     "padrao": false
+    },
+    {
+     "nome": "p_nota",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "355d8b7e31416a0552d44d5f548a69c9"
+  },
+  {
+   "nome": "agendamento_fechar_interno",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_desfecho",
+     "padrao": false
+    },
+    {
+     "nome": "p_origem",
+     "padrao": false
+    },
+    {
+     "nome": "p_por",
+     "padrao": false
+    },
+    {
+     "nome": "p_nota",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "000d5e4e232b6b76579968dde7a1b6a1"
+  },
+  {
+   "nome": "agendamento_perguntar",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_modo",
+     "padrao": false
+    },
+    {
+     "nome": "p_item",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "47e49ecb7e1fa83b9b615e9bd0036a81"
+  },
+  {
+   "nome": "agendamento_preparar_remarcacao",
+   "args": [
+    {
+     "nome": "p_destino",
+     "padrao": false
+    },
+    {
+     "nome": "p_origem",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "6e66f672c32582ee67ea5526a6488af2"
+  },
+  {
+   "nome": "agendamento_reconhecer_alvos",
+   "args": [
+    {
+     "nome": "p_dias",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "d5651a967b68fe9d8a961d29d42570f1"
+  },
+  {
+   "nome": "agendamento_reconhecer_aplicar",
+   "args": [
+    {
+     "nome": "p_resultados",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "e8d5ea6150ebf6e7e70ba36306ad90bb"
+  },
+  {
+   "nome": "agendamento_reconhecer_disparar",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "7754f9f0c4956fc0cdb81bcd0ef98740"
+  },
+  {
+   "nome": "agendamento_reconhecer_fim",
+   "args": [
+    {
+     "nome": "p_ok",
+     "padrao": false
+    },
+    {
+     "nome": "p_erro",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "05bbd742dca1137bca281eb88c463f3c"
+  },
+  {
+   "nome": "agendamento_reconhecer_klingo",
+   "args": [
+    {
+     "nome": "p_aplicar",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "fb248fe53b6f2d97cd898147e411c377"
+  },
+  {
+   "nome": "agendamento_remarcacao_feita_trg",
+   "args": [],
+   "definer": true,
+   "gatilho": true,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "93ee0f43690d5f414bb64b74955510e4"
+  },
+  {
+   "nome": "agendamento_remarcacao_resolver",
+   "args": [
+    {
+     "nome": "p_fechamento",
+     "padrao": false
+    },
+    {
+     "nome": "p_resultado",
+     "padrao": false
+    },
+    {
+     "nome": "p_nota",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "1b7a9eebb5c21b3055f730b7b5bd318c"
+  },
+  {
+   "nome": "agendamento_valido_para_encerrar",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "d502b5e96f70617d973473277e9dd772"
+  },
+  {
+   "nome": "alerta_preco_conferir",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "dbcbb6d1bc838d6c6789c6cc39cbf61d"
+  },
+  {
+   "nome": "assinatura_contexto",
+   "args": [
+    {
+     "nome": "p_segredo",
+     "padrao": false
+    },
+    {
+     "nome": "p_token",
+     "padrao": false
+    },
+    {
+     "nome": "p_hash",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "2badbbf8a84b6155e578c03e2bb8d5be"
+  },
+  {
+   "nome": "assinatura_registrar",
+   "args": [
+    {
+     "nome": "p_segredo",
+     "padrao": false
+    },
+    {
+     "nome": "p_token",
+     "padrao": false
+    },
+    {
+     "nome": "p_hash",
+     "padrao": false
+    },
+    {
+     "nome": "p_resultado",
+     "padrao": false
+    },
+    {
+     "nome": "p_pontos",
+     "padrao": false
+    },
+    {
+     "nome": "p_ip",
+     "padrao": false
+    },
+    {
+     "nome": "p_user_agent",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "65313208de1c672803ace8f29b359c93"
+  },
+  {
+   "nome": "atendimentos_transicao_trg",
+   "args": [],
+   "definer": false,
+   "gatilho": true,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "ded81620b992c8a6571a6910b38ddea3"
+  },
+  {
+   "nome": "autoencerrar_candidatas",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "8d609b7e670aec53d2489b18051d3401"
+  },
+  {
+   "nome": "autoencerrar_horas",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "d5e8c2c776eb396631d99b0bb9f906b7"
+  },
+  {
+   "nome": "autoencerrar_resumo",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "66d35df0b3e6427d690c09a23cac2c83"
+  },
+  {
+   "nome": "autoencerrar_vigiar",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "074e6acbb3b5deb07f40b9a13db0381c"
+  },
+  {
+   "nome": "avaliacoes_resumo",
+   "args": [
+    {
+     "nome": "p_dias",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "8ce08b856f423109c0b0cc19ab03a2b3"
+  },
+  {
+   "nome": "catalogo_agenda_hash_trg",
+   "args": [],
+   "definer": false,
+   "gatilho": true,
+   "anon": true,
+   "authenticated": true,
+   "publico": true,
+   "md5": "980442e22569bdf7ab2837a998a7723a"
+  },
+  {
+   "nome": "catalogo_cardapio",
+   "args": [
+    {
+     "nome": "p_busca",
+     "padrao": true
+    },
+    {
+     "nome": "p_operadora",
+     "padrao": true
+    },
+    {
+     "nome": "p_filtro",
+     "padrao": true
+    },
+    {
+     "nome": "p_limite",
+     "padrao": true
+    },
+    {
+     "nome": "p_deslocamento",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "09114aad943229a9b42219b231ca5abc"
+  },
+  {
+   "nome": "catalogo_cardapio_dados",
+   "args": [
+    {
+     "nome": "p_busca",
+     "padrao": true
+    },
+    {
+     "nome": "p_operadora",
+     "padrao": true
+    },
+    {
+     "nome": "p_filtro",
+     "padrao": true
+    },
+    {
+     "nome": "p_limite",
+     "padrao": true
+    },
+    {
+     "nome": "p_deslocamento",
+     "padrao": true
+    },
+    {
+     "nome": "p_limite_pct",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "5d36dc5161aa3a809267b93c89a0b8ed"
+  },
+  {
+   "nome": "catalogo_cardapio_operadoras",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "c186c23ecadd5e5254208eef6e468eec"
+  },
+  {
+   "nome": "catalogo_exames_regiao",
+   "args": [
+    {
+     "nome": "p_modalidade",
+     "padrao": false
+    },
+    {
+     "nome": "p_regiao",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "6f402eb9e3477fc92b4ffc3db033fb4c"
+  },
+  {
+   "nome": "catalogo_limpeza",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "b7657046d0dcfdf457c12971e7284087"
+  },
+  {
+   "nome": "catalogo_mudancas",
+   "args": [
+    {
+     "nome": "p_limite",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "ced3bb4a36f3c58a55bb2d012d1ea524"
+  },
+  {
+   "nome": "catalogo_preco_confianca_trg",
+   "args": [],
+   "definer": false,
+   "gatilho": true,
+   "anon": true,
+   "authenticated": true,
+   "publico": true,
+   "md5": "cb685f58cd16985b806799fa1ab6553f"
+  },
+  {
+   "nome": "catalogo_preco_operadoras",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "ae5811081d3d5310a6f952b50b0b46f4"
+  },
+  {
+   "nome": "catalogo_preco_particular_sincronizar",
+   "args": [
+    {
+     "nome": "p_linhas",
+     "padrao": false
+    },
+    {
+     "nome": "p_demanda",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "bd85921555cde9df337f24c8126e4fd9"
+  },
+  {
+   "nome": "catalogo_preco_revisar",
+   "args": [
+    {
+     "nome": "p_procedimento",
+     "padrao": false
+    },
+    {
+     "nome": "p_operadora",
+     "padrao": false
+    },
+    {
+     "nome": "p_ligado",
+     "padrao": false
+    },
+    {
+     "nome": "p_valor",
+     "padrao": true
+    },
+    {
+     "nome": "p_nota",
+     "padrao": true
+    },
+    {
+     "nome": "p_referencia",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "fbda72e577659a7ca58db86c3ed95a2e"
+  },
+  {
+   "nome": "catalogo_preco_sincronizar",
+   "args": [
+    {
+     "nome": "p_operadora_id",
+     "padrao": false
+    },
+    {
+     "nome": "p_linhas",
+     "padrao": false
+    },
+    {
+     "nome": "p_forcar",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "25cca263f94bf77a315e280c8ceb9cbf"
+  },
+  {
+   "nome": "catalogo_sincronizar",
+   "args": [
+    {
+     "nome": "p_tipo",
+     "padrao": false
+    },
+    {
+     "nome": "p_linhas",
+     "padrao": false
+    },
+    {
+     "nome": "p_forcar",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "13b534307667fb1294191494b13584a7"
+  },
+  {
+   "nome": "catalogo_substituir",
+   "args": [
+    {
+     "nome": "p_tipo",
+     "padrao": false
+    },
+    {
+     "nome": "p_linhas",
+     "padrao": false
+    },
+    {
+     "nome": "p_anexar",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "2aacfb6ea8ffbd8b6da5530aa4255b33"
+  },
+  {
+   "nome": "chat_acompanhar",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_token",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": true,
+   "md5": "658c345cce6e0764711f9d16369c5ab8"
+  },
+  {
+   "nome": "chat_anexo_enviar",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_token",
+     "padrao": false
+    },
+    {
+     "nome": "p_mime",
+     "padrao": false
+    },
+    {
+     "nome": "p_base64",
+     "padrao": false
+    },
+    {
+     "nome": "p_ocr",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": true,
+   "md5": "00827fe964dec997ebc53d3dee69ed1f"
+  },
+  {
+   "nome": "chat_ao_vivo_validar",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_token",
+     "padrao": false
+    },
+    {
+     "nome": "p_de",
+     "padrao": false
+    },
+    {
+     "nome": "p_ate",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "da7ad54769be09abb0be1a9a34a96288"
+  },
+  {
+   "nome": "chat_avaliacao_estado",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_token",
+     "padrao": false
+    },
+    {
+     "nome": "p_encerrada_em",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "866833b6d24a50b668dcb59df96e49c4"
+  },
+  {
+   "nome": "chat_avaliar",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_token",
+     "padrao": false
+    },
+    {
+     "nome": "p_nota_atendimento",
+     "padrao": false
+    },
+    {
+     "nome": "p_nota_site",
+     "padrao": false
+    },
+    {
+     "nome": "p_canal",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "25c2691f0e5ba42f70580c4e7e68d7e8"
+  },
+  {
+   "nome": "chat_config",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "84eaf0ad0177edebdd5842cf7cd1fdc0"
+  },
+  {
+   "nome": "chat_consulta_salvar",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_token",
+     "padrao": false
+    },
+    {
+     "nome": "p_procedimento_id",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": true,
+   "md5": "cdd7a195dc37c7480f50d0052b544e07"
+  },
+  {
+   "nome": "chat_consultas",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_token",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": true,
+   "md5": "5750c8aeea2b8f0da14093eb526c193f"
+  },
+  {
+   "nome": "chat_corpo",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_token",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "4d3033058e876c75e444010bf2b331dd"
+  },
+  {
+   "nome": "chat_despedida_imagem",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_token",
+     "padrao": false
+    },
+    {
+     "nome": "p_versao",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "7512b1a37a61af8ebf3af07f0e472064"
+  },
+  {
+   "nome": "chat_enviar",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_token",
+     "padrao": false
+    },
+    {
+     "nome": "p_texto",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "b95373b522b5527a78eab718bf910004"
+  },
+  {
+   "nome": "chat_exames",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_token",
+     "padrao": false
+    },
+    {
+     "nome": "p_modalidade",
+     "padrao": false
+    },
+    {
+     "nome": "p_regiao",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "5d2b4b61fa2a420895db1625d42c4211"
+  },
+  {
+   "nome": "chat_exames_buscar",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_token",
+     "padrao": false
+    },
+    {
+     "nome": "p_termo",
+     "padrao": false
+    },
+    {
+     "nome": "p_ocr",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": true,
+   "md5": "523f1d894a707a55782730e4f7a5c27f"
+  },
+  {
+   "nome": "chat_exames_salvar",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_token",
+     "padrao": false
+    },
+    {
+     "nome": "p_itens",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": true,
+   "md5": "7d83fb257e5f0726f486c6635462b402"
+  },
+  {
+   "nome": "chat_foto_enviar",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_token",
+     "padrao": false
+    },
+    {
+     "nome": "p_mime",
+     "padrao": false
+    },
+    {
+     "nome": "p_base64",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "72e38cfc3280ffa5153c5ac977a1c059"
+  },
+  {
+   "nome": "chat_horario_escolher",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_token",
+     "padrao": false
+    },
+    {
+     "nome": "p_grupo",
+     "padrao": false
+    },
+    {
+     "nome": "p_data",
+     "padrao": false
+    },
+    {
+     "nome": "p_hora",
+     "padrao": false
+    },
+    {
+     "nome": "p_unidade",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "33bb5a1092455c2536fd10880bb5b359"
+  },
+  {
+   "nome": "chat_horarios",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_token",
+     "padrao": false
+    },
+    {
+     "nome": "p_grupo",
+     "padrao": true
+    },
+    {
+     "nome": "p_de",
+     "padrao": true
+    },
+    {
+     "nome": "p_ate",
+     "padrao": true
+    },
+    {
+     "nome": "p_unidade",
+     "padrao": true
+    },
+    {
+     "nome": "p_periodo",
+     "padrao": true
+    },
+    {
+     "nome": "p_excluir",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "402c5cbbdb821a269d8bcf848c0291c2"
+  },
+  {
+   "nome": "chat_incidente",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_token",
+     "padrao": false
+    },
+    {
+     "nome": "p_codigo",
+     "padrao": false
+    },
+    {
+     "nome": "p_tipo",
+     "padrao": false
+    },
+    {
+     "nome": "p_detalhe",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "a69f4d2683749404fcb55ec68d748e86"
+  },
+  {
+   "nome": "chat_iniciar",
+   "args": [
+    {
+     "nome": "p_nome",
+     "padrao": false
+    },
+    {
+     "nome": "p_telefone",
+     "padrao": false
+    },
+    {
+     "nome": "p_email",
+     "padrao": true
+    },
+    {
+     "nome": "p_mensagem",
+     "padrao": true
+    },
+    {
+     "nome": "p_aceite",
+     "padrao": true
+    },
+    {
+     "nome": "p_origem",
+     "padrao": true
+    },
+    {
+     "nome": "p_unidade",
+     "padrao": true
+    },
+    {
+     "nome": "p_medico",
+     "padrao": true
+    },
+    {
+     "nome": "p_paciente_tipo",
+     "padrao": true
+    },
+    {
+     "nome": "p_paciente_nome",
+     "padrao": true
+    },
+    {
+     "nome": "p_irmaos",
+     "padrao": true
+    },
+    {
+     "nome": "p_irmaos_modo",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": true,
+   "md5": "dcb79231db35ad2e6e17b733843bf384"
+  },
+  {
+   "nome": "chat_irmao_iniciar",
+   "args": [
+    {
+     "nome": "p_origem",
+     "padrao": false
+    },
+    {
+     "nome": "p_token",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": true,
+   "md5": "33cec8d17193dfb8e36f965ab8add6a7"
+  },
+  {
+   "nome": "chat_listar",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_token",
+     "padrao": false
+    },
+    {
+     "nome": "p_apos",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "2def79776398fe81bb18ab6fbb814b32"
+  },
+  {
+   "nome": "chat_medico_limpar",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_token",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": true,
+   "md5": "ef484d21d0eec51716cf274083471ea5"
+  },
+  {
+   "nome": "chat_medicos_disponiveis",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_token",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "6156d6c7f311017ecdd2a8cde4c04622"
+  },
+  {
+   "nome": "chat_nova_conversa",
+   "args": [
+    {
+     "nome": "p_conversa_anterior",
+     "padrao": false
+    },
+    {
+     "nome": "p_token_anterior",
+     "padrao": false
+    },
+    {
+     "nome": "p_nome",
+     "padrao": false
+    },
+    {
+     "nome": "p_telefone",
+     "padrao": false
+    },
+    {
+     "nome": "p_email",
+     "padrao": true
+    },
+    {
+     "nome": "p_aceite",
+     "padrao": true
+    },
+    {
+     "nome": "p_aceite_previsao",
+     "padrao": true
+    },
+    {
+     "nome": "p_origem",
+     "padrao": true
+    },
+    {
+     "nome": "p_unidade",
+     "padrao": true
+    },
+    {
+     "nome": "p_medico",
+     "padrao": true
+    },
+    {
+     "nome": "p_paciente_tipo",
+     "padrao": true
+    },
+    {
+     "nome": "p_paciente_nome",
+     "padrao": true
+    },
+    {
+     "nome": "p_irmaos",
+     "padrao": true
+    },
+    {
+     "nome": "p_irmaos_modo",
+     "padrao": true
+    },
+    {
+     "nome": "p_motivo",
+     "padrao": true
+    },
+    {
+     "nome": "p_motivo_texto",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "23dae67a5d372c76359695f4c063dc33"
+  },
+  {
+   "nome": "chat_opcoes_inicio",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": true,
+   "md5": "eec4473419c50ef699d0a58896f8b3d1"
+  },
+  {
+   "nome": "chat_pedido_enviar",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_token",
+     "padrao": false
+    },
+    {
+     "nome": "p_itens",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "87bf951b27e7e4e87e10529736b69e93"
+  },
+  {
+   "nome": "chat_pedido_escolha",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_token",
+     "padrao": false
+    },
+    {
+     "nome": "p_anexo",
+     "padrao": false
+    },
+    {
+     "nome": "p_escolha",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": true,
+   "md5": "c1c0beb58962a424b7b08eba625e8de9"
+  },
+  {
+   "nome": "chat_pedido_ler",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_token",
+     "padrao": false
+    },
+    {
+     "nome": "p_anexo",
+     "padrao": false
+    },
+    {
+     "nome": "p_texto",
+     "padrao": false
+    },
+    {
+     "nome": "p_linhas",
+     "padrao": false
+    },
+    {
+     "nome": "p_largura",
+     "padrao": true
+    },
+    {
+     "nome": "p_altura",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": true,
+   "md5": "ed11c54b6a30532e4bb860285513bd21"
+  },
+  {
+   "nome": "chat_pedido_salvar",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_token",
+     "padrao": false
+    },
+    {
+     "nome": "p_itens",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "e9fe612adb9605443125cff2f2d19435"
+  },
+  {
+   "nome": "chat_previsao_aceitar",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_token",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "4dba6494a822719a6e95265f48b86ca9"
+  },
+  {
+   "nome": "chat_push_config",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": true,
+   "md5": "30280c71fd642ff4e5af881c838ee3db"
+  },
+  {
+   "nome": "chat_push_estado",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_token",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "f289f5ae6376a5c4b424dd2476679753"
+  },
+  {
+   "nome": "chat_push_remover",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_token",
+     "padrao": false
+    },
+    {
+     "nome": "p_endpoint",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": true,
+   "md5": "5b34aa69b429a70c0dab7f7b5108f4fe"
+  },
+  {
+   "nome": "chat_push_salvar",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_token",
+     "padrao": false
+    },
+    {
+     "nome": "p_endpoint",
+     "padrao": false
+    },
+    {
+     "nome": "p_p256dh",
+     "padrao": false
+    },
+    {
+     "nome": "p_auth",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": true,
+   "md5": "683761ff77127d47ca593a2f3b1c4791"
+  },
+  {
+   "nome": "chat_push_silenciar",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_token",
+     "padrao": false
+    },
+    {
+     "nome": "p_silenciar",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "af93b3763165eb4b8fa35b8e0e3293ac"
+  },
+  {
+   "nome": "chat_push_trg",
+   "args": [],
+   "definer": true,
+   "gatilho": true,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "e1a1d416f376d6629a61485522c04b01"
+  },
+  {
+   "nome": "chat_reentrada_estado",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_token",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "2d50afd929123f1825c21bea662dad4b"
+  },
+  {
+   "nome": "chat_responder",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_token",
+     "padrao": false
+    },
+    {
+     "nome": "p_passo",
+     "padrao": false
+    },
+    {
+     "nome": "p_valor",
+     "padrao": false
+    },
+    {
+     "nome": "p_texto",
+     "padrao": true
+    },
+    {
+     "nome": "p_ms",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": true,
+   "md5": "683524f3f79547027b550a7d24ecd0aa"
+  },
+  {
+   "nome": "chat_respostas",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_apos",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "de57077c226e65529d3afae90d9b7e53"
+  },
+  {
+   "nome": "chat_valida",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_token",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "eca6ede12d699b9090e480b1fb3da309"
+  },
+  {
+   "nome": "checkin_publico",
+   "args": [
+    {
+     "nome": "p_nome",
+     "padrao": false
+    },
+    {
+     "nome": "p_email",
+     "padrao": false
+    },
+    {
+     "nome": "p_telefone",
+     "padrao": false
+    },
+    {
+     "nome": "p_ajuda_senha",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "a594426758e705c5f7e0a58c0552f439"
+  },
+  {
+   "nome": "consultas_da_unidade",
+   "args": [
+    {
+     "nome": "p_catalogo",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "11083eef1c45dd9ca9ea601360321a78"
+  },
+  {
+   "nome": "conta_paciente_adotar_conversas",
+   "args": [
+    {
+     "nome": "p_itens",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "d471c4de73238550d900d2296df34083"
+  },
+  {
+   "nome": "conta_paciente_confirmar_cpf",
+   "args": [
+    {
+     "nome": "p_cpf",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "625c878c54ad206245fe6d866a9c7d9f"
+  },
+  {
+   "nome": "conta_paciente_conversas",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "d5697068ede4d773eba0a31bf39de149"
+  },
+  {
+   "nome": "conta_paciente_excluir",
+   "args": [
+    {
+     "nome": "p_confirmacao",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "a90e789c36050d1de92d71237fcb9495"
+  },
+  {
+   "nome": "conta_paciente_meus_dados",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "8698b0016c31c71a142f3221f403d1e5"
+  },
+  {
+   "nome": "conta_paciente_pedir_alteracao",
+   "args": [
+    {
+     "nome": "p_cpf",
+     "padrao": false
+    },
+    {
+     "nome": "p_email",
+     "padrao": true
+    },
+    {
+     "nome": "p_telefone",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "71114a6a8744643b6bf9e12bcd44116b"
+  },
+  {
+   "nome": "conta_paciente_perfil",
+   "args": [
+    {
+     "nome": "p_nome",
+     "padrao": false
+    },
+    {
+     "nome": "p_telefone",
+     "padrao": false
+    },
+    {
+     "nome": "p_aceite",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "d95e9bef9529791872042fd752c87e05"
+  },
+  {
+   "nome": "conta_paciente_resumo",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "5258071c45023f37c34e50e0ab189cb2"
+  },
+  {
+   "nome": "conta_paciente_vincular",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "b149fa1cfe9f3361b9fb68f4aeaa8007"
+  },
+  {
+   "nome": "conta_paciente_vinculo_estado",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "a225ad098db1915649c51c48cb9bc434"
+  },
+  {
+   "nome": "conta_precisa_trocar_senha",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "5d566be424a0bcea1b91533919d07944"
+  },
+  {
+   "nome": "conta_senha_trocada",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "ed31c8f27b9dabb7093978492e5563cd"
+  },
+  {
+   "nome": "contato_marcar_teste",
+   "args": [
+    {
+     "nome": "p_contato",
+     "padrao": false
+    },
+    {
+     "nome": "p_teste",
+     "padrao": false
+    },
+    {
+     "nome": "p_motivo",
+     "padrao": true
+    },
+    {
+     "nome": "p_conversas",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "456d89147c7c6cb9d16352cee49986f6"
+  },
+  {
+   "nome": "convenio_ativo",
+   "args": [
+    {
+     "nome": "p_operadora",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "c043f083ef532f35c48abf12b43abe74"
+  },
+  {
+   "nome": "convenio_avisar",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_operadora",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "48fab2d704bdbc5a4b0603e74a588aa9"
+  },
+  {
+   "nome": "convenio_aviso_contagem",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "32dec36d32a4659288fc0abc4338a1cf"
+  },
+  {
+   "nome": "convenio_chave",
+   "args": [
+    {
+     "nome": "t",
+     "padrao": false
+    }
+   ],
+   "definer": false,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "ed5d1b369563ada1d354b012124f44e8"
+  },
+  {
+   "nome": "convenio_demanda",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "a0249bad18073024ec2d9360e755c35b"
+  },
+  {
+   "nome": "convenio_detalhe",
+   "args": [
+    {
+     "nome": "p_operadora",
+     "padrao": false
+    },
+    {
+     "nome": "p_limite",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "5091a9bcd4225e29c421b057dc24e9d7"
+  },
+  {
+   "nome": "convenio_evento_catalogo_trg",
+   "args": [],
+   "definer": true,
+   "gatilho": true,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "8dd162de50b2f120a2f122d2734d5c46"
+  },
+  {
+   "nome": "convenio_eventos",
+   "args": [
+    {
+     "nome": "p_limite",
+     "padrao": true
+    },
+    {
+     "nome": "p_so_novos",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "18c7dde8a88cc7fe923c1fc8863e087e"
+  },
+  {
+   "nome": "convenio_eventos_visto",
+   "args": [
+    {
+     "nome": "p_operadora",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "5c7fe60518b02e30c02ca7c4d0d986be"
+  },
+  {
+   "nome": "convenio_inativos",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "398022ed5b235a3deca5f03ef12f454f"
+  },
+  {
+   "nome": "convenio_msg",
+   "args": [
+    {
+     "nome": "p_operadora",
+     "padrao": false
+    },
+    {
+     "nome": "p_tipo",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "d4132e3cbc1dd8a638b43e30f702fcdc"
+  },
+  {
+   "nome": "convenio_reativar",
+   "args": [
+    {
+     "nome": "p_operadora",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "4a470be3e78464e92437de4b1ad52a17"
+  },
+  {
+   "nome": "convenio_renovar",
+   "args": [
+    {
+     "nome": "p_operadora",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "94410a8f4fe72d84756ae349ce86f360"
+  },
+  {
+   "nome": "convenio_salvar",
+   "args": [
+    {
+     "nome": "p_operadora",
+     "padrao": false
+    },
+    {
+     "nome": "p_dados",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "568fbc51f03eccbfb31e82b9ca69e8c1"
+  },
+  {
+   "nome": "convenio_suspender",
+   "args": [
+    {
+     "nome": "p_operadora",
+     "padrao": false
+    },
+    {
+     "nome": "p_motivo",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "5dfda32c8df66a58e8bfb325c2b0053d"
+  },
+  {
+   "nome": "convenios_painel",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "25b5f0d443a14a1cf7949952e5d68000"
+  },
+  {
+   "nome": "convenios_revisar",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "1a2f039a1bddbdeb7ec27ab7e0a673fa"
+  },
+  {
+   "nome": "convenios_suspensos",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "7a7cce7d40f69f1c8f0e845644ce007a"
+  },
+  {
+   "nome": "conversa_antes_update",
+   "args": [],
+   "definer": true,
+   "gatilho": true,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "69b733204ad76c8aead8203ebdc9fe05"
+  },
+  {
+   "nome": "conversa_encerrar_se_resolvida",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "eb25cf3be95a0c0b5cfe74e86c922389"
+  },
+  {
+   "nome": "conversa_exame_aberto_trg",
+   "args": [],
+   "definer": true,
+   "gatilho": true,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "0df19ba1583a9fadc8fb4f8f01ea9ab2"
+  },
+  {
+   "nome": "conversa_fluxo_klingo_trg",
+   "args": [],
+   "definer": true,
+   "gatilho": true,
+   "anon": true,
+   "authenticated": true,
+   "publico": true,
+   "md5": "315e5c11ae44533ad2a09e001e16e1ed"
+  },
+  {
+   "nome": "conversa_limpa_aguarda_paciente_trg",
+   "args": [],
+   "definer": false,
+   "gatilho": true,
+   "anon": true,
+   "authenticated": true,
+   "publico": true,
+   "md5": "214141d33a9476d254508da876bd27f3"
+  },
+  {
+   "nome": "conversa_marcar_teste",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_teste",
+     "padrao": false
+    },
+    {
+     "nome": "p_motivo",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "945ddcc71906a1616c6ae5c8eebf1fe9"
+  },
+  {
+   "nome": "conversa_marcar_teste_interno",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_motivo",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "4fdcb6dc92fbd4b49020c642533d89ff"
+  },
+  {
+   "nome": "conversa_status_mudou",
+   "args": [],
+   "definer": true,
+   "gatilho": true,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "a25223be7e23879011c3cb2a757fffa1"
+  },
+  {
+   "nome": "conversa_transferida_reinicia_trg",
+   "args": [],
+   "definer": false,
+   "gatilho": true,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "8ab3e7c71c4d9a15b3c0e7b4e5868f09"
+  },
+  {
+   "nome": "conversa_transferir",
+   "args": [
+    {
+     "nome": "p_conversas",
+     "padrao": false
+    },
+    {
+     "nome": "p_para_agente",
+     "padrao": true
+    },
+    {
+     "nome": "p_para_unidade",
+     "padrao": true
+    },
+    {
+     "nome": "p_motivo",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "6ffee6198ef5676cdb15fc5f77757d19"
+  },
+  {
+   "nome": "conversa_valida_agendado_trg",
+   "args": [],
+   "definer": true,
+   "gatilho": true,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "8a18e9fd117b0b09a6d1fc0dc5b2f5e6"
+  },
+  {
+   "nome": "conversas_conta_trg",
+   "args": [],
+   "definer": true,
+   "gatilho": true,
+   "anon": true,
+   "authenticated": true,
+   "publico": true,
+   "md5": "29d6f5ef983c13dc88bb3c42f51b2242"
+  },
+  {
+   "nome": "conversas_evento_trg",
+   "args": [],
+   "definer": true,
+   "gatilho": true,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "114e28bc679e821a4d1599e4d4e571f1"
+  },
+  {
+   "nome": "conversas_motor_trg",
+   "args": [],
+   "definer": true,
+   "gatilho": true,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "f3552e21d7ccfff8ab8344d9b7acf27c"
+  },
+  {
+   "nome": "conversas_teste_trg",
+   "args": [],
+   "definer": true,
+   "gatilho": true,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "92fc0b627c170c54c3d2ff9cea9c17a5"
+  },
+  {
+   "nome": "cpf_digitos",
+   "args": [
+    {
+     "nome": "t",
+     "padrao": false
+    }
+   ],
+   "definer": false,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "0d43d950f65e27924d9f6790540e89bb"
+  },
+  {
+   "nome": "cpf_valido",
+   "args": [
+    {
+     "nome": "t",
+     "padrao": false
+    }
+   ],
+   "definer": false,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "c23aa49e3495416d6cbbeced07ed720c"
+  },
+  {
+   "nome": "data_ou_nula",
+   "args": [
+    {
+     "nome": "t",
+     "padrao": false
+    }
+   ],
+   "definer": false,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": true,
+   "md5": "cc92f7dd7c7191becf9fcf7a2e1b3ab3"
+  },
+  {
+   "nome": "despedida_atual",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "35bb45931d3f47ee97fd889b6f8b5428"
+  },
+  {
+   "nome": "despedida_imagem",
+   "args": [
+    {
+     "nome": "p_versao",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "10a80baf0691c2d254a9ca2ca617b4f5"
+  },
+  {
+   "nome": "despedida_publicar",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_encerrada_em",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "333dc0517829e3dbaeccb1372364574e"
+  },
+  {
+   "nome": "despedida_salvar",
+   "args": [
+    {
+     "nome": "p_texto",
+     "padrao": false
+    },
+    {
+     "nome": "p_mime",
+     "padrao": true
+    },
+    {
+     "nome": "p_base64",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "2e414301dcbe8c007dcd7d9aceaea9f9"
+  },
+  {
+   "nome": "encerramentos_resumo",
+   "args": [
+    {
+     "nome": "p_dias",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "8914da1f0240ae64aa98b3fa1dddf075"
+  },
+  {
+   "nome": "equipe_convidar",
+   "args": [
+    {
+     "nome": "p_email",
+     "padrao": false
+    },
+    {
+     "nome": "p_papel",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "e03c1e8d99c566d6c29ebc696c97bbde"
+  },
+  {
+   "nome": "equipe_convite_cancelar",
+   "args": [
+    {
+     "nome": "p_email",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "c24f2fbd0fb1c0b07c0aac9617d1d4c3"
+  },
+  {
+   "nome": "equipe_notificacao_lida",
+   "args": [
+    {
+     "nome": "p_ids",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "566536a68f72db5ce021abbaf973524d"
+  },
+  {
+   "nome": "equipe_pedido_decidir",
+   "args": [
+    {
+     "nome": "p_agente",
+     "padrao": false
+    },
+    {
+     "nome": "p_aprovar",
+     "padrao": false
+    },
+    {
+     "nome": "p_papel",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "2da2fb5866813fee6559b34c3a4ab276"
+  },
+  {
+   "nome": "equipe_pedido_reforcar",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "8fc03e535f695e38180e9585d4a2450d"
+  },
+  {
+   "nome": "equipe_pedidos",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "8d4ed7e8d9020993c63646fa94b2ad99"
+  },
+  {
+   "nome": "espera_vigiar",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "fc68707747f3b2912c6d4ba28dd647d7"
+  },
+  {
+   "nome": "fila_atendimento_de",
+   "args": [
+    {
+     "nome": "p_token",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "fb71c6d94a91157d53728e76069dc938"
+  },
+  {
+   "nome": "fila_atendimento_do_cabecalho",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "cb18903640a3b2a13b4f95aeea86cdba"
+  },
+  {
+   "nome": "fila_avisar_n8n",
+   "args": [
+    {
+     "nome": "p_atendimento",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "d6b7498f2c03d74c0c84f943d2932492"
+  },
+  {
+   "nome": "fila_avisar_trg",
+   "args": [],
+   "definer": true,
+   "gatilho": true,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "2d3c6331ce38b300daa329d7b382ebd7"
+  },
+  {
+   "nome": "fila_aviso_segredo",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "f51e82de504fac2190c4bd28cad35406"
+  },
+  {
+   "nome": "fila_b64url",
+   "args": [
+    {
+     "nome": "p",
+     "padrao": false
+    }
+   ],
+   "definer": false,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "51bb5146c6a1f4c1be82919cc2ae06a1"
+  },
+  {
+   "nome": "fila_b64url_decode",
+   "args": [
+    {
+     "nome": "p",
+     "padrao": false
+    }
+   ],
+   "definer": false,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "7da980d045f18b5355f1bf76c60e596b"
+  },
+  {
+   "nome": "fila_cancelar_assinatura",
+   "args": [
+    {
+     "nome": "p_atendimento",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "5b0e7f6a72210365f9bb73e094ae51b6"
+  },
+  {
+   "nome": "fila_chamar_assinatura",
+   "args": [
+    {
+     "nome": "p_atendimento",
+     "padrao": false
+    },
+    {
+     "nome": "p_texto",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "239efbedc2f0b6cd82418ddcd678a65f"
+  },
+  {
+   "nome": "fila_chamar_proximo",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "b52ca01e964f49e950c210e10ba31889"
+  },
+  {
+   "nome": "fila_chegada_trg",
+   "args": [],
+   "definer": true,
+   "gatilho": true,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "4d1b0b0f55f41f67ed400ec7984861d6"
+  },
+  {
+   "nome": "fila_cheguei",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "792cd4369bab5afdbb5d359f87dde458"
+  },
+  {
+   "nome": "fila_concluir",
+   "args": [
+    {
+     "nome": "p_atendimento",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "01da4ec3a3c366ea4ea879fbac8fc1e0"
+  },
+  {
+   "nome": "fila_config_publica",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "30280c71fd642ff4e5af881c838ee3db"
+  },
+  {
+   "nome": "fila_criar_conta",
+   "args": [
+    {
+     "nome": "p_id",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "2bce8d69c1b36e7004b2c9be91d9c2e6"
+  },
+  {
+   "nome": "fila_dia",
+   "args": [
+    {
+     "nome": "p",
+     "padrao": false
+    }
+   ],
+   "definer": false,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": true,
+   "md5": "148f6a57a655b7cb9da4bf3f1cc0961c"
+  },
+  {
+   "nome": "fila_emitir_token",
+   "args": [
+    {
+     "nome": "p_segredo",
+     "padrao": false
+    },
+    {
+     "nome": "p_atendimento",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "1eba24cb3d123237d2114e212a5c2733"
+  },
+  {
+   "nome": "fila_entrar",
+   "args": [
+    {
+     "nome": "p_nome",
+     "padrao": false
+    },
+    {
+     "nome": "p_email",
+     "padrao": false
+    },
+    {
+     "nome": "p_telefone",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "7cae16745afb4d2fba1fef196d19f5d6"
+  },
+  {
+   "nome": "fila_equipe_ok",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "32d82e03a320e409709f127566e8adb0"
+  },
+  {
+   "nome": "fila_estado",
+   "args": [
+    {
+     "nome": "p_token",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "18a0a9609fac8c09ebea6c0cda6a041e"
+  },
+  {
+   "nome": "fila_exige_staff",
+   "args": [],
+   "definer": false,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "475d1b82276f2384e847ef0d5f83e0d2"
+  },
+  {
+   "nome": "fila_identificar_todos",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "7c027ae48cf4d57b842d4e3b6b7fff95"
+  },
+  {
+   "nome": "fila_jwt_assinar",
+   "args": [
+    {
+     "nome": "p_claims",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "29ee0ddd9dfa0bb3cb36f05f782c6729"
+  },
+  {
+   "nome": "fila_jwt_validar",
+   "args": [
+    {
+     "nome": "p_token",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "cbc2911310e483b0d38a67d2e8637a89"
+  },
+  {
+   "nome": "fila_listar",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "0cbd4f489cb9bfa311440794f608e735"
+  },
+  {
+   "nome": "fila_minha_vez",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "a28371dd77690940997c1ca85c7d6def"
+  },
+  {
+   "nome": "fila_minha_vez_ticket",
+   "args": [
+    {
+     "nome": "p_ticket",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "95c80cc6fc30ccf500a209d74f8aecde"
+  },
+  {
+   "nome": "fila_mudar",
+   "args": [
+    {
+     "nome": "p_id",
+     "padrao": false
+    },
+    {
+     "nome": "p_para",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "b123afae8058791340df83f973ea3a2b"
+  },
+  {
+   "nome": "fila_posicao",
+   "args": [
+    {
+     "nome": "p_id",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "a439d31f33b6e9774f7589f91d67b709"
+  },
+  {
+   "nome": "fila_push_remover",
+   "args": [
+    {
+     "nome": "p_endpoint",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "4ffb54e35567825f50bf78e55848b63e"
+  },
+  {
+   "nome": "fila_push_salvar",
+   "args": [
+    {
+     "nome": "p_endpoint",
+     "padrao": false
+    },
+    {
+     "nome": "p_p256dh",
+     "padrao": false
+    },
+    {
+     "nome": "p_auth",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "1dfb3b2d50507c33d183442f7ad3acf7"
+  },
+  {
+   "nome": "fila_recalcular",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "cbdf98994d32572819e96ec9156bae7d"
+  },
+  {
+   "nome": "fila_redefinir_senha",
+   "args": [
+    {
+     "nome": "p_id",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "9276f4b016535048b2b2d6e2c410246d"
+  },
+  {
+   "nome": "fila_reenviar_link",
+   "args": [
+    {
+     "nome": "p_atendimento",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "8c048248e805ab639ebc3bdceab78e33"
+  },
+  {
+   "nome": "fila_registrar_chegada",
+   "args": [
+    {
+     "nome": "p_nome",
+     "padrao": false
+    },
+    {
+     "nome": "p_conta",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "ead9b99ef06523cac4c86466f9b84133"
+  },
+  {
+   "nome": "fila_registrar_completo",
+   "args": [
+    {
+     "nome": "p_nome",
+     "padrao": false
+    },
+    {
+     "nome": "p_email",
+     "padrao": false
+    },
+    {
+     "nome": "p_telefone",
+     "padrao": false
+    },
+    {
+     "nome": "p_criar_conta",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "f93fb528e7b22aec2917456d7bd164ea"
+  },
+  {
+   "nome": "fila_segredo_ok",
+   "args": [
+    {
+     "nome": "p_segredo",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "546324a01707dc497dad3eb1c914a6ff"
+  },
+  {
+   "nome": "fila_segredo_vault",
+   "args": [
+    {
+     "nome": "p_nome",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "73a8153097bca15fdba61e44c9bcdc3f"
+  },
+  {
+   "nome": "fila_situacao_linha",
+   "args": [
+    {
+     "nome": "r",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "71d5a2e7ec0c51922c8fa887555039bb"
+  },
+  {
+   "nome": "fila_unidades_hoje",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "1fa0813e6df13c3dad6b388938e76d15"
+  },
+  {
+   "nome": "fluxo_aplicar",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_passo",
+     "padrao": false
+    },
+    {
+     "nome": "p_valor",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "61e99e942a3413944b77fdd8bf18cffa"
+  },
+  {
+   "nome": "fluxo_assunto_aplicar",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_passo",
+     "padrao": false
+    },
+    {
+     "nome": "v",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "6c6deb75aa5f105046bcff9cfbfc79c8"
+  },
+  {
+   "nome": "fluxo_assunto_futuros",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "f773bbc0ed56ac29efeec3cfd98c0398"
+  },
+  {
+   "nome": "fluxo_assunto_pergunta",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_passo",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "ff3a079be04f331eb300870f6188ae7f"
+  },
+  {
+   "nome": "fluxo_avancar",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_entrada",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "2c54069a90997a4cd199d65d3e132e33"
+  },
+  {
+   "nome": "fluxo_cpf_ok",
+   "args": [
+    {
+     "nome": "p",
+     "padrao": false
+    }
+   ],
+   "definer": false,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": true,
+   "md5": "7e94e4e76165410fe2dc5fbd19e1cee4"
+  },
+  {
+   "nome": "fluxo_ctx",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "769360889cad7a6dd4b71c6bc3c60bc2"
+  },
+  {
+   "nome": "fluxo_dizer",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_texto",
+     "padrao": false
+    },
+    {
+     "nome": "p_opcoes",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "56ed246c54442bbbe2d88f812e540ed3"
+  },
+  {
+   "nome": "fluxo_equipe_online",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "ac6316bf08aea3993e52677358eb6c23"
+  },
+  {
+   "nome": "fluxo_escolha",
+   "args": [
+    {
+     "nome": "p_passo",
+     "padrao": false
+    },
+    {
+     "nome": "p_itens",
+     "padrao": false
+    },
+    {
+     "nome": "p_extra",
+     "padrao": true
+    }
+   ],
+   "definer": false,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": true,
+   "md5": "7e638b91d845941512ad338315ecfd0a"
+  },
+  {
+   "nome": "fluxo_finalizar",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "ae7199d5f7a15a8a03af56991f00b611"
+  },
+  {
+   "nome": "fluxo_leitura",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "0da371fd434474a82e313fd6a12e6888"
+  },
+  {
+   "nome": "fluxo_ler_data",
+   "args": [
+    {
+     "nome": "p",
+     "padrao": false
+    }
+   ],
+   "definer": false,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": true,
+   "md5": "ac6ef9eb6aeef6c5f9915c24246cdd37"
+  },
+  {
+   "nome": "fluxo_ler_texto",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_passo",
+     "padrao": false
+    },
+    {
+     "nome": "p_texto",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "38fe4302adc28914d2fa1525f1cb4edd"
+  },
+  {
+   "nome": "fluxo_medicos",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "022a6f21e137a0373394cd1e3d858933"
+  },
+  {
+   "nome": "fluxo_mensagem_trg",
+   "args": [],
+   "definer": true,
+   "gatilho": true,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "0e0fa03e850e96d6fdc0eec03f12a6c5"
+  },
+  {
+   "nome": "fluxo_norm",
+   "args": [
+    {
+     "nome": "t",
+     "padrao": false
+    }
+   ],
+   "definer": false,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": true,
+   "md5": "62295f73543f2e4431cd066e02c47173"
+  },
+  {
+   "nome": "fluxo_norm_exame",
+   "args": [
+    {
+     "nome": "t",
+     "padrao": false
+    }
+   ],
+   "definer": false,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": true,
+   "md5": "f86da157cdb6b9bc5e85eb79b240f106"
+  },
+  {
+   "nome": "fluxo_nota",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_nota",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "c4dbe473fad322eba4a44ce7c64fc033"
+  },
+  {
+   "nome": "fluxo_perguntar",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_passo",
+     "padrao": false
+    },
+    {
+     "nome": "p_prefixo",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "88026c59045b377d623e8dd76d0ec2ce"
+  },
+  {
+   "nome": "fluxo_pos_aplicar",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_passo",
+     "padrao": false
+    },
+    {
+     "nome": "v",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "4a584c36a8c50b7283dcc6f9c6b62d61"
+  },
+  {
+   "nome": "fluxo_pos_pergunta",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_passo",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "511be39a75a029ad65f95dcf940ad0f2"
+  },
+  {
+   "nome": "fluxo_pre",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_dados",
+     "padrao": false
+    },
+    {
+     "nome": "p_pronto",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "824969f5bca052c781d4bceb1ee6d388"
+  },
+  {
+   "nome": "fluxo_procs",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "2e4a3a41e1cae12fc0521abf364c9787"
+  },
+  {
+   "nome": "fluxo_proximo",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "46fd3ddfeaf2c609be059fd48a30f100"
+  },
+  {
+   "nome": "fluxo_proximo_assunto",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "d",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "b192a01f4b5f5232366f4b79b6d268f2"
+  },
+  {
+   "nome": "fluxo_relatorio",
+   "args": [
+    {
+     "nome": "p_dias",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "ecfc39346e5d522ab8f98ddf6cc7242f"
+  },
+  {
+   "nome": "fluxo_resumo",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "4b7314f4381fb55c9c401ae73155d545"
+  },
+  {
+   "nome": "fluxo_rotulo_item",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_proc",
+     "padrao": false
+    },
+    {
+     "nome": "p_nome",
+     "padrao": false
+    },
+    {
+     "nome": "p_mod",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "70d478d689df76956449e2cc02f19524"
+  },
+  {
+   "nome": "fluxo_set",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_dados",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "c2be9d3ca2ff7b2408a877fee396f49a"
+  },
+  {
+   "nome": "fluxo_t",
+   "args": [
+    {
+     "nome": "p_chave",
+     "padrao": false
+    },
+    {
+     "nome": "p_v",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "49437b9c42df0fec799d2b1cc1ae8221"
+  },
+  {
+   "nome": "fluxo_transferir",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_motivo",
+     "padrao": false
+    },
+    {
+     "nome": "p_urgencia",
+     "padrao": true
+    },
+    {
+     "nome": "p_avisar",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "bb36937b97c8d9c564cc24db1df398cc"
+  },
+  {
+   "nome": "fone_chave",
+   "args": [
+    {
+     "nome": "t",
+     "padrao": false
+    }
+   ],
+   "definer": false,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": true,
+   "md5": "3de0f8817c09e46d724f5aec6bbe74e8"
+  },
+  {
+   "nome": "fone_digitos",
+   "args": [
+    {
+     "nome": "t",
+     "padrao": false
+    }
+   ],
+   "definer": false,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "30c70c0a8d405ef8312f51cdbec23986"
+  },
+  {
+   "nome": "horario_trabalho_agora",
+   "args": [
+    {
+     "nome": "p_em",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "a67374f7cf6e29914975bf9871847ddc"
+  },
+  {
+   "nome": "ia_catalogo_carregar",
+   "args": [
+    {
+     "nome": "p_segredo",
+     "padrao": false
+    },
+    {
+     "nome": "p_tipo",
+     "padrao": false
+    },
+    {
+     "nome": "p_linhas",
+     "padrao": false
+    },
+    {
+     "nome": "p_anexar",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "b0af37efe1ab40bb93ae033a55a05e53"
+  },
+  {
+   "nome": "ia_coorte",
+   "args": [
+    {
+     "nome": "p_ini",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "abfc667e207dc5028d5f24950b6327b6"
+  },
+  {
+   "nome": "ia_evento_motivo",
+   "args": [
+    {
+     "nome": "p_pre",
+     "padrao": false
+    },
+    {
+     "nome": "p_motivo",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "5151533c9697358f3905c645ef8fb3b1"
+  },
+  {
+   "nome": "ia_evento_trg",
+   "args": [],
+   "definer": true,
+   "gatilho": true,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "8c74b97e98aae8926f992ca5dbd44da5"
+  },
+  {
+   "nome": "ia_exemplos",
+   "args": [
+    {
+     "nome": "p_dias",
+     "padrao": true
+    },
+    {
+     "nome": "p_limite",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "998e9a47fcf3eaecfce506182fa07ae5"
+  },
+  {
+   "nome": "ia_pre_agendar",
+   "args": [
+    {
+     "nome": "p_segredo",
+     "padrao": false
+    },
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_dados",
+     "padrao": false
+    },
+    {
+     "nome": "p_pronto",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "ef8635c6a3594fee80348e43f85858f3"
+  },
+  {
+   "nome": "ia_precos_divergentes",
+   "args": [
+    {
+     "nome": "p_limite",
+     "padrao": true
+    },
+    {
+     "nome": "p_minimo_pct",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "1ca037c5f938920597973d84fbaf4231"
+  },
+  {
+   "nome": "ia_relatorio",
+   "args": [
+    {
+     "nome": "p_dias",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "ad661ca384ddddf9546f435c4a04ab1e"
+  },
+  {
+   "nome": "ind_calc_conclusoes",
+   "args": [
+    {
+     "nome": "p_de",
+     "padrao": false
+    },
+    {
+     "nome": "p_ate",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "205d438beee0cd73e0919b49be1025ef"
+  },
+  {
+   "nome": "ind_calc_pessoas",
+   "args": [
+    {
+     "nome": "p_de",
+     "padrao": false
+    },
+    {
+     "nome": "p_ate",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "5d95e6b34dc1fd188589c6049596e23e"
+  },
+  {
+   "nome": "ind_calc_semhumano",
+   "args": [
+    {
+     "nome": "p_de",
+     "padrao": false
+    },
+    {
+     "nome": "p_ate",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "eaf943fbf22318f1fbb04dd3088de3cb"
+  },
+  {
+   "nome": "ind_fechar_dia",
+   "args": [
+    {
+     "nome": "p_dia",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "6f0828cfca7131af855600f7c61b2097"
+  },
+  {
+   "nome": "ind_fechar_pendentes",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "0e736aaca605b17a9f426912bb737f64"
+  },
+  {
+   "nome": "ind_imutavel_trg",
+   "args": [],
+   "definer": false,
+   "gatilho": true,
+   "anon": true,
+   "authenticated": true,
+   "publico": true,
+   "md5": "4fcc61f7764ceaab5515d0ca39b671e9"
+  },
+  {
+   "nome": "jornada_acordar",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "9b275436f323d0b5bfb646e4275a5265"
+  },
+  {
+   "nome": "jornada_admin",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "900457744c8bbb29ba63545443642895"
+  },
+  {
+   "nome": "jornada_anotar_card",
+   "args": [
+    {
+     "nome": "p_card",
+     "padrao": false
+    },
+    {
+     "nome": "p_nota",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "1a8368904bafa4d705ded4d24c637710"
+  },
+  {
+   "nome": "jornada_aplicar_chat",
+   "args": [
+    {
+     "nome": "p_card",
+     "padrao": false
+    },
+    {
+     "nome": "p_alvo",
+     "padrao": false
+    },
+    {
+     "nome": "p_detalhe",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "389e0e63a73677c70d6e4824a07ca067"
+  },
+  {
+   "nome": "jornada_aplicar_klingo",
+   "args": [
+    {
+     "nome": "p_card",
+     "padrao": false
+    },
+    {
+     "nome": "p_alvo",
+     "padrao": false
+    },
+    {
+     "nome": "p_detalhe",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "c4e38cac6e5d4b1a65b48f46488e95c5"
+  },
+  {
+   "nome": "jornada_aplicar_regras",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "68eb2855727f52bb0ec99f720cc5ea7f"
+  },
+  {
+   "nome": "jornada_arquivar_card",
+   "args": [
+    {
+     "nome": "p_card",
+     "padrao": false
+    },
+    {
+     "nome": "p_versao",
+     "padrao": false
+    },
+    {
+     "nome": "p_nota",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "1cf97235db0f5be0a323a6f6f0ca906e"
+  },
+  {
+   "nome": "jornada_atribuir_card",
+   "args": [
+    {
+     "nome": "p_card",
+     "padrao": false
+    },
+    {
+     "nome": "p_responsavel",
+     "padrao": false
+    },
+    {
+     "nome": "p_versao",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "c4e08aaed71de485c811bf1af98d02e4"
+  },
+  {
+   "nome": "jornada_avisar_card_upd",
+   "args": [],
+   "definer": true,
+   "gatilho": true,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "05b1db3077e1b790a4ece2a79d5acff1"
+  },
+  {
+   "nome": "jornada_avisar_exame_ins",
+   "args": [],
+   "definer": true,
+   "gatilho": true,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "8fd3ff4e2a4754e2f9fac621020e74fe"
+  },
+  {
+   "nome": "jornada_avisar_exame_upd",
+   "args": [],
+   "definer": true,
+   "gatilho": true,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "f4088f56aa02faab454ec238ba24d221"
+  },
+  {
+   "nome": "jornada_checklist_do_card",
+   "args": [
+    {
+     "nome": "p_card",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "d69ba60af777952c4391031327b5402f"
+  },
+  {
+   "nome": "jornada_checklist_gatilho",
+   "args": [],
+   "definer": true,
+   "gatilho": true,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "374efe5edc53cee4b8e4c98b8ae5e5a4"
+  },
+  {
+   "nome": "jornada_coluna_do_card",
+   "args": [
+    {
+     "nome": "p_status",
+     "padrao": false
+    }
+   ],
+   "definer": false,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": true,
+   "md5": "e4caccca86ced831ef1421fe2aa4d160"
+  },
+  {
+   "nome": "jornada_coluna_do_chat",
+   "args": [
+    {
+     "nome": "p_pre_status",
+     "padrao": false
+    },
+    {
+     "nome": "p_pre_etapa",
+     "padrao": false
+    },
+    {
+     "nome": "p_conv_status",
+     "padrao": false
+    }
+   ],
+   "definer": false,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": true,
+   "md5": "df73413ec7b38923c514e45d5a0ea445"
+  },
+  {
+   "nome": "jornada_conversa_do_card",
+   "args": [
+    {
+     "nome": "p_card",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "e6018f65ecf26a9ec70344f368208b75"
+  },
+  {
+   "nome": "jornada_conversas_sincronizar",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "90ff495c0fd9ccbe0125c13df969b393"
+  },
+  {
+   "nome": "jornada_criar_tarefa",
+   "args": [
+    {
+     "nome": "p_card",
+     "padrao": false
+    },
+    {
+     "nome": "p_titulo",
+     "padrao": false
+    },
+    {
+     "nome": "p_vence",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "e0f0ba5b958b313b33b9aac1ad3873c3"
+  },
+  {
+   "nome": "jornada_definir_status",
+   "args": [
+    {
+     "nome": "p_card",
+     "padrao": false
+    },
+    {
+     "nome": "p_para",
+     "padrao": false
+    },
+    {
+     "nome": "p_versao",
+     "padrao": false
+    },
+    {
+     "nome": "p_nota",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "eacbf7b5b5e9fd511068bc2104b526bb"
+  },
+  {
+   "nome": "jornada_enviar_mensagem",
+   "args": [
+    {
+     "nome": "p_card",
+     "padrao": false
+    },
+    {
+     "nome": "p_texto",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "6d36a0f0e236fe570bacbfd6da987cca"
+  },
+  {
+   "nome": "jornada_equipe",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "796d10d5891f04913e2cc6db08e8fedf"
+  },
+  {
+   "nome": "jornada_exame_conferir_ins",
+   "args": [],
+   "definer": true,
+   "gatilho": true,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "2ae9a508f9c6a15b193d03a8802bccca"
+  },
+  {
+   "nome": "jornada_exame_conferir_upd",
+   "args": [],
+   "definer": true,
+   "gatilho": true,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "0b8f6ef53105cb7330da9a531d622d80"
+  },
+  {
+   "nome": "jornada_imutavel",
+   "args": [],
+   "definer": false,
+   "gatilho": true,
+   "anon": true,
+   "authenticated": true,
+   "publico": true,
+   "md5": "162cd34875fd8cf0d1c01bd5aa603796"
+  },
+  {
+   "nome": "jornada_klingo_agendar",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "0fcfc09fe82722863054760fa74a7454"
+  },
+  {
+   "nome": "jornada_klingo_expediente",
+   "args": [
+    {
+     "nome": "p_agora",
+     "padrao": false
+    }
+   ],
+   "definer": false,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "e8cd0995bce00750071504258eaf68b6"
+  },
+  {
+   "nome": "jornada_klingo_falha",
+   "args": [
+    {
+     "nome": "p_erro",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "32c07b845a2570eb97103cbdccccc711"
+  },
+  {
+   "nome": "jornada_klingo_fechar",
+   "args": [
+    {
+     "nome": "p_atras",
+     "padrao": true
+    },
+    {
+     "nome": "p_frente",
+     "padrao": true
+    },
+    {
+     "nome": "p_resumo",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "ac579b0dfb8d7e6c91cb2a956901ac4d"
+  },
+  {
+   "nome": "jornada_klingo_lote",
+   "args": [
+    {
+     "nome": "p_linhas",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "664a1914594f5d71509ac224f1f09319"
+  },
+  {
+   "nome": "jornada_klingo_pode_mover",
+   "args": [
+    {
+     "nome": "p_atual",
+     "padrao": false
+    },
+    {
+     "nome": "p_alvo",
+     "padrao": false
+    }
+   ],
+   "definer": false,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "911cbca9588637e99326359b9ef05404"
+  },
+  {
+   "nome": "jornada_klingo_proximo",
+   "args": [
+    {
+     "nome": "p_agora",
+     "padrao": false
+    },
+    {
+     "nome": "p_movimento",
+     "padrao": false
+    }
+   ],
+   "definer": false,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "184a6583897d5442e2dfe9e5d5eb3d7d"
+  },
+  {
+   "nome": "jornada_marcar_tarefa",
+   "args": [
+    {
+     "nome": "p_tarefa",
+     "padrao": false
+    },
+    {
+     "nome": "p_feita",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "6fae82a32474df5488bcac9b3d954204"
+  },
+  {
+   "nome": "jornada_mover_card",
+   "args": [
+    {
+     "nome": "p_card",
+     "padrao": false
+    },
+    {
+     "nome": "p_para",
+     "padrao": false
+    },
+    {
+     "nome": "p_versao",
+     "padrao": false
+    },
+    {
+     "nome": "p_nota",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "cd5682760a0bbdd0d5cf22147d2aea03"
+  },
+  {
+   "nome": "jornada_nome_de",
+   "args": [
+    {
+     "nome": "p_id",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "5410a2d0b70e409be9a8f1cc0213e1f8"
+  },
+  {
+   "nome": "jornada_pendencia_resolver",
+   "args": [
+    {
+     "nome": "p_chave",
+     "padrao": false
+    },
+    {
+     "nome": "p_resolvida",
+     "padrao": false
+    },
+    {
+     "nome": "p_nota",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "53f63b89cd108bde7ee647358b8f8957"
+  },
+  {
+   "nome": "jornada_pessoas",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "d6886fcee4c771eb3004d6063e74f135"
+  },
+  {
+   "nome": "jornada_pode",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "3bebd9fc58c0a28809b4fef6ceca8b78"
+  },
+  {
+   "nome": "jornada_registrar_acesso",
+   "args": [
+    {
+     "nome": "p_card",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "b2867436aaed3bd231c0515f175e6655"
+  },
+  {
+   "nome": "jornada_regra_ativa",
+   "args": [
+    {
+     "nome": "p_chave",
+     "padrao": false
+    }
+   ],
+   "definer": false,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "5b40658c1c51c28244f19fe42da1e4ed"
+  },
+  {
+   "nome": "jornada_remarcar_pelo_chat",
+   "args": [
+    {
+     "nome": "p_card",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "ec15cd2e8d44bd857c041ac3973bce0e"
+  },
+  {
+   "nome": "jornada_status_exame",
+   "args": [
+    {
+     "nome": "p_status",
+     "padrao": false
+    },
+    {
+     "nome": "p_atendido",
+     "padrao": false
+    },
+    {
+     "nome": "p_motivo",
+     "padrao": false
+    },
+    {
+     "nome": "p_confirm",
+     "padrao": false
+    },
+    {
+     "nome": "p_para",
+     "padrao": false
+    },
+    {
+     "nome": "p_hoje",
+     "padrao": false
+    }
+   ],
+   "definer": false,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": true,
+   "md5": "0379fcee873cafc833bcbcb195bc90c1"
+  },
+  {
+   "nome": "jornada_unidade_curta",
+   "args": [
+    {
+     "nome": "p",
+     "padrao": false
+    }
+   ],
+   "definer": false,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": true,
+   "md5": "083c49e87cd622bfc7cbedf8e9dc871d"
+  },
+  {
+   "nome": "jornada_vigiar",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "760ab91639658d5daf0b6cc21c7d56c0"
+  },
+  {
+   "nome": "klingo_conferir_agendar",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "01a370894b23d26ec88d58e27d6b8182"
+  },
+  {
+   "nome": "login_paciente_ativo",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "f500bb620773e4d08d60dbbd12e67579"
+  },
+  {
+   "nome": "medico_admin",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "8032b83a6fd1f4f16d72bd74b2632c13"
+  },
+  {
+   "nome": "medico_aviso_contagem",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "be7033cdcf57ae17c729c430400e8309"
+  },
+  {
+   "nome": "medico_aviso_resolver",
+   "args": [
+    {
+     "nome": "p_id",
+     "padrao": false
+    },
+    {
+     "nome": "p_acao",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "bcfb0177408e12b012759b9ae31d10e5"
+  },
+  {
+   "nome": "medico_convenio_salvar",
+   "args": [
+    {
+     "nome": "p_prof",
+     "padrao": false
+    },
+    {
+     "nome": "p_operadora",
+     "padrao": false
+    },
+    {
+     "nome": "p_proc",
+     "padrao": false
+    },
+    {
+     "nome": "p_aceita",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "08e0e3cae9b4b2c96d9749377466cee7"
+  },
+  {
+   "nome": "medico_detalhe",
+   "args": [
+    {
+     "nome": "p_prof",
+     "padrao": false
+    },
+    {
+     "nome": "p_unid",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "8f05955cdd442eccdc844c13e3a86e25"
+  },
+  {
+   "nome": "medico_detectar",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "a60d3e242d3720cc5fa48955c8ca1d14"
+  },
+  {
+   "nome": "medico_detectar_procs",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "7515576a034afd5bce2f8b1bf55404d2"
+  },
+  {
+   "nome": "medico_detectar_trg",
+   "args": [],
+   "definer": true,
+   "gatilho": true,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "4781f294356c14f7801e7891a260019d"
+  },
+  {
+   "nome": "medico_diferencas",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "3524377cc54cc4113a475efafe78f801"
+  },
+  {
+   "nome": "medico_excecao_remover",
+   "args": [
+    {
+     "nome": "p_id",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "311b21c1f66f5223a3f08ec131b80cf6"
+  },
+  {
+   "nome": "medico_excecao_salvar",
+   "args": [
+    {
+     "nome": "p_prof",
+     "padrao": false
+    },
+    {
+     "nome": "p_ini",
+     "padrao": false
+    },
+    {
+     "nome": "p_fim",
+     "padrao": false
+    },
+    {
+     "nome": "p_motivo",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "012aa14838452b05ea9820653f0dfe64"
+  },
+  {
+   "nome": "medico_klingo",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "990df0e7bb68dd635aed939e66ca88e5"
+  },
+  {
+   "nome": "medico_particular_salvar",
+   "args": [
+    {
+     "nome": "p_prof",
+     "padrao": false
+    },
+    {
+     "nome": "p_valor",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "b9f78ba99227deaf6e0b63ab49643d51"
+  },
+  {
+   "nome": "medico_proc_resolver",
+   "args": [
+    {
+     "nome": "p_ids",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "c87d5d653d8b9921eeee3d30cc29bba0"
+  },
+  {
+   "nome": "medico_procs_klingo",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "0e81f7b17a7fe13d18fc67a851fa2dd9"
+  },
+  {
+   "nome": "medico_regra_gravar",
+   "args": [
+    {
+     "nome": "p_prof",
+     "padrao": false
+    },
+    {
+     "nome": "p_unid",
+     "padrao": false
+    },
+    {
+     "nome": "p_dias",
+     "padrao": false
+    },
+    {
+     "nome": "p_ini",
+     "padrao": false
+    },
+    {
+     "nome": "p_fim",
+     "padrao": false
+    },
+    {
+     "nome": "p_nota",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "7b1f56cc75cb196f8081bd2708e7b913"
+  },
+  {
+   "nome": "medico_salvar",
+   "args": [
+    {
+     "nome": "p_profissional",
+     "padrao": false
+    },
+    {
+     "nome": "p_unidade",
+     "padrao": false
+    },
+    {
+     "nome": "p_dados",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "6a5af6883424145bac80a21888108822"
+  },
+  {
+   "nome": "medico_turnos_salvar",
+   "args": [
+    {
+     "nome": "p_prof",
+     "padrao": false
+    },
+    {
+     "nome": "p_unid",
+     "padrao": false
+    },
+    {
+     "nome": "p_turnos",
+     "padrao": false
+    },
+    {
+     "nome": "p_nota",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "cb732fe33c09cffb7b32a71fdd49ea99"
+  },
+  {
+   "nome": "medicos_disponiveis_interno",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "d79ee11a82f713af2320bd3cacd21a6a"
+  },
+  {
+   "nome": "medicos_mapa_salas",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "53cf97eb425d7b4b154bd1edda81f2cd"
+  },
+  {
+   "nome": "medicos_painel",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "4a2d66093ad21450d429797a4be57be4"
+  },
+  {
+   "nome": "mensagem_aguarda_paciente_trg",
+   "args": [],
+   "definer": true,
+   "gatilho": true,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "4ddaa8d873d5f04076d9a4b85c5616bf"
+  },
+  {
+   "nome": "mensagem_inserida",
+   "args": [],
+   "definer": true,
+   "gatilho": true,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "0135002edd79ba4995d744116f4a333e"
+  },
+  {
+   "nome": "mensagens_conferir_preco_trg",
+   "args": [],
+   "definer": true,
+   "gatilho": true,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "b9cf02ab1666e68093e30e5c89e83f48"
+  },
+  {
+   "nome": "mensagens_teste_trg",
+   "args": [],
+   "definer": true,
+   "gatilho": true,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "8c039f9361a3c61408db6cf0362ebdf3"
+  },
+  {
+   "nome": "modalidade_de",
+   "args": [
+    {
+     "nome": "p_classe",
+     "padrao": false
+    }
+   ],
+   "definer": false,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": true,
+   "md5": "686b0208860c79928779b3a6dd44a890"
+  },
+  {
+   "nome": "nome_confere",
+   "args": [
+    {
+     "nome": "a",
+     "padrao": false
+    },
+    {
+     "nome": "b",
+     "padrao": false
+    }
+   ],
+   "definer": false,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": true,
+   "md5": "68519471485d8cc3934292d4451785bf"
+  },
+  {
+   "nome": "norm_chave",
+   "args": [
+    {
+     "nome": "t",
+     "padrao": false
+    }
+   ],
+   "definer": false,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "e9f9f66889d6ad6ff58e8457179dd36a"
+  },
+  {
+   "nome": "norm_nome",
+   "args": [
+    {
+     "nome": "t",
+     "padrao": false
+    }
+   ],
+   "definer": false,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": true,
+   "md5": "fa8df0591d421fdd7b373965aeebce83"
+  },
+  {
+   "nome": "novo_usuario",
+   "args": [],
+   "definer": true,
+   "gatilho": true,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "ddf3cbbbd688490e45e07a6e589e7e02"
+  },
+  {
+   "nome": "ocr_chave",
+   "args": [
+    {
+     "nome": "t",
+     "padrao": false
+    }
+   ],
+   "definer": false,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "0d565b03e4a7f083f5f6503cf8dcaaa9"
+  },
+  {
+   "nome": "ocr_exame_json",
+   "args": [
+    {
+     "nome": "p_id",
+     "padrao": false
+    },
+    {
+     "nome": "p_lado",
+     "padrao": false
+    },
+    {
+     "nome": "p_linha",
+     "padrao": false
+    }
+   ],
+   "definer": false,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "6ca4630657059a8177c72319551e3246"
+  },
+  {
+   "nome": "ocr_ia_contexto",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_token",
+     "padrao": false
+    },
+    {
+     "nome": "p_anexo",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "113907b4f5e2e75a70faa26a010ba0cc"
+  },
+  {
+   "nome": "ocr_ia_grupos",
+   "args": [
+    {
+     "nome": "p_anexo",
+     "padrao": false
+    }
+   ],
+   "definer": false,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "00270c6418fd57cf6b888175f56ce8d1"
+  },
+  {
+   "nome": "ocr_ia_salvar",
+   "args": [
+    {
+     "nome": "p_anexo",
+     "padrao": false
+    },
+    {
+     "nome": "p_leitura",
+     "padrao": false
+    },
+    {
+     "nome": "p_modelo",
+     "padrao": false
+    },
+    {
+     "nome": "p_ms",
+     "padrao": false
+    },
+    {
+     "nome": "p_erro",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "a7b2758576b0494bb44d4921d4174e56"
+  },
+  {
+   "nome": "ocr_lado",
+   "args": [
+    {
+     "nome": "t",
+     "padrao": false
+    }
+   ],
+   "definer": false,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "496796414f97ecc8c62b8f960ef0fbc2"
+  },
+  {
+   "nome": "org_equipe_salvar",
+   "args": [
+    {
+     "nome": "p_id",
+     "padrao": false
+    },
+    {
+     "nome": "p_nome",
+     "padrao": false
+    },
+    {
+     "nome": "p_unidade",
+     "padrao": true
+    },
+    {
+     "nome": "p_transversal",
+     "padrao": true
+    },
+    {
+     "nome": "p_ativa",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "276bdb87c8a652631a5fbb64dc020fe1"
+  },
+  {
+   "nome": "org_estrutura",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "7ecab2b1196b0e549e29359eb3d2a13c"
+  },
+  {
+   "nome": "org_log_imutavel_trg",
+   "args": [],
+   "definer": false,
+   "gatilho": true,
+   "anon": true,
+   "authenticated": true,
+   "publico": true,
+   "md5": "a12601fb6d0131be53db6269c45c144b"
+  },
+  {
+   "nome": "org_membro_salvar",
+   "args": [
+    {
+     "nome": "p_id",
+     "padrao": false
+    },
+    {
+     "nome": "p_equipe",
+     "padrao": false
+    },
+    {
+     "nome": "p_agente",
+     "padrao": false
+    },
+    {
+     "nome": "p_rotulo",
+     "padrao": false
+    },
+    {
+     "nome": "p_funcao",
+     "padrao": false
+    },
+    {
+     "nome": "p_ativo",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "c8a67aede34385d719d88dfd1f602d95"
+  },
+  {
+   "nome": "org_membro_vincular",
+   "args": [
+    {
+     "nome": "p_membro",
+     "padrao": false
+    },
+    {
+     "nome": "p_agente",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "8b05b5be678281626e3dac89e969f029"
+  },
+  {
+   "nome": "org_nivel",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "4b7860b64d101b86a9e4c1919d7fdfe4"
+  },
+  {
+   "nome": "org_nivel_de",
+   "args": [
+    {
+     "nome": "p_agente",
+     "padrao": false
+    },
+    {
+     "nome": "p_papel",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "a056bb4b44dcd7be830a9fd45e931c21"
+  },
+  {
+   "nome": "org_pode_ver",
+   "args": [
+    {
+     "nome": "p_agente",
+     "padrao": false
+    },
+    {
+     "nome": "p_papel",
+     "padrao": false
+    },
+    {
+     "nome": "p_dono",
+     "padrao": false
+    },
+    {
+     "nome": "p_unidade",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "3ac4de5a65f8a7b8d11206bab80fcc49"
+  },
+  {
+   "nome": "paciente_aviso_resolver",
+   "args": [
+    {
+     "nome": "p_id",
+     "padrao": false
+    },
+    {
+     "nome": "p_aplicar",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "b6c1f2d00b532af44aef09740442e31e"
+  },
+  {
+   "nome": "paciente_avisos",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "316469e01afed26f2b5861d0afb6d304"
+  },
+  {
+   "nome": "paciente_conferir",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "e1668fbbbc6de0de79a58c87ee5d7def"
+  },
+  {
+   "nome": "paciente_dado_conferir",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "e4e6a2b20803235159f7fffc63e0a1d6"
+  },
+  {
+   "nome": "paciente_historico_para_ia",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "acbfb8e0f63ed83e351545281a69c250"
+  },
+  {
+   "nome": "paciente_jornada",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "d43357a7f6b8f86ef7f11cb398801643"
+  },
+  {
+   "nome": "paciente_klingo",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "5f90411b33d763b3fe77bdac8c2dfe60"
+  },
+  {
+   "nome": "paciente_klingo_ligar",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "176cad045a7d5f08201e0edd30f93002"
+  },
+  {
+   "nome": "paciente_klingo_registrar",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_resultado",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "21bb6420946bfd201bbedc6eabaf2fc8"
+  },
+  {
+   "nome": "paciente_linha_do_tempo",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "a31da0aa18cca4a1a86da3a9085dbc8b"
+  },
+  {
+   "nome": "painel_alerta_agenda_limpar",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "dcac9ca0a32d48a2eaf3f0e6a62436b6"
+  },
+  {
+   "nome": "painel_anexo",
+   "args": [
+    {
+     "nome": "p_id",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "686085055bad22d8eb98f8f640931df3"
+  },
+  {
+   "nome": "painel_anexo_conferir",
+   "args": [
+    {
+     "nome": "p_id",
+     "padrao": false
+    },
+    {
+     "nome": "p_itens",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "3b77ee2b17d93a6e2f7787cb1c9374ae"
+  },
+  {
+   "nome": "painel_anexo_klingo_conferido",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_feito",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "ac187045a73f74542bc68a1cbfc799ad"
+  },
+  {
+   "nome": "painel_anexos_resumo",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "30b5dc91f4dc8ccdf0573505c6af7508"
+  },
+  {
+   "nome": "painel_conversa_pessoa_un",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "2b1797fd7fac26c8f1dd884058273ffa"
+  },
+  {
+   "nome": "painel_exames_buscar",
+   "args": [
+    {
+     "nome": "p_termo",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "8dced1e2966f2f4c2142dbf4d8a41beb"
+  },
+  {
+   "nome": "painel_incidentes",
+   "args": [
+    {
+     "nome": "p_codigo",
+     "padrao": true
+    },
+    {
+     "nome": "p_dias",
+     "padrao": true
+    },
+    {
+     "nome": "p_limite",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "359e99044dc2897b86ebc61b39bbec8c"
+  },
+  {
+   "nome": "painel_indicadores",
+   "args": [
+    {
+     "nome": "p_dias",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "c36c4c77f8772f87143e3335605eb75e"
+  },
+  {
+   "nome": "painel_indicadores_equipe",
+   "args": [
+    {
+     "nome": "p_de",
+     "padrao": true
+    },
+    {
+     "nome": "p_ate",
+     "padrao": true
+    },
+    {
+     "nome": "p_incluir_teste",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "7140feb8e1599a884762c5320327ef18"
+  },
+  {
+   "nome": "painel_indicadores_extras_v2",
+   "args": [
+    {
+     "nome": "p_de",
+     "padrao": true
+    },
+    {
+     "nome": "p_ate",
+     "padrao": true
+    },
+    {
+     "nome": "p_unidade",
+     "padrao": true
+    },
+    {
+     "nome": "p_incluir_teste",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "5a23d61e4985f152c856d66ddab9f5ac"
+  },
+  {
+   "nome": "painel_indicadores_jornada",
+   "args": [
+    {
+     "nome": "p_dias",
+     "padrao": true
+    },
+    {
+     "nome": "p_unidade",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "565ee1e0b2a77ed8b195946efc1d20b4"
+  },
+  {
+   "nome": "painel_indicadores_jornada_v2",
+   "args": [
+    {
+     "nome": "p_de",
+     "padrao": true
+    },
+    {
+     "nome": "p_ate",
+     "padrao": true
+    },
+    {
+     "nome": "p_unidade",
+     "padrao": true
+    },
+    {
+     "nome": "p_incluir_teste",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "55daa897c4ebd347e7047fedb74b3166"
+  },
+  {
+   "nome": "painel_indicadores_unidade",
+   "args": [
+    {
+     "nome": "p_dias",
+     "padrao": true
+    },
+    {
+     "nome": "p_unidade",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "1d52438e18d6eb1abe47044118708053"
+  },
+  {
+   "nome": "painel_indicadores_v2",
+   "args": [
+    {
+     "nome": "p_de",
+     "padrao": true
+    },
+    {
+     "nome": "p_ate",
+     "padrao": true
+    },
+    {
+     "nome": "p_unidade",
+     "padrao": true
+    },
+    {
+     "nome": "p_incluir_teste",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "a79094ec68dc9d95f4283644ea279dd3"
+  },
+  {
+   "nome": "painel_mensagem_alterar",
+   "args": [
+    {
+     "nome": "p_id",
+     "padrao": false
+    },
+    {
+     "nome": "p_texto",
+     "padrao": false
+    },
+    {
+     "nome": "p_excluir",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "5db9fa4874bae25f1d52882d3d57ca26"
+  },
+  {
+   "nome": "painel_presenca",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "7a369842b305d32b45ac436cea9a6b05"
+  },
+  {
+   "nome": "papel_atual",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "cfab3c0b8fea36fa74f8df02093c5026"
+  },
+  {
+   "nome": "permissao_modo_definir",
+   "args": [
+    {
+     "nome": "p_modo",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "a648153d1af1c2b10cb05ef4be1f8ad8"
+  },
+  {
+   "nome": "permissao_restringe",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "f7f4cc5dcf14f209982c17ea0523182f"
+  },
+  {
+   "nome": "permissao_simular",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "7fd642833244360aab9981786435f893"
+  },
+  {
+   "nome": "pessoa_agrupar",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "8ddd6c51531ae1866166af5444f098b0"
+  },
+  {
+   "nome": "pessoa_agrupar_conversa_trg",
+   "args": [],
+   "definer": true,
+   "gatilho": true,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "2d8fcb95196e38fbdea70de75c8cb9ca"
+  },
+  {
+   "nome": "pessoa_agrupar_pendentes",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "b53d69bb10a8f1bb00a5dff18f525e67"
+  },
+  {
+   "nome": "pessoa_agrupar_pre_trg",
+   "args": [],
+   "definer": true,
+   "gatilho": true,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "44ab1b4214e331a7eaa1303a57841688"
+  },
+  {
+   "nome": "pessoa_avisos_data",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "88d9e2bcadb45f5785163130710894ed"
+  },
+  {
+   "nome": "pessoa_confirmar",
+   "args": [
+    {
+     "nome": "p_a",
+     "padrao": false
+    },
+    {
+     "nome": "p_b",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "5ffc76a3dd6e5db1d417196a362435fe"
+  },
+  {
+   "nome": "pessoa_conversas_de",
+   "args": [
+    {
+     "nome": "p_nome",
+     "padrao": false
+    },
+    {
+     "nome": "p_fone",
+     "padrao": false
+    },
+    {
+     "nome": "p_email",
+     "padrao": false
+    },
+    {
+     "nome": "p_conta",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "81bc02d6264d81416f017d6297cd406d"
+  },
+  {
+   "nome": "pessoa_corrigir_data",
+   "args": [
+    {
+     "nome": "p_a",
+     "padrao": false
+    },
+    {
+     "nome": "p_b",
+     "padrao": false
+    },
+    {
+     "nome": "p_ids",
+     "padrao": false
+    },
+    {
+     "nome": "p_data",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "db1a51089f523be392da6c7e871ec6cf"
+  },
+  {
+   "nome": "pessoa_equipe",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "3a2ed663a2b4d5f8d735dd996fde40fc"
+  },
+  {
+   "nome": "pessoa_ficha",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "9ca98b1ba37fddb8b12c9a79c2f83550"
+  },
+  {
+   "nome": "pessoa_klingo_confirmar",
+   "args": [
+    {
+     "nome": "p_prontuario",
+     "padrao": false
+    },
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "6a5622d312edb527c6ddb42c7e48aec1"
+  },
+  {
+   "nome": "pessoa_klingo_confirmar_sup",
+   "args": [
+    {
+     "nome": "p_prontuario",
+     "padrao": false
+    },
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_substituir",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "156e48cb3a0eb8285461a6e8d048afd2"
+  },
+  {
+   "nome": "pessoa_klingo_desfazer",
+   "args": [
+    {
+     "nome": "p_prontuario",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "e6116ea40c3ead3aa15802825cd14a29"
+  },
+  {
+   "nome": "pessoa_manter_separado",
+   "args": [
+    {
+     "nome": "p_ids_a",
+     "padrao": false
+    },
+    {
+     "nome": "p_ids_b",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "cf8b369c6ea582ab6e7dc47dfeb6035c"
+  },
+  {
+   "nome": "pessoa_membros",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "f3e675dfb64b9370b74676a2a3811faf"
+  },
+  {
+   "nome": "pessoa_nasc_parecida",
+   "args": [
+    {
+     "nome": "a",
+     "padrao": false
+    },
+    {
+     "nome": "b",
+     "padrao": false
+    }
+   ],
+   "definer": false,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "c49d44ac9cb568fe0d7fc905bc836ce8"
+  },
+  {
+   "nome": "pessoa_pedidos_de",
+   "args": [
+    {
+     "nome": "p_ids",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "59fdc360ffe34a81c17fabfb868fb37e"
+  },
+  {
+   "nome": "pessoa_recusar",
+   "args": [
+    {
+     "nome": "p_a",
+     "padrao": false
+    },
+    {
+     "nome": "p_b",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "301a1b41781f2dc08d641635505415fe"
+  },
+  {
+   "nome": "pessoa_resumo_de",
+   "args": [
+    {
+     "nome": "p_ids",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "4ba763449b13a7d02f6b566c227b7819"
+  },
+  {
+   "nome": "pessoa_separar",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "af8f6f9a4c3e4ccbd96aaa4856b1b3ce"
+  },
+  {
+   "nome": "pessoa_sinais",
+   "args": [
+    {
+     "nome": "p_a",
+     "padrao": false
+    },
+    {
+     "nome": "p_b",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "873f670f2940936cbdcb4dcc5e7a6025"
+  },
+  {
+   "nome": "pessoa_sinais_fichas",
+   "args": [
+    {
+     "nome": "a",
+     "padrao": false
+    },
+    {
+     "nome": "b",
+     "padrao": false
+    }
+   ],
+   "definer": false,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "ef9f675dbdfe278012151eeb17e1fb8b"
+  },
+  {
+   "nome": "pessoa_sugestoes",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "86221356c8ecf4a946fb66f54712b2ab"
+  },
+  {
+   "nome": "pessoa_unir_grupos",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "57bfdb2762da53f3f24244e7ccefdbd9"
+  },
+  {
+   "nome": "pode_ver_conversa",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "281a60fb237e7407173c2358967b0775"
+  },
+  {
+   "nome": "pre_agendamento_autoria_trg",
+   "args": [],
+   "definer": true,
+   "gatilho": true,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "9747274f739a283c69c2eb4531ed9472"
+  },
+  {
+   "nome": "pre_agendamento_historico_trg",
+   "args": [],
+   "definer": true,
+   "gatilho": true,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "d97e63eebea9e2c0d3e4c21408b284a0"
+  },
+  {
+   "nome": "pre_agendamento_valida_paciente_trg",
+   "args": [],
+   "definer": true,
+   "gatilho": true,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "4d332c9f060fe1612075091d215ff718"
+  },
+  {
+   "nome": "pre_agendamento_vincula_conta_trg",
+   "args": [],
+   "definer": true,
+   "gatilho": true,
+   "anon": true,
+   "authenticated": true,
+   "publico": true,
+   "md5": "1d2a35b4cebfa20f7389d81559b054b0"
+  },
+  {
+   "nome": "pre_enviar_confirmacao",
+   "args": [
+    {
+     "nome": "p_pre",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "ef3391b9a67f4d0f803ef543f015e42f"
+  },
+  {
+   "nome": "pre_pendencia_anterior",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "57a7ce927cfee04eaec4990b2028c4ca"
+  },
+  {
+   "nome": "pre_reaproveitar",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_origem",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "4d5dd1625ac8b541e3f3eff6304889bf"
+  },
+  {
+   "nome": "preco_brl",
+   "args": [
+    {
+     "nome": "v",
+     "padrao": false
+    }
+   ],
+   "definer": false,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": true,
+   "md5": "423de4d2ee7c824e59963338d9e20c5e"
+  },
+  {
+   "nome": "preco_fator_lado",
+   "args": [
+    {
+     "nome": "p_lado",
+     "padrao": false
+    },
+    {
+     "nome": "p_nome",
+     "padrao": false
+    }
+   ],
+   "definer": false,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": true,
+   "md5": "b4456d2d8c1248a2ec1835f0829e2cd0"
+  },
+  {
+   "nome": "preco_observado_registrar",
+   "args": [
+    {
+     "nome": "p_linhas",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "dd2f33836b72fa80e986fc5de004806f"
+  },
+  {
+   "nome": "preco_previsao_chat",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "f846c49c7143acbfbed320aea48bd8f0"
+  },
+  {
+   "nome": "preco_referencia_pedido",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "9ff5f693cba583b67cdafabb1af98e7f"
+  },
+  {
+   "nome": "profissional_bloqueado",
+   "args": [
+    {
+     "nome": "p_nome",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "79e378088857a1b0187bfd7da9560d86"
+  },
+  {
+   "nome": "profissional_bloquear",
+   "args": [
+    {
+     "nome": "p_nome",
+     "padrao": false
+    },
+    {
+     "nome": "p_motivo",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "6232202956a01f7e959ebe80c16d6bf3"
+  },
+  {
+   "nome": "profissional_liberar",
+   "args": [
+    {
+     "nome": "p_nome",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "3e944311b46fae700a964f513dcf2bca"
+  },
+  {
+   "nome": "registro_imutavel_trg",
+   "args": [],
+   "definer": false,
+   "gatilho": true,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "8e65c452f13b8b95384ccb3f9ef09026"
+  },
+  {
+   "nome": "teste_ids",
+   "args": [
+    {
+     "nome": "p_chave",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "5e54da2661e5fa04ca8413c04f0e89d3"
+  },
+  {
+   "nome": "teste_regra_passado",
+   "args": [
+    {
+     "nome": "p_aplicar",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "6f8013cb0ec477ad5d7001e14b6e0635"
+  },
+  {
+   "nome": "teste_regra_passado_interno",
+   "args": [
+    {
+     "nome": "p_aplicar",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "b55bf7ca1502d4370320bedcbc1e8df7"
+  },
+  {
+   "nome": "unidade_chave",
+   "args": [
+    {
+     "nome": "p",
+     "padrao": false
+    }
+   ],
+   "definer": false,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": true,
+   "md5": "5709a5964df0534eecdba1898fe09214"
+  },
+  {
+   "nome": "unidade_medicos",
+   "args": [
+    {
+     "nome": "p_chave",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "f0676f9f747b656a0e14f8c59c35f562"
+  },
+  {
+   "nome": "valores_em_reais",
+   "args": [
+    {
+     "nome": "p_texto",
+     "padrao": false
+    }
+   ],
+   "definer": false,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": true,
+   "md5": "9aabc8d832a16be03a53aced9c9dac6d"
+  },
+  {
+   "nome": "vinculo_decidir",
+   "args": [
+    {
+     "nome": "p_id",
+     "padrao": false
+    },
+    {
+     "nome": "p_acao",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "14c0456c882273aa6c66bb39315d0396"
+  },
+  {
+   "nome": "vinculo_listar",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "e95d19cb0b797b54d0d539939bdfffc7"
+  },
+  {
+   "nome": "vinculo_log_trg",
+   "args": [],
+   "definer": true,
+   "gatilho": true,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "8ba37c7ebfa3803770d772078a6a4ac5"
+  }
+ ]
+}
