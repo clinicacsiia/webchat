@@ -29,7 +29,7 @@ const COLUNAS = [['contato', 'Em conversa no chat', 1, 'manual', 'antes'], ['orc
   .map(([id, nome, ordem, origem, etapa]) => ({ id, nome, ordem, origem, etapa, sla_min: null }));
 const TRANS = [['confirmado', 'chegou'], ['chegou', 'finalizado'], ['finalizado', 'laudo_pendente'], ['contato', 'orcamento']].map(([de, para]) => ({ de, para }));
 const card = (id, nome, coluna, extra = {}) => ({ id, paciente_nome: nome, coluna, coluna_nome: COLUNAS.find((c) => c.id === coluna).nome, etapa: 'depois', origem: 'klingo', ordem: 1, data_ref: '2026-11-02', unidade: 'CSI 1',
-  coluna_desde: minAtras(10), responsavel: null, prioridade: 0, versao: 1, conversa_id: null, primeiro_exame: 'Ultrassom de abdome', n_ativos: 1, atrasado: false, n_tarefas_abertas: 0, n_tarefas_vencidas: 0, proxima_hora: daqui(30), ...extra });
+  coluna_desde: minAtras(10), responsavel: null, prioridade: 0, versao: 1, conversa_id: null, paciente_chave: 'P' + id, primeiro_exame: 'Ultrassom de abdome', n_ativos: 1, atrasado: false, n_tarefas_abertas: 0, n_tarefas_vencidas: 0, proxima_hora: daqui(30), ...extra });
 const CARTOES = [
   card(1, 'Maria Souza', 'contato', { conversa_id: 'c1', primeiro_exame: 'Ressonância de joelho' }),
   card(2, 'Carlos Klingo', 'confirmado', { proxima_hora: minAtras(25), coluna_desde: minAtras(400), n_tarefas_abertas: 1, n_tarefas_vencidas: 1 }),   // passou do horário
@@ -61,6 +61,7 @@ async function pagina(browser, { estado = 'ok', bancoFora = false } = {}) {
     localStorage.setItem('sb-nrvuynjwcgwpjdptkiay-auth-token', JSON.stringify({ access_token: token, refresh_token: 'x', token_type: 'bearer', expires_in: 86400, expires_at: Math.floor(Date.now() / 1000) + 86400,
       user: { id, aud: 'authenticated', role: 'authenticated', email, app_metadata: {}, user_metadata: {} } }));
   }, [EU.id, jwt(EU.id), EU.email]);
+  await ctx.addInitScript(() => { try { if (localStorage.getItem('painel.jsochat') === null) localStorage.setItem('painel.jsochat', '0'); } catch {} });   // os testes antigos esperam ver todos; o filtro novo tem teste próprio
   const reg = { excecoes: [], pedidos: [], rpcs: [] };
   const page = await ctx.newPage();
   page.on('pageerror', (e) => reg.excecoes.push(e.message));
@@ -126,6 +127,18 @@ await caso('mostra todos os pacientes (inclusive os do Klingo sem conversa) e n�
   const total = await page.locator('.q-card').count();
   await ctx.close();
   return { ok: total === 5 && !/conversa_id=not\.is\.null/.test(pedido) && /data_ref\.eq\.\d{4}-\d{2}-\d{2}/.test(decodeURIComponent(pedido)) && !reg.excecoes.length, detalhe: reg.excecoes[0] ?? `cartões=${total}; pedido=${decodeURIComponent(pedido).slice(0, 160)}` };
+});
+
+await caso('"Só do chat e no Klingo" (ligado por padrão) esconde quem não passou pelo chat, vale também para "Precisam de atenção", e desligar mostra todos', async () => {
+  const { page, ctx } = await abrir();
+  await page.waitForSelector('.q-card');
+  const chip = page.locator('.q-topo .chip:has-text("Só do chat e no Klingo")');
+  await chip.click(); await page.waitForTimeout(300);   // o teste começa com ele desligado (ver pagina()); aqui liga, como estaria por padrão
+  const ligado = await chip.getAttribute('aria-pressed'), cartoes = await page.locator('.q-card').allInnerTexts(), atencao = await page.locator('.j-atencao').count();
+  await chip.click(); await page.waitForTimeout(300);
+  const todos = await page.locator('.q-card').count(), atencaoOff = await page.locator('.j-atencao').count(), salvo = await page.evaluate(() => localStorage.getItem('painel.jsochat'));
+  await ctx.close();
+  return { ok: ligado === 'true' && cartoes.length === 1 && /Maria Souza/.test(cartoes[0]) && atencao === 0 && todos === 5 && atencaoOff === 1 && salvo === '0', detalhe: JSON.stringify({ ligado, cartoes: cartoes.length, atencao, todos, atencaoOff, salvo }) };
 });
 
 await caso('cada paciente aparece na coluna certa; o fluxo normal aparece mesmo vazio e as exceções só com cartão', async () => {

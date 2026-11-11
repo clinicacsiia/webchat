@@ -1066,7 +1066,10 @@
   /* ---------- aba Jornada: onde está cada paciente, ao vivo ---------- */
   // O banco lê o Klingo e vigia os prazos sozinho, a cada minuto (jornada_vigiar). O painel só mostra e avisa: não fala com o Klingo.
   const J = { cards: [], colunas: [], trans: [], estado: null, ok: true, lente: 'hoje', filtro: 'todos', busca: '', atencao: [], ticker: null, atencaoAberta: false, aberto: null, nAtencao: 0, seq: 0, canal: null, tRecarga: null,
-    pessoas: new Map(), junto: new Map(), agrupar: (() => { try { return localStorage.getItem('painel.jagrupar') !== '0'; } catch { return true; } })() };
+    pessoas: new Map(), junto: new Map(),
+    // "Só do chat e no Klingo": ligado por padrão (só some se a pessoa desligar e a escolha ficar guardada no aparelho).
+    soChat: (() => { try { return localStorage.getItem('painel.jsochat') !== '0'; } catch { return true; } })(),
+    agrupar: (() => { try { return localStorage.getItem('painel.jagrupar') !== '0'; } catch { return true; } })() };
   const LENTES_J = [['hoje', 'Hoje'], ['perto', 'Ontem a amanhã'], ['todos', 'Próximos 30 dias']];
   const COLS_J = 'id,paciente_nome,coluna,coluna_nome,etapa,origem,ordem,data_ref,unidade,coluna_desde,responsavel,prioridade,versao,conversa_id,primeiro_exame,n_ativos,atrasado,n_tarefas_abertas,n_tarefas_vencidas,proxima_hora,paciente_chave';
   const hojeBR = () => new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(new Date());
@@ -1120,7 +1123,11 @@
   const noLimiteAtencao = (k) => Date.now() - new Date(k.coluna_desde).getTime() <= LIMITE_ATENCAO_MS;
   const maisRecentePrimeiro = (a, b) => String(b.coluna_desde).localeCompare(String(a.coluna_desde));
   const unidadeDoCartaoJ = (k) => chavesDe([k.unidade]);
-  const atencaoDe = (cards) => cards.filter((k) => k.n_tarefas_vencidas > 0 && noLimiteAtencao(k) && passaUnidade(unidadeDoCartaoJ(k))).sort(maisRecentePrimeiro);
+  // Paciente que já passou pelo chat (tem conversa) E já está cadastrado no Klingo (chave de paciente é um prontuário, não "conv:" nem "manual:").
+  const temChatJ = (k) => !!(k.conversa_id || (J.pessoas.get(k.id) || {}).conversa_id);
+  const noKlingoJ = (k) => !!k.paciente_chave && !/^(conv|manual):/.test(k.paciente_chave);
+  const chatNoKlingoJ = (k) => temChatJ(k) && noKlingoJ(k);
+  const atencaoDe = (cards) => cards.filter((k) => k.n_tarefas_vencidas > 0 && noLimiteAtencao(k) && passaUnidade(unidadeDoCartaoJ(k)) && (!J.soChat || chatNoKlingoJ(k))).sort(maisRecentePrimeiro);
   // Texto da barra: os 3 primeiros da lista. Só é recalculado quando pedido (a cada 2 minutos, ou ao trocar a unidade).
   function pintarBarraAtencao() {
     const el = document.getElementById('jBarra'); if (!el) return;
@@ -1132,7 +1139,7 @@
     if (!S.me || !podeAtender()) return;
     try {
       const desde = new Date(Date.now() - LIMITE_ATENCAO_MS).toISOString();
-      const r = await db.from('v_jornada_quadro').select('n_tarefas_vencidas,coluna_desde,coluna_nome,unidade,paciente_nome,id').gt('n_tarefas_vencidas', 0).gte('coluna_desde', desde).order('coluna_desde', { ascending: false }).limit(1000);
+      const r = await db.from('v_jornada_quadro').select('n_tarefas_vencidas,coluna_desde,coluna_nome,unidade,paciente_nome,id,conversa_id,paciente_chave').gt('n_tarefas_vencidas', 0).gte('coluna_desde', desde).order('coluna_desde', { ascending: false }).limit(1000);
       if (r.error) return;
       J.atencao = atencaoDe(r.data || []);
       J.nAtencao = J.atencao.length;
@@ -1196,6 +1203,7 @@
       if (J.filtro === 'livres' && k.responsavel) return false;
       if (J.filtro === 'aviso' && !(k.n_tarefas_vencidas > 0 || k.atrasado)) return false;
       if (!passaUnidade(unidadeDoCartaoJ(k))) return false;
+      if (J.soChat && !chatNoKlingoJ(k)) return false;
       if (q && !semAcento((k.paciente_nome || '') + ' ' + (k.primeiro_exame || '')).includes(q)) return false;
       return true;
     }));
@@ -1223,6 +1231,7 @@
       LENTES_J.map(([id, rot]) => chip(rot, J.lente === id, () => { J.lente = id; carregarJornada(); renderJornada(); })),
       h('span', { style: 'width:8px' }),
       [['todos', 'Todos'], ['meus', 'Meus'], ['livres', 'Sem responsável'], ['aviso', 'Com aviso']].map(([id, rot]) => chip(rot, J.filtro === id, () => { J.filtro = id; renderJornada(); })),
+      chip('Só do chat e no Klingo', J.soChat, () => { J.soChat = !J.soChat; try { localStorage.setItem('painel.jsochat', J.soChat ? '1' : '0'); } catch {} J.ticker = null; renderJornada(); atualizarAtencao(true); }),
       J.pessoas.size ? chip('Um cartão por paciente', J.agrupar, () => { J.agrupar = !J.agrupar; try { localStorage.setItem('painel.jagrupar', J.agrupar ? '1' : '0'); } catch {} renderJornada(); }) : null,
       busca);
     const lista = cartoesJ(), porColuna = new Map();
