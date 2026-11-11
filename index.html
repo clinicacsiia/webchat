@@ -1443,6 +1443,8 @@
         h('button', { class: 'btn-w', type: 'button', onclick: () => abrirFotoPedido(o) }, '📷 Tenho o pedido médico: enviar a foto'),
         h('button', { class: 'btn-w sec', type: 'button', onclick: () => abrirPedido() }, 'Escolher o exame (tipo, parte do corpo e lado)'),
         h('button', { class: 'link-add', type: 'button', onclick: () => abrirBusca(o) }, 'Sei o nome do exame: procurar pelo nome')));
+    } else if (o.tipo === 'arquivo') {
+      widgetArquivo(w, o);
     } else if (o.tipo === 'pedido_exames') {
       w.append(h('button', { class: 'btn-w', type: 'button', onclick: abrirPedido }, o.rotulo || 'Escolher exames no mapa do corpo'),
         h('p', { class: 'w-nota' }, 'Você pode marcar várias partes do corpo e vários exames.'));
@@ -1463,6 +1465,21 @@
     pai.append(w);
   }
 
+  // Foto ou PDF que o atendente mandou: buscado com o token desta conversa (nunca de outra). Foto aparece na bolha; PDF vira link.
+  const arquivosEquipe = new Map();
+  function widgetArquivo(w, o) {
+    w.style.borderTop = '0'; w.style.paddingTop = '0';
+    const info = h('p', { class: 'w-nota' }, 'Carregando ' + (o.mime === 'application/pdf' ? 'o documento…' : 'a foto…'));
+    w.append(info);
+    const pronto = (r) => {
+      if (!r || !r.base64) { info.textContent = 'Não foi possível abrir o arquivo. Peça ao atendente para enviar de novo.'; return; }
+      if (!r.url) { const bin = atob(r.base64), b = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) b[i] = bin.charCodeAt(i); r.url = URL.createObjectURL(new Blob([b], { type: r.mime })); }
+      if (r.mime === 'application/pdf') { info.replaceWith(h('a', { class: 'btn-w', href: r.url, target: '_blank', rel: 'noopener', download: r.nome || 'documento.pdf', style: 'display:inline-block;text-decoration:none;text-align:center' }, '📄 Abrir ' + (r.nome || 'o PDF'))); return; }
+      info.replaceWith(h('a', { href: r.url, target: '_blank', rel: 'noopener' }, h('img', { src: r.url, alt: 'Foto enviada pela clínica', style: 'display:block;max-width:100%;border-radius:8px' })));
+    };
+    if (arquivosEquipe.has(o.id)) { pronto(arquivosEquipe.get(o.id)); return; }
+    db.rpc('chat_arquivo_equipe', { p_conversa: conv.id, p_token: conv.token, p_id: o.id }).then(({ data }) => { if (data) arquivosEquipe.set(o.id, data); pronto(data); }, () => pronto(null));
+  }
   function widgetDespedida(w, o) {
     w.style.borderTop = '0'; w.style.paddingTop = '0'; w.hidden = true;   // só aparece se tiver imagem ou o convite para avaliar
     if (o.imagem && o.versao) {
