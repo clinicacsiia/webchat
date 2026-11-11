@@ -53,7 +53,7 @@ export function linhaDe(r: Row): Linha | null {
 const FORCA: Record<Via, number> = { nome: 1, telefone: 2, ambos: 3 };
 const dataBR = (ini: string) => `${ini.slice(8, 10)}/${ini.slice(5, 7)} ${ini.slice(11, 16)}`;
 
-export function avaliar(alvo: Alvo, linhas: Linha[]): Resultado {
+export function avaliar(alvo: Alvo, linhas: Linha[], janela: Linha[] = []): Resultado {
   const procBate = (l: Linha) => alvo.procs.length === 0 || alvo.procs.some((p) =>
     l.procNorm === p || (l.procNorm.length >= 8 && p.length >= 8 && (l.procNorm.includes(p) || p.includes(l.procNorm))));
   const procExato = (l: Linha) => alvo.procs.includes(l.procNorm);
@@ -94,8 +94,25 @@ export function avaliar(alvo: Alvo, linhas: Linha[]): Resultado {
       }
     }
   }
+  // Nada de errado nos dias lidos: procura o paciente nos próximos dias (janela de 30 dias). Se a atendente marcou em outra
+  // data ou hora, sinaliza em vez de dizer que a marcação não apareceu. Por nome só vale com o exame exato (homônimos).
+  if (!div && alvo.procs.length > 0 && slots.some((x) => x.r !== "ok")) {
+    for (const l of [...janela].sort((a, b) => (a.ini < b.ini ? -1 : 1))) {
+      const v = paciente(l);
+      if (!v || !procBate(l) || (v === "nome" && !procExato(l))) continue;
+      if (alvo.slots.some((s) => naPosicao(l, s))) continue;
+      div = `Este paciente tem ${l.proc || "o exame"} marcado em ${dataBR(l.ini)} (${l.profOrig}, ${l.unidadeOrig}), em outra data ou hora que a escolhida no chat.`;
+      break;
+    }
+  }
   return { id: alvo.id, slots, via, div };
 }
+
+// Esta janela só precisa ser lida se algum alvo ainda não bate e o horário escolhido já passou (ou na revisão lenta).
+export const slotPassou = (s: Slot, agora: Date): boolean => {
+  const fim = s.chegada ? Date.parse(`${s.data}T00:00:00Z`) + 86_400_000 : Date.parse(`${s.data}T${s.hora}:00Z`) + (s.min + 60) * 60_000;
+  return fim < agora.getTime() - 3 * 3600_000;   // Bahia = UTC-3
+};
 
 // Escolhe os alvos desta rodada sem passar de maxDias dias diferentes (cada dia é uma consulta ao Klingo).
 // A ordem é embaralhada para que, se houver muitos dias esperando, todos sejam atendidos com o tempo.
