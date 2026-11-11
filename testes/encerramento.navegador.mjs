@@ -253,15 +253,6 @@ await caso('"Chamei, o paciente desistiu": anota o contato e encerra com o motiv
   return { ok: !!envio && p.length === 1 && p[0].motivo_encerramento === 'desistiu' && !reg.excecoes.length, detalhe: JSON.stringify(p) };
 });
 
-await caso('Indicadores: mostra os motivos de encerramento e (administrador) as avaliações, só com contagens', async () => {
-  const { page, ctx, reg } = await abrir({ quadroIndisponivel: true, admin: true });
-  await page.click('nav.nav button[data-aba="indicadores"]'); await page.waitForFunction(() => /Motivos de encerramento/.test(document.body.innerText), null, { timeout: 8000 });
-  await page.waitForFunction(() => /Avaliações dos pacientes/.test(document.body.innerText), null, { timeout: 5000 });
-  const t = await page.locator('.pagina').innerText();
-  await ctx.close();
-  return { ok: /Agendado\s*\n?.*/.test(t) && /9 encerramentos no período: 7 pela equipe, 2 por inatividade/.test(t) && /8.4/.test(t) && /nota média do atendimento/.test(t) && !reg.excecoes.length, detalhe: t.slice(-160).replace(/\n/g, ' ') };
-});
-
 await browser.close(); srv.close();
 const falhas = resultados.filter((r) => !r).length;
 console.log(`\n${resultados.length - falhas}/${resultados.length} verificações passaram`);

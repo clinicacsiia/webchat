@@ -43,3 +43,17 @@ Teste: `cd testes && npm run test:indicadores` (9 verificações: ordem das colu
 ## Filtro "Ontem" (10/11/2026)
 
 O filtro de período da aba Indicadores ganhou **Ontem** (entre Hoje e Últimos 7 dias). No banco ele é `p_dias = -1`: do começo de ontem até o começo de hoje, no fuso de São Paulo, nas funções `painel_indicadores_unidade` e `painel_indicadores_jornada` (aplicado em 10/11/2026; só `create or replace`, ver `supabase/indicadores-unidade.sql` e `supabase/indicadores-jornada.sql`). Conferido ao vivo: ontem (09/11) = 83 conversas, 67 pessoas, 54 finalizadas, 27 pedidos completos e 13 agendados, igual à linha daquele dia na tabela "Por dia". Os cartões do topo continuam sendo de hoje. Sem o SQL novo, escolher "Ontem" mostra um aviso em vez de números errados.
+
+## Aba Indicadores refeita para decidir (11/11/2026)
+
+A aba deixou de ser uma lista de KPIs e virou 3 blocos, sempre comparando com o período anterior de mesmo tamanho (setas verde/vermelha):
+
+1. **O que chama atenção:** até 7 frases escritas por regra a partir dos números (taxa de agendamento, maior perda do funil, pessoas nunca respondidas, queda de marcações, taxa de falta, grupos que mais faltam).
+2. **Por que não estão agendando?** Caminho do paciente no chat (procuraram → começaram pedido → escolha de data → horário → pedido pronto → agendaram, com a maior perda marcada), onde pararam e por que a conversa terminou sem agendar.
+3. **Por que faltam e cancelam?** (Klingo, toda a clínica, pela data do exame) faltas por confirmação, antecedência, unidade e convênio/particular, e motivos dos cancelamentos (texto livre da recepção, classificação aproximada).
+
+Saíram da tela: tabela Por dia, reentradas, transferências, concluídas atravessando meia-noite, motivos de encerramento, gráfico por horário e avaliações. O banco continua com as funções antigas (`painel_indicadores_v2` etc.).
+
+Banco: `supabase/indicadores-decisao.sql` (aplicado em 11/11/2026; só `create or replace`): `painel_indicadores_decisao(p_de, p_ate, p_unidade, p_incluir_teste)` e a interna `ind_decisao_periodo`. ROLLBACK: ver o cabeçalho do arquivo. Nenhum relatório novo do Klingo foi preciso (usa `jornada_exame`, relatório #14359).
+Teste: `cd testes && npm run test:indicadores` (16 verificações).
+Atenção: o id da marcação no Klingo tem "m" na frente (`m22544`), diferente do guardado em `pre_agendamentos.klingo_marcacoes` (`22544`).
