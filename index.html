@@ -842,14 +842,14 @@
       if (ult && ult.texto) registrarHistorico(conv, { ultima: String(ult.texto).replace(/\s+/g, ' ').slice(0, 90) });
     }, 300);
   }
-  // Aviso fixo no começo da conversa: quem fala (uma IA), que dá para chamar uma pessoa e que o resultado é uma PREVISÃO.
+  // Aviso fixo no começo da conversa: quem fala (assistente automático, sem IA), que dá para chamar uma pessoa e que o resultado é uma PREVISÃO.
   function preencherAvisoIA(caixa) {
     caixa = caixa || document.getElementById('avisoIA'); if (!caixa) return;
     if (statusAtual === 'em_atendimento') {
       caixa.replaceChildren(h('p', {}, h('b', {}, 'Agora você está falando com uma pessoa da nossa equipe.'), ' Pode escrever à vontade, no campo aqui embaixo.'));
     } else if (motorAtivo) {
       caixa.replaceChildren(
-        h('p', {}, h('b', {}, 'Sou o assistente virtual (IA) da CSI.'), ' Isto é uma ', h('b', {}, 'previsão'), ' de agendamento: ', h('b', {}, 'quem confirma é um atendente'), '.'));
+        h('p', {}, h('b', {}, 'Sou o assistente automático da CSI.'), ' Isto é uma ', h('b', {}, 'previsão'), ' de agendamento: ', h('b', {}, 'quem confirma é um atendente'), '.'));
     } else {
       caixa.replaceChildren(h('p', {}, h('b', {}, 'Recebemos o seu pedido.'), ' Uma pessoa da equipe vai responder aqui. O que você já escolheu fica registrado como ', h('b', {}, 'previsão'), ' de agendamento, e o atendente confirma com você.'));
     }
@@ -962,7 +962,7 @@
     } else if (status === 'encerrada') {
       el.ponto.className = 'ponto'; el.status.textContent = 'Atendimento encerrado';
     } else if (motorAtivo) {
-      el.ponto.className = 'ponto atendendo'; el.status.textContent = 'Assistente virtual (IA) · atendente pelo botão abaixo';
+      el.ponto.className = 'ponto atendendo'; el.status.textContent = 'Assistente automático · atendente pelo botão abaixo';
     } else {
       el.ponto.className = 'ponto aguardando'; el.status.textContent = 'Aguardando um atendente';
     }
