@@ -1507,6 +1507,40 @@
   }
   function desligarTempoReal() { if (S.canal) { db.removeChannel(S.canal); S.canal = null; } }
   function agendarRecarga() { clearTimeout(tRecarga); tRecarga = setTimeout(async () => { await carregarConversas(); if (S.aba === 'atendimento') { renderLista(); renderTopoChat(); renderPessoaChat(); renderAlertaPreco(); renderAnexosBox(); carregarPre(); if (S.modo === 'quadro') carregarQuadro(); } atualizarSelo(); }, 250); }
+  // Reserva dos cards do topo (11/2026): o tempo real é o caminho principal, mas se a aba ficou escondida ou a conexão caiu os cards ficavam velhos até um recarregamento.
+  // Aqui o painel relê as conversas ao voltar para a aba, a cada minuto se o tempo real estiver caído (a cada 3 min se estiver de pé) e na virada do dia.
+  // Se a releitura achar números diferentes dos que estavam na tela, anota em localStorage 'painel_defasagem' (últimos 50) e no console.
+  let reservaOcupada = false, diaDosCards = null, tickCards = 0;
+  function registrarDefasagem(motivo, antes, depois) {
+    try {
+      const l = JSON.parse(localStorage.getItem('painel_defasagem') || '[]');
+      l.push({ em: new Date().toISOString(), motivo, ao_vivo: !!S.ao_vivo, antes, depois });
+      localStorage.setItem('painel_defasagem', JSON.stringify(l.slice(-50)));
+    } catch { /* sem armazenamento: só o console */ }
+    console.warn('[painel] cards estavam defasados (' + motivo + '):', antes, '=>', depois);
+  }
+  async function conferirCards(motivo) {
+    if (reservaOcupada || !S.me || !podeAtender() || document.hidden) return;
+    reservaOcupada = true;
+    try {
+      const lerCards = () => (document.getElementById('kpis') || {}).textContent || '';
+      const antes = lerCards();
+      await carregarConversas();
+      if (S.aba === 'atendimento') { renderLista(); renderTopoChat(); renderPessoaChat(); renderAlertaPreco(); renderAnexosBox(); }
+      atualizarSelo();
+      const depois = lerCards();
+      if (motivo !== 'virada do dia' && antes && depois && antes !== depois) registrarDefasagem(motivo, antes, depois);
+    } catch { /* tenta de novo na próxima */ } finally { reservaOcupada = false; }
+  }
+  setInterval(() => {
+    if (!S.me || !podeAtender() || document.hidden) return;
+    const dia = fmtDiaSP.format(new Date());
+    if (diaDosCards && dia !== diaDosCards) { diaDosCards = dia; conferirCards('virada do dia'); return; }
+    diaDosCards = dia;
+    tickCards++;
+    if (!S.ao_vivo || tickCards % 3 === 0) conferirCards(S.ao_vivo ? 'reserva' : 'tempo real caído');
+  }, 60000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) conferirCards('voltou para a aba'); });
   function aplicarAlteracao(m) {
     const i = S.msgs.findIndex((x) => x.id === m.id); if (i < 0) return;
     Object.assign(S.msgs[i], { texto: m.texto, editada_em: m.editada_em, excluida_em: m.excluida_em });
