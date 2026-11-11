@@ -123,3 +123,15 @@ test("escolherAlvos respeita o limite de dias e não perde ninguém quando cabe"
   assert.equal(escolherAlvos(muitos.slice(0, 5), 8).length, 5);
   assert.equal(escolherAlvos([mk("x", "2026-11-01"), mk("y", "2026-11-01")], 1).length, 2);
 });
+
+test("horário reconhecido do Klingo (sem médico, unidade com nome curto) confirma em vez de 'sumiu'", () => {
+  const a = alvo({ status: "agendado", slots: [{ idx: 0, data: "2026-11-06", hora: "10:00", prof: "", unidade: "UNIDADE A", chegada: false, min: 30 }] });
+  const r = avaliar(a, [linha()]);
+  assert.equal(r.slots[0].r, "ok");
+  assert.equal(r.div, null);
+});
+
+test("médico informado e diferente continua não casando", () => {
+  const a = alvo({ slots: [{ idx: 0, data: "2026-11-06", hora: "10:00", prof: "DRA OUTRA PESSOA", unidade: "CLINICA DE SAUDE E IMAGEM UNIDADE A", chegada: false, min: 30 }] });
+  assert.notEqual(avaliar(a, [linha()]).slots[0].r, "ok");
+});

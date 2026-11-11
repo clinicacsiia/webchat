@@ -89,7 +89,10 @@ function avaliar(alvo: Alvo, linhas: Row[], porProntuario: boolean): Resultado {
     const pront = txt(l.col2, 40) || "sem-prontuario";
     cadastros.add(pront);
     const em = txt(l.col3, 30), para = txt(l.col4, 30), proc = txt(l.col5, 200);
-    if (!/^\d{4}-\d{2}-\d{2}/.test(para) || !/^\d{4}-\d{2}-\d{2}/.test(em) || paraMs(em) < minEm) continue;
+    if (!/^\d{4}-\d{2}-\d{2}/.test(para) || !/^\d{4}-\d{2}-\d{2}/.test(em)) continue;
+    // Pelo prontuário já conferido (CPF + nascimento) a marcação feita ANTES da conversa também vale, desde que o exame ainda não tenha passado
+    // (paciente que marcou no Klingo e só depois chamou no chat). Pelo nome, continua valendo só marcação feita depois da conversa.
+    if (porProntuario ? paraMs(para) < minEm : paraMs(em) < minEm) continue;
     const c = compat(proc, alvo.itens);
     if (!c) { outros++; continue; }
     cands.push({ id: txt(l.col0, 40), proc, unidade: txt(l.col14, 120), para, em, compat: c, ident: porProntuario || foneIgual ? "forte" : "medio" });
