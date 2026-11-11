@@ -2,7 +2,7 @@
 // Só dados fictícios.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { avaliar, escolherAlvos, fonesDaLinha, linhaDe, nomeConfere, normNome, type Alvo } from "./conferencia.ts";
+import { avaliar, escolherAlvos, fonesDaLinha, linhaDe, nomeConfere, normNome, slotPassou, type Alvo } from "./conferencia.ts";
 
 const alvo = (extra: Partial<Alvo> = {}): Alvo => ({
   id: "pre-1", status: "pronto", conf: null, fones: ["80001111"], nomes: ["ANA MARIA SOUZA"], procs: ["RESSONANCIA MAGNETICA DE JOELHO DIREITO"],
@@ -134,4 +134,23 @@ test("horário reconhecido do Klingo (sem médico, unidade com nome curto) confi
 test("médico informado e diferente continua não casando", () => {
   const a = alvo({ slots: [{ idx: 0, data: "2026-11-06", hora: "10:00", prof: "DRA OUTRA PESSOA", unidade: "CLINICA DE SAUDE E IMAGEM UNIDADE A", chegada: false, min: 30 }] });
   assert.notEqual(avaliar(a, [linha()]).slots[0].r, "ok");
+});
+
+test("marcado em outra data dentro de 30 dias: sinaliza com a data nova", () => {
+  const nova = linha({ Data_Atendimento: "2026-11-12T08:40:00" });
+  const r = avaliar(alvo(), [], [nova]);
+  assert.equal(r.slots[0].r, "livre");
+  assert.match(r.div ?? "", /12\/11 08:40/);
+});
+
+test("janela sem o paciente ou com exame diferente não sinaliza", () => {
+  assert.equal(avaliar(alvo(), [], [linha({ Data_Atendimento: "2026-11-12T08:40:00", Paciente: "Outra Pessoa", Telefone: "" })]).div, null);
+  assert.equal(avaliar(alvo(), [], [linha({ Data_Atendimento: "2026-11-12T08:40:00", Procedimento: "ULTRASSOM" })]).div, null);
+});
+
+test("slotPassou: hora exata e ordem de chegada", () => {
+  const s = { idx: 0, data: "2026-11-10", hora: "16:00", prof: "", unidade: "", chegada: false, min: 30 };
+  assert.ok(slotPassou(s, new Date("2026-11-11T12:00:00Z")));
+  assert.ok(!slotPassou(s, new Date("2026-11-10T19:00:00Z")));
+  assert.ok(!slotPassou({ ...s, chegada: true }, new Date("2026-11-10T23:00:00Z")));
 });

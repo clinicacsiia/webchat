@@ -1,5 +1,5 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { avaliar, escolherAlvos, linhaDe, type Alvo, type Linha } from "./conferencia.ts";
+import { avaliar, escolherAlvos, linhaDe, slotPassou, type Alvo, type Linha } from "./conferencia.ts";
 import { AgregadorPrecos } from "./precos.ts";
 
 // Atualiza o catálogo que a IA consulta (procedimentos, agenda e planos) a partir de relatórios do Klingo.
@@ -299,7 +299,21 @@ async function agendaConferir(supabase: Supa, token: string, lento: boolean) {
       const { error: e } = await supabase.rpc("agenda_ocupacao_atualizar", { p_linhas: ocupacao.slice(i, i + 1500), p_execucao: null, p_finalizar: false });
       if (e) throw new Error(e.message);
     }
-    const resultados = alvos.filter((a) => a.slots.every((s) => !falhou.has(s.data))).map((a) => avaliar(a, linhas));
+    const avaliaveis = alvos.filter((a) => a.slots.every((s) => !falhou.has(s.data)));
+    // Janela dos próximos 30 dias: só lida se algum alvo não bateu no horário escolhido e ele já passou (ou na revisão lenta).
+    let janela: Linha[] = [];
+    const parciais = avaliaveis.filter((a) => avaliar(a, linhas).slots.some((x) => x.r !== "ok") && (lento || a.slots.some((s) => slotPassou(s, new Date()))));
+    if (parciais.length > 0) {
+      try {
+        const hoje = new Date(Date.now() - 3 * 3600_000);
+        for (const r of await lerAgendaMarcada(token, dia(hoje), dia(new Date(hoje.getTime() + 30 * 86_400_000)))) {
+          const l = linhaDe(r);
+          if (l) janela.push(l);
+        }
+      } catch { janela = []; }   // sem a janela, vale o veredito de antes
+    }
+    const comJanela = new Set(parciais.map((a) => a.id));
+    const resultados = avaliaveis.map((a) => avaliar(a, linhas, comJanela.has(a.id) ? janela : []));
     const { data: aplicado, error: e2 } = await supabase.rpc("agenda_conferencia_aplicar", { p_resultados: resultados });
     if (e2) throw new Error(e2.message);
     return { alvos: alvos.length, avaliados: resultados.length, dias: dias.length, dias_com_erro: falhou.size, horarios_lidos: ocupacao.length, ...(aplicado as Row) };
