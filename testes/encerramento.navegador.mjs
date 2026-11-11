@@ -42,7 +42,7 @@ function servidor() {
   });
 }
 
-async function pagina(browser, { quadroIndisponivel = false, patchModo = 'ok', abertos = [], admin = false, despedida = 'ok' } = {}) {
+async function pagina(browser, { quadroIndisponivel = false, patchModo = 'ok', abertos = [], admin = false, despedida = 'ok', zap = false } = {}) {
   const EU = admin ? { ...EU0, papel: 'admin' } : EU0;
   const ctx = await browser.newContext();
   await ctx.addInitScript(([id, token, email]) => {
@@ -72,13 +72,14 @@ async function pagina(browser, { quadroIndisponivel = false, patchModo = 'ok', a
       else { return rota.fulfill({ status: 204, headers: CORS }); }
     }
     else if (p.startsWith('/rest/v1/v_agendamento_aberto')) corpo = abertos;
-    else if (p.startsWith('/rest/v1/conversas')) corpo = CONVERSAS;
+    else if (p.startsWith('/rest/v1/conversas')) corpo = zap ? CONVERSAS.map((c) => (c.id === 'c2' ? { ...c, chamar_zap_em: new Date().toISOString(), aguarda_paciente_desde: new Date(Date.now() - 90000000).toISOString() } : c)) : CONVERSAS;
     else if (p.startsWith('/rest/v1/jornada_coluna')) corpo = COLUNAS;
     else if (p.startsWith('/rest/v1/jornada_transicao')) corpo = TRANS;
     else if (p.startsWith('/rest/v1/v_jornada_quadro')) { if (quadroIndisponivel) { status = 404; corpo = { message: 'relation "v_jornada_quadro" does not exist' }; } else corpo = CARTOES; }
+    else if (p.endsWith('/rpc/chamar_zap_feito')) { reg.rpcs.push({ rpc: 'chamar_zap_feito', ...JSON.parse(req.postData() || '{}') }); corpo = 1; }
     else if (p.endsWith('/rpc/jornada_mover_card')) { reg.rpcs.push(JSON.parse(req.postData() || '{}')); corpo = { ok: true, versao: 2 }; }
     else if (p.endsWith('/rpc/despedida_atual')) { if (despedida === 'sem_sql') { status = 404; corpo = { code: 'PGRST202', message: 'function despedida_atual does not exist' }; } else corpo = { ativa: true, versao: 5, texto: 'Obrigado pelo contato!', tem_imagem: false }; }
-    else if (p.endsWith('/rpc/autoencerrar_resumo')) { if (despedida === 'sem_sql') { status = 404; corpo = { code: 'PGRST202', message: 'function autoencerrar_resumo does not exist' }; } else corpo = { modo: 'simulacao', horas: 24, elegiveis_agora: 3, aguardando_paciente: 11, ultimas: [{ em: '2026-11-09T10:00:00Z', modo: 'simulacao', elegiveis: 3, fechadas: 0 }] }; }
+    else if (p.endsWith('/rpc/autoencerrar_resumo')) { if (despedida === 'sem_sql') { status = 404; corpo = { code: 'PGRST202', message: 'function autoencerrar_resumo does not exist' }; } else corpo = { modo: 'simulacao', horas: 24, elegiveis_agora: 3, aguardando_paciente: 11, chamar_zap_agora: 2, ultimas: [{ em: '2026-11-09T10:00:00Z', modo: 'simulacao', elegiveis: 3, marcadas: 0 }] }; }
     else if (p.endsWith('/rpc/painel_indicadores_v2')) {
       const b = JSON.parse(req.postData() || '{}');
       corpo = { periodo: { de: b.p_de, ate: b.p_ate, fechado_ate: null }, unidade: null, incluir_teste: false, gerado_em: new Date().toISOString(), pessoas: { unicas_no_periodo: 4, soma_dos_dias: 4 }, reentradas: { total: 0, pessoas_que_voltaram: 0 },
@@ -218,13 +219,26 @@ await caso('Configurações sem o SQL da despedida: o bloco avisa e a tela não 
   return { ok: !reg.excecoes.length };
 });
 
-await caso('Configurações: o encerramento automático mostra a contagem da simulação e as 3 opções de modo', async () => {
+await caso('Configurações: o aviso de 24 h (chamar no WhatsApp) mostra a contagem da simulação e as 3 opções de modo', async () => {
   const { page, ctx, reg } = await abrir({ quadroIndisponivel: true, admin: true });
   await page.click('nav.nav button[data-aba="config"]'); await page.waitForSelector('#cfg-atualizacao', { timeout: 8000 });
-  await page.waitForFunction(() => /Seriam encerradas agora/.test(document.getElementById('cfg-atualizacao').innerText), null, { timeout: 5000 });
+  await page.waitForFunction(() => /Seriam marcadas na próxima leitura/.test(document.getElementById('cfg-atualizacao').innerText), null, { timeout: 5000 });
   const t = await page.locator('#cfg-atualizacao').innerText();
   await ctx.close();
-  return { ok: /Aguardando resposta do paciente: 11|aguardando resposta do paciente: 11/i.test(t) && /Seriam encerradas agora: 3/.test(t) && /Última leitura: 3 elegível\(is\), 0 encerrada\(s\)/.test(t) && !reg.excecoes.length, detalhe: t.slice(-200).replace(/\n/g, ' ') };
+  return { ok: /Aguardando resposta do paciente: 11|aguardando resposta do paciente: 11/i.test(t) && /Para chamar no WhatsApp agora: 2/.test(t) && /Seriam marcadas na próxima leitura: 3/.test(t) && /Última leitura: 3 elegível\(is\), 0 marcada\(s\)/.test(t) && !reg.excecoes.length, detalhe: t.slice(-200).replace(/\n/g, ' ') };
+});
+
+await caso('24 h sem resposta: a conversa NÃO é encerrada, vai para "Chamar no WhatsApp" e o botão "Já chamei no zap" avisa o banco', async () => {
+  const { page, ctx, reg } = await abrir({ quadroIndisponivel: true, zap: true });
+  const grupo = await page.locator('.grupo-cab[data-grupo="zap"]').innerText().catch(() => '');
+  const etiqueta = await page.locator('.itens .item:has-text("João Lima") [data-zap]').count();
+  const naoMarcada = await page.locator('.itens .item:has-text("Ana Paula") [data-zap]').count();
+  await abrirConversa(page);
+  await page.waitForSelector('.proximo:has-text("chame no WhatsApp")', { timeout: 5000 });
+  await page.click('.proximo button:has-text("Já chamei no zap")'); await page.waitForTimeout(500);
+  const envio = reg.rpcs.find((r) => r.rpc === 'chamar_zap_feito');
+  await ctx.close();
+  return { ok: /Chamar no WhatsApp/i.test(grupo) && etiqueta === 1 && naoMarcada === 0 && envio && envio.p_conversa === 'c2' && patchesStatus(reg).length === 0 && !reg.excecoes.length, detalhe: grupo.replace(/\n/g, ' ') + ' | ' + JSON.stringify(envio) };
 });
 
 await caso('Indicadores: mostra os motivos de encerramento e (administrador) as avaliações, só com contagens', async () => {
