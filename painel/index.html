@@ -1608,6 +1608,36 @@
     return min;
   }
   const aguardaPaciente = (p) => !!desdeAguardaPac(p) && !desdeEspera(p);
+  // 11/11/2026: passou de 24 h sem resposta -> NÃO fecha; fica marcada para a equipe chamar no WhatsApp e pedir que o paciente responda no site.
+  const membroZap = (p) => p.membros.find((m) => m.status === 'em_atendimento' && m.chamar_zap_em) || null;
+  const precisaZap = (p) => !!membroZap(p);
+  // Confirmação do contato no WhatsApp: a atendente diz o que aconteceu. Em todos os casos o contato fica registrado (quem e quando) e a marca sai.
+  //  - "vai responder": a conversa continua aberta e as 24 h recomeçam;  - "desistiu / não quer mais": encerra como Paciente desistiu;  - "outro desfecho": abre a janela normal de Encerrar.
+  async function zapFeito(p, desfecho) {
+    const m = membroZap(p); if (!m) return;
+    const { error } = await db.rpc('chamar_zap_feito', { p_conversa: m.id });
+    if (error) { toast(msgErro(error)); return; }
+    if (desfecho === 'desistiu') {
+      if (!(await atualizarConversa({ status: 'encerrada', motivo_encerramento: 'desistiu' }))) { toast('O contato foi anotado, mas a conversa não encerrou. Use Encerrar.'); }
+      else toast('Contato anotado e conversa encerrada (paciente desistiu).');
+    } else if (desfecho === 'outro') {
+      await carregarConversas(); renderLista(); renderChat(); encerrar(); return;
+    } else toast('Anotado. Se o paciente não responder, avisamos de novo em 24 h.');
+    await carregarConversas(); renderLista(); renderChat(); if (S.modo === 'quadro') renderQuadro();
+  }
+  function zapPerguntar(p) {
+    const fechar = () => dlg.close();
+    const ir = (d) => { fechar(); zapFeito(p, d); };
+    dlg.className = '';
+    dlg.replaceChildren(h('h3', {}, 'Como foi o contato no WhatsApp?'),
+      h('p', { class: 'dica', style: 'margin:-8px 0 12px' }, 'Escolha o que aconteceu. Nada é encerrado sem você escolher.'),
+      h('div', { style: 'display:grid;gap:8px' },
+        h('button', { class: 'btn prim', type: 'button', 'data-zap-op': 'responder', onclick: () => ir('responder') }, 'Chamei, o paciente vai responder no site'),
+        h('button', { class: 'btn perigo', type: 'button', 'data-zap-op': 'desistiu', onclick: () => ir('desistiu') }, 'Chamei, o paciente desistiu ou não quer mais contato (encerrar)'),
+        h('button', { class: 'btn', type: 'button', 'data-zap-op': 'outro', onclick: () => ir('outro') }, 'Outro desfecho (escolher o motivo ao encerrar)')),
+      h('div', { class: 'rodape' }, h('button', { class: 'btn', type: 'button', onclick: fechar }, 'Voltar')));
+    dlg.showModal();
+  }
   function atualizarKpis() {
     const box = document.getElementById('kpis'), sino = document.getElementById('sinoPonto');
     // pessoas() já obedece o filtro de unidade do topo; os três primeiros cartões e a aba Indicadores usam a mesma conta.
@@ -1651,7 +1681,9 @@
     const consulta = (cols) => db.from('conversas').select(cols).order('atualizado_em', { ascending: false }).limit(300);
     const fase6 = 'paciente_tipo,paciente_nome,unidade_inicial,medico_preferido,', motivo = 'motivo_encerramento,encerramento_origem,aguarda_paciente_desde,';
     const novos = 'teste,primeiro_humano_em,encerrada_em,';   // 10/11/2026: teste da TI, primeiro atendimento humano e hora real do encerramento
-    let { data, error } = await consulta(base.replace('email_informado,', 'email_informado,' + fase6 + motivo + novos));
+    const zap = 'chamar_zap_em,';   // 11/11/2026: conversa 24 h sem resposta do paciente, marcada para chamar no WhatsApp
+    let { data, error } = await consulta(base.replace('email_informado,', 'email_informado,' + fase6 + motivo + novos + zap));
+    if (error && /chamar_zap_em/.test(error.message || '')) ({ data, error } = await consulta(base.replace('email_informado,', 'email_informado,' + fase6 + motivo + novos)));
     if (error && /teste|primeiro_humano_em|encerrada_em/.test(error.message || '')) ({ data, error } = await consulta(base.replace('email_informado,', 'email_informado,' + fase6 + motivo)));
     // WC-03: se o SQL do motivo ainda não foi aplicado, volta para a lista sem ele em vez de quebrar o painel.
     if (error && /motivo_encerramento|encerramento_origem|aguarda_paciente_desde/.test(error.message || '')) ({ data, error } = await consulta(base.replace('email_informado,', 'email_informado,' + fase6)));
@@ -2017,16 +2049,18 @@
   const emAtencao = (p) => { if (!donoDe(p)) return false; const d = desdeEspera(p); return !!d && (Date.now() - d) / 1000 >= LIMITE_ATENCAO; };
   const nomeAgente = (id) => { const a = S.agentes.get(id); return a ? a.nome : 'Outro atendente'; };
   function itensAgrupados(lista) {
-    const atencao = [], livres = [], aguardaPac = [], porDono = new Map();
+    const zapLista = [], atencao = [], livres = [], aguardaPac = [], porDono = new Map();
     for (const p of lista) {
       const dono = donoDe(p);
-      if (emAtencao(p)) atencao.push(p);
+      if (precisaZap(p)) zapLista.push(p);
+      else if (emAtencao(p)) atencao.push(p);
       else if (!dono) livres.push(p);
       else if (aguardaPaciente(p)) aguardaPac.push(p);   // equipe já respondeu e o paciente demora: sai da fila de cada atendente para não poluir
       else { if (!porDono.has(dono)) porDono.set(dono, []); porDono.get(dono).push(p); }
     }
     const donos = [...porDono.keys()].sort((a, b) => (a === S.me.id ? -1 : b === S.me.id ? 1 : nomeAgente(a).localeCompare(nomeAgente(b), 'pt-BR')));
-    const grupos = [['atencao', 'Precisam de atenção', atencao, 'Assumidas há mais de 2 h e ainda sem resposta. Aparecem para todos até alguém resolver.'], ['livres', 'Sem atendente', livres, 'Ninguém assumiu ainda. Qualquer pessoa pode pegar.'],
+    const grupos = [['zap', 'Chamar no WhatsApp', zapLista, 'Mais de 24 h sem resposta do paciente. Nada foi encerrado: chame no WhatsApp e peça para ele responder aqui no site. Depois toque em "Já chamei no zap" dentro da conversa.'],
+      ['atencao', 'Precisam de atenção', atencao, 'Assumidas há mais de 2 h e ainda sem resposta. Aparecem para todos até alguém resolver.'], ['livres', 'Sem atendente', livres, 'Ninguém assumiu ainda. Qualquer pessoa pode pegar.'],
       ...donos.map((id) => ['ag-' + id, id === S.me.id ? 'Minhas conversas' : nomeAgente(id), porDono.get(id), '']),
       ['aguardapac', 'Aguardando resposta do paciente', aguardaPac, 'A equipe já respondeu e o paciente ainda não voltou. Ficam aqui, da mais antiga para a mais recente, para não poluir a fila de cada atendente. Voltam ao grupo do atendente quando o paciente responde.']];
     // Dentro de cada grupo: quem espera há mais tempo primeiro (a mensagem mais antiga a resolver); sem espera ficam por último, na ordem de sempre.
@@ -2036,7 +2070,7 @@
     for (const [chave, titulo, itens, dica] of grupos) {
       if (!itens.length) continue;
       const fechado = S.gruposFechados.has(chave);
-      out.push(h('button', { class: 'grupo-cab' + (chave === 'atencao' ? ' atencao' : ''), type: 'button', 'aria-expanded': String(!fechado), 'data-grupo': chave, title: dica || undefined,
+      out.push(h('button', { class: 'grupo-cab' + (chave === 'atencao' || chave === 'zap' ? ' atencao' : ''), type: 'button', 'aria-expanded': String(!fechado), 'data-grupo': chave, title: dica || undefined,
         onclick: () => { if (S.gruposFechados.has(chave)) S.gruposFechados.delete(chave); else S.gruposFechados.add(chave); renderLista(); } },
         h('span', { class: 'seta', 'aria-hidden': 'true' }, fechado ? '▸' : '▾'), h('span', { class: 'gnome' }, titulo), h('span', { class: 'gn' }, itens.length)));
       if (!fechado) out.push(...itens.map((p) => itemPessoa(p, chave === 'atencao')));
@@ -2069,6 +2103,7 @@
           ag ? h('span', { style: 'color:var(--suave)' }, ag.nome) : null,
           destacarDono ? h('span', { class: 'urg alta', title: 'Conversa assumida há mais de 2 h, com o paciente esperando resposta' }, `⚠ ${nomeAgente(donoDe(p))} assumiu e ainda não resolveu`) : null,
           desde && seg >= LIMITE_ESPERA ? h('span', { class: 'cron', title: 'Tempo que o paciente espera uma resposta' }, '⏱ ' + fmtCron(seg)) : null,
+          precisaZap(p) ? h('span', { class: 'urg alta', 'data-zap': '1', title: 'Mais de 24 h sem resposta: chame no WhatsApp e peça para responder no site' }, '📲 Chamar no zap') : null,
           aguardaPaciente(p) ? h('span', { class: 'urg', 'data-pac': desdeAguardaPac(p), title: 'Tempo desde a última mensagem da equipe, sem resposta do paciente' }, '💬 Sem resposta há ' + fmtHa((Date.now() - desdeAguardaPac(p)) / 1000)) : null));
     }
   }
@@ -2296,6 +2331,12 @@
       if (rm.length) pontos.push({ tom: 'media', titulo: 'Falta remarcar o exame', detalhe: 'Peça ao paciente que remarque pelo chat ou registre que já foi remarcado.', rot: 'Remarcar', fn: ir('exameAberto'), noPainel: true });
       if (pre) pontos.push({ tom: 'media', titulo: 'Marque o horário no Klingo e depois avise o paciente', detalhe: 'O pré-agendamento está pronto para conferir.', rot: 'Ver pré-agendamento', fn: ir('pre'), noPainel: true });
       if (ultima && ultima.autor === 'cliente') pontos.push({ tom: 'media', titulo: 'O paciente está esperando a sua resposta', detalhe: String(ultima.texto || '').slice(0, 90), rot: 'Responder', fn: () => document.getElementById('caixa')?.focus() });
+    }
+    // 11/11/2026: mais de 24 h sem resposta. Nada foi encerrado; qualquer pessoa da equipe (dona ou não) vê o pedido para chamar no WhatsApp. Vai por primeiro.
+    const pZap = { membros: ids.map((i) => S.conversas.find((x) => x.id === i)).filter(Boolean) };
+    if (podeAtender() && precisaZap(pZap)) {
+      const tel = c.contatos && c.contatos.telefone ? fmtTel(c.contatos.telefone) : '';
+      pontos.unshift({ tom: 'alta', titulo: 'Sem resposta há mais de 24 h: chame no WhatsApp', detalhe: 'Peça ao paciente que responda aqui no site' + (tel ? ' (' + tel + ', link no topo da conversa)' : '') + '. Depois toque no botão.', rot: 'Já chamei no zap', fn: () => zapPerguntar(pZap) });
     }
     // Avisos que moram na área de detalhes (valor, fotos, exame aberto, remarcação, pré-agendamento): contam no botão e abrem a área uma vez por conversa.
     const n = minha ? pontos.filter((x) => x.noPainel).length : 0;
@@ -2902,7 +2943,7 @@
     ] },
     { id: 'atualizacao', icone: 'livro', titulo: 'Encerramento e avaliação', desc: 'Chaves da Atualização do WebChat. Ligue uma por vez e confira o dia seguinte; desligar volta ao comportamento anterior na hora.', custom: 'autoencerrar', campos: [
       { k: 'encerramento_exige_motivo', tipo: 'sim', rot: 'Exigir motivo ao encerrar', dica: 'Ligado: o painel só encerra a conversa com um motivo escolhido. Desligado: o motivo fica opcional.' },
-      { k: 'autoencerrar_modo', tipo: 'escolha', rot: 'Encerramento automático (24 h sem resposta do paciente)', opcoes: [['desligado', 'Desligado'], ['simulacao', 'Simulação (só conta, não encerra nada)'], ['ligado', 'Ligado']], dica: 'Comece em Simulação e olhe a contagem abaixo por alguns dias. Só conta quando uma pessoa da equipe escreveu e o paciente não respondeu; exame em aberto nunca é encerrado.' },
+      { k: 'autoencerrar_modo', tipo: 'escolha', rot: 'Aviso de 24 h sem resposta do paciente (chamar no WhatsApp)', opcoes: [['desligado', 'Desligado'], ['simulacao', 'Simulação (só conta, não marca nada)'], ['ligado', 'Ligado']], dica: 'Nenhuma conversa é encerrada sozinha. Passadas 24 h sem resposta do paciente (depois de uma mensagem de pessoa da equipe), a conversa continua aberta e aparece em "Chamar no WhatsApp" para a equipe pedir ao paciente que responda no site. Comece em Simulação e olhe a contagem abaixo.' },
       { k: 'agendamento_reconhecer', tipo: 'sim', rot: 'Reconhecer agendamentos feitos no Klingo', dica: 'Ligado: a cada 10 min o sistema procura no Klingo, pelo nome completo do paciente, marcações feitas depois da conversa cujo exame bate com o pedido (conversa aberta ou já encerrada). O pedido vira “Agendado” com a data, hora e unidade reais do Klingo; conversa aberta recebe a confirmação, e diferenças só geram um aviso para a atendente.' },
       { k: 'avaliacao_ativa', tipo: 'sim', rot: 'Convite para avaliar o atendimento', dica: 'Ligado: abaixo da despedida o paciente vê o botão “Avaliar o atendimento” (duas notas e por onde conheceu a clínica). Ligue só depois de o jurídico revisar a página de privacidade.' },
       { k: 'encerramento_valida_agendado', tipo: 'sim', rot: 'Conferir a agenda depois de encerrar como Agendado', dica: 'Ligado: Agendado sempre encerra. O sistema confere o agendamento no Klingo em segundo plano e, se não achar, se o Klingo falhar ou se o exame mudar, põe um aviso na conversa e avisa a equipe. Exame ainda futuro deixa de bloquear o encerramento. Ligue depois de “Exigir motivo”.' },
@@ -3099,13 +3140,13 @@ h1.longo { font-size: 14mm; }
     const atualizar = h('button', { class: 'btn', type: 'button', style: 'width:auto' }, 'Atualizar contagem');
     const ler = async () => {
       const { data, error } = await db.rpc('autoencerrar_resumo');
-      if (error || !data) { texto.textContent = 'Disponível depois de aplicar o SQL do encerramento automático (supabase/autoencerrar.sql).'; atualizar.hidden = true; return; }
+      if (error || !data) { texto.textContent = 'Disponível depois de aplicar o SQL do aviso de 24 h (supabase/autoencerrar-chamar-zap.sql).'; atualizar.hidden = true; return; }
       const u = (data.ultimas || [])[0];
-      texto.textContent = `Modo: ${data.modo}. Prazo: ${data.horas} h. Conversas aguardando resposta do paciente: ${data.aguardando_paciente}. Seriam encerradas agora: ${data.elegiveis_agora}.`
-        + (u ? ` Última leitura: ${u.elegiveis} elegível(is), ${u.fechadas} encerrada(s).` : ' Nenhuma leitura ainda.');
+      texto.textContent = `Modo: ${data.modo}. Prazo: ${data.horas} h. Conversas aguardando resposta do paciente: ${data.aguardando_paciente}. Para chamar no WhatsApp agora: ${data.chamar_zap_agora ?? 0}. Seriam marcadas na próxima leitura: ${data.elegiveis_agora}.`
+        + (u ? ` Última leitura: ${u.elegiveis} elegível(is), ${u.marcadas ?? u.fechadas} marcada(s).` : ' Nenhuma leitura ainda.');
     };
     atualizar.addEventListener('click', ler);
-    caixa.append(h('span', { class: 'rot' }, 'Situação do encerramento automático'), texto, atualizar);
+    caixa.append(h('span', { class: 'rot' }, 'Situação do aviso de 24 h (chamar no WhatsApp)'), texto, atualizar);
     ler().catch(() => {});
     return caixa;
   }
