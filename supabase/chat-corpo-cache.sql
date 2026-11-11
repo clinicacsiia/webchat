@@ -1,5 +1,6 @@
 -- FLUXOGRAMA: entrada (o paciente abre o pedido de exames no chat: tipos de exame e partes do corpo que têm exame) -> validação (token da conversa, como antes) -> lógica (a resposta é igual para todo paciente e só muda quando o catálogo muda: fica guardada pronta e uma rotina refaz a cada 10 minutos; sem cópia recente, calcula na hora como antes) -> saída (o mesmo JSON de sempre, em ~1 ms no lugar de ~1,1 s)
 -- Versão 1.0 — 11/11/2026 / Mudança: Implementação inicial (auditoria de 11/11/2026)
+-- APLICADO NA PRODUÇÃO em 11/11/2026 (migrações auditoria_1111_*) e conferido lá. Resultado medido: docs/auditoria-2026-11-11.md.
 --
 -- O QUE ESTAVA ERRADO (medido na produção em 11/11/2026):
 --   * chat_corpo levava 1,1 s com o banco livre (média histórica 1,2 s; máximo 2,4 s) e o chat do paciente tem limite de 3 s.

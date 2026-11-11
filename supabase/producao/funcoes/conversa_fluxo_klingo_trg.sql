@@ -1,5 +1,5 @@
 -- public.conversa_fluxo_klingo_trg()
--- Pode executar: anon, authenticated, service_role (PUBLIC)
+-- Pode executar: service_role
 CREATE OR REPLACE FUNCTION public.conversa_fluxo_klingo_trg()
  RETURNS trigger
  LANGUAGE plpgsql

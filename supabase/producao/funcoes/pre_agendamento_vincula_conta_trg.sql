@@ -1,5 +1,5 @@
 -- public.pre_agendamento_vincula_conta_trg()
--- Pode executar: anon, authenticated, service_role (PUBLIC)
+-- Pode executar: service_role
 CREATE OR REPLACE FUNCTION public.pre_agendamento_vincula_conta_trg()
  RETURNS trigger
  LANGUAGE plpgsql

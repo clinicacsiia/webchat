@@ -1,5 +1,5 @@
 -- public.catalogo_agenda_hash_trg()
--- Pode executar: anon, authenticated, service_role (PUBLIC)
+-- Pode executar: service_role
 CREATE OR REPLACE FUNCTION public.catalogo_agenda_hash_trg()
  RETURNS trigger
  LANGUAGE plpgsql

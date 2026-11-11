@@ -105,13 +105,12 @@ caso('o paciente (chat e Minha vez) nunca lê tabela direto: só funções; o pa
 caso('toda função que só o dono/rotina deveria usar está fechada: nenhuma função de gatilho ou rotina aberta ao paciente sem login por engano', () => {
   // Gatilho aberto a anon não é explorável (o PostgREST não chama função que devolve trigger), mas fica anotado para não crescer.
   const gatilhosAbertos = indice.funcoes.filter((f) => f.gatilho && f.anon).map((f) => f.nome);
-  // Os 9 que existiam em 11/11/2026 (fechados por supabase/seguranca-ajustes.sql quando ele for aplicado). Um nome novo aqui reprova o teste.
-  const CONHECIDOS = ['catalogo_agenda_hash_trg', 'catalogo_preco_confianca_trg', 'conversa_fluxo_klingo_trg', 'conversa_limpa_aguarda_paciente_trg', 'conversas_conta_trg', 'ind_imutavel_trg', 'jornada_imutavel', 'org_log_imutavel_trg', 'pre_agendamento_vincula_conta_trg'];
-  const novos = gatilhosAbertos.filter((n) => !CONHECIDOS.includes(n));
+  // Em 11/11/2026 eram 9; supabase/seguranca-ajustes.sql fechou todos. Qualquer um que reapareça reprova o teste.
+  const novos = gatilhosAbertos;
   const rotinas = ['manutencao_limpar', 'jornada_vigiar', 'jornada_conversas_sincronizar', 'autoencerrar_vigiar', 'agendado_vigiar', 'espera_vigiar', 'pessoa_agrupar_pendentes', 'ind_fechar_pendentes', 'convenios_revisar',
     'agendamento_valido_para_encerrar', 'chat_corpo_atualizar', 'chat_corpo_calcular'];
   const abertas = rotinas.filter((n) => (funcoes.get(n) || []).some((f) => f.anon || f.authenticated));
-  return { ok: abertas.length === 0 && novos.length === 0, detalhe: `rotinas abertas: ${abertas.join(', ') || 'nenhuma'}; gatilhos visíveis ao anon (inofensivo, ${gatilhosAbertos.length} conhecidos): ${novos.length ? 'NOVOS: ' + novos.join(', ') : 'nenhum novo'}` };
+  return { ok: abertas.length === 0 && novos.length === 0, detalhe: `rotinas abertas: ${abertas.join(', ') || 'nenhuma'}; funções de gatilho visíveis ao paciente: ${novos.join(', ') || 'nenhuma'}` };
 });
 
 caso('cada rotina agendada (pg_cron) chama função que existe, e as Edge Functions que ela aciona têm o código neste repositório', () => {
@@ -121,7 +120,8 @@ caso('cada rotina agendada (pg_cron) chama função que existe, e as Edge Functi
     for (const m of r.comando.matchAll(/functions\/v1\/([a-z0-9-]+)/g)) if (!existsSync(`${REPO}/supabase/functions/${m[1]}/index.ts`)) ruins.push(`${r.nome}: Edge Function ${m[1]} sem código no repositório`);
     if (!r.ativa) ruins.push(`${r.nome}: está PARADA`);
   }
-  return { ok: ruins.length === 0 && indice.rotinas.length >= 18, detalhe: ruins.join(' | ') || `${indice.rotinas.length} rotinas conferidas` };
+  for (const n of ['manutencao-limpeza', 'chat-corpo-cache', 'jornada-vigia', 'autoencerrar-vigia']) if (!indice.rotinas.some((r) => r.nome === n)) ruins.push(`falta a rotina ${n}`);
+  return { ok: ruins.length === 0 && indice.rotinas.length >= 21, detalhe: ruins.join(' | ') || `${indice.rotinas.length} rotinas conferidas` };
 });
 
 caso('cada gatilho aponta para função que existe; nenhuma função do banco chama função ou tabela que não existe', () => {

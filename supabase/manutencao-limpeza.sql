@@ -1,5 +1,6 @@
 -- FLUXOGRAMA: entrada (uma vez por dia, de madrugada) -> validação (só registros TÉCNICOS de execução das rotinas; nada de paciente, conversa ou auditoria) -> lógica (apaga o histórico de execuções do pg_cron com mais de 3 dias, guardando as falhas por 14 dias) -> saída (o banco para de crescer sem necessidade; a função devolve quantas linhas saíram)
 -- Versão 1.0 — 11/11/2026 / Mudança: Implementação inicial (auditoria de 11/11/2026)
+-- APLICADO NA PRODUÇÃO em 11/11/2026 (migrações auditoria_1111_*) e conferido lá. Resultado medido: docs/auditoria-2026-11-11.md.
 --
 -- O QUE ESTAVA ERRADO (medido na produção em 11/11/2026):
 --   * cron.job_run_details guardava TODAS as execuções desde 06/11: 41.924 linhas, 20 MB em 4 dias e meio (há rotinas de 15 e 30 s:

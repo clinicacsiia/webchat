@@ -1,10 +1,11 @@
 # Retrato da estrutura do banco de produção
 
-Versão 1.0 — 11/11/2026 / Mudança: primeiro retrato (auditoria de 11/11/2026); refeito no mesmo dia depois das correções aplicadas
+Versão 1.1 — 11/11/2026 (14h49) / Mudança: retrato refeito depois das PRs #120 a #134 do dono e das últimas migrações da auditoria
+Versão 1.0 — 11/11/2026 (07h14) / Mudança: primeiro retrato (auditoria de 11/11/2026)
 
 **Esta pasta é a verdade sobre o banco.** Ela copia a **estrutura** do projeto Supabase `webchat-atendimento` (`nrvuynjwcgwpjdptkiay`) como ele está de fato: funções, tabelas, gatilhos, regras de acesso e rotinas. **Não tem nenhuma linha de tabela, nenhum valor de configuração e nenhum segredo** (o gerador recusa gravar se achar e-mail, telefone, chave ou token).
 
-Tirado em **11/11/2026 às 07:44 de Brasília**: 416 funções, 99 tabelas, 5 visões, 56 gatilhos, 65 regras de acesso, 18 rotinas, Postgres 17.11.
+Tirado em **11/11/2026 às 14:49 de Brasília**: 425 funções, 101 tabelas, 5 visões, 56 gatilhos, 65 regras de acesso, 21 rotinas, Postgres 17.11.
 
 ## Por que existe
 
@@ -32,7 +33,7 @@ Ou seja: quem lesse só os arquivos antigos entenderia errado 83 funções, incl
 1. **Entender o sistema**: abrir `funcoes/chat_responder.sql` mostra o que roda de verdade.
 2. **Testar contra a produção**: `testes/banco-producao.mjs` monta um Postgres embutido com este retrato em 3 segundos. Em cima dele rodam `sql-producao.test.mjs` (as correções) e `sql-ponta-a-ponta.test.mjs` (o paciente do começo ao fim, a equipe, a segurança).
 3. **Manter tela e banco sincronizados**: `testes/retrato.test.mjs` confere que toda função chamada pelas telas existe aqui com os mesmos parâmetros.
-4. **Ver o que mudou no banco**: o histórico do git desta pasta é o histórico do banco. Entre os dois retratos de 11/11 mudaram exatamente 3 funções, as 3 da auditoria.
+4. **Ver o que mudou no banco**: o histórico do git desta pasta é o histórico do banco. Nos quatro retratos de 11/11 a diferença entre um e outro foi exatamente o que cada sessão aplicou: as 3 funções da auditoria de manhã; as 6 funções novas, 9 alteradas, 1 tabela e 1 rotina do dono à tarde; e as 3 funções e a tabela das últimas migrações da auditoria.
 5. **Voltar atrás**: a definição anterior de qualquer função está no commit anterior.
 
 ## Como refazer (sempre que o banco mudar)
@@ -43,7 +44,7 @@ Depois: `cd testes && npm run test:retrato && npm run test:producao-sql && npm r
 
 **Não rodar `estrutura.sql` nem as funções em cima da produção.** O retrato é leitura e teste; mudança no banco continua sendo um arquivo novo em `supabase/`, testado no clone e aplicado em partes.
 
-## As diferenças encontradas em 11/11/2026
+## As diferenças encontradas em 11/11/2026 (primeiro retrato, 416 funções)
 
 **Produção diferente de qualquer versão do repositório (31):** `agenda_cobre`, `agenda_conferencia_alvos`, `agenda_horarios_klingo`, `assinatura_contexto`, `assinatura_registrar`, `catalogo_preco_revisar`, `chat_horario_escolher`, `chat_horarios`, `chat_iniciar`, `chat_pedido_salvar`, `consultas_da_unidade`, `convenio_salvar`, `equipe_pedido_reforcar`, `fila_emitir_token`, `fila_entrar`, `fila_identificar_todos`, `fila_reenviar_link`, `fluxo_aplicar`, `fluxo_assunto_aplicar`, `fluxo_avancar`, `fluxo_leitura`, `fluxo_ler_texto`, `fluxo_perguntar`, `ia_pre_agendar`, `painel_mensagem_alterar`, `pessoa_agrupar_conversa_trg`, `pessoa_agrupar_pre_trg`, `pre_agendamento_historico_trg`, `pre_reaproveitar`, `preco_referencia_pedido`, `unidade_medicos`.
 

@@ -13,6 +13,7 @@ begin
     'horas', public.autoencerrar_horas(),
     'elegiveis_agora', (select count(*) from public.autoencerrar_candidatas()),
     'aguardando_paciente', (select count(*) from public.conversas where status = 'em_atendimento' and aguarda_paciente_desde is not null),
-    'ultimas', coalesce((select jsonb_agg(x) from (select em, modo, elegiveis, fechadas from public.autoencerramento_execucao order by id desc limit 5) x), '[]'::jsonb));
+    'chamar_zap_agora', (select count(*) from public.conversas where status = 'em_atendimento' and chamar_zap_em is not null),
+    'ultimas', coalesce((select jsonb_agg(x) from (select em, modo, elegiveis, fechadas as marcadas from public.autoencerramento_execucao order by id desc limit 5) x), '[]'::jsonb));
 end $function$;
 

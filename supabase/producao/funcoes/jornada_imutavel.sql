@@ -1,5 +1,5 @@
 -- public.jornada_imutavel()
--- Pode executar: anon, authenticated, service_role (PUBLIC)
+-- Pode executar: service_role
 CREATE OR REPLACE FUNCTION public.jornada_imutavel()
  RETURNS trigger
  LANGUAGE plpgsql

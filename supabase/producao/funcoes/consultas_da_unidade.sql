@@ -12,13 +12,15 @@ AS $function$
     where p.ativo and p.classe = 'CONSULTAS' and a.vig_fim >= current_date
       and a.profissional !~* '(teste|^eletro)' and not public.profissional_bloqueado(a.profissional) and coalesce(a.especialidade, '') !~* 'anestesi'
       and (p_catalogo is null or a.unidade = p_catalogo)
+      and not exists (select 1 from public.consulta_config cc where cc.procedimento_id = p.id and cc.oculta)
     group by p.id, p.nome),
   rot as (
-    select b.*, (b.nome ~* '^consulta( medica| médica)?$') as generica, case
-      when b.nome ~* '^consulta( medica| médica)?$' then 'Consulta de ' || coalesce(b.esp, 'clínica médica')
-      when b.nome ~* 'teleconsulta' then 'Teleconsulta de ' || coalesce(b.esp, 'clínica médica')
-      when b.nome ~* '^atendimento ambulatorial em ' then initcap(lower(regexp_replace(b.nome, '^atendimento ambulatorial em ', '', 'i')))
-      else initcap(lower(b.nome)) end as rotulo
+    select b.*, (b.nome ~* '^consulta( medica| médica)?$') as generica,
+      coalesce(nullif(btrim((select cc.rotulo from public.consulta_config cc where cc.procedimento_id = b.id)), ''), case
+        when b.nome ~* '^consulta( medica| médica)?$' then 'Consulta de ' || coalesce(b.esp, 'clínica médica')
+        when b.nome ~* 'teleconsulta' then 'Teleconsulta de ' || coalesce(b.esp, 'clínica médica')
+        when b.nome ~* '^atendimento ambulatorial em ' then initcap(lower(regexp_replace(b.nome, '^atendimento ambulatorial em ', '', 'i')))
+        else initcap(lower(b.nome)) end) as rotulo
     from base b)
   select distinct on (r.rotulo) r.id, r.rotulo, cardinality(r.meds), r.meds
   from rot r

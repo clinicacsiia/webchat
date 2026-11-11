@@ -1,8 +1,9 @@
 # Auditoria completa — 11/11/2026
 
-Versão 1.0 — 11/11/2026 / Mudança: auditoria do repositório e da produção, correções e documentação
+Versão 1.1 — 11/11/2026 (tarde) / Mudança: tudo o que estava "pronto, falta aplicar" foi aplicado e medido; trabalho juntado com as PRs #120 a #134 do dono; retrato refeito
+Versão 1.0 — 11/11/2026 (manhã) / Mudança: auditoria do repositório e da produção, correções e documentação
 
-**Em uma frase:** o sistema funciona de ponta a ponta, mas tinha dois defeitos sérios em produção que ninguém via (um enchia o banco, outro impedia a atendente de encerrar), um defeito no chat que gerava 21 erros por dia ao paciente e um banco que não batia com o repositório. Os dois primeiros **já estão corrigidos na produção**; o resto está corrigido no repositório e entra no ar quando esta branch for publicada.
+**Em uma frase:** o sistema funciona de ponta a ponta, mas tinha dois defeitos sérios em produção que ninguém via (um enchia o banco, outro impedia a atendente de encerrar), um defeito no chat que gerava 21 erros por dia ao paciente e um banco que não batia com o repositório. **Tudo o que é de banco já está corrigido na produção**; as correções das telas estão no repositório e entram no ar quando esta branch for publicada.
 
 Privacidade: na produção só li **estrutura, contagens, tempos e mensagens de erro técnicas**. Nenhum nome, telefone, CPF ou texto de conversa foi lido ou copiado.
 
@@ -25,14 +26,14 @@ Privacidade: na produção só li **estrutura, contagens, tempos e mensagens de 
 
 ## 2. O que estava errado e o que foi feito
 
-Legenda do estado: **NO AR** = aplicado e conferido na produção · **NO REPOSITÓRIO** = corrigido e testado, entra no ar ao publicar a branch · **PRONTO, FALTA APLICAR** = arquivo testado, esperando você (ver `pendencias-do-dono.md`).
+Legenda do estado: **NO AR** = aplicado e conferido na produção · **NO REPOSITÓRIO** = corrigido e testado, entra no ar ao publicar a branch (ver `pendencias-do-dono.md`, item 1.2).
 
 ### 2.1 Avalanche de avisos de tempo real: 193 mil por dia — **NO AR**
 
 - **Evidência:** em 10/11 a tabela `realtime.messages` recebeu **193.461** avisos `jornada_mudou`, em rajadas de ~166 no mesmo segundo, uma vez por minuto. Ocupava **47 MB por dia** (o banco estava em 208 MB de 500 MB do plano). Cada portal "Minha vez" aberto refazia a consulta a cada aviso: 190 mil chamadas de `paciente_jornada` e 205 mil de `fila_minha_vez` acumuladas.
 - **Causa:** a rotina de 1 minuto copia cada conversa para a Jornada com um `insert ... on conflict` por conversa, e o gatilho de INSERT avisava a cada comando, mesmo sem criar linha. A correção de 07/11 tinha calado só a leitura do Klingo.
 - **Correção** (`supabase/jornada-avisos-enxutos.sql`): o gatilho só avisa se uma linha foi criada; a rotina fica calada e manda **um** aviso no fim, só se algo mudou.
-- **Prova:** no clone da produção o defeito é reproduzido (6 avisos por rodada sem mudança) e some (0). Na produção, minuto a minuto: 166, 166, 166 … até 07:23; **0** a partir de 07:24.
+- **Prova:** no clone da produção o defeito é reproduzido (6 avisos por rodada sem mudança) e some (0). Na produção, minuto a minuto: 166, 166, 166 … até 07:23; **0** a partir de 07:24. Num dia inteiro de trabalho: de **~9.960 por hora** para **33 a 60 por hora** (os avisos que sobram são mudanças de verdade).
 
 ### 2.2 Encerrar como "Agendado" estourava o tempo — **NO AR**
 
@@ -54,17 +55,17 @@ Legenda do estado: **NO AR** = aplicado e conferido na produção · **NO REPOSI
 - **Evidência:** 30 dos incidentes "falha ao falar com o servidor" em 5 dias eram a consulta de rotina do chat (a que ele repete sozinho a cada poucos segundos) falhando uma vez por rede do celular. O paciente via um aviso vermelho com código de erro.
 - **Correção** (`sentinela.js` 1.1): falha isolada de rotina não mostra nada; na 3ª seguida aparece "A conexão está instável" (amarelo, sem código) e a equipe recebe **um** registro. Falha numa ação do paciente continua avisando na hora.
 
-### 2.5 Histórico das rotinas crescendo sem limpeza — **PRONTO, FALTA APLICAR (precisa de você)**
+### 2.5 Histórico das rotinas crescendo sem limpeza — **NO AR**
 
 - **Evidência:** `cron.job_run_details` tinha 41.924 linhas e **20 MB em 4 dias e meio** (há rotinas de 15 e 30 segundos). No ritmo, ~130 MB por mês.
 - **Correção** (`supabase/manutencao-limpeza.sql`): rotina diária que apaga execuções com mais de 3 dias (falhas ficam 14).
-- **Por que não está no ar:** o comando tem `delete` e o Supabase pede a sua confirmação na tela, com 60 segundos de espera. Não houve resposta.
+- **Aplicação:** o comando tem `delete` e o Supabase pede a confirmação do dono na tela, com 60 segundos de espera. De manhã ninguém respondeu; à tarde foi aprovado. A primeira limpeza apagou **18.668** registros (de 52.890 para 34.274); a rotina `manutencao-limpeza` roda toda madrugada às 04:17.
 
-### 2.6 "Mapa do corpo" lento no chat — **PRONTO, FALTA APLICAR**
+### 2.6 "Mapa do corpo" lento no chat — **NO AR**
 
 - **Evidência:** `chat_corpo` leva **1,1 s** com o banco livre (o limite do paciente é 3 s) e estourou 2 vezes em 09/11. O resultado é igual para todo paciente.
 - **Correção** (`supabase/chat-corpo-cache.sql`): a resposta fica guardada pronta e é refeita a cada 10 minutos; o chat lê a cópia (~1 ms). Sem cópia recente, calcula na hora como antes.
-- **Por que não está no ar:** depois da confirmação que expirou no item 2.5, a ferramenta de migração ficou bloqueada nesta sessão. É só pedir "aplique o que falta".
+- **Prova na produção:** a resposta de `chat_corpo` é idêntica à do cálculo antigo e sai em **0,9 ms** no lugar de **1.180 ms**. A rotina `chat-corpo-cache` refaz a cópia a cada 10 minutos; o paciente sem login não lê a tabela da cópia.
 
 ### 2.7 O painel refazia consultas pesadas a cada mensagem — **NO REPOSITÓRIO**
 
@@ -83,11 +84,11 @@ Legenda do estado: **NO AR** = aplicado e conferido na produção · **NO REPOSI
 
 ### 2.10 `npm test` não rodava tudo — **CORRIGIDO**
 
-- 4 suítes ficavam de fora (`test:paciente-status`, `test:catalogo-painel`, `test:login-sql`, `test:carga`) e `test:login` rodava duas vezes. Agora as 68 suítes estão na cadeia, sem repetição.
+- 4 suítes ficavam de fora (`test:paciente-status`, `test:catalogo-painel`, `test:login-sql`, `test:carga`) e `test:login` rodava duas vezes. Agora as 69 suítes estão na cadeia, sem repetição.
 
 ### 2.11 E-mail de confirmação de conta não está saindo — **DEPENDE DE VOCÊ**
 
-- **Evidência:** em 10/11, às 17:21, 17:22 e 17:23 (Brasília), três criações de conta falharam com `535 5.7.8 Username and Password not accepted` (resposta do Gmail). A senha de app configurada no Supabase deixou de valer.
+- **Evidência:** em 10/11, às 17:21, 17:22 e 17:23 (Brasília), três criações de conta falharam com `535 5.7.8 Username and Password not accepted` (resposta do Gmail); em 11/11 foram mais cinco (entre 8h e 10h). A senha de app configurada no Supabase deixou de valer.
 - **Efeito:** conta nova (paciente ou equipe) e "esqueci a senha" **não funcionam** até a senha ser trocada. Quem já tem conta entra normalmente.
 
 ### 2.12 Segurança: o que foi conferido
@@ -100,10 +101,19 @@ Legenda do estado: **NO AR** = aplicado e conferido na produção · **NO REPOSI
 | Marketing | Lê contatos; 0 linhas em mensagens e pedidos (provado no clone) |
 | 49 funções abertas ao paciente | Todas conferem token, segredo ou são dados públicos |
 | 200 funções abertas a quem está logado | Todas conferem o papel, exceto `agendamento_valido_para_encerrar` (fechada, item 2.2) |
-| 9 funções de gatilho visíveis ao paciente | Inofensivas (não dá para chamá-las pela API). Arquivo `supabase/seguranca-ajustes.sql` pronto para fechar |
+| 9 funções de gatilho visíveis ao paciente | Eram inofensivas (não dá para chamá-las pela API); **fechadas** por `supabase/seguranca-ajustes.sql` (agora são 0) |
 | Proteção contra senha vazada | **Desligada** (precisa do plano Pro; decisão sua) |
 | Segredos | Nenhum no repositório nem no retrato (o gerador recusa) |
 | Pendência conhecida, por decisão | Atendente ainda altera qualquer coluna de qualquer conversa pela API (PERF-04), e as permissões por unidade estão em modo observação |
+
+## 2.13 O que o dono mudou no mesmo dia e como foi juntado
+
+Enquanto a auditoria corria, o dono juntou **15 PRs (#120 a #134)** na `main` e aplicou **11 migrações**: Cardápio só Particular, consultas oferecidas no chat, expiração dos avisos da Jornada, "24 h sem resposta marca para chamar no WhatsApp" (no lugar de encerrar), correções da conferência com o Klingo e religar conversas sem prontuário.
+
+- O trabalho da auditoria foi **reposto em cima dessa `main`**. Houve conflito em dois arquivos, resolvidos guardando as duas mudanças: no painel, os "cards que se corrigem sozinhos" (#124) passaram a respeitar a regra de "uma releitura por vez" (item 2.7); em `testes/package.json`, a cadeia ficou com o teste novo do dono (`test:autoencerrar-zap-sql`).
+- As 3 correções aplicadas de manhã **continuavam intactas** na produção à tarde (conferido função por função).
+- O retrato foi refeito três vezes no dia e **mostrou exatamente o que mudou**: de manhã, as 3 funções da auditoria; à tarde, as 6 funções novas, 9 alteradas, 1 tabela, 3 colunas e 1 rotina do dono; no fim, as 3 funções e a tabela das últimas migrações da auditoria.
+- Com tudo junto: telas × banco 10 de 10, correções 29 de 29, ponta a ponta 19 de 19.
 
 ## 3. O que foi conferido e estava certo
 
@@ -119,8 +129,9 @@ Legenda do estado: **NO AR** = aplicado e conferido na produção · **NO REPOSI
 
 | Medida | Valor |
 |---|---|
-| Banco | 208 MB de 500 MB (120 MB eram avisos de tempo real; devem cair nos próximos 3 dias) |
-| Conversas / mensagens | 201 / 4.118 |
+| Banco | 208 MB de 500 MB (cerca de 115 MB são avisos de tempo real dos dias 08 a 11/11, que o Supabase descarta sozinho em 3 dias; o dia 12 já nasce com poucos kB) |
+| Conversas / mensagens | 201 / 4.118 (manhã) |
+| Estrutura no fim do dia | 425 funções, 101 tabelas, 21 rotinas, 0 falha de rotina em 6 h |
 | Consultas mais caras desde 29/10 | `pessoa_sugestoes` 26.299 s · `agenda_ocupacao_atualizar` 18.751 s · leitura do tempo real 6.673 s · `paciente_jornada` 4.438 s · `pessoa_avisos_data` 3.549 s |
 | Estouros de tempo do paciente (3 s) em 6 dias | `chat_responder` no passo médico 10 · `chat_horarios` 8 · `chat_consulta_salvar` 7 · `chat_corpo` 2. Os três primeiros são de antes da lista de horários rápida (10/11); nenhum depois dela |
 | Chat publicado | versão `2026.11.01-2` (a constante não era trocada desde 01/11; agora é `2026.11.11-1`) |
@@ -138,12 +149,11 @@ Legenda do estado: **NO AR** = aplicado e conferido na produção · **NO REPOSI
 
 | Arquivo | O que é |
 |---|---|
-| `supabase/jornada-avisos-enxutos.sql`, `agendado-rapido.sql` | Correções **no ar** |
-| `supabase/chat-corpo-cache.sql`, `manutencao-limpeza.sql`, `seguranca-ajustes.sql` | Prontos, **faltam aplicar** |
+| `supabase/jornada-avisos-enxutos.sql`, `agendado-rapido.sql`, `chat-corpo-cache.sql`, `manutencao-limpeza.sql`, `seguranca-ajustes.sql` | Correções **no ar** (7 migrações `auditoria_1111_*`) |
 | `supabase/producao/` | Retrato da produção (novo) |
 | `index.html`, `sentinela.js`, `sw.js`, `painel/index.html`, `painel/sw.js` | Correções das telas |
 | `testes/banco-producao.mjs`, `sql-producao.test.mjs`, `sql-ponta-a-ponta.test.mjs`, `retrato.test.mjs`, `chat-equipe-assume.navegador.mjs`, `painel-recarga.navegador.mjs` | Testes novos (29 + 19 + 10 + 9 + 4 verificações) |
-| `testes/antes-da-auditoria-1111/` | As 3 funções como eram, para o teste reproduzir os defeitos |
+| `testes/antes-da-auditoria-1111/` | As 4 funções como eram, para o teste reproduzir os defeitos |
 | `docs/DOCUMENTACAO.md`, `docs/pendencias-do-dono.md`, este arquivo | Documentação |
 
 ## 7. Como conferir você mesmo
@@ -170,6 +180,8 @@ Antes: cerca de 10.000 por hora. Depois: poucas dezenas.
 | Mudança | Como desfazer |
 |---|---|
 | Avisos enxutos (2.1) | Reaplicar `testes/antes-da-auditoria-1111/jornada_avisar_exame_ins.sql` e `jornada_conversas_sincronizar.sql` |
+| Mapa do corpo (2.6) | Reaplicar `testes/antes-da-auditoria-1111/chat_corpo.sql` e `select cron.unschedule('chat-corpo-cache');` |
+| Limpeza (2.5) | `select cron.unschedule('manutencao-limpeza');` |
 | Agendado rápido (2.2) | Reaplicar `testes/antes-da-auditoria-1111/agendamento_valido_para_encerrar.sql` e `grant execute ... to authenticated` |
 | Telas (2.3, 2.4, 2.7) | Reverter o commit desta branch |
 | Conferência do "Agendado" inteira | `update public.config set valor = 'nao' where chave = 'encerramento_valida_agendado';` |

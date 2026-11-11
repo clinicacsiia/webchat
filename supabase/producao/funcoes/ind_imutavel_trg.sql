@@ -1,5 +1,5 @@
 -- public.ind_imutavel_trg()
--- Pode executar: anon, authenticated, service_role (PUBLIC)
+-- Pode executar: service_role
 CREATE OR REPLACE FUNCTION public.ind_imutavel_trg()
  RETURNS trigger
  LANGUAGE plpgsql

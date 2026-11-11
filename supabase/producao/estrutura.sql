@@ -1,5 +1,5 @@
 -- RETRATO DA ESTRUTURA DO BANCO DE PRODUÇÃO (projeto webchat-atendimento). GERADO: não editar à mão.
--- Tirado em 2026-11-11T10:44:44.301076+00:00 · Postgres 17.11. Só estrutura: nenhuma linha de tabela, nenhum valor de configuração.
+-- Tirado em 2026-11-11T17:49:00.709137+00:00 · Postgres 17.11. Só estrutura: nenhuma linha de tabela, nenhum valor de configuração.
 -- Serve de referência e para os testes. NÃO rodar inteiro sobre a produção. Como refazer: supabase/producao/LEIAME.md.
 
 -- ===== Extensões =====
@@ -18,7 +18,7 @@
 -- authenticator: session_preload_libraries=supautils, safeupdate, statement_timeout=8s, lock_timeout=8s
 -- service_role: sem limite
 
--- ===== Tabelas (99) =====
+-- ===== Tabelas (101) =====
 
 create table public.agenda_ao_vivo (
   dia date not null,
@@ -491,6 +491,15 @@ alter table public.catalogo_regiao enable row level security;
 -- concessão a anon: DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
 -- concessão a authenticated: DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
 
+create table public.chat_cache (
+  chave text not null,
+  valor jsonb not null,
+  calculado_em timestamp with time zone default now() not null,
+  constraint chat_cache_pkey PRIMARY KEY (chave)
+);
+comment on table public.chat_cache is 'Respostas prontas do chat que são iguais para todo paciente (hoje: o mapa do corpo). Sem dado pessoal. Só as funções leem.';
+alter table public.chat_cache enable row level security;
+
 create table public.chat_push_inscricao (
   id bigint generated always as identity not null,
   conversa_id uuid not null,
@@ -518,6 +527,19 @@ create policy config_update on public.config as permissive for update to authent
   using ((( SELECT papel_atual() AS papel_atual) = 'admin'::text))
   with check ((( SELECT papel_atual() AS papel_atual) = 'admin'::text));
 -- concessão a authenticated: SELECT
+
+create table public.consulta_config (
+  procedimento_id integer not null,
+  oculta boolean default false not null,
+  rotulo text,
+  atualizado_em timestamp with time zone default now() not null,
+  atualizado_por uuid,
+  constraint consulta_config_pkey PRIMARY KEY (procedimento_id)
+);
+comment on table public.consulta_config is 'Ajustes por consulta: esconder do chat e/ou renomear. Sem policy: só as funções security definer acessam.';
+alter table public.consulta_config enable row level security;
+-- concessão a anon: DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+-- concessão a authenticated: DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
 
 create table public.conta_paciente_evento (
   id bigint generated always as identity not null,
@@ -815,6 +837,9 @@ create table public.conversas (
   reentrada_texto_informado boolean,
   unidade_responsavel text,
   push_silenciado_em timestamp with time zone,
+  chamar_zap_em timestamp with time zone,
+  chamar_zap_feito_em timestamp with time zone,
+  chamar_zap_feito_por uuid,
   constraint conversas_encerramento_origem_ck CHECK (((encerramento_origem IS NULL) OR (encerramento_origem = ANY (ARRAY['equipe'::text, 'sistema'::text, 'inatividade'::text, 'paciente'::text])))),
   constraint conversas_irmaos_modo_check CHECK ((irmaos_modo = ANY (ARRAY['um_de_cada_vez'::text, 'juntos'::text]))),
   constraint conversas_motivo_encerramento_ck CHECK (((motivo_encerramento IS NULL) OR (motivo_encerramento = ANY (ARRAY['agendado'::text, 'apenas_informacoes'::text, 'nao_respondido'::text, 'desistiu'::text, 'outro'::text, 'nova_conversa'::text])))),
@@ -2162,7 +2187,7 @@ CREATE TRIGGER vinculo_log_imutavel BEFORE DELETE OR UPDATE ON public.vinculo_lo
 -- public.jornada_tarefa
 -- public.mensagens
 
--- ===== Rotinas agendadas (pg_cron): 18 =====
+-- ===== Rotinas agendadas (pg_cron): 21 =====
 -- agenda-conferir · 15 seconds · ativa
 --   select net.http_post( url := 'https://nrvuynjwcgwpjdptkiay.supabase.co/functions/v1/sync-catalogo-klingo', headers := jsonb_build_object('Content-Type', 'application/json', 'x-sync-key', (select valor from public.config where chave = 'ia_segredo')), body := '{"agenda":"conferir"}'::jsonb, timeout_milliseconds := 40000) where public.agenda_conferencia_ha_trabalho(false);
 -- agenda-ocupacao · */10 8-23,0,1 * * * · ativa
@@ -2183,6 +2208,8 @@ CREATE TRIGGER vinculo_log_imutavel BEFORE DELETE OR UPDATE ON public.vinculo_lo
 --   select net.http_post( url := 'https://nrvuynjwcgwpjdptkiay.supabase.co/functions/v1/sync-catalogo-klingo', headers := jsonb_build_object('Content-Type', 'application/json', 'x-sync-key', (select valor from public.config where chave = 'ia_segredo')), body := '{"precos":"convenio"}'::jsonb, timeout_milliseconds := 150000);
 -- catalogo-precos-particular · 25 6 * * * · ativa
 --   select net.http_post( url := 'https://nrvuynjwcgwpjdptkiay.supabase.co/functions/v1/sync-catalogo-klingo', headers := jsonb_build_object('Content-Type', 'application/json', 'x-sync-key', (select valor from public.config where chave = 'ia_segredo')), body := '{"precos":"particular"}'::jsonb, timeout_milliseconds := 150000);
+-- chat-corpo-cache · */10 * * * * · ativa
+--   select public.chat_corpo_atualizar()
 -- convenios-revisar · 5 11 * * * · ativa
 --   select public.convenios_revisar()
 -- espera-vigia · * * * * * · ativa
@@ -2195,6 +2222,10 @@ CREATE TRIGGER vinculo_log_imutavel BEFORE DELETE OR UPDATE ON public.vinculo_lo
 --   select public.jornada_klingo_agendar()
 -- jornada-vigia · * * * * * · ativa
 --   select public.jornada_vigiar()
+-- klingo-ligar-pendentes · 4-59/10 * * * * · ativa
+--   select public.paciente_klingo_ligar_pendentes()
+-- manutencao-limpeza · 17 7 * * * · ativa
+--   select public.manutencao_limpar()
 -- pessoa-agrupar · */5 * * * * · ativa
 --   select public.pessoa_agrupar_pendentes()
 -- sync-catalogo-klingo · 0 6 * * * · ativa

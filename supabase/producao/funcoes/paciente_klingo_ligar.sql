@@ -6,7 +6,7 @@ CREATE OR REPLACE FUNCTION public.paciente_klingo_ligar(p_conversa uuid)
  SECURITY DEFINER
  SET search_path TO ''
 AS $function$
-declare v_sal text; v_fh text; v_nome text; v_dig text; v_pros text[]; v_ids uuid[]; v_lin integer := 0;
+declare v_sal text; v_fh text; v_nome text; v_dig text; v_pros text[]; v_reais text[]; v_ids uuid[]; v_lin integer := 0;
 begin
   select regexp_replace(coalesce(ct.telefone, ''), '\D', '', 'g'), public.pessoa_ficha(c.id) ->> 'nome' into v_dig, v_nome
     from public.conversas c join public.contatos ct on ct.id = c.contato_id where c.id = p_conversa;
@@ -15,6 +15,8 @@ begin
   v_fh := encode(sha256(convert_to(right(v_dig, 8) || coalesce(v_sal, ''), 'UTF8')), 'hex');
   v_pros := array(select jp.prontuario from public.jornada_paciente jp where jp.fone_chave = v_fh and public.nome_confere(jp.nome, v_nome));
   if cardinality(v_pros) = 0 then return 0; end if;
+  v_reais := array(select p from unnest(v_pros) p where p not like 'n:%');
+  if cardinality(v_reais) > 0 then v_pros := v_reais; end if;
   v_ids := public.pessoa_membros(p_conversa);
   if exists (select 1 from public.pessoa_klingo_vinculo vk where vk.prontuario = any (v_pros) and vk.conversa_id = any (v_ids)) then return 0; end if;
   if cardinality(v_pros) > 1 then

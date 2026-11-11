@@ -235,8 +235,9 @@ await db.exec(`
 `);
 const tokenDe = async (conv) => (await um(`select token from public.conversa_segredo where conversa_id = $1`, [conv])).token;
 let corpoAntes = null;
-await caso('chat_corpo (código da produção) responde com os tipos de exame e as partes do corpo do catálogo de teste', async () => {
-  corpoAntes = (await um(`select public.chat_corpo($1, $2) r`, [convs[3], await tokenDe(convs[3])])).r;
+await caso('chat_corpo (código da produção até 11/11, que calculava tudo a cada chamada) responde com os tipos de exame e as partes do corpo do catálogo de teste', async () => {
+  await db.exec(antes('chat_corpo').replace('FUNCTION public.chat_corpo(', 'FUNCTION public.chat_corpo_antigo('));
+  corpoAntes = (await um(`select public.chat_corpo_antigo($1, $2) r`, [convs[3], await tokenDe(convs[3])])).r;
   const rm = (corpoAntes.modalidades || []).find((m) => m.codigo === 'RM');
   return { ok: !!rm && rm.regioes.includes('joelho') && !rm.regioes.includes('cranio') && corpoAntes.regioes.length === 3, detalhe: JSON.stringify(rm) };
 });

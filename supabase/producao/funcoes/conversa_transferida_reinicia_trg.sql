@@ -8,7 +8,7 @@ AS $function$
 begin
   if old.agente_id is not null and new.agente_id is not null and new.agente_id is distinct from old.agente_id
      and new.status = 'em_atendimento' and new.aguarda_paciente_desde is not null then
-    new.aguarda_paciente_desde := now();
+    new.aguarda_paciente_desde := now(); new.chamar_zap_em := null;
   end if;
   return new;
 end $function$;

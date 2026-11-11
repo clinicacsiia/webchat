@@ -33,8 +33,8 @@ Não há servidor próprio. As páginas são arquivos parados no GitHub Pages; t
                                             ▼
                          ┌──────────── SUPABASE ────────────┐
                          │  Postgres 17                      │
-                         │   · 99 tabelas, todas com RLS     │      a cada 15 s / 30 s / 1 min / 5 min / dia
-                         │   · 416 funções (o "motor")       │◄──── pg_cron (19 rotinas)
+                         │   · 101 tabelas, todas com RLS    │      a cada 15 s / 30 s / 1 min / 5 min / dia
+                         │   · 425 funções (o "motor")       │◄──── pg_cron (21 rotinas)
                          │   · 56 gatilhos                   │
                          │  Auth (equipe e conta do paciente)│
                          │  Realtime (avisos instantâneos)   │
@@ -90,7 +90,7 @@ Portal da fila de chegada: o paciente toca em "Cheguei", vê a posição e é av
 
 | Onde | O que é |
 |---|---|
-| `supabase/*.sql` (94 arquivos) | **Histórico das mudanças do banco**, um arquivo por assunto, aplicados à mão no Supabase. Cada um tem cabeçalho com fluxograma, versão e como voltar atrás. **Não são a verdade do banco**: várias correções foram aplicadas direto e 31 funções da produção diferem de qualquer versão destes arquivos. |
+| `supabase/*.sql` (cerca de 100 arquivos) | **Histórico das mudanças do banco**, um arquivo por assunto, aplicados à mão no Supabase. Cada um tem cabeçalho com fluxograma, versão e como voltar atrás. **Não são a verdade do banco**: várias correções foram aplicadas direto e 31 funções da produção diferem de qualquer versão destes arquivos. |
 | `supabase/producao/` | **A verdade do banco**: retrato da estrutura real da produção (uma função por arquivo, tabelas, gatilhos, regras de acesso, rotinas). Sem dado de paciente e sem segredo. Ver [`LEIAME.md`](../supabase/producao/LEIAME.md). |
 | `supabase/functions/` | Edge Functions (Deno/TypeScript). Ver seção 6. |
 | `supabase/00-base-snapshot.sql` | Foto antiga da base (30/10). Só referência histórica. |
@@ -115,7 +115,7 @@ Modelo em português do e-mail de confirmação de conta (colar em Supabase > Au
 
 ## 4. O banco, por assunto
 
-Números de 11/11/2026: 99 tabelas, 5 visões, 416 funções, 56 gatilhos, 65 regras de acesso. **Toda tabela tem RLS ligada.**
+Números de 11/11/2026 (fim do dia): 101 tabelas, 5 visões, 425 funções, 56 gatilhos, 65 regras de acesso. **Toda tabela tem RLS ligada.**
 
 | Assunto | Tabelas principais | Funções (prefixo) |
 |---|---|---|
@@ -124,7 +124,7 @@ Números de 11/11/2026: 99 tabelas, 5 visões, 416 funções, 56 gatilhos, 65 re
 | Pedido | `pre_agendamentos` (1 por conversa), `pre_agendamento_itens`, `conversa_anexo` (fotos) | `chat_pedido_*`, `chat_exames_*`, `ia_pre_agendar` |
 | Paciente e pessoa | `pacientes`, `contas_paciente`, `conversa_grupo` (conversas da mesma pessoa), `paciente_klingo_vinculo`, `pessoa_klingo_vinculo`, `vinculo_log` | `paciente_*`, `pessoa_*`, `conta_*` |
 | Agenda | `catalogo_agenda` (grade), `agenda_ocupacao` (o que o Klingo tem marcado), `agenda_ao_vivo`, regras de duração e sala | `agenda_*`, `chat_horarios`, `chat_horario_escolher` |
-| Catálogo e preços | `catalogo_procedimento`, `catalogo_plano`, `catalogo_preco`, `catalogo_regiao`, `catalogo_mudanca` | `catalogo_*`, `preco_*` |
+| Catálogo e preços | `catalogo_procedimento`, `catalogo_plano`, `catalogo_preco`, `catalogo_regiao`, `catalogo_mudanca`, `consulta_config` (quais consultas aparecem no chat), `chat_cache` (respostas prontas) | `catalogo_*`, `preco_*`, `consultas_*` |
 | Convênios e médicos | `convenio_config`, `medico_*`, `profissional_bloqueio` | `convenio_*`, `medico_*` |
 | Jornada (Klingo) | `jornada_paciente`, `jornada_card`, `jornada_exame`, `jornada_evento`, `jornada_tarefa` | `jornada_*` |
 | Equipe e permissões | `agentes`, `org_equipe`, `org_membro`, `permissao_observacao`, `equipe_notificacao` | `org_*`, `equipe_*`, `papel_atual` |
@@ -149,7 +149,7 @@ O servidor só aceita resposta a uma pergunta do motor enquanto **o motor conduz
 
 ### 4.3 Estados da conversa
 
-`aguardando` → `em_atendimento` → `encerrada` (pode reabrir em até 2 dias se o paciente escrever). Encerrar pela equipe exige motivo. Sem resposta do paciente por 24 h, encerra sozinha com texto próprio.
+`aguardando` → `em_atendimento` → `encerrada` (pode reabrir em até 2 dias se o paciente escrever). Encerrar pela equipe exige motivo. Sem resposta do paciente por 24 h a conversa **não fecha**: fica marcada "Chamar no WhatsApp" para a equipe ir atrás (decisão do dono de 11/11/2026, `docs/autoencerramento.md`).
 
 ## 5. Rotinas automáticas (pg_cron)
 
@@ -159,14 +159,14 @@ O servidor só aceita resposta a uma pergunta do motor enquanto **o motor conduz
 | `jornada-klingo-30s` | 30 s | Lê as marcações do Klingo para a Jornada (uma leitura por vez) |
 | `agendamento-reconhecer-klingo` | 30 s | Reconhece no Klingo o agendamento de um pedido do chat |
 | `jornada-vigia`, `espera-vigia` | 1 min | Copia as conversas para a Jornada, alertas de atraso; aviso de paciente esperando |
-| `autoencerrar-vigia`, `agendado-vigia`, `pessoa-agrupar` | 5 min | Encerra por inatividade; confere "Agendado"; une conversas da mesma pessoa |
-| `agenda-ocupacao`, `agenda-revisar`, `agendamento-klingo` | 10 min | Ocupação da agenda e conferências |
+| `autoencerrar-vigia`, `agendado-vigia`, `pessoa-agrupar` | 5 min | Marca "Chamar no WhatsApp" quem não responde há 24 h; confere "Agendado"; une conversas da mesma pessoa |
+| `agenda-ocupacao`, `agenda-revisar`, `agendamento-klingo`, `klingo-ligar-pendentes` | 10 min | Ocupação da agenda, conferências e religar conversas ainda sem prontuário do Klingo |
+| `chat-corpo-cache` | 10 min | Deixa pronto o "mapa do corpo" do chat (resposta em ~1 ms) |
 | `agenda-ocupacao-noite` | 30 min (23h–4h) | Ocupação fora do expediente |
 | `sync-catalogo-klingo`, `catalogo-precos-*`, `fluxo-exames` | 03:00–03:40 | Catálogo, preços e visão de fluxo |
 | `indicadores-fechar-dia` | 00:10 | Congela os números do dia anterior |
 | `convenios-revisar` | 08:05 | Avisa a gestão de convênio suspenso há 1 mês |
-| `manutencao-limpeza` (**aguardando você aplicar**) | 04:17 | Limpa o histórico técnico de execuções |
-| `chat-corpo-cache` (**aguardando aplicar**) | 10 min | Deixa pronto o "mapa do corpo" do chat |
+| `manutencao-limpeza` | 04:17 | Apaga o histórico técnico de execuções com mais de 3 dias |
 
 Horários em Brasília. Conferir a saúde delas: `select jobname, status, count(*) from cron.job_run_details d join cron.job j using (jobid) where start_time > now() - interval '1 day' group by 1, 2;`
 
@@ -196,7 +196,7 @@ Liga/desliga e textos. Só o administrador lê e altera (aba Configurações ou 
 |---|---|---|
 | `motor` | `fluxo` | Quem responde o paciente (motor de regras) |
 | `agenda_ao_vivo` | `sim` | Ler o Klingo na hora em que o paciente chega ao calendário |
-| `autoencerrar_modo` / `autoencerrar_horas` | `ligado` / `24` | Encerrar por inatividade |
+| `autoencerrar_modo` / `autoencerrar_horas` | `ligado` / `24` | Depois de 24 h sem resposta, marcar para chamar no WhatsApp (não encerra mais) |
 | `reabrir_dias` | `2` | Janela para reabrir por mensagem |
 | `encerramento_exige_motivo` | `sim` | Motivo obrigatório ao encerrar |
 | `encerramento_valida_agendado` | `sim` | Conferir a agenda quando encerra como "Agendado" |
@@ -212,7 +212,7 @@ Segredos e endereços (`ia_segredo`, `*_url`, `fila_vapid_publica`) existem mas 
 
 ## 8. Testes
 
-`cd testes && npm install && CHROMIUM_PATH=/opt/pw-browsers/chromium npm test` roda **67 suítes**. Quatro famílias:
+`cd testes && npm install && CHROMIUM_PATH=/opt/pw-browsers/chromium npm test` roda **69 suítes**. Quatro famílias:
 
 | Família | Arquivos | O que prova |
 |---|---|---|

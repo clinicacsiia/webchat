@@ -1,5 +1,6 @@
 -- FLUXOGRAMA: entrada (a equipe encerra uma conversa como "Agendado", ou a rotina agendado_vigiar confere depois) -> validação (existe exame vigente dessa pessoa? no chat, ou no Klingo ligado por prontuário confirmado ou por nome + telefone) -> lógica (1º acha os POUCOS prontuários que são dessa pessoa; 2º procura exame vigente só neles) -> saída (a mesma resposta de antes, em milissegundos)
 -- Versão 1.0 — 11/11/2026 / Mudança: Implementação inicial (auditoria de 11/11/2026)
+-- APLICADO NA PRODUÇÃO em 11/11/2026 (migrações auditoria_1111_*) e conferido lá. Resultado medido: docs/auditoria-2026-11-11.md.
 --
 -- O QUE ESTAVA ERRADO (medido na produção em 11/11/2026):
 --   * A consulta antiga varria TODOS os exames futuros do Klingo e, para cada um, recalculava a ficha da pessoa (pessoa_ficha) e o nome.

@@ -7,7 +7,7 @@ CREATE OR REPLACE FUNCTION public.autoencerrar_candidatas()
  SET search_path TO ''
 AS $function$
   select c.id from public.conversas c
-   where c.status = 'em_atendimento' and c.aguarda_paciente_desde is not null
+   where c.status = 'em_atendimento' and c.aguarda_paciente_desde is not null and c.chamar_zap_em is null
      and c.aguarda_paciente_desde <= now() - make_interval(hours => public.autoencerrar_horas())
      and not exists (select 1 from public.v_remarcacao_pendente r where r.conversa_id = any (public.pessoa_membros(c.id)))
      and not exists (select 1 from public.conversas m where m.id = any (public.pessoa_membros(c.id)) and m.status <> 'encerrada'

@@ -1,5 +1,6 @@
 -- FLUXOGRAMA: entrada (a rotina de 1 minuto jornada_vigiar copia cada conversa do chat para o quadro da Jornada) -> validação (o aviso de tempo real só sai se uma linha foi REALMENTE criada ou mudou; comando que não cria nem muda nada não avisa) -> lógica (durante a cópia os gatilhos ficam calados e a rotina manda 1 único aviso no fim, só se algo mudou) -> saída (broadcast "jornada_mudou" no canal fila-chegada: de ~194 mil por dia para poucas dezenas)
 -- Versão 1.0 — 11/11/2026 / Mudança: Implementação inicial (auditoria de 11/11/2026)
+-- APLICADO NA PRODUÇÃO em 11/11/2026 (migrações auditoria_1111_*) e conferido lá. Resultado medido: docs/auditoria-2026-11-11.md.
 --
 -- O QUE ESTAVA ERRADO (medido na produção em 10/11/2026):
 --   * 193.461 avisos "jornada_mudou" num dia, em rajadas de ~166 no mesmo segundo, uma vez por minuto.

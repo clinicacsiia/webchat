@@ -1,5 +1,5 @@
 {
- "gerado_em": "2026-11-11T10:44:44.301076+00:00",
+ "gerado_em": "2026-11-11T17:49:00.709137+00:00",
  "postgres": "17.11",
  "tabelas": [
   {
@@ -395,6 +395,16 @@
    "politicas": 0
   },
   {
+   "nome": "chat_cache",
+   "colunas": [
+    "chave",
+    "valor",
+    "calculado_em"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
    "nome": "chat_push_inscricao",
    "colunas": [
     "id",
@@ -415,6 +425,18 @@
    ],
    "rls": true,
    "politicas": 2
+  },
+  {
+   "nome": "consulta_config",
+   "colunas": [
+    "procedimento_id",
+    "oculta",
+    "rotulo",
+    "atualizado_em",
+    "atualizado_por"
+   ],
+   "rls": true,
+   "politicas": 0
   },
   {
    "nome": "conta_paciente_evento",
@@ -675,7 +697,10 @@
     "reentrada_motivo_auto",
     "reentrada_texto_informado",
     "unidade_responsavel",
-    "push_silenciado_em"
+    "push_silenciado_em",
+    "chamar_zap_em",
+    "chamar_zap_feito_em",
+    "chamar_zap_feito_por"
    ],
    "rls": true,
    "politicas": 2
@@ -1617,6 +1642,12 @@
    "comando": "select net.http_post( url := 'https://nrvuynjwcgwpjdptkiay.supabase.co/functions/v1/sync-catalogo-klingo', headers := jsonb_build_object('Content-Type', 'application/json', 'x-sync-key', (select valor from public.config where chave = 'ia_segredo')), body := '{\"precos\":\"particular\"}'::jsonb, timeout_milliseconds := 150000);"
   },
   {
+   "nome": "chat-corpo-cache",
+   "quando": "*/10 * * * *",
+   "ativa": true,
+   "comando": "select public.chat_corpo_atualizar()"
+  },
+  {
    "nome": "convenios-revisar",
    "quando": "5 11 * * *",
    "ativa": true,
@@ -1651,6 +1682,18 @@
    "quando": "* * * * *",
    "ativa": true,
    "comando": "select public.jornada_vigiar()"
+  },
+  {
+   "nome": "klingo-ligar-pendentes",
+   "quando": "4-59/10 * * * *",
+   "ativa": true,
+   "comando": "select public.paciente_klingo_ligar_pendentes()"
+  },
+  {
+   "nome": "manutencao-limpeza",
+   "quando": "17 7 * * *",
+   "ativa": true,
+   "comando": "select public.manutencao_limpar()"
   },
   {
    "nome": "pessoa-agrupar",
@@ -2523,7 +2566,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "8d609b7e670aec53d2489b18051d3401"
+   "md5": "d3cc00d06c748f268c425a38e34afda0"
   },
   {
    "nome": "autoencerrar_horas",
@@ -2543,7 +2586,7 @@
    "anon": false,
    "authenticated": true,
    "publico": false,
-   "md5": "66d35df0b3e6427d690c09a23cac2c83"
+   "md5": "1f863a6ac83a1e949a12fcf4acbf81b6"
   },
   {
    "nome": "autoencerrar_vigiar",
@@ -2553,7 +2596,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "074e6acbb3b5deb07f40b9a13db0381c"
+   "md5": "f424a6e3db10f44dbd2f629e19fdfcf4"
   },
   {
    "nome": "avaliacoes_resumo",
@@ -2575,9 +2618,9 @@
    "args": [],
    "definer": false,
    "gatilho": true,
-   "anon": true,
-   "authenticated": true,
-   "publico": true,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
    "md5": "980442e22569bdf7ab2837a998a7723a"
   },
   {
@@ -2701,13 +2744,59 @@
    "md5": "ced3bb4a36f3c58a55bb2d012d1ea524"
   },
   {
+   "nome": "catalogo_particular_lista",
+   "args": [
+    {
+     "nome": "p_busca",
+     "padrao": true
+    },
+    {
+     "nome": "p_filtro",
+     "padrao": true
+    },
+    {
+     "nome": "p_limite",
+     "padrao": true
+    },
+    {
+     "nome": "p_deslocamento",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "29139d76c72e5a4500c8c26e56482497"
+  },
+  {
+   "nome": "catalogo_particular_salvar",
+   "args": [
+    {
+     "nome": "p_procedimento",
+     "padrao": false
+    },
+    {
+     "nome": "p_valor",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "390364f942106c9059f783e8066fc8bf"
+  },
+  {
    "nome": "catalogo_preco_confianca_trg",
    "args": [],
    "definer": false,
    "gatilho": true,
-   "anon": true,
-   "authenticated": true,
-   "publico": true,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
    "md5": "cb685f58cd16985b806799fa1ab6553f"
   },
   {
@@ -2842,6 +2931,21 @@
    "authenticated": false,
    "publico": false,
    "md5": "2aacfb6ea8ffbd8b6da5530aa4255b33"
+  },
+  {
+   "nome": "chamar_zap_feito",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "7cac8386b01e006d183b845d65d8315a"
   },
   {
    "nome": "chat_acompanhar",
@@ -3043,7 +3147,27 @@
    "anon": true,
    "authenticated": true,
    "publico": false,
-   "md5": "4d3033058e876c75e444010bf2b331dd"
+   "md5": "d31972d5cca48fe74f678341d49ff6f9"
+  },
+  {
+   "nome": "chat_corpo_atualizar",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "52315a8fe3d7c965cfdc082648098cf6"
+  },
+  {
+   "nome": "chat_corpo_calcular",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "6f00698c860e1285749f9f6af2323a2e"
   },
   {
    "nome": "chat_despedida_imagem",
@@ -3895,6 +4019,39 @@
    "md5": "a594426758e705c5f7e0a58c0552f439"
   },
   {
+   "nome": "consulta_config_salvar",
+   "args": [
+    {
+     "nome": "p_id",
+     "padrao": false
+    },
+    {
+     "nome": "p_oculta",
+     "padrao": false
+    },
+    {
+     "nome": "p_rotulo",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": true,
+   "md5": "68d8da421a71a204cc66d6a1d84634ea"
+  },
+  {
+   "nome": "consultas_config_listar",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": true,
+   "md5": "5ecc7a223c2a1e1982824a0d6fd3c6cc"
+  },
+  {
    "nome": "consultas_da_unidade",
    "args": [
     {
@@ -3907,7 +4064,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "11083eef1c45dd9ca9ea601360321a78"
+   "md5": "661f050ba328dae5fcc96d1e21589264"
   },
   {
    "nome": "conta_paciente_adotar_conversas",
@@ -4396,9 +4553,9 @@
    "args": [],
    "definer": true,
    "gatilho": true,
-   "anon": true,
-   "authenticated": true,
-   "publico": true,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
    "md5": "315e5c11ae44533ad2a09e001e16e1ed"
   },
   {
@@ -4406,10 +4563,10 @@
    "args": [],
    "definer": false,
    "gatilho": true,
-   "anon": true,
-   "authenticated": true,
-   "publico": true,
-   "md5": "214141d33a9476d254508da876bd27f3"
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "76fcffbd614426a257768e34b8232b14"
   },
   {
    "nome": "conversa_marcar_teste",
@@ -4471,7 +4628,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "8ab3e7c71c4d9a15b3c0e7b4e5868f09"
+   "md5": "f01b94ac0232af6787ed116637651a7c"
   },
   {
    "nome": "conversa_transferir",
@@ -4515,9 +4672,9 @@
    "args": [],
    "definer": true,
    "gatilho": true,
-   "anon": true,
-   "authenticated": true,
-   "publico": true,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
    "md5": "29d6f5ef983c13dc88bb3c42f51b2242"
   },
   {
@@ -6222,9 +6379,9 @@
    "args": [],
    "definer": false,
    "gatilho": true,
-   "anon": true,
-   "authenticated": true,
-   "publico": true,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
    "md5": "4fcc61f7764ceaab5515d0ca39b671e9"
   },
   {
@@ -6590,9 +6747,9 @@
    "args": [],
    "definer": false,
    "gatilho": true,
-   "anon": true,
-   "authenticated": true,
-   "publico": true,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
    "md5": "162cd34875fd8cf0d1c01bd5aa603796"
   },
   {
@@ -6918,7 +7075,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "760ab91639658d5daf0b6cc21c7d56c0"
+   "md5": "711d97373f983d80ce8a197b8b324249"
   },
   {
    "nome": "klingo_conferir_agendar",
@@ -6944,6 +7101,16 @@
    "authenticated": true,
    "publico": false,
    "md5": "f500bb620773e4d08d60dbbd12e67579"
+  },
+  {
+   "nome": "manutencao_limpar",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "7037b0d6810ef7eb47e58ba0ff7463cc"
   },
   {
    "nome": "medico_admin",
@@ -7294,7 +7461,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "4ddaa8d873d5f04076d9a4b85c5616bf"
+   "md5": "ea4fc6b86650714d6b8fe57fdddfc12c"
   },
   {
    "nome": "mensagem_inserida",
@@ -7568,9 +7735,9 @@
    "args": [],
    "definer": false,
    "gatilho": true,
-   "anon": true,
-   "authenticated": true,
-   "publico": true,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
    "md5": "a12601fb6d0131be53db6269c45c144b"
   },
   {
@@ -7795,7 +7962,17 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "176cad045a7d5f08201e0edd30f93002"
+   "md5": "20ba43391a00dfbfecd29526798694a5"
+  },
+  {
+   "nome": "paciente_klingo_ligar_pendentes",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": true,
+   "md5": "6bec1738a2dcc65809d299d933442262"
   },
   {
    "nome": "paciente_klingo_registrar",
@@ -8632,9 +8809,9 @@
    "args": [],
    "definer": true,
    "gatilho": true,
-   "anon": true,
-   "authenticated": true,
-   "publico": true,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
    "md5": "1d2a35b4cebfa20f7389d81559b054b0"
   },
   {
