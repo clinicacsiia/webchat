@@ -1,4 +1,5 @@
 // FLUXOGRAMA: entrada (as funções REAIS de supabase/pacientes.sql e do motor em supabase/fase7-motor.sql, mais os arquivos que o remendam, mais supabase/pessoa-unica.sql e pessoa-unica-jornada.sql, num Postgres embutido) -> validação (aplica os arquivos duas vezes; recusa função diferente do esperado; só a equipe usa as funções novas) -> lógica (agrupar com 3 informações, sugerir com 2, recusar contradição, separar; exame em aberto trava o encerramento até alguém fechar; falta vira remarcação pelo chat; cartão do Klingo só se junta com 3 informações) -> saída (PASS/FAIL por caso e código de saída)
+// Versão — 11/11/2026 / Mudança: os horários do teste passam a usar o relógio da clínica (o teste falhava das 21h às 00h20 de Brasília)
 // Versão 1.0 — 01/11/2026 / Mudança: Implementação inicial
 import { PGlite } from '@electric-sql/pglite';
 import { readFileSync } from 'node:fs';
@@ -249,6 +250,9 @@ await caso('as conversas do grupo vêm da mais recente para a mais antiga', asyn
 // ---------------------------------------------------------------- 2. exame em aberto
 const amanha = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
 const ontem = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+// Dia e hora "de parede" na clínica (America/Bahia), que é como o banco lê os horários escolhidos. Antes o teste usava dia e hora em UTC:
+// das 21h às 00h20 de Brasília o "20 minutos atrás" virava um horário do FUTURO e 3 verificações falhavam conforme a hora em que a suíte rodava.
+const naClinica = (msAtras = 0) => { const s = new Date(Date.now() - msAtras).toLocaleString('sv-SE', { timeZone: 'America/Bahia' }); return { dia: s.slice(0, 10), hora: s.slice(11, 16) }; };
 const marcado = async (conv, data, hora = '09:00') => {
   await db.query(`insert into public.pre_agendamento_itens (conversa_id, modalidade, regiao, regiao_nome, lado, procedimento_id, procedimento) values ($1, 'RM', 'JOELHO', 'Joelho', 'D', 10, 'RESSONANCIA DO JOELHO')`, [conv]);
   await db.query(`insert into public.pre_agendamentos (conversa_id, tipo, procedimento, plano, unidade, status, escolha_horario, identidade, paciente)
@@ -566,8 +570,8 @@ await caso('Klingo ainda "agendado" ou nome diferente (só 2 informações): NÃ
 });
 
 const recente = async (nome, tel, status) => {
-  const c = await conversa({ nome, tel }); const hoje = new Date().toISOString().slice(0, 10);
-  await marcado(c, hoje, new Date(Date.now() - 20 * 60000).toISOString().slice(11, 16));
+  const c = await conversa({ nome, tel }); const { dia: hoje, hora: haPouco } = naClinica(20 * 60000);
+  await marcado(c, hoje, haPouco);
   await cartaoKlingo('K' + tel.slice(-6), nome.toUpperCase(), tel, hoje, 'a_confirmar', status);
   await db.query(`select public.agendamento_conferir_klingo()`);
   return c;
@@ -582,9 +586,9 @@ await caso('Klingo: "atendido" vale na hora (não espera 1 hora) e a conversa pa
   return { ok: (await abertos(c)).length === 0 && cv.status === 'encerrada' && cv.ia_ativa === false, detalhe: JSON.stringify(cv) };
 });
 await caso('Klingo "atendido" com atendente falando com o paciente: não encerra, deixa o aviso "pode encerrar"', async () => {
-  const c = await conversa({ nome: 'Em Atendimento', tel: '71944000009' }); const hoje = new Date().toISOString().slice(0, 10);
+  const c = await conversa({ nome: 'Em Atendimento', tel: '71944000009' }); const { dia: hoje, hora: haPouco } = naClinica(20 * 60000);
   await db.query(`update public.conversas set status = 'em_atendimento' where id = $1`, [c]);
-  await marcado(c, hoje, new Date(Date.now() - 20 * 60000).toISOString().slice(11, 16));
+  await marcado(c, hoje, haPouco);
   await cartaoKlingo('K000009', 'EM ATENDIMENTO', '71944000009', hoje, 'a_confirmar', 'atendido');
   await db.query(`select public.agendamento_conferir_klingo()`);
   const cv = await um(`select status, alerta_agenda from public.conversas where id = $1`, [c]);
@@ -605,8 +609,8 @@ await db.exec(`
 `);
 await db.exec(lerSql('jornada-tempo-real.sql')); await db.exec(lerSql('automacao-sistema.sql')); await db.exec(lerSql('automacao-sistema.sql'));
 await caso('gatilho: o Klingo muda o exame para atendido -> fecha o exame em aberto e encerra a conversa SEM esperar a rotina', async () => {
-  const c = await conversa({ nome: 'Gatilho Automatico', tel: '71944000020' }); const hoje = new Date().toISOString().slice(0, 10);
-  await marcado(c, hoje, new Date(Date.now() - 20 * 60000).toISOString().slice(11, 16));
+  const c = await conversa({ nome: 'Gatilho Automatico', tel: '71944000020' }); const { dia: hoje, hora: haPouco } = naClinica(20 * 60000);
+  await marcado(c, hoje, haPouco);
   const card = await cartaoKlingo('K000020', 'GATILHO AUTOMATICO', '71944000020', hoje, 'a_confirmar', 'agendado');
   const antes = (await abertos(c)).length;
   await db.query(`update public.jornada_exame set status = 'atendido' where card_id = $1`, [card]);
@@ -614,7 +618,7 @@ await caso('gatilho: o Klingo muda o exame para atendido -> fecha o exame em abe
   return { ok: antes === 1 && (await abertos(c)).length === 0 && cv.status === 'encerrada', detalhe: `antes=${antes} ${JSON.stringify(cv)}` };
 });
 await caso('gatilho: atualizar o exame sem mudar o status não faz nada (nem aviso em tempo real)', async () => {
-  const c = await conversa({ nome: 'Sem Mudanca', tel: '71944000021' }); const hoje = new Date().toISOString().slice(0, 10);
+  const c = await conversa({ nome: 'Sem Mudanca', tel: '71944000021' }); const hoje = naClinica().dia;
   await marcado(c, hoje, '23:00');
   const card = await cartaoKlingo('K000021', 'SEM MUDANCA', '71944000021', hoje, 'a_confirmar', 'agendado');
   const n0 = (await um(`select count(*)::int n from realtime.messages where event = 'jornada_mudou'`)).n;
@@ -623,7 +627,7 @@ await caso('gatilho: atualizar o exame sem mudar o status não faz nada (nem avi
   return { ok: n1 === n0 && (await abertos(c)).length === 1, detalhe: `${n0} ${n1}` };
 });
 await caso('tempo real: mudar o status do exame ou a etapa da visita avisa os portais ("jornada_mudou", sem dado pessoal)', async () => {
-  const c = await conversa({ nome: 'Aviso Portal', tel: '71944000022' }); const hoje = new Date().toISOString().slice(0, 10);
+  const c = await conversa({ nome: 'Aviso Portal', tel: '71944000022' }); const hoje = naClinica().dia;
   const card = await cartaoKlingo('K000022', 'AVISO PORTAL', '71944000022', hoje, 'a_confirmar', 'agendado');
   const n0 = (await um(`select count(*)::int n from realtime.messages where event = 'jornada_mudou'`)).n;
   await db.query(`update public.jornada_exame set status = 'confirmado' where card_id = $1`, [card]);

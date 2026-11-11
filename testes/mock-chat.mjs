@@ -1,4 +1,5 @@
 // FLUXOGRAMA: entrada (repositório servido localmente + Supabase simulado com estado) -> validação (cada chamada do chat é registrada e pode ser atrasada ou falhar) -> lógica (um "mundo" guarda a conversa: mensagens, o que a listagem esconde, atrasos e erros) -> saída (página do chat pronta e conferida por quem importa este módulo)
+// Versão 1.1 — 11/11/2026 / Mudança: queda de rede simulada por chamada (mundo.quedas)
 // Versão 1.0 — 31/10/2026 / Mudança: Implementação inicial
 //
 // Servidor de mentira do chat para os testes de navegador da Fase 9 (corrida das mensagens e Sentinela).
@@ -205,6 +206,8 @@ export async function novaPaginaChat(browser, mundo, { init = [], auth = null } 
     const nome = (/\/rest\/v1\/rpc\/([a-z0-9_]+)/.exec(url.pathname) || [])[1];
     if (!nome) return rota.fulfill({ status: 200, headers: CORS, contentType: 'application/json', body: '[]' });
     let corpo = {}; try { corpo = JSON.parse(req.postData() || '{}'); } catch { /* sem corpo */ }
+    // Queda de rede simulada (a chamada nem chega ao servidor): mundo.quedas = { chat_listar: 2 } derruba as 2 próximas.
+    if (mundo.quedas && mundo.quedas[nome] > 0) { mundo.quedas[nome]--; mundo.chamadas.push({ nome, corpo, t: Date.now(), queda: true }); return rota.abort('failed'); }
     const r = await mundo.tratar(nome, corpo, req.headers());
     return rota.fulfill({ status: r.status ?? 200, headers: CORS, contentType: 'application/json', body: JSON.stringify(r.body) });
   });

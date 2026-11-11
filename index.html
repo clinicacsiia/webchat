@@ -237,6 +237,8 @@
   .hist-ultima { color: var(--texto); font-size: calc(14px * var(--esc)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .btn-w.sec { background: var(--papel); color: var(--verde); border: 1.5px solid var(--verde); }
   .widget.respondido { opacity: .6; }
+  .widget.pausado [data-motor], .widget.pausado[data-motor] > :not(.w-pausa) { opacity: .55; }
+  .widget .w-pausa { color: var(--texto); font-weight: 600; }
   .widget .w-nota { font-size: calc(13.5px * var(--esc)); color: var(--texto-suave); margin: 6px 0 0; }
 
   /* Folha (modal em tela cheia no celular) */
@@ -575,7 +577,7 @@
   const CHAVE_HIST = 'webchat.historico.v1';   // as últimas conversas deste aparelho (cada uma com o seu token): dá para voltar a elas
   const MAX_HIST = 5;                          // mínimo pedido: 3
   // Muda a cada alteração do chat. Cópia de mensagens guardada por outra versão é descartada (era isso que mostrava conversa velha e travada).
-  const VERSAO_APP = '2026.11.01-2';
+  const VERSAO_APP = '2026.11.11-1';
   const ESCALAS = [1, 1.18, 1.36], TOAST_LETRA = ['Letra normal.', 'Letra grande.', 'Letra muito grande.'];
 
   // Chegou pelo link "esqueci a senha"? O supabase-js limpa o endereço ao ler o link, então a pergunta é feita antes de criá-lo.
@@ -612,6 +614,7 @@
   const OCIO_ESCONDIDA_MS = 10 * 60 * 1000;
   // Motor de atendimento (Fase 7): quem responde é o banco, na mesma chamada. passoAtual = pergunta em aberto.
   let motorAtivo = false, passoAtual = null, ultimoMs = null;
+  let widgetsCom = '';   // situação (status|assistente) com que as perguntas na tela foram ligadas/desligadas pela última vez
   const vistos = new Set();
 
   /* ---------- utilidades ---------- */
@@ -862,7 +865,7 @@
     }
   }
   function limparConversa() {
-    el.msgs.textContent = ''; vistos.clear(); ultimoId = 0; baseServidor = 0; maiorDesenhado = 0; ultimoDia = ''; ultimoAutor = ''; statusAtual = ''; cacheMsgs = [];
+    el.msgs.textContent = ''; vistos.clear(); ultimoId = 0; baseServidor = 0; maiorDesenhado = 0; ultimoDia = ''; ultimoAutor = ''; statusAtual = ''; widgetsCom = ''; cacheMsgs = [];
     provisorias.length = 0;
     montarTopo();
   }
@@ -970,6 +973,9 @@
     el.barraHumano.hidden = !(motorAtivo && status !== 'encerrada' && status !== 'em_atendimento');
     preencherAvisoIA();
     atualizarCompor();
+    // A equipe assumiu, devolveu ao assistente ou encerrou: as perguntas do assistente na tela ligam/desligam junto.
+    const marca = status + '|' + motorAtivo;
+    if (marca !== widgetsCom) { widgetsCom = marca; atualizarWidgets(); }
   }
   // Com o assistente automático o paciente só toca nas opções; o campo de texto aparece quando a pergunta pede texto
   // ou quando quem responde é a equipe.
@@ -1218,8 +1224,19 @@
     };
   }
   // Toque numa opção ou formulário enviado: vai estruturado para o motor, que responde na mesma chamada.
+  let respondendo = false;
   async function responder(passo, valor, texto, botao) {
     if (!conv) return false;
+    if (respondendo) return false;   // uma resposta por vez (toque duplo, "Pular" logo depois de "Continuar")
+    const pedeAtendente = !!(valor && valor.acao === 'atendente');
+    if (!motorAtivo && !pedeAtendente && statusAtual !== '') {
+      // O assistente não conduz mais esta conversa: o servidor recusaria. Explica e leva ao campo de texto.
+      atualizarWidgets(); atualizarCompor();
+      toast(statusAtual === 'encerrada' ? 'Este atendimento foi encerrado.' : 'Uma pessoa da equipe está com você. Escreva sua mensagem no campo abaixo.');
+      if (!el.formEnviar.hidden) el.texto.focus();
+      return false;
+    }
+    respondendo = true;
     const temp = texto ? bolhaProvisoria(texto) : null;
     if (temp) atualizarWidgets();
     if (botao) botao.disabled = true;
@@ -1232,13 +1249,16 @@
       mostrarRespostas(data.respostas, t0);
       if (temp) soltarBolha(temp);
       mon('respondeu', { passo: passo || passoAtual, ms: ultimoMs });
+      respondendo = false;
       carregar();
       return true;
     } catch (e) {
       if (temp) soltarBolha(temp);
+      respondendo = false;
       atualizarWidgets();
-      if (botao) botao.disabled = false;
-      toast(mensagemErro(e));
+      if (botao && botao.isConnected && !botao.closest('.widget.respondido, .widget.pausado')) botao.disabled = false;
+      // 22023 = a pergunta não vale mais (respondida em outra aba ou a equipe assumiu): a conversa é relida e a tela se ajusta sozinha.
+      toast(e && e.code === '22023' ? 'Atualizei a conversa: veja a mensagem mais recente.' : mensagemErro(e));
       carregar();
       return false;
     }
@@ -1431,6 +1451,8 @@
     const o = m.opcoes;
     if (!o || typeof o !== 'object') return;
     const w = h('div', { class: 'widget', 'data-tipo': String(o.tipo) });
+    // data-motor: a resposta vai para o assistente (chat_responder), que só aceita enquanto ELE conduz a conversa.
+    if (o.tipo === 'lista' || o.tipo === 'escolha' || o.tipo === 'campos') w.dataset.motor = '1';
     if (o.tipo === 'lista') widgetLista(w, o);
     else if (o.tipo === 'escolha') widgetEscolha(w, o);
     else if (o.tipo === 'campos') widgetCampos(w, o);
@@ -1459,7 +1481,7 @@
       widgetDespedida(w, o);
     } else return;
     if (Array.isArray(o.acoes) && o.acoes.length && o.passo) {
-      w.append(h('div', { class: 'acoes-w' }, o.acoes.map((a) => h('button', { class: 'btn-w sec', type: 'button',
+      w.append(h('div', { class: 'acoes-w', 'data-motor': '1' }, o.acoes.map((a) => h('button', { class: 'btn-w sec', type: 'button',
         onclick: (ev) => responder(o.passo, a.valor, a.rotulo, ev.currentTarget) }, a.rotulo))));
     }
     pai.append(w);
@@ -2173,9 +2195,20 @@
       m.querySelectorAll('.widget').forEach((w) => {
         if (w.dataset.tipo === 'acompanhar' || w.dataset.tipo === 'nova') return;
         const ativo = i > ultimoCliente;
-        w.classList.toggle('respondido', !ativo);
-        w.querySelectorAll('input,button,select').forEach((x) => { x.disabled = !ativo; });
-        if (ativo && w._anotar && !w._anotado) { w._anotado = true; w._anotar(); }
+        // 11/11/2026: o servidor recusa a resposta a uma pergunta do assistente quando quem conduz já é a equipe
+        // ("Essa pergunta já foi respondida": 21 vezes em 24 h). A tela agora desliga esses botões e explica.
+        const pausado = ativo && !motorAtivo && statusAtual !== '' && (w.dataset.motor === '1' || !!w.querySelector('[data-motor]'));
+        const todoMotor = w.dataset.motor === '1';
+        w.classList.toggle('respondido', !ativo); w.classList.toggle('pausado', pausado);
+        w.querySelectorAll('input,button,select').forEach((x) => { x.disabled = !ativo || (pausado && (todoMotor || !!x.closest('[data-motor]'))); });
+        let nota = w.querySelector(':scope > .w-pausa');
+        if (pausado && !nota) { nota = h('p', { class: 'w-nota w-pausa', role: 'status' }); w.append(nota); }
+        if (nota) {
+          nota.hidden = !pausado;
+          nota.textContent = statusAtual === 'em_atendimento' ? 'Uma pessoa da equipe está com você agora. Escreva sua resposta no campo aqui embaixo.'
+            : statusAtual === 'encerrada' ? 'Este atendimento foi encerrado.' : 'Seu pedido já está com a equipe. Escreva no campo aqui embaixo se quiser acrescentar algo.';
+        }
+        if (ativo && !pausado && w._anotar && !w._anotado) { w._anotado = true; w._anotar(); }
       });
     });
   }

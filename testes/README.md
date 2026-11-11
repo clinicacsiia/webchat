@@ -1,8 +1,28 @@
 # Testes
 
+Versão 1.1 — 11/11/2026 / Mudança: testes contra o clone da produção, sincronismo telas x banco e cadeia `npm test` completa (69 suítes)
 Versão 1.0 — 30/10/2026 / Mudança: Implementação inicial
 
 Esta pasta **não vai para o GitHub Pages** (o site publica a raiz, mas nenhuma página aponta para cá) e não é lida pelo painel. Serve para repetir, em qualquer máquina, a bateria que sustenta a auditoria de `docs/auditoria-2026-10-30.md`.
+
+## Novidade de 11/11/2026: testes contra o banco real
+
+Até 11/11/2026 os testes de banco usavam os arquivos `supabase/*.sql`, que **não batiam com a produção** (31 funções diferentes, 52 só no banco). Agora existe o retrato da produção em `supabase/producao/` e estes testes rodam em cima dele:
+
+| Comando | O que prova | Resultado em 11/11/2026 |
+|---|---|---|
+| `npm run test:retrato` | Sincronismo: cada função que as 3 telas chamam existe no banco com os mesmos parâmetros e permissões; rotinas e gatilhos apontam para funções que existem; nenhuma função chama outra que não existe; toda tabela com RLS. Sem banco, 1 segundo | 10 de 10 |
+| `npm run test:producao-sql` | Monta o clone da produção e, para cada defeito da auditoria, primeiro **reproduz** com a função antiga (`antes-da-auditoria-1111/`) e depois confere a correção: avalanche de avisos, "Agendado" rápido com resposta idêntica, mapa do corpo guardado, limpeza, segurança | 29 de 29 |
+| `npm run test:ponta-a-ponta` | Com o **código real do banco**: paciente do "Começar" ao pedido enviado (exame e consulta), horário reservado, limites, token errado, paciente logado sem acesso, equipe assumindo, respondendo e encerrando, reabertura em 2 dias, rotinas do sistema | 19 de 19 |
+| `npm run test:equipe-assume` | Chat no navegador: a equipe assume e as perguntas do assistente se desligam; corrida; uma resposta por vez; falha de rede isolada não vira alarme | 9 de 9 |
+| `npm run test:painel-recarga` | Painel no navegador com o tempo real do Supabase simulado: consultas pesadas não se repetem a cada mensagem; nunca duas releituras ao mesmo tempo | 4 de 4 |
+| `npm run retrato:montar` | Só monta o clone e diz se algum comando do retrato não entrou | 425 funções, 101 tabelas |
+
+`banco-producao.mjs` é a peça que monta o clone (Postgres embutido + Supabase simulado + as chaves de `config` como estão na produção). Qualquer teste novo de banco deve partir dele: `const { db } = await criarBancoProducao()`.
+
+Depois de mudar o banco, refaça o retrato (`supabase/producao/LEIAME.md`), senão estes testes conferem o banco de ontem.
+
+Para simular outra hora do dia (um teste já falhou só das 21h às 00h20): `RELOGIO_UTC=01:10 node --import ./relogio-falso.mjs sql-pessoa.test.mjs`.
 
 ## Como rodar
 

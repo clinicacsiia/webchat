@@ -1560,7 +1560,20 @@
     if (!marcarPresenca.ligado) { marcarPresenca.ligado = true; document.addEventListener('visibilitychange', () => { if (S.me && !document.hidden) db.rpc('painel_presenca').then(() => {}); }); }
   }
   function desligarTempoReal() { if (S.canal) { db.removeChannel(S.canal); S.canal = null; } }
-  function agendarRecarga() { clearTimeout(tRecarga); tRecarga = setTimeout(async () => { await carregarConversas(); if (S.aba === 'atendimento') { renderLista(); renderTopoChat(); renderPessoaChat(); renderAlertaPreco(); renderAnexosBox(); carregarPre(); if (S.modo === 'quadro') carregarQuadro(); } atualizarSelo(); }, 250); }
+  // Uma releitura por vez: o que chegar ENQUANTO a lista está sendo lida vira uma única releitura depois (antes, cada evento disparava a sua,
+  // e num pico várias leituras completas corriam ao mesmo tempo, travando a tela e pesando o banco).
+  let recarregando = false, recargaDeNovo = false;
+  async function recarregarAgora() {
+    if (recarregando) { recargaDeNovo = true; return; }
+    recarregando = true;
+    try {
+      await carregarConversas();
+      if (S.aba === 'atendimento') { renderLista(); renderTopoChat(); renderPessoaChat(); renderAlertaPreco(); renderAnexosBox(); carregarPre(); if (S.modo === 'quadro') carregarQuadro(); }
+      atualizarSelo();
+    } catch { /* a próxima releitura tenta de novo */ }
+    finally { recarregando = false; if (recargaDeNovo) { recargaDeNovo = false; agendarRecarga(); } }
+  }
+  function agendarRecarga() { clearTimeout(tRecarga); tRecarga = setTimeout(recarregarAgora, 250); }
   // Reserva dos cards do topo (11/2026): o tempo real é o caminho principal, mas se a aba ficou escondida ou a conexão caiu os cards ficavam velhos até um recarregamento.
   // Aqui o painel relê as conversas ao voltar para a aba, a cada minuto se o tempo real estiver caído (a cada 3 min se estiver de pé) e na virada do dia.
   // Se a releitura achar números diferentes dos que estavam na tela, anota em localStorage 'painel_defasagem' (últimos 50) e no console.
@@ -1574,8 +1587,8 @@
     console.warn('[painel] cards estavam defasados (' + motivo + '):', antes, '=>', depois);
   }
   async function conferirCards(motivo) {
-    if (reservaOcupada || !S.me || !podeAtender() || document.hidden) return;
-    reservaOcupada = true;
+    if (reservaOcupada || recarregando || !S.me || !podeAtender() || document.hidden) return;   // já há uma releitura em andamento: ela atualiza os cards
+    reservaOcupada = true; recarregando = true;
     try {
       const lerCards = () => (document.getElementById('kpis') || {}).textContent || '';
       const antes = lerCards();
@@ -1584,7 +1597,7 @@
       atualizarSelo();
       const depois = lerCards();
       if (motivo !== 'virada do dia' && antes && depois && antes !== depois) registrarDefasagem(motivo, antes, depois);
-    } catch { /* tenta de novo na próxima */ } finally { reservaOcupada = false; }
+    } catch { /* tenta de novo na próxima */ } finally { reservaOcupada = false; recarregando = false; if (recargaDeNovo) { recargaDeNovo = false; agendarRecarga(); } }
   }
   setInterval(() => {
     if (!S.me || !podeAtender() || document.hidden) return;
@@ -1792,15 +1805,26 @@
   /* ---------- a mesma pessoa em várias conversas, exame em aberto e remarcação (supabase/pessoa-unica.sql) ---------- */
   // Leitura do que o banco já agrupou: conversas da mesma pessoa viram UMA na lista e no chat (nada é apagado nem movido).
   // Se o SQL ainda não foi aplicado, as consultas falham em silêncio e a tela funciona como antes (uma conversa por linha).
-  async function carregarPessoas() {
+  // 11/11/2026: as sugestões de "mesma pessoa" e os avisos de data cruzam TODAS as conversas de 120 dias no banco. Eram refeitas a cada
+  // mensagem que chegava, em cada painel aberto (15 mil chamadas, a consulta mais cara do banco). Elas só mudam quando a rotina de 5 minutos
+  // agrupa ou quando a equipe decide algo: agora são relidas no máximo 1 vez por minuto, e na hora quando a equipe age ou abre os Avisos.
+  const PESADO_MIN_MS = 60000;
+  let pesadoEm = 0, pesadoDe = null;   // quando e para quem (conta logada) a leitura pesada foi feita
+  async function carregarPessoas(forcarAvisos) {
     const vazio = () => ({ error: true, data: null });
+    const eu = S.me ? S.me.id : null;
+    // forcarAvisos: true = relê já; um número = relê se a última leitura pesada tem mais que isso (em ms); sem nada = no máximo 1 vez por minuto.
+    const idadeMax = typeof forcarAvisos === 'number' ? forcarAvisos : PESADO_MIN_MS;
+    const pesado = forcarAvisos === true || !pesadoEm || pesadoDe !== eu || Date.now() - pesadoEm >= idadeMax;
+    if (pesado) { pesadoEm = Date.now(); pesadoDe = eu; }
     const [g, ab, rm, su, ad, ap] = await Promise.all([
       Promise.resolve(db.from('conversa_grupo').select('conversa_id,grupo_id,sinais,origem,confirmado_por')).then((r) => r, vazio),
       Promise.resolve(db.from('v_agendamento_aberto').select('pre_id,conversa_id,chave,quando,exames,passou,unidade')).then((r) => r, vazio),
       Promise.resolve(db.from('v_remarcacao_pendente').select('fechamento_id,conversa_id,exames,quando,desfecho,remarcacao')).then((r) => r, vazio),
-      Promise.resolve(db.rpc('pessoa_sugestoes')).then((r) => r, vazio),
-      Promise.resolve(db.rpc('pessoa_avisos_data')).then((r) => r, vazio),
+      pesado ? Promise.resolve(db.rpc('pessoa_sugestoes')).then((r) => r, vazio) : { error: null, data: S.sugestoes || [] },
+      pesado ? Promise.resolve(db.rpc('pessoa_avisos_data')).then((r) => r, vazio) : { error: null, data: S.avisosData || [] },
       Promise.resolve(db.rpc('paciente_avisos')).then((r) => r, vazio)]);
+    if (pesado && (su.error || ad.error)) pesadoEm = 0;   // falhou: tenta de novo na próxima leitura
     // Pedidos de acesso da equipe (e-mail já confirmado): só o administrador recebe linhas.
     const pa = ehAdmin() ? await Promise.resolve(db.rpc('equipe_pedidos')).then((r) => r, vazio) : vazio();
     S.pedidosAcesso = pa.error || !Array.isArray(pa.data) ? [] : pa.data;
@@ -1850,7 +1874,7 @@
   const listaPt = (xs) => (xs.length > 1 ? xs.slice(0, -1).join(', ') + ' e ' + xs[xs.length - 1] : xs.join(''));
   const quandoCurto = (q) => (q ? `${String(q).slice(8, 10)}/${String(q).slice(5, 7)} às ${String(q).slice(11, 16)}` : '');
   async function recarregarPessoas() {
-    await carregarPessoas();
+    await carregarPessoas(true);   // a equipe acabou de decidir algo: relê tudo
     atualizarSeloAvisos();
     if (S.aba === 'avisos') { renderAvisos(); return; }
     if (S.aba !== 'atendimento') return;
@@ -1962,7 +1986,7 @@
   }
   async function viewAvisos(c) {
     c.append(h('div', { class: 'pagina', id: 'paginaAvisos' }, h('h2', {}, 'Avisos'), h('p', { class: 'sub' }, 'Carregando…')));
-    try { await carregarPessoas(); } catch { /* mostra o que já tem */ }
+    try { await carregarPessoas(3000); } catch { /* mostra o que já tem */ }   // dado fresco ao abrir a aba (sem repetir se a tela for redesenhada em seguida)
     atualizarSeloAvisos(); renderAvisos();
   }
   // Faixa do chat: conversas unidas + exames em aberto + remarcações pendentes da mesma pessoa.

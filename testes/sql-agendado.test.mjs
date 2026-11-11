@@ -1,4 +1,5 @@
 // FLUXOGRAMA: entrada (supabase/encerramento-motivo.sql + encerramento-agendado.sql e as funções reais papel_atual, nome_confere, pessoa_membros e conversa_exame_aberto_trg, num Postgres embutido) -> validação (chave config.encerramento_valida_agendado desligada e ligada; usuário do painel x sistema) -> lógica (Agendado NUNCA é recusado; a conferência de agendamento vigente pelo chat ou pelo Klingo roda depois: confirma, avisa se não achou no prazo, se o Klingo está com problema, se o exame sumiu ou mudou de data; exame marcado nunca barra o encerramento) -> saída (PASS/FAIL por caso).
+// Versão 1.3 — 11/11/2026 / Mudança: os cenários rodam com a consulta nova de agendado-rapido.sql
 // Versão 1.2 — 09/11/2026 / Mudança: nenhuma regra de exame em aberto barra mais o encerramento pela equipe
 // Versão 1.1 — 09/11/2026 / Mudança: encerrar como Agendado nunca é recusado; testes da conferência em segundo plano e do aviso
 // Versão 1.0 — 09/11/2026 / Mudança: Implementação inicial (WC-04)
@@ -37,6 +38,10 @@ await db.exec(`
 const sql1 = readFileSync(`${REPO}/supabase/encerramento-motivo.sql`, 'utf8'), sql2 = readFileSync(`${REPO}/supabase/encerramento-agendado.sql`, 'utf8');
 
 await caso('os dois arquivos aplicam sem erro e podem ser aplicados de novo', async () => { await db.exec(sql1); await db.exec(sql2); await db.exec(sql1); await db.exec(sql2); return { ok: true }; });
+// 11/11/2026: todos os cenários abaixo passam a rodar com a consulta nova (agendado-rapido.sql), que substitui a PARTE 2 do arquivo acima.
+await caso('agendado-rapido.sql (consulta nova da auditoria de 11/11/2026) aplica por cima sem erro, duas vezes', async () => {
+  const sql3 = readFileSync(`${REPO}/supabase/agendado-rapido.sql`, 'utf8'); await db.exec(sql3); await db.exec(sql3); return { ok: true };
+});
 await db.exec(`
   create trigger conversas_antes_update before update on public.conversas for each row execute function public.conversa_antes_update();
   create trigger conversas_apos_update after update on public.conversas for each row execute function public.conversa_status_mudou();
