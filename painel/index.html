@@ -348,6 +348,7 @@
   .atalho-pop button:hover, .atalho-pop button[aria-selected=true] { background: var(--csi-primary-soft); }
   .atalho-pop b { margin-right: 8px; } .atalho-pop span { color: var(--suave); font-size: 13px; }
   .at-lista { list-style: none; padding: 0; margin: 14px 0; display: grid; gap: 8px; } .at-lista li { display: flex; gap: 12px; align-items: flex-start; justify-content: space-between; border: 1px solid var(--csi-border-strong); border-radius: var(--radius-md); padding: 10px 12px; }
+  .at-vars { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
   .at-lista code { font-weight: 700; } .at-lista p { margin: 4px 0 0; white-space: pre-wrap; } .at-form { border: 1px solid var(--csi-primary); border-radius: var(--radius-md); padding: 12px; margin: 14px 0; display: grid; gap: 8px; } .at-form label { display: grid; gap: 3px; font-weight: 600; }
   .compor textarea { resize: none; min-height: 44px; max-height: 140px; border-radius: 22px; padding: 11px 16px; }
   .compor .btn { height: 44px; border-radius: 22px; padding: 0 20px; }
@@ -2714,6 +2715,34 @@
     if (error) throw error;
     return (S.atalhos = data || []);
   }
+  // Variáveis das respostas prontas: {nome} vira o dado da conversa aberta. Sem o dado, a variável fica escrita no texto para o atendente preencher.
+  const ATALHO_VARS = [['nome', 'Primeiro nome de quem escreve'], ['paciente', 'Primeiro nome do paciente (se for filho, o da criança)'], ['nome_completo', 'Nome completo de quem escreve'], ['atendente', 'Seu primeiro nome'],
+    ['saudacao', 'Bom dia, Boa tarde ou Boa noite'], ['exame', 'Exame(s) do pedido'], ['data', 'Data do horário escolhido'], ['hora', 'Hora do horário escolhido'], ['unidade', 'Unidade do horário'], ['plano', 'Convênio / plano'], ['medico', 'Profissional']];
+  const bonito = (t) => String(t || '').trim().toLowerCase().replace(/(^|\s)([a-zà-ú])/g, (m, a, b) => a + b.toUpperCase());
+  const primeiroNome = (t) => bonito(String(t || '').trim().split(/\s+/)[0]);
+  function valoresAtalho() {
+    const c = conversaAberta() || {}, p = S.pre || null, ab = c.id ? abertosDe(c.id)[0] : null;
+    const quem = c.nome_informado || (c.contatos && c.contatos.nome) || '';
+    const pac = c.paciente_tipo === 'filho' && c.paciente_nome ? c.paciente_nome : quem;
+    const itens = (S.preItens || []).map((i) => i.procedimento).filter(Boolean);
+    const hor = p && Array.isArray(p.escolha_horario) && p.escolha_horario[0] ? p.escolha_horario[0] : null;
+    const hora = new Date().getHours();
+    return {
+      nome: primeiroNome(quem), paciente: primeiroNome(pac), nome_completo: bonito(quem), atendente: primeiroNome(S.me && S.me.nome),
+      saudacao: hora < 12 ? 'Bom dia' : hora < 18 ? 'Boa tarde' : 'Boa noite',
+      exame: itens.length ? listaPt(itens) : (ab && ab.exames) || '',
+      data: hor ? dataBR(hor.data) : (ab && ab.quando ? String(ab.quando).slice(8, 10) + '/' + String(ab.quando).slice(5, 7) : ''),
+      hora: hor ? String(hor.hora || '') : (ab && ab.quando ? String(ab.quando).slice(11, 16) : ''),
+      unidade: hor && hor.unidade ? curtaUnidade(hor.unidade) : (p && p.unidade ? curtaUnidade(p.unidade) : ''),
+      plano: (p && p.plano) || '', medico: (p && p.profissional) || ''
+    };
+  }
+  function aplicarVariaveis(texto) {
+    const v = valoresAtalho(), faltou = [];
+    const out = texto.replace(/\{([a-z_]+)\}/g, (m, k) => { if (!(k in v)) return m; if (!v[k]) { faltou.push(m); return m; } return v[k]; });
+    if (faltou.length) toast('Sem dado nesta conversa para ' + [...new Set(faltou)].join(', ') + '. Preencha à mão antes de enviar.');
+    return out;
+  }
   // Digitar "/" no começo da caixa (ou depois de um espaço) abre a lista; setas e Enter/Tab escolhem; Esc fecha.
   function ligarAtalhos(area) {
     const pop = h('div', { class: 'atalho-pop', role: 'listbox', 'aria-label': 'Respostas prontas', hidden: true });
@@ -2723,8 +2752,9 @@
       const pos = area.selectionStart, ini = area.value.slice(0, pos).search(/(^|\s)\/[^\s/]*$/);
       if (ini < 0) return fechar();
       const de = ini + (area.value[ini] === '/' ? 0 : 1);
-      area.value = area.value.slice(0, de) + r.texto + area.value.slice(pos);
-      const fim = de + r.texto.length; area.setSelectionRange(fim, fim);
+      const txt = aplicarVariaveis(r.texto);
+      area.value = area.value.slice(0, de) + txt + area.value.slice(pos);
+      const fim = de + txt.length; area.setSelectionRange(fim, fim);
       area.dispatchEvent(new Event('input')); fechar(); area.focus();
     };
     const desenhar = () => pop.replaceChildren(...itens.map((r, i) => h('button', { type: 'button', role: 'option', 'aria-selected': String(i === sel), onmousedown: (e) => { e.preventDefault(); escolher(r); } },
@@ -2763,7 +2793,11 @@
           formBox.replaceChildren(); toast('Resposta pronta salva.'); await recarregar();
         } catch (e) { toast(msgErro(e)); } finally { ok.disabled = false; }
       });
-      formBox.replaceChildren(h('div', { class: 'at-form' }, h('label', {}, 'Atalho (sem a barra)', fa), h('label', {}, 'Resposta', ft),
+      const inserir = (k) => { const a = ft.selectionStart ?? ft.value.length, b = ft.selectionEnd ?? a, v = '{' + k + '}'; ft.value = ft.value.slice(0, a) + v + ft.value.slice(b); ft.focus(); ft.setSelectionRange(a + v.length, a + v.length); };
+      const vars = h('div', { class: 'at-vars', role: 'group', 'aria-label': 'Variáveis' }, h('span', { class: 'dica' }, 'Inserir variável:'),
+        ...ATALHO_VARS.map(([k, d]) => h('button', { type: 'button', class: 'chip', title: d + ' — vira o dado de cada paciente', onclick: () => inserir(k) }, '{' + k + '}')));
+      formBox.replaceChildren(h('div', { class: 'at-form' }, h('label', {}, 'Atalho (sem a barra)', fa), h('label', {}, 'Resposta', ft), vars,
+        h('p', { class: 'dica' }, 'Ex.: “{saudacao}, {nome}! Seu {exame} está marcado para {data} às {hora}.” Na conversa, cada variável vira o dado do paciente; se faltar o dado, ela fica escrita para você preencher.'),
         h('div', { class: 'ex-acoes' }, ok, h('button', { type: 'button', class: 'btn', onclick: () => formBox.replaceChildren() }, 'Cancelar'))));
       fa.focus();
     };
