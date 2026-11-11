@@ -109,3 +109,6 @@ Achado da auditoria: o contador de alertas chegou a ~300, com cartões "Pedido p
 - **Ainda manual:** redistribuir os "sem responsável" depende de cadastrar a escala (item 3 de "O que ainda falta"). Assumir/Resolver não foi testado em dado real.
 - Não depende dos relatórios pendentes do Klingo.
 - **Expiração geral (mesmo dia, 2ª parte):** qualquer aviso do sistema (confirmar presença, remarcar, horário) de cartão parado há mais de `expira_horas` também fecha sozinho, sem ser recriado. Aplicado no Supabase como `jornada_alerta_expiracao_geral`.
+
+## Filtro "Só do chat e no Klingo" (11/11/2026)
+Botão na barra de filtros da Jornada, **ligado por padrão** (a escolha de desligar fica guardada no aparelho). Mostra só quem **já conversou no chat** (cartão com conversa) **e já está cadastrado no Klingo** (cartão com prontuário, não "conv:" nem "manual:"). Vale para o quadro **e** para "Precisam de atenção agora", a barra de aviso e o selo da aba. Desligado, volta a mostrar todos. Não depende de relatório novo do Klingo.

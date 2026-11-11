@@ -63,7 +63,7 @@ async function pagina(browser, { semSql = false, perguntaCanal = 'botoes' } = {}
   await ctx.addInitScript(([id, token, email]) => {
     localStorage.setItem('sb-nrvuynjwcgwpjdptkiay-auth-token', JSON.stringify({ access_token: token, refresh_token: 'x', token_type: 'bearer', expires_in: 86400, expires_at: Math.floor(Date.now() / 1000) + 86400,
       user: { id, aud: 'authenticated', role: 'authenticated', email, app_metadata: {}, user_metadata: {} } }));
-    try { localStorage.removeItem('painel.modo'); localStorage.removeItem('painel.jagrupar'); } catch {}
+    try { localStorage.removeItem('painel.modo'); localStorage.removeItem('painel.jagrupar'); localStorage.setItem('painel.jsochat', '0'); } catch {}
   }, [EU.id, jwt(EU.id), EU.email]);
   const reg = { excecoes: [], pedidos: [], rpcs: [], posts: [], patches: [] };
   const page = await ctx.newPage();
