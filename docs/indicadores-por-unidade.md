@@ -63,3 +63,4 @@ Atenção: o id da marcação no Klingo tem "m" na frente (`m22544`), diferente 
 - **4. Avaliações dos pacientes** (só administrador): total, nota do atendimento, nota do site e canal de origem. Voltaram a pedido do dono.
 - Banco: `supabase/indicadores-atendentes.sql` (aplicado em 11/11/2026; `painel_indicadores_atendentes`; ROLLBACK no cabeçalho). Sem ele a seção avisa qual arquivo rodar.
 - Teste: `npm run test:indicadores` (19 verificações).
+- **Quem respondeu primeiro (11/11/2026):** sem registro novo: a primeira mensagem de atendente de cada conversa abre o "primeiro a responder" (vale também para o histórico). A aba mostra, por atendente, quantas conversas respondeu primeiro e a **mediana de minutos** até essa resposta (verde = mais rápido, vermelho > 30 min). Conversas contadas pelo dia em que abriram. Mesmo arquivo `supabase/indicadores-atendentes.sql` (reaplicado).

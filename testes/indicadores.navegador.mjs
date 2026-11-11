@@ -46,7 +46,7 @@ const DECISAO = (a) => {
   return { periodo: { de: a.p_de, ate: a.p_ate }, anterior_periodo: { de: mais(a.p_de, -1), ate: mais(a.p_de, -1) }, unidade: un, incluir_teste: !!a.p_incluir_teste, gerado_em: agora, atual, anterior };
 };
 const ATENDENTES = (a) => ({ periodo: { de: a.p_de, ate: a.p_ate }, unidade: a.p_unidade, gerado_em: agora, nota_media_geral: 8.5,
-  pessoas: [{ nome: 'Ana', conversas: 40, agendados: 12, avaliacoes: 8, nota_media: 9.4 }, { nome: 'Bia', conversas: 25, agendados: 3, avaliacoes: 2, nota_media: 6.5 }, { nome: 'Caio', conversas: 10, agendados: 0, avaliacoes: 0, nota_media: null }] });
+  pessoas: [{ nome: 'Ana', conversas: 40, agendados: 12, avaliacoes: 8, nota_media: 9.4, primeiras: 30, espera_mediana_min: 6 }, { nome: 'Bia', conversas: 25, agendados: 3, avaliacoes: 2, nota_media: 6.5, primeiras: 9, espera_mediana_min: 45 }, { nome: 'Caio', conversas: 10, agendados: 0, avaliacoes: 0, nota_media: null, primeiras: 1, espera_mediana_min: 12 }] });
 const EXTRAS = (admin) => ({ por_hora: [], pedidos: {}, avaliacoes: admin ? { total: 10, media_atendimento: 8.5, media_site: 7.9, por_canal: { WhatsApp: 4, Instagram: 5, Google: 1 } } : null });
 const jwt = (sub) => { const b = (o) => Buffer.from(JSON.stringify(o)).toString('base64url'); return `${b({ alg: 'HS256', typ: 'JWT' })}.${b({ sub, role: 'authenticated', exp: Math.floor(Date.now() / 1000) + 86400 })}.x`; };
 
@@ -251,7 +251,9 @@ await caso('Equipe: barras por atendente (conversas, agendamentos, nota) com o m
   const forte = await t.page.locator('.ind-linha.forte', { hasText: 'Ana' }).count();
   await t.ctx.close();
   return { ok: por('Conversas atendidas').linhas[0].startsWith('Ana') && /40/.test(por('Conversas atendidas').linhas[0]) && por('Agendamentos feitos').linhas.map((l) => l.split(' ')[0]).join() === 'Ana,Bia,Caio'
-    && /9,4 · 8 aval\./.test(por('Nota média').linhas[0]) && /6,5 · 2 aval\. \(poucas\)/.test(por('Nota média').linhas[1]) && por('Nota média').linhas.length === 2 && forte >= 2, detalhe: JSON.stringify(paineis.slice(-3)) };
+    && /9,4 · 8 aval\./.test(por('Nota média').linhas[0]) && /6,5 · 2 aval\. \(poucas\)/.test(por('Nota média').linhas[1]) && por('Nota média').linhas.length === 2 && forte >= 2
+    && por('Quem respondeu primeiro').linhas[0].startsWith('Ana') && /30/.test(por('Quem respondeu primeiro').linhas[0])
+    && por('Rapidez').linhas.map((l) => l.split(' ')[0]).join() === 'Ana,Caio,Bia' && /6 min · 30 conversas/.test(por('Rapidez').linhas[0]) && /45 min · 9 conversas/.test(por('Rapidez').linhas[2]), detalhe: JSON.stringify(paineis.slice(-3)) };
 });
 await caso('Avaliações dos pacientes voltaram: só o administrador vê; atendente comum não', async () => {
   const adm = await abrir({ admin: true }); await abaInd(adm);
