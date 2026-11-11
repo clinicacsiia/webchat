@@ -63,8 +63,11 @@ export function avaliar(alvo: Alvo, linhas: Linha[]): Resultado {
     const nomeLinha = normNome(l.nome);
     return nomeLinha && alvo.procs.length > 0 && alvo.nomes.some((x) => normNome(x) === nomeLinha) ? "nome" : null;
   };
+  // Horário reconhecido direto do Klingo (origem 'klingo', relatório #13825) não traz médico e a unidade vem com nome curto ("DESENVOAR"),
+  // diferente do #7. Médico ou unidade vazios não restringem; unidade igual ou contida no outro nome vale (antes isso gerava "sumiu do Klingo" falso).
+  const unidadeBate = (a: string, b: string) => !a || !b || a === b || a.includes(b) || b.includes(a);
   const naPosicao = (l: Linha, s: Slot) =>
-    l.prof === s.prof && l.unidade === s.unidade && (s.chegada ? l.dia === s.data : l.ini === `${s.data} ${s.hora}`);
+    (!s.prof || l.prof === s.prof) && unidadeBate(l.unidade, s.unidade) && (s.chegada ? l.dia === s.data : l.ini === `${s.data} ${s.hora}`);
 
   let via: Via | null = null;
   const slots = alvo.slots.map((s) => {

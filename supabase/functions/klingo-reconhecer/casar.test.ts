@@ -34,7 +34,7 @@ test("traz a data, a hora e a unidade reais do Klingo", () => {
   assert.equal(r.marcacoes.length, 1); assert.equal(r.marcacoes[0].para, "2026-12-09 09:20:00"); assert.equal(r.marcacoes[0].unidade, "CSI Pediatria"); assert.equal(r.marcacoes[0].compat, "exato");
 });
 test("marcação feita ANTES da conversa não é agendamento do pedido; cancelada também não", () => {
-  assert.equal(casar(alvo(), [linha({ col3: "2026-10-01 10:00:00" })]).marcacoes.length, 0);
+  assert.equal(casar(alvo(), [linha({ col3: "2026-10-01 10:00:00", col4: "2026-10-20 08:00:00" })]).marcacoes.length, 0);
   assert.equal(casar(alvo(), [linha({ col12: "Cancelada" })]).marcacoes.length, 0);
   assert.equal(casar(alvo(), [linha({ col3: "2026-11-09 09:55:00" })]).marcacoes.length, 1, "9:55 (12:55Z) é depois de 12:50Z - 1h");
 });
@@ -82,9 +82,9 @@ test("prontuário conferido: sem marcação desse prontuário, volta à regra de
   const r = casar(alvo({ prontuarios: ["000001"] }), [linha()]);
   assert.equal(r.marcacoes.length, 1); assert.equal(r.por_prontuario, false); assert.equal(r.identidade, "forte");
 });
-test("prontuário conferido: marcação anterior à conversa, cancelada ou de outro exame continua não valendo", () => {
+test("prontuário conferido: exame que já passou antes da conversa, cancelada ou de outro exame continua não valendo", () => {
   const a = alvo({ nome: "Fulano", prontuarios: ["129808"] });
-  assert.equal(casar(a, [linha({ col3: "2026-10-01 10:00:00" })]).marcacoes.length, 0);
+  assert.equal(casar(a, [linha({ col3: "2026-10-01 10:00:00", col4: "2026-10-20 08:00:00" })]).marcacoes.length, 0);
   assert.equal(casar(a, [linha({ col12: "Cancelada" })]).marcacoes.length, 0);
   const o = casar(alvo({ itens: ["RM DE JOELHO"], prontuarios: ["129808"] }), [linha()]);
   assert.equal(o.marcacoes.length, 0); assert.equal(o.outros_exames, 1);
@@ -94,10 +94,27 @@ test("prontuário conferido: dois prontuários conferidos com marcação na mesm
   assert.equal(r.ambiguo, true); assert.equal(r.marcacoes.length, 0);
 });
 test("prontuário conferido sem marcação útil (só uma antiga): cai na regra de sempre; dois cadastros de mesmo nome completo continuam ambíguos (a atendente decide)", () => {
-  const velha = linha({ col0: "10", col2: "129808", col3: "2026-10-01 10:00:00" });
+  const velha = linha({ col0: "10", col2: "129808", col3: "2026-10-01 10:00:00", col4: "2026-10-20 08:00:00" });
   const nova = linha({ col0: "20", col2: "888888" });   // cadastro duplicado no Klingo, nome e telefone iguais, feita depois da conversa
   const r = casar(alvo({ prontuarios: ["129808"] }), [velha, nova]);
   assert.equal(r.ambiguo, true); assert.equal(r.marcacoes.length, 0); assert.equal(r.por_prontuario, false);
   const soNova = casar(alvo({ prontuarios: ["129808"] }), [nova]);
   assert.deepEqual(soNova.marcacoes.map((m) => m.id), ["20"], "sem a marcação antiga do outro cadastro, a regra de sempre reconhece");
+});
+
+test("prontuário conferido: marcação feita ANTES da conversa vale se o exame ainda não passou", () => {
+  const antes = linha({ col3: "2026-11-01 09:00:00", col4: "2026-12-02 08:00:00" });
+  const r = casar(alvo({ prontuarios: ["129808"] }), [antes]);
+  assert.equal(r.marcacoes.length, 1);
+  assert.equal(r.identidade, "forte");
+});
+
+test("prontuário conferido: exame que já passou antes da conversa não vale", () => {
+  const passado = linha({ col3: "2026-10-01 09:00:00", col4: "2026-10-20 08:00:00" });
+  assert.equal(casar(alvo({ prontuarios: ["129808"] }), [passado]).marcacoes.length, 0);
+});
+
+test("só pelo nome (sem prontuário) a marcação anterior à conversa continua não valendo", () => {
+  const antes = linha({ col3: "2026-11-01 09:00:00", col4: "2026-12-02 08:00:00" });
+  assert.equal(casar(alvo(), [antes]).marcacoes.length, 0);
 });
