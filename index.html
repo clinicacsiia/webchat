@@ -511,10 +511,9 @@
         </label>
       </div>
       <div class="aviso-form" id="avisoForm">
-        <p>Importante: os dias e horários que mostramos aqui são uma <b>previsão de agendamento</b>. Quem confirma o seu agendamento é <b>uma pessoa da nossa equipe</b>.</p>
         <label class="aceite">
           <input type="checkbox" id="fPrevisao">
-          <span>Estou ciente de que os horários são uma previsão e que a equipe confirma o agendamento.</span>
+          <span>Entendi: os horários são só uma <b>previsão</b>. Uma <b>pessoa da equipe</b> confirma.</span>
         </label>
       </div>
       <p class="erro-form" id="erroForm" role="alert"></p>
@@ -577,7 +576,7 @@
   const CHAVE_HIST = 'webchat.historico.v1';   // as últimas conversas deste aparelho (cada uma com o seu token): dá para voltar a elas
   const MAX_HIST = 5;                          // mínimo pedido: 3
   // Muda a cada alteração do chat. Cópia de mensagens guardada por outra versão é descartada (era isso que mostrava conversa velha e travada).
-  const VERSAO_APP = '2026.11.11-1';
+  const VERSAO_APP = '2026.11.11-2';
   const ESCALAS = [1, 1.18, 1.36], TOAST_LETRA = ['Letra normal.', 'Letra grande.', 'Letra muito grande.'];
 
   // Chegou pelo link "esqueci a senha"? O supabase-js limpa o endereço ao ler o link, então a pergunta é feita antes de criá-lo.
@@ -780,8 +779,8 @@
     const b = document.createElement('button');
     b.type = 'button'; b.className = 'unidade'; b.setAttribute('role', 'radio'); b.setAttribute('aria-checked', String(marcado));
     const t = document.createElement('strong'); t.textContent = titulo;
-    const d = document.createElement('span'); d.textContent = texto;
-    b.append(t, d); b.addEventListener('click', aoClicar);
+    b.append(t); if (texto) { const d = document.createElement('span'); d.textContent = texto; b.append(d); }
+    b.addEventListener('click', aoClicar);
     return b;
   }
   // Texto da caixa de aceite do formulário. Para criança, o responsável legal consente em nome dela (LGPD, art. 14).
@@ -793,7 +792,7 @@
   }
   function desenharQuem() {
     const quem = (tipo, titulo, texto) => cartao(titulo, texto, !!escolha && escolha.tipo === tipo, () => { escolha = { tipo }; el.erroForm.textContent = ''; desenharQuem(); });
-    el.fQuem.replaceChildren(quem('proprio', 'Para mim', 'Sou o paciente (adulto)'), quem('filho', 'Para meu filho(a)', 'Sou o responsável'));
+    el.fQuem.replaceChildren(quem('proprio', 'Para mim', ''), quem('filho', 'Para meu filho(a)', ''));
     const filho = !!escolha && escolha.tipo === 'filho';
     el.lNome.textContent = filho ? 'Seu nome (responsável)' : 'Seu nome completo';
     const at = $('#aceiteTxt'); if (at) at.replaceChildren(...textoAceite(filho));
@@ -2888,7 +2887,7 @@
   function atualizarContaUI(semForm) {
     el.faixaConta.hidden = !loginAtivo;
     el.btnContaEntrar.hidden = el.btnContaCriar.hidden = !!conta; el.btnContaSair.hidden = el.btnContaDados.hidden = !conta;
-    el.faixaContaTxt.textContent = conta ? 'Conta: ' + conta.email : 'Já tem conta?';
+    el.faixaContaTxt.textContent = conta ? 'Conta: ' + conta.email : '';
     el.btnSair.textContent = conta ? 'Sair da conta' : 'Sair (não sou eu)';
     if (!semForm && !el.telaInicio.hidden) mostrarForm(!!escolha);   // refaz o formulário já com (ou sem) os dados da conta
   }

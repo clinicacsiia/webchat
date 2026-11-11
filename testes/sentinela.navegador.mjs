@@ -120,7 +120,7 @@ await caso('formulário inicial: avisa que é uma PREVISÃO, que uma pessoa conf
   await page.click('#fQuem .unidade >> nth=0'); await page.fill('#fNome', 'Ana'); await page.fill('#fTel', '71999998888'); await page.fill('#fEmail', 'a@b.co'); await page.check('#fAceite');
   await page.click('#btnIniciar'); await page.waitForTimeout(300);
   const erro = (await page.locator('#erroForm').innerText()).trim(); const iniciou = mundo.chamadas.some((c) => c.nome === 'chat_iniciar'); await ctx.close();
-  return { ok: /previsão de agendamento/.test(t) && /uma pessoa/.test(t) && caixa && /ciente/.test(erro) && !iniciou, detalhe: `${t.slice(0, 60)} | erro="${erro}"` };
+  return { ok: /previsão/.test(t) && /pessoa da equipe/.test(t) && caixa && /ciente/.test(erro) && !iniciou, detalhe: `${t.slice(0, 60)} | erro="${erro}"` };
 });
 
 await caso('mensagem final: deixa claro que é PREVISÃO, que ainda não está confirmado e que um atendente vai confirmar', async () => {
