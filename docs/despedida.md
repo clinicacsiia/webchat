@@ -20,5 +20,8 @@ Configurações > **Despedida do atendimento** > "Usar a despedida configurada" 
 
 Desfazer: desligar a chave (imediato).
 
+## Confirmações do dono
+- 11/11/2026: o dono confirmou que a mensagem da marca Meu Tesouro **deve mesmo aparecer** no chat da clínica (texto da despedida está certo).
+
 ## Testes
 `npm run test:despedida-sql` (14), `npm run test:despedida` (4, chat) e `npm run test:encerramento` (10, painel).
