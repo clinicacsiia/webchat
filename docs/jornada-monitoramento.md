@@ -108,3 +108,4 @@ Achado da auditoria: o contador de alertas chegou a ~300, com cartões "Pedido p
 - **Prioridade:** só o recente é "urgente", igual ao que o painel já mostrava; agora o número do banco e o da tela são o mesmo.
 - **Ainda manual:** redistribuir os "sem responsável" depende de cadastrar a escala (item 3 de "O que ainda falta"). Assumir/Resolver não foi testado em dado real.
 - Não depende dos relatórios pendentes do Klingo.
+- **Expiração geral (mesmo dia, 2ª parte):** qualquer aviso do sistema (confirmar presença, remarcar, horário) de cartão parado há mais de `expira_horas` também fecha sozinho, sem ser recriado. Aplicado no Supabase como `jornada_alerta_expiracao_geral`.
