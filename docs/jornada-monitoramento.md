@@ -98,3 +98,13 @@ Cada atendente com a aba aberta mantém uma conexão em tempo real (Realtime) e 
   - *Atendimento:* exame marcado pelo chat, depois cartão da Jornada, depois a unidade escolhida no formulário ("Ainda não sei" = todas).
   - *Fila:* função `fila_unidades_hoje` (SQL em `supabase/fila-unidade.sql`, já aplicado): exame de hoje no Klingo, depois pedido do chat (3 dias), depois formulário. A linha da fila mostra "Unidade provável: … (de onde veio)".
 - Não depende dos relatórios pendentes do Klingo.
+
+
+## Avisos expiram sozinhos (11/11/2026)
+
+Achado da auditoria: o contador de alertas chegou a ~300, com cartões "Pedido pronto" parados há 4-5 dias. O painel já escondia da lista/selo o que passava de 2 dias, mas as tarefas continuavam abertas no banco.
+
+- **Regra nova** (`supabase/jornada-alerta-expiracao.sql`, troca a função `jornada_vigiar`): `alerta_atraso` só abre aviso se o cartão está parado há **no máximo** `expira_horas` (padrão **48**, em `jornada_regra.parametros`), e **fecha sozinho** o aviso de quem passou disso. O cartão continua no quadro; mudando de etapa, o prazo recomeça.
+- **Prioridade:** só o recente é "urgente", igual ao que o painel já mostrava; agora o número do banco e o da tela são o mesmo.
+- **Ainda manual:** redistribuir os "sem responsável" depende de cadastrar a escala (item 3 de "O que ainda falta"). Assumir/Resolver não foi testado em dado real.
+- Não depende dos relatórios pendentes do Klingo.
