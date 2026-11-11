@@ -86,3 +86,7 @@ Um telefone de teste e o CPF do dono estavam em arquivos de teste e documentos. 
 
 ## 4. Como conferir
 `cd testes && npm install && CHROMIUM_PATH=/opt/pw-browsers/chromium npm test` repete tudo. Novos nesta rodada: `test:c1-sql` (17), `test:c1` (8, navegador), `test:estrutura-sql` (13), `test:transferir-sql` (9), `test:convenio-suspenso-sql` (7), `test:vinculo-sql` (8), `test:sino` (3).
+
+## 5. Atualização de 11/11/2026
+- **Etapa B (dados do dono):** convites criados para **Luzia** (supervisora da unidade CSI) e **Juliana** (gerente: vê tudo; responde pelo Call Center e pela unidade CSI RM/TC). Os dois entram em `equipe_convites` com papel de atendente; o escopo vem da estrutura (`org_membro`). Quando elas criarem a conta no painel, ligar cada uma na aba Equipe > Estrutura. A Carla Adrielle já consta como supervisora da Desenvoar na estrutura, mas a conta dela ainda tem papel de administradora (vê tudo) — mudar para atendente quando o dono autorizar. `permissao_modo` continua em observação.
+- **Catálogo só Particular** (`supabase/catalogo-particular.sql`): a aba Cardápio virou lista de exame + campo de valor Particular + Salvar. Valor preenchido liga o preço no chat; vazio tira. Convênios saíram da tela (as funções antigas continuam no banco).

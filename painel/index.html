@@ -3289,140 +3289,58 @@ h1.longo { font-size: 14mm; }
     return viewCardapio(corpo);
   }
 
+  // Cardápio Particular (11/11/2026): só o nome do exame e o valor Particular que a equipe digita. Valor preenchido = o chat informa; vazio = o atendente informa.
   async function viewCardapio(c) {
-    const PAG = 40;
+    const PAG = 50;
     const lista = h('div', {}), resumo = h('div', {}), maisBox = h('div', { class: 'acoes' });
     let seq = 0, offset = 0;
     const busca = h('input', { type: 'search', placeholder: 'Procurar exame', 'aria-label': 'Procurar exame', value: CD.busca });
-    const selOp = h('select', { 'aria-label': 'Operadora' }, h('option', { value: '' }, 'Todas as operadoras'));
-    const selFiltro = h('select', { 'aria-label': 'Mostrar' }, [['', 'Todos os exames'], ['alerta', 'Só com alerta (!)'], ['previsao', 'Só com preço em previsão'], ['sem_preco', 'Só com linha sem preço'], ['ligado', 'Só com chat ligado'], ['nao_ligado', 'Só com preço ainda não ligado']].map(([v, t]) => h('option', { value: v }, t)));
-    selFiltro.value = CD.filtro;
-    c.append(h('p', { class: 'sub' }, 'Todos os serviços com o preço por operadora. Atualizado toda noite, às 03:00; os preços lançados no Klingo são relidos ao longo do dia.'),
-      h('div', { class: 'cd-aviso' }, 'Os valores são uma previsão. O preço final é o lançado pela recepção no Klingo. O "!" marca onde o Klingo lança um valor 10% ou mais diferente do catálogo, ou onde a referência mudou depois da sua confirmação. Em "Chat informa", ligue só os preços que você conferiu: com o preço ligado, o chat passa essa previsão ao paciente; desligado (padrão), o chat diz que o atendente informa o valor. Com vários exames ou com os dois lados de um exame que cobra por lado, o chat soma e mostra o total; se não souber se o exame cobra por lado, deixa para o atendente.'),
-      resumo, h('div', { class: 'cd-filtros' }, busca, selOp, selFiltro), lista, maisBox);
+    const selFiltro = h('select', { 'aria-label': 'Mostrar' }, [['', 'Todos os exames'], ['sem_valor', 'Só sem valor'], ['com_valor', 'Só com valor']].map(([v, t]) => h('option', { value: v }, t)));
+    selFiltro.value = CD.filtro === 'sem_valor' || CD.filtro === 'com_valor' ? CD.filtro : '';
+    c.append(h('p', { class: 'sub' }, 'Digite o valor Particular ao lado do exame e clique em Salvar. Com valor, o chat informa esse preço (previsão); sem valor, o chat diz que o atendente informa. Os preços de convênio não são mostrados.'),
+      resumo, h('div', { class: 'cd-filtros' }, busca, selFiltro), lista, maisBox);
 
-    // Referência atual de uma linha (o que o cardápio mostra sem revisão) e se o alerta "!" está valendo.
-    const refAtual = (l) => (l.estado === 'ok' ? l.catalogo : l.estado === 'sem_preco' ? null : l.observado);
-    const alertaAtivo = (l) => (l.estado === 'divergente' && (!l.revisao || l.revisao.mudou)) || !!(l.revisao && l.revisao.mudou);
-    const dia = (iso) => (iso ? new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '');
-
-    // Liga, desliga ou corrige o preço que o chat informa. Só o administrador chega aqui (a função do banco confere de novo).
-    const salvarRevisao = async (x, l, ligado, valor, nota) => {
-      const { error } = await db.rpc('catalogo_preco_revisar', { p_procedimento: x.id, p_operadora: l.operadora, p_ligado: ligado, p_valor: valor ?? null, p_nota: nota ?? null, p_referencia: refAtual(l) });
-      if (error) { toast(msgErro(error)); return false; }
-      const ant = l.revisao || {};
-      l.revisao = { ligado, valor: valor ?? ant.valor, nota: nota ?? ant.nota ?? null, em: new Date().toISOString(), por: ant.por || 'você', mudou: false };
-      toast(ligado ? 'Preço ligado: o chat passa a informar esta previsão.' : 'Preço desligado: o chat volta a dizer que o atendente informa.');
-      return true;
+    const linha = (x) => {
+      const inp = h('input', { type: 'text', inputmode: 'decimal', placeholder: 'R$ 0,00', 'aria-label': `Valor Particular de ${x.nome}`, style: 'width:120px' });
+      const ini = x.valor != null ? String(x.valor).replace('.', ',') : '';
+      inp.value = ini;
+      const st = h('span', { class: 'cd-mudo' }, x.valor != null ? 'Chat informa' : '');
+      const btn = h('button', { class: 'btn', type: 'button', onclick: async () => {
+        const txt = inp.value.trim();
+        const v = txt === '' ? null : Number(txt.replace(/\./g, '').replace(',', '.'));
+        if (txt !== '' && (!Number.isFinite(v) || v < 5 || v >= 100000)) { toast('Informe um valor entre R$ 5 e R$ 99.999,99 (ou deixe vazio para tirar).'); return; }
+        btn.disabled = true;
+        const { error } = await db.rpc('catalogo_particular_salvar', { p_procedimento: x.id, p_valor: v });
+        btn.disabled = false;
+        if (error) { toast(msgErro(error)); return; }
+        x.valor = v; inp.value = v == null ? '' : String(v).replace('.', ',');
+        st.textContent = v == null ? 'Sem valor: o atendente informa' : 'Salvo. O chat informa'; toast(v == null ? 'Valor removido.' : 'Valor salvo.');
+      } }, 'Salvar');
+      inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') btn.click(); });
+      return h('tr', {}, h('td', {}, x.nome, x.especialidade ? h('span', { class: 'cd-mudo' }, ` · ${x.especialidade}`) : null), h('td', {}, inp), h('td', {}, btn), h('td', {}, st));
     };
-
-    const linhaPreco = (x, l, refresh) => {
-      const dif = l.estado === 'divergente', rv = l.revisao, alerta = alertaAtivo(l);
-      const nomeOp = l.particular ? 'Particular' : l.operadora;
-      let preco, nota = '';
-      if (l.estado === 'ok') preco = brl(l.exibido);
-      else if (l.estado === 'sem_preco') { preco = rv ? brl(rv.valor) : '—'; nota = 'Sem preço confiável no catálogo e sem marcações recentes.'; }
-      else {
-        preco = [alerta ? h('span', { class: 'cd-alerta', title: 'Atenção neste preço', 'aria-label': 'Alerta' }, '!') : null, brl(l.exibido), h('span', { class: 'cd-tag' }, 'previsão')];
-        const amostra = `${l.amostras} ${l.amostras === 1 ? 'marcação' : 'marcações'}`;
-        const faixa = l.obs_min != null && l.obs_max != null && l.obs_min !== l.obs_max ? `, variou de ${brl(l.obs_min)} a ${brl(l.obs_max)}` : '';
-        nota = dif ? `O Klingo está lançando ${brl(l.observado)} (${pctTxt(l.dif_pct)} sobre o catálogo, ${amostra}${faixa}). Confirme com a recepção qual está certo.`
-          : `Sem preço confiável no catálogo; valor das marcações recentes (${amostra}${faixa}).`;
-        if (dif && rv && !rv.mudou) nota = `Diferença já conferida: o chat informa ${brl(rv.valor)}.`;
-      }
-      // CAT-02 (Q-18): o cardápio mostra só o PARTICULAR. Vale o preço revisado por uma pessoa; sem ele, "Sob consulta" (o chat não informa valor).
-      if (l.particular) {
-        preco = rv ? brl(rv.valor) : h('span', { class: 'cd-mudo' }, 'Sob consulta');
-        if (!rv) nota = 'Sem preço revisado: o chat não informa valor. Use "Definir valor" para liberar.';
-      }
-      if (rv && rv.mudou) nota = `A referência mudou depois da última confirmação (hoje: ${l.exibido != null ? brl(l.exibido) : '—'}). O chat segue informando ${brl(rv.valor)} até você revisar.`;
-
-      const celChat = h('td', {});
-      const pintarChat = (editando = false) => {
-        if (editando) {
-          const inp = h('input', { type: 'text', inputmode: 'decimal', placeholder: '0,00', 'aria-label': 'Valor que o chat informa', style: 'width:110px' });
-          inp.value = rv ? String(rv.valor).replace('.', ',') : (l.exibido != null ? String(l.exibido).replace('.', ',') : '');
-          const nt = h('input', { type: 'text', maxlength: '200', placeholder: 'Nota (opcional)', 'aria-label': 'Nota', style: 'width:100%;margin-top:4px', value: rv && rv.nota ? rv.nota : '' });
-          celChat.replaceChildren(h('div', {}, inp, nt, h('div', { class: 'acoes', style: 'margin-top:6px' },
-            h('button', { class: 'btn', type: 'button', onclick: async () => {
-              const v = Number(String(inp.value).replace(',', '.'));
-              if (!Number.isFinite(v) || v < 5 || v >= 100000) { toast('Informe um valor entre R$ 5 e R$ 99.999,99.'); return; }
-              if (!confirm(`O chat vai informar ${brl(v)} (previsão) para ${x.nome} em ${nomeOp}. Confirmar?`)) return;
-              if (await salvarRevisao(x, l, true, v, nt.value.trim() || null)) refresh();
-            } }, 'Salvar e ligar'),
-            h('button', { class: 'btn', type: 'button', onclick: () => pintarChat(false) }, 'Cancelar'))));
-          inp.focus();
-          return;
-        }
-        const sw = h('input', { type: 'checkbox', role: 'switch', 'aria-label': `Chat informa o preço de ${x.nome} para ${nomeOp}` });
-        sw.checked = !!(rv && rv.ligado);
-        sw.addEventListener('change', async () => {
-          if (!sw.checked) { if (await salvarRevisao(x, l, false, null, null)) refresh(); else sw.checked = true; return; }
-          const sugerido = rv ? rv.valor : l.exibido;
-          if (sugerido == null) { sw.checked = false; pintarChat(true); return; }
-          if (!confirm(`O chat vai informar ${brl(sugerido)} (previsão) para ${x.nome} em ${nomeOp}. Confirmar?`)) { sw.checked = false; return; }
-          if (await salvarRevisao(x, l, true, sugerido, null)) refresh(); else sw.checked = false;
-        });
-        celChat.replaceChildren(h('div', {}, h('label', { style: 'display:inline-flex;gap:6px;align-items:center;cursor:pointer' }, sw, rv && rv.ligado ? 'Ligado' : 'Desligado'),
-          rv ? h('div', {}, h('b', {}, brl(rv.valor)), ' ', h('button', { class: 'btn', type: 'button', style: 'padding:1px 8px', onclick: () => pintarChat(true) }, 'Corrigir')) : h('div', {}, h('button', { class: 'btn', type: 'button', style: 'padding:1px 8px', onclick: () => pintarChat(true) }, 'Definir valor')),
-          rv ? h('div', { class: 'cd-mudo' }, `${rv.por ? 'Por ' + rv.por : 'Confirmado'}${rv.em ? ' em ' + dia(rv.em) : ''}${rv.nota ? ' · ' + rv.nota : ''}`) : null));
-      };
-      pintarChat();
-
-      return h('tr', { class: alerta ? 'cd-div' : (l.estado === 'sem_preco' && !rv ? 'cd-mudo' : '') },
-        h('td', {}, nomeOp, l.tabelas > 1 ? h('span', { class: 'cd-mudo' }, ` · ${l.tabelas} tabelas`) : null),
-        h('td', { class: 'cd-valor' }, preco),
-        h('td', { class: 'cd-mudo' }, l.catalogo != null ? brl(l.catalogo) : '—'),
-        celChat,
-        h('td', {}, nota));
-    };
-    const cartao = (x) => {
-      const todasLinhas = (x.linhas || []).slice().sort((a, b) => (b.particular - a.particular) || (ORDEM_ESTADO[a.estado] - ORDEM_ESTADO[b.estado]) || String(a.operadora).localeCompare(String(b.operadora), 'pt-BR'));
-      const linhas = todasLinhas;   // alertas e contagens continuam olhando todas as operadoras (uso interno)
-      const particulares = todasLinhas.filter((l) => l.particular), outros = todasLinhas.filter((l) => !l.particular);
-      const nAlertas = linhas.filter(alertaAtivo).length, nLigadas = linhas.filter((l) => l.revisao && l.revisao.ligado).length;
-      const refresh = () => { const n = cartao(x); n.open = d.open; const o = d.querySelector('.cd-outros'), no = n.querySelector('.cd-outros'); if (o && no) no.open = o.open; d.replaceWith(n); };
-      const d = h('details', { class: 'cat-bloco' },
-        h('summary', {}, nAlertas > 0 ? h('span', { class: 'cd-alerta', title: `${nAlertas} operadora(s) para revisar`, 'aria-label': 'Alerta' }, '!') : null, x.nome,
-          h('span', { class: 'sub-lista' }, ` · ${x.especialidade || 'sem especialidade'}${x.marcacoes_90d ? ` · ${x.marcacoes_90d} pedidos em 90 dias` : ''}${nLigadas ? ` · ${nLigadas} ligada(s) no chat` : ''}${/UNILATERAL|POR ARTICULA/i.test(x.nome) ? ' · preço por lado (os dois lados = 2×)' : ''}`)),
-        h('div', { class: 'tabela-wrap', style: 'margin-top:8px' }, h('table', { class: 'cd-tabela' },
-          h('thead', {}, h('tr', {}, ['Operadora', 'Preço previsto', 'Catálogo', 'Chat informa', 'Observação'].map((t) => h('th', {}, t)))), h('tbody', {}, particulares.length ? particulares.map((l) => linhaPreco(x, l, refresh)) : [h('tr', { class: 'cd-mudo' }, h('td', {}, 'Particular'), h('td', { class: 'cd-valor' }, 'Sob consulta'), h('td', {}, '—'), h('td', {}, '—'), h('td', {}, 'Sem preço particular no catálogo: o chat não informa valor.'))]))),
-        outros.length ? h('details', { class: 'cd-outros', style: 'margin-top:8px' }, h('summary', { class: 'cd-mudo' }, `Convênios (${outros.length}) — só para conferência interna; o paciente nunca vê estes valores`),
-          h('div', { class: 'tabela-wrap' }, h('table', { class: 'cd-tabela' },
-            h('thead', {}, h('tr', {}, ['Operadora', 'Preço previsto', 'Catálogo', 'Chat informa', 'Observação'].map((t) => h('th', {}, t)))), h('tbody', {}, outros.map((l) => linhaPreco(x, l, refresh)))))) : null);
-      if (nAlertas > 0) d.open = true;
-      return d;
-    };
-
+    let corpo = null;
     const carregar = async (maisUm) => {
       const minha = ++seq;
       if (!maisUm) { offset = 0; lista.replaceChildren(h('p', { class: 'dica' }, 'Carregando…')); }
       maisBox.replaceChildren();
-      const { data, error } = await db.rpc('catalogo_cardapio', { p_busca: CD.busca || null, p_operadora: CD.operadora || null, p_filtro: CD.filtro || null, p_limite: PAG, p_deslocamento: offset });
+      const { data, error } = await db.rpc('catalogo_particular_lista', { p_busca: CD.busca || null, p_filtro: CD.filtro || null, p_limite: PAG, p_deslocamento: offset });
       if (S.aba !== 'catalogo' || CD.aba !== 'cardapio' || minha !== seq) return;
-      if (error) { lista.replaceChildren(h('p', { class: 'erro' }, msgErro(error)), h('p', { class: 'dica' }, 'Se a mensagem fala de função inexistente, falta rodar supabase/catalogo-cardapio.sql e supabase/catalogo-preco-revisao.sql.')); return; }
-      const R = data || {}, ex = R.exames || [];
-      resumo.replaceChildren(h('div', { class: 'numeros' },
-        h('div', { class: 'num' }, h('b', {}, R.exames_total ?? 0), h('span', {}, CD.busca || CD.operadora || CD.filtro ? 'exames neste filtro' : 'exames no cardápio')),
-        h('div', { class: 'num' }, h('b', {}, R.exames_com_alerta ?? 0), h('span', {}, 'com alerta (!)')),
-        h('div', { class: 'num' }, h('b', {}, R.exames_com_previsao ?? 0), h('span', {}, 'com preço só em previsão')),
-        h('div', { class: 'num' }, h('b', {}, R.exames_com_chat_ligado ?? 0), h('span', {}, 'com preço ligado no chat'))),
-        h('p', { class: 'dica' }, `Catálogo atualizado em ${R.catalogo_em ? fmtDataHora(R.catalogo_em) : '—'}. Preços lançados lidos em ${R.preco_lido_em ? fmtDataHora(R.preco_lido_em) : 'nenhuma leitura nas últimas 24 h (sem alertas por enquanto)'}.`));
-      if (!maisUm) lista.replaceChildren();
-      if (!ex.length && !maisUm) { lista.replaceChildren(h('p', { class: 'dica' }, 'Nenhum exame encontrado.')); return; }
-      ex.forEach((x) => lista.append(cartao(x)));
-      offset += ex.length;
-      if (offset < (R.exames_total || 0)) maisBox.replaceChildren(h('button', { class: 'btn', type: 'button', onclick: () => carregar(true) }, `Mostrar mais (${offset} de ${R.exames_total})`));
+      if (error) { lista.replaceChildren(h('p', { class: 'erro' }, msgErro(error))); return; }
+      const R = data || {}, it = R.itens || [];
+      resumo.replaceChildren(h('div', { class: 'numeros' }, h('div', { class: 'num' }, h('b', {}, R.total ?? 0), h('span', {}, 'exames')), h('div', { class: 'num' }, h('b', {}, R.com_valor ?? 0), h('span', {}, 'com valor Particular'))));
+      if (!maisUm) {
+        if (!it.length) { lista.replaceChildren(h('p', { class: 'dica' }, 'Nenhum exame encontrado.')); return; }
+        corpo = h('tbody', {});
+        lista.replaceChildren(h('div', { class: 'tabela-wrap' }, h('table', { class: 'cd-tabela' }, h('thead', {}, h('tr', {}, ['Exame', 'Valor Particular', '', ''].map((t) => h('th', {}, t)))), corpo)));
+      }
+      it.forEach((x) => corpo.append(linha(x)));
+      offset += it.length;
+      if (offset < (R.total || 0)) maisBox.replaceChildren(h('button', { class: 'btn', type: 'button', onclick: () => carregar(true) }, `Mostrar mais (${offset} de ${R.total})`));
     };
-
     let tempo;
     busca.addEventListener('input', () => { clearTimeout(tempo); tempo = setTimeout(() => { CD.busca = busca.value.trim(); carregar(false); }, 300); });
-    selOp.addEventListener('change', () => { CD.operadora = selOp.value; carregar(false); });
     selFiltro.addEventListener('change', () => { CD.filtro = selFiltro.value; carregar(false); });
-    db.rpc('catalogo_cardapio_operadoras').then(({ data }) => {
-      (Array.isArray(data) ? data : []).forEach((o) => selOp.append(h('option', { value: o }, o === 'PARTICULAR' ? 'Particular' : o)));
-      selOp.value = CD.operadora;
-    });
     carregar(false);
   }
 
