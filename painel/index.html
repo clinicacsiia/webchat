@@ -1611,12 +1611,32 @@
   // 11/11/2026: passou de 24 h sem resposta -> NÃO fecha; fica marcada para a equipe chamar no WhatsApp e pedir que o paciente responda no site.
   const membroZap = (p) => p.membros.find((m) => m.status === 'em_atendimento' && m.chamar_zap_em) || null;
   const precisaZap = (p) => !!membroZap(p);
-  async function zapFeito(p) {
+  // Confirmação do contato no WhatsApp: a atendente diz o que aconteceu. Em todos os casos o contato fica registrado (quem e quando) e a marca sai.
+  //  - "vai responder": a conversa continua aberta e as 24 h recomeçam;  - "desistiu / não quer mais": encerra como Paciente desistiu;  - "outro desfecho": abre a janela normal de Encerrar.
+  async function zapFeito(p, desfecho) {
     const m = membroZap(p); if (!m) return;
     const { error } = await db.rpc('chamar_zap_feito', { p_conversa: m.id });
     if (error) { toast(msgErro(error)); return; }
-    toast('Anotado. Se o paciente não responder, avisamos de novo em 24 h.');
+    if (desfecho === 'desistiu') {
+      if (!(await atualizarConversa({ status: 'encerrada', motivo_encerramento: 'desistiu' }))) { toast('O contato foi anotado, mas a conversa não encerrou. Use Encerrar.'); }
+      else toast('Contato anotado e conversa encerrada (paciente desistiu).');
+    } else if (desfecho === 'outro') {
+      await carregarConversas(); renderLista(); renderChat(); encerrar(); return;
+    } else toast('Anotado. Se o paciente não responder, avisamos de novo em 24 h.');
     await carregarConversas(); renderLista(); renderChat(); if (S.modo === 'quadro') renderQuadro();
+  }
+  function zapPerguntar(p) {
+    const fechar = () => dlg.close();
+    const ir = (d) => { fechar(); zapFeito(p, d); };
+    dlg.className = '';
+    dlg.replaceChildren(h('h3', {}, 'Como foi o contato no WhatsApp?'),
+      h('p', { class: 'dica', style: 'margin:-8px 0 12px' }, 'Escolha o que aconteceu. Nada é encerrado sem você escolher.'),
+      h('div', { style: 'display:grid;gap:8px' },
+        h('button', { class: 'btn prim', type: 'button', 'data-zap-op': 'responder', onclick: () => ir('responder') }, 'Chamei, o paciente vai responder no site'),
+        h('button', { class: 'btn perigo', type: 'button', 'data-zap-op': 'desistiu', onclick: () => ir('desistiu') }, 'Chamei, o paciente desistiu ou não quer mais contato (encerrar)'),
+        h('button', { class: 'btn', type: 'button', 'data-zap-op': 'outro', onclick: () => ir('outro') }, 'Outro desfecho (escolher o motivo ao encerrar)')),
+      h('div', { class: 'rodape' }, h('button', { class: 'btn', type: 'button', onclick: fechar }, 'Voltar')));
+    dlg.showModal();
   }
   function atualizarKpis() {
     const box = document.getElementById('kpis'), sino = document.getElementById('sinoPonto');
@@ -2316,7 +2336,7 @@
     const pZap = { membros: ids.map((i) => S.conversas.find((x) => x.id === i)).filter(Boolean) };
     if (podeAtender() && precisaZap(pZap)) {
       const tel = c.contatos && c.contatos.telefone ? fmtTel(c.contatos.telefone) : '';
-      pontos.unshift({ tom: 'alta', titulo: 'Sem resposta há mais de 24 h: chame no WhatsApp', detalhe: 'Peça ao paciente que responda aqui no site' + (tel ? ' (' + tel + ', link no topo da conversa)' : '') + '. Depois toque no botão.', rot: 'Já chamei no zap', fn: () => zapFeito(pZap) });
+      pontos.unshift({ tom: 'alta', titulo: 'Sem resposta há mais de 24 h: chame no WhatsApp', detalhe: 'Peça ao paciente que responda aqui no site' + (tel ? ' (' + tel + ', link no topo da conversa)' : '') + '. Depois toque no botão.', rot: 'Já chamei no zap', fn: () => zapPerguntar(pZap) });
     }
     // Avisos que moram na área de detalhes (valor, fotos, exame aberto, remarcação, pré-agendamento): contam no botão e abrem a área uma vez por conversa.
     const n = minha ? pontos.filter((x) => x.noPainel).length : 0;

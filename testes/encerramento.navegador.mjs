@@ -235,10 +235,22 @@ await caso('24 h sem resposta: a conversa NÃO é encerrada, vai para "Chamar no
   const naoMarcada = await page.locator('.itens .item:has-text("Ana Paula") [data-zap]').count();
   await abrirConversa(page);
   await page.waitForSelector('.proximo:has-text("chame no WhatsApp")', { timeout: 5000 });
-  await page.click('.proximo button:has-text("Já chamei no zap")'); await page.waitForTimeout(500);
+  await page.click('.proximo button:has-text("Já chamei no zap")'); await page.waitForSelector('[data-zap-op="responder"]');
+  const tres = await page.locator('[data-zap-op]').count();
+  await page.click('[data-zap-op="responder"]'); await page.waitForTimeout(500);
   const envio = reg.rpcs.find((r) => r.rpc === 'chamar_zap_feito');
   await ctx.close();
-  return { ok: /Chamar no WhatsApp/i.test(grupo) && etiqueta === 1 && naoMarcada === 0 && envio && envio.p_conversa === 'c2' && patchesStatus(reg).length === 0 && !reg.excecoes.length, detalhe: grupo.replace(/\n/g, ' ') + ' | ' + JSON.stringify(envio) };
+  return { ok: /Chamar no WhatsApp/i.test(grupo) && etiqueta === 1 && naoMarcada === 0 && tres === 3 && envio && envio.p_conversa === 'c2' && patchesStatus(reg).length === 0 && !reg.excecoes.length, detalhe: grupo.replace(/\n/g, ' ') + ' | ' + JSON.stringify(envio) };
+});
+
+await caso('"Chamei, o paciente desistiu": anota o contato e encerra com o motivo Paciente desistiu', async () => {
+  const { page, ctx, reg } = await abrir({ quadroIndisponivel: true, zap: true });
+  await abrirConversa(page); await page.waitForSelector('.proximo:has-text("chame no WhatsApp")', { timeout: 5000 });
+  await page.click('.proximo button:has-text("Já chamei no zap")'); await page.waitForSelector('[data-zap-op="desistiu"]');
+  await page.click('[data-zap-op="desistiu"]'); await page.waitForTimeout(600);
+  const envio = reg.rpcs.find((r) => r.rpc === 'chamar_zap_feito'); const p = patchesStatus(reg);
+  await ctx.close();
+  return { ok: !!envio && p.length === 1 && p[0].motivo_encerramento === 'desistiu' && !reg.excecoes.length, detalhe: JSON.stringify(p) };
 });
 
 await caso('Indicadores: mostra os motivos de encerramento e (administrador) as avaliações, só com contagens', async () => {
