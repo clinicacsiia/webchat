@@ -107,6 +107,23 @@
   @keyframes capa-varre { 0%, 25% { background-position: -150% 0; } 70%, 100% { background-position: 250% 0; } }
   @keyframes capa-onda { from { transform: translateX(-14px); } to { transform: translateX(14px); } }
   @media (prefers-reduced-motion: reduce) { .capa * { animation: none !important; } }
+  /* Animações da tela inicial (todas desligam com "reduzir movimento") */
+  .capa .bol { position: absolute; bottom: 40px; width: 8px; height: 8px; border-radius: 50%; background: rgba(0,136,204,.35); animation: capa-sobe 7s ease-in infinite; z-index: 1; }
+  .capa .b1 { left: 14%; animation-delay: 0s; } .capa .b2 { left: 30%; width: 5px; height: 5px; animation-delay: -2s; } .capa .b3 { left: 52%; animation-delay: -4s; width: 6px; height: 6px; } .capa .b4 { left: 72%; animation-delay: -1s; } .capa .b5 { left: 86%; width: 5px; height: 5px; animation-delay: -5s; }
+  @keyframes capa-sobe { 0% { transform: translateY(0) scale(.6); opacity: 0; } 15% { opacity: .9; } 100% { transform: translateY(-170px) scale(1.2); opacity: 0; } }
+  .capa .marca { animation: capa-flut 5s ease-in-out infinite, capa-entra 1s cubic-bezier(.2,.8,.2,1) both; }
+  @keyframes capa-entra { from { opacity: 0; transform: translateY(14px) scale(.94); } to { opacity: 1; } }
+  .inicio > h1, .inicio .conta-faixa, .inicio #formInicio > *, .inicio > .link-add, .inicio .inst-clinica { animation: sobe .55s cubic-bezier(.2,.8,.2,1) both; }
+  .inicio > h1 { animation-delay: .15s; } .inicio .conta-faixa { animation-delay: .25s; }
+  .inicio #formInicio > :nth-child(1) { animation-delay: .3s; } .inicio #formInicio > :nth-child(2) { animation-delay: .4s; } .inicio #formInicio > :nth-child(3) { animation-delay: .5s; } .inicio #formInicio > :nth-child(n+4) { animation-delay: .6s; }
+  .inicio > .link-add, .inicio .inst-clinica { animation-delay: .75s; }
+  @keyframes sobe { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+  .inicio .unidade[aria-checked="true"] { animation: escolhe .35s cubic-bezier(.3,1.6,.5,1); }
+  @keyframes escolhe { 0% { transform: scale(.94); } 100% { transform: scale(1); } }
+  .inicio .btn-primario { position: relative; overflow: hidden; }
+  .inicio .btn-primario::after { content: ""; position: absolute; top: 0; bottom: 0; left: -40%; width: 30%; background: linear-gradient(100deg, transparent, rgba(255,255,255,.35), transparent); transform: skewX(-20deg); animation: brilha 3.6s ease-in-out 1.5s infinite; }
+  @keyframes brilha { 0%, 60% { left: -40%; } 100% { left: 130%; } }
+  @media (prefers-reduced-motion: reduce) { .capa *, .inicio *, .inicio *::after { animation: none !important; } }
   .inicio h1 { font-size: calc(26px * var(--esc)); line-height: 1.2; margin: 0 0 4px; text-align: left; }
   .inicio p.sub { margin: 0 0 8px; color: var(--texto-suave); text-align: left; }
   .inicio > form { margin-bottom: 24px; }
@@ -478,7 +495,7 @@
 
   <!-- Tela 1: dados iniciais -->
   <section class="inicio" id="telaInicio" hidden>
-    <div class="capa" aria-hidden="false"><span class="luz l1"></span><span class="luz l2"></span><span class="luz l3"></span>
+    <div class="capa" aria-hidden="false"><span class="luz l1"></span><span class="luz l2"></span><span class="luz l3"></span><span class="bol b1"></span><span class="bol b2"></span><span class="bol b3"></span><span class="bol b4"></span><span class="bol b5"></span>
       <div class="marca"><img src="img/logo-csi.svg" alt="CSI · Clínica de Saúde e Imagem" width="270" height="92"><span class="brilho" aria-hidden="true"></span></div>
       <svg class="ondas" viewBox="0 0 360 80" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="capaO1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#cfeafa"/><stop offset="1" stop-color="#a6d8f3"/></linearGradient></defs><path class="w2" d="M0 40 C70 8 140 60 220 34 S330 14 360 30 V80 H0Z" fill="#d4eefb" opacity=".8"/><path class="w1" d="M0 52 C80 22 150 70 230 46 S330 30 360 44 V80 H0Z" fill="url(#capaO1)"/></svg>
     </div>
@@ -596,7 +613,7 @@
   const CHAVE_HIST = 'webchat.historico.v1';   // as últimas conversas deste aparelho (cada uma com o seu token): dá para voltar a elas
   const MAX_HIST = 5;                          // mínimo pedido: 3
   // Muda a cada alteração do chat. Cópia de mensagens guardada por outra versão é descartada (era isso que mostrava conversa velha e travada).
-  const VERSAO_APP = '2026.11.12-3';
+  const VERSAO_APP = '2026.11.12-4';
   const ESCALAS = [1, 1.18, 1.36], TOAST_LETRA = ['Letra normal.', 'Letra grande.', 'Letra muito grande.'];
 
   // Chegou pelo link "esqueci a senha"? O supabase-js limpa o endereço ao ler o link, então a pergunta é feita antes de criá-lo.
