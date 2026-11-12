@@ -4027,6 +4027,25 @@
    "md5": "eca6ede12d699b9090e480b1fb3da309"
   },
   {
+   "nome": "chat_voltar",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_token",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": ""
+  },
+  {
    "nome": "checkin_publico",
    "args": [
     {
@@ -6130,6 +6149,25 @@
    "authenticated": false,
    "publico": false,
    "md5": "bb36937b97c8d9c564cc24db1df398cc"
+  },
+  {
+   "nome": "fluxo_voltar_passo",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_op",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": ""
   },
   {
    "nome": "fone_chave",

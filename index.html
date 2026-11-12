@@ -445,9 +445,11 @@
   .aviso-ia p { margin: 0 0 6px; }
   .aviso-ia p:last-child { margin-bottom: 0; }
   .aviso-ia.compacto { align-self: stretch; max-width: none; margin: 0 0 16px; box-shadow: var(--shadow-sm); background: var(--csi-surface); border: 1px solid var(--csi-border); border-left: 4px solid var(--csi-primary); border-radius: var(--radius-md); }
-  .barra-humano { flex: none; display: flex; justify-content: center; padding: 6px 10px 8px; background: #f3f7fc; border-top: 1px solid var(--linha); }
+  .barra-humano { flex: none; display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; padding: 6px 10px 8px; background: #f3f7fc; border-top: 1px solid var(--linha); }
   .barra-humano button { background: var(--papel); color: var(--verde); border: 1.5px solid var(--verde); border-radius: 999px; padding: 10px 18px; min-height: 46px; font-weight: 650; font-size: calc(16px * var(--esc)); cursor: pointer; }
   .barra-humano button:hover { background: #eef4fc; }
+  .barra-humano button.sec { border-color: var(--linha); color: #33506e; font-weight: 600; }
+  .barra-humano button[hidden] { display: none; }
   .barra-humano[hidden] { display: none; }
   .nota-previsao { margin: 8px 0 0; padding: 9px 11px; border-radius: 10px; background: #fff; border: 1.5px dashed #c9a24a; color: var(--texto); font-size: calc(15.5px * var(--esc)); }
 
@@ -603,7 +605,7 @@
   <section id="telaChat" style="display:contents" hidden>
     <main class="msgs" id="msgs" aria-live="polite" aria-label="Mensagens"></main>
     <div class="apoio" id="apoio" hidden></div>
-    <div class="barra-humano" id="barraHumano" hidden><button type="button" id="btnHumano">&#128100; Falar com um atendente</button></div>
+    <div class="barra-humano" id="barraHumano" hidden><button type="button" id="btnCorrigir" class="sec" hidden>&#8617; Voltar e corrigir</button><button type="button" id="btnHumano">&#128100; Falar com um atendente</button></div>
     <div class="proximo" id="proximo" hidden>
       <span id="proximoTxt"></span>
       <button type="button" class="btn-w" id="btnProximo">Agendar</button>
@@ -645,7 +647,7 @@
   const CHAVE_HIST = 'webchat.historico.v1';   // as últimas conversas deste aparelho (cada uma com o seu token): dá para voltar a elas
   const MAX_HIST = 5;                          // mínimo pedido: 3
   // Muda a cada alteração do chat. Cópia de mensagens guardada por outra versão é descartada (era isso que mostrava conversa velha e travada).
-  const VERSAO_APP = '2026.11.12-9';
+  const VERSAO_APP = '2026.11.12-10';
   const ESCALAS = [1, 1.18, 1.36], TOAST_LETRA = ['Letra normal.', 'Letra grande.', 'Letra muito grande.'];
 
   // Chegou pelo link "esqueci a senha"? O supabase-js limpa o endereço ao ler o link, então a pergunta é feita antes de criá-lo.
@@ -656,7 +658,7 @@
   const el = {
     empresa: $('#empresa'), ponto: $('#ponto'), status: $('#status'),
     btnMenu: $('#btnMenu'), btnVoltarInicio: $('#btnVoltarInicio'), menu: $('#menu'), btnNova: $('#btnNova'), btnHistorico: $('#btnHistorico'), btnHistoricoForm: $('#btnHistoricoForm'), btnAtendente: $('#btnAtendente'), btnSair: $('#btnSair'),
-    btnLetra: $('#btnLetra'), btnLetraMenor: $('#btnLetraMenor'), btnSuporte: $('#btnSuporte'), btnPrivacidade: $('#btnPrivacidade'), apoio: $('#apoio'), barraHumano: $('#barraHumano'), btnHumano: $('#btnHumano'),
+    btnLetra: $('#btnLetra'), btnLetraMenor: $('#btnLetraMenor'), btnSuporte: $('#btnSuporte'), btnPrivacidade: $('#btnPrivacidade'), apoio: $('#apoio'), barraHumano: $('#barraHumano'), btnHumano: $('#btnHumano'), btnCorrigir: $('#btnCorrigir'),
     telaInicio: $('#telaInicio'), telaChat: $('#telaChat'), boasForm: $('#boasVindasForm'), tituloInicio: $('#tituloInicio'),
     faixaConta: $('#faixaConta'), faixaContaTxt: $('#faixaContaTxt'), btnContaEntrar: $('#btnContaEntrar'), btnContaCriar: $('#btnContaCriar'), btnContaDados: $('#btnContaDados'), btnContaSair: $('#btnContaSair'),
     form: $('#formInicio'), fNome: $('#fNome'), fTel: $('#fTel'), fEmail: $('#fEmail'),
@@ -1007,7 +1009,7 @@
     if (m.id == null || vistos.has(m.id)) return false;
     vistos.add(m.id);
     if (m.id > ultimoId) ultimoId = m.id;
-    if (m.autor === 'agente' && m.opcoes && m.opcoes.passo) passoAtual = m.opcoes.passo;
+    if (m.autor === 'agente' && m.opcoes && m.opcoes.passo) { passoAtual = m.opcoes.passo; atualizarVoltar(); }
     inserirNoCache(m);
     const t = m.autor === 'cliente' ? String(m.texto || '').trim() : null;
     const ib = t == null ? -1 : provisorias.findIndex((p) => p.n.isConnected && p.texto === t);
@@ -1039,6 +1041,7 @@
     }
     // Uma pessoa está sempre a um toque: o botão fica à vista enquanto o assistente automático conduz a conversa.
     el.barraHumano.hidden = !(motorAtivo && status !== 'encerrada' && status !== 'em_atendimento');
+    atualizarVoltar();
     preencherAvisoIA();
     atualizarCompor();
     // A equipe assumiu, devolveu ao assistente ou encerrou: as perguntas do assistente na tela ligam/desligam junto.
@@ -1430,6 +1433,30 @@
     if (!confirm(conta ? 'Sair da sua conta neste aparelho? Seus dados continuam salvos na conta; é só entrar de novo.' : 'Sair deste aparelho? Seus dados deixam de aparecer aqui; a conversa fica guardada com a equipe.')) return;
     if (conta) { try { await db.auth.signOut(); } catch { /* sem rede: o aparelho é limpo mesmo assim */ } conta = null; atualizarContaUI(true); }
     naoSouEu();
+  }
+  // "Voltar e corrigir": só nas perguntas depois da primeira, enquanto o assistente conduz (a pergunta "Está tudo certo?" também).
+  const SEM_VOLTAR = ['identidade', 'atalho', 'motivo', 'pronto', 'humano', 'assunto_fim'];
+  function atualizarVoltar() {
+    if (!el.btnCorrigir) return;
+    el.btnCorrigir.hidden = !(motorAtivo && statusAtual === 'aguardando' && passoAtual && !SEM_VOLTAR.includes(passoAtual));
+  }
+  async function voltarEtapa() {
+    if (!conv || respondendo || el.btnCorrigir.hidden) return;
+    respondendo = true; el.btnCorrigir.disabled = true; atualizarWidgets();
+    const t0 = performance.now();
+    mon('enviou', { via: 'voltar', passo: passoAtual });
+    try {
+      const { data, error } = await db.rpc('chat_voltar', { p_conversa: conv.id, p_token: conv.token });
+      if (error) throw error;
+      mostrarRespostas(data.respostas, t0);
+      mon('respondeu', { passo: data.passo, ms: null });
+    } catch (e) {
+      // 22023 = já não dá para voltar (a equipe assumiu, ou a pergunta mudou em outra aba): relê a conversa e a tela se ajusta.
+      toast(e && e.code === '22023' ? 'Não deu para voltar agora. Veja a última mensagem.' : mensagemErro(e));
+    }
+    respondendo = false; el.btnCorrigir.disabled = false;
+    atualizarWidgets(); atualizarVoltar();
+    carregar();
   }
   function pedirAtendente() {
     fecharMenu();
@@ -2844,6 +2871,7 @@
   $('#btnSino').addEventListener('click', tocarSino);
   el.btnAtendente.addEventListener('click', pedirAtendente);
   el.btnHumano.addEventListener('click', pedirAtendente);
+  el.btnCorrigir.addEventListener('click', voltarEtapa);
   // Letra: três tamanhos, guardados neste aparelho.
   let letra = 0;
   function aplicarLetra(n, gravar) {

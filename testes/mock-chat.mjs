@@ -131,6 +131,11 @@ export function criarMundo(opcoes = {}) {
         m.ocultos.clear();
         return { body: { id: cli.id, respostas } };
       }
+      case 'chat_voltar': {
+        if (!m.motor || m.passo === 'motivo') return { status: 400, body: { code: '22023', message: 'Esta é a primeira pergunta: não há o que corrigir antes dela.' } };
+        const q = m.perguntaMotivo(); q.texto = 'Tudo bem, vamos corrigir.\n\n' + q.texto;
+        return { body: { passo: 'motivo', respostas: [q] } };
+      }
       case 'chat_acompanhar': return { body: { agora: agora(), conversa: m.status, agente: null, em_horario: true, espera_longa: false, pedido: 'pronto', tipo: 'exame', conferencia: null, confirmado: false, horarios: [] } };
       case 'chat_corpo': return { body: CONFIG_CORPO };
       case 'chat_medicos_disponiveis': return { body: m.medicos || [] };
