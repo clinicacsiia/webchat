@@ -32,6 +32,14 @@ curl $B/paciente -H "Authorization: Bearer <token>"                             
 ```
 Observações: `GET /paciente/cpf` e `POST /paciente/identificar` (telefone + nascimento) **não acharam** o pré-cadastro depois de criado ("PACIENTE_NAO_IDENTIFICADO"). A equipe não encontrou onde o pré-cadastro aparece para aprovação; o Yan disse que ele "vai pra agenda".
 
+## Achados dos testes completos de 12/11/2026 que viram perguntas
+- **Duplicidade:** `POST /externo/register` com o mesmo CPF **cria outro pré-cadastro** (7960 → 7992). É esperado? Como a recepção junta? Existe como achar pré-cadastro por CPF (`GET /paciente/cpf` não acha)?
+- **Limite de requisições:** recebemos `429` (página HTML) depois de ~14 chamadas seguidas. Qual o limite?
+- **API de telefonia:** `/api/telefonia/live` e `/bloqueios` dão `404` com a nossa chave. Está habilitada para a CSI?
+- **`mae` no registro:** o nome da mãe enviado no `register` não aparece depois em `GET /paciente`. É ignorado?
+- **Plano ASSEFAZ:** não está no catálogo; qual o número do plano?
+- **Convênio sem carteirinha:** a marcação com Planserv foi aceita sem convênio no cadastro. A recepção confere depois?
+
 ## Perguntas (em ordem de importância)
 1. **Paciente novo:** qual é o fluxo, só por API, que chega até `POST /agenda/horario` sem a recepção? Existe outro endpoint (ex.: `/externo/portal/register` + `/externo/portal/login`) que já devolva sessão com `id_paciente`? Quais campos de `paciente` são obrigatórios?
 2. **Pré-cadastro:** a reserva e a marcação funcionam com sessão sem `id_paciente`? Se não, o que gera o `id_paciente` e quando?

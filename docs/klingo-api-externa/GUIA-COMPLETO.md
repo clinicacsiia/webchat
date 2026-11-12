@@ -7,8 +7,9 @@ Escrito em 12/11/2026, a partir da documentação oficial e de **testes reais** 
 > 2. São dois tipos de credencial: a **chave da clínica** (`X-APP-TOKEN`) e a **sessão do paciente** (`Authorization: Bearer`). Horários e catálogos usam só a chave; **reservar e marcar exigem a sessão do paciente**.
 > 3. **Paciente já cadastrado**: achar pelo CPF → entrar como ele → reservar → marcar. **Provado.**
 > 4. **Paciente novo**: pré-cadastro → entrar com o id do pré-cadastro (**sem a letra P**) → reservar → marcar, **sem a recepção aprovar nada**. **Provado.**
-> 5. **Resultado de exame** vem pela API como PDF/HTML (não existe link nem senha). **Não testado.**
-> 6. A função `klingo-agenda-api` (no Supabase) já faz tudo isso, mas **ainda não está ligada ao chat**.
+> 5. Também **provados**: marcar **exame**, reservar e soltar a reserva, **remarcar**, **trocar procedimento**, **cancelar pela API**, conflito de horário, convênio na marcação e as opções `revisao`, `obs` e `confirmado`.
+> 6. **Resultado de exame** vem como PDF/HTML (não existe link nem senha); sem laudo a API responde 403 em HTML. O laudo pronto em si **não foi testado** (nenhum paciente de teste tem exame feito).
+> 7. A função `klingo-agenda-api` (no Supabase) já faz o essencial, mas **ainda não está ligada ao chat**. A API tem **limite de requisições** (429).
 
 Arquivos relacionados nesta pasta: `Klingo_API_Externa_Referencia.pdf` (guia oficial), `swagger-1.0.0.json` (definição completa), `swagger-telefonia-1.0.0.json` (API de confirmação), `roteiro-reuniao-suporte.md` (perguntas para o Klingo), `teste-marcacao.sh` (teste manual). Diário dos testes: `docs/klingo-api-agendamento.md`.
 
@@ -68,11 +69,13 @@ Erros normais (não são falha do sistema):
 2. **Conferir o nascimento** (`dt_nasc` = o que o paciente informou). Se não bater, parar.
 3. `POST /externo/login` com `{"id":"P123456"}` (o `id` **exatamente** como veio). Resposta: `access_token`, `user {id, nome, id_paciente, sexo, nascimento, plano {id, nome}}`.
 4. **Conferir quem abriu a sessão**: `user.id` = o id, `user.nascimento` = o informado. Se não bater, descartar a sessão.
-5. `POST /agenda/reservar` com `{"id":"<chave do horário>","procedimento":"1096","plano":1,"email":false}` e o Bearer → segura o horário por ~10 minutos e devolve o id e a hora de expiração da reserva.
+5. (Opcional) `POST /agenda/reservar` com `{"id":"<chave do horário>","procedimento":"1096","plano":1,"email":false}` e o Bearer → segura o horário por **10 minutos** e devolve `id` (da reserva), `data`, `hora`, `expira` (ex.: `2026-11-12 13:03:17`), `profissional`, `instrucao` e `validacao[]`. **Reservar antes não é obrigatório**: dá para marcar direto. Enquanto está reservado, o horário **continua aparecendo** na lista pública, mas qualquer outra pessoa que tente reservar ou marcar recebe `403 "Horário já ocupado. [reservado 2026-11-17 11:00/6901]"` (reservar) ou `400` com a mesma frase (marcar).
 6. `POST /agenda/horario` com o mesmo corpo → **marca** e devolve o voucher: `id`, `status` (`agendado`), `data`, `hora`, `procedimento`, `realizador` (médico), `unidade`.
-7. Se a marcação falhar depois da reserva, soltar a reserva: `DELETE /agenda/reservar` com `{"id": <id da reserva>}` (**não testado**).
+7. Se a marcação falhar depois da reserva, soltar a reserva: `DELETE /agenda/reservar` com `{"id": <id da reserva, número>}` → `200 {"status":"…"}` (**provado**; o horário volta à lista).
 
-Alternativa para achar o paciente: `POST /paciente/identificar` com telefone + nascimento (ou CPF); devolve a sessão direto. **Provado só o caso "não achou".**
+Alternativa para achar o paciente: `POST /paciente/identificar` com `{"cpf":"…","dt_nascimento":"AAAA-MM-DD"}` (ou telefone + nascimento) → **200 já com a sessão** (`access_token`, `user`, `unidade`) para paciente com cadastro (**provado**). Para quem só tem pré-cadastro (ou não existe): `403 PACIENTE_NAO_IDENTIFICADO`.
+
+`GET /paciente` (Bearer) devolve o cadastro do próprio paciente: `id`, `chave`, `nome`, `sexo`, `dt_nasc`, `mae`, `docs`, `contatos`, `endereco`, `convenio {id, nome, reg_ans, id_paciente, validade…}`. `PUT /paciente` atualiza (**provado**: `200` devolvendo o cadastro; basta mandar o trecho a mudar, ex.: `{"contatos":{"celular":"…"}}`).
 
 ### 2.3 Paciente novo (**provado**)
 1. `POST /externo/register` com
@@ -89,34 +92,45 @@ Alternativa para achar o paciente: `POST /paciente/identificar` com telefone + n
 
 Como o Klingo explicou: "toda marcação gera pré-cadastro" e "vai pra agenda": o pré-cadastro não precisa de aprovação antes de marcar; a recepção o completa depois.
 
+**Provado sobre o pré-cadastro (12/11/2026):**
+- `GET /paciente`, `GET /vouchers`, reservar, marcar, trocar procedimento e cancelar funcionam com a sessão do pré-cadastro (`id_paciente` vazio).
+- **Registrar o mesmo CPF de novo NÃO é recusado: cria outro pré-cadastro** (outro id: 7960 → 7992). A API não evita duplicidade. **O sistema precisa guardar o id do pré-cadastro por paciente e nunca chamar `/externo/register` de novo para a mesma pessoa.**
+- `GET /paciente/cpf` continua sem achar o CPF mesmo depois de marcar e depois do segundo registro.
+- O campo `mae` enviado no registro **não aparece** depois (`mae` vem vazio em `GET /paciente`); celular e CPF aparecem.
+- O Planserv (convênio) foi aceito na marcação mesmo com o cadastro sem convênio nenhum (ver 2.4).
+
 Pontos em aberto do paciente novo:
 - **A busca por CPF não acha quem só tem pré-cadastro.** Se a pessoa voltar, o sistema não sabe que ela já se cadastrou e pode gerar um segundo pré-cadastro. Precisa de uma regra (ex.: guardar o id do pré-cadastro no nosso banco, por paciente) e de combinar com a recepção como juntam duplicados.
 - O que a recepção vê do pré-cadastro na agenda (a conferir com o Klingo).
 
-### 2.4 Convênio (**provado** na consulta, **não testado** na marcação)
+### 2.4 Convênio (**provado** na consulta e na marcação)
 - Lista: `GET /convenios` → 31 convênios, cada um com os seus `planos`. O `plano` que vai na busca e na marcação é o **id do plano** (ex.: PARTICULAR = 1, PLANSERV = 28, SUS = 34).
 - **Planos inativos não aparecem na lista**, mas respondem pelo número (`Plano X inativo`).
 - **ASSEFAZ não foi encontrado** (nem na lista, nem pelo nome). Falta o número do plano com a recepção.
 - Planos dentro de "Particular": 1 PARTICULAR, 8 CORTESIA, 9 COLABORADOR (DESCONTO), 10 FAZ BEM BENEFÍCIOS, 4949 MEU TESOURO.
-- `GET /agenda/verificar_horario` e `GET /agenda/horario_procedimentos?horario=<chave>` mostram operadoras e procedimentos aceitos por um horário. Convênio costuma pedir carteirinha/matrícula (`convenio` no cadastro do paciente); **não testado** o que o Klingo exige na marcação.
+- `GET /agenda/verificar_horario` e `GET /agenda/horario_procedimentos?horario=<chave>` mostram operadoras e procedimentos aceitos por um horário. **Provado na marcação:** com o plano **Planserv (28)** a marcação foi **aceita sem carteirinha/matrícula** no cadastro (a recepção confere depois); com plano **inativo** (Bradesco, 17) a marcação é recusada: `403 "Plano BRADESCO SAUDE inativado."`. `GET /agenda/especialidades?id_plano=28` lista as especialidades que o plano atende (neurologia e pediatria para o Planserv). `GET /preco?id_procedimento=1096&id_plano=1` → `{id_item_tabela, valor}` (o valor veio inteiro; `id_item_tabela` nulo nesses casos). O que o cadastro guarda de convênio fica em `convenio` (`id`, `nome`, `reg_ans`, `id_plano`, `validade`…).
 
-### 2.5 Cancelar, remarcar, ver marcações (**não testado**)
-- `GET /vouchers` (Bearer): marcações do paciente (`agendado`, `atendido`, `checkin`); não tem filtro de período.
-- `DELETE /voucher` com `{"id":"26610"}` (Bearer): cancela. Nos testes, o call center cancelou à mão.
-- Remarcar: `POST /agenda/horario` com `remarcacao: <id da marcação antiga>`.
-- Check-in: `POST /checkin` com `{"id": <voucher>, "expresso": false, "preferencial": false}`.
+### 2.5 Cancelar, remarcar, trocar procedimento, check-in e ver marcações (**provado**)
+- `GET /vouchers` (Bearer): lista as marcações **ativas** do paciente (`id`, `status` = `agendado`/`atendido`/`checkin`, `tipo`, `data`, `hora`, `realizador`, `unidade`…). **Marcação cancelada não aparece.** Não tem filtro de período. Paciente sem marcação: `[]`.
+- **Cancelar:** `DELETE /voucher` com `{"id":"26638"}` (Bearer) → `200`, e o horário **volta à lista na hora**. Cancelar de novo: `403 "Agendamento já cancelado."`. Os vouchers de teste foram cancelados assim, pela API.
+- **Remarcar:** `POST /agenda/horario` com o novo horário e `"remarcacao": <id do voucher antigo, número>` → `200` com o **voucher novo**; o antigo é **cancelado sozinho**.
+- **Trocar o procedimento** de uma marcação: `PUT /agenda/procedimento` com `{"id_marcacao": <número>, "id_procedimento": 1472}` → `200` com o voucher.
+- **Check-in:** `POST /checkin` só vale **no dia do atendimento**; de outra data: `403 "Agendamento para outra data: 26641 / 2026-11-17"`. (Check-in no dia, `DELETE /checkin` e a resposta do check-in expresso **não foram testados**.)
+- **Opções da marcação, provadas:** `id_externo` fica gravado no voucher; `obs` fica gravada (`"obs":"…"` no voucher); `revisao:true` e `confirmado:"texto"` foram aceitos (o `status` continua `agendado`; a confirmação não aparece em `/vouchers`); `email:false` não envia e-mail.
 
-### 2.6 Resultado de exame (**não testado**)
+### 2.6 Resultado de exame (**parcialmente testado**)
 - Rotas com **só a chave da clínica**: `GET /resultado/{id_marcacao}` (laudo em HTML e PDF base64, `pronto`, `status`), `GET /resultado/pdf/{id_marcacao}` (laboratório), `GET /resultado/pdf/an/{accession_number}` (imagem; confere nascimento ou id do paciente). `GET /atendimentos?data=` lista os atendimentos do dia.
 - **Não existe link nem senha**: o resultado vem como arquivo. Não há como ler senha de portal pela API (só criar conta com `/externo/portal/register` ou mandar e-mail de recuperação com `/externo/portal/recuperar`).
 - Para achar o número da marcação: entrar como o paciente e ler `GET /vouchers` (os `atendido`).
+- **Provado:** para uma marcação **sem laudo** (voucher de teste cancelado), `GET /resultado/{id}` e `GET /resultado/pdf/{id}` respondem **`403` com uma página HTML** (não JSON). O código deve tratar 403 como "sem resultado" e **não** tentar ler JSON. **Não testado:** o laudo pronto em si (nenhum paciente de teste tem exame feito; não se buscou laudo de terceiros).
+- Cuidado: `GET /atendimentos?data=AAAA-MM-DD` devolve **todos os atendimentos do dia com dados completos dos pacientes** (nome, CPF, mãe, endereço, telefone; ~140 a 250 linhas) — não usar sem necessidade; **não traz o número da marcação**, então não leva ao laudo.
 - Regras: conferir CPF + nascimento antes; só entregar se `pronto` for verdadeiro; não guardar o PDF nem logar o conteúdo.
 
 ### 2.7 Aviso automático de mudança (webhook, **não configurado**)
 O Klingo chama uma URL nossa quando a marcação muda. Cabeçalhos `X-APP-TOKEN`, `X-DOMAIN`, `X-EVENT` (`STATUS-MARCACAO`, `REMARCACAO`, `CHAMADA`, `FIM-ATENDIMENTO`). Corpo: `id_marcacao`, `status` (A aberto, B bloqueado, C cancelado), `motivo`, `checkin`, `evento {nome, local}`, `nova` (só na remarcação). Substitui a leitura de relatórios para saber que um paciente chegou ou cancelou.
 
-### 2.8 API de Confirmação ("telefonia", **não testada**)
-`https://api-externa.klingo.app/api/telefonia` (chave da clínica): `POST /entrada`, `GET /lista/{data}` (marcações do dia para confirmar), `GET /{id}`, `POST /confirmar`, `POST /nps`, `GET /lista_ultimo_por_cpf`, `GET /bloqueios`. É para ligações de confirmação, NPS e bloqueios de agenda. **Não trata de cadastro nem de marcação.**
+### 2.8 API de Confirmação ("telefonia")
+`https://api-externa.klingo.app/api/telefonia` (chave da clínica): `POST /entrada`, `GET /lista/{data}` (marcações do dia para confirmar), `GET /{id}`, `POST /confirmar`, `POST /nps`, `GET /lista_ultimo_por_cpf`, `GET /bloqueios`. É para ligações de confirmação, NPS e bloqueios de agenda. **Não trata de cadastro nem de marcação.** **Testada em 12/11/2026:** `GET /api/telefonia/live` e `GET /api/telefonia/bloqueios` responderam **404** com a chave da clínica: provavelmente **não está habilitada** para a CSI. Perguntar ao Klingo se for útil.
 
 ---
 
@@ -129,9 +143,35 @@ O Klingo chama uma URL nossa quando a marcação muda. Cabeçalhos `X-APP-TOKEN`
 | Procedimentos de consulta | neurologia **1096** CONSULTA e **1472** CONSULTA NEUROPEDIATRIA · pediatria **1132** CONSULTA · radiologia **1150** CONSULTA MÉDICA. |
 | Exames | `GET /agenda/exames?busca=ultra` devolve id, descrição, TUSS, classe (ex.: `USG`). |
 | Convênios | 31 ativos na lista (AMIL, BRADESCO, SULAMÉRICA, UNIMED, PLANSERV, SUS…). Planos inativos ficam escondidos. |
+| Unidade de exames | existe uma terceira unidade, **"CSI - 2" (id 3)**, usada por ressonância (apareceu na chave do horário: `…|101|77|3|07:00`). `GET /unidades` listou só 1; a lista de horários mostra as outras. |
+| Exames com horário (15 dias) | ECG (1853) 8; mamografia (1244/1889/586/1573) ~603 (14 dias); ultrassons (1724, 1725) 19 e 71; ecocardiograma/elastografia (1920, 1558) 4; ressonância defecorresonância (1996) 414. Todos pela unidade CSI; exame sem horário devolve lista vazia. |
+| Outros catálogos | `GET /profissionais?especialidade=225112` → 2 médicos (com `especialidades[].paciente_idade_maxima`); `GET /profissional?id_medico=63` → inclui `regras` (`in_prazo_revisao`, idade mínima/máxima, sexo); `GET /agenda/profissionais?id_procedimento&id_plano`; `GET /agenda/consultas?cbos=225112` → 1096 e 1472; `GET /formas_de_pagamento` → 9 formas; `GET /recepcoes?cnes=1` → 3 recepções; `GET /regiao_cd?cnes=1` → vazio (sem coleta domiciliar). |
 | Disponibilidade vista | neurologia: 71 horários em 15 dias (uma médica, unidade PEDIATRIA); pediatria: 50 em 11 dias (vários médicos); radiologia: poucos (unidade CSI). |
 
 ---
+
+## 3.1 Limite de requisições e tabela de erros (**provado**)
+
+- **Limite:** depois de ~14 chamadas seguidas, sem pausa, o Klingo respondeu **`429`** com uma página HTML. A função de testes passou a esperar **0,8 s entre chamadas** e não viu mais 429; o limite exato é desconhecido (perguntar ao Klingo). O código deve esperar e tentar de novo, e **nunca martelar** a API.
+- Respostas de erro podem ser JSON `{"status_code","msg","code"}` ou, em alguns casos (403 de resultado, 429), **uma página HTML**: sempre checar o tipo antes de ler JSON.
+
+| Situação | Código e mensagem |
+|---|---|
+| Chave ausente | `401 Token de app não enviado. [HEADER:X-APP-TOKEN]` |
+| Chave errada ou sem o prefixo `clinicacsi:` | `401 Token inválido. [HEADER:X-APP-TOKEN]` |
+| Rota de paciente sem sessão válida (ex.: proxy que muda o cabeçalho) | `401 ID de cliente inválido []` |
+| CPF fora do formato | `403 {"cpf":["O campo cpf deve ter 11 dígitos."]}` |
+| Paciente não encontrado | `403 {"msg":"Paciente não identificado: . <cpf>","code":"PACIENTE_NAO_IDENTIFICADO"}` (a mensagem repete o CPF: não registrar em log) |
+| Plano que não existe (ou passado pelo nome) | `403 {"plano":["Plano não identificado."]}` |
+| Plano inativo (busca) | `403 {"status_code":403,"msg":"Plano BRADESCO SAUDE inativo."}` |
+| Plano inativo (marcação) | `403 {"msg":"Plano BRADESCO SAUDE inativado.","status_code":403}` |
+| Convênio sem médico | `403 "Nenhum médico credenciado para CONSULTA (68), para operadora X."` |
+| Horário reservado/ocupado (reservar) | `403 "Horário já ocupado. [reservado 2026-11-17 11:00/6901]"` |
+| Horário reservado/ocupado (marcar) | `400 "Horário já ocupado. …ID: 6901"` (com `code` e `origem`) |
+| Cancelar voucher já cancelado | `403 "Agendamento já cancelado."` |
+| Check-in fora do dia | `403 "Agendamento para outra data: <voucher> / <data>"` |
+| Resultado sem laudo | `403` com página HTML |
+| Limite de requisições | `429` com página HTML |
 
 ## 4. A função `klingo-agenda-api` (no Supabase)
 
@@ -154,6 +194,8 @@ select net.http_post(
   body := jsonb_build_object('acao','horarios','especialidade','225112','inicio','2026-11-17','fim','2026-11-20'));
 -- a resposta fica em net._http_response (id devolvido acima)
 ```
+**Função temporária `klingo-teste-api`:** foi usada em 12/11/2026 para rodar os testes com sessão de paciente (o ambiente do Claude não consegue, por causa do proxy). **Foi desativada** (responde 410 e exige JWT) e **pode ser apagada** no painel do Supabase. Não foi para o repositório de propósito: ela executava passos arbitrários na API com a sessão de qualquer paciente (protegida só pela chave interna).
+
 Publicar de novo: painel https://supabase.com/dashboard/project/nrvuynjwcgwpjdptkiay/functions (ou a ferramenta de deploy), mantendo `verify_jwt=false`.
 
 ---
@@ -173,19 +215,50 @@ Publicar de novo: painel https://supabase.com/dashboard/project/nrvuynjwcgwpjdpt
 | Reserva/`GET /paciente` **pelo ambiente do Claude** | 401 "ID de cliente inválido" (era o proxy) |
 | Marcação, paciente com cadastro, pela função | **voucher 26610** (e 26617 na repetição) |
 | Marcação, paciente novo, pela função | **voucher 26616** |
-| `ASSEFAZ` no catálogo e no filtro | não encontrado |
+| `ASSEFAZ` no catálogo e no filtro | não encontrado (provavelmente plano inativo/escondido; falta o número com a recepção) |
+| **Grupo 1** (paciente novo): `GET /paciente`, `GET /vouchers` | 200; `[]` sem marcações |
+| Reservar → ver lista → soltar → lista | reserva 200 (expira em 10 min); horário continua na lista pública; soltar 200 |
+| Marcar, `PUT /agenda/procedimento`, `DELETE /voucher` | 200 / 200 / 200; horário volta à lista |
+| **Grupo 2:** conflito entre dois pacientes | 2º recebe 403 (reservar) e 400 (marcar): "Horário já ocupado" |
+| Remarcar (`remarcacao`) | 200; voucher antigo cancelado sozinho |
+| Cancelar voucher já cancelado | 403 "Agendamento já cancelado." |
+| Check-in de consulta futura | 403 "Agendamento para outra data" |
+| **Grupo 3:** `GET /paciente`, `/vouchers`, `/autorizacoes` (paciente com cadastro) | 200 (vazios) |
+| `POST /paciente/identificar` com CPF + nascimento | 200 com sessão |
+| Marcar com Planserv (28), sem convênio no cadastro | 200 (aceito); cancelado |
+| Marcar com plano inativo (17) | 403 "Plano … inativado." |
+| `PUT /paciente` | 200 |
+| `POST /externo/register` repetido (mesmo CPF) | 200 com **outro id** (duplicidade permitida) |
+| `GET /resultado/{id}` e `/pdf/{id}` sem laudo | 403 HTML |
+| Catálogos (profissionais, consultas, preço, formas de pagamento, recepções) | 200; `/precos` deu 429 (limite) |
+| API de telefonia (`/live`, `/bloqueios`) | 404 (não habilitada) |
+| **Grupo 4:** marcar exame ultrassom 1725; ressonância 1996 (unidade 3); `revisao`, `obs`, `confirmado` | todos 200; cancelados |
+| Sobrou marcação de teste? | não (conferido por `GET /vouchers` nos dois pacientes) |
 
 Vouchers de teste (todos neurologia, 17/11/2026, Dra. Geanne, unidade DESENVOAR, plano 1): 26610, 26616, 26617 — já cancelados pelo call center.
 
 ---
 
+## 5.1 O que continua NÃO testado (e por quê)
+- **Laudo pronto** (HTML/PDF): nenhum paciente de teste tem exame feito; não se buscou laudo de terceiros.
+- **Check-in no dia do atendimento** e `DELETE /checkin`: exigiria uma marcação para hoje.
+- **`POST /externo/portal/register`, `/externo/portal/login`, `/externo/portal/recuperar`**: criam conta do portal (e-mail e senha) e mandam e-mail; não são necessários para marcar.
+- **Webhook**: quem configura a URL é o Klingo (pedir a eles).
+- **Plano ASSEFAZ**: não aparece no catálogo; falta o número com a recepção.
+- **`email: true`** (e-mail de confirmação ao paciente): os pacientes de teste não têm e-mail cadastrado.
+- **`GET /agenda/verificar_horario`**: é um GET com corpo (a documentação é estranha aqui); usar `horario_procedimentos`.
+- **Telemedicina (`telemed`), coleta domiciliar (`id_regiao_cd`), agenda por ordem de chegada (`ordem_chegada`), `lista` de procedimentos associados, `solicitante` em exame, `/requisicao`**: nenhum horário de teste usou.
+- **Dinheiro** (`/adiantamento`, `/pagamento`, `/registrar_atendimento`): **de propósito não testados**; validar com o suporte.
+- **Homologação**: não existe; todos os testes foram em produção e **cancelados no fim**.
+
 ## 6. Plano para ligar ao chat
 
 Regras do projeto (`CLAUDE.md`): toda mudança de banco = arquivo novo em `supabase/` (fluxograma, versão, rollback) → testar no clone → aplicar em partes → medir → refazer o retrato → `npm run test:retrato`; toda mudança de tela troca `VERSAO_APP` (chat) e `VERSAO` nos `sw.js`.
 
+0. **Limite de requisições:** o chat não pode chamar a API a cada tecla; guardar o resultado por alguns segundos (como a `chat-agenda-ao-vivo` faz) e tratar `429` com espera.
 1. **Horários pela API (primeiro, sem risco de marcar):** no passo `horario` do chat, pedir os horários à função (com o token da conversa, como a `chat-agenda-ao-vivo`), guardar a **chave do horário** escolhido no pedido e mostrar dia, hora, médico e unidade. A grade atual (`catalogo_agenda` − `agenda_ocupacao`) fica como **plano B**, com interruptor em `config`. Tratar `sem_medico_credenciado` e plano inativo com mensagem clara.
 2. **Marcação de quem já tem cadastro:** no passo `confirmar`, chamar `marcar` com `executar:true`, gravar o voucher no pedido e marcar "Agendado". Se o horário foi tomado, voltar ao passo `horario` com horários novos.
-3. **Paciente novo:** a função passa a fazer o `/externo/register` + `marcar_pre`. Guardar o id do pré-cadastro por paciente no nosso banco (para não duplicar) e combinar com a recepção.
+3. **Paciente novo:** a função passa a fazer o `/externo/register` + `marcar_pre`. **Guardar o id do pré-cadastro por paciente no nosso banco e nunca registrar de novo** (a API aceita duplicar: provado). Combinar com a recepção como juntam os duplicados.
 4. **Webhook** do Klingo para status/chegada/cancelamento; depois desligar as rotinas que leem relatório (`agenda-conferir`, `agendamento-reconhecer-klingo`, ocupação por relatório), **só depois de medir**.
 5. **Resultados:** ação `resultados` na função, com conferência de CPF + nascimento.
 
