@@ -1,5 +1,5 @@
 // FLUXOGRAMA: entrada (POST com x-sync-key = config.ia_segredo e {"acao": "versao" | "horarios" | "marcar", ...}) -> validação (chave, formato de datas/CPF, janela de até 31 dias) -> lógica (versao e horarios só LEEM da API do Klingo; marcar identifica o paciente pelo CPF, confere o nascimento, e só com "executar": true faz login -> reservar -> marcar, soltando a reserva se a marcação falhar) -> saída (horários e voucher enxutos; nunca nome, CPF, telefone ou corpo de erro do Klingo; nada vai para o log)
-// Versão 0.1 — 12/11/2026 / Mudança: EXEMPLO de agendamento pela API externa do Klingo (horários livres + marcação). Ainda NÃO está ligado ao chat nem publicado.
+// Versão 0.2 — 12/11/2026 / Mudança: agendamento pela API externa do Klingo (horários livres + marcação), publicada para TESTE (verify_jwt=false; quem prova é o x-sync-key). Ainda NÃO está ligada ao chat. 0.2: o id de login vem do Klingo já com "P" e a sessão é conferida (id e nascimento) antes de reservar.
 //
 // Ações:
 //   {"acao":"versao"}                                                      -> {"ok":true,"api":"OK [API1]"}
@@ -51,13 +51,17 @@ Deno.serve(async (req: Request) => {
 
       // 1) Identifica pelo CPF e confere o nascimento (mesma regra do klingo-paciente: sem bater, nada acontece).
       const pac = await api.pacientePorCpf(cpf) as Record<string, unknown> | null;
-      const idPaciente = pac?.id ?? pac?.id_paciente ?? pac?.id_origem; // CONFIRMAR qual campo a API devolve (ver docs)
-      if (!pac || idPaciente === undefined || idPaciente === null) return json({ ok: false, motivo: "nao_encontrado" });
+      const idLogin = String(pac?.id ?? "");
+      if (!pac || !idLogin) return json({ ok: false, motivo: "nao_encontrado" });
       if (dataIso(pac.dt_nasc) !== nasc) return json({ ok: false, motivo: "nascimento_nao_confere" });
+      // Só paciente DEFINITIVO ("P" + número). Qualquer outro formato não é logado (o login com id errado abre a sessão de outra pessoa).
+      if (!/^P\d+$/.test(idLogin)) return json({ ok: false, motivo: "cadastro_sem_id_definitivo" });
       if (c?.executar !== true) return json({ ok: true, simulacao: true, proximos_passos: ["login", "reservar", "marcar"] });
 
-      // 2) Sessão do paciente -> reserva (10 min) -> marcação. Se a marcação falhar, solta a reserva.
-      const sessao = await api.login(String(idPaciente));
+      // 2) Sessão do paciente (conferida) -> reserva (10 min) -> marcação. Se a marcação falhar, solta a reserva.
+      const { token: sessao, user } = await api.login(idLogin);
+      // Confere QUEM abriu a sessão antes de reservar ou marcar: o id e o nascimento têm de ser os do cadastro achado pelo CPF.
+      if (String(user.id ?? "") !== idLogin || dataIso(user.nascimento) !== nasc) return json({ ok: false, motivo: "sessao_nao_confere" });
       const m = { horario, procedimento, plano, enviarEmail: c?.enviar_email === true, idExterno: soTexto(c?.id_externo, 60) ?? undefined };
       const reserva = await api.reservar(sessao, m);
       try {

@@ -143,11 +143,16 @@ export class KlingoApi {
   /** GET /paciente/cpf — identifica o cadastro pelo CPF (11 dígitos). */
   pacientePorCpf(cpf: string) { return this.chamar<Record<string, unknown>>("GET", "/paciente/cpf", { query: { cpf } }); }
 
-  /** POST /externo/login — sessão do paciente. O id vai precedido de "P" (ex.: P123). Devolve o access_token. */
-  async login(idPaciente: string | number): Promise<string> {
-    const r = await this.chamar<{ access_token?: string }>("POST", "/externo/login", { corpo: { id: `P${idPaciente}` } });
+  /**
+   * POST /externo/login — abre a sessão. O id vai EXATAMENTE como o Klingo o devolveu:
+   *  - paciente definitivo: "P148289" (é o `id` de GET /paciente/cpf, já com o P);
+   *  - pré-cadastro: o número puro devolvido por /externo/register (sem P). Com P abre OUTRO paciente (testado em 12/11/2026).
+   * Devolve o token e o `user` da sessão, para o chamador conferir quem é antes de reservar ou marcar.
+   */
+  async login(idLogin: string): Promise<{ token: string; user: Record<string, unknown> }> {
+    const r = await this.chamar<{ access_token?: string; user?: Record<string, unknown> }>("POST", "/externo/login", { corpo: { id: String(idLogin) } });
     if (!r?.access_token) throw new KlingoErro(0, "/externo/login", "sem access_token");
-    return r.access_token;
+    return { token: r.access_token, user: r.user ?? {} };
   }
 
   /** POST /agenda/reservar — segura o horário por ~10 min, sem marcar. */

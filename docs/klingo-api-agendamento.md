@@ -1,6 +1,6 @@
 # Agendamento automático pela API externa do Klingo (exemplo — 12/11/2026)
 
-**Estado: exemplo escrito, testado com dados inventados e conferido com chamadas REAIS de leitura em 12/11/2026 (sem paciente). NÃO está publicado e NÃO está ligado ao chat.** Nada na produção mudou.
+**Estado (12/11/2026): função `klingo-agenda-api` PUBLICADA no Supabase para teste (v1, `verify_jwt=false`, protegida por `x-sync-key`), NÃO ligada ao chat. Provado em produção: horários, ensaio de marcação e MARCAÇÃO REAL de paciente já cadastrado (voucher 26610, neurologia 17/11 14:20, plano 1, paciente que autorizou; cancelamento fica com o call center). Falta provar: paciente novo (pré-cadastro).**
 
 Fonte: https://app.swaggerhub.com/apis/agsx30/klingo-api-externa/1.0.0 (cópia da documentação oficial, PDF e JSON, em `docs/klingo-api-externa/`) (API "Klingo API Externa" 1.0.0, suporte@klingo.com.br). Endereço real: `https://api-externa.klingo.app/api`. Conferido em 12/11/2026: `GET /live` responde `OK [API1]` (sem chave, sem dado de paciente).
 
@@ -75,18 +75,20 @@ Achados que mudam o desenho:
 
 ## O que ainda NÃO sei
 
-1. **Qual campo de `GET /paciente/cpf` é o id usado em `P<id>`** (o código tenta `id`, `id_paciente`, `id_origem`). Só se descobre com um paciente real que autorize; **não foi testado**.
-2. **Se as rotas só de paciente (`reservar`, `horario`) também exigem `X-APP-TOKEN`** junto do Bearer (o cliente manda os dois). Idem: só testável com sessão de paciente.
+1. ~~Qual campo de `GET /paciente/cpf` é o id do login~~ **Resolvido:** é o `id` (já vem como `P148289`). O login usa esse valor exato.
+2. ~~Se `reservar`/`horario` aceitam `X-APP-TOKEN` + Bearer~~ **Resolvido:** funciona assim (testado de dentro do Supabase).
 3. **Se a marcação feita pela API aparece nos relatórios do Klingo** (#7, #14359) no mesmo ritmo das marcações da equipe. Hoje a equipe confere assim; precisa de uma marcação de teste.
 4. Mapeamento do nosso catálogo para `procedimento`/`plano` da API (o id da API é o `procedimento` de cada dia; planos vêm de `/convenios`).
-5. Limite de chamadas e expiração do `access_token`.
+5. Limite de chamadas. O `access_token` dura 10 h (`expires_in` 36000).
+6. **Paciente novo:** reservar/marcar com a sessão do pré-cadastro (login sem `P`). Não testado de verdade (o 401 anterior foi do proxy do Claude).
+7. **Convênio inativo:** a API avisa com 403 "Plano X inativo" (visto com Bradesco Saúde, plano 17). O chat deve tratar essa resposta.
 
 ## Paciente novo e pré-cadastro (Klingo explicou em 12/11/2026, pelo grupo de WhatsApp)
 
 - **"Toda marcação gera pré-cadastro"** e o pré-cadastro **"vai pra agenda"**: o paciente novo **não precisa de aprovação antes de marcar**; a recepção completa o cadastro depois, a partir da agenda.
 - `POST /externo/register` devolve o id do **pré-cadastro**. **Esse id NÃO é o do paciente definitivo.** O login `P<id>` (com `P`) é para o paciente definitivo: em 12/11 o `P7960` abriu a sessão de OUTRA paciente que já existia. Nunca logar `P<id>` com um id de pré-cadastro.
 - Hipótese ainda não testada: o pré-cadastro entra com o id **sem o `P`**, e a sessão traria `user.id` = o próprio id e `id_paciente` vazio (o Swagger descreve `id_paciente` como "id do cadastro definitivo"). **Qualquer login deve conferir nome, sexo e nascimento da sessão com o paciente esperado antes de reservar ou marcar**, e descartar a sessão se não bater.
-- **Testado em 12/11/2026 (com autorização do próprio paciente):** `POST /externo/login {"id":"7960"}` (sem `P`) abriu a sessão do pré-cadastro certo (nome, sexo e nascimento conferiram; `user.id`=7960, `id_paciente`=null, `plano` vazio). Com essa sessão, `GET /agenda/horarios` funciona, mas **`POST /agenda/reservar`, `GET /paciente` e `GET /vouchers` respondem 401 "ID de cliente inválido []"**. Ou seja: a sessão de pré-cadastro (sem `id_paciente`) **não consegue reservar nem marcar** por essas rotas. Nenhuma reserva nem marcação foi criada. Falta descobrir com o Klingo como marcar paciente novo (portal? cadastro definitivo feito pela recepção?).
+- **ATENÇÃO — CORREÇÃO (12/11/2026, depois da publicação da função):** o "401 ID de cliente inválido" visto em `reservar`, `GET /paciente` e `GET /vouchers` **era do ambiente de teste do Claude** (um proxy que mexe nos cabeçalhos), **não do Klingo**. De dentro do Supabase, o paciente definitivo foi logado, reservado e marcado sem erro (voucher 26610). **Portanto o que se concluiu sobre o pré-cadastro (sessão sem `id_paciente` não reserva) NÃO foi provado e deve ser retestado pela função.** Fatos que continuam valendo: `P<id>` abre o paciente definitivo; o id do pré-cadastro entra no login **sem** o `P` (sessão com `user.id`=7960 e `id_paciente` vazio, identidade conferida).
 - O login só com a chave da clínica abre a sessão de qualquer paciente: o sistema precisa conferir CPF e nascimento antes (como o `klingo-paciente` já faz).
 
 ## Como trocar os horários do chat para esta API (plano, não feito)

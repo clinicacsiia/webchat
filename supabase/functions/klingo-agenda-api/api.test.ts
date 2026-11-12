@@ -61,15 +61,20 @@ test("horarios: sem especialidade nem exame não chama a API", async () => {
   assert.equal(chamadas.length, 0);
 });
 
-test("login: precede o id com P e devolve o access_token", async () => {
-  const { f, chamadas } = falso([[200, { access_token: "SESSAO-1" }]]);
-  assert.equal(await new KlingoApi("T", f).login(123), "SESSAO-1");
+test("login: manda o id exatamente como recebido e devolve token e user", async () => {
+  const { f, chamadas } = falso([[200, { access_token: "SESSAO-1", user: { id: "P123", nascimento: "1990-01-01" } }], [200, { access_token: "SESSAO-2", user: { id: 7960 } }]]);
+  const api = new KlingoApi("T", f);
+  const a = await api.login("P123");
+  assert.equal(a.token, "SESSAO-1");
+  assert.equal(a.user.id, "P123");
   assert.equal(chamadas[0].init.method, "POST");
-  assert.deepEqual(JSON.parse(String(chamadas[0].init.body)), { id: "P123" });
+  assert.deepEqual(JSON.parse(String(chamadas[0].init.body)), { id: "P123" });   // não acrescenta outro P
+  await api.login("7960");                                                         // pré-cadastro: sem P
+  assert.deepEqual(JSON.parse(String(chamadas[1].init.body)), { id: "7960" });
 });
 test("login: resposta sem token é erro", async () => {
   const { f } = falso([[200, {}]]);
-  await assert.rejects(new KlingoApi("T", f).login(1), KlingoErro);
+  await assert.rejects(new KlingoApi("T", f).login("P1"), KlingoErro);
 });
 
 test("reservar e marcar: usam a sessão como Bearer e o corpo do Swagger", async () => {
