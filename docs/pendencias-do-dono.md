@@ -66,6 +66,16 @@ A conferência por CPF + nascimento (`klingo-paciente`) nunca foi provada com um
 ### 2.7 Desenho do cadastro do paciente
 Decidir se o login continua opcional como está ou se vira o cadastro único (nome, telefone e e-mail, com a senha confirmada pela data de nascimento) e quando abrir ao público.
 
+### 2.8 Ligar o encerramento por inatividade (48 h)
+- **O que acontece:** o código está pronto e testado no clone, mas **não está valendo**. A conversa sem resposta do paciente por 48 h passa a ser encerrada como "Não respondido" (às 24 h continua só marcando "Chamar no WhatsApp"). O SQL ainda não foi aplicado na produção e a chave nasce desligada.
+- **Como resolver:**
+  1. Junte a PR: https://github.com/clinicacsiia/webchat/pull/154 (é ela que traz o seletor no painel).
+  2. Peça ao Claude "aplique o SQL das 48 h" (`supabase/autoencerrar-fechar-48h.sql`). Ele aplica em partes, mede o efeito e refaz o retrato.
+  3. No painel, em Configurações > Encerramento e avaliação, ponha **Encerrar por inatividade** em **Simulação** por alguns dias e olhe a contagem: https://clinicacsiia.github.io/webchat/painel/
+  4. Se a contagem estiver certa, mude para **Ligado**.
+- **Atenção:** ao encerrar, o paciente recebe a mensagem de despedida. Se algo fechar errado, reabra pelo botão Reabrir, uma a uma. Desligar é imediato (volta a chave para Desligado).
+- **Detalhes:** `docs/autoencerramento.md`.
+
 ---
 
 ## 3. Contas e segurança
