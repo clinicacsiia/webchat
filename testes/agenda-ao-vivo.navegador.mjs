@@ -164,7 +164,7 @@ await caso('na pergunta de médico, confere o Klingo e mostra o próximo horári
   const textos = await page.$$eval('#msgs .op[data-valor]', (bs) => Object.fromEntries(bs.map((b) => [b.dataset.valor, b.textContent.replace(/\s+/g, ' ').trim()])));
   const ordem = nomesChamadas(mundo);
   await ctx.close();
-  return { ok: /Dra Ana.*Próximo horário: \w{3}, \d{2}\/\d{2} às 08:30/.test(textos['DRA ANA']) && /Dr Pedro.*Sem horário livre nos próximos dias/.test(textos['DR PEDRO'])
+  return { ok: /Dra Ana.*Próximo horário: [^\s,]{3}, \d{2}\/\d{2} às 08:30/.test(textos['DRA ANA']) && /Dr Pedro.*Sem horário livre nos próximos dias/.test(textos['DR PEDRO'])
       && !/Próximo|Sem horário|conferindo/.test(textos['']) && ordem.indexOf('fn:chat-agenda-ao-vivo') < ordem.indexOf('chat_medicos_disponiveis') && erros.excecoes.length === 0,
     detalhe: JSON.stringify(textos) };
 });

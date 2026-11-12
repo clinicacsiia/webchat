@@ -1,6 +1,6 @@
 # Pendências que dependem do dono
 
-Versão 1.0 — 11/11/2026 / Mudança: lista única, conferida na produção em 11/11/2026 às 14:50 (Brasília)
+Versão 1.1 — 12/11/2026 / Mudança: seção 2.8 (autoatendimento Klingo). Versão 1.0 — 11/11/2026: lista única, conferida na produção em 11/11/2026 às 14:50 (Brasília)
 
 Só entra aqui o que **só você consegue fazer**: decidir, colar um segredo, autorizar, falar com terceiros. O que é técnico e não depende de você está no fim, para você saber que não está esquecido. Cada item tem o link direto da tela onde a ação acontece.
 
@@ -68,6 +68,14 @@ Decidir se o login continua opcional como está ou se vira o cadastro único (no
 
 ---
 
+## 2.8 Autoatendimento Klingo (12/11/2026): o que só você ou o Klingo fazem
+Detalhes e números em [`klingo-autoatendimento.md`](klingo-autoatendimento.md).
+- **Primeiro teste real de marcação** (o único passo para abrir a marcação sozinha): um paciente que autorize, o celular dele em `klingo_api_telefones_teste` (Configurações) e o call center avisado para cancelar. Passo a passo na seção 6 do documento. Sem isso a marcação sozinha fica em modo teste (ninguém usa) e o sistema não avança.
+- **Perguntas ao suporte do Klingo** (e-mail em `docs/klingo-api-externa/roteiro-reuniao-suporte.md`): a URL do webhook (`https://nrvuynjwcgwpjdptkiay.supabase.co/functions/v1/klingo-webhook`, com a chave da clínica no cabeçalho `X-APP-TOKEN`); o limite de chamadas por minuto; liberar ortopedia, endocrinologia e as outras especialidades na API (hoje só neurologia, pediatria e radiologia); o número do plano da ASSEFAZ; uma agenda de teste na API; se `/vouchers` mostra o `id_externo`.
+- **13 pacientes com nascimento diferente do Klingo** (o mesmo CPF com outra data): o sistema não marca sozinho para eles; a recepção confere (pode ser CPF do responsável de uma criança).
+- **Revisar `privacidade.html`** para citar a marcação automática e o envio de CPF ao Klingo (junto com o item 2.5).
+- **Código por SMS/e-mail** (segundo fator): sem ele, resultado de exame e troca de telefone ficam com a equipe (plano, etapa 6).
+
 ## 3. Contas e segurança
 
 ### 3.1 Plano do Supabase e proteção contra senha vazada
@@ -87,6 +95,7 @@ Um telefone de teste e o seu CPF saíram dos arquivos atuais, mas **continuam no
 ## 4. Limpezas pequenas (quando sobrar tempo)
 
 - Apagar a função temporária `klingo-inspecionar-chat`: https://supabase.com/dashboard/project/nrvuynjwcgwpjdptkiay/functions/klingo-inspecionar-chat
+- Apagar também a função de testes `klingo-teste-api` (já desativada; responde 410): https://supabase.com/dashboard/project/nrvuynjwcgwpjdptkiay/functions/klingo-teste-api
 - Conferir se os 7 bloqueios automáticos antigos de "mesma pessoa" (02/11) ainda existem; o comando está em `docs/pendencias-pessoa-unica.md` e precisa ser rodado por você no editor SQL: https://supabase.com/dashboard/project/nrvuynjwcgwpjdptkiay/sql/new
 - Testar o chat com 3 a 5 pessoas de 70 anos ou mais.
 - Decidir se o módulo "Fila com assinatura biométrica" segue ou é arquivado (está parado desde 30/10).

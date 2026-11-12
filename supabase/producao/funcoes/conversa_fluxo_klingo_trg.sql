@@ -8,7 +8,8 @@ CREATE OR REPLACE FUNCTION public.conversa_fluxo_klingo_trg()
 AS $function$
 begin
   if new.dados -> 'digitado' ? 'cpf' and new.dados -> 'digitado' ? 'dt_nasc' then
-    perform public.klingo_conferir_agendar(new.conversa_id);
+    begin perform public.klingo_identificar_agendar(new.conversa_id); exception when others then null; end;
+    begin perform public.klingo_conferir_agendar(new.conversa_id); exception when others then null; end;
   end if;
   return new;
 exception when others then

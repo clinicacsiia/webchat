@@ -22,6 +22,9 @@ begin
   if pa.identidade is not null then v := v || ('Cadastro: ' || case pa.identidade when 'conferida' then 'paciente conhecido, data de nascimento conferida'
       when 'divergente' then 'data de nascimento NÃO conferiu' when 'atualizar' then 'conhecido, atualizar dados' when 'aguardando' then 'aguardando conferência' else 'paciente novo' end); end if;
   if d ->> 'assunto' is not null then v := v || ('Assunto: ' || (d ->> 'assunto') || coalesce(' — ' || (d ->> 'assunto_texto'), '')); end if;
+  select 'Marcação automática: ' || o.estado || coalesce(' (' || o.codigo || ')', '') || coalesce(' — voucher ' || o.voucher_id, '') into x   -- klingo-auto
+    from public.klingo_operacao o where o.conversa_id = p_conversa order by o.criado_em desc limit 1;
+  if x is not null then v := v || x; end if;
   select string_agg(n, ' | ') into x from jsonb_array_elements_text(coalesce(d -> 'notas', '[]'::jsonb)) n;
   if x is not null then v := v || ('Observações: ' || x); end if;
   return array_to_string(v, E'\n');

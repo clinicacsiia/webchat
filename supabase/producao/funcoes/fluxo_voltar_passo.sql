@@ -1,11 +1,11 @@
 -- public.fluxo_voltar_passo(p_conversa uuid, p_op integer)
--- Pode executar: service_role
-CREATE OR REPLACE FUNCTION public.fluxo_voltar_passo(p_conversa uuid, p_op int)
- returns void
- language plpgsql
- security definer
- set search_path to ''
-as $function$
+-- Pode executar: ninguém pela API (só o dono/gatilhos/rotinas)
+CREATE OR REPLACE FUNCTION public.fluxo_voltar_passo(p_conversa uuid, p_op integer)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
 declare d jsonb; v_motivo text;
 begin
   select dados into d from public.conversa_fluxo where conversa_id = p_conversa;
@@ -27,6 +27,7 @@ begin
   when 8 then perform public.fluxo_set(p_conversa, '{"confirmado": false, "refazer": "pedido"}');
   when 9 then
     if v_motivo = 'assunto' then perform public.fluxo_set(p_conversa, '{"assunto": null}'); end if;
+  when 11 then perform public.fluxo_set(p_conversa, '{"confirmado": false, "cpf_nasc_refazer": true}');   -- klingo-auto
   when 10 then
     perform public.fluxo_set(p_conversa, '{"confirmado": false, "motivo": null, "refazer": null, "medico_feito": false, "assunto": null}');
     update public.pre_agendamento_itens set ativo = false where conversa_id = p_conversa and ativo;
@@ -34,3 +35,4 @@ begin
   else null;
   end case;
 end $function$;
+

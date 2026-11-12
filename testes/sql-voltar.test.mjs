@@ -10,7 +10,7 @@ const caso = async (nome, fn) => { try { const r = await fn(); registrar(nome, r
 import { readFileSync } from 'node:fs';
 import { REPO } from './banco-producao.mjs';
 const { db } = await criarBancoProducao();
-await db.exec(readFileSync(`${REPO}/supabase/chat-voltar.sql`, 'utf8'));
+// o retrato da produção já traz chat_voltar e fluxo_voltar_passo (com o passo cpf_nasc); recarregar o arquivo antigo desfaria isso
 const { q, um, como, anonimo } = ajudantes(db);
 
 const ADMIN = '00000000-0000-4000-8000-0000000000a1', ATEND = '00000000-0000-4000-8000-0000000000a2', OUTRO_PACIENTE = '00000000-0000-4000-8000-0000000000b1';
@@ -103,7 +103,7 @@ const pedidoDe = async (c) => { await como(''); return um(`select status, tipo, 
 const erroDe = async (fn) => { try { await fn(); return null; } catch (e) { return { code: e.code, msg: String(e.message).split('\n')[0] }; } };
 const flux = async (c) => { await como(''); return um(`select passo, dados from public.conversa_fluxo where conversa_id = $1`, [c]); };
 
-await caso('voltar do PLANO: refaz a escolha do exame (com o exame antigo trocado) e o resto do caminho continua até o fim', async () => {
+await caso('voltar do CPF E NASCIMENTO: refaz a escolha do exame (com o exame antigo trocado) e o resto do caminho continua até o fim', async () => {
   const p = await iniciar('Voltar Plano Teste');
   await responder(p, { motivo: 'exame' }); await responder(p, {});            // motivo, exame
   const antes = p.passos.join(' > ');
@@ -112,7 +112,7 @@ await caso('voltar do PLANO: refaz a escolha do exame (com o exame antigo trocad
   const refeito = await responder(p, {});                                        // escolhe o exame de novo
   const fim = await ateOFim(p, { plano: 'Particular', confirmar: 'ok' });
   const f = await pedidoDe(p.c);
-  return { ok: antes === 'motivo > exame > plano' && r.passo === 'exame' && p.passos[3] === 'exame' && /Tudo bem, vamos corrigir/.test(r.respostas.at(-1).texto) && refeito && fim.passos.at(-1) === 'acompanhar' && f.status === 'pronto',
+  return { ok: antes === 'motivo > exame > cpf_nasc' && r.passo === 'exame' && p.passos[3] === 'exame' && /Tudo bem, vamos corrigir/.test(r.respostas.at(-1).texto) && refeito && fim.passos.at(-1) === 'acompanhar' && f.status === 'pronto',
     detalhe: fim.passos.join(' > ') };
 });
 await caso('voltar do EXAME leva ao MOTIVO e dá para trocar de exame para consulta', async () => {
@@ -125,7 +125,7 @@ await caso('voltar do EXAME leva ao MOTIVO e dá para trocar de exame para consu
 });
 await caso('voltar do HORÁRIO leva ao PLANO e o plano antigo é apagado', async () => {
   const p = await iniciar('Voltar Horario Teste');
-  for (let i = 0; i < 3; i++) await responder(p, { motivo: 'exame', plano: 'Particular' });
+  for (let i = 0; i < 4; i++) await responder(p, { motivo: 'exame', plano: 'Particular' });   // motivo, exame, cpf_nasc, plano
   const ok1 = p.ult.opcoes.tipo === 'calendario';
   const r = await voltar(p);
   const pa = await pedidoDe(p.c);
@@ -144,12 +144,12 @@ await caso('voltar da CONFIRMAÇÃO leva ao último grupo de dados; voltar de no
   const a = await voltar(p), b = await voltar(p), c = await voltar(p), d = await voltar(p);
   return { ok: a.passo === 'dados_contato' && b.passo === 'dados_ident' && c.passo === 'horario' && d.passo === 'plano', detalhe: [a, b, c, d].map((x) => x.passo).join(' < ') };
 });
-await caso('CONSULTA: voltar do plano leva à escolha do médico; do médico, à consulta', async () => {
+await caso('CONSULTA: voltar do CPF e nascimento leva à escolha do médico; do médico, à consulta', async () => {
   const p = await iniciar('Voltar Consulta Teste');
   await responder(p, { motivo: 'consulta' }); await responder(p, {}); await responder(p, { medico: 'DRA EXEMPLO DOIS' });
   const a = await voltar(p), f = await flux(p.c);
   const b = await voltar(p);
-  return { ok: p.passos.slice(0, 4).join(' > ') === 'motivo > consulta > medico > plano' && a.passo === 'medico' && b.passo === 'consulta', detalhe: `${a.passo} / ${b.passo}` };
+  return { ok: p.passos.slice(0, 4).join(' > ') === 'motivo > consulta > medico > cpf_nasc' && a.passo === 'medico' && b.passo === 'consulta', detalhe: `${a.passo} / ${b.passo}` };
 });
 await caso('primeira pergunta: não há o que corrigir antes dela (recusa clara)', async () => {
   const p = await iniciar('Voltar Primeira Teste');
