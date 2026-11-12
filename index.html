@@ -99,13 +99,14 @@
   .capa .marca { position: relative; width: min(270px, 74%); z-index: 2; animation: capa-flut 5s ease-in-out infinite; }
   .capa img { display: block; width: 100%; height: auto; filter: drop-shadow(0 2px 0 rgba(255,255,255,.9)) drop-shadow(0 10px 8px rgba(0,70,130,.35)) saturate(1.15) contrast(1.05); }
   .capa .brilho { position: absolute; inset: 0; -webkit-mask: url(img/logo-csi.svg) center/contain no-repeat; mask: url(img/logo-csi.svg) center/contain no-repeat; background: linear-gradient(105deg, transparent 35%, rgba(255,255,255,.95) 50%, transparent 65%) -150% 0/60% 100% no-repeat; animation: capa-varre 4.5s ease-in-out infinite; }
-  .capa .ondas { position: absolute; left: 0; bottom: 0; width: 100%; height: 80px; z-index: 1; }
+  .capa .ondas { position: absolute; left: -10%; bottom: 0; width: 120%; height: 80px; z-index: 1; }
+  @media (max-height: 760px) { .capa { height: 190px; padding-top: 36px; } .capa .ondas { height: 60px; } }
   .capa .w1 { animation: capa-onda 7s ease-in-out infinite alternate; } .capa .w2 { animation: capa-onda 9s ease-in-out infinite alternate-reverse; }
   .capa .luz { position: absolute; border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,.9), rgba(255,255,255,0) 70%); animation: capa-flut 6s ease-in-out infinite; }
   .capa .l1 { width: 120px; height: 120px; left: -30px; top: 30px; } .capa .l2 { width: 80px; height: 80px; right: 10px; top: 10px; animation-delay: -2s; } .capa .l3 { width: 50px; height: 50px; left: 30%; top: 150px; animation-delay: -4s; }
   @keyframes capa-flut { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
   @keyframes capa-varre { 0%, 25% { background-position: -150% 0; } 70%, 100% { background-position: 250% 0; } }
-  @keyframes capa-onda { from { transform: translateX(-14px); } to { transform: translateX(14px); } }
+  @keyframes capa-onda { from { transform: translateX(-8px); } to { transform: translateX(8px); } }
   @media (prefers-reduced-motion: reduce) { .capa * { animation: none !important; } }
   /* Animações da tela inicial (todas desligam com "reduzir movimento") */
   .capa .bol { position: absolute; bottom: 40px; width: 8px; height: 8px; border-radius: 50%; background: rgba(0,136,204,.35); animation: capa-sobe 7s ease-in infinite; z-index: 1; }
@@ -613,7 +614,7 @@
   const CHAVE_HIST = 'webchat.historico.v1';   // as últimas conversas deste aparelho (cada uma com o seu token): dá para voltar a elas
   const MAX_HIST = 5;                          // mínimo pedido: 3
   // Muda a cada alteração do chat. Cópia de mensagens guardada por outra versão é descartada (era isso que mostrava conversa velha e travada).
-  const VERSAO_APP = '2026.11.12-4';
+  const VERSAO_APP = '2026.11.12-5';
   const ESCALAS = [1, 1.18, 1.36], TOAST_LETRA = ['Letra normal.', 'Letra grande.', 'Letra muito grande.'];
 
   // Chegou pelo link "esqueci a senha"? O supabase-js limpa o endereço ao ler o link, então a pergunta é feita antes de criá-lo.
