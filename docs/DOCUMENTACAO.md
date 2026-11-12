@@ -107,7 +107,7 @@ Algoritmo de referência (Python) da assinatura na tela, do módulo "Fila + assi
 
 ### 3.7 `docs/`
 
-Um documento por mudança ou decisão. Os mais úteis para começar: este; `auditoria-2026-11-11.md`; `pendencias-do-dono.md`; `planejamento-auditoria-2026-11-10.md` (decisões do dono, com as regras dos indicadores e das permissões); `klingo-relatorios-pendentes.md` (o que o Klingo entrega e o que falta); `klingo-api-agendamento.md` e `klingo-api-externa/` (API externa do Klingo: documentação oficial, testes reais e plano do agendamento automático); `fase7-motor-implementado.md` (o motor do chat).
+Um documento por mudança ou decisão. Os mais úteis para começar: este; `auditoria-2026-11-11.md`; `pendencias-do-dono.md`; `planejamento-auditoria-2026-11-10.md` (decisões do dono, com as regras dos indicadores e das permissões); `klingo-relatorios-pendentes.md` (o que o Klingo entrega e o que falta); `klingo-api-externa/GUIA-COMPLETO.md` (manual da API externa do Klingo), `klingo-api-agendamento.md` e `klingo-api-externa/` (API externa do Klingo: documentação oficial, testes reais e plano do agendamento automático); `fase7-motor-implementado.md` (o motor do chat).
 
 ### 3.8 `supabase-emails/`
 

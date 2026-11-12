@@ -4,6 +4,7 @@ Para consulta futura, sem depender do SwaggerHub estar no ar.
 
 | Arquivo | O que é |
 |---|---|
+| **`GUIA-COMPLETO.md`** | **COMECE POR AQUI.** Manual de como usar a API: consultar horários, marcar (paciente com cadastro e paciente novo), convênio, resultados, webhook, a função `klingo-agenda-api`, testes reais, plano para o chat e cuidados. |
 | `Klingo_API_Externa_Referencia.pdf` | Guia de referência rápida (8 páginas, versão 1.0.0), recebido do dono em 12/11/2026. Endpoints, fluxo de agendamento, webhook, modelos de dados e a lista do que **não** consta na documentação. |
 | `swagger-telefonia-1.0.0.json` | A outra API que o Klingo indicou ("Confirmação"): `https://api-externa.klingo.app/api/telefonia` — confirmar marcações por ligação, NPS, bloqueios de agenda. **Não trata de cadastro nem de marcação.** |
 | `roteiro-reuniao-suporte.md` | Roteiro para a reunião com o desenvolvedor do Klingo: objetivo, prova reproduzível do problema do paciente novo e perguntas. |
