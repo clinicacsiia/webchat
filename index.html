@@ -101,15 +101,15 @@
   .hero-nome { margin: 4px 0 0; font-size: calc(15px * var(--esc)); font-weight: 650; letter-spacing: .02em; color: var(--csi-sidebar-bg); }
   /* Capa da tela inicial: logo com brilho sobre degradê azul e ondas (sem o logo pequeno do topo nesta tela) */
   .app:has(#telaInicio:not([hidden])) .topo-logo { display: none; }
-  .capa { position: relative; overflow: hidden; margin: -18px -16px 4px; height: 250px; display: grid; place-items: start center; padding-top: 52px;
+  .capa { position: relative; overflow: hidden; margin: -18px -16px 4px; height: 220px; display: grid; place-items: start center; padding-top: 34px;
     background: radial-gradient(ellipse 85% 70% at 50% 36%, #fff 0%, rgba(255,255,255,.7) 50%, rgba(255,255,255,0) 100%), radial-gradient(circle at 96% 6%, rgba(160,220,250,.55), transparent 50%), linear-gradient(180deg, #d9eefa 0%, #ecf6fc 55%, var(--fundo) 100%);
     -webkit-mask-image: linear-gradient(#000 78%, transparent 100%); mask-image: linear-gradient(#000 78%, transparent 100%); }
-  .capa .marca { position: relative; width: min(270px, 74%); z-index: 2; animation: capa-flut 5s ease-in-out infinite; }
+  .capa .marca { position: relative; width: min(215px, 60%); z-index: 2; animation: capa-flut 5s ease-in-out infinite; }
   .capa img.anel { position: absolute; inset: 0; transform-origin: 85.2% 20.9%; animation: capa-gira 18s linear infinite; }
   .capa img { display: block; width: 100%; height: auto; filter: drop-shadow(0 2px 0 rgba(255,255,255,.9)) drop-shadow(0 10px 8px rgba(0,70,130,.35)) saturate(1.15) contrast(1.05); }
   .capa .brilho { position: absolute; inset: 0; -webkit-mask: url(img/logo-csi-sem-anel.svg) center/contain no-repeat; mask: url(img/logo-csi-sem-anel.svg) center/contain no-repeat; background: linear-gradient(105deg, transparent 35%, rgba(255,255,255,.95) 50%, transparent 65%) -150% 0/60% 100% no-repeat; animation: capa-varre 4.5s ease-in-out infinite; }
   .capa .ondas { position: absolute; left: -10%; bottom: 0; width: 120%; height: 80px; z-index: 1; }
-  @media (max-height: 760px) { .capa { height: 190px; padding-top: 36px; } .capa .ondas { height: 60px; } }
+  @media (max-height: 760px) { .capa { height: 170px; padding-top: 22px; } .capa .ondas { height: 60px; } }
   .capa .w1 { animation: capa-onda 7s ease-in-out infinite alternate; } .capa .w2 { animation: capa-onda 9s ease-in-out infinite alternate-reverse; }
   .capa .luz { position: absolute; border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,.9), rgba(255,255,255,0) 70%); animation: capa-flut 6s ease-in-out infinite; }
   .capa .l1 { width: 120px; height: 120px; left: -30px; top: 30px; } .capa .l2 { width: 80px; height: 80px; right: 10px; top: 10px; animation-delay: -2s; } .capa .l3 { width: 50px; height: 50px; left: 30%; top: 150px; animation-delay: -4s; }
@@ -509,7 +509,7 @@
     <button class="btn-menu btn-voltar" id="btnVoltarInicio" type="button" aria-label="Voltar ao início" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M12 5l-7 7 7 7"/></svg></button>
     <img class="topo-logo" src="img/logo-csi-simbolo.svg" alt="" width="89" height="30">
     <div class="topo-info">
-      <div class="topo-nome" id="empresa">CSI · Clínica de Saúde e Imagem</div>
+      <div class="topo-nome" id="empresa" hidden>CSI · Clínica de Saúde e Imagem</div>
       <div class="topo-status"><span class="ponto" id="ponto"></span><span id="status">Online</span></div>
     </div>
     <button class="btn-menu" id="btnMenu" aria-label="Menu" aria-haspopup="true" aria-expanded="false" hidden><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="4.5" r="2.6"/><circle cx="12" cy="12" r="2.6"/><circle cx="12" cy="19.5" r="2.6"/></svg></button>
@@ -647,7 +647,7 @@
   const CHAVE_HIST = 'webchat.historico.v1';   // as últimas conversas deste aparelho (cada uma com o seu token): dá para voltar a elas
   const MAX_HIST = 5;                          // mínimo pedido: 3
   // Muda a cada alteração do chat. Cópia de mensagens guardada por outra versão é descartada (era isso que mostrava conversa velha e travada).
-  const VERSAO_APP = '2026.11.12-12';
+  const VERSAO_APP = '2026.11.12-13';
   const ESCALAS = [1, 1.18, 1.36], TOAST_LETRA = ['Letra normal.', 'Letra grande.', 'Letra muito grande.'];
 
   // Chegou pelo link "esqueci a senha"? O supabase-js limpa o endereço ao ler o link, então a pergunta é feita antes de criá-lo.
