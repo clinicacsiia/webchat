@@ -2470,7 +2470,19 @@
     const out = []; let dia = '', ultimoQuem = '', ultimaConv = null;
     const unidas = S.abertaId && membrosDe(S.abertaId).length > 1;
     if (unidas) S.msgs.sort((a, b) => String(a.criado_em).localeCompare(String(b.criado_em)) || a.id - b.id);
+    // Encerrar fecha todas as conversas unidas e cada uma grava a sua despedida: mostra uma só por encerramento (a da conversa aberta; senão a primeira).
+    const escondidas = new Set();
+    if (unidas) {
+      const desp = S.msgs.filter((m) => m.opcoes && m.opcoes.tipo === 'despedida' && !m.excluida_em);
+      desp.forEach((m) => {
+        const t = Date.parse(m.criado_em);
+        const par = desp.filter((x) => Math.abs(Date.parse(x.criado_em) - t) < 120000);
+        const fica = par.find((x) => x.conversa_id === S.abertaId) || par[0];
+        if (fica !== m) escondidas.add(m.id);
+      });
+    }
     S.msgs.forEach((m) => {
+      if (escondidas.has(m.id)) return;
       // Assumir muda todas as conversas unidas e cada uma grava o seu "entrou na conversa": mostra só o da conversa aberta (o paciente só vê esse).
       if (unidas && m.autor === 'sistema' && m.conversa_id !== S.abertaId && /entrou na conversa\.$/.test(m.texto || '')) return;
       const d = rotuloDia(m.criado_em);
