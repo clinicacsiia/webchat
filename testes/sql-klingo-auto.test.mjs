@@ -13,11 +13,11 @@ const caso = async (nome, fn) => { try { const r = await fn(); registrar(nome, r
 const { db, falhas } = await criarBancoProducao();
 const { q, um, como, anonimo } = ajudantes(db);
 await db.exec(`insert into vault.secrets_tbl (name, secret) values ('klingo_hash_sal', 'sal-de-teste'), ('klingo_interno_segredo', 'interno-de-teste')`);
-for (const f of ['klingo-auto-parte1-tabelas', 'klingo-auto-parte2-base', 'klingo-auto-parte3-identidade', 'klingo-auto-parte4a-operacao', 'klingo-auto-parte4b-motor', 'klingo-auto-parte5-autogestao', 'klingo-auto-parte6-novo-e-eventos', 'klingo-auto-parte7-indicadores', 'klingo-auto-parte8-pos-marcacao', 'klingo-auto-parte9-voltar', 'klingo-auto-parte10-interruptor-geral', 'klingo-auto-parte11-voltar-mae-divergencia', 'klingo-auto-parte12-convenio-segue-klingo']) {
+for (const f of ['klingo-auto-parte1-tabelas', 'klingo-auto-parte2-base', 'klingo-auto-parte3-identidade', 'klingo-auto-parte4a-operacao', 'klingo-auto-parte4b-motor', 'klingo-auto-parte5-autogestao', 'klingo-auto-parte6-novo-e-eventos', 'klingo-auto-parte7-indicadores', 'klingo-auto-parte8-pos-marcacao', 'klingo-auto-parte9-voltar', 'klingo-auto-parte10-interruptor-geral', 'klingo-auto-parte11-voltar-mae-divergencia', 'klingo-auto-parte12-convenio-segue-klingo', 'klingo-auto-parte13-paciente-conhecido-cpf']) {
   try { await db.exec(readFileSync(`${REPO}/supabase/${f}.sql`, 'utf8')); } catch (e) { registrar(`aplicar ${f}.sql no clone da produção`, false, String(e.message).split('\n')[0]); }
 }
 await db.exec(`insert into public.config (chave, valor) values ('klingo_auto', 'legado') on conflict (chave) do update set valor = 'legado'`);   // os casos abaixo testam as regras por chave; o interruptor geral tem casos próprios no fim
-registrar('o retrato da produção monta inteiro e as 13 partes novas aplicam sem erro', falhas.length === 0 && resultados.every(Boolean));
+registrar('o retrato da produção monta inteiro e as 14 partes novas aplicam sem erro', falhas.length === 0 && resultados.every(Boolean));
 
 const UNIDADE = 'CLÍNICA DE SAÚDE E IMAGEM - CSI';
 await db.exec(`
@@ -798,6 +798,52 @@ await caso('CONVÊNIO SEGUE O KLINGO: o que o Klingo não atende fica inativo, o
   const por = Object.fromEntries(a.map((x) => [x.operadora, x.ativo]));
   return { ok: r.desativados >= 1 && r.ativados >= 1 && por['CONV FORA TESTE'] === false && por['CONV VOLTOU TESTE'] === true && por['CONV MANUAL TESTE'] === true && /convenio_inativo|não estamos atendendo/.test(msg) && r2.ligada === false && a2.ativo === false,
     detalhe: `${JSON.stringify(r)} ${JSON.stringify(por)} | desligado: ${JSON.stringify(r2)} | msg=${msg}` };
+});
+
+
+// ---------------------------------------------------------------- 14. paciente conhecido confirma só o CPF; "não sou eu" e conferência velha pedem tudo de novo
+const conhecido = async (nome, { idadeDias = 1 } = {}) => {
+  const { p } = await marcando(nome);
+  const pa = await pedidoDe(p.c), cpf = String(pa.paciente.cpf).replace(/\D/g, ''), nasc = pa.paciente.dt_nasc;
+  await db.query(`insert into public.klingo_identidade (chave, cpf_hash, tipo, klingo_id, situacao, conferido_em) values (public.klingo_hash($1 || '|' || $2::text), public.klingo_hash($1), 'definitivo', 'P' || (floor(random() * 900000) + 100000)::int, 'confere', now() - make_interval(days => $3))
+                  on conflict (chave) do update set situacao = 'confere', conferido_em = excluded.conferido_em`, [cpf, nasc, idadeDias]);
+  // volta ao estado de "paciente que o chat já conhecia": dados guardados de antes, nada digitado nesta conversa
+  await db.query(`update public.conversa_fluxo set dados = (dados - 'cpf_confirmado' - 'nao_sou_eu' - 'cpf_tentativas') || jsonb_build_object('digitado', (dados -> 'digitado') - 'cpf' - 'dt_nasc'), passo = 'plano' where conversa_id = $1`, [p.c]);
+  return { p, cpf };
+};
+const proximo = async (c) => (await um(`select public.fluxo_proximo($1) r`, [c])).r;
+await caso('PACIENTE CONHECIDO: o chat pede só o CPF; o CPF errado não passa; o certo segue para o plano', async () => {
+  const { p, cpf } = await conhecido('Conhecido Cpf Teste');
+  const a = await proximo(p.c);
+  const errado = (await um(`select public.fluxo_aplicar($1, 'cpf_confirma', $2::jsonb) r`, [p.c, JSON.stringify({ cpf: '52998224725' })])).r;
+  const certo = (await um(`select public.fluxo_aplicar($1, 'cpf_confirma', $2::jsonb) r`, [p.c, JSON.stringify({ cpf })])).r;
+  const b = await proximo(p.c);
+  return { ok: a === 'cpf_confirma' && errado.ok === false && /não confere/.test(errado.erro) && certo.ok !== false && b !== 'cpf_confirma' && b !== 'cpf_nasc', detalhe: `antes=${a}; errado=${errado.ok}; depois=${b}` };
+});
+await caso('NÃO SOU EU: apaga os dados guardados, não preenche nada e pede CPF, nascimento, nome, contato e mãe de novo', async () => {
+  const { p } = await conhecido('Nao Sou Eu Teste');
+  await um(`select public.fluxo_aplicar($1, 'cpf_confirma', $2::jsonb) r`, [p.c, JSON.stringify({ pular: true })]);
+  const pa = await pedidoDe(p.c), a = await proximo(p.c);
+  await como(''); await db.query(`select public.fluxo_perguntar($1, 'dados_ident', '')`, [p.c]);
+  const m = (await q(`select opcoes from public.mensagens where conversa_id = $1 and autor = 'agente' order by id desc limit 1`, [p.c]))[0];
+  const campos = (m.opcoes.campos || []), cheio = campos.filter((c) => c.valor);
+  return { ok: JSON.stringify(pa.paciente) === '{}' && a === 'cpf_nasc' && campos.some((c) => c.nome === 'mae') && cheio.length === 0, detalhe: `paciente=${JSON.stringify(pa.paciente)}; próximo=${a}; campos preenchidos=${cheio.length}` };
+});
+await caso('3 CPFs errados viram "não sou eu" (tudo de novo)', async () => {
+  const { p } = await conhecido('Tres Erros Teste');
+  for (let i = 0; i < 3; i++) await um(`select public.fluxo_aplicar($1, 'cpf_confirma', $2::jsonb) r`, [p.c, JSON.stringify({ cpf: '52998224725' })]);
+  const pa = await pedidoDe(p.c);
+  return { ok: JSON.stringify(pa.paciente) === '{}' && (await proximo(p.c)) === 'cpf_nasc', detalhe: JSON.stringify(pa.paciente) };
+});
+await caso('CONFERÊNCIA VELHA (mais de 90 dias): não vale só o CPF, o paciente digita tudo de novo', async () => {
+  const { p } = await conhecido('Conferencia Velha Teste', { idadeDias: 120 });
+  const a = await proximo(p.c), pa = await pedidoDe(p.c);
+  return { ok: a === 'cpf_nasc' && JSON.stringify(pa.paciente) === '{}', detalhe: `próximo=${a}` };
+});
+await caso('API desligada: o paciente conhecido segue como sempre (não pede o CPF de novo)', async () => {
+  const { p } = await conhecido('Api Desligada Teste');
+  await cfg('klingo_auto', 'nao'); const a = await proximo(p.c); await cfg('klingo_auto', 'legado');
+  return { ok: a !== 'cpf_confirma', detalhe: `próximo=${a}` };
 });
 
 const ok = resultados.filter(Boolean).length;

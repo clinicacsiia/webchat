@@ -654,7 +654,7 @@
   const CHAVE_HIST = 'webchat.historico.v1';   // as últimas conversas deste aparelho (cada uma com o seu token): dá para voltar a elas
   const MAX_HIST = 5;                          // mínimo pedido: 3
   // Muda a cada alteração do chat. Cópia de mensagens guardada por outra versão é descartada (era isso que mostrava conversa velha e travada).
-  const VERSAO_APP = '2026.11.12-14';
+  const VERSAO_APP = '2026.11.12-15';
   const ESCALAS = [1, 1.18, 1.36], TOAST_LETRA = ['Letra normal.', 'Letra grande.', 'Letra muito grande.'];
 
   // Chegou pelo link "esqueci a senha"? O supabase-js limpa o endereço ao ler o link, então a pergunta é feita antes de criá-lo.
@@ -1823,6 +1823,8 @@
       h('div', { class: 'cm-topo' }, h('span', { class: 'cm-ok', 'aria-hidden': 'true' }, '✓'), h('b', {}, 'Agendamento confirmado')),
       ...linhas.map(([k, val]) => h('p', { class: 'cm-linha' }, h('span', {}, k), h('b', {}, String(val)))));
     w.append(cartao);
+    // Acompanhar cada etapa (agendado, confirmado, chegada, exame feito, laudo) no portal "Minha vez" (o mesmo e-mail da conta).
+    w.append(h('a', { class: 'btn-w sec', href: new URL('minha-vez/', location.href).href, target: '_blank', rel: 'noopener', style: 'display:block;text-align:center;text-decoration:none;margin-top:8px' }, '🧭 Acompanhar meu atendimento (Minha vez)'));
     if (v.data && v.hora) {
       try {
         const url = URL.createObjectURL(new Blob([ics(v)], { type: 'text/calendar' }));
