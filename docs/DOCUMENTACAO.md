@@ -182,6 +182,7 @@ Todas publicadas **sem exigir JWT** e cada uma confere o próprio segredo.
 | `klingo-paciente` | gatilho do banco (CPF + nascimento) | `x-sync-key` | sim |
 | `chat-agenda-ao-vivo` | o chat, ao chegar no calendário | token da conversa | sim |
 | `chat-avisar`, `avisar-equipe`, `fila-avisar` | o banco (pg_net) | segredo do Vault `fila_aviso_segredo` | sim |
+| `klingo-agenda-api` | **exemplo, não publicada** (horários e marcação pela API externa; ver `docs/klingo-api-agendamento.md`) | `x-sync-key` | sim |
 | `klingo-inspecionar-chat` | manual (diagnóstico) | `x-sync-key` | sim (pode ser apagada) |
 | `ler-pedido` | o chat (foto do pedido lida por IA) | token da conversa | **não** (depende de chave e de revisão jurídica) |
 | `fila-emitir-link`, `fila-validar-assinatura` | módulo da biometria | segredo / token | **não** (módulo parado) |
