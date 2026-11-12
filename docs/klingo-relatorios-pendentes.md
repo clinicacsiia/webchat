@@ -1,4 +1,7 @@
-# Relatórios do Klingo para o chat (atualizado em 03/11/2026)
+# Relatórios do Klingo para o chat (atualizado em 12/11/2026)
+
+> **12/11/2026:** a conferência de CPF + nascimento passou a ser feita também pela **API externa** (`/paciente/cpf`, função `klingo-identificar`), que achou o cadastro onde o relatório A dizia `nao_encontrado`. O relatório A continua rodando (dá o prontuário e o histórico usados pelo reconhecimento de marcações), mas **o número do prontuário dos relatórios não é o id da API** (0 iguais em 38 comparações): nunca misture os dois. Nenhum relatório novo ou editado é necessário para o autoatendimento. Ver `klingo-autoatendimento.md`.
+
 
 **Estado: os 5 relatórios foram criados no Klingo e testados em 03/11/2026 (só estrutura e contagem de linhas; nenhum valor de paciente foi lido, gravado ou mostrado).** A API do Klingo que usamos só lê (`/api/info/relatorio`), então tudo passa por relatório.
 

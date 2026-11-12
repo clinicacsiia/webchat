@@ -4268,6 +4268,24 @@ h1.longo { font-size: 14mm; }
         h('div', { class: 'ind-mini' }, h('b', {}, num(av.media_site)), h('span', {}, 'nota do site (0 a 10)')), h('div', { class: 'ind-mini' }, h('b', {}, nf(pc.WhatsApp)), h('span', {}, 'conheceram pelo WhatsApp')),
         h('div', { class: 'ind-mini' }, h('b', {}, nf(pc.Instagram)), h('span', {}, 'pelo Instagram')), h('div', { class: 'ind-mini' }, h('b', {}, nf(pc.Google)), h('span', {}, 'pelo Google'))));
   }
+  /* Autoatendimento com a API do Klingo (planejamento de 12/11/2026): só números, nenhum dado de paciente. */
+  function blocoAutoatendimento(d) {
+    if (!d || !d.modos) return null;
+    const m = d.modos, op = d.operacoes || {}, cad = d.cadastros || {}, ha = d.horarios_api || {};
+    const modoHor = { nao: 'desligados', sombra: 'só medindo (a tela do paciente não muda)', sim: 'ligados' }[m.horarios] || m.horarios;
+    const modoMar = m.marcar === 'sim' ? `ligada para ${m.percentual}% das conversas` : m.marcar === 'teste' ? 'só nos telefones de teste' : 'desligada';
+    const mini2 = (n, rot) => h('div', { class: 'ind-mini' }, h('b', {}, String(n ?? 0)), h('span', {}, rot));
+    const decisoes = (d.decisoes || []);
+    const nomeChave = { klingo_api_horarios: 'Horários reais', klingo_api_marcar: 'Marcação automática', klingo_api_percentual: 'Parte das conversas' };
+    return h('div', { class: 'ind-auto' },
+      h('h3', { class: 'ind-sec' }, 'Autoatendimento (marcação automática pelo Klingo)'),
+      h('p', { class: 'dica' }, `Horários reais do Klingo: ${modoHor}. Marcação automática: ${modoMar}. O sistema avança e recua sozinho conforme os números; você só é avisado quando ele recua.`),
+      h('div', { class: 'ind-minis' }, mini2(d.agendadas_sozinhas, 'agendadas sozinhas'), mini2(d.resolvidas_sem_humano, 'resolvidas sem atendente'), mini2(op.sucesso, 'marcações certas'),
+        mini2((op.incerto || 0) + (op.falha || 0), 'foram para a equipe'), mini2(op.horario_tomado, 'horário já ocupado'), mini2(d.tempo_medio_s != null ? d.tempo_medio_s + ' s' : '–', 'tempo médio para marcar')),
+      h('p', { class: 'dica' }, `Cadastros conferidos no Klingo: ${cad.confere || 0} encontrados · ${cad.nao_encontrado || 0} pacientes novos · ${cad.divergente || 0} com nascimento diferente (a equipe confere). Convênios traduzidos: ${(d.convenios || {}).traduzidos || 0} · sem tradução: ${(d.convenios || {}).sem_traducao || 0}. Consultas à agenda do Klingo no período: ${ha.ok || 0} certas, ${(ha.erro || 0) + (ha.limite || 0)} com problema.`),
+      (d.motivos_falha || []).length ? h('p', { class: 'dica' }, 'O que mandou para a equipe: ' + d.motivos_falha.map((x) => `${x.codigo} (${x.n})`).join(', ') + '.') : null,
+      decisoes.length ? h('p', { class: 'dica' }, 'Últimas decisões automáticas: ' + decisoes.map((x) => `${fmtDataHora(x.em)} · ${nomeChave[x.chave] || x.chave}: ${x.de || '–'} → ${x.para}`).join(' | ')) : null);
+  }
   async function viewIndicadores(c, silencioso = false) {
     if (IND.preset !== 'livre') [IND.de, IND.ate] = periodoDe(IND.preset);
     const titulo = h('h2', {}, 'Indicadores');
@@ -4275,9 +4293,10 @@ h1.longo { font-size: 14mm; }
     const minha = viewIndicadores.seq = (viewIndicadores.seq || 0) + 1;   // só a última escolha pinta a tela
     const un = UN.sel || null;
     const args = { p_de: IND.de, p_ate: IND.ate, p_unidade: un, p_incluir_teste: IND.teste };
-    const [r, eq, ext] = await Promise.all([db.rpc('painel_indicadores_decisao', args),
+    const [r, eq, ext, au] = await Promise.all([db.rpc('painel_indicadores_decisao', args),
       Promise.resolve(db.rpc('painel_indicadores_atendentes', args)).then((x) => x, () => ({ error: true, data: null })),
-      Promise.resolve(db.rpc('painel_indicadores_extras_v2', args)).then((x) => x, () => ({ error: true, data: null }))]);
+      Promise.resolve(db.rpc('painel_indicadores_extras_v2', args)).then((x) => x, () => ({ error: true, data: null })),
+      Promise.resolve(db.rpc('painel_automacao_resumo', { p_de: IND.de, p_ate: IND.ate })).then((x) => x, () => ({ error: true, data: null }))]);
     if (S.aba !== 'indicadores' || minha !== viewIndicadores.seq) return;
     if (r.error || !r.data) {
       c.replaceChildren(h('div', { class: 'pagina' }, titulo, h('p', { class: 'erro' }, msgErro(r.error || { message: 'Sem resposta do banco.' })),
@@ -4342,6 +4361,7 @@ h1.longo { font-size: 14mm; }
       h('div', { class: 'ind-destaques' }, h('h3', {}, 'O que chama atenção'),
         lista.length ? h('ul', {}, lista.map((d) => h('li', { class: d.nivel }, d.txt))) : h('p', { class: 'dica' }, 'Ainda não há dados suficientes neste período para destacar algo. Tente um período maior.')),
       cartoes,
+      blocoAutoatendimento(au && au.data),
 
       h('h3', { class: 'ind-sec' }, '1. Por que não estão agendando?'),
       h('p', { class: 'dica' }, 'Acompanha as pessoas que abriram conversa no chat no período, passo a passo, até o agendamento.'),

@@ -41,6 +41,8 @@ begin
     if coalesce(cardinality(v_med), 0) > 1 then return 'medico'; end if;
     perform public.fluxo_set(p_conversa, '{"medico_feito": true}');
   end if;
+  -- klingo-auto: CPF e data de nascimento válidos são obrigatórios antes do plano (a agenda real e a marcação dependem deles)
+  if not public.fluxo_cpf_ok(pa.paciente ->> 'cpf') or public.fluxo_ler_data(pa.paciente ->> 'dt_nasc') is null or coalesce((d ->> 'cpf_nasc_refazer')::boolean, false) then return 'cpf_nasc'; end if;
   if pa.plano is null then return 'plano'; end if;
   v_procs := public.fluxo_procs(p_conversa);
   if v_procs is not null and not coalesce((d ->> 'sem_horario')::boolean, false)
@@ -51,7 +53,8 @@ begin
           and nullif(btrim(coalesce(pa.paciente ->> 'nome', '')), '') is not null
           and nullif(btrim(coalesce(pa.paciente ->> 'sexo', '')), '') is not null
           and nullif(btrim(coalesce(pa.paciente ->> 'dt_nasc', '')), '') is not null
-          and nullif(btrim(coalesce(pa.paciente ->> 'celular', '')), '') is not null;
+          and nullif(btrim(coalesce(pa.paciente ->> 'celular', '')), '') is not null
+          and public.fluxo_cpf_ok(pa.paciente ->> 'cpf');   -- klingo-auto: quem não deixou CPF volta a ser perguntado
   if pa.identidade in ('conferida', 'atualizar') and d ->> 'mudou' is null and not v_ja then return 'mudou'; end if;
   if not v_ja and not coalesce((d ->> 'g_ident')::boolean, false) then return 'dados_ident'; end if;
   if not v_ja and not coalesce((d ->> 'g_contato')::boolean, false) then return 'dados_contato'; end if;

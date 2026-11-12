@@ -91,17 +91,17 @@ const erroDe = async (fn) => { try { await fn(); return null; } catch (e) { retu
 
 // ---------------------------------------------------------------- 1. caminhos completos
 let exame, consulta;
-await caso('EXAME particular, do "Começar" ao pedido enviado: motivo > exame > plano > horário > dados > confirmação > acompanhamento', async () => {
+await caso('EXAME particular, do "Começar" ao pedido enviado: motivo > exame > CPF e nascimento > plano > horário > dados > confirmação > acompanhamento', async () => {
   exame = await ateOFim(await iniciar(), { motivo: 'exame', plano: 'Particular', confirmar: 'ok' });
   const pa = await pedidoDe(exame.c), cv = await conversaDe(exame.c);
-  const esperado = 'motivo > exame > plano > horario > dados_ident > dados_contato > confirmar > acompanhar';
+  const esperado = 'motivo > exame > cpf_nasc > plano > horario > dados_ident > dados_contato > confirmar > acompanhar';   // klingo-auto: CPF e nascimento obrigatórios antes do plano
   return { ok: exame.passos.join(' > ') === esperado && pa.status === 'pronto' && pa.tipo === 'exame' && pa.plano === 'Particular' && pa.horarios === 1 && /JOELHO/.test(pa.procedimento)
     && pa.paciente.nome === 'Maria Teste da Silva' && cv.status === 'aguardando' && cv.ia_ativa === false, detalhe: exame.passos.join(' > ') };
 });
-await caso('CONSULTA com escolha de médico: motivo > consulta > médico > plano > horário > dados > confirmação > acompanhamento', async () => {
+await caso('CONSULTA com escolha de médico: motivo > consulta > médico > CPF e nascimento > plano > horário > dados > confirmação > acompanhamento', async () => {
   consulta = await ateOFim(await iniciar('Carlos Teste Pereira'), { motivo: 'consulta', medico: 'DRA EXEMPLO DOIS', plano: 'Particular', confirmar: 'ok' });
   const pa = await pedidoDe(consulta.c);
-  const esperado = 'motivo > consulta > medico > plano > horario > dados_ident > dados_contato > confirmar > acompanhar';
+  const esperado = 'motivo > consulta > medico > cpf_nasc > plano > horario > dados_ident > dados_contato > confirmar > acompanhar';
   return { ok: consulta.passos.join(' > ') === esperado && pa.status === 'pronto' && pa.tipo === 'consulta' && pa.horarios === 1 && consulta.escolhido.profissional === 'DRA EXEMPLO DOIS',
     detalhe: `${consulta.passos.join(' > ')} | médico do horário: ${consulta.escolhido.profissional}` };
 });

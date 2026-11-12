@@ -414,6 +414,13 @@
   .cp .erro-campo { color: var(--erro); font-size: calc(15.5px * var(--esc)); margin: 3px 0 0; }
   .sexo { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .acoes-w { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+  .acomp.marcando { background: var(--verde-claro); border-color: #a9c6ec; }
+  .cartao-marcado { background: var(--verde-claro); border: 1.5px solid #8fb4e3; border-radius: 14px; padding: 12px 14px; }
+  .cartao-marcado .cm-topo { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font-size: calc(17px * var(--esc)); }
+  .cartao-marcado .cm-ok { width: 26px; height: 26px; border-radius: 50%; background: #1f7a3d; color: #fff; display: grid; place-items: center; font-weight: 700; flex: none; }
+  .cartao-marcado .cm-linha { display: flex; justify-content: space-between; gap: 12px; margin: 4px 0; font-size: calc(15.5px * var(--esc)); }
+  .cartao-marcado .cm-linha span { color: var(--texto-suave); flex: none; }
+  .cartao-marcado .cm-linha b { text-align: right; }
   .acomp { background: #fff7e5; border: 1px solid #f0dfb8; border-radius: 12px; padding: 12px 14px; }
   .acomp.ok { background: var(--verde-claro); border-color: #a9c6ec; }
   .acomp b { display: block; font-size: calc(17px * var(--esc)); }
@@ -647,7 +654,7 @@
   const CHAVE_HIST = 'webchat.historico.v1';   // as últimas conversas deste aparelho (cada uma com o seu token): dá para voltar a elas
   const MAX_HIST = 5;                          // mínimo pedido: 3
   // Muda a cada alteração do chat. Cópia de mensagens guardada por outra versão é descartada (era isso que mostrava conversa velha e travada).
-  const VERSAO_APP = '2026.11.12-13';
+  const VERSAO_APP = '2026.11.12-14';
   const ESCALAS = [1, 1.18, 1.36], TOAST_LETRA = ['Letra normal.', 'Letra grande.', 'Letra muito grande.'];
 
   // Chegou pelo link "esqueci a senha"? O supabase-js limpa o endereço ao ler o link, então a pergunta é feita antes de criá-lo.
@@ -905,7 +912,7 @@
   /* ---------- conversa ---------- */
   // Cópia das últimas mensagens neste aparelho: ao abrir pelo link do WhatsApp ou do e-mail a conversa aparece na hora.
   let cacheMsgs = [], tGuardar = null, carregarDeNovo = false;
-  const WIDGET_LARGO = new Set(['escolha', 'campos', 'acompanhar']);
+  const WIDGET_LARGO = new Set(['escolha', 'campos', 'acompanhar', 'marcando', 'marcado']);
   function guardarMsgs() {
     clearTimeout(tGuardar);
     tGuardar = setTimeout(() => {
@@ -1552,6 +1559,8 @@
     else if (o.tipo === 'escolha') widgetEscolha(w, o);
     else if (o.tipo === 'campos') widgetCampos(w, o);
     else if (o.tipo === 'acompanhar') widgetAcompanhar(w);
+    else if (o.tipo === 'marcando') widgetMarcando(w);
+    else if (o.tipo === 'marcado') widgetMarcado(w, o);
     else if (o.tipo === 'texto') w.append(h('p', { class: 'w-nota' }, 'Escreva no campo aqui embaixo e toque na setinha para enviar.'));
     else if (o.tipo === 'nova') w.append(h('button', { class: 'btn-w', type: 'button', onclick: () => novaConversa(true) }, 'Fazer um novo pedido'));
     else if (o.tipo === 'busca_exame') {
@@ -1570,7 +1579,7 @@
         h('p', { class: 'w-nota' }, 'É a escolha que libera o calendário de horários.'));
     } else if (o.tipo === 'calendario') {
       w.append(h('button', { class: 'btn-w', type: 'button', onclick: () => abrirCalendario(o.grupo || 1) }, o.rotulo || 'Escolher data e horário'),
-        h('p', { class: 'w-nota' }, 'Os horários são uma previsão; o atendente confirma o dia e o horário.'));
+        h('p', { class: 'w-nota' }, 'Na tela seguinte você vê se o horário foi conferido agora na agenda da clínica.'));
     } else if (o.tipo === 'despedida') {
       // WC-06: a despedida é uma mensagem de sistema; se tiver imagem, ela é buscada com o token desta conversa (nunca de outra).
       widgetDespedida(w, o);
@@ -1793,6 +1802,34 @@
 
   /* acompanhamento: se já foi confirmado, quem atende e se estamos em horário de trabalho (sem relógio de espera) */
   let acompBox = null, acompDados = null, acompP = null;
+  /* Autoatendimento (Klingo): "reservando…" enquanto a marcação roda e o cartão do agendamento confirmado. */
+  function widgetMarcando(w) {
+    w.append(h('div', { class: 'acomp marcando', role: 'status', 'aria-live': 'polite' }, h('b', {}, 'Reservando o seu horário…'),
+      h('p', {}, 'Leva só alguns segundos. Você não precisa fechar esta tela: o resultado aparece aqui.')));
+  }
+  const ics = (v) => {
+    const d = String(v.data || '').replace(/-/g, ''), hh = String(v.hora || '00:00').split(':'), ini = `${d}T${hh[0]}${hh[1]}00`;
+    const fim = `${d}T${String(Math.min(23, Number(hh[0]) + 1)).padStart(2, '0')}${hh[1]}00`;
+    const t = (x) => String(x || '').replace(/[\r\n,;]/g, ' ');
+    return ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//CSI//Webchat//PT', 'BEGIN:VEVENT', `UID:${t(v.id)}@csi`, `DTSTAMP:${ini}`, `DTSTART:${ini}`, `DTEND:${fim}`,
+      `SUMMARY:${t(v.procedimento) || 'Atendimento'} - CSI`, `LOCATION:${t(v.unidade)}`, `DESCRIPTION:${t(v.profissional ? 'Com ' + v.profissional + '. ' : '')}Chegue 15 minutos antes, com documento com foto.`, 'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
+  };
+  function widgetMarcado(w, o) {
+    const v = o.voucher || {};
+    const dt = v.data ? dataLocal(v.data) : null;
+    const quando0 = dt ? dt.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' }) : '', quando = quando0.charAt(0).toUpperCase() + quando0.slice(1);
+    const linhas = [['Quando', `${quando}${v.hora ? ' às ' + v.hora : ''}`], ['O quê', v.procedimento], ['Onde', v.unidade], ['Com', v.profissional ? nomeBonito(v.profissional) : null], ['Protocolo', v.id]].filter((l) => l[1]);
+    const cartao = h('div', { class: 'cartao-marcado', role: 'group', 'aria-label': 'Agendamento confirmado' },
+      h('div', { class: 'cm-topo' }, h('span', { class: 'cm-ok', 'aria-hidden': 'true' }, '✓'), h('b', {}, 'Agendamento confirmado')),
+      ...linhas.map(([k, val]) => h('p', { class: 'cm-linha' }, h('span', {}, k), h('b', {}, String(val)))));
+    w.append(cartao);
+    if (v.data && v.hora) {
+      try {
+        const url = URL.createObjectURL(new Blob([ics(v)], { type: 'text/calendar' }));
+        w.append(h('a', { class: 'btn-w sec', href: url, download: 'agendamento-csi.ics', style: 'display:block;text-align:center;text-decoration:none;margin-top:8px' }, '📅 Adicionar à minha agenda'));
+      } catch { /* sem o botão da agenda: o cartão já tem tudo */ }
+    }
+  }
   function widgetAcompanhar(w) {
     const box = h('div', { class: 'acomp', 'aria-live': 'polite' }, h('b', {}, 'Solicitação registrada'), h('p', {}, 'Carregando…'));
     w.append(box);
@@ -2657,6 +2694,16 @@
       return false;
     }
   }
+  /* Autoatendimento (Klingo): pede à API os horários REAIS desta conversa. Nunca trava o chat: se falhar ou estiver desligada, vale a grade de sempre.
+     Em modo "sombra" a função responde na hora e só mede em segundo plano. */
+  let apiHorariosOff = false;
+  async function chamarAgendaApi() {
+    if (!conv || apiHorariosOff) return;
+    try {
+      const { data } = await comLimite(db.functions.invoke('chat-agenda-api', { body: { conversa: conv.id, token: conv.token } }), 7000);
+      if (data && data.motivo === 'desligado') apiHorariosOff = true;
+    } catch { /* usa a grade */ }
+  }
   async function buscarHorarios() {
     const hoje = new Date();
     const { data, error } = await db.rpc('chat_horarios', { p_conversa: conv.id, p_token: conv.token, p_grupo: C.grupo, p_de: ymd(hoje),
@@ -2669,7 +2716,7 @@
     const meu = C, hoje = new Date();
     if (forcar) V.ts.clear();
     // 1) Confere o Klingo agora (primeiros 14 dias; o resto vem em segundo plano depois de a lista aparecer).
-    await conferirAgenda(ymd(hoje), ymd(somaDias(hoje, 13)));
+    await Promise.all([conferirAgenda(ymd(hoje), ymd(somaDias(hoje, 13))), chamarAgendaApi()]);
     if (C !== meu) return;
     // 2) Pede a lista ao banco, que já enxerga a agenda de agora.
     try {
@@ -2743,7 +2790,8 @@
     if (g && g.nomes) corpo.append(h('p', { class: 'p-dica' }, 'Neste horário: ' + g.nomes.join(' + ')));
     const v = V, semConferir = v.desligado || v.falhas.size > 0;
     const limitePerto = ymd(somaDias(new Date(), 13)), pertoFalhou = [...v.falhas].some((d) => d <= limitePerto || d === C.dia);
-    corpo.append(h('p', { class: 'aviso-cal' }, 'Os horários abaixo são uma previsão. Um atendente confere tudo e confirma o dia e o horário.' + (r.aviso && semConferir ? ' ' + r.aviso : '')));
+    if (r.klingo_api) corpo.append(h('p', { class: 'p-dica ao-vivo', role: 'status' }, '✔ Horários livres conferidos agora na agenda da clínica.'));
+    else corpo.append(h('p', { class: 'aviso-cal' }, 'Os horários abaixo são uma previsão. Um atendente confere tudo e confirma o dia e o horário.' + (r.aviso && semConferir ? ' ' + r.aviso : '')));
     if (!v.desligado) {
       if (v.falhas.size) corpo.append(h('p', { class: 'aviso-cal', role: 'status' }, (pertoFalhou ? 'Não consegui conferir a agenda da clínica agora; os horários abaixo podem estar desatualizados. ' : 'Não consegui conferir algumas datas mais adiante; os horários delas podem estar desatualizados. '),
         h('button', { class: 'chip', type: 'button', onclick: () => carregarHorarios(false, true) }, 'Conferir de novo')));

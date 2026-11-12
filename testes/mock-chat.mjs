@@ -87,9 +87,9 @@ export function criarMundo(opcoes = {}) {
     aoVivo: { falha: false, motivo: null, status: null, atraso: 0, retira: {}, libera: {} } };
   m.chamadasFuncao = [];
   m.tratarFuncao = async (nome, corpo) => {
-    m.chamadasFuncao.push({ nome, corpo, t: Date.now() });
     m.chamadas.push({ nome: 'fn:' + nome, corpo, t: Date.now() });
-    if (nome !== 'chat-agenda-ao-vivo') return { body: {} };
+    if (nome !== 'chat-agenda-ao-vivo') return { body: {} };   // outras funções (ex.: chat-agenda-api, do autoatendimento) respondem vazio e não contam como "leitura do Klingo"
+    m.chamadasFuncao.push({ nome, corpo, t: Date.now() });
     const a = m.agenda.aoVivo;
     if (a.atraso) await espera(a.atraso);
     if (a.status) return { status: a.status, body: { error: 'falha simulada' } };

@@ -6,14 +6,28 @@ CREATE OR REPLACE FUNCTION public.fluxo_finalizar(p_conversa uuid)
  SECURITY DEFINER
  SET search_path TO ''
 AS $function$
-declare ctx jsonb := public.fluxo_ctx(p_conversa); v_on boolean := public.fluxo_equipe_online(); v_txt text; c public.conversas;
+declare ctx jsonb := public.fluxo_ctx(p_conversa); v_pode jsonb; v_op uuid; v_rem jsonb; pa public.pre_agendamentos;
 begin
-  select * into c from public.conversas where id = p_conversa;
-  perform public.fluxo_pre(p_conversa, '{"etapa": "pronto"}'::jsonb, true);
-  update public.conversa_fluxo set passo = 'pronto', dados = dados || jsonb_build_object('enviado_em', now()), atualizado_em = now() where conversa_id = p_conversa;
-  v_txt := public.fluxo_t(case when v_on then 'pronto_online' else 'pronto_offline' end, ctx);
-  if jsonb_array_length(coalesce(c.irmaos, '[]'::jsonb)) > 0 then v_txt := v_txt || E'\n\n' || public.fluxo_t('irmao_proximo', ctx); end if;
-  perform public.fluxo_dizer(p_conversa, v_txt, jsonb_build_object('tipo', 'acompanhar'));
-  perform public.fluxo_transferir(p_conversa, 'Pré-agendamento pronto (confirmado pelo paciente).', 'baixa', false);
+  select f.dados -> 'remarcando' into v_rem from public.conversa_fluxo f where f.conversa_id = p_conversa;
+  begin v_pode := public.klingo_pode_marcar(p_conversa); exception when others then v_pode := jsonb_build_object('ok', false, 'motivo', 'erro_interno'); end;
+  if coalesce((v_pode ->> 'ok')::boolean, false) then
+    begin
+      v_op := public.klingo_operacao_criar(p_conversa);
+      update public.conversa_fluxo set passo = 'marcando', dados = dados || jsonb_build_object('enviado_em', now(), 'operacao', v_op), atualizado_em = now() where conversa_id = p_conversa;
+      perform public.fluxo_dizer(p_conversa, public.fluxo_t(case when jsonb_typeof(v_rem) = 'object' then 'remarcando' else 'marcando' end, ctx), jsonb_build_object('tipo', 'marcando', 'operacao', v_op));
+      return;
+    exception when others then null;
+    end;
+  end if;
+  if jsonb_typeof(v_rem) = 'object' then
+    select * into pa from public.pre_agendamentos where conversa_id = p_conversa;
+    perform public.fluxo_nota(p_conversa, 'Remarcação pedida pelo chat, mas a automação não pôde fazer (' || coalesce(v_pode ->> 'motivo', '?') || '). O agendamento atual (voucher ' || coalesce(v_rem ->> 'voucher', '?') || ') continua valendo; novo horário escolhido: '
+      || coalesce((pa.escolha_horario -> 0 ->> 'data') || ' ' || (pa.escolha_horario -> 0 ->> 'hora'), 'nenhum') || '.');
+    perform public.fluxo_dizer(p_conversa, public.fluxo_t('marcar_equipe', ctx));
+    perform public.fluxo_transferir(p_conversa, 'Paciente quer remarcar o agendamento (novo horário escolhido no chat).', 'baixa', false);
+    update public.conversa_fluxo set dados = dados - 'remarcando', atualizado_em = now() where conversa_id = p_conversa;
+    return;
+  end if;
+  perform public.fluxo_finalizar_humano(p_conversa, case when coalesce(v_pode ->> 'motivo', 'desligado') in ('desligado', 'ja_agendado') then null else 'Automação não aplicada: ' || (v_pode ->> 'motivo') end);
 end $function$;
 
