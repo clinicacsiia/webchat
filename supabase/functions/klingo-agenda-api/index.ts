@@ -72,6 +72,8 @@ Deno.serve(async (req: Request) => {
 
     return json({ error: "acao inválida (use versao, horarios ou marcar)" }, 400);
   } catch (e) {
+    // 403 em /agenda/horarios = regra de negócio ("nenhum médico credenciado para esse convênio"): não é falha.
+    if (e instanceof KlingoErro && e.status === 403 && e.caminho === "/agenda/horarios") return json({ ok: true, total: 0, horarios: [], motivo: "sem_medico_credenciado" });
     // Só status e caminho; o corpo do erro do Klingo pode ter dado de paciente.
     if (e instanceof KlingoErro) return json({ ok: false, motivo: "klingo_recusou", status: e.status, caminho: e.caminho }, 502);
     return json({ ok: false, motivo: "erro" }, 500);

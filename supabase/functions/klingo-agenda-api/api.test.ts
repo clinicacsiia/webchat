@@ -14,22 +14,26 @@ function falso(respostas: Array<[number, unknown]>) {
   return { f, chamadas };
 }
 
+// Mesmo formato da resposta real de 12/11/2026 (nomes e números inventados).
 const DIA = {
-  id: "2026-11-16|3|2", data: "2026-11-16", procedimento: "CONS", ordem_chegada: false,
+  id: "2026-11-16|3|2|1", data: "2026-11-16", procedimento: 1096, ordem_chegada: false, faixa_ordem_chegada: null,
   horarios: { "2026-11-16|3|2|1|08:00": "08:00", "2026-11-16|3|2|1|08:30": "08:30" },
-  profissional: { id: "3", nome: "Dra. Teste", conselho: "CRM", numero: "1234", uf: "BA" },
-  unidade: { nome: "Unidade Teste", cnes: "999" },
+  profissional: { id: 3, tratamento: "Dr(a).", nome: "Dra. Teste", conselho: "CRM", numero: 1234, uf: "BA", foto: null },
+  unidade: { id: 1, nome: "Unidade Teste", cnes: null, sigla: "UT" },
 };
 
 test("normalizarHorarios: mapa {id: hora}, mapa {hora: id} e lista de horas", () => {
   const a = normalizarHorarios({ horarios: [DIA] });
   assert.deepEqual(a.map((h) => [h.id, h.hora]), [["2026-11-16|3|2|1|08:00", "08:00"], ["2026-11-16|3|2|1|08:30", "08:30"]]);
   assert.equal(a[0].profissional?.nome, "Dra. Teste");
-  assert.equal(a[0].unidade?.cnes, "999");
+  assert.equal(a[0].unidade?.id, "1");
+  assert.equal(a[0].unidade?.sigla, "UT");
+  assert.equal(a[0].unidade?.cnes, null);
+  assert.equal(a[0].procedimento, "1096");
   const b = normalizarHorarios({ horarios: [{ ...DIA, horarios: { "09:00": "chave-9" } }] });
   assert.deepEqual([b[0].id, b[0].hora], ["chave-9", "09:00"]);
   const c = normalizarHorarios({ horarios: [{ ...DIA, horarios: ["10:00:00"] }] });
-  assert.deepEqual([c[0].id, c[0].hora], ["2026-11-16|3|2|10:00:00", "10:00"]);
+  assert.deepEqual([c[0].id, c[0].hora], ["2026-11-16|3|2|1|10:00:00", "10:00"]);
 });
 test("normalizarHorarios: resposta vazia ou estranha vira lista vazia e ordena por data e hora", () => {
   assert.deepEqual(normalizarHorarios(null), []);

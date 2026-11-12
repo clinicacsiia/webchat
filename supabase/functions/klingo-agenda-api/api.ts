@@ -38,10 +38,11 @@ export type Horario = {
   id: string;               // chave do horário, ex.: "2023-08-28|3|2|1|08:00" (é o que se manda para reservar/marcar)
   data: string;
   hora: string;
+  procedimento: string | null;  // id do procedimento (ex.: 1096 = CONSULTA de neurologia); é o que se manda ao marcar
   ordem_chegada: boolean;
   faixa_ordem_chegada: string | null;
   profissional: { id: string | null; nome: string | null; conselho: string | null; numero: string | null; uf: string | null; subespecialidade: string | null } | null;
-  unidade: { nome: string | null; cnes: string | null } | null;
+  unidade: { id: string | null; nome: string | null; sigla: string | null; cnes: string | null } | null; // na CSI o cnes vem nulo: usar id/sigla
 };
 
 const texto = (v: unknown): string | null => (v === null || v === undefined || v === "" ? null : String(v));
@@ -49,9 +50,8 @@ const HORA = /^\d{2}:\d{2}/;
 
 /**
  * Transforma a resposta de GET /agenda/horarios numa lista plana e enxuta.
- * O Swagger descreve `horarios` de cada dia só como "objeto com ID e horário", sem mostrar o formato.
- * Por isso aceita: {"<id>": "08:00"}, {"08:00": "<id>"}, ["08:00"] ou [{id, hora}], e, na falta do id,
- * monta "<id do dia>|08:00". CONFIRMAR com uma chamada real (ver docs) e então apertar esta função.
+ * Formato REAL confirmado em 12/11/2026: `horarios` de cada dia é {"2026-11-16|63|308|2|13:40": "13:40"}
+ * (chave = data|médico|agenda|unidade|hora). Por segurança ainda aceita {"08:00": "<id>"}, ["08:00"] e [{id, hora}].
  */
 export function normalizarHorarios(resposta: unknown): Horario[] {
   const dias = (resposta as { horarios?: unknown[] } | null)?.horarios;
@@ -64,11 +64,12 @@ export function normalizarHorarios(resposta: unknown): Horario[] {
       data: String(dia.data ?? ""),
       ordem_chegada: dia.ordem_chegada === true,
       faixa_ordem_chegada: texto(dia.faixa_ordem_chegada),
+      procedimento: texto(dia.procedimento),
       profissional: prof ? {
         id: texto(prof.id), nome: texto(prof.nome), conselho: texto(prof.conselho), numero: texto(prof.numero),
         uf: texto(prof.uf), subespecialidade: texto(prof.subespecialidade),
       } : null,
-      unidade: uni ? { nome: texto(uni.nome), cnes: texto(uni.cnes) } : null,
+      unidade: uni ? { id: texto(uni.id), nome: texto(uni.nome), sigla: texto(uni.sigla), cnes: texto(uni.cnes) } : null,
     };
     const lista = dia.horarios;
     const pares: Array<[string, string]> = []; // [id, hora]
