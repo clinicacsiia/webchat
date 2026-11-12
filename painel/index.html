@@ -1844,6 +1844,11 @@
     if (error && /paciente_tipo|paciente_nome|unidade_inicial|medico_preferido/.test(error.message || '')) ({ data, error } = await consulta(base));
     if (error) { toast(msgErro(error)); return; }
     S.conversas = data || [];
+    // Quem conduz a conversa: quais pedidos foram agendados sozinhos pela API (conversas novas; as antigas seguem como estavam)
+    try {
+      const r = await db.from('pre_agendamentos').select('conversa_id').eq('agendado_origem', 'chat_api').order('agendado_auto_em', { ascending: false }).limit(500);
+      S.agendadoApi = new Set(((r && r.data) || []).map((x) => x.conversa_id));
+    } catch { S.agendadoApi = new Set(); }
     await carregarPessoas();
     await carregarAlertasPreco();
     // As fotos chegam logo depois, sem segurar a lista de conversas.
@@ -1954,6 +1959,18 @@
   const avisosSug = () => (S.sugestoes || []).filter((s) => passaUnidade(unidadesConversas([s.a, s.b])));
   const avisosDat = () => (S.avisosData || []).filter((av) => passaUnidade(unidadesConversas([...(av.ids_a || []), ...(av.ids_b || [])])));
   const avisosPacV = () => (S.avisosPac || []).filter((av) => passaUnidade(unidadesConversas([av.conversa_id])));
+  /* Quem conduz a conversa (os quatro grupos do Atendimento):
+       assistente = o atendimento automático (com a API, quando ligada) conduz; agendado_api = o pedido foi agendado sozinho e ninguém da equipe entrou
+       (conversa encerrada ou só no menu de ver, remarcar ou cancelar); espera_atendente = foi para a equipe e ninguém assumiu; com_atendente = uma pessoa assumiu. */
+  const viaApi = (p) => !!S.agendadoApi && p.membros.some((m) => S.agendadoApi.has(m.id));
+  const semHumano = (p) => p.membros.every((m) => !m.primeiro_humano_em);
+  const quemConduz = (p) => {
+    const st = statusPessoa(p);
+    if (viaApi(p) && semHumano(p) && (st === 'encerrada' || p.membros.some((m) => m.ia_ativa))) return 'agendado_api';
+    if (st === 'em_atendimento') return 'com_atendente';
+    if (st === 'aguardando') return p.membros.some((m) => m.ia_ativa && m.status === 'aguardando') ? 'assistente' : 'espera_atendente';
+    return null;
+  };
   const statusPessoa = (p) => (p.membros.some((m) => m.status === 'aguardando') ? 'aguardando' : p.membros.some((m) => m.status === 'em_atendimento') ? 'em_atendimento' : 'encerrada');
   const abertosDe = (id) => { const ids = membrosDe(id); return S.abertos.filter((a) => ids.includes(a.conversa_id)); };
   const remarcarDe = (id) => { const ids = membrosDe(id); return S.remarcar.filter((a) => ids.includes(a.conversa_id)); };
@@ -2193,16 +2210,18 @@
     const f = document.getElementById('filtros'), it = document.getElementById('itens'); if (!f || !it) return;
     const todas = pessoas();
     const fn = { aguardando: (p) => statusPessoa(p) === 'aguardando', meus: (p) => p.membros.some((m) => m.status === 'em_atendimento' && m.agente_id === S.me.id),
-      abertas: (p) => statusPessoa(p) !== 'encerrada', encerradas: (p) => statusPessoa(p) === 'encerrada' };
+      abertas: (p) => statusPessoa(p) !== 'encerrada', encerradas: (p) => statusPessoa(p) === 'encerrada',
+      assistente: (p) => quemConduz(p) === 'assistente', agendado_api: (p) => quemConduz(p) === 'agendado_api', com_atendente: (p) => quemConduz(p) === 'com_atendente' };
     const cont = (g) => todas.filter(g).length;
-    const defs = [['aguardando', 'Aguardando', cont(fn.aguardando)], ['meus', 'Meus', cont(fn.meus)], ['abertas', 'Abertas', cont(fn.abertas)], ['encerradas', 'Encerradas', null]];
+    const defs = [['aguardando', 'Aguardando', cont(fn.aguardando)], ['meus', 'Meus', cont(fn.meus)], ['abertas', 'Abertas', cont(fn.abertas)], ['assistente', 'Com o assistente', cont(fn.assistente)], ['agendado_api', 'Agendado pela API', cont(fn.agendado_api)], ['com_atendente', 'Com atendente', cont(fn.com_atendente)], ['encerradas', 'Encerradas', null]];
     f.replaceChildren(seletorModo(), ...defs.map(([id, rot, n]) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(S.filtro === id), onclick: () => { S.filtro = id; renderLista(); } }, n != null ? `${rot} (${n})` : rot)),
       h('button', { class: 'chip', type: 'button', id: 'btnLote', title: 'Transferir várias conversas de uma vez', onclick: abrirLote }, 'Transferir em lote'));
     const buscando = S.busca.trim() !== '';
     const lista = buscando ? todas.filter(combinaBusca) : todas.filter(fn[S.filtro]);   // com busca, procura em todas as conversas
     const sug = renderSugestoes();
     if (!lista.length) {
-      const msgs = buscando ? { [S.filtro]: ['Nada encontrado', 'Confira o nome ou limpe a busca no alto da tela.'] } : { aguardando: ['Ninguém na fila', 'Novas conversas aparecem aqui na hora.'], meus: ['Nada com você agora', 'Assuma uma conversa da fila para começar.'], abertas: ['Sem conversas abertas', ''], encerradas: ['Nenhuma encerrada ainda', ''] };
+      const msgs = buscando ? { [S.filtro]: ['Nada encontrado', 'Confira o nome ou limpe a busca no alto da tela.'] } : { aguardando: ['Ninguém na fila', 'Novas conversas aparecem aqui na hora.'], meus: ['Nada com você agora', 'Assuma uma conversa da fila para começar.'], abertas: ['Sem conversas abertas', ''], encerradas: ['Nenhuma encerrada ainda', ''],
+        assistente: ['Nenhuma com o assistente', 'Conversas que o atendimento automático está conduzindo aparecem aqui.'], agendado_api: ['Nenhum agendamento automático ainda', 'Pedidos agendados sozinhos pela API, sem a equipe, aparecem aqui.'], com_atendente: ['Ninguém com atendente agora', 'Conversas assumidas por uma pessoa da equipe aparecem aqui.'] };
       it.replaceChildren(...(sug ? [sug] : []), h('div', { class: 'vazio' }, h('b', {}, msgs[S.filtro][0]), msgs[S.filtro][1]));
       return;
     }

@@ -13,11 +13,11 @@ const caso = async (nome, fn) => { try { const r = await fn(); registrar(nome, r
 const { db, falhas } = await criarBancoProducao();
 const { q, um, como, anonimo } = ajudantes(db);
 await db.exec(`insert into vault.secrets_tbl (name, secret) values ('klingo_hash_sal', 'sal-de-teste'), ('klingo_interno_segredo', 'interno-de-teste')`);
-for (const f of ['klingo-auto-parte1-tabelas', 'klingo-auto-parte2-base', 'klingo-auto-parte3-identidade', 'klingo-auto-parte4a-operacao', 'klingo-auto-parte4b-motor', 'klingo-auto-parte5-autogestao', 'klingo-auto-parte6-novo-e-eventos', 'klingo-auto-parte7-indicadores', 'klingo-auto-parte8-pos-marcacao', 'klingo-auto-parte9-voltar', 'klingo-auto-parte10-interruptor-geral', 'klingo-auto-parte11-voltar-mae-divergencia', 'klingo-auto-parte12-convenio-segue-klingo', 'klingo-auto-parte13-paciente-conhecido-cpf']) {
+for (const f of ['klingo-auto-parte1-tabelas', 'klingo-auto-parte2-base', 'klingo-auto-parte3-identidade', 'klingo-auto-parte4a-operacao', 'klingo-auto-parte4b-motor', 'klingo-auto-parte5-autogestao', 'klingo-auto-parte6-novo-e-eventos', 'klingo-auto-parte7-indicadores', 'klingo-auto-parte8-pos-marcacao', 'klingo-auto-parte9-voltar', 'klingo-auto-parte10-interruptor-geral', 'klingo-auto-parte11-voltar-mae-divergencia', 'klingo-auto-parte12-convenio-segue-klingo', 'klingo-auto-parte13-paciente-conhecido-cpf', 'klingo-auto-parte14-quadros-encerrar-agendado']) {
   try { await db.exec(readFileSync(`${REPO}/supabase/${f}.sql`, 'utf8')); } catch (e) { registrar(`aplicar ${f}.sql no clone da produção`, false, String(e.message).split('\n')[0]); }
 }
 await db.exec(`insert into public.config (chave, valor) values ('klingo_auto', 'legado') on conflict (chave) do update set valor = 'legado'`);   // os casos abaixo testam as regras por chave; o interruptor geral tem casos próprios no fim
-registrar('o retrato da produção monta inteiro e as 14 partes novas aplicam sem erro', falhas.length === 0 && resultados.every(Boolean));
+registrar('o retrato da produção monta inteiro e as 15 partes novas aplicam sem erro', falhas.length === 0 && resultados.every(Boolean));
 
 const UNIDADE = 'CLÍNICA DE SAÚDE E IMAGEM - CSI';
 await db.exec(`
@@ -844,6 +844,26 @@ await caso('API desligada: o paciente conhecido segue como sempre (não pede o C
   const { p } = await conhecido('Api Desligada Teste');
   await cfg('klingo_auto', 'nao'); const a = await proximo(p.c); await cfg('klingo_auto', 'legado');
   return { ok: a !== 'cpf_confirma', detalhe: `próximo=${a}` };
+});
+
+
+// ---------------------------------------------------------------- 15. quadros: "Está tudo certo" depois da marcação automática encerra a conversa (só se ninguém da equipe entrou)
+await caso('TUDO CERTO depois de agendado pela API: a conversa é encerrada (agendado/sistema); se a equipe já entrou, não é encerrada', async () => {
+  const marcar = async (nome) => {
+    const { p, op } = await marcando(nome);
+    await um(`select public.klingo_operacao_pegar($1)`, [op.id]);
+    await um(`select public.klingo_operacao_concluir($1, 'sucesso', $2::jsonb)`, [op.id, JSON.stringify({ voucher: { id: String(27000 + Math.floor(Math.random() * 900)), data: op.detalhe.data, hora: op.detalhe.hora, procedimento: 'RM JOELHO', unidade: 'CSI', profissional: 'EXEMPLO' } })]);
+    return p;
+  };
+  const a = await marcar('Tudo Certo Teste'), b = await marcar('Tudo Certo Humano Teste');
+  const AG = '00000000-0000-4000-8000-0000000000b9';
+  await db.exec(`insert into auth.users (id, email) values ('${AG}', 'atendente-quadro@exemplo.invalid') on conflict do nothing;
+                 insert into public.agentes (id, nome, email, papel, ativo) values ('${AG}', 'Atendente Quadro', 'atendente-quadro@exemplo.invalid', 'atendente', true) on conflict do nothing;`);
+  await db.query(`update public.conversas set agente_id = $2, status = 'em_atendimento' where id = $1`, [b.c, AG]);
+  const antesB = await conversaDe(b.c);
+  await um(`select public.fluxo_pos_responder($1, 'fim')`, [a.c]); await um(`select public.fluxo_pos_responder($1, 'fim')`, [b.c]);
+  const ca = await conversaDe(a.c), cb = await conversaDe(b.c);
+  return { ok: ca.status === 'encerrada' && ca.motivo_encerramento === 'agendado' && ca.encerramento_origem === 'sistema' && cb.status !== 'encerrada', detalhe: `sem humano=${ca.status}/${ca.motivo_encerramento}/${ca.encerramento_origem}; com humano=${cb.status} (antes ${antesB.status}/${antesB.primeiro_humano_em ? 'humano' : 'sem humano'})` };
 });
 
 const ok = resultados.filter(Boolean).length;

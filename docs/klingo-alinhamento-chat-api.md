@@ -33,7 +33,7 @@ Campo vazio no Klingo não é divergência (vira "atualizar cadastro"). Não rev
 | Link do Minha vez no cartão do agendamento | Feito (chat 2026.11.12-15). |
 | Vários exames: um horário por grupo, em sequência; se falhar, mantém o que marcou e a equipe resolve o resto | Projetado, não implementado (ver abaixo). |
 | Laudo automático e segunda via em qualquer conversa | Projetado, não implementado (ver abaixo). |
-| Quadros | Proposta abaixo; nada alterado. |
+| Quadros do Atendimento por quem conduz a conversa | Feito (painel v19 + parte 14): chips "Com o assistente", "Agendado pela API" e "Com atendente"; "Está tudo certo" encerra a conversa agendada pela API. A Jornada e as conversas antigas não foram alteradas. "Consulta API" é a conversa agendada pela API que voltou ao menu (fica em "Agendado pela API"). |
 
 ### Vários exames (desenho)
 Hoje a API só entra quando há 1 procedimento e 1 horário: `chat-agenda-api` (`pedidoDaApi`), `chat_horarios`, `chat_horario_escolher`, `klingo_pode_marcar` (`varios_procedimentos`, `horario_nao_unico`) e o executor assumem isso. Para marcar um grupo por vez é preciso: (1) ofertas da API por grupo (um pedido de horários por procedimento do grupo); (2) `chat_horarios`/`chat_horario_escolher` guardarem a chave do Klingo de cada grupo; (3) a operação levar a lista de grupos; (4) o executor marcar um por vez (pausa entre chamadas, por causa do limite de requisições), parar no primeiro erro e devolver "parcial"; (5) o `concluir` marcar como agendado o que foi marcado e passar o resto à equipe; (6) cancelar/remarcar de mais de uma marcação ficar com a equipe.
