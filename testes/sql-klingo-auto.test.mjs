@@ -13,11 +13,11 @@ const caso = async (nome, fn) => { try { const r = await fn(); registrar(nome, r
 const { db, falhas } = await criarBancoProducao();
 const { q, um, como, anonimo } = ajudantes(db);
 await db.exec(`insert into vault.secrets_tbl (name, secret) values ('klingo_hash_sal', 'sal-de-teste'), ('klingo_interno_segredo', 'interno-de-teste')`);
-for (const f of ['klingo-auto-parte1-tabelas', 'klingo-auto-parte2-base', 'klingo-auto-parte3-identidade', 'klingo-auto-parte4a-operacao', 'klingo-auto-parte4b-motor', 'klingo-auto-parte5-autogestao', 'klingo-auto-parte6-novo-e-eventos', 'klingo-auto-parte7-indicadores', 'klingo-auto-parte8-pos-marcacao', 'klingo-auto-parte9-voltar', 'klingo-auto-parte10-interruptor-geral', 'klingo-auto-parte11-voltar-mae-divergencia', 'klingo-auto-parte12-convenio-segue-klingo', 'klingo-auto-parte13-paciente-conhecido-cpf', 'klingo-auto-parte14-quadros-encerrar-agendado']) {
+for (const f of ['klingo-auto-parte1-tabelas', 'klingo-auto-parte2-base', 'klingo-auto-parte3-identidade', 'klingo-auto-parte4a-operacao', 'klingo-auto-parte4b-motor', 'klingo-auto-parte5-autogestao', 'klingo-auto-parte6-novo-e-eventos', 'klingo-auto-parte7-indicadores', 'klingo-auto-parte8-pos-marcacao', 'klingo-auto-parte9-voltar', 'klingo-auto-parte10-interruptor-geral', 'klingo-auto-parte11-voltar-mae-divergencia', 'klingo-auto-parte12-convenio-segue-klingo', 'klingo-auto-parte13-paciente-conhecido-cpf', 'klingo-auto-parte14-quadros-encerrar-agendado', 'klingo-auto-parte15-so-o-que-o-klingo-libera']) {
   try { await db.exec(readFileSync(`${REPO}/supabase/${f}.sql`, 'utf8')); } catch (e) { registrar(`aplicar ${f}.sql no clone da produção`, false, String(e.message).split('\n')[0]); }
 }
 await db.exec(`insert into public.config (chave, valor) values ('klingo_auto', 'legado') on conflict (chave) do update set valor = 'legado'`);   // os casos abaixo testam as regras por chave; o interruptor geral tem casos próprios no fim
-registrar('o retrato da produção monta inteiro e as 15 partes novas aplicam sem erro', falhas.length === 0 && resultados.every(Boolean));
+registrar('o retrato da produção monta inteiro e as 16 partes novas aplicam sem erro', falhas.length === 0 && resultados.every(Boolean));
 
 const UNIDADE = 'CLÍNICA DE SAÚDE E IMAGEM - CSI';
 await db.exec(`
@@ -864,6 +864,34 @@ await caso('TUDO CERTO depois de agendado pela API: a conversa é encerrada (age
   await um(`select public.fluxo_pos_responder($1, 'fim')`, [a.c]); await um(`select public.fluxo_pos_responder($1, 'fim')`, [b.c]);
   const ca = await conversaDe(a.c), cb = await conversaDe(b.c);
   return { ok: ca.status === 'encerrada' && ca.motivo_encerramento === 'agendado' && ca.encerramento_origem === 'sistema' && cb.status !== 'encerrada', detalhe: `sem humano=${ca.status}/${ca.motivo_encerramento}/${ca.encerramento_origem}; com humano=${cb.status} (antes ${antesB.status}/${antesB.primeiro_humano_em ? 'humano' : 'sem humano'})` };
+});
+
+
+// ---------------------------------------------------------------- 16. só o que o Klingo libera: consultas e exames
+await caso('SÓ O QUE O KLINGO LIBERA: desligado mostra tudo; ligado, no autoatendimento, a consulta some se a especialidade não é da API e o exame só aparece com horário no Klingo; fora do autoatendimento é tudo como antes', async () => {
+  const { p } = await marcando('So Liberados Teste');
+  const lib = async (proc, tipo) => (await um(`select public.klingo_liberado($1, $2, $3) r`, [p.c, proc, tipo])).r;
+  await db.exec(`insert into public.klingo_especialidade (cbos, nome, procedimentos, liberada_api) values ('999991', 'TESTE LIBERADA', array[301], true), ('999992', 'TESTE NAO', array[302], false) on conflict (cbos) do update set procedimentos = excluded.procedimentos, liberada_api = excluded.liberada_api`);
+  await cfg('klingo_so_liberados', 'nao'); const desligado = [await lib(301, 'consulta'), await lib(302, 'consulta'), await lib(201, 'exame')];
+  await cfg('klingo_so_liberados', 'sim');
+  const sem = await lib(201, 'exame');
+  await um(`select public.klingo_sondagem_gravar(201, true)`); const com = await lib(201, 'exame');
+  await um(`select public.klingo_sondagem_gravar(202, false)`); const vazio = await lib(202, 'exame');
+  const ligado = [await lib(301, 'consulta'), await lib(302, 'consulta')];
+  await db.exec(`update public.klingo_proc_api set com_horario_em = now() - interval '8 days' where procedimento_id = 201`); const velho = await lib(201, 'exame');
+  await cfg('klingo_auto', 'nao'); const fora = [await lib(302, 'consulta'), await lib(202, 'exame')];
+  await cfg('klingo_auto', 'legado'); await cfg('klingo_so_liberados', 'nao');
+  return { ok: desligado.every(Boolean) && sem === false && com === true && vazio === false && ligado[0] === true && ligado[1] === false && velho === false && fora.every(Boolean),
+    detalhe: `desligado=${desligado} | exame sem sondagem=${sem} com horário=${com} sem horário=${vazio} velho=${velho} | consultas ligado=${ligado} | fora do autoatendimento=${fora}` };
+});
+await caso('SONDAGEM DE EXAMES: pega os mais pedidos ainda não vistos, grava o resultado e só roda com o autoatendimento ligado', async () => {
+  const antes = await q(`select public.klingo_exames_sondar(5) as id`);
+  await um(`select public.klingo_sondagem_gravar(201, true)`);
+  const dep = await q(`select public.klingo_exames_sondar(40) as id`);
+  const g = await um(`select com_horario_em is not null as com, vazio_em is not null as vazio from public.klingo_proc_api where procedimento_id = 201`);
+  await cfg('klingo_auto', 'nao'); const n0 = (await um(`select count(*)::int n from net.chamadas where url like '%klingo-sincronizar'`)).n; await um(`select public.klingo_sondar_disparar()`);
+  const n1 = (await um(`select count(*)::int n from net.chamadas where url like '%klingo-sincronizar'`)).n; await cfg('klingo_auto', 'legado');
+  return { ok: g.com === true && !dep.map((x) => x.id).includes(201) && n0 === n1, detalhe: `a sondar antes=${antes.length}, depois=${dep.length}; 201 gravado=${g.com}; chamadas com o interruptor desligado: ${n1 - n0}` };
 });
 
 const ok = resultados.filter(Boolean).length;

@@ -1,10 +1,11 @@
 // FLUXOGRAMA: entrada (POST {"acao":"catalogo"} com x-klingo-segredo; chamado toda madrugada pelo banco) -> validação (segredo conferido pelo banco)
 //   -> lógica (GET /convenios, GET /agenda/especialidades e GET /agenda/consultas por especialidade, tudo pela cota global; só catálogo, nenhum dado de paciente)
 //   -> saída (klingo_catalogo_gravar grava convênios/planos/especialidades e traduz sozinho o convênio do chat para o plano do Klingo; resposta só com contagens)
+// Versão 1.1 — 12/11/2026 / Mudança: ação "exames": sonda, aos poucos (15 por chamada), se o Klingo tem horário livre para cada exame; o chat usa isso para mostrar ao paciente só o que o Klingo libera.
 // Versão 1.0 — 12/11/2026 / Mudança: primeira versão (autoatendimento Klingo, etapa 0: tradução de convênio e especialidade).
 // Secret: KLINGO_APP_TOKEN.
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { cotaGlobal, KlingoApi } from "./klingo-api.ts";
+import { cotaGlobal, KlingoApi, KlingoErro } from "./klingo-api.ts";
 
 const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { "Content-Type": "application/json" } });
 
@@ -16,9 +17,27 @@ Deno.serve(async (req: Request) => {
   const token = Deno.env.get("KLINGO_APP_TOKEN");
   if (!token) return json({ error: "KLINGO_APP_TOKEN não configurado" }, 500);
   const c = await req.json().catch(() => ({}));
-  if (c?.acao !== "catalogo") return json({ error: "acao inválida (use catalogo)" }, 400);
+  if (c?.acao !== "catalogo" && c?.acao !== "exames") return json({ error: "acao inválida (use catalogo ou exames)" }, 400);
   const rpc = (n: string, a: Record<string, unknown>) => supabase.rpc(n, a);
   const api = new KlingoApi(token, (u, i) => fetch(u, i), { antes: cotaGlobal(rpc, { maxTentativas: 10, maxEsperaMs: 3000 }), aoLimite: async () => { await supabase.rpc("klingo_cota_429"); }, tentativas429: 3 });
+  if (c.acao === "exames") {
+    // Sonda os exames mais pedidos que ainda não foram vistos nos últimos 3 dias: tem horário livre nas próximas 3 semanas? Só catálogo, nenhum dado de paciente.
+    const hoje = new Date().toLocaleString("sv-SE", { timeZone: "America/Bahia" }).slice(0, 10);
+    const fim = new Date(`${hoje}T12:00:00Z`); fim.setUTCDate(fim.getUTCDate() + 21);
+    const { data: ids } = await supabase.rpc("klingo_exames_sondar", { p_n: 15 });
+    let tem = 0, vazio = 0, pulados = 0;
+    for (const id of (Array.isArray(ids) ? ids : []) as number[]) {
+      try {
+        const hs = await api.horarios({ exame: String(id), inicio: hoje, fim: fim.toISOString().slice(0, 10) });
+        await supabase.rpc("klingo_sondagem_gravar", { p_proc: id, p_tem: hs.length > 0 });
+        if (hs.length > 0) tem++; else vazio++;
+      } catch (e) {
+        if (e instanceof KlingoErro && e.tipo === "limite") break;   // o Klingo pediu calma: para por aqui e tenta na próxima rodada
+        if (e instanceof KlingoErro && (e.tipo === "sem_medico" || e.tipo === "plano_inativo" || e.tipo === "plano_desconhecido")) { await supabase.rpc("klingo_sondagem_gravar", { p_proc: id, p_tem: false }); vazio++; } else pulados++;
+      }
+    }
+    return json({ ok: true, com_horario: tem, sem_horario: vazio, pulados });
+  }
   try {
     const convenios = await api.convenios();
     const esps = await api.especialidades();
