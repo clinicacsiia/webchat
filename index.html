@@ -125,6 +125,13 @@
   .inicio .btn-primario::after { content: ""; position: absolute; top: 0; bottom: 0; left: -40%; width: 30%; background: linear-gradient(100deg, transparent, rgba(255,255,255,.35), transparent); transform: skewX(-20deg); animation: brilha 3.6s ease-in-out 1.5s infinite; }
   @keyframes brilha { 0%, 60% { left: -40%; } 100% { left: 130%; } }
   @media (prefers-reduced-motion: reduce) { .capa *, .inicio *, .inicio *::after { animation: none !important; } }
+  /* Entrar / Criar conta no cabeçalho, do lado oposto ao "Online" (só na tela inicial) */
+  .inicio .conta-faixa { position: absolute; top: calc(8px + env(safe-area-inset-top)); right: 12px; z-index: 6; margin: 0; height: 36px; align-items: center; justify-content: flex-end; gap: 0; }
+  .inicio .conta-faixa .txt { display: none; }
+  .inicio .conta-faixa .acoes { gap: 16px; }
+  .inicio .conta-faixa .link-add { padding: 6px 0; }
+  .app:has(#telaInicio:not([hidden]) #faixaConta:not([hidden])) .topo { padding-right: 160px; }
+  .app:has(#telaInicio:not([hidden]) #btnContaDados:not([hidden])) .topo { padding-right: 210px; }
   .inicio h1 { font-size: calc(26px * var(--esc)); line-height: 1.2; margin: 0 0 4px; text-align: left; }
   .inicio p.sub { margin: 0 0 8px; color: var(--texto-suave); text-align: left; }
   .inicio > form { margin-bottom: 24px; }
@@ -614,7 +621,7 @@
   const CHAVE_HIST = 'webchat.historico.v1';   // as últimas conversas deste aparelho (cada uma com o seu token): dá para voltar a elas
   const MAX_HIST = 5;                          // mínimo pedido: 3
   // Muda a cada alteração do chat. Cópia de mensagens guardada por outra versão é descartada (era isso que mostrava conversa velha e travada).
-  const VERSAO_APP = '2026.11.12-5';
+  const VERSAO_APP = '2026.11.12-6';
   const ESCALAS = [1, 1.18, 1.36], TOAST_LETRA = ['Letra normal.', 'Letra grande.', 'Letra muito grande.'];
 
   // Chegou pelo link "esqueci a senha"? O supabase-js limpa o endereço ao ler o link, então a pergunta é feita antes de criá-lo.
