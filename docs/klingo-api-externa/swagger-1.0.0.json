@@ -1,0 +1,3858 @@
+{
+ "swagger": "2.0",
+ "info": {
+  "description": "Klingo API externa",
+  "version": "1.0.0",
+  "title": "Klingo API Externa",
+  "termsOfService": "http://swagger.io/terms/",
+  "contact": {
+   "email": "suporte@klingo.com.br"
+  },
+  "license": {
+   "name": "Apache 2.0",
+   "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
+  }
+ },
+ "tags": [
+  {
+   "name": "teste",
+   "description": "Teste da API."
+  },
+  {
+   "name": "sessao",
+   "description": "Autenticação do usuário."
+  },
+  {
+   "name": "cadastros",
+   "description": "Obtenção de dados cadastrais."
+  },
+  {
+   "name": "paciente",
+   "description": "Integração do cadastro de paciente."
+  },
+  {
+   "name": "agenda",
+   "description": "Funções da agenda."
+  },
+  {
+   "name": "voucher",
+   "description": "Gestão das agendas marcadas"
+  },
+  {
+   "name": "check-in",
+   "description": "Funções para realização do check-in do paciente"
+  },
+  {
+   "name": "webhook",
+   "description": "Documentação do webhook de retorno dos status das marcações"
+  },
+  {
+   "name": "atendimentos",
+   "description": "Consulta dos Atendimentos de uma Data"
+  }
+ ],
+ "schemes": [
+  "https"
+ ],
+ "paths": {
+  "/live": {
+   "get": {
+    "tags": [
+     "teste"
+    ],
+    "summary": "Verifica se a API está no ar.",
+    "description": "Verifica se a API está no ar e exibe a versão.",
+    "operationId": "versao",
+    "responses": {
+     "200": {
+      "description": "OK"
+     },
+     "405": {
+      "description": "Invalid input"
+     }
+    }
+   }
+  },
+  "/externo/register": {
+   "post": {
+    "tags": [
+     "sessao"
+    ],
+    "summary": "Realiza o pré-cadastro do paciente.",
+    "security": [
+     {
+      "app_token": []
+     }
+    ],
+    "description": "Pré-Cadastro do Paciente",
+    "operationId": "register",
+    "consumes": [
+     "application/json"
+    ],
+    "produces": [
+     "application/json"
+    ],
+    "parameters": [
+     {
+      "in": "body",
+      "name": "body",
+      "description": "Dados do Paciente.",
+      "required": true,
+      "schema": {
+       "type": "object",
+       "properties": {
+        "paciente": {
+         "$ref": "#/definitions/paciente"
+        }
+       }
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Id do paciente criado.",
+      "schema": {
+       "type": "object",
+       "properties": {
+        "id": {
+         "type": "number",
+         "example": "123",
+         "description": "Id do novo paciente registrado."
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "dados inválidos."
+     },
+     "405": {
+      "description": "Invalid input"
+     }
+    }
+   }
+  },
+  "/externo/login": {
+   "post": {
+    "tags": [
+     "sessao"
+    ],
+    "summary": "Realiza a autenticação da aplicação, identificando o paciente.",
+    "security": [
+     {
+      "app_token": []
+     }
+    ],
+    "description": "Autenticação da Aplicação. Para logar com o id do paciente, deve-se preceder o id com a letra P (Ex.: P123)",
+    "operationId": "login",
+    "consumes": [
+     "application/json"
+    ],
+    "produces": [
+     "application/json"
+    ],
+    "parameters": [
+     {
+      "in": "body",
+      "name": "body",
+      "description": "Dados para Autenticação.",
+      "required": true,
+      "schema": {
+       "$ref": "#/definitions/credencialLogin"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Token da autenticação que deve ser enviado no header dos demais endpoints.",
+      "schema": {
+       "$ref": "#/definitions/sessao"
+      }
+     },
+     "403": {
+      "description": "dados inválidos."
+     },
+     "405": {
+      "description": "Invalid input"
+     }
+    }
+   }
+  },
+  "/externo/portal/register": {
+   "post": {
+    "tags": [
+     "sessao"
+    ],
+    "summary": "Realiza o pré-cadastro do paciente, como um usuário do portal.",
+    "security": [
+     {
+      "app_token": []
+     }
+    ],
+    "description": "Cadastro do Paciente",
+    "operationId": "registerPortal",
+    "consumes": [
+     "application/json"
+    ],
+    "produces": [
+     "application/json"
+    ],
+    "parameters": [
+     {
+      "in": "body",
+      "name": "body",
+      "description": "Dados do Paciente.",
+      "required": true,
+      "schema": {
+       "type": "object",
+       "properties": {
+        "senha": {
+         "type": "string",
+         "example": "1234",
+         "description": "Senha do usuário no portal."
+        },
+        "paciente": {
+         "$ref": "#/definitions/paciente"
+        }
+       }
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Id do paciente criado.",
+      "schema": {
+       "$ref": "#/definitions/sessao"
+      }
+     },
+     "403": {
+      "description": "dados inválidos."
+     },
+     "405": {
+      "description": "Invalid input"
+     }
+    }
+   }
+  },
+  "/externo/portal/login": {
+   "post": {
+    "tags": [
+     "sessao"
+    ],
+    "summary": "Realiza a autenticação da aplicação, identificando o paciente, baseado no login/senha do portal de agendamentos do klingo.",
+    "security": [
+     {
+      "app_token": []
+     }
+    ],
+    "description": "Autenticação da Aplicação.",
+    "operationId": "loginPortal",
+    "consumes": [
+     "application/json"
+    ],
+    "produces": [
+     "application/json"
+    ],
+    "parameters": [
+     {
+      "in": "body",
+      "name": "body",
+      "description": "Dados para Autenticação.",
+      "required": true,
+      "schema": {
+       "$ref": "#/definitions/credencialLoginPortal"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Token da autenticação que deve ser enviado no header dos demais endpoints.",
+      "schema": {
+       "$ref": "#/definitions/sessao"
+      }
+     },
+     "403": {
+      "description": "dados inválidos."
+     },
+     "405": {
+      "description": "Invalid input"
+     }
+    }
+   }
+  },
+  "/externo/portal/recuperar": {
+   "post": {
+    "tags": [
+     "sessao"
+    ],
+    "summary": "Envio de e-mail para o usuário para recuperação de senha.",
+    "security": [
+     {
+      "app_token": []
+     }
+    ],
+    "description": "Autenticação da Aplicação.",
+    "operationId": "recuperarPortal",
+    "consumes": [
+     "application/json"
+    ],
+    "produces": [
+     "application/json"
+    ],
+    "parameters": [
+     {
+      "in": "body",
+      "name": "body",
+      "description": "Dados para Autenticação.",
+      "required": true,
+      "schema": {
+       "type": "object",
+       "properties": {
+        "email": {
+         "type": "string",
+         "example": "teste@teste.com.br",
+         "description": "email do usuário para recuperação de senha."
+        }
+       }
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Token da autenticação que deve ser enviado no header dos demais endpoints.",
+      "schema": {
+       "type": "object",
+       "properties": {
+        "level": {
+         "type": "string",
+         "example": "success",
+         "description": "status de sucesso: success ou error."
+        },
+        "msg": {
+         "type": "string",
+         "example": "texto da mensagem",
+         "description": "mensagem de retorno."
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "dados inválidos."
+     },
+     "405": {
+      "description": "Invalid input"
+     }
+    }
+   }
+  },
+  "/paciente": {
+   "put": {
+    "tags": [
+     "paciente"
+    ],
+    "summary": "Atualização dos dados do paciente",
+    "security": [
+     {
+      "bearer": []
+     }
+    ],
+    "description": "Realiza a atualização dos dados do paciente",
+    "operationId": "updatePac",
+    "consumes": [
+     "application/json"
+    ],
+    "produces": [
+     "application/json"
+    ],
+    "parameters": [
+     {
+      "in": "body",
+      "name": "body",
+      "description": "Dados do paciente.",
+      "required": true,
+      "schema": {
+       "$ref": "#/definitions/paciente"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "requisição executada com sucesso.",
+      "schema": {
+       "$ref": "#/definitions/paciente"
+      }
+     },
+     "403": {
+      "description": "credenciais inválidas."
+     },
+     "405": {
+      "description": "Invalid input"
+     }
+    }
+   },
+   "get": {
+    "tags": [
+     "paciente"
+    ],
+    "summary": "Obter dados do paciente",
+    "security": [
+     {
+      "bearer": []
+     }
+    ],
+    "description": "Realiza a consulta do paciente",
+    "operationId": "getPac",
+    "produces": [
+     "application/json"
+    ],
+    "responses": {
+     "200": {
+      "description": "requisição executada com sucesso.",
+      "schema": {
+       "$ref": "#/definitions/paciente"
+      }
+     },
+     "403": {
+      "description": "credenciais inválidas."
+     },
+     "405": {
+      "description": "Invalid input"
+     }
+    }
+   }
+  },
+  "/paciente/identificar": {
+   "post": {
+    "tags": [
+     "paciente"
+    ],
+    "summary": "Realiza a identificação do do paciente pelo telefone, para integração via Whatsapp.",
+    "security": [
+     {
+      "app_token": []
+     }
+    ],
+    "description": "Realiza a identificação do do paciente pelo telefone. Deve ser enviado adicional ao telefone, o CPF ou a data de nascimento (ou passando o parâmetro apenas_telefone = true).",
+    "operationId": "identificar paciente por telefone",
+    "consumes": [
+     "application/json"
+    ],
+    "produces": [
+     "application/json"
+    ],
+    "parameters": [
+     {
+      "in": "body",
+      "name": "body",
+      "description": "Dados do paciente.",
+      "required": true,
+      "schema": {
+       "type": "object",
+       "properties": {
+        "telefone": {
+         "type": "string",
+         "example": "1199999999"
+        },
+        "dt_nascimento": {
+         "type": "string",
+         "example": "1980-01-01"
+        },
+        "cpf": {
+         "type": "string",
+         "example": "enviar alternativa a data de nascimento"
+        },
+        "apenas_telefone": {
+         "type": "boolean",
+         "example": false
+        }
+       }
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "requisição executada com sucesso.",
+      "schema": {
+       "$ref": "#/definitions/sessao"
+      }
+     },
+     "403": {
+      "description": "credenciais inválidas."
+     },
+     "405": {
+      "description": "Invalid input"
+     }
+    }
+   }
+  },
+  "/paciente/cpf": {
+   "get": {
+    "tags": [
+     "paciente"
+    ],
+    "summary": "Realiza a identificação do do paciente pelo CPF",
+    "security": [
+     {
+      "app_token": []
+     }
+    ],
+    "description": "Realiza a identificação do do paciente pelo CPF.",
+    "operationId": "identificar paciente por CPF",
+    "consumes": [
+     "application/json"
+    ],
+    "produces": [
+     "application/json"
+    ],
+    "parameters": [
+     {
+      "in": "query",
+      "name": "cpf",
+      "description": "CPF do paciente (apenas números com 11 dígitos).",
+      "required": true,
+      "type": "string"
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "requisição executada com sucesso.",
+      "schema": {
+       "$ref": "#/definitions/paciente"
+      }
+     },
+     "403": {
+      "description": "credenciais inválidas."
+     },
+     "405": {
+      "description": "Invalid input"
+     }
+    }
+   }
+  },
+  "/atendimentos": {
+   "get": {
+    "tags": [
+     "atendimentos"
+    ],
+    "summary": "Obter a lista de atendimentos de uma determinada data",
+    "security": [
+     {
+      "app_token": []
+     }
+    ],
+    "description": "Realiza a consulta dos atendimentos de uma determinada data.",
+    "operationId": "getAtendimentos",
+    "consumes": [
+     "application/json"
+    ],
+    "produces": [
+     "application/json"
+    ],
+    "parameters": [
+     {
+      "in": "query",
+      "name": "data",
+      "description": "Data desejada no formato YYYY-MM-DD. Se não informada, busca-se os atendimentos do dia.",
+      "required": false,
+      "type": "string"
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "requisição executada com sucesso.",
+      "schema": {
+       "type": "array",
+       "items": {
+        "$ref": "#/definitions/atendimento"
+       }
+      }
+     },
+     "405": {
+      "description": "Invalid input"
+     }
+    }
+   }
+  },
+  "/resultado/{id_marcacao}": {
+   "get": {
+    "tags": [
+     "resultados"
+    ],
+    "summary": "Obter resultados de um determinado voucher (marcação)",
+    "security": [
+     {
+      "app_token": []
+     }
+    ],
+    "description": "Realiza a consulta dos resultados de um determinado voucher.",
+    "operationId": "getResultado",
+    "consumes": [
+     "application/json"
+    ],
+    "produces": [
+     "application/json"
+    ],
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id_marcacao",
+      "required": true,
+      "type": "number",
+      "description": "Número da Marcação"
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Lista de resultados enviada com sucesso.",
+      "schema": {
+       "type": "array",
+       "items": {
+        "$ref": "#/definitions/resultado"
+       }
+      }
+     },
+     "405": {
+      "description": "Invalid input"
+     }
+    }
+   }
+  },
+  "/resultado/pdf/{id_marcacao}": {
+   "get": {
+    "tags": [
+     "resultados"
+    ],
+    "summary": "Obter resultado laboratorial (PDF) de um determinado voucher (marcação)",
+    "security": [
+     {
+      "app_token": []
+     }
+    ],
+    "description": "Realiza a consulta do resultado de um determinado voucher.",
+    "operationId": "getResultadoPdf",
+    "consumes": [
+     "application/json"
+    ],
+    "produces": [
+     "application/json"
+    ],
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id_marcacao",
+      "required": true,
+      "type": "number",
+      "description": "Número da Marcação"
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Resultado enviada com sucesso.",
+      "schema": {
+       "type": "object",
+       "properties": {
+        "id_marcacao": {
+         "type": "string"
+        },
+        "id_atendimento": {
+         "type": "string"
+        },
+        "pdf_base64": {
+         "type": "string"
+        }
+       }
+      }
+     },
+     "405": {
+      "description": "Invalid input"
+     }
+    }
+   }
+  },
+  "/resultado/pdf/an/{accession_number}": {
+   "get": {
+    "tags": [
+     "resultados"
+    ],
+    "summary": "Obter resultado de exame de imagem (PDF) de um determinado accession number",
+    "security": [
+     {
+      "app_token": []
+     }
+    ],
+    "description": "Realiza a consulta do resultado de um determinado accession number.",
+    "operationId": "getResultadoPdfAn",
+    "consumes": [
+     "application/json"
+    ],
+    "produces": [
+     "application/json"
+    ],
+    "parameters": [
+     {
+      "in": "path",
+      "name": "accession_number",
+      "required": true,
+      "type": "string",
+      "description": "Accession Number"
+     },
+     {
+      "in": "body",
+      "name": "body",
+      "description": "Data de Nascimento (Opcional) ou Id do Paciente pra validar a consulta.",
+      "required": true,
+      "schema": {
+       "type": "object",
+       "properties": {
+        "dtnasc": {
+         "type": "string",
+         "example": "2000-01-01"
+        },
+        "patientid": {
+         "type": "string",
+         "example": "1234"
+        }
+       }
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Resultado enviada com sucesso.",
+      "schema": {
+       "type": "object",
+       "properties": {
+        "id_marcacao": {
+         "type": "string"
+        },
+        "id_atendimento": {
+         "type": "string"
+        },
+        "pdf_base64": {
+         "type": "string"
+        }
+       }
+      }
+     },
+     "405": {
+      "description": "Invalid input"
+     }
+    }
+   }
+  },
+  "/vouchers": {
+   "get": {
+    "tags": [
+     "voucher"
+    ],
+    "summary": "Obter os vouchers do paciente (agendamentos)",
+    "security": [
+     {
+      "bearer": []
+     }
+    ],
+    "description": "Realiza a consulta de agendamentos.",
+    "operationId": "getVouchers",
+    "consumes": [
+     "application/json"
+    ],
+    "produces": [
+     "application/json"
+    ],
+    "responses": {
+     "200": {
+      "description": "requisição executada com sucesso.",
+      "schema": {
+       "type": "array",
+       "items": {
+        "$ref": "#/definitions/voucher"
+       }
+      }
+     },
+     "405": {
+      "description": "Invalid input"
+     }
+    }
+   }
+  },
+  "/voucher": {
+   "delete": {
+    "tags": [
+     "voucher"
+    ],
+    "summary": "Exclusão do voucher (agendamento)",
+    "security": [
+     {
+      "bearer": []
+     }
+    ],
+    "description": "Realiza a exclusão do voucher.",
+    "operationId": "delVoucher",
+    "consumes": [
+     "application/json"
+    ],
+    "produces": [
+     "application/json"
+    ],
+    "parameters": [
+     {
+      "in": "body",
+      "name": "body",
+      "description": "Id do voucher a ser cancelado.",
+      "required": true,
+      "schema": {
+       "type": "object",
+       "properties": {
+        "id": {
+         "type": "string"
+        }
+       }
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "requisição executada com sucesso.",
+      "schema": {
+       "type": "string",
+       "example": "Voucher cancelado"
+      }
+     },
+     "405": {
+      "description": "Invalid input"
+     }
+    }
+   }
+  },
+  "/requisicao": {
+   "get": {
+    "tags": [
+     "voucher"
+    ],
+    "summary": "Obter os dados da requisição de exames do paciente",
+    "security": [
+     {
+      "bearer": []
+     }
+    ],
+    "description": "Obter dados da requisição de exames do paciente.",
+    "operationId": "getRequisicao",
+    "consumes": [
+     "application/json"
+    ],
+    "produces": [
+     "application/json"
+    ],
+    "parameters": [
+     {
+      "in": "query",
+      "name": "id",
+      "description": "Id da requisição lida no QRCode da requisicão. RQ-ORIGEM-ID-TOKEN",
+      "required": true,
+      "type": "number"
+     },
+     {
+      "in": "query",
+      "name": "origem",
+      "description": "Origem da requisição lida no QRCode da requisicão. RQ-ORIGEM-ID-TOKEN",
+      "required": true,
+      "type": "string"
+     },
+     {
+      "in": "query",
+      "name": "token",
+      "description": "Token da requisição lida no QRCode da requisicão. RQ-ORIGEM-ID-TOKEN",
+      "required": true,
+      "type": "string"
+     },
+     {
+      "in": "query",
+      "name": "pdf",
+      "description": "Se esse parâmetro for passado igual a 1, é retornado um PDF no lugar do json",
+      "required": false,
+      "type": "number"
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "requisição executada com sucesso.",
+      "schema": {
+       "$ref": "#/definitions/requisicao"
+      }
+     },
+     "405": {
+      "description": "Invalid input"
+     }
+    }
+   }
+  },
+  "/agenda/horarios": {
+   "get": {
+    "tags": [
+     "agenda"
+    ],
+    "summary": "Consultar horários disponíveis para marcação.",
+    "security": [
+     {
+      "app_token": []
+     },
+     {
+      "bearer": []
+     }
+    ],
+    "description": "Consulta dos horários disponíveis para marcação.",
+    "operationId": "getTimes",
+    "consumes": [
+     "application/json"
+    ],
+    "produces": [
+     "application/json"
+    ],
+    "parameters": [
+     {
+      "in": "query",
+      "name": "especialidade",
+      "description": "CBOS da especialidade. Obrigatório somente se marcação de consulta.",
+      "required": false,
+      "type": "string"
+     },
+     {
+      "in": "query",
+      "name": "exame",
+      "description": "Código do exame. Obrigatório somente se marcação de exame.",
+      "required": false,
+      "type": "string"
+     },
+     {
+      "in": "query",
+      "name": "inicio",
+      "description": "Data inicial da busca. Se não informado, busca-se a partir da data atual.",
+      "required": false,
+      "type": "string"
+     },
+     {
+      "in": "query",
+      "name": "fim",
+      "description": "Data final da busca. Se não informado, busca-se até 10 dias em relação a data inicial.",
+      "required": false,
+      "type": "string"
+     },
+     {
+      "in": "query",
+      "name": "crm",
+      "description": "Filtra o médico pelo CRM informado. (opcional)",
+      "required": false,
+      "type": "string"
+     },
+     {
+      "in": "query",
+      "name": "cnes",
+      "description": "Filtra a unidade pelo CNES informado. (opcional)",
+      "required": false,
+      "type": "string"
+     },
+     {
+      "in": "query",
+      "name": "classe_unidade",
+      "description": "Filtra a unidade pela classificação da unidade. (opcional)",
+      "required": false,
+      "type": "string"
+     },
+     {
+      "in": "query",
+      "name": "plano",
+      "description": "Filtra operadora/plano. (opcional)",
+      "required": false,
+      "type": "string"
+     },
+     {
+      "in": "query",
+      "name": "revisao",
+      "description": "Indica se a consulta é de revisão. (opcional)",
+      "required": false,
+      "type": "string"
+     },
+     {
+      "in": "query",
+      "name": "adicao",
+      "description": "Indica se é uma busca adicional, na qual as reservas do paciente não devem ser liberadas. (opcional)",
+      "required": false,
+      "type": "string"
+     },
+     {
+      "in": "query",
+      "name": "remarcacao",
+      "description": "Indica se é uma busca para remarcação do procedimento. (opcional)",
+      "required": false,
+      "type": "string"
+     },
+     {
+      "in": "query",
+      "name": "subespecialidade",
+      "description": "Indica a subespecialidade do profissional. (opcional)",
+      "required": false,
+      "type": "string"
+     },
+     {
+      "in": "query",
+      "name": "sexo",
+      "description": "Sexo do Paciente, quando buscado sem o bearer token do paciente (opcional)",
+      "required": false,
+      "type": "string"
+     },
+     {
+      "in": "query",
+      "name": "nascimento",
+      "description": "Data de nascimento do paciente (YYYY-MM-DD), quando buscado sem o bearer token do paciente (opcional)",
+      "required": false,
+      "type": "string"
+     },
+     {
+      "in": "query",
+      "name": "id_regiao_cd",
+      "description": "Id da Região de Coleta Domiciliar (Necessário apenas para agendamentos de coleta domiciliar)",
+      "required": false,
+      "type": "number"
+     },
+     {
+      "in": "query",
+      "name": "telemed",
+      "description": "Indica se a consulta é apenas de agendas de telemedicina. (preencher com 1 ou 0) - (opcional)",
+      "required": false,
+      "type": "string"
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "requisição executada com sucesso.",
+      "schema": {
+       "$ref": "#/definitions/horariosAgenda"
+      }
+     },
+     "403": {
+      "description": "procedimento não identificado. Vai ocorrer se o procedimento de consulta não for identificado."
+     },
+     "405": {
+      "description": "Invalid input"
+     }
+    }
+   }
+  },
+  "/agenda/horario": {
+   "post": {
+    "tags": [
+     "agenda"
+    ],
+    "summary": "Confirmar a marcação do horário..",
+    "security": [
+     {
+      "bearer": []
+     }
+    ],
+    "description": "Realiza a marcação do horário na agenda do médico. O solicitante pode ser informado opcionalmente para marcações de exames.",
+    "operationId": "schedule",
+    "consumes": [
+     "application/json"
+    ],
+    "produces": [
+     "application/json"
+    ],
+    "parameters": [
+     {
+      "in": "body",
+      "name": "body",
+      "description": "Dados da marcação.",
+      "required": true,
+      "schema": {
+       "$ref": "#/definitions/horarioMarcar"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "requisição executada com sucesso.",
+      "schema": {
+       "$ref": "#/definitions/voucher"
+      }
+     },
+     "405": {
+      "description": "Invalid input"
+     }
+    }
+   }
+  },
+  "/agenda/horario_procedimentos": {
+   "get": {
+    "tags": [
+     "agenda"
+    ],
+    "summary": "Consultar os procedimentos disponíveis para um determinado horário.",
+    "security": [
+     {
+      "app_token": []
+     },
+     {
+      "bearer": []
+     }
+    ],
+    "description": "Consultar os procedimentos disponíveis para um determinado horário.",
+    "operationId": "getHorarioProcs",
+    "consumes": [
+     "application/json"
+    ],
+    "produces": [
+     "application/json"
+    ],
+    "parameters": [
+     {
+      "in": "query",
+      "name": "horario",
+      "description": "Chave do horário obtido na lista de horários. (Ex.: 2023-08-28|3|2|1|08:00)",
+      "required": true,
+      "type": "string"
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Lista de Procedimentos.",
+      "schema": {
+       "$ref": "#/definitions/horarioProcedimentos"
+      }
+     },
+     "403": {
+      "description": "horário não identificado."
+     },
+     "405": {
+      "description": "Invalid input"
+     }
+    }
+   }
+  },
+  "/agenda/reservar": {
+   "post": {
+    "tags": [
+     "agenda"
+    ],
+    "summary": "Realizar a reserva do horário.",
+    "security": [
+     {
+      "bearer": []
+     }
+    ],
+    "description": "Realiza a reserva do horário para posterior confirmação da marcação. Essa ação não REALIZA a marcação, mas apenas segura o horário durante 10 minutos, caso ainda tenha alguma etapa para realizar a confirmação final.",
+    "operationId": "reserve",
+    "consumes": [
+     "application/json"
+    ],
+    "produces": [
+     "application/json"
+    ],
+    "parameters": [
+     {
+      "in": "body",
+      "name": "body",
+      "description": "Dados da marcação.",
+      "required": true,
+      "schema": {
+       "$ref": "#/definitions/horarioMarcar"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "requisição executada com sucesso.",
+      "schema": {
+       "$ref": "#/definitions/reserva"
+      }
+     },
+     "403": {
+      "description": "Invalid input"
+     }
+    }
+   },
+   "delete": {
+    "tags": [
+     "agenda"
+    ],
+    "summary": "Cancelar a reserva de horário.",
+    "security": [
+     {
+      "bearer": []
+     }
+    ],
+    "description": "Realiza o cancelamento da reserva do horário, passando o id da reserva realizada.",
+    "operationId": "reserveDelete",
+    "consumes": [
+     "application/json"
+    ],
+    "produces": [
+     "application/json"
+    ],
+    "parameters": [
+     {
+      "in": "body",
+      "name": "body",
+      "description": "Dados da marcação.",
+      "required": true,
+      "schema": {
+       "type": "object",
+       "properties": {
+        "id": {
+         "type": "number",
+         "example": 123
+        }
+       }
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "requisição executada com sucesso.",
+      "schema": {
+       "type": "object",
+       "properties": {
+        "status": {
+         "type": "string",
+         "example": "ok"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "Invalid input"
+     }
+    }
+   }
+  },
+  "/agenda/procedimento": {
+   "put": {
+    "tags": [
+     "agenda"
+    ],
+    "summary": "Alterar procedimento de uma marcação.",
+    "security": [
+     {
+      "bearer": []
+     }
+    ],
+    "description": "Alterar procedimento de uma marcação.",
+    "operationId": "alterProc",
+    "consumes": [
+     "application/json"
+    ],
+    "produces": [
+     "application/json"
+    ],
+    "parameters": [
+     {
+      "in": "body",
+      "name": "body",
+      "description": "Dados da marcação.",
+      "required": true,
+      "schema": {
+       "type": "object",
+       "properties": {
+        "id_marcacao": {
+         "type": "number",
+         "example": 1234,
+         "description": "Id da marcação."
+        },
+        "id_procedimento": {
+         "type": "number",
+         "example": 1000,
+         "description": "Id do novo procedimento."
+        }
+       }
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "requisição executada com sucesso.",
+      "schema": {
+       "$ref": "#/definitions/voucher"
+      }
+     },
+     "403": {
+      "description": "Invalid input"
+     }
+    }
+   }
+  },
+  "/agenda/verificar_horario": {
+   "get": {
+    "tags": [
+     "agenda"
+    ],
+    "summary": "Verificar operadoras e procedimentos específicos para um horário.",
+    "security": [
+     {
+      "app_token": []
+     }
+    ],
+    "description": "Verificar operadoras e procedimentos específicos para um horário.",
+    "operationId": "verificarHorario",
+    "consumes": [
+     "application/json"
+    ],
+    "produces": [
+     "application/json"
+    ],
+    "parameters": [
+     {
+      "in": "body",
+      "name": "body",
+      "description": "Dados da marcação.",
+      "required": true,
+      "schema": {
+       "type": "object",
+       "properties": {
+        "id": {
+         "type": "string",
+         "example": "2021-07-19|71|2|1|18:30",
+         "description": "Id da horário selecionado."
+        }
+       }
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "requisição executada com sucesso.",
+      "schema": {
+       "$ref": "#/definitions/regraHorario"
+      }
+     },
+     "403": {
+      "description": "Invalid input"
+     }
+    }
+   }
+  },
+  "/agenda/consultas": {
+   "get": {
+    "tags": [
+     "cadastros"
+    ],
+    "summary": "lista os procedimentos de consulta disponíveis na base. Pode ser enviado o CBOS ou o id da especialidade para filtrar as consultas.",
+    "security": [
+     {
+      "app_token": []
+     },
+     {
+      "bearer": []
+     }
+    ],
+    "description": "Lista os procedimentos de consulta.",
+    "operationId": "getConsultas",
+    "produces": [
+     "application/json"
+    ],
+    "parameters": [
+     {
+      "in": "query",
+      "name": "cbos",
+      "type": "number",
+      "required": false
+     },
+     {
+      "in": "query",
+      "name": "id_especialidade",
+      "type": "number",
+      "required": false
+     },
+     {
+      "in": "query",
+      "name": "cnes",
+      "type": "string",
+      "required": false
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "lista de consultas.",
+      "schema": {
+       "type": "array",
+       "items": {
+        "$ref": "#/definitions/procedimento"
+       }
+      }
+     },
+     "405": {
+      "description": "Invalid input"
+     }
+    }
+   }
+  },
+  "/agenda/especialidades": {
+   "get": {
+    "tags": [
+     "cadastros"
+    ],
+    "summary": "lista as especialidades disponíveis na base.",
+    "security": [
+     {
+      "app_token": []
+     },
+     {
+      "bearer": []
+     }
+    ],
+    "description": "Lista as especialidades.",
+    "operationId": "getEspecialidades",
+    "produces": [
+     "application/json"
+    ],
+    "parameters": [
+     {
+      "in": "query",
+      "name": "cbos",
+      "type": "number",
+      "required": false
+     },
+     {
+      "in": "query",
+      "name": "cnes",
+      "type": "string",
+      "required": false
+     },
+     {
+      "in": "query",
+      "name": "id_plano",
+      "type": "number",
+      "required": false
+     },
+     {
+      "in": "query",
+      "name": "consultas",
+      "type": "boolean",
+      "required": false
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "lista de especialidades.",
+      "schema": {
+       "type": "array",
+       "items": {
+        "$ref": "#/definitions/especialidade"
+       }
+      }
+     },
+     "405": {
+      "description": "Invalid input"
+     }
+    }
+   }
+  },
+  "/agenda/exames": {
+   "get": {
+    "tags": [
+     "cadastros"
+    ],
+    "summary": "lista os exames disponíveis na base.",
+    "security": [
+     {
+      "app_token": []
+     },
+     {
+      "bearer": []
+     }
+    ],
+    "description": "Lista os exames.",
+    "operationId": "getExames",
+    "produces": [
+     "application/json"
+    ],
+    "parameters": [
+     {
+      "in": "query",
+      "name": "id",
+      "type": "number",
+      "required": false
+     },
+     {
+      "in": "query",
+      "name": "busca",
+      "type": "string",
+      "required": false
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "lista de exames.",
+      "schema": {
+       "type": "array",
+       "items": {
+        "$ref": "#/definitions/procedimento"
+       }
+      }
+     },
+     "405": {
+      "description": "Invalid input"
+     }
+    }
+   }
+  },
+  "/agenda/profissionais": {
+   "get": {
+    "tags": [
+     "cadastros"
+    ],
+    "summary": "lista os profissionais disponíveis para um determinado procedimento.",
+    "security": [
+     {
+      "app_token": []
+     },
+     {
+      "bearer": []
+     }
+    ],
+    "description": "Lista os profissionais.",
+    "operationId": "getProfissionais",
+    "produces": [
+     "application/json"
+    ],
+    "parameters": [
+     {
+      "in": "query",
+      "name": "id_procedimento",
+      "type": "number",
+      "required": true
+     },
+     {
+      "in": "query",
+      "name": "id_plano",
+      "type": "number",
+      "required": true
+     },
+     {
+      "in": "query",
+      "name": "cnes",
+      "type": "number",
+      "required": false
+     },
+     {
+      "in": "query",
+      "name": "agenda_compartilhada",
+      "type": "number",
+      "description": "Colocar 1 para exibir as agendas compartilhadas."
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "lista de profissionais.",
+      "schema": {
+       "type": "array",
+       "items": {
+        "$ref": "#/definitions/profissional"
+       }
+      }
+     },
+     "405": {
+      "description": "Invalid input"
+     }
+    }
+   }
+  },
+  "/checkin": {
+   "post": {
+    "tags": [
+     "check-in"
+    ],
+    "summary": "realiza o check-in de atendimento do paciente.",
+    "security": [
+     {
+      "bearer": []
+     }
+    ],
+    "description": "Realiza o check-in de atendimento do paciente.",
+    "operationId": "checkIn",
+    "consumes": [
+     "application/json"
+    ],
+    "produces": [
+     "application/json"
+    ],
+    "parameters": [
+     {
+      "in": "body",
+      "name": "body",
+      "description": "Parâmetros para o checkin.",
+      "required": true,
+      "schema": {
+       "type": "object",
+       "properties": {
+        "id": {
+         "type": "number",
+         "example": 123,
+         "description": "Id do voucher"
+        },
+        "expresso": {
+         "type": "boolean",
+         "example": false,
+         "description": "Indica se deve ser realizado check-in expresso para o atendimento."
+        },
+        "preferencial": {
+         "type": "boolean",
+         "example": false,
+         "description": "Indica se é atendimento preferencial. Parâmetro opcional."
+        }
+       }
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "requisição executada com sucesso.",
+      "schema": {
+       "$ref": "#/definitions/checkinrealizado"
+      }
+     },
+     "405": {
+      "description": "Dados inválidos"
+     }
+    }
+   },
+   "delete": {
+    "tags": [
+     "check-in"
+    ],
+    "summary": "realiza o cancelamento do check-in de atendimento do paciente.",
+    "security": [
+     {
+      "bearer": []
+     }
+    ],
+    "description": "Realiza o cancelamento do check-in de atendimento do paciente. Somente se o atendimento não tiver sido iniciado.",
+    "operationId": "checkInCancel",
+    "consumes": [
+     "application/json"
+    ],
+    "produces": [
+     "application/json"
+    ],
+    "parameters": [
+     {
+      "in": "body",
+      "name": "body",
+      "description": "Parâmetros para o cancelamento do checkin.",
+      "required": true,
+      "schema": {
+       "type": "object",
+       "properties": {
+        "id": {
+         "type": "number",
+         "example": 123,
+         "description": "Id do voucher"
+        }
+       }
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "requisição executada com sucesso.",
+      "schema": {
+       "type": "string",
+       "example": "Checkin cancelado"
+      }
+     },
+     "403": {
+      "description": "Dados inválidos"
+     }
+    }
+   }
+  },
+  "/webhook-configurado": {
+   "post": {
+    "tags": [
+     "webhook"
+    ],
+    "summary": "Webhook disparado quando ocorre uma atualização no status da marcação.",
+    "description": "Essa não é uma rota da API, mas a descrição da requisição enviada quando uma atualização de status da agenda ocorre.",
+    "consumes": [
+     "application/json"
+    ],
+    "produces": [
+     "application/json"
+    ],
+    "parameters": [
+     {
+      "in": "header",
+      "name": "X-APP-TOKEN",
+      "type": "string",
+      "required": true
+     },
+     {
+      "in": "header",
+      "name": "X-DOMAIN",
+      "type": "string",
+      "required": true
+     },
+     {
+      "in": "header",
+      "name": "X-EVENT",
+      "type": "string",
+      "required": true,
+      "description": "Possíveis Eventos: STATUS-MARCACAO, REMARCACAO, CHAMADA ou FIM-ATENDIMENTO"
+     },
+     {
+      "in": "body",
+      "name": "body",
+      "description": "Informações da Atualização de Status. A informação {nova} é enviada quando o evento é de REMARCACAO.",
+      "required": true,
+      "schema": {
+       "type": "object",
+       "properties": {
+        "id_marcacao": {
+         "type": "number",
+         "example": 123,
+         "description": "Id do marcação atualizada."
+        },
+        "status": {
+         "type": "string",
+         "example": "C",
+         "description": "Status atualizado: A - Aberto, B - Bloqueado ou C - Cancelado."
+        },
+        "motivo": {
+         "type": "string",
+         "example": "Motivo do cancelamento."
+        },
+        "checkin": {
+         "type": "string",
+         "example": "2020-01-01 10:00",
+         "description": "Quando o paciente realiza o check-in na clínica, é enviado o status A, com a data/hora do check-in."
+        },
+        "evento": {
+         "type": "object",
+         "description": "Evento de Chamada e Fim de Atendimento",
+         "properties": {
+          "nome": {
+           "type": "string",
+           "example": "chamada",
+           "description": "Evento Especial: chamada e fim-atendimento"
+          },
+          "local": {
+           "type": "string",
+           "example": "Consultório 10",
+           "description": "Local da chamada. Específico para o evento chamada"
+          }
+         }
+        },
+        "nova": {
+         "$ref": "#/definitions/voucher"
+        }
+       }
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Chamada com sucesso."
+     }
+    }
+   }
+  },
+  "/convenios": {
+   "get": {
+    "tags": [
+     "cadastros"
+    ],
+    "summary": "lista de convênios.",
+    "security": [
+     {
+      "app_token": []
+     },
+     {
+      "bearer": []
+     }
+    ],
+    "description": "Lista de convênios.",
+    "operationId": "getConvenios",
+    "consumes": [
+     "application/json"
+    ],
+    "produces": [
+     "application/json"
+    ],
+    "parameters": [
+     {
+      "in": "query",
+      "name": "cnes",
+      "type": "string",
+      "required": false
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "lista com sucesso.",
+      "schema": {
+       "$ref": "#/definitions/convenios"
+      }
+     },
+     "405": {
+      "description": "Invalid input"
+     }
+    }
+   }
+  },
+  "/convenio/{cnpj}": {
+   "get": {
+    "tags": [
+     "cadastros"
+    ],
+    "summary": "lista de convênios por CNPJ.",
+    "security": [
+     {
+      "app_token": []
+     },
+     {
+      "bearer": []
+     }
+    ],
+    "description": "Lista de convênios por CNPJ.",
+    "operationId": "getConvenioCnpj",
+    "consumes": [
+     "application/json"
+    ],
+    "produces": [
+     "application/json"
+    ],
+    "parameters": [
+     {
+      "in": "path",
+      "name": "cnpj",
+      "type": "string",
+      "required": true
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "lista com sucesso.",
+      "schema": {
+       "$ref": "#/definitions/convenios"
+      }
+     },
+     "405": {
+      "description": "Invalid input"
+     }
+    }
+   }
+  },
+  "/unidades": {
+   "get": {
+    "tags": [
+     "cadastros"
+    ],
+    "summary": "lista de unidades.",
+    "security": [
+     {
+      "app_token": []
+     },
+     {
+      "bearer": []
+     }
+    ],
+    "description": "Lista de unidades.",
+    "operationId": "getUnidades",
+    "consumes": [
+     "application/json"
+    ],
+    "produces": [
+     "application/json"
+    ],
+    "parameters": [
+     {
+      "in": "query",
+      "name": "classe_unidade",
+      "type": "string",
+      "description": "Filtra pela classificação da unidade. (opcional)",
+      "required": false
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "lista com sucesso.",
+      "schema": {
+       "type": "array",
+       "items": {
+        "$ref": "#/definitions/unidade"
+       }
+      }
+     },
+     "405": {
+      "description": "Invalid input"
+     }
+    }
+   }
+  },
+  "/recepcoes": {
+   "get": {
+    "tags": [
+     "cadastros"
+    ],
+    "summary": "lista de recepções.",
+    "security": [
+     {
+      "app_token": []
+     },
+     {
+      "bearer": []
+     }
+    ],
+    "description": "Lista de recepções.",
+    "operationId": "getRecepcoes",
+    "consumes": [
+     "application/json"
+    ],
+    "produces": [
+     "application/json"
+    ],
+    "parameters": [
+     {
+      "in": "query",
+      "name": "cnes",
+      "type": "string",
+      "description": "Identificação da unidade.",
+      "required": true
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "lista com sucesso.",
+      "schema": {
+       "type": "array",
+       "items": {
+        "$ref": "#/definitions/recepcao"
+       }
+      }
+     },
+     "405": {
+      "description": "Invalid input"
+     }
+    }
+   }
+  },
+  "/profissionais": {
+   "get": {
+    "tags": [
+     "cadastros"
+    ],
+    "summary": "lista de profissionais.",
+    "security": [
+     {
+      "app_token": []
+     },
+     {
+      "bearer": []
+     }
+    ],
+    "description": "Lista de profissionais. agenda_compartilhada=1, trás além dos profissionais, as agendas compartilhadas. Pode ser enviado o CBOS no parâmetro especialidade ou o id, no parâmetro id_especialidade.",
+    "operationId": "getMedicos",
+    "consumes": [
+     "application/json"
+    ],
+    "produces": [
+     "application/json"
+    ],
+    "parameters": [
+     {
+      "in": "query",
+      "name": "especialidade",
+      "type": "string",
+      "required": false
+     },
+     {
+      "in": "query",
+      "name": "id_especialidade",
+      "type": "string",
+      "required": false
+     },
+     {
+      "in": "query",
+      "name": "agenda_compartilhada",
+      "type": "number",
+      "required": false
+     },
+     {
+      "in": "query",
+      "name": "vinculos",
+      "type": "number",
+      "required": false
+     },
+     {
+      "in": "query",
+      "name": "cnes",
+      "type": "string",
+      "required": false
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "lista com sucesso.",
+      "schema": {
+       "type": "array",
+       "items": {
+        "$ref": "#/definitions/profissional"
+       }
+      }
+     },
+     "405": {
+      "description": "Invalid input"
+     }
+    }
+   }
+  },
+  "/profissional": {
+   "get": {
+    "tags": [
+     "cadastros"
+    ],
+    "summary": "informação do profissional.",
+    "security": [
+     {
+      "app_token": []
+     },
+     {
+      "bearer": []
+     }
+    ],
+    "description": "Informações do Profissional.",
+    "operationId": "getMedico",
+    "consumes": [
+     "application/json"
+    ],
+    "produces": [
+     "application/json"
+    ],
+    "parameters": [
+     {
+      "in": "query",
+      "name": "id_medico",
+      "type": "number",
+      "required": false
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "lista com sucesso.",
+      "schema": {
+       "$ref": "#/definitions/profissional"
+      }
+     },
+     "405": {
+      "description": "Invalid input"
+     }
+    }
+   }
+  },
+  "/preco": {
+   "get": {
+    "tags": [
+     "cadastros"
+    ],
+    "summary": "preço de procedimento.",
+    "security": [
+     {
+      "app_token": []
+     },
+     {
+      "bearer": []
+     }
+    ],
+    "description": "Preço de Procedimento.",
+    "operationId": "getPreco",
+    "consumes": [
+     "application/json"
+    ],
+    "produces": [
+     "application/json"
+    ],
+    "parameters": [
+     {
+      "in": "query",
+      "name": "id_procedimento",
+      "type": "string",
+      "required": true
+     },
+     {
+      "in": "query",
+      "name": "id_plano",
+      "type": "number",
+      "required": true
+     },
+     {
+      "in": "query",
+      "name": "id_medico",
+      "type": "number",
+      "required": false
+     },
+     {
+      "in": "query",
+      "name": "id_unidade",
+      "type": "number",
+      "required": false
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "lista com sucesso.",
+      "schema": {
+       "type": "object",
+       "properties": {
+        "id_item_tabela": {
+         "type": "number",
+         "description": "Id",
+         "example": 123
+        },
+        "valor": {
+         "type": "number",
+         "description": "Valor",
+         "example": 100
+        }
+       }
+      }
+     },
+     "405": {
+      "description": "Invalid input"
+     }
+    }
+   }
+  },
+  "/precos": {
+   "get": {
+    "tags": [
+     "cadastros"
+    ],
+    "summary": "preços de procedimento.",
+    "security": [
+     {
+      "app_token": []
+     },
+     {
+      "bearer": []
+     }
+    ],
+    "description": "Preços de Procedimento. Resultado Paginado.",
+    "operationId": "getPrecos",
+    "consumes": [
+     "application/json"
+    ],
+    "produces": [
+     "application/json"
+    ],
+    "parameters": [
+     {
+      "in": "query",
+      "name": "id_plano",
+      "type": "number",
+      "required": true
+     },
+     {
+      "in": "query",
+      "name": "id_medico",
+      "type": "number",
+      "required": false
+     },
+     {
+      "in": "query",
+      "name": "id_unidade",
+      "type": "number",
+      "required": false
+     },
+     {
+      "in": "query",
+      "name": "page",
+      "type": "number",
+      "required": false
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "lista com sucesso.",
+      "schema": {
+       "type": "object",
+       "properties": {
+        "data": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "properties": {
+           "id_item_tabela": {
+            "type": "number",
+            "description": "Id",
+            "example": 123
+           },
+           "valor": {
+            "type": "number",
+            "description": "Valor",
+            "example": 100
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     "405": {
+      "description": "Invalid input"
+     }
+    }
+   }
+  },
+  "/regiao_cd": {
+   "get": {
+    "tags": [
+     "cadastros"
+    ],
+    "summary": "Regiões de Coleta Domiciliar.",
+    "security": [
+     {
+      "app_token": []
+     },
+     {
+      "bearer": []
+     }
+    ],
+    "description": "Lista as regiões de coleta domiciliar de uma unidade de coleta domiciliar.",
+    "operationId": "getRegioes",
+    "consumes": [
+     "application/json"
+    ],
+    "produces": [
+     "application/json"
+    ],
+    "parameters": [
+     {
+      "in": "query",
+      "name": "cnes",
+      "type": "string",
+      "required": true
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "lista com sucesso.",
+      "schema": {
+       "type": "object",
+       "properties": {
+        "lista": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "properties": {
+           "id": {
+            "type": "number",
+            "description": "Id",
+            "example": 123
+           },
+           "nome": {
+            "type": "string",
+            "description": "Nome",
+            "example": "Pituba"
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     "405": {
+      "description": "Invalid input"
+     }
+    }
+   }
+  },
+  "/formas_de_pagamento": {
+   "get": {
+    "tags": [
+     "adiantamentos"
+    ],
+    "summary": "Lista de formas de pagamento para o registro do adiantamento.",
+    "security": [
+     {
+      "app_token": []
+     },
+     {
+      "bearer": []
+     }
+    ],
+    "description": "Formas de Pagamento.",
+    "operationId": "getFormas",
+    "consumes": [
+     "application/json"
+    ],
+    "produces": [
+     "application/json"
+    ],
+    "responses": {
+     "200": {
+      "description": "lista com sucesso.",
+      "schema": {
+       "type": "object",
+       "properties": {
+        "lista": {
+         "type": "array",
+         "items": {
+          "$ref": "#/definitions/formaPag"
+         }
+        }
+       }
+      }
+     },
+     "405": {
+      "description": "Invalid input"
+     }
+    }
+   }
+  },
+  "/adiantamentos": {
+   "get": {
+    "tags": [
+     "adiantamentos"
+    ],
+    "summary": "Lista de os adiantamentos registrados do paciente.",
+    "security": [
+     {
+      "bearer": []
+     }
+    ],
+    "description": "Lista os Adiantamentos Registros do Paciente.",
+    "operationId": "getAdiantamentos",
+    "consumes": [
+     "application/json"
+    ],
+    "produces": [
+     "application/json"
+    ],
+    "responses": {
+     "200": {
+      "description": "lista com sucesso.",
+      "schema": {
+       "type": "object",
+       "properties": {
+        "lista": {
+         "type": "array",
+         "items": {
+          "$ref": "#/definitions/adiantamento"
+         }
+        }
+       }
+      }
+     },
+     "405": {
+      "description": "Invalid input"
+     }
+    }
+   }
+  },
+  "/adiantamento": {
+   "post": {
+    "tags": [
+     "adiantamentos"
+    ],
+    "summary": "Registrar adiantamento do paciente.",
+    "security": [
+     {
+      "bearer": []
+     }
+    ],
+    "description": "Registrar Adiantamento do Paciente.",
+    "operationId": "saveAdiantamento",
+    "consumes": [
+     "application/json"
+    ],
+    "produces": [
+     "application/json"
+    ],
+    "parameters": [
+     {
+      "in": "body",
+      "name": "body",
+      "description": "Dados do Adiantamento.",
+      "required": true,
+      "schema": {
+       "type": "object",
+       "properties": {
+        "id_externo": {
+         "type": "string",
+         "example": "Id no sistema de origem"
+        },
+        "data": {
+         "type": "string",
+         "example": "2025-01-01"
+        },
+        "cnes": {
+         "type": "string",
+         "example": "123456"
+        },
+        "valor_total": {
+         "type": "number",
+         "example": 50
+        },
+        "obs": {
+         "type": "string",
+         "example": "Lorem Ipsum"
+        },
+        "responsavel_financeiro": {
+         "type": "string",
+         "example": "Nome, somente quando for outro responável financeiro"
+        },
+        "responsavel_cpf_cnpj": {
+         "type": "string",
+         "example": "12345678901 - CPF/CNPJ somente números"
+        },
+        "responsavel_endereco": {
+         "type": "string",
+         "example": "Endereço"
+        },
+        "responsavel_email": {
+         "type": "string",
+         "example": "teste@teste.com"
+        },
+        "formas_de_pagamento": {
+         "type": "array",
+         "items": {
+          "properties": {
+           "id_forma_pagamento": {
+            "type": "number",
+            "example": 1
+           },
+           "id_bandeira_cartao": {
+            "type": "number",
+            "example": 1
+           },
+           "valor": {
+            "type": "number",
+            "example": 50
+           },
+           "parcelas": {
+            "type": "number",
+            "example": 1
+           },
+           "num_autorizacao": {
+            "type": "string",
+            "example": "1234"
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "lista com sucesso.",
+      "schema": {
+       "type": "object",
+       "properties": {
+        "lista": {
+         "type": "array",
+         "items": {
+          "$ref": "#/definitions/adiantamento"
+         }
+        }
+       }
+      }
+     },
+     "405": {
+      "description": "Invalid input"
+     }
+    }
+   }
+  },
+  "/registrar_atendimento": {
+   "post": {
+    "tags": [
+     "pagamentos"
+    ],
+    "summary": "Registrar o atendimento do paciente.",
+    "security": [
+     {
+      "bearer": []
+     }
+    ],
+    "description": "Registrar o atendimento do paciente.",
+    "operationId": "regAtendimento",
+    "consumes": [
+     "application/json"
+    ],
+    "produces": [
+     "application/json"
+    ],
+    "parameters": [
+     {
+      "in": "body",
+      "name": "body",
+      "description": "Dados do Marcação.",
+      "required": true,
+      "schema": {
+       "type": "object",
+       "properties": {
+        "id": {
+         "type": "number",
+         "example": "123",
+         "description": "Número da marcação"
+        },
+        "id_recepcao": {
+         "type": "number",
+         "example": 1,
+         "description": "Id da recepção. Deve ser da mesma unidade para a qual a marcação foi gerada."
+        },
+        "cpf": {
+         "type": "string",
+         "example": "12345678900",
+         "description": "CPF do Paciente."
+        }
+       }
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Dados do Atendimento Gerado."
+     },
+     "405": {
+      "description": "Invalid input"
+     }
+    }
+   }
+  },
+  "/pagamentos": {
+   "get": {
+    "tags": [
+     "pagamentos"
+    ],
+    "summary": "Lista de os pagamentos registrados do paciente.",
+    "security": [
+     {
+      "bearer": []
+     }
+    ],
+    "description": "Lista os Pdiantamentos Registros do Paciente.",
+    "operationId": "getPdiantamentos",
+    "consumes": [
+     "application/json"
+    ],
+    "produces": [
+     "application/json"
+    ],
+    "responses": {
+     "200": {
+      "description": "lista com sucesso.",
+      "schema": {
+       "type": "object",
+       "properties": {
+        "lista": {
+         "type": "array",
+         "items": {
+          "$ref": "#/definitions/adiantamento"
+         }
+        }
+       }
+      }
+     },
+     "405": {
+      "description": "Invalid input"
+     }
+    }
+   }
+  },
+  "/pagamento": {
+   "post": {
+    "tags": [
+     "pagamentos"
+    ],
+    "summary": "Registrar pagamento do paciente.",
+    "security": [
+     {
+      "bearer": []
+     }
+    ],
+    "description": "Registrar Pagamento do Paciente.",
+    "operationId": "savePagamento",
+    "consumes": [
+     "application/json"
+    ],
+    "produces": [
+     "application/json"
+    ],
+    "parameters": [
+     {
+      "in": "body",
+      "name": "body",
+      "description": "Dados do Pagamento.",
+      "required": true,
+      "schema": {
+       "type": "object",
+       "properties": {
+        "id_atendimentos": {
+         "type": "array",
+         "items": {
+          "type": "number",
+          "example": "123"
+         }
+        },
+        "id_externo": {
+         "type": "string",
+         "example": "Id no sistema de origem"
+        },
+        "data": {
+         "type": "string",
+         "example": "2025-01-01"
+        },
+        "valor_total": {
+         "type": "number",
+         "example": 50
+        },
+        "obs": {
+         "type": "string",
+         "example": "Lorem Ipsum"
+        },
+        "responsavel_financeiro": {
+         "type": "string",
+         "example": "Nome, somente quando for outro responável financeiro"
+        },
+        "responsavel_cpf_cnpj": {
+         "type": "string",
+         "example": "12345678901 - CPF/CNPJ somente números"
+        },
+        "responsavel_endereco": {
+         "type": "string",
+         "example": "Endereço"
+        },
+        "responsavel_email": {
+         "type": "string",
+         "example": "teste@teste.com"
+        },
+        "formas_de_pagamento": {
+         "type": "array",
+         "items": {
+          "properties": {
+           "id_forma_pagamento": {
+            "type": "number",
+            "example": 1
+           },
+           "id_bandeira_cartao": {
+            "type": "number",
+            "example": 1
+           },
+           "valor": {
+            "type": "number",
+            "example": 50
+           },
+           "parcelas": {
+            "type": "number",
+            "example": 1
+           },
+           "num_autorizacao": {
+            "type": "string",
+            "example": "1234"
+           },
+           "zoop_transaction_id": {
+            "type": "string",
+            "example": "123e4567-e89b-12d3-a456-426614174000"
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "lista com sucesso.",
+      "schema": {
+       "type": "object",
+       "properties": {
+        "pagamento": {
+         "$ref": "#/definitions/adiantamento"
+        }
+       }
+      }
+     },
+     "405": {
+      "description": "Invalid input"
+     }
+    }
+   }
+  },
+  "/autorizacoes": {
+   "get": {
+    "tags": [
+     "autorizacoes"
+    ],
+    "summary": "Lista as autorizações registradas do paciente.",
+    "security": [
+     {
+      "bearer": []
+     }
+    ],
+    "description": "Lista as Autorizações Registradas do Paciente.",
+    "operationId": "getAutorizacoes",
+    "consumes": [
+     "application/json"
+    ],
+    "produces": [
+     "application/json"
+    ],
+    "responses": {
+     "200": {
+      "description": "lista com sucesso.",
+      "schema": {
+       "type": "object",
+       "properties": {
+        "lista": {
+         "type": "array",
+         "items": {
+          "$ref": "#/definitions/autorizacao"
+         }
+        }
+       }
+      }
+     },
+     "405": {
+      "description": "Invalid input"
+     }
+    }
+   }
+  }
+ },
+ "securityDefinitions": {
+  "bearer": {
+   "type": "apiKey",
+   "name": "Authorization",
+   "in": "header"
+  },
+  "app_token": {
+   "type": "apiKey",
+   "name": "X-APP-TOKEN",
+   "in": "header"
+  }
+ },
+ "definitions": {
+  "plano": {
+   "type": "object",
+   "properties": {
+    "id": {
+     "type": "string",
+     "description": "id do plano",
+     "example": "01"
+    },
+    "nome": {
+     "type": "string",
+     "description": "nome do plano",
+     "example": "Básico"
+    },
+    "codigo": {
+     "type": "string",
+     "description": "código do plano",
+     "example": "123"
+    }
+   }
+  },
+  "addconvenio": {
+   "type": "object",
+   "properties": {
+    "id": {
+     "type": "string",
+     "description": "id do convenio",
+     "example": "01"
+    },
+    "reg_ans": {
+     "type": "string",
+     "description": "registro na ANS",
+     "example": "12345"
+    },
+    "matricula": {
+     "type": "string",
+     "description": "matrícula no convênio",
+     "example": "12345"
+    },
+    "validade": {
+     "type": "string",
+     "description": "validade da matrícula no formato yyyy-mm-dd",
+     "example": "1980-06-01"
+    },
+    "id_plano": {
+     "type": "string",
+     "description": "Id do Plano",
+     "example": "01"
+    }
+   }
+  },
+  "convenio": {
+   "type": "object",
+   "properties": {
+    "id": {
+     "type": "string",
+     "description": "id do convenio",
+     "example": "01"
+    },
+    "nome": {
+     "type": "string",
+     "description": "nome do convenio",
+     "example": "UNIMED"
+    },
+    "reg_ans": {
+     "type": "string",
+     "description": "registro na ANS",
+     "example": "12345"
+    },
+    "planos": {
+     "type": "array",
+     "items": {
+      "$ref": "#/definitions/plano"
+     }
+    }
+   }
+  },
+  "convenios": {
+   "type": "array",
+   "items": {
+    "$ref": "#/definitions/convenio"
+   }
+  },
+  "sessao": {
+   "type": "object",
+   "properties": {
+    "access_token": {
+     "type": "string",
+     "description": "Token de autenticação. Deve enviado nas demais requisições como Bearer Token",
+     "example": "ABCDE12345"
+    },
+    "token_type": {
+     "type": "string",
+     "description": "bearer",
+     "example": "bearer"
+    },
+    "expires_in": {
+     "type": "number",
+     "description": "Tempo para expiração do token.",
+     "example": 360000
+    },
+    "user": {
+     "type": "object",
+     "description": "Dados do Paciente",
+     "properties": {
+      "id": {
+       "type": "number",
+       "example": 1,
+       "description": "Id do Paciente"
+      },
+      "nome": {
+       "type": "string",
+       "example": "FULANO DA SILVA",
+       "description": "Nome do Paciente"
+      },
+      "id_paciente": {
+       "type": "number",
+       "example": 1,
+       "description": "ID do cadastro definitivo do paciente."
+      }
+     }
+    },
+    "unidade": {
+     "type": "object",
+     "description": "Dados da Unidade",
+     "properties": {
+      "nome": {
+       "type": "string",
+       "example": "Clinica Modelo",
+       "description": "Nome da Unidade Acessada"
+      }
+     }
+    }
+   }
+  },
+  "credencialLogin": {
+   "type": "object",
+   "properties": {
+    "id": {
+     "type": "string",
+     "description": "Id do paciente que será tratado na sessão.",
+     "example": "123"
+    }
+   }
+  },
+  "credencialLoginPortal": {
+   "type": "object",
+   "properties": {
+    "email": {
+     "type": "string",
+     "description": "e-mail da conta de acesso ao portal de agendamento.",
+     "example": "teste@teste.com.br"
+    },
+    "senha": {
+     "type": "string",
+     "description": "senha da conta de acesso ao portal de agendamento.",
+     "example": "1234"
+    }
+   }
+  },
+  "docs": {
+   "type": "object",
+   "properties": {
+    "cpf": {
+     "type": "string",
+     "example": "11111111111",
+     "description": "CPF do paciente."
+    },
+    "rg": {
+     "type": "string",
+     "example": "2222222222",
+     "description": "RG do paciente."
+    }
+   }
+  },
+  "contatos": {
+   "type": "object",
+   "properties": {
+    "celular": {
+     "type": "string",
+     "example": "11988884444"
+    },
+    "telefone": {
+     "type": "string",
+     "example": "112345678"
+    },
+    "email": {
+     "type": "string",
+     "example": "a@a.com.br"
+    }
+   }
+  },
+  "endereco": {
+   "type": "object",
+   "properties": {
+    "cep": {
+     "type": "string"
+    },
+    "endereco": {
+     "type": "string"
+    },
+    "numero": {
+     "type": "string"
+    },
+    "complemento": {
+     "type": "string"
+    },
+    "bairro": {
+     "type": "string"
+    },
+    "cidade": {
+     "type": "string",
+     "example": "São Paulo"
+    },
+    "uf": {
+     "type": "string",
+     "example": "SP"
+    }
+   }
+  },
+  "paciente": {
+   "type": "object",
+   "properties": {
+    "id_origem": {
+     "type": "integer",
+     "description": "Id do paciente no sistema de origem.",
+     "example": "1234"
+    },
+    "nome": {
+     "type": "string",
+     "description": "Nome do Paciente",
+     "example": "João da Silva"
+    },
+    "sexo": {
+     "type": "string",
+     "enum": [
+      "M",
+      "F"
+     ]
+    },
+    "dt_nasc": {
+     "type": "string",
+     "description": "yyyy-mm-dd",
+     "example": "1980-06-01"
+    },
+    "mae": {
+     "type": "string",
+     "description": "Nome da Mãe",
+     "example": "Maria das Graças"
+    },
+    "docs": {
+     "$ref": "#/definitions/docs"
+    },
+    "contatos": {
+     "$ref": "#/definitions/contatos"
+    },
+    "endereco": {
+     "$ref": "#/definitions/endereco"
+    },
+    "convenio": {
+     "$ref": "#/definitions/addconvenio"
+    }
+   }
+  },
+  "profissional": {
+   "type": "object",
+   "properties": {
+    "id": {
+     "type": "string",
+     "description": "Id do Profissional"
+    },
+    "tratamento": {
+     "type": "string",
+     "description": "Tratamento",
+     "example": "Dr(a)."
+    },
+    "numero": {
+     "type": "string",
+     "description": "Número no Conselho",
+     "example": "1234"
+    },
+    "uf": {
+     "type": "string",
+     "description": "UF do Conselho do Médico",
+     "example": "SP"
+    },
+    "conselho": {
+     "type": "string",
+     "description": "Conselho do Médico",
+     "example": "CRM"
+    },
+    "nome": {
+     "type": "string",
+     "description": "Nome do Profissional",
+     "example": "Fulano da Silva"
+    },
+    "subespecialidade": {
+     "type": "string",
+     "description": "Subespecialidade do profissional.",
+     "example": "Catarata"
+    },
+    "foto": {
+     "type": "string",
+     "description": "URL da Foto do Profissional",
+     "example": "https://endereco-da-foto/"
+    },
+    "selecionado": {
+     "type": "boolean",
+     "example": false
+    }
+   }
+  },
+  "unidade": {
+   "type": "object",
+   "properties": {
+    "nome": {
+     "type": "string"
+    },
+    "cep": {
+     "type": "string"
+    },
+    "cnes": {
+     "type": "string"
+    },
+    "local": {
+     "type": "string"
+    }
+   }
+  },
+  "recepcao": {
+   "type": "object",
+   "properties": {
+    "id": {
+     "type": "number",
+     "example": 12
+    },
+    "nome": {
+     "type": "string",
+     "example": "Principal"
+    },
+    "sigla": {
+     "type": "string",
+     "example": "PC"
+    },
+    "id_externo": {
+     "type": "string",
+     "example": "123"
+    },
+    "senhas": {
+     "type": "array",
+     "description": "Senhas que podem ser retiradas nessa recepção",
+     "items": {
+      "type": "object",
+      "properties": {
+       "id": {
+        "type": "number",
+        "example": 123
+       },
+       "nome": {
+        "type": "string",
+        "example": "Atendimento"
+       },
+       "preferencial": {
+        "type": "boolean",
+        "example": false
+       },
+       "link": {
+        "type": "string",
+        "example": "Link para Geração da Senha (POST)"
+       }
+      }
+     }
+    }
+   }
+  },
+  "horarioMarcar": {
+   "type": "object",
+   "properties": {
+    "procedimento": {
+     "type": "string",
+     "description": "Código do Procedimento",
+     "example": "1000"
+    },
+    "id": {
+     "type": "string",
+     "description": "Id do horário a ser marcado"
+    },
+    "plano": {
+     "type": "number",
+     "description": "Id do plano sendo marcado.",
+     "example": 1
+    },
+    "email": {
+     "type": "boolean",
+     "description": "Indica se o e-mail será enviado ao paciente ao realizar a marcação.",
+     "example": true
+    },
+    "teleatendimento": {
+     "type": "boolean",
+     "description": "Indica se o atendimento será no formato de teleatendimento.",
+     "example": false
+    },
+    "revisao": {
+     "type": "boolean",
+     "description": "Para para indicar se a consulta deve ser marcada como revisão. Se não for passado o parâmetro como true, será marcado de acordo com o cálculo do sistema.",
+     "example": false
+    },
+    "remarcacao": {
+     "type": "number",
+     "description": "Id da marcação de origem, quando é um processo de remarcação.",
+     "example": 3333
+    },
+    "ordem_chegada": {
+     "type": "boolean",
+     "description": "Quando o horário consultado for de ordem de chegada, deve-se enviar esse parâmetro como true, para realizar a marcação",
+     "example": false
+    },
+    "lista": {
+     "type": "array",
+     "description": "Id dos procedimentos associados, para realização no mesmo horário (ex.: Procedimentos laboratoriais).",
+     "items": {
+      "type": "number",
+      "example": 123,
+      "description": "Id do procedimento associado."
+     }
+    },
+    "solicitante": {
+     "$ref": "#/definitions/solicitante"
+    },
+    "confirmado": {
+     "type": "string",
+     "description": "Se for passado um texto, a marcação já irá ser feita como confirmada."
+    },
+    "id_externo": {
+     "type": "string",
+     "description": "Id do sistema de origem."
+    },
+    "obs": {
+     "type": "string",
+     "description": "Observação da Marcação."
+    },
+    "duracao": {
+     "type": "number",
+     "example": 10,
+     "description": "Apenas para reserva de horário. Duração em minutos da expiração da reserva."
+    },
+    "id_ampliar": {
+     "type": "number",
+     "description": "Apenas para reserva de horário. Id da reserva anterior, a qual se deseja ampliar a expiração."
+    },
+    "anexos": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "example": "URL do anexo"
+     }
+    }
+   }
+  },
+  "procedimento": {
+   "type": "object",
+   "properties": {
+    "id": {
+     "type": "string"
+    },
+    "descr": {
+     "type": "string"
+    },
+    "abrev": {
+     "type": "string"
+    },
+    "tuss": {
+     "type": "string"
+    },
+    "sus": {
+     "type": "string"
+    },
+    "especialidade": {
+     "$ref": "#/definitions/especialidade"
+    }
+   }
+  },
+  "voucher": {
+   "type": "object",
+   "properties": {
+    "id": {
+     "type": "string",
+     "description": "Id do Voucher",
+     "example": 123
+    },
+    "status": {
+     "type": "string",
+     "description": "Status do Voucher.",
+     "enum": [
+      "agendado",
+      "atendido",
+      "checkin"
+     ]
+    },
+    "tipo": {
+     "type": "string",
+     "description": "Tipo de Voucher.",
+     "enum": [
+      "A"
+     ]
+    },
+    "data": {
+     "type": "string",
+     "example": "2019-01-01"
+    },
+    "hora": {
+     "type": "string",
+     "example": "09:00"
+    },
+    "solicitante": {
+     "$ref": "#/definitions/profissional"
+    },
+    "realizador": {
+     "$ref": "#/definitions/profissional"
+    },
+    "unidade": {
+     "$ref": "#/definitions/unidade"
+    },
+    "procedimento": {
+     "$ref": "#/definitions/procedimento"
+    },
+    "especialidade": {
+     "$ref": "#/definitions/especialidade"
+    },
+    "id_externo": {
+     "type": "string",
+     "example": "1234"
+    }
+   }
+  },
+  "atendimento": {
+   "type": "object",
+   "properties": {
+    "id": {
+     "type": "string",
+     "description": "Id do Atendimento",
+     "example": 123
+    },
+    "paciente": {
+     "$ref": "#/definitions/paciente"
+    },
+    "medico": {
+     "$ref": "#/definitions/profissional"
+    },
+    "plano": {
+     "$ref": "#/definitions/plano"
+    },
+    "procedimento": {
+     "type": "array",
+     "items": {
+      "$ref": "#/definitions/procedimento"
+     }
+    }
+   }
+  },
+  "horariosAgenda": {
+   "type": "object",
+   "properties": {
+    "procedimento": {
+     "type": "string",
+     "example": "CONS"
+    },
+    "horarios": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "id": {
+        "type": "string",
+        "description": "Id da Data."
+       },
+       "data": {
+        "type": "string",
+        "description": "data do horário disponível.",
+        "example": "2019-01-01"
+       },
+       "procedimento": {
+        "type": "string",
+        "description": "procedimento para o qual o horário está disponível",
+        "example": "CONS"
+       },
+       "ordem_chegada": {
+        "type": "boolean",
+        "example": false,
+        "description": "Indica se a agenda é por ordem de chegada."
+       },
+       "faixa_ordem_chegada": {
+        "type": "string",
+        "description": "Preenchido quando é agenda por ordem de chegada."
+       },
+       "horarios": {
+        "type": "object",
+        "description": "Lista de Horários com ID e horário."
+       },
+       "profissional": {
+        "$ref": "#/definitions/profissional"
+       },
+       "unidade": {
+        "$ref": "#/definitions/unidade"
+       }
+      }
+     }
+    }
+   }
+  },
+  "horarioProcedimentos": {
+   "type": "object",
+   "properties": {
+    "chave": {
+     "type": "string",
+     "example": "2023-08-28|3|2|1|08:00"
+    },
+    "data": {
+     "type": "string",
+     "example": "2023-08-28"
+    },
+    "hora": {
+     "type": "string",
+     "example": "08:00"
+    },
+    "medico": {
+     "$ref": "#/definitions/profissional"
+    },
+    "unidade": {
+     "$ref": "#/definitions/unidade"
+    },
+    "procedimentos": {
+     "type": "array",
+     "items": {
+      "$ref": "#/definitions/procedimento"
+     }
+    }
+   }
+  },
+  "especialidade": {
+   "type": "object",
+   "properties": {
+    "codigo": {
+     "type": "string",
+     "example": "OFT"
+    },
+    "nome": {
+     "type": "string",
+     "example": "OFTALMOLOGIA"
+    },
+    "cbos": {
+     "type": "string",
+     "example": "225265"
+    },
+    "subespecialidade": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "example": "Especial"
+     }
+    }
+   }
+  },
+  "requisicao": {
+   "type": "object",
+   "properties": {
+    "id": {
+     "type": "number",
+     "example": 123
+    },
+    "origem": {
+     "type": "string",
+     "example": "origem"
+    },
+    "tipo": {
+     "type": "string",
+     "example": "requisicao"
+    },
+    "paciente": {
+     "type": "string",
+     "example": "FULANO DA SILVA"
+    },
+    "data": {
+     "type": "string",
+     "example": "01/01/2000"
+    },
+    "medico": {
+     "$ref": "#/definitions/solicitante"
+    },
+    "items": {
+     "type": "array",
+     "items": {
+      "$ref": "#/definitions/procedimento"
+     }
+    }
+   }
+  },
+  "solicitante": {
+   "type": "object",
+   "properties": {
+    "conselho": {
+     "type": "string",
+     "example": "CRM"
+    },
+    "uf": {
+     "type": "string",
+     "example": "BA"
+    },
+    "numero": {
+     "type": "number",
+     "example": 1234
+    },
+    "nome": {
+     "type": "string",
+     "example": "João da Silva"
+    },
+    "cbos": {
+     "type": "string",
+     "example": "225265"
+    }
+   }
+  },
+  "reserva": {
+   "type": "object",
+   "properties": {
+    "id": {
+     "type": "number",
+     "example": "123"
+    },
+    "expira": {
+     "type": "string",
+     "example": "2020-01-01 14:10",
+     "description": "Data/Hora da expiração da reserva."
+    },
+    "data": {
+     "type": "string",
+     "example": "2020-01-01"
+    },
+    "hora": {
+     "type": "string",
+     "example": "10:00"
+    },
+    "profissional": {
+     "$ref": "#/definitions/profissional"
+    },
+    "instrucao": {
+     "type": "object",
+     "properties": {
+      "procedimento": {
+       "type": "string",
+       "example": "instrução do procedimento"
+      },
+      "profissional": {
+       "type": "string",
+       "example": "instrução do profissional"
+      }
+     }
+    },
+    "validacao": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "procedimento": {
+        "type": "number",
+        "example": 123
+       },
+       "validado": {
+        "type": "boolean"
+       },
+       "id_requisicao": {
+        "type": "number",
+        "example": 456
+       },
+       "solicitante": {
+        "$ref": "#/definitions/profissional"
+       }
+      }
+     }
+    }
+   }
+  },
+  "laudo": {
+   "type": "object",
+   "properties": {
+    "id_laudo": {
+     "type": "number",
+     "example": 123
+    },
+    "id_marcacao": {
+     "type": "number",
+     "example": 123
+    },
+    "id_atendimento": {
+     "type": "number",
+     "example": 123
+    },
+    "id_atendimento_procedimento": {
+     "type": "number",
+     "example": 123
+    },
+    "dt_atendimento": {
+     "type": "string",
+     "example": "1900-01-01 00:00"
+    },
+    "procedimento": {
+     "$ref": "#/definitions/procedimento"
+    },
+    "status": {
+     "type": "string",
+     "example": "Status do Laudo"
+    },
+    "pronto": {
+     "type": "boolean",
+     "example": true
+    },
+    "medico": {
+     "$ref": "#/definitions/profissional"
+    },
+    "unidade": {
+     "$ref": "#/definitions/unidade"
+    },
+    "resultado_html": {
+     "type": "string",
+     "example": "Resultado em HTML"
+    },
+    "resultado_pdf": {
+     "type": "string",
+     "example": "Base 64 do PDF"
+    },
+    "anexos": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "example": "URL do anexo"
+     }
+    }
+   }
+  },
+  "resultado": {
+   "type": "object",
+   "properties": {
+    "lista": {
+     "type": "array",
+     "items": {
+      "$ref": "#/definitions/laudo"
+     }
+    }
+   }
+  },
+  "regraHorario": {
+   "type": "object",
+   "properties": {
+    "id_agenda": {
+     "type": "number",
+     "example": 123
+    },
+    "filtro_operadora": {
+     "type": "string",
+     "example": "T",
+     "description": "T - Todas, A - Apenas ou E - Exceto"
+    },
+    "operadoras": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "id": {
+        "type": "number"
+       },
+       "nome": {
+        "type": "string"
+       }
+      }
+     }
+    },
+    "procedimentos": {
+     "type": "array",
+     "items": {
+      "$ref": "#/definitions/procedimento"
+     }
+    }
+   }
+  },
+  "checkinrealizado": {
+   "type": "object",
+   "properties": {
+    "id": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "example": "Check-in Realizado",
+      "description": "Mensagem de Retorno"
+     }
+    },
+    "id_marcacao": {
+     "type": "number",
+     "example": 1234,
+     "description": "Id da marcação"
+    },
+    "preferencial": {
+     "type": "boolean",
+     "example": false
+    },
+    "expresso": {
+     "type": "string",
+     "example": "Check-in Expresso. Dirija-se ao consultório X.",
+     "description": "Mensagem para o paciente, no caso de check-in expresso."
+    },
+    "local": {
+     "type": "string",
+     "example": "consultório X",
+     "description": "Local de encaminhamento em caso de check-in expresso."
+    },
+    "recepcao": {
+     "type": "string",
+     "example": "Recepção Principal",
+     "description": "Recepção na qual o paciente fez o check-in. Exibir para o paciente, no caso de check-in não expresso."
+    }
+   }
+  },
+  "formaPag": {
+   "type": "object",
+   "properties": {
+    "id": {
+     "type": "number",
+     "example": "2",
+     "description": "Id da Forma de Pagamento"
+    },
+    "nome": {
+     "type": "string",
+     "example": "Cartão de Crédito",
+     "description": "Descrição da Forma de Pagamento"
+    },
+    "tipo_cartao": {
+     "type": "string",
+     "example": "C",
+     "description": "Quando cartão, tipo do cartão (C - Crédito ou D - Débito)"
+    },
+    "bandeiras": {
+     "type": "array",
+     "items": {
+      "properties": {
+       "id": {
+        "type": "number",
+        "example": 1,
+        "description": "Id da Bandeira do Cartão"
+       },
+       "nome": {
+        "type": "string",
+        "example": "AMEX",
+        "description": "Nome da Bandeira do Cartão"
+       }
+      }
+     }
+    }
+   }
+  },
+  "adiantamento": {
+   "type": "object",
+   "properties": {
+    "id_pagamento_atendimento": {
+     "type": "number",
+     "example": "1",
+     "description": "Id do Adiantamento"
+    },
+    "dt_data": {
+     "type": "string",
+     "example": "2025-01-01",
+     "description": "Data do Adiantamento"
+    },
+    "dc_valor_adiantado": {
+     "type": "number",
+     "example": 50,
+     "description": "Valor do Adiantamento"
+    },
+    "st_observacoes": {
+     "type": "string",
+     "example": "Lorem Ipsum",
+     "description": "Observação do Adiantamento"
+    },
+    "id_unidade_operacao": {
+     "type": "number",
+     "example": 1,
+     "description": "Id da Unidade do Adiantamento"
+    },
+    "item_pagamento_atendimentos": {
+     "type": "array",
+     "description": "Formas de Pagamento",
+     "items": {
+      "properties": {
+       "id_item_pagamento_atendimento": {
+        "type": "number",
+        "example": 1,
+        "description": "Id do Item da Forma de Pagamento"
+       },
+       "id_forma_pagamento": {
+        "type": "number",
+        "example": 1,
+        "description": "Id da Forma de Pagamento"
+       },
+       "id_bandeira_cartao": {
+        "type": "number",
+        "example": 1,
+        "description": "Id da Bandeira do Cartão"
+       },
+       "dc_valor": {
+        "type": "number",
+        "example": 50,
+        "description": "Valor da Forma de Pagamento"
+       }
+      }
+     }
+    }
+   }
+  },
+  "autorizacao": {
+   "type": "object",
+   "properties": {
+    "id": {
+     "type": "number",
+     "example": "1",
+     "description": "Id da Autorização"
+    },
+    "data": {
+     "type": "string",
+     "example": "2025-01-01",
+     "description": "Data da Autorização"
+    },
+    "procedimento": {
+     "type": "object",
+     "properties": {
+      "id": {
+       "type": "number",
+       "example": 123,
+       "description": "Id do Procedimento"
+      },
+      "nome": {
+       "type": "string",
+       "example": "EXAME ABC",
+       "description": "Nome do Procedimento"
+      },
+      "sigla": {
+       "type": "string",
+       "example": "ABC",
+       "description": "Sigla do Procedimento"
+      }
+     }
+    },
+    "quantidade": {
+     "type": "number",
+     "example": 1,
+     "description": "Quantidade"
+    },
+    "status_id": {
+     "type": "number",
+     "example": 0,
+     "description": "Status do Procedimento"
+    },
+    "status_nome": {
+     "type": "number",
+     "example": "Aberto",
+     "description": "Status do Procedimento"
+    },
+    "observacoes": {
+     "type": "string",
+     "example": "Lorem Ipsum",
+     "description": "Observação do Adiantamento"
+    },
+    "unidade": {
+     "type": "object",
+     "properties": {
+      "id": {
+       "type": "number",
+       "example": 1,
+       "description": "Id da Unidade"
+      },
+      "nome": {
+       "type": "string",
+       "example": "Central",
+       "description": "Nome da Unidade"
+      },
+      "sigla": {
+       "type": "string",
+       "example": "CEN",
+       "description": "Sigla da Unidade"
+      }
+     }
+    },
+    "autorizacao": {
+     "type": "object",
+     "properties": {
+      "codigo": {
+       "type": "string",
+       "example": "1234",
+       "description": "Código da Autorização (Senha)"
+      },
+      "data": {
+       "type": "string",
+       "example": "2000-01-01",
+       "description": "Data da Autorização"
+      },
+      "validade_inicio": {
+       "type": "string",
+       "example": "2000-01-01",
+       "description": "Validade Início"
+      },
+      "validade_termino": {
+       "type": "string",
+       "example": "2000-01-01",
+       "description": "Validade Término"
+      }
+     }
+    }
+   }
+  }
+ },
+ "externalDocs": {
+  "description": "klingo",
+  "url": "https://www.klingo.com.br/"
+ },
+ "host": "api-externa.klingo.app",
+ "basePath": "/api"
+}

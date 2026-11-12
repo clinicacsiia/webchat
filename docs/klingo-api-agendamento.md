@@ -2,7 +2,7 @@
 
 **Estado: exemplo escrito, testado com dados inventados e conferido com chamadas REAIS de leitura em 12/11/2026 (sem paciente). NÃO está publicado e NÃO está ligado ao chat.** Nada na produção mudou.
 
-Fonte: https://app.swaggerhub.com/apis/agsx30/klingo-api-externa/1.0.0 (API "Klingo API Externa" 1.0.0, suporte@klingo.com.br). Endereço real: `https://api-externa.klingo.app/api`. Conferido em 12/11/2026: `GET /live` responde `OK [API1]` (sem chave, sem dado de paciente).
+Fonte: https://app.swaggerhub.com/apis/agsx30/klingo-api-externa/1.0.0 (cópia da documentação oficial, PDF e JSON, em `docs/klingo-api-externa/`) (API "Klingo API Externa" 1.0.0, suporte@klingo.com.br). Endereço real: `https://api-externa.klingo.app/api`. Conferido em 12/11/2026: `GET /live` responde `OK [API1]` (sem chave, sem dado de paciente).
 
 ## O que a API faz (e o que usávamos até hoje)
 
