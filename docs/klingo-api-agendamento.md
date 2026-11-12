@@ -81,6 +81,13 @@ Achados que mudam o desenho:
 4. Mapeamento do nosso catálogo para `procedimento`/`plano` da API (o id da API é o `procedimento` de cada dia; planos vêm de `/convenios`).
 5. Limite de chamadas e expiração do `access_token`.
 
+## Paciente novo e pré-cadastro (Klingo explicou em 12/11/2026, pelo grupo de WhatsApp)
+
+- **"Toda marcação gera pré-cadastro"** e o pré-cadastro **"vai pra agenda"**: o paciente novo **não precisa de aprovação antes de marcar**; a recepção completa o cadastro depois, a partir da agenda.
+- `POST /externo/register` devolve o id do **pré-cadastro**. **Esse id NÃO é o do paciente definitivo.** O login `P<id>` (com `P`) é para o paciente definitivo: em 12/11 o `P7960` abriu a sessão de OUTRA paciente que já existia. Nunca logar `P<id>` com um id de pré-cadastro.
+- Hipótese ainda não testada: o pré-cadastro entra com o id **sem o `P`**, e a sessão traria `user.id` = o próprio id e `id_paciente` vazio (o Swagger descreve `id_paciente` como "id do cadastro definitivo"). **Qualquer login deve conferir nome, sexo e nascimento da sessão com o paciente esperado antes de reservar ou marcar**, e descartar a sessão se não bater.
+- O login só com a chave da clínica abre a sessão de qualquer paciente: o sistema precisa conferir CPF e nascimento antes (como o `klingo-paciente` já faz).
+
 ## Como trocar os horários do chat para esta API (plano, não feito)
 
 Hoje: `chat-agenda-ao-vivo` lê o relatório #7 e o banco monta os horários (`chat_horarios`, `chat_horario_escolher`).
