@@ -108,7 +108,7 @@ Algoritmo de referência (Python) da assinatura na tela, do módulo "Fila + assi
 
 ### 3.7 `docs/`
 
-Um documento por mudança ou decisão. Os mais úteis para começar: este; `auditoria-2026-11-11.md`; `pendencias-do-dono.md`; `planejamento-auditoria-2026-11-10.md` (decisões do dono, com as regras dos indicadores e das permissões); `klingo-relatorios-pendentes.md` (o que o Klingo entrega e o que falta); `fase7-motor-implementado.md` (o motor do chat).
+Um documento por mudança ou decisão. Os mais úteis para começar: este; `auditoria-2026-11-11.md`; `pendencias-do-dono.md`; `planejamento-auditoria-2026-11-10.md` (decisões do dono, com as regras dos indicadores e das permissões); `klingo-relatorios-pendentes.md` (o que o Klingo entrega e o que falta); `klingo-api-externa/GUIA-COMPLETO.md` (manual da API externa do Klingo), `klingo-api-agendamento.md` e `klingo-api-externa/` (API externa do Klingo: documentação oficial, testes reais e plano do agendamento automático); `fase7-motor-implementado.md` (o motor do chat).
 
 ### 3.8 `supabase-emails/`
 
@@ -183,6 +183,7 @@ Todas publicadas **sem exigir JWT** e cada uma confere o próprio segredo.
 | `klingo-paciente` | gatilho do banco (CPF + nascimento) | `x-sync-key` | sim |
 | `chat-agenda-ao-vivo` | o chat, ao chegar no calendário | token da conversa | sim |
 | `chat-avisar`, `avisar-equipe`, `fila-avisar` | o banco (pg_net) | segredo do Vault `fila_aviso_segredo` | sim |
+| `klingo-agenda-api` | **exemplo, não publicada** (horários e marcação pela API externa; ver `docs/klingo-api-agendamento.md`) | `x-sync-key` | sim |
 | `klingo-inspecionar-chat` | manual (diagnóstico) | `x-sync-key` | sim (pode ser apagada) |
 | `ler-pedido` | o chat (foto do pedido lida por IA) | token da conversa | **não** (depende de chave e de revisão jurídica) |
 | `fila-emitir-link`, `fila-validar-assinatura` | módulo da biometria | segredo / token | **não** (módulo parado) |
