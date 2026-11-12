@@ -72,6 +72,7 @@ Três ideias que explicam quase tudo:
 | Aba | Para quê | Quem vê |
 |---|---|---|
 | Atendimento | Lista (ou Quadro) de conversas, o chat com o paciente, o cartão do pedido, "próximo passo", transferir (pessoa, unidade, lote), encerrar com motivo | admin e atendente |
+| Atendimento > Equipe agora | Botão no alto da aba, **só para TI, gerência e supervisão** (`org_nivel()`): por atendente, quantas conversas tem, quantos pacientes esperam resposta (e há quanto tempo), quantos a equipe espera, quantos para chamar no zap, quantos marcou hoje. Sai das conversas já carregadas no painel; só "Marcou hoje" usa `painel_indicadores_atendentes` | chefia |
 | Jornada | Onde está cada paciente (dados do Klingo + chat), com alertas de atraso | admin e atendente |
 | Fila | Fila de chegada da recepção | admin e atendente |
 | Avisos | "Mesma pessoa?", data de nascimento diferente, paciente × Klingo, pedidos de acesso | admin e atendente |
