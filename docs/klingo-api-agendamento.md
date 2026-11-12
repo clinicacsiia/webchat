@@ -75,7 +75,7 @@ Achados que mudam o desenho:
 
 ## O que ainda NÃO sei
 
-1. ~~Qual campo de `GET /paciente/cpf` é o id do login~~ **Resolvido:** é o `id` (já vem como `P148289`). O login usa esse valor exato.
+1. ~~Qual campo de `GET /paciente/cpf` é o id do login~~ **Resolvido:** é o `id` (já vem como `P123456`). O login usa esse valor exato.
 2. ~~Se `reservar`/`horario` aceitam `X-APP-TOKEN` + Bearer~~ **Resolvido:** funciona assim (testado de dentro do Supabase).
 3. **Se a marcação feita pela API aparece nos relatórios do Klingo** (#7, #14359) no mesmo ritmo das marcações da equipe. Hoje a equipe confere assim; precisa de uma marcação de teste.
 4. Mapeamento do nosso catálogo para `procedimento`/`plano` da API (o id da API é o `procedimento` de cada dia; planos vêm de `/convenios`).

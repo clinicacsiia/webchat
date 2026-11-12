@@ -145,7 +145,7 @@ export class KlingoApi {
 
   /**
    * POST /externo/login — abre a sessão. O id vai EXATAMENTE como o Klingo o devolveu:
-   *  - paciente definitivo: "P148289" (é o `id` de GET /paciente/cpf, já com o P);
+   *  - paciente definitivo: "P123456" (é o `id` de GET /paciente/cpf, já com o P);
    *  - pré-cadastro: o número puro devolvido por /externo/register (sem P). Com P abre OUTRO paciente (testado em 12/11/2026).
    * Devolve o token e o `user` da sessão, para o chamador conferir quem é antes de reservar ou marcar.
    */
