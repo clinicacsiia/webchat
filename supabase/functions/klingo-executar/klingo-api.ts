@@ -164,6 +164,43 @@ export function resumoPaciente(r: unknown): { id: string | null; nascimento: str
   return { id: texto(o.id), nascimento: dataIso(o.dt_nasc), faltando, planoId: num(cv.id_plano) ?? num(pl.id) ?? null };
 }
 
+/** Só para comparar em memória com o que o paciente digitou (nunca devolver, gravar nem registrar em log). */
+export function cadastroParaComparar(r: unknown): { nome: string | null; mae: string | null; sexo: string | null; celulares: string[]; email: string | null } {
+  const o = (r ?? {}) as Record<string, unknown>;
+  const ct = (o.contatos ?? {}) as Record<string, unknown>;
+  const digitos = (v: unknown) => String(v ?? "").replace(/\D/g, "");
+  const sx = String(o.sexo ?? "").trim().toUpperCase().slice(0, 1);
+  return {
+    nome: texto(o.nome), mae: texto(o.mae), sexo: sx === "M" || sx === "F" ? sx : null,
+    celulares: [ct.celular, ct.telefone].map(digitos).filter((x) => x.length >= 8), email: texto(ct.email)?.toLowerCase() ?? null,
+  };
+}
+
+/**
+ * Compara o que o paciente digitou com o cadastro do Klingo (o Klingo é sempre a verdade). Devolve só os NOMES dos campos que divergem,
+ * nunca os valores. Campo vazio de um dos lados não conta como divergência (vira "atualizar cadastro" para a equipe).
+ */
+export function camposDivergentes(
+  k: { nome: string | null; mae: string | null; sexo: string | null; celulares: string[]; email: string | null },
+  d: { nome: string | null; mae?: string | null; sexo: string | null; celular: string | null; email: string | null },
+): string[] {
+  const lig = new Set(["DE", "DA", "DO", "DAS", "DOS", "E"]);
+  const toks = (v: unknown) => semAcento(v).split(" ").filter((t) => t && !lig.has(t));
+  const mesmoNome = (a: unknown, b: unknown) => {
+    const x = toks(a), y = toks(b);
+    if (!x.length || !y.length) return true;
+    return x.join(" ") === y.join(" ") || (x[0] === y[0] && x[x.length - 1] === y[y.length - 1] && x.filter((t) => y.includes(t)).length >= Math.min(x.length, y.length));
+  };
+  const out: string[] = [];
+  if (!mesmoNome(k.nome, d.nome)) out.push("nome");
+  if (!mesmoNome(k.mae, d.mae)) out.push("mae");
+  if (k.sexo && d.sexo && k.sexo !== String(d.sexo).trim().toUpperCase().slice(0, 1)) out.push("sexo");
+  const cel = String(d.celular ?? "").replace(/\D/g, "").slice(-8);
+  if (k.celulares.length && cel.length === 8 && !k.celulares.some((c) => c.slice(-8) === cel)) out.push("telefone");
+  if (k.email && d.email && k.email !== String(d.email).trim().toLowerCase()) out.push("email");
+  return out;
+}
+
 export class KlingoApi {
   private appToken: string;
   private f: Fetcher;

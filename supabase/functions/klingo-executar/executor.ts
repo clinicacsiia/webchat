@@ -8,13 +8,13 @@
 //   4) o horário ainda existe? (GET /agenda/horarios do dia com a sessão); se não, "horário tomado"
 //   5) reservar -> marcar (id_externo = id da operação); se o resultado for incerto, reconcilia por GET /vouchers; se não achar, INCERTO (a equipe confere ANTES de marcar de novo)
 // Cancelar e remarcar (etapa 4): mesma identidade e mesma sessão conferida; só mexem em voucher que está entre as marcações ATIVAS da sessão do próprio paciente.
-import { type Horario, type KlingoApi, KlingoErro, resumoPaciente, resumoVoucher, semAcento, dataIso } from "./klingo-api.ts";
+import { cadastroParaComparar, camposDivergentes, type Horario, type KlingoApi, KlingoErro, resumoPaciente, resumoVoucher, semAcento, dataIso } from "./klingo-api.ts";
 
 export type Rpc = (nome: string, args: Record<string, unknown>) => PromiseLike<{ data: unknown; error?: unknown }>;
 export type Pegar = {
   operacao: { id: string; tipo: string; conversa_id: string; detalhe: Record<string, unknown> };
   dados: {
-    tipo: string | null; plano: string | null; procedimento: number | null; cpf: string | null; nascimento: string | null; nome: string | null; sexo: string | null; celular: string | null; email: string | null;
+    tipo: string | null; plano: string | null; procedimento: number | null; cpf: string | null; nascimento: string | null; nome: string | null; mae?: string | null; sexo: string | null; celular: string | null; email: string | null;
     identidade: { situacao: string; tipo: string | null; klingo_id: string | null; plano_id: number | null } | null;
   };
   oferta: { chave: string; procedimento: number; plano: number; data: string; hora: string; profissional: string | null } | null;
@@ -67,6 +67,10 @@ async function abrirSessao(api: KlingoApi, rpc: Rpc, p: Pegar, o: { planoDaOfert
       return falha("nascimento_divergente");
     }
     if (!/^P\d+$/.test(s.id)) return falha("sem_id_definitivo");
+    // nome, mãe, sexo, telefone e e-mail digitados x cadastro do Klingo (o Klingo manda): 1 divergente = a equipe valida; 2 ou mais = o paciente vai à clínica
+    const dif = camposDivergentes(cadastroParaComparar(pac), d);
+    if (dif.length >= 2) { await rpc("klingo_identidade_registrar", { p_cpf: d.cpf, p_nasc: d.nascimento, p_r: { situacao: "divergente" }, p_conversa: null }); return falha("divergencia_2:" + dif.join(",")); }
+    if (dif.length === 1) return falha("divergencia_1:" + dif[0]);
     idLogin = s.id; tipoId = "definitivo"; planoCadastro = s.planoId;
     await rpc("klingo_identidade_registrar", { p_cpf: d.cpf, p_nasc: d.nascimento, p_r: { situacao: "confere", klingo_id: s.id, faltando: s.faltando, plano_id: s.planoId }, p_conversa: null });
   } else {

@@ -13,11 +13,11 @@ const caso = async (nome, fn) => { try { const r = await fn(); registrar(nome, r
 const { db, falhas } = await criarBancoProducao();
 const { q, um, como, anonimo } = ajudantes(db);
 await db.exec(`insert into vault.secrets_tbl (name, secret) values ('klingo_hash_sal', 'sal-de-teste'), ('klingo_interno_segredo', 'interno-de-teste')`);
-for (const f of ['klingo-auto-parte1-tabelas', 'klingo-auto-parte2-base', 'klingo-auto-parte3-identidade', 'klingo-auto-parte4a-operacao', 'klingo-auto-parte4b-motor', 'klingo-auto-parte5-autogestao', 'klingo-auto-parte6-novo-e-eventos', 'klingo-auto-parte7-indicadores', 'klingo-auto-parte8-pos-marcacao', 'klingo-auto-parte9-voltar', 'klingo-auto-parte10-interruptor-geral']) {
+for (const f of ['klingo-auto-parte1-tabelas', 'klingo-auto-parte2-base', 'klingo-auto-parte3-identidade', 'klingo-auto-parte4a-operacao', 'klingo-auto-parte4b-motor', 'klingo-auto-parte5-autogestao', 'klingo-auto-parte6-novo-e-eventos', 'klingo-auto-parte7-indicadores', 'klingo-auto-parte8-pos-marcacao', 'klingo-auto-parte9-voltar', 'klingo-auto-parte10-interruptor-geral', 'klingo-auto-parte11-voltar-mae-divergencia', 'klingo-auto-parte12-convenio-segue-klingo']) {
   try { await db.exec(readFileSync(`${REPO}/supabase/${f}.sql`, 'utf8')); } catch (e) { registrar(`aplicar ${f}.sql no clone da produção`, false, String(e.message).split('\n')[0]); }
 }
 await db.exec(`insert into public.config (chave, valor) values ('klingo_auto', 'legado') on conflict (chave) do update set valor = 'legado'`);   // os casos abaixo testam as regras por chave; o interruptor geral tem casos próprios no fim
-registrar('o retrato da produção monta inteiro e as 11 partes novas aplicam sem erro', falhas.length === 0 && resultados.every(Boolean));
+registrar('o retrato da produção monta inteiro e as 13 partes novas aplicam sem erro', falhas.length === 0 && resultados.every(Boolean));
 
 const UNIDADE = 'CLÍNICA DE SAÚDE E IMAGEM - CSI';
 await db.exec(`
@@ -719,6 +719,85 @@ await caso('a migração começa com o interruptor geral DESLIGADO e só o servi
   const sql = readFileSync(`${REPO}/supabase/klingo-auto-parte10-interruptor-geral.sql`, 'utf8');
   const g = await q(`select has_function_privilege('anon', 'public.klingo_mestre()', 'execute') a, has_function_privilege('authenticated', 'public.klingo_mestre()', 'execute') b, has_function_privilege('service_role', 'public.klingo_mestre()', 'execute') c`);
   return { ok: /values \('klingo_auto', 'nao'\)/.test(sql) && g[0].a === false && g[0].b === false && g[0].c === true, detalhe: JSON.stringify(g[0]) };
+});
+
+
+// ---------------------------------------------------------------- 13. parte 11: voltar seguro, uma operação por pedido, nome da mãe e divergência de cadastro
+const marcando = async (nome) => {
+  await cfg('klingo_auto', 'legado'); await cfg('klingo_api_horarios', 'sim'); await cfg('klingo_api_marcar', 'sim'); await cfg('klingo_api_percentual', '100');
+  const p = await ateOFim(await iniciar(nome), { motivo: 'exame', plano: 'Particular', confirmar: 'ok', antesDoHorario: async (x) => { await ofertar(x); } });
+  const op = (await q(`select * from public.klingo_operacao where conversa_id = $1`, [p.c]))[0];
+  return { p, op };
+};
+await caso('VOLTAR: durante "marcando" o chat NÃO deixa voltar (nada é desfeito e a operação segue uma só)', async () => {
+  const { p, op } = await marcando('Voltar Bloqueado Teste');
+  let erro = null; await anonimo();
+  try { await rpc('chat_voltar', { p_conversa: p.c, p_token: p.t }); } catch (e) { erro = String(e.message).split('\n')[0]; } finally { await como(''); }
+  const f = (await q(`select passo from public.conversa_fluxo where conversa_id = $1`, [p.c]))[0], n = (await um(`select count(*)::int n from public.klingo_operacao where conversa_id = $1`, [p.c])).n;
+  return { ok: op && /não dá para voltar/i.test(erro || '') && f.passo === 'marcando' && n === 1, detalhe: `${erro} | passo=${f.passo} | operações=${n}` };
+});
+await caso('UMA OPERAÇÃO POR PEDIDO: mudar a chave do horário e criar de novo devolve a mesma operação (sem 2ª reserva)', async () => {
+  const { p, op } = await marcando('Uma Operacao Teste');
+  await db.query(`update public.pre_agendamentos set escolha_horario = jsonb_set(escolha_horario, '{0,klingo_chave}', '"2026-12-01|63|308|2|10:00"') where conversa_id = $1`, [p.c]);
+  const r = await um(`select public.klingo_operacao_criar($1) id`, [p.c]);
+  const n = (await um(`select count(*)::int n from public.klingo_operacao where conversa_id = $1`, [p.c])).n;
+  return { ok: r.id === op.id && n === 1, detalhe: `mesma=${r.id === op.id}; operações=${n}` };
+});
+await caso('DIVERGÊNCIA 2+: nada marcado, o paciente é orientado a vir à CSI e a equipe é avisada (sem dado pessoal na nota)', async () => {
+  const { p, op } = await marcando('Divergencia Dois Teste');
+  await um(`select public.klingo_operacao_pegar($1)`, [op.id]);
+  await um(`select public.klingo_operacao_concluir($1, 'falha', $2::jsonb)`, [op.id, JSON.stringify({ codigo: 'divergencia_2:nome,email' })]);
+  const msgs = await q(`select texto, autor from public.mensagens where conversa_id = $1 order by id desc limit 6`, [p.c]);
+  const pa = await pedidoDe(p.c), cv = await conversaDe(p.c);
+  const aviso = msgs.find((m) => /CSI/.test(m.texto || '') && /documento com foto/.test(m.texto || ''));
+  const nota = (await q(`select dados -> 'notas' as n from public.conversa_fluxo where conversa_id = $1 and dados::text ilike '%2 ou mais campos%'`, [p.c]))[0];
+  return { ok: !!aviso && pa.status !== 'agendado' && cv.ia_ativa === false && !!nota && !/Divergencia Dois|11144477735/.test(JSON.stringify(nota)), detalhe: `aviso=${!!aviso}; status=${pa.status}; ia_ativa=${cv.ia_ativa}; nota=${!!nota}` };
+});
+await caso('DIVERGÊNCIA 1: nada marcado e a equipe recebe a nota com o NOME do campo para validar', async () => {
+  const { p, op } = await marcando('Divergencia Um Teste');
+  await um(`select public.klingo_operacao_pegar($1)`, [op.id]);
+  await um(`select public.klingo_operacao_concluir($1, 'falha', $2::jsonb)`, [op.id, JSON.stringify({ codigo: 'divergencia_1:telefone' })]);
+  const pa = await pedidoDe(p.c), cv = await conversaDe(p.c);
+  const nota = (await q(`select dados -> 'notas' as n from public.conversa_fluxo where conversa_id = $1 and dados::text ilike '%Um campo do cadastro diverge%telefone%'`, [p.c]))[0];
+  return { ok: pa.status !== 'agendado' && cv.ia_ativa === false && !!nota, detalhe: `status=${pa.status}; ia_ativa=${cv.ia_ativa}; nota=${!!nota}` };
+});
+await caso('DIVERGÊNCIA não é falha técnica: a autogestão em "sim" não recua por causa dela', async () => {
+  await db.query(`delete from public.klingo_operacao`); await db.query(`delete from public.klingo_medida`);
+  for (let i = 0; i < 5; i++) await db.query(`insert into public.klingo_operacao (tipo, conversa_id, chave_idem, estado, codigo, criado_em) select 'marcar', c.id, 'div-' || gen_random_uuid()::text, 'falha', 'divergencia_2:nome,mae', now() - interval '1 hour' from public.conversas c limit 1`);
+  await cfg('klingo_autogestao', 'sim'); await cfg('klingo_auto', 'sim');
+  const r = (await um(`select public.klingo_autogestao() r`)).r, m = await um(`select valor from public.config where chave = 'klingo_auto'`);
+  await db.query(`delete from public.klingo_operacao where chave_idem like 'div-%'`); await cfg('klingo_auto', 'legado');
+  return { ok: (r.acoes || []).length === 0 && m.valor === 'sim', detalhe: `acoes=${JSON.stringify(r.acoes)} valor=${m.valor}` };
+});
+await caso('NOME DA MÃE: com a API ligada o passo de identificação pede o nome da mãe; com o interruptor desligado, não', async () => {
+  const { p } = await marcando('Mae Teste Paciente');
+  const campos = async () => {
+    await como('');
+    await db.query(`select public.fluxo_perguntar($1, 'dados_ident', '')`, [p.c]);
+    const m = (await q(`select opcoes from public.mensagens where conversa_id = $1 and autor = 'agente' order by id desc limit 1`, [p.c]))[0];
+    return ((m.opcoes && m.opcoes.campos) || []).map((c) => c.nome);
+  };
+  const ligado = await campos();
+  await cfg('klingo_auto', 'nao'); const desligado = await campos(); await cfg('klingo_auto', 'legado');
+  return { ok: ligado.includes('mae') && !desligado.includes('mae') && desligado.includes('cpf'), detalhe: `ligado=${ligado} | desligado=${desligado}` };
+});
+
+
+await caso('CONVÊNIO SEGUE O KLINGO: o que o Klingo não atende fica inativo, o que atende volta a ativo, e o paciente vê a mensagem de inativo ao escolher o convênio', async () => {
+  await db.exec(`
+    delete from public.convenio_config where operadora in ('CONV FORA TESTE', 'CONV VOLTOU TESTE', 'CONV MANUAL TESTE');
+    insert into public.klingo_plano_map (operadora, convenio_id, plano_id, origem) values ('Conv Fora Teste', null, null, 'nao_atende'), ('Conv Voltou Teste', 7, 77, 'auto')
+      on conflict (operadora) do update set plano_id = excluded.plano_id, origem = excluded.origem;
+    insert into public.convenio_config (operadora, ativo, mensagem_inativo) values ('CONV VOLTOU TESTE', false, null), ('CONV MANUAL TESTE', true, 'texto da equipe') on conflict (operadora) do update set ativo = excluded.ativo;`);
+  const r = (await um(`select public.convenio_seguir_klingo() r`)).r;
+  const a = await q(`select operadora, ativo from public.convenio_config where operadora in ('CONV FORA TESTE', 'CONV VOLTOU TESTE', 'CONV MANUAL TESTE') order by 1`);
+  const msg = (await um(`select public.convenio_msg('Conv Fora Teste', 'inativo') t`)).t;
+  await cfg('convenio_seguir_klingo', 'nao'); await db.exec(`update public.convenio_config set ativo = false where operadora = 'CONV VOLTOU TESTE'`);
+  const r2 = (await um(`select public.convenio_seguir_klingo() r`)).r, a2 = await um(`select ativo from public.convenio_config where operadora = 'CONV VOLTOU TESTE'`);
+  await cfg('convenio_seguir_klingo', 'sim');
+  const por = Object.fromEntries(a.map((x) => [x.operadora, x.ativo]));
+  return { ok: r.desativados >= 1 && r.ativados >= 1 && por['CONV FORA TESTE'] === false && por['CONV VOLTOU TESTE'] === true && por['CONV MANUAL TESTE'] === true && /convenio_inativo|não estamos atendendo/.test(msg) && r2.ligada === false && a2.ativo === false,
+    detalhe: `${JSON.stringify(r)} ${JSON.stringify(por)} | desligado: ${JSON.stringify(r2)} | msg=${msg}` };
 });
 
 const ok = resultados.filter(Boolean).length;

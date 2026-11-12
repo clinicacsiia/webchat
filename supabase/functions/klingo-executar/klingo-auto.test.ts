@@ -313,3 +313,34 @@ test("tipo de operação desconhecido não faz nada", async () => {
   assert.equal((await executar(a.api, rpcDe().rpc, opDe("ler_vouchers", {}), ESPS)).codigo, "tipo_nao_suportado");
   assert.equal(a.k.chamadas.length, 0);
 });
+
+// ------------------------------------------------------------------ divergência de cadastro (o Klingo manda): 1 campo = equipe valida; 2 ou mais = clínica; vazio não conta
+test("DIVERGÊNCIA: nenhum campo diferente (acento, caixa e preposição não contam) segue e marca", async () => {
+  const { api } = apiDe({ paciente: { ...PAC, nome: "MARIA DA SILVA TESTÉ", mae: "ANA DE SOUZA", sexo: "F", contatos: { celular: "(71) 99999-0001", email: "MARIA@EXEMPLO.COM" } } });
+  const r = await executarMarcacao(api, rpcDe().rpc, pegar({ nome: "Maria Silva Teste", mae: "Ana Souza", sexo: "F", celular: "71999990001", email: "maria@exemplo.com" }), ESPS);
+  assert.equal(r.estado, "sucesso");
+});
+test("DIVERGÊNCIA: UM campo diferente (telefone) -> nada é marcado, nem login; o código leva só o NOME do campo", async () => {
+  const { api, k } = apiDe({ paciente: { ...PAC, contatos: { celular: "71988887777", email: "" } } });
+  const r = await executarMarcacao(api, rpcDe().rpc, pegar(), ESPS);
+  assert.equal(r.estado, "falha"); assert.equal(r.codigo, "divergencia_1:telefone");
+  assert.ok(!k.chamadas.some((c) => c.includes("login") || c.includes("reservar") || c.includes("agenda/horario")));
+});
+test("DIVERGÊNCIA: DOIS campos diferentes (nome e e-mail) -> nada é marcado; o código lista os campos, nunca os valores", async () => {
+  const { api, k } = apiDe({ paciente: { ...PAC, nome: "JOSEFA ALMEIDA", contatos: { celular: "71999990001", email: "outra@exemplo.com" } } });
+  const r = await executarMarcacao(api, rpcDe().rpc, pegar({ email: "maria@exemplo.com" }), ESPS);
+  assert.equal(r.estado, "falha"); assert.equal(r.codigo, "divergencia_2:nome,email");
+  assert.ok(!JSON.stringify(r).includes("JOSEFA") && !JSON.stringify(r).includes("outra@"));
+  assert.ok(!k.chamadas.some((c) => c.includes("login")));
+});
+test("DIVERGÊNCIA: campo vazio no Klingo (ou não digitado) não conta como diferente", async () => {
+  const { api } = apiDe({ paciente: { ...PAC, mae: "", contatos: { celular: "", email: "" } } });
+  const r = await executarMarcacao(api, rpcDe().rpc, pegar({ mae: "Ana Souza", email: "maria@exemplo.com" }), ESPS);
+  assert.equal(r.estado, "sucesso");
+});
+test("DIVERGÊNCIA também vale para cancelar: dois campos diferentes não cancelam nada", async () => {
+  const { api, k } = apiDe({ paciente: { ...PAC, nome: "JOSEFA ALMEIDA", sexo: "M" }, vouchers: [V26700] });
+  const r = await executar(api, rpcDe().rpc, opDe("cancelar", { voucher: "26700" }), ESPS);
+  assert.equal(r.estado, "falha"); assert.match(String(r.codigo), /^divergencia_2:/);
+  assert.ok(!k.chamadas.includes("DELETE /voucher"));
+});
