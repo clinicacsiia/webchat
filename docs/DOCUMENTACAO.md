@@ -143,7 +143,7 @@ Números de 11/11/2026 (fim do dia): 101 tabelas, 5 visões, 425 funções, 56 g
 
 ### 4.2 O caminho do motor (função `fluxo_proximo`)
 
-`motivo` → `exame` ou `consulta` (ou `assunto`) → `medico` (só consulta, se houver mais de um) → `plano` → `horario` → `dados_ident` → `dados_contato` → `dados_carteira` (só convênio) → `confirmar` → pronto (o pedido vai para a equipe).
+`motivo` → `exame` ou `consulta` (ou `assunto`) → `medico` (só consulta, se houver mais de um) → `plano` → `horario` → `dados_ident` → `dados_contato` → `confirmar` (a carteirinha deixou de ser perguntada em 12/11/2026) → pronto (o pedido vai para a equipe).
 
 O servidor só aceita resposta a uma pergunta do motor enquanto **o motor conduz** (`motor = fluxo`, `ia_ativa`, status `aguardando`). Se a equipe assumiu, a resposta é recusada com "Essa pergunta já foi respondida". Desde 11/11/2026 a tela do chat desliga esses botões sozinha quando a equipe entra.
 
