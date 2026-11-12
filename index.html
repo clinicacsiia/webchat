@@ -647,7 +647,7 @@
   const CHAVE_HIST = 'webchat.historico.v1';   // as últimas conversas deste aparelho (cada uma com o seu token): dá para voltar a elas
   const MAX_HIST = 5;                          // mínimo pedido: 3
   // Muda a cada alteração do chat. Cópia de mensagens guardada por outra versão é descartada (era isso que mostrava conversa velha e travada).
-  const VERSAO_APP = '2026.11.12-11';
+  const VERSAO_APP = '2026.11.12-12';
   const ESCALAS = [1, 1.18, 1.36], TOAST_LETRA = ['Letra normal.', 'Letra grande.', 'Letra muito grande.'];
 
   // Chegou pelo link "esqueci a senha"? O supabase-js limpa o endereço ao ler o link, então a pergunta é feita antes de criá-lo.
@@ -2866,7 +2866,7 @@
   });
   el.btnHistorico.addEventListener('click', abrirHistorico);
   el.btnHistoricoForm.addEventListener('click', abrirHistorico);
-  document.addEventListener('click', (e) => { if (!el.menu.hidden && !el.menu.contains(e.target) && e.target !== el.btnMenu) el.menu.hidden = true; });
+  document.addEventListener('click', (e) => { if (!el.menu.hidden && !el.menu.contains(e.target) && !el.btnMenu.contains(e.target)) fecharMenu(); });
   el.btnNova.addEventListener('click', novaConversa);
   $('#btnSino').addEventListener('click', tocarSino);
   el.btnAtendente.addEventListener('click', pedirAtendente);
