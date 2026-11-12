@@ -1,6 +1,7 @@
 // FLUXOGRAMA: entrada (POST {"acao":"catalogo"} com x-klingo-segredo; chamado toda madrugada pelo banco) -> validação (segredo conferido pelo banco)
 //   -> lógica (GET /convenios, GET /agenda/especialidades e GET /agenda/consultas por especialidade, tudo pela cota global; só catálogo, nenhum dado de paciente)
 //   -> saída (klingo_catalogo_gravar grava convênios/planos/especialidades e traduz sozinho o convênio do chat para o plano do Klingo; resposta só com contagens)
+// Versão 1.2 — 12/11/2026 / Mudança: a sondagem passa sexo e nascimento de mentira (o Klingo exige sem a sessão do paciente).
 // Versão 1.1 — 12/11/2026 / Mudança: ação "exames": sonda, aos poucos (15 por chamada), se o Klingo tem horário livre para cada exame; o chat usa isso para mostrar ao paciente só o que o Klingo libera.
 // Versão 1.0 — 12/11/2026 / Mudança: primeira versão (autoatendimento Klingo, etapa 0: tradução de convênio e especialidade).
 // Secret: KLINGO_APP_TOKEN.
@@ -25,18 +26,23 @@ Deno.serve(async (req: Request) => {
     const hoje = new Date().toLocaleString("sv-SE", { timeZone: "America/Bahia" }).slice(0, 10);
     const fim = new Date(`${hoje}T12:00:00Z`); fim.setUTCDate(fim.getUTCDate() + 21);
     const { data: ids } = await supabase.rpc("klingo_exames_sondar", { p_n: 15 });
-    let tem = 0, vazio = 0, pulados = 0;
+    let tem = 0, vazio = 0, pulados = 0; const tipos: Record<string, number> = {};
     for (const id of (Array.isArray(ids) ? ids : []) as number[]) {
       try {
-        const hs = await api.horarios({ exame: String(id), inicio: hoje, fim: fim.toISOString().slice(0, 10) });
-        await supabase.rpc("klingo_sondagem_gravar", { p_proc: id, p_tem: hs.length > 0 });
-        if (hs.length > 0) tem++; else vazio++;
+        // sem a sessão de um paciente o Klingo pede sexo e nascimento: usa um adulto de mentira (nenhum dado real); se não houver horário para o sexo feminino, tenta o masculino
+        let achou = false;
+        for (const sexo of ["F", "M"]) {
+          const hs = await api.horarios({ exame: String(id), inicio: hoje, fim: fim.toISOString().slice(0, 10), sexo, nascimento: "1985-06-15" });
+          if (hs.length > 0) { achou = true; break; }
+        }
+        await supabase.rpc("klingo_sondagem_gravar", { p_proc: id, p_tem: achou });
+        if (achou) tem++; else vazio++;
       } catch (e) {
         if (e instanceof KlingoErro && e.tipo === "limite") break;   // o Klingo pediu calma: para por aqui e tenta na próxima rodada
-        if (e instanceof KlingoErro && (e.tipo === "sem_medico" || e.tipo === "plano_inativo" || e.tipo === "plano_desconhecido")) { await supabase.rpc("klingo_sondagem_gravar", { p_proc: id, p_tem: false }); vazio++; } else pulados++;
+        if (e instanceof KlingoErro && (e.tipo === "sem_medico" || e.tipo === "plano_inativo" || e.tipo === "plano_desconhecido")) { await supabase.rpc("klingo_sondagem_gravar", { p_proc: id, p_tem: false }); vazio++; } else { pulados++; const t = e instanceof KlingoErro ? `${e.tipo}_${e.status}` : "erro"; tipos[t] = (tipos[t] ?? 0) + 1; }
       }
     }
-    return json({ ok: true, com_horario: tem, sem_horario: vazio, pulados });
+    return json({ ok: true, com_horario: tem, sem_horario: vazio, pulados, tipos });
   }
   try {
     const convenios = await api.convenios();
