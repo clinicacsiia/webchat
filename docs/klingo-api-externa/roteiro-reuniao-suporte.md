@@ -10,7 +10,7 @@ O chat da clínica deve **marcar consulta e exame sozinho pela API externa**, pa
 - A API "Telefonia/Confirmação" (`swagger-telefonia-1.0.0.json`) é só de confirmação por ligação, NPS e bloqueios; não trata de cadastro nem de marcação.
 - Chave da clínica válida, leitura de agenda funcionando (horários, especialidades, exames, convênios).
 
-> **CORREÇÃO (12/11/2026):** a prova abaixo foi feita pelo ambiente de teste do Claude, cujo proxy mexe nos cabeçalhos. O 401 "ID de cliente inválido" **era desse ambiente, não do Klingo**. De dentro do Supabase, paciente definitivo: login, reserva e marcação funcionaram. **Não mande esta prova ao Klingo; refaça o teste do pré-cadastro pela função antes de qualquer pergunta.** Perguntas 3 a 10 continuam válidas.
+> **CORREÇÃO (12/11/2026):** a prova abaixo foi feita pelo ambiente de teste do Claude, cujo proxy mexe nos cabeçalhos. O 401 "ID de cliente inválido" **era desse ambiente, não do Klingo**. De dentro do Supabase, paciente definitivo: login, reserva e marcação funcionaram. **Não mande esta prova ao Klingo.** O teste foi refeito pela função e **o paciente novo marca sem a recepção** (vouchers 26616 e outros, ver `docs/klingo-api-agendamento.md`). As perguntas 1 e 2 deixaram de ser necessárias; 3 a 10 continuam válidas (em especial: o que a recepção vê do pré-cadastro, duplicidade de CPF e homologação).
 
 ## Prova do problema (INVÁLIDA para a etapa 3; ver correção acima)
 `$T` = a chave da clínica (`clinicacsi:…`). Use um paciente de teste inventado.
