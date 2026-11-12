@@ -1807,7 +1807,7 @@
         h('li', {}, h('b', {}, 'Atendendo: '), 'conversas abertas que a pessoa assumiu (inclui as das próximas colunas).'),
         h('li', {}, h('b', {}, 'Paciente esperando resposta: '), 'o paciente escreveu e a equipe ainda não respondeu; ao lado, há quanto tempo o mais antigo espera.'),
         h('li', {}, h('b', {}, 'Esperando o paciente: '), 'a equipe já respondeu e o paciente ainda não voltou.'),
-        h('li', {}, h('b', {}, 'Marcou hoje: '), 'exames que a pessoa marcou como agendados hoje.')),
+        h('li', {}, h('b', {}, 'Marcou hoje: '), 'exames agendados hoje nas conversas da pessoa (marcados por ela ou confirmados sozinhos com o Klingo).')),
       h('div', { class: 'rodape' }, h('button', { class: 'btn', type: 'button', onclick: () => dlg.close() }, 'Fechar')));
   }
   function abrirEquipe() {
@@ -4230,7 +4230,7 @@ h1.longo { font-size: 14mm; }
   // Seção 3: cada atendente, com barras para ver quem atendeu/agendou mais e quem tem a melhor nota.
   function secaoEquipe(eq) {
     const cab = [h('h3', { class: 'ind-sec' }, '3. Equipe: quem atende e agenda mais'),
-      h('p', { class: 'dica' }, 'Cada atendente no período. "Agendou" conta só o que a pessoa marcou como agendado; o que o sistema confirmou sozinho não tem dono. A nota é a das avaliações dos pacientes nas conversas em que a pessoa mais escreveu.')];
+      h('p', { class: 'dica' }, 'Cada atendente no período. "Agendou" conta o que a pessoa marcou como agendado e também o que o sistema confirmou sozinho com o Klingo, creditado a quem atendia a conversa (o dono dela; se não tinha dono, quem mais escreveu). Sem nenhum atendente na conversa, não é creditado a ninguém. A nota é a das avaliações dos pacientes nas conversas em que a pessoa mais escreveu.')];
     const E = !eq.error && eq.data && Array.isArray(eq.data.pessoas) ? eq.data : null;
     if (!E) return h('div', {}, ...cab, h('p', { class: 'dica' }, 'Para ver esta parte falta rodar o SQL supabase/indicadores-atendentes.sql.'));
     const P = E.pessoas;
@@ -4249,7 +4249,7 @@ h1.longo { font-size: 14mm; }
       comEspera.length ? comEspera.map((x, i) => barra(x.nome, Number(x.espera_mediana_min), maxEsp, `${nf(x.espera_mediana_min)} min · ${nf(x.primeiras)} conversa${x.primeiras === 1 ? '' : 's'}`, Number(x.espera_mediana_min) > 30 ? 'verm' : i === 0 ? 'verde' : 'azul', i === 0)) : h('p', { class: 'dica' }, 'Ninguém respondeu primeiro em conversas abertas neste período.'));
     return h('div', {}, ...cab, h('div', { class: 'ind-grade' },
       bloco('Conversas atendidas', 'Conversas em que a pessoa escreveu no período.', 'conversas'),
-      bloco('Agendamentos feitos', 'Marcados como agendado pela própria pessoa.', 'agendados'),
+      bloco('Agendamentos feitos', 'Marcados pela pessoa ou confirmados sozinhos com o Klingo nas conversas dela.', 'agendados'),
       bloco('Quem respondeu primeiro', 'Conversas abertas no período em que a pessoa deu a primeira resposta.', 'primeiras'), rapidez, notas));
   }
   // Seção 4: avaliações dos pacientes (só administrador; a consulta já devolve vazio para os outros).
