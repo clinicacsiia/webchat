@@ -55,8 +55,7 @@ begin
   if pa.identidade in ('conferida', 'atualizar') and d ->> 'mudou' is null and not v_ja then return 'mudou'; end if;
   if not v_ja and not coalesce((d ->> 'g_ident')::boolean, false) then return 'dados_ident'; end if;
   if not v_ja and not coalesce((d ->> 'g_contato')::boolean, false) then return 'dados_contato'; end if;
-  if lower(coalesce(pa.plano, '')) <> 'particular' and nullif(btrim(coalesce(pa.paciente ->> 'matricula', '')), '') is null
-     and not coalesce((d ->> 'g_carteira')::boolean, false) then return 'dados_carteira'; end if;
+  -- carteirinha-removida: o passo 'dados_carteira' não é mais perguntado; o atendente confere o convênio depois.
   if not coalesce((d ->> 'confirmado')::boolean, false) then return 'confirmar'; end if;
   return 'pronto';
 end $function$;
