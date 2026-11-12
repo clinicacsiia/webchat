@@ -28,7 +28,11 @@ Deno.serve(async (req: Request) => {
   if (eTok) return json({ error: "Conversa não encontrada" }, 403);
 
   const medir = (tipo: string, ms?: number) => supabase.rpc("klingo_medir", { p_tipo: tipo, p_n: 1, p_ms: ms ?? null }).then(() => {}, () => {});
-  const modo = String((await supabase.rpc("klingo_cfg", { p_chave: "klingo_api_horarios", p_padrao: "nao" })).data ?? "nao");
+  // Interruptor geral (config.klingo_auto): nao = desligado; teste/sim = a API vale (o banco, em klingo_ativo, separa só os telefones de teste de todos); legado = a chave antiga.
+  const mestre = String((await supabase.rpc("klingo_mestre")).data ?? "nao");
+  if (mestre === "nao") return json({ ok: false, motivo: "desligado" });
+  const chave = String((await supabase.rpc("klingo_cfg", { p_chave: "klingo_api_horarios", p_padrao: "nao" })).data ?? "nao");
+  const modo = mestre === "legado" ? chave : (chave === "nao" ? "nao" : "sim");
   if (modo !== "sombra" && modo !== "sim") return json({ ok: false, motivo: "desligado" });
   if (modo === "sim") {
     const { data: ativo } = await supabase.rpc("klingo_ativo", { p_conversa: conversa, p_chave: "klingo_api_horarios" });

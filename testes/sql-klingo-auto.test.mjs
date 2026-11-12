@@ -13,10 +13,11 @@ const caso = async (nome, fn) => { try { const r = await fn(); registrar(nome, r
 const { db, falhas } = await criarBancoProducao();
 const { q, um, como, anonimo } = ajudantes(db);
 await db.exec(`insert into vault.secrets_tbl (name, secret) values ('klingo_hash_sal', 'sal-de-teste'), ('klingo_interno_segredo', 'interno-de-teste')`);
-for (const f of ['klingo-auto-parte1-tabelas', 'klingo-auto-parte2-base', 'klingo-auto-parte3-identidade', 'klingo-auto-parte4a-operacao', 'klingo-auto-parte4b-motor', 'klingo-auto-parte5-autogestao', 'klingo-auto-parte6-novo-e-eventos', 'klingo-auto-parte7-indicadores', 'klingo-auto-parte8-pos-marcacao', 'klingo-auto-parte9-voltar']) {
+for (const f of ['klingo-auto-parte1-tabelas', 'klingo-auto-parte2-base', 'klingo-auto-parte3-identidade', 'klingo-auto-parte4a-operacao', 'klingo-auto-parte4b-motor', 'klingo-auto-parte5-autogestao', 'klingo-auto-parte6-novo-e-eventos', 'klingo-auto-parte7-indicadores', 'klingo-auto-parte8-pos-marcacao', 'klingo-auto-parte9-voltar', 'klingo-auto-parte10-interruptor-geral']) {
   try { await db.exec(readFileSync(`${REPO}/supabase/${f}.sql`, 'utf8')); } catch (e) { registrar(`aplicar ${f}.sql no clone da produção`, false, String(e.message).split('\n')[0]); }
 }
-registrar('o retrato da produção monta inteiro e as 10 partes novas aplicam sem erro', falhas.length === 0 && resultados.every(Boolean));
+await db.exec(`insert into public.config (chave, valor) values ('klingo_auto', 'legado') on conflict (chave) do update set valor = 'legado'`);   // os casos abaixo testam as regras por chave; o interruptor geral tem casos próprios no fim
+registrar('o retrato da produção monta inteiro e as 11 partes novas aplicam sem erro', falhas.length === 0 && resultados.every(Boolean));
 
 const UNIDADE = 'CLÍNICA DE SAÚDE E IMAGEM - CSI';
 await db.exec(`
@@ -674,6 +675,50 @@ await caso('VOLTAR: do plano volta para CPF e nascimento (já preenchidos); de l
   p.ult = r2.respostas.filter((m) => m.autor === 'agente').at(-1);
   return { ok: r1.passo === 'cpf_nasc' && f1.passo === 'cpf_nasc' && (campos.find((c) => c.nome === 'cpf') || {}).valor === '11144477735' && ['exame', 'busca_exame'].includes(p.ult.opcoes.tipo === 'busca_exame' ? 'exame' : p.ult.opcoes.passo) && f2.passo === 'exame',
     detalhe: `${r1.passo} (CPF já preenchido: ${(campos.find((c) => c.nome === 'cpf') || {}).valor === '11144477735'}) > ${f2.passo}` };
+});
+
+
+// ---------------------------------------------------------------- 12. interruptor geral (klingo_auto): começa desligado, teste só para os telefones, sim para todos, volta sozinho para teste
+await caso('INTERRUPTOR GERAL: "nao" desliga tudo (ninguém, nem telefone da lista); "teste" só a lista; "sim" todos; chave individual em "nao" desliga só aquela função', async () => {
+  const p = await ateOFim(await iniciar('Mestre Teste'), { motivo: 'exame', plano: 'Particular', confirmar: 'ok', antesDoHorario: async (x) => { await ofertar(x); } });
+  await db.query(`update public.pre_agendamentos set status = 'rascunho' where conversa_id = $1`, [p.c]);
+  const ativo = async (k) => (await um(`select public.klingo_ativo($1, $2) r`, [p.c, k])).r;
+  await cfg('klingo_api_marcar', 'teste'); await cfg('klingo_api_horarios', 'sombra'); await cfg('klingo_api_pre_cadastro', 'teste'); await cfg('klingo_api_pos', 'teste'); await cfg('klingo_api_telefones_teste', `55${p.tel}`);
+  await cfg('klingo_auto', 'nao');   const n1 = [await ativo('klingo_api_marcar'), await ativo('klingo_api_horarios'), await ativo('klingo_api_pre_cadastro'), await ativo('klingo_api_pos')];
+  await cfg('klingo_auto', 'teste'); const t1 = [await ativo('klingo_api_marcar'), await ativo('klingo_api_horarios'), await ativo('klingo_api_pre_cadastro'), await ativo('klingo_api_pos')];
+  await cfg('klingo_api_telefones_teste', '5571900000000'); const t2 = await ativo('klingo_api_marcar');
+  await cfg('klingo_auto', 'sim'); const s1 = [await ativo('klingo_api_marcar'), await ativo('klingo_api_horarios'), await ativo('klingo_api_pre_cadastro'), await ativo('klingo_api_pos')];
+  await cfg('klingo_api_pos', 'nao'); const s2 = await ativo('klingo_api_pos');
+  await cfg('klingo_auto', 'xyz'); const x1 = await ativo('klingo_api_marcar');   // valor desconhecido = desligado
+  await cfg('klingo_api_pos', 'teste'); await cfg('klingo_api_telefones_teste', ''); await cfg('klingo_auto', 'legado');
+  return { ok: n1.every((v) => v === false) && t1.every((v) => v === true) && t2 === false && s1.every((v) => v === true) && s2 === false && x1 === false, detalhe: `nao=${n1} teste(lista)=${t1} teste(fora)=${t2} sim=${s1} sim+pos nao=${s2} invalido=${x1}` };
+});
+await caso('INTERRUPTOR GERAL desligado: a marcação sozinha não acontece e o pedido segue para a equipe; ligado em "teste" só para o telefone da lista', async () => {
+  await cfg('klingo_api_horarios', 'sim'); await cfg('klingo_auto', 'legado');
+  const p = await ateOFim(await iniciar('Mestre Marca'), { motivo: 'exame', plano: 'Particular', confirmar: 'ok', antesDoHorario: async (x) => { await ofertar(x); } });
+  await db.query(`update public.pre_agendamentos set status = 'rascunho' where conversa_id = $1`, [p.c]);
+  await cfg('klingo_api_marcar', 'sim'); await cfg('klingo_api_percentual', '100'); await cfg('klingo_api_telefones_teste', `55${p.tel}`);
+  await cfg('klingo_auto', 'nao'); const a = await motivoDe(p.c);
+  await cfg('klingo_auto', 'teste'); const b = await motivoDe(p.c);
+  await cfg('klingo_api_telefones_teste', ''); const c = await motivoDe(p.c);
+  await cfg('klingo_auto', 'sim'); const d = await motivoDe(p.c);
+  await cfg('klingo_api_marcar', 'teste'); await cfg('klingo_auto', 'legado');
+  return { ok: a.ok === false && a.motivo === 'desligado' && b.ok === true && c.ok === false && c.motivo === 'desligado' && d.ok === true, detalhe: `nao=${a.motivo} teste(lista)=${b.ok}/${b.motivo} teste(fora)=${c.motivo} sim=${d.ok}/${d.motivo}` };
+});
+await caso('INTERRUPTOR GERAL em "sim": a autogestão não avança sozinha, mas VOLTA para "teste" (e avisa a gestão) quando há 2 marcações incertas; nao/teste: ela não mexe em nada', async () => {
+  await db.query(`delete from public.klingo_operacao`); await db.query(`delete from public.klingo_medida`);   // começa limpo: as operações dos casos anteriores não valem aqui
+  await cfg('klingo_autogestao', 'sim'); await cfg('klingo_auto', 'nao'); const r0 = (await um(`select public.klingo_autogestao() r`)).r;
+  await cfg('klingo_auto', 'sim'); const r1 = (await um(`select public.klingo_autogestao() r`)).r;
+  const op = async (estado, codigo) => db.query(`insert into public.klingo_operacao (tipo, conversa_id, chave_idem, estado, codigo, criado_em) select 'marcar', c.id, 'mestre-' || gen_random_uuid()::text, $1, $2, now() - interval '1 hour' from public.conversas c limit 1`, [estado, codigo]);
+  await op('incerto', 'timeout'); await op('incerto', 'timeout');
+  const r2 = (await um(`select public.klingo_autogestao() r`)).r, m = await um(`select valor from public.config where chave = 'klingo_auto'`), dec = await um(`select count(*)::int n from public.klingo_decisao where chave = 'klingo_auto' and para = 'teste'`);
+  await db.query(`delete from public.klingo_operacao where chave_idem like 'mestre-%'`); await cfg('klingo_auto', 'legado');
+  return { ok: (r0.acoes || []).length === 0 && (r1.acoes || []).length === 0 && (r2.acoes || []).includes('mestre:recuou') && m.valor === 'teste' && dec.n === 1, detalhe: `nao=${JSON.stringify(r0.acoes)} sim=${JSON.stringify(r1.acoes)} depois=${JSON.stringify(r2.acoes)} valor=${m.valor}` };
+});
+await caso('a migração começa com o interruptor geral DESLIGADO e só o service_role chama klingo_mestre', async () => {
+  const sql = readFileSync(`${REPO}/supabase/klingo-auto-parte10-interruptor-geral.sql`, 'utf8');
+  const g = await q(`select has_function_privilege('anon', 'public.klingo_mestre()', 'execute') a, has_function_privilege('authenticated', 'public.klingo_mestre()', 'execute') b, has_function_privilege('service_role', 'public.klingo_mestre()', 'execute') c`);
+  return { ok: /values \('klingo_auto', 'nao'\)/.test(sql) && g[0].a === false && g[0].b === false && g[0].c === true, detalhe: JSON.stringify(g[0]) };
 });
 
 const ok = resultados.filter(Boolean).length;

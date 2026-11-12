@@ -29,6 +29,19 @@ Este documento diz **o que foi feito, o que está ligado, o que está desligado 
 | Cancelar e remarcar pelo chat (`klingo_api_pos`) | **Feito, em modo `teste`** (liga junto com a marcação: a autogestão libera quando a marcação chega a 100% e estável). Só o que ESTE chat marcou; prazo mínimo de 24 h (`klingo_pos_prazo_horas`); cancelar pede confirmação ("Sim, cancelar") | Etapa 4 do plano. Com `nao`/`teste` o menu só tem "ver", "falar com a equipe" e "tudo certo". |
 | Resultado de exame, atualizar contato, check-in, IA intérprete (etapas 6 e 7) | **Não feitos** | Etapas 6 e 7: precisam de um segundo fator (código por SMS/e-mail) que a clínica ainda não tem, e o plano manda deixar com a equipe até lá. |
 
+## 2.1 Interruptor geral (12/11/2026): como ligar e desligar tudo
+
+Em **Configurações > Autoatendimento com o Klingo** há um só botão (`config.klingo_auto`) e a lista de telefones de teste (`klingo_api_telefones_teste`). Ele **começa em `nao`**.
+
+| Valor | O que acontece |
+|---|---|
+| `nao` (Desligado) | Nenhum paciente usa a API (nem a lista de teste). O chat funciona como antes e a equipe marca. A autogestão não mexe em nada. |
+| `teste` | Só quem usa um celular da lista de telefones passa por **todas** as funções (horários reais, cadastro de paciente novo, marcar, cancelar, remarcar). Os outros seguem como antes. |
+| `sim` | Todos os pacientes. A autogestão deixa de "avançar" e só vigia: com 2 marcações incertas, 3+ falhas técnicas (20%+ do dia) ou a agenda do Klingo falhando em metade das consultas, **volta sozinha para `teste`** e avisa a gestão. |
+| `legado` | Regras antigas por chave (`klingo_api_marcar` etc. e a autogestão que sobe 10% > 50% > 100%). Não aparece na tela. |
+
+Uma chave individual (`klingo_api_marcar`, `klingo_api_pos`...) em `nao` continua desligando só aquela função. Exame com convênio continua indo para a equipe (`klingo_api_exame_convenio`). Para voltar ao antigo na hora: Configurações > Desligado (ou `update public.config set valor = 'nao' where chave = 'klingo_auto'`). Arquivo: `supabase/klingo-auto-parte10-interruptor-geral.sql` (3 partes; **ainda não aplicado na produção**).
+
 ## 3. Como funciona (fluxo)
 
 ```
