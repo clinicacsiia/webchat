@@ -868,7 +868,7 @@ await caso('TUDO CERTO depois de agendado pela API: a conversa é encerrada (age
 
 
 // ---------------------------------------------------------------- 16. só o que o Klingo libera: consultas e exames
-await caso('SÓ O QUE O KLINGO LIBERA: desligado mostra tudo; ligado, no autoatendimento, a consulta some se a especialidade não é da API e o exame só aparece com horário no Klingo; fora do autoatendimento é tudo como antes', async () => {
+await caso('SÓ O QUE O KLINGO LIBERA: desligado mostra tudo; ligado, no autoatendimento, a consulta some se a especialidade não é da API e o exame some só se o Klingo foi consultado e não tinha horário; fora do autoatendimento é tudo como antes', async () => {
   const { p } = await marcando('So Liberados Teste');
   const lib = async (proc, tipo) => (await um(`select public.klingo_liberado($1, $2, $3) r`, [p.c, proc, tipo])).r;
   await db.exec(`insert into public.klingo_especialidade (cbos, nome, procedimentos, liberada_api) values ('999991', 'TESTE LIBERADA', array[301], true), ('999992', 'TESTE NAO', array[302], false) on conflict (cbos) do update set procedimentos = excluded.procedimentos, liberada_api = excluded.liberada_api`);
@@ -879,10 +879,11 @@ await caso('SÓ O QUE O KLINGO LIBERA: desligado mostra tudo; ligado, no autoate
   await um(`select public.klingo_sondagem_gravar(202, false)`); const vazio = await lib(202, 'exame');
   const ligado = [await lib(301, 'consulta'), await lib(302, 'consulta')];
   await db.exec(`update public.klingo_proc_api set com_horario_em = now() - interval '8 days' where procedimento_id = 201`); const velho = await lib(201, 'exame');
+  await db.exec(`update public.klingo_proc_api set vazio_em = now() - interval '8 days' where procedimento_id = 202`); const vazioVelho = await lib(202, 'exame');
   await cfg('klingo_auto', 'nao'); const fora = [await lib(302, 'consulta'), await lib(202, 'exame')];
   await cfg('klingo_auto', 'legado'); await cfg('klingo_so_liberados', 'nao');
-  return { ok: desligado.every(Boolean) && sem === false && com === true && vazio === false && ligado[0] === true && ligado[1] === false && velho === false && fora.every(Boolean),
-    detalhe: `desligado=${desligado} | exame sem sondagem=${sem} com horário=${com} sem horário=${vazio} velho=${velho} | consultas ligado=${ligado} | fora do autoatendimento=${fora}` };
+  return { ok: desligado.every(Boolean) && sem === true && com === true && vazio === false && ligado[0] === true && ligado[1] === false && velho === true && vazioVelho === true && fora.every(Boolean),
+    detalhe: `desligado=${desligado} | exame sem sondagem=${sem} com horário=${com} sem horário=${vazio} velho=${velho} vazio velho=${vazioVelho} | consultas ligado=${ligado} | fora do autoatendimento=${fora}` };
 });
 await caso('SONDAGEM DE EXAMES: pega os mais pedidos ainda não vistos, grava o resultado e só roda com o autoatendimento ligado', async () => {
   const antes = await q(`select public.klingo_exames_sondar(5) as id`);

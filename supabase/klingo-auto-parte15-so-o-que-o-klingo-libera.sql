@@ -1,4 +1,4 @@
--- FLUXOGRAMA: entrada (o paciente abre a lista de consultas ou de exames no chat; uma rotina sonda no Klingo, aos poucos, quais exames têm horário) -> validação (o filtro só vale se config.klingo_so_liberados = 'sim' E esta conversa está no autoatendimento; senão a lista é a de sempre) -> lógica (consulta aparece se a especialidade está liberada na API; exame aparece se o Klingo teve horário para ele nos últimos 7 dias) -> saída (o paciente só vê o que o Klingo libera)
+-- FLUXOGRAMA: entrada (o paciente abre a lista de consultas ou de exames no chat; uma rotina sonda no Klingo, aos poucos, quais exames têm horário) -> validação (o filtro só vale se config.klingo_so_liberados = 'sim' E esta conversa está no autoatendimento; senão a lista é a de sempre) -> lógica (consulta aparece se a especialidade está liberada na API; exame some só se o Klingo foi consultado nos últimos 7 dias e não tinha horário (exame ainda não consultado continua aparecendo)) -> saída (o paciente só vê o que o Klingo libera)
 -- Versão 1.0 — 12/11/2026 / Mudança: pedido do dono (mostrar ao paciente só consultas e exames liberados no Klingo, com chave para ligar e desligar em Configurações). Começa DESLIGADO.
 -- ROLLBACK: update public.config set valor = 'nao' where chave = 'klingo_so_liberados' (a lista volta ao normal na hora); para remover de vez: select cron.unschedule('klingo-sondar-exames'); e recriar chat_consultas, chat_exames e chat_exames_buscar a partir de supabase/producao/funcoes/.
 -- APLICAR EM PARTES: 15a (chave, funções novas e rotina), 15b (chat_consultas e chat_exames), 15c (chat_exames_buscar).
@@ -18,8 +18,9 @@ begin
   if p_tipo = 'consulta' then
     return exists (select 1 from public.klingo_especialidade e where e.liberada_api and p_proc = any (e.procedimentos));
   end if;
-  return exists (select 1 from public.klingo_proc_api a where a.procedimento_id = p_proc and a.com_horario_em > now() - interval '7 days'
-                   and (a.vazio_em is null or a.com_horario_em >= a.vazio_em));
+  -- exame: só some se o Klingo foi consultado há menos de 7 dias e NÃO tinha horário; exame ainda não consultado continua aparecendo
+  return not exists (select 1 from public.klingo_proc_api a where a.procedimento_id = p_proc and a.vazio_em > now() - interval '7 days'
+                       and (a.com_horario_em is null or a.com_horario_em < a.vazio_em));
 end $function$;
 REVOKE ALL ON FUNCTION public.klingo_liberado(uuid, integer, text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.klingo_liberado(uuid, integer, text) TO service_role;

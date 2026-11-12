@@ -1,7 +1,7 @@
 // FLUXOGRAMA: entrada (POST {"acao":"catalogo"} com x-klingo-segredo; chamado toda madrugada pelo banco) -> validação (segredo conferido pelo banco)
 //   -> lógica (GET /convenios, GET /agenda/especialidades e GET /agenda/consultas por especialidade, tudo pela cota global; só catálogo, nenhum dado de paciente)
 //   -> saída (klingo_catalogo_gravar grava convênios/planos/especialidades e traduz sozinho o convênio do chat para o plano do Klingo; resposta só com contagens)
-// Versão 1.2 — 12/11/2026 / Mudança: a sondagem passa sexo e nascimento de mentira (o Klingo exige sem a sessão do paciente).
+// Versão 1.3 — 12/11/2026 / Mudança: janela de 14 dias (o Klingo recusa mais de 15). Versão 1.2: a sondagem passa sexo e nascimento de mentira.
 // Versão 1.1 — 12/11/2026 / Mudança: ação "exames": sonda, aos poucos (15 por chamada), se o Klingo tem horário livre para cada exame; o chat usa isso para mostrar ao paciente só o que o Klingo libera.
 // Versão 1.0 — 12/11/2026 / Mudança: primeira versão (autoatendimento Klingo, etapa 0: tradução de convênio e especialidade).
 // Secret: KLINGO_APP_TOKEN.
@@ -22,9 +22,9 @@ Deno.serve(async (req: Request) => {
   const rpc = (n: string, a: Record<string, unknown>) => supabase.rpc(n, a);
   const api = new KlingoApi(token, (u, i) => fetch(u, i), { antes: cotaGlobal(rpc, { maxTentativas: 10, maxEsperaMs: 3000 }), aoLimite: async () => { await supabase.rpc("klingo_cota_429"); }, tentativas429: 3 });
   if (c.acao === "exames") {
-    // Sonda os exames mais pedidos que ainda não foram vistos nos últimos 3 dias: tem horário livre nas próximas 3 semanas? Só catálogo, nenhum dado de paciente.
+    // Sonda os exames mais pedidos que ainda não foram vistos nos últimos 3 dias: tem horário livre nas próximas 2 semanas? Só catálogo, nenhum dado de paciente.
     const hoje = new Date().toLocaleString("sv-SE", { timeZone: "America/Bahia" }).slice(0, 10);
-    const fim = new Date(`${hoje}T12:00:00Z`); fim.setUTCDate(fim.getUTCDate() + 21);
+    const fim = new Date(`${hoje}T12:00:00Z`); fim.setUTCDate(fim.getUTCDate() + 14)   // o Klingo recusa períodos maiores que 15 dias (403 "Período excedido. Máximo 15 dias.");
     const { data: ids } = await supabase.rpc("klingo_exames_sondar", { p_n: 15 });
     let tem = 0, vazio = 0, pulados = 0; const tipos: Record<string, number> = {};
     for (const id of (Array.isArray(ids) ? ids : []) as number[]) {
@@ -39,7 +39,9 @@ Deno.serve(async (req: Request) => {
         if (achou) tem++; else vazio++;
       } catch (e) {
         if (e instanceof KlingoErro && e.tipo === "limite") break;   // o Klingo pediu calma: para por aqui e tenta na próxima rodada
-        if (e instanceof KlingoErro && (e.tipo === "sem_medico" || e.tipo === "plano_inativo" || e.tipo === "plano_desconhecido")) { await supabase.rpc("klingo_sondagem_gravar", { p_proc: id, p_tem: false }); vazio++; } else { pulados++; const t = e instanceof KlingoErro ? `${e.tipo}_${e.status}` : "erro"; tipos[t] = (tipos[t] ?? 0) + 1; }
+        if (e instanceof KlingoErro && (e.tipo === "sem_medico" || e.tipo === "plano_inativo" || e.tipo === "plano_desconhecido")) { await supabase.rpc("klingo_sondagem_gravar", { p_proc: id, p_tem: false }); vazio++; } else {
+          pulados++; const t = e instanceof KlingoErro ? `${e.tipo}_${e.status}` : "erro"; tipos[t] = (tipos[t] ?? 0) + 1;
+        }
       }
     }
     return json({ ok: true, com_horario: tem, sem_horario: vazio, pulados, tipos });

@@ -1,5 +1,5 @@
 // FLUXOGRAMA: entrada (o chat chega ao passo do horário: POST {conversa, token}) -> validação (token da conversa; interruptor klingo_api_horarios = sombra ou sim; 1 procedimento; convênio traduzido para plano do Klingo)
-//   -> lógica (cota global; GET /agenda/horarios por 28 dias com sexo e nascimento do paciente; grava as ofertas em klingo_oferta; no modo sombra mede a divergência contra a grade) -> saída ({ok, modo, ofertas}; nunca dado de paciente)
+//   -> lógica (cota global; GET /agenda/horarios por 14 dias com sexo e nascimento do paciente; grava as ofertas em klingo_oferta; no modo sombra mede a divergência contra a grade) -> saída ({ok, modo, ofertas}; nunca dado de paciente)
 // Versão 1.0 — 12/11/2026 / Mudança: primeira versão (autoatendimento Klingo, etapa 1: horários reais). Só LEITURA: não reserva nem marca nada.
 //
 // Nunca trava o chat: qualquer problema (limite de chamadas, Klingo lento ou fora, convênio sem tradução) devolve ok:false/motivo e o chat usa a grade, como sempre.
@@ -13,7 +13,7 @@ import { identificar } from "./identificar.ts";
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info", "Access-Control-Allow-Methods": "POST, OPTIONS" };
 const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { ...CORS, "Content-Type": "application/json" } });
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const JANELA_DIAS = 28;
+const JANELA_DIAS = 14;   // o Klingo recusa períodos maiores que 15 dias (403 "Período excedido. Máximo 15 dias.", provado em 12/11/2026)
 const VALIDADE_CACHE_S = 45;
 
 Deno.serve(async (req: Request) => {
