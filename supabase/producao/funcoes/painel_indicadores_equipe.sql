@@ -27,8 +27,13 @@ begin
              where e.tipo = 'assumida' and e.em >= v_de and e.em < v_ate and e.para_agente is not null group by e.para_agente),
   enc as (select ce.por as agente_id, count(*) as n from public.conversa_encerramento ce join cv on cv.id = ce.conversa_id
            where ce.encerrada_em >= v_de and ce.encerrada_em < v_ate and ce.por is not null group by ce.por),
-  agd as (select p.agendado_por as agente_id, count(*) as n from public.pre_agendamentos p join cv on cv.id = p.conversa_id
-           where p.agendado_em >= v_de and p.agendado_em < v_ate and p.agendado_por is not null group by p.agendado_por),
+  -- Mesma regra do painel_indicadores_atendentes: quem marcou à mão; senão o dono da conversa; senão quem mais escreveu nela.
+  agd as (select x.agente_id, count(*) as n
+            from (select coalesce(p.agendado_por, c.agente_id, (select m.agente_id from public.mensagens m where m.conversa_id = p.conversa_id and m.autor = 'agente' and m.agente_id is not null
+                                                                  group by m.agente_id order by count(*) desc, m.agente_id limit 1)) as agente_id
+                    from public.pre_agendamentos p join cv on cv.id = p.conversa_id join public.conversas c on c.id = p.conversa_id
+                   where coalesce(p.agendado_em, p.agendado_auto_em) >= v_de and coalesce(p.agendado_em, p.agendado_auto_em) < v_ate) x
+           where x.agente_id is not null group by x.agente_id),
   tf as (select e.por as agente_id, count(*) as n from public.conversa_evento e join cv on cv.id = e.conversa_id
           where e.tipo = 'transferencia' and e.em >= v_de and e.em < v_ate and e.por is not null group by e.por),
   tr as (select e.para_agente as agente_id, count(*) as n from public.conversa_evento e join cv on cv.id = e.conversa_id
@@ -48,4 +53,3 @@ begin
     into v_res;
   return v_res;
 end $function$;
-

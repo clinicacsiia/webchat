@@ -17,6 +17,7 @@ Até 11/11/2026 os testes de banco usavam os arquivos `supabase/*.sql`, que **n�
 | `npm run test:equipe-assume` | Chat no navegador: a equipe assume e as perguntas do assistente se desligam; corrida; uma resposta por vez; falha de rede isolada não vira alarme | 9 de 9 |
 | `npm run test:painel-recarga` | Painel no navegador com o tempo real do Supabase simulado: consultas pesadas não se repetem a cada mensagem; nunca duas releituras ao mesmo tempo | 4 de 4 |
 | `npm run test:equipe-agora` | Painel > botão "Equipe agora" da chefia: contagem por atendente (atendendo, paciente esperando, esperando o paciente, zap, marcou hoje), só para TI/gerência/supervisão | 5 de 5 |
+| `npm run test:agendou-credito` | Clone da produção: agendamento confirmado sozinho com o Klingo é creditado ao dono da conversa (ou a quem mais escreveu); marcado à mão fica com quem marcou | 6 de 6 |
 | `npm run retrato:montar` | Só monta o clone e diz se algum comando do retrato não entrou | 425 funções, 101 tabelas |
 
 `banco-producao.mjs` é a peça que monta o clone (Postgres embutido + Supabase simulado + as chaves de `config` como estão na produção). Qualquer teste novo de banco deve partir dele: `const { db } = await criarBancoProducao()`.
