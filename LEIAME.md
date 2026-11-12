@@ -9,13 +9,14 @@ sentinela.js          monitor do chat: ajuda quem trava e gera o código de rast
 painel/index.html     painel da equipe       -> https://SEU-USUARIO.github.io/SEU-REPO/painel/
 ```
 
-## Comece por aqui (estado em 11/11/2026)
+## Comece por aqui (estado em 12/11/2026)
 
 | Quero… | Abra |
 |---|---|
 | Entender o sistema inteiro (pastas, banco, rotinas, testes) | [`docs/DOCUMENTACAO.md`](docs/DOCUMENTACAO.md) |
 | Saber o que depende do dono | [`docs/pendencias-do-dono.md`](docs/pendencias-do-dono.md) |
 | Ver o que foi auditado, corrigido e medido | [`docs/auditoria-2026-11-11.md`](docs/auditoria-2026-11-11.md) |
+| Entender o autoatendimento com a API do Klingo (CPF obrigatório, horários reais, marcação automática, cancelar e remarcar) | [`docs/klingo-autoatendimento.md`](docs/klingo-autoatendimento.md) |
 | Ler uma função do banco como ela está de verdade | [`supabase/producao/funcoes/`](supabase/producao/LEIAME.md) |
 | Rodar os testes | `cd testes && npm install && npm test` ([`testes/README.md`](testes/README.md)) |
 

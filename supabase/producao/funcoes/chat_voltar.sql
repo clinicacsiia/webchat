@@ -1,11 +1,11 @@
 -- public.chat_voltar(p_conversa uuid, p_token text)
--- Pode executar: anon, authenticated, service_role
+-- Pode executar: anon, authenticated
 CREATE OR REPLACE FUNCTION public.chat_voltar(p_conversa uuid, p_token text)
- returns jsonb
- language plpgsql
- security definer
- set search_path to ''
-as $function$
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
 declare c public.conversas; v_passo text; v_p text; v_novo text; i int; v_antes bigint;
 begin
   perform public.chat_valida(p_conversa, p_token);
@@ -19,7 +19,7 @@ begin
   end if;
   select coalesce(max(id), 0) into v_antes from public.mensagens where conversa_id = p_conversa;
   -- cada tentativa é ensaiada e desfeita (o erro de propósito desfaz só o que foi mexido no bloco); a primeira que muda a pergunta vale
-  for i in 1..10 loop
+  foreach i in array array[1, 2, 3, 4, 5, 6, 11, 7, 8, 9, 10] loop   -- klingo-auto: a 11 (CPF e nascimento) vem logo antes do médico/exame
     begin
       perform public.fluxo_voltar_passo(p_conversa, i);
       v_p := public.fluxo_proximo(p_conversa);
@@ -39,3 +39,4 @@ begin
   perform public.fluxo_perguntar(p_conversa, v_novo, 'Tudo bem, vamos corrigir.');
   return jsonb_build_object('passo', v_novo, 'respostas', public.chat_respostas(p_conversa, v_antes));
 end $function$;
+

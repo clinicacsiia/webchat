@@ -1,5 +1,5 @@
 -- public.ind_calc_semhumano(p_de date, p_ate date)
--- Pode executar: service_role
+-- Pode executar: ninguém pela API (só o dono/gatilhos/rotinas)
 CREATE OR REPLACE FUNCTION public.ind_calc_semhumano(p_de date, p_ate date)
  RETURNS TABLE(dia date, pessoa text, teste boolean, unidades text[])
  LANGUAGE sql
@@ -10,6 +10,7 @@ AS $function$
     from public.conversas c
     join public.painel_conversa_pessoa_un() pu on pu.conversa_id = c.id
    where (c.criado_em at time zone 'America/Sao_Paulo')::date between p_de and p_ate
+     and not exists (select 1 from public.pre_agendamentos pa where pa.conversa_id = c.id and pa.agendado_origem = 'chat_api')   -- klingo-auto: resolvida pela automação não é abandono
      and (c.primeiro_humano_em is null
           or c.primeiro_humano_em >= (((c.criado_em at time zone 'America/Sao_Paulo')::date + 1)::timestamp at time zone 'America/Sao_Paulo'))
 $function$;

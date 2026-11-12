@@ -173,9 +173,11 @@ O Klingo chama uma URL nossa quando a marcação muda. Cabeçalhos `X-APP-TOKEN`
 | Resultado sem laudo | `403` com página HTML |
 | Limite de requisições | `429` com página HTML |
 
+> **Atualização de 12/11/2026 (noite):** a `klingo-agenda-api` passou à **versão 0.4, sem escrita** (`marcar` e `marcar_pre` respondem 410). Quem marca agora é a `klingo-executar`, só com o id de uma operação aprovada pelo banco, e quem pede horários ao chat é a `chat-agenda-api`. As linhas `marcar` e `marcar_pre` da tabela abaixo descrevem o que a função fazia na v0.3. Ver `docs/klingo-autoatendimento.md`.
+
 ## 4. A função `klingo-agenda-api` (no Supabase)
 
-Código em `supabase/functions/klingo-agenda-api/` (`api.ts` = cliente; `index.ts` = função; `api.test.ts` = 11 testes). Publicada em 12/11/2026 com `verify_jwt=false`, protegida pelo cabeçalho `x-sync-key` (= `config.ia_segredo`), como as outras funções do projeto. **Ainda não está ligada ao chat.** Usa o secret `KLINGO_APP_TOKEN`.
+Código em `supabase/functions/klingo-agenda-api/` (`api.ts` = cliente; `index.ts` = função; `api.test.ts` = 11 testes). Publicada em 12/11/2026 com `verify_jwt=false`, protegida pelo cabeçalho `x-sync-key` (= `config.ia_segredo`), como as outras funções do projeto. Usa o secret `KLINGO_APP_TOKEN`. (Desde 12/11/2026 à noite só lê; o chat usa `chat-agenda-api` e `klingo-executar`.)
 
 | Ação | O que faz | Efeito |
 |---|---|---|

@@ -59,6 +59,16 @@ begin
       insert into public.fluxo_evento (conversa_id, passo, entrada, entendido, ms, ms_cliente) values (p_conversa, v_passo, 'atendente', true, extract(milliseconds from clock_timestamp() - v_t0), (p_entrada ->> 'ms')::int);
       return;
     end if;
+    -- klingo-auto: texto livre enquanto a marcação roda ou depois dela
+    if v_passo = 'marcando' then
+      perform public.fluxo_dizer(p_conversa, public.fluxo_t('marcado_aguarde', ctx));
+      insert into public.fluxo_evento (conversa_id, passo, entrada, entendido, ms, ms_cliente) values (p_conversa, v_passo, 'texto', true, extract(milliseconds from clock_timestamp() - v_t0), (p_entrada ->> 'ms')::int);
+      return;
+    elsif v_passo in ('marcado', 'pos_menu', 'pos_cancelar') then
+      perform public.fluxo_pos_menu(p_conversa, public.fluxo_t('pos_menu_texto', ctx));
+      insert into public.fluxo_evento (conversa_id, passo, entrada, entendido, ms, ms_cliente) values (p_conversa, v_passo, 'texto', true, extract(milliseconds from clock_timestamp() - v_t0), (p_entrada ->> 'ms')::int);
+      return;
+    end if;
     if v_passo is distinct from 'assunto_texto' then
       if v_norm ~ '(quanto custa|quanto (e|fica|sai)|qual (o )?valor|\mvalor\M|\mpreco|\mcusta\M|orcamento)' then
         v_prefixo := coalesce(public.preco_previsao_chat(p_conversa), public.fluxo_t('preco', ctx)); v_prox := v_passo;
@@ -81,6 +91,11 @@ begin
   end if;
 
   if v_valor is not null and v_prox is null then
+    if v_passo in ('pos_menu', 'pos_cancelar') then   -- klingo-auto: menu depois da marcação
+      perform public.fluxo_pos_responder(p_conversa, case when jsonb_typeof(v_valor) = 'string' then v_valor #>> '{}' end);
+      insert into public.fluxo_evento (conversa_id, passo, entrada, entendido, ms, ms_cliente) values (p_conversa, v_passo, 'botao', true, extract(milliseconds from clock_timestamp() - v_t0), (p_entrada ->> 'ms')::int);
+      return;
+    end if;
     v_res := public.fluxo_aplicar(p_conversa, v_passo, v_valor);
     if not coalesce((v_res ->> 'ok')::boolean, false) then
       v_entendeu := false;

@@ -10,7 +10,7 @@ const caso = async (nome, fn) => { try { const r = await fn(); registrar(nome, r
 import { readFileSync } from 'node:fs';
 import { REPO } from './banco-producao.mjs';
 const { db } = await criarBancoProducao();
-await db.exec(readFileSync(`${REPO}/supabase/chat-voltar.sql`, 'utf8'));
+// o retrato da produção já traz chat_voltar e fluxo_voltar_passo (com o passo cpf_nasc); recarregar o arquivo antigo desfaria isso
 const { q, um, como, anonimo } = ajudantes(db);
 
 const ADMIN = '00000000-0000-4000-8000-0000000000a1', ATEND = '00000000-0000-4000-8000-0000000000a2', OUTRO_PACIENTE = '00000000-0000-4000-8000-0000000000b1';

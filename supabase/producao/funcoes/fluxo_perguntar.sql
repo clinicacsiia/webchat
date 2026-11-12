@@ -101,6 +101,12 @@ begin
     v_txt := public.fluxo_t('mudou', ctx);
     v_op := public.fluxo_escolha(p_passo, jsonb_build_array(jsonb_build_object('valor', 'igual', 'rotulo', 'Não, continuam os mesmos'),
                                                             jsonb_build_object('valor', 'mudou', 'rotulo', 'Sim, algo mudou')));
+  when 'cpf_nasc' then   -- klingo-auto
+    v_txt := public.fluxo_t('cpf_nasc', ctx);
+    v_op := jsonb_build_object('tipo', 'campos', 'passo', p_passo, 'botao', 'Continuar', 'campos', jsonb_build_array(
+      jsonb_build_object('nome', 'cpf', 'rotulo', case when (ctx ->> 'filho')::boolean then 'CPF da criança (ou do responsável, se ela não tiver)' else 'CPF' end,
+                         'tipo', 'cpf', 'obrigatorio', true, 'valor', v_dig ->> 'cpf'),
+      jsonb_build_object('nome', 'dt_nasc', 'rotulo', 'Data de nascimento' || (ctx ->> 'de_quem'), 'tipo', 'data', 'obrigatorio', true, 'valor', v_dig ->> 'dt_nasc')));
   when 'dados_ident' then
     v_nome := coalesce(v_dig ->> 'nome', case when (ctx ->> 'filho')::boolean then c.paciente_nome else c.nome_informado end);
     v_txt := public.fluxo_t('dados_ident', ctx);
@@ -109,7 +115,7 @@ begin
       jsonb_build_object('nome', 'sexo', 'rotulo', 'Sexo', 'tipo', 'sexo', 'obrigatorio', true, 'valor', v_dig ->> 'sexo'),
       jsonb_build_object('nome', 'dt_nasc', 'rotulo', 'Data de nascimento', 'tipo', 'data', 'obrigatorio', true, 'valor', v_dig ->> 'dt_nasc'),
       jsonb_build_object('nome', 'cpf', 'rotulo', case when (ctx ->> 'filho')::boolean then 'CPF da criança (ou do responsável, se ela não tiver)' else 'CPF' end,
-                         'tipo', 'cpf', 'obrigatorio', false, 'valor', v_dig ->> 'cpf')));
+                         'tipo', 'cpf', 'obrigatorio', true, 'valor', v_dig ->> 'cpf')));   -- klingo-auto: CPF obrigatório
   when 'dados_contato' then
     select ct.telefone into v_tel from public.contatos ct where ct.id = c.contato_id;
     v_txt := public.fluxo_t('dados_contato', ctx);
@@ -149,7 +155,7 @@ begin
   perform public.fluxo_dizer(p_conversa, v_txt, v_op);
   update public.conversa_fluxo set tentativas = case when passo is distinct from p_passo then 0 else tentativas end, passo = p_passo, atualizado_em = now()
   where conversa_id = p_conversa;
-  v_etapa := case when p_passo in ('motivo','exame','consulta','atalho','medico') then 'pedido' when p_passo in ('plano', 'plano_confirma') then 'plano' when p_passo = 'horario' then 'data_hora'
+  v_etapa := case when p_passo in ('motivo','exame','consulta','atalho','medico') then 'pedido' when p_passo in ('plano', 'plano_confirma', 'cpf_nasc') then 'plano' when p_passo = 'horario' then 'data_hora'
                   when p_passo in ('mudou','dados_ident','dados_contato','dados_endereco','dados_carteira','identidade') then 'dados' when p_passo = 'confirmar' then 'confirmacao' end;
   if v_etapa is not null then update public.pre_agendamentos set etapa = v_etapa where conversa_id = p_conversa and status = 'rascunho'; end if;
 end $function$;

@@ -1,5 +1,6 @@
 # Retrato da estrutura do banco de produção
 
+Versão 1.3 — 12/11/2026 / Mudança: acrescentadas as funções e as 12 tabelas do autoatendimento com a API do Klingo (52 funções novas ou alteradas), 5 rotinas e 9 chaves de `config`. Feito a partir das migrações `supabase/klingo-auto-parte1..9.sql` aplicadas num clone do retrato anterior (as definições são as do `pg_get_functiondef` do clone, não uma leitura direta da produção): 11 delas diferem do banco real só em comentários e variáveis sem uso, porque as migrações foram coladas sem os comentários. O comportamento é o mesmo (os testes passam nos dois). O próximo retrato completo, tirado da produção, normaliza.
 Versão 1.2 — 11/11/2026 (noite) / Mudança: retrato atualizado com o que o dono aplicou depois (431 funções, 102 tabelas): 6 funções novas (`chat_arquivo_equipe`, `painel_arquivo_enviar`, `painel_indicadores_decisao`, `painel_indicadores_atendentes`, `ind_decisao_periodo`, `origem_limpa`), `chat_iniciar` alterada e a tabela `respostas_prontas`
 Versão 1.1 — 11/11/2026 (14h49) / Mudança: retrato refeito depois das PRs #120 a #134 do dono e das últimas migrações da auditoria
 Versão 1.0 — 11/11/2026 (07h14) / Mudança: primeiro retrato (auditoria de 11/11/2026)

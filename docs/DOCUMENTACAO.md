@@ -1,18 +1,19 @@
 # Documentação do Webchat da CSI
 
-Versão 1.0 — 11/11/2026 / Mudança: primeira documentação única do sistema, escrita na auditoria de 11/11/2026
+Versão 1.1 — 12/11/2026 / Mudança: autoatendimento com a API do Klingo (CPF + nascimento obrigatórios, horários reais, marcação automática, revisão dos pacientes antigos); corrigidas as divergências D1 a D3 do planejamento. Versão 1.0 — 11/11/2026: primeira documentação única do sistema, escrita na auditoria de 11/11/2026
 
 Este é o documento para **entender o sistema inteiro**: o que é cada pasta, cada arquivo, cada peça do banco e como elas se falam. Os outros arquivos de `docs/` contam a história de cada mudança; este diz **como as coisas são hoje**.
 
 - O que foi auditado e corrigido em 11/11/2026: [`auditoria-2026-11-11.md`](auditoria-2026-11-11.md)
 - O que depende do dono: [`pendencias-do-dono.md`](pendencias-do-dono.md)
+- **Autoatendimento com a API do Klingo (12/11/2026):** [`klingo-autoatendimento.md`](klingo-autoatendimento.md); desenho completo e riscos em [`planejamento-autoatendimento-klingo.md`](planejamento-autoatendimento-klingo.md)
 - A estrutura real do banco de produção: [`../supabase/producao/`](../supabase/producao/LEIAME.md)
 
 ---
 
 ## 1. O que o sistema faz
 
-Um paciente abre o chat no celular, diz se quer **exame**, **consulta** ou **outro assunto**, escolhe o exame (por foto do pedido médico, pelo mapa do corpo ou pelo nome), o plano, um dia e horário **previstos** e informa os dados do cadastro. O pedido chega pronto ao **painel** da equipe, que marca no Klingo e confirma com o paciente. O sistema **não grava nada no Klingo**: ele só lê.
+Um paciente abre o chat no celular, diz se quer **exame**, **consulta** ou **outro assunto**, escolhe o exame (por foto do pedido médico, pelo mapa do corpo ou pelo nome), o plano, um dia e horário **previstos** e informa os dados do cadastro. O pedido chega pronto ao **painel** da equipe, que marca no Klingo e confirma com o paciente. Desde 12/11/2026 o chat também pede **CPF e data de nascimento** (obrigatórios), confere o cadastro na **API do Klingo** e, quando liberado (`config.klingo_api_marcar`), **marca sozinho** consultas e exames Particular com um horário real, mostrando o cartão do agendamento; tudo que não for seguro continua indo para a equipe. As rotinas de relatório continuam só lendo. Ver [`klingo-autoatendimento.md`](klingo-autoatendimento.md).
 
 Três telas, um banco:
 
@@ -46,7 +47,7 @@ Três ideias que explicam quase tudo:
 
 1. **O paciente nunca lê tabela.** O chat só chama funções `chat_*`, e cada uma confere o **token secreto da conversa** (guardado no aparelho). Quem não tem o token não vê nada. Isso é conferido por teste (`testes/retrato.test.mjs` e `testes/sql-ponta-a-ponta.test.mjs`).
 2. **Quem responde o paciente é o banco** ("motor de regras", funções `fluxo_*`), na mesma chamada que grava a mensagem dele. Não há IA conversando. Uma pessoa da equipe pode assumir a qualquer momento; aí o motor para.
-3. **O Klingo é a verdade da agenda.** Rotinas leem relatórios do Klingo o tempo todo (ocupação da agenda, marcações, catálogo, preços) e o chat mostra horários a partir disso. Marcar continua sendo com a equipe.
+3. **O Klingo é a verdade da agenda.** Rotinas leem relatórios do Klingo o tempo todo (ocupação da agenda, marcações, catálogo, preços) e o chat mostra horários a partir disso (previsão). A API externa do Klingo dá os horários livres de verdade e a marcação: a função `klingo-executar` marca, só a partir de uma operação aprovada pelo banco, e só nos modos liberados.
 
 ## 3. As pastas, uma a uma
 
@@ -132,6 +133,7 @@ Números de 11/11/2026 (fim do dia): 101 tabelas, 5 visões, 425 funções, 56 g
 | Indicadores | `ind_fechamento`, `ind_pessoa_dia`, `ind_conclusao_dia`, `ind_semhumano_dia` | `painel_indicadores_*`, `ind_*` |
 | Fila de chegada | `fila_chegada`, `fila_aviso`, `push_inscricao` | `fila_*`, `checkin_publico` |
 | Diagnóstico | `incidente_chat` (códigos da Sentinela), `autoencerramento_execucao` | `chat_incidente`, `painel_incidentes` |
+| Autoatendimento Klingo | `klingo_identidade` (CPF conferido, só hash), `klingo_oferta` (horários que a API ofereceu à conversa), `klingo_operacao` (cada marcação: estado, voucher, código), `klingo_plano_map` e `klingo_convenio` (tradução convênio → plano), `klingo_especialidade`, `klingo_cota` (limite de chamadas), `klingo_medida`, `klingo_decisao` (o que a autogestão decidiu), `klingo_evento`, `klingo_proc_api`, `klingo_conversa_ident` | `klingo_*`, `painel_automacao_resumo` |
 | Configuração | `config` (chave → valor) | — |
 
 ### 4.1 Como o paciente é protegido
@@ -144,7 +146,7 @@ Números de 11/11/2026 (fim do dia): 101 tabelas, 5 visões, 425 funções, 56 g
 
 ### 4.2 O caminho do motor (função `fluxo_proximo`)
 
-`motivo` → `exame` ou `consulta` (ou `assunto`) → `medico` (só consulta, se houver mais de um) → `plano` → `horario` → `dados_ident` → `dados_contato` → `confirmar` (a carteirinha deixou de ser perguntada em 12/11/2026) → pronto (o pedido vai para a equipe).
+`motivo` → `exame` ou `consulta` (ou `assunto`) → `medico` (só consulta, se houver mais de um) → **`cpf_nasc`** (CPF e nascimento válidos, obrigatórios; 12/11/2026) → `plano` → `horario` → `dados_ident` → `dados_contato` → `confirmar` (a carteirinha deixou de ser perguntada em 12/11/2026) → pronto (o pedido vai para a equipe) **ou** `marcando` → `marcado` → `pos_menu` (quando a marcação automática vale para a conversa).
 
 O servidor só aceita resposta a uma pergunta do motor enquanto **o motor conduz** (`motor = fluxo`, `ia_ativa`, status `aguardando`). Se a equipe assumiu, a resposta é recusada com "Essa pergunta já foi respondida". Desde 11/11/2026 a tela do chat desliga esses botões sozinha quando a equipe entra.
 
@@ -168,6 +170,11 @@ O servidor só aceita resposta a uma pergunta do motor enquanto **o motor conduz
 | `indicadores-fechar-dia` | 00:10 | Congela os números do dia anterior |
 | `convenios-revisar` | 08:05 | Avisa a gestão de convênio suspenso há 1 mês |
 | `manutencao-limpeza` | 04:17 | Apaga o histórico técnico de execuções com mais de 3 dias |
+| `klingo-operacao-vigia` | 1 min | Refaz chamada perdida do executor, marca como INCERTO o que ficou preso e encerra a conversa resolvida sozinha há 2 h |
+| `klingo-autogestao` | 10 min | Avança ou recua sozinha os interruptores `klingo_api_*` conforme as medidas e avisa a gestão |
+| `klingo-revisar-pacientes` | 5 min | Confere na API do Klingo quem deixou CPF + nascimento e ainda não foi conferido |
+| `klingo-sincronizar` | 03:50 | Copia convênios, planos e especialidades da API e traduz o convênio do chat |
+| `klingo-limpeza` | 04:27 | Apaga ofertas, medidas e avisos antigos do autoatendimento |
 
 Horários em Brasília. Conferir a saúde delas: `select jobname, status, count(*) from cron.job_run_details d join cron.job j using (jobid) where start_time > now() - interval '1 day' group by 1, 2;`
 
@@ -183,7 +190,12 @@ Todas publicadas **sem exigir JWT** e cada uma confere o próprio segredo.
 | `klingo-paciente` | gatilho do banco (CPF + nascimento) | `x-sync-key` | sim |
 | `chat-agenda-ao-vivo` | o chat, ao chegar no calendário | token da conversa | sim |
 | `chat-avisar`, `avisar-equipe`, `fila-avisar` | o banco (pg_net) | segredo do Vault `fila_aviso_segredo` | sim |
-| `klingo-agenda-api` | **exemplo, não publicada** (horários e marcação pela API externa; ver `docs/klingo-api-agendamento.md`) | `x-sync-key` | sim |
+| `klingo-agenda-api` | diagnóstico: só **lê** horários (versão 0.4, sem escrita; marcar responde 410) | `x-sync-key` | sim |
+| `chat-agenda-api` | o chat, ao chegar no horário (só leitura: grava as ofertas da API) | token da conversa | sim |
+| `klingo-executar` | só o banco (pg_net), com o id de uma operação | segredo próprio do cofre (`klingo_interno_segredo`) | sim |
+| `klingo-identificar` | o banco (gatilho do CPF e rotina de revisão) | segredo do cofre | sim |
+| `klingo-sincronizar` | pg_cron (03:50) | segredo do cofre | sim |
+| `klingo-webhook` | o próprio Klingo (aviso de cancelamento, remarcação, chegada) | `X-APP-TOKEN` = chave da clínica | sim (ligado só com `klingo_webhook = sim`) |
 | `klingo-inspecionar-chat` | manual (diagnóstico) | `x-sync-key` | sim (pode ser apagada) |
 | `ler-pedido` | o chat (foto do pedido lida por IA) | token da conversa | **não** (depende de chave e de revisão jurídica) |
 | `fila-emitir-link`, `fila-validar-assinatura` | módulo da biometria | segredo / token | **não** (módulo parado) |
@@ -209,6 +221,12 @@ Liga/desliga e textos. Só o administrador lê e altera (aba Configurações ou 
 | `agendamento_reconhecer` | `sim` | Reconhecer agendamento no Klingo |
 | `vinculo_manual_quem` | `equipe` | Quem liga paciente a prontuário |
 | `jornada_relatorio_id` / `_filtro` | `14359` / `exame` | Relatório do Klingo usado na Jornada |
+| `klingo_api_horarios` | `sombra` | Horários reais da API: `nao` / `sombra` (só mede) / `sim` |
+| `klingo_api_marcar`, `klingo_api_pre_cadastro`, `klingo_api_pos` | `teste` | Marcar sozinho (com cadastro / paciente novo / pós): `nao` / `teste` (só os telefones da lista) / `sim` |
+| `klingo_api_telefones_teste` | vazio | Celulares (só números, vírgula) que sempre usam a automação nos modos `teste` |
+| `klingo_api_percentual` | `100` | No modo `sim`, que parte das conversas usa a automação (a autogestão sobe 10 → 50 → 100) |
+| `klingo_autogestao` | `sim` | O sistema pode avançar/recuar os interruptores acima |
+| `klingo_webhook` | `nao` | Aplicar os avisos do Klingo |
 
 Segredos e endereços (`ia_segredo`, `*_url`, `fila_vapid_publica`) existem mas não são listados aqui.
 
