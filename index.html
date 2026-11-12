@@ -76,6 +76,14 @@
     background: transparent; border: 0; color: var(--csi-sidebar-bg); width: 44px; height: 44px; border-radius: 50%; cursor: pointer; font-size: calc(23px * var(--esc)); line-height: 1;
   }
   .btn-menu:hover { background: var(--csi-primary-soft); }
+  /* Botões do topo (voltar e ⋮): círculo com fundo e borda, ícone grosso, fáceis de ver e de tocar */
+  .btn-menu {
+    display: inline-flex; align-items: center; justify-content: center; flex: none;
+    width: 46px; height: 46px; background: var(--csi-primary-soft); border: 2px solid var(--csi-primary);
+  }
+  .btn-menu svg { width: 26px; height: 26px; display: block; }
+  .btn-menu:active { background: var(--csi-primary); color: #fff; }
+  .btn-menu:focus-visible { outline: 3px solid var(--csi-primary); outline-offset: 2px; }
   .btn-voltar { margin-left: -6px; }
   .menu {
     position: absolute; right: 10px; top: calc(60px + env(safe-area-inset-top)); background: var(--papel); border: 1px solid var(--linha);
@@ -496,13 +504,13 @@
 <body>
 <div class="app" id="app">
   <header class="topo">
-    <button class="btn-menu btn-voltar" id="btnVoltarInicio" type="button" aria-label="Voltar ao início" hidden>&#8592;</button>
+    <button class="btn-menu btn-voltar" id="btnVoltarInicio" type="button" aria-label="Voltar ao início" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M12 5l-7 7 7 7"/></svg></button>
     <img class="topo-logo" src="img/logo-csi-simbolo.svg" alt="" width="89" height="30">
     <div class="topo-info">
       <div class="topo-nome" id="empresa">CSI · Clínica de Saúde e Imagem</div>
       <div class="topo-status"><span class="ponto" id="ponto"></span><span id="status">Online</span></div>
     </div>
-    <button class="btn-menu" id="btnMenu" aria-label="Menu" aria-haspopup="true" aria-expanded="false" hidden>&#8942;</button>
+    <button class="btn-menu" id="btnMenu" aria-label="Menu" aria-haspopup="true" aria-expanded="false" hidden><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="4.5" r="2.6"/><circle cx="12" cy="12" r="2.6"/><circle cx="12" cy="19.5" r="2.6"/></svg></button>
   </header>
   <div class="menu" id="menu" hidden>
     <button type="button" id="btnAtendente" hidden>Falar com um atendente</button>
@@ -637,7 +645,7 @@
   const CHAVE_HIST = 'webchat.historico.v1';   // as últimas conversas deste aparelho (cada uma com o seu token): dá para voltar a elas
   const MAX_HIST = 5;                          // mínimo pedido: 3
   // Muda a cada alteração do chat. Cópia de mensagens guardada por outra versão é descartada (era isso que mostrava conversa velha e travada).
-  const VERSAO_APP = '2026.11.12-8';
+  const VERSAO_APP = '2026.11.12-9';
   const ESCALAS = [1, 1.18, 1.36], TOAST_LETRA = ['Letra normal.', 'Letra grande.', 'Letra muito grande.'];
 
   // Chegou pelo link "esqueci a senha"? O supabase-js limpa o endereço ao ler o link, então a pergunta é feita antes de criá-lo.
