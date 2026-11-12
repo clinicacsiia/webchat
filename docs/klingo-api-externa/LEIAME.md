@@ -5,6 +5,8 @@ Para consulta futura, sem depender do SwaggerHub estar no ar.
 | Arquivo | O que é |
 |---|---|
 | `Klingo_API_Externa_Referencia.pdf` | Guia de referência rápida (8 páginas, versão 1.0.0), recebido do dono em 12/11/2026. Endpoints, fluxo de agendamento, webhook, modelos de dados e a lista do que **não** consta na documentação. |
+| `swagger-telefonia-1.0.0.json` | A outra API que o Klingo indicou ("Confirmação"): `https://api-externa.klingo.app/api/telefonia` — confirmar marcações por ligação, NPS, bloqueios de agenda. **Não trata de cadastro nem de marcação.** |
+| `roteiro-reuniao-suporte.md` | Roteiro para a reunião com o desenvolvedor do Klingo: objetivo, prova reproduzível do problema do paciente novo e perguntas. |
 | `swagger-1.0.0.json` | A definição completa (OAS 2.0) baixada de `https://api.swaggerhub.com/apis/agsx30/klingo-api-externa/1.0.0` em 12/11/2026. É pública; não tem chave nem dado de paciente. |
 
 Fonte: https://app.swaggerhub.com/apis/agsx30/klingo-api-externa/1.0.0 · Base: `https://api-externa.klingo.app/api` · Suporte: suporte@klingo.com.br.
