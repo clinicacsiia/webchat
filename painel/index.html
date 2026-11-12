@@ -2822,7 +2822,7 @@
     area.addEventListener('input', async () => {
       const m = area.value.slice(0, area.selectionStart).match(/(?:^|\s)\/([^\s/]*)$/);
       if (!m) return fechar();
-      try { const todas = await carregarAtalhos(); const q = m[1].toLowerCase(); itens = todas.filter((r) => r.atalho.includes(q)).slice(0, 20); } catch { return fechar(); }
+      try { const todas = await carregarAtalhos(); const sa = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(), q = sa(m[1]); itens = todas.filter((r) => sa(r.atalho).includes(q)).slice(0, 20); } catch { return fechar(); }
       sel = 0; if (!itens.length) return fechar(); desenhar(); pop.hidden = false;
     });
     // capture: roda antes do Enter que envia a mensagem
@@ -2838,12 +2838,12 @@
   async function viewAtalhos(c) {
     const lista = h('ul', { class: 'at-lista' }), formBox = h('div', {});
     const abrirForm = (r) => {
-      const fa = h('input', { type: 'text', maxlength: '30', placeholder: 'bomdia', value: r ? r.atalho : '', 'aria-label': 'Atalho' });
+      const fa = h('input', { type: 'text', maxlength: '50', placeholder: 'bomdia', value: r ? r.atalho : '', 'aria-label': 'Atalho' });
       const ft = h('textarea', { rows: '4', maxlength: '4000', placeholder: 'Texto que entra na conversa', 'aria-label': 'Resposta' }); ft.value = r ? r.texto : '';
       const ok = h('button', { type: 'button', class: 'btn prim' }, 'Salvar');
       ok.addEventListener('click', async () => {
-        const atalho = fa.value.trim().replace(/^\//, '').toLowerCase(), texto = ft.value.trim();
-        if (!/^[a-z0-9_-]{1,30}$/.test(atalho)) return toast('Atalho: use só letras minúsculas sem acento, números, - ou _ (até 30).');
+        const atalho = fa.value.trim().replace(/^\//, ''), texto = ft.value.trim();
+        if (!/^[A-Za-z0-9À-ÖØ-öø-ÿ_-]{1,50}$/.test(atalho)) return toast('Atalho: use letras (maiúsculas ou minúsculas, com acento), números, - ou _ (até 50), sem espaços.');
         if (!texto) return toast('Escreva o texto da resposta.');
         ok.disabled = true;
         try {

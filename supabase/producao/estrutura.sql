@@ -1840,11 +1840,11 @@ create table public.respostas_prontas (
   texto text not null,
   criado_em timestamp with time zone default now() not null,
   atualizado_em timestamp with time zone default now() not null,
-  constraint respostas_prontas_atalho_ck CHECK ((atalho ~ '^[a-z0-9_-]{1,30}$'::text)),
+  constraint respostas_prontas_atalho_ck CHECK ((atalho ~ '^[A-Za-z0-9À-ÖØ-öø-ÿ_-]{1,50}$'::text)),
   constraint respostas_prontas_texto_ck CHECK (((length(btrim(texto)) >= 1) AND (length(btrim(texto)) <= 4000))),
   constraint respostas_prontas_pkey PRIMARY KEY (id)
 );
-CREATE UNIQUE INDEX respostas_prontas_atalho_uq ON public.respostas_prontas USING btree (atalho);
+CREATE UNIQUE INDEX respostas_prontas_atalho_lower_uq ON public.respostas_prontas USING btree (lower(atalho));
 alter table public.respostas_prontas enable row level security;
 create policy respostas_prontas_delete on public.respostas_prontas as permissive for delete to public
   using ((( SELECT papel_atual() AS papel_atual) = 'admin'::text));
