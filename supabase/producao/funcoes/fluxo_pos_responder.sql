@@ -65,6 +65,9 @@ begin
   else
     perform public.fluxo_dizer(p_conversa, public.fluxo_t('pos_fim', ctx), jsonb_build_object('tipo', 'nova'));
     update public.conversa_fluxo set passo = 'marcado', atualizado_em = now() where conversa_id = p_conversa;
+    -- quadro "Agendado pela API": o paciente disse que está tudo certo e ninguém da equipe entrou, então a conversa é encerrada (se ele voltar, cai de novo no menu)
+    update public.conversas set status = 'encerrada', encerrada_em = now(), motivo_encerramento = 'agendado', encerramento_origem = 'sistema'
+     where id = p_conversa and status <> 'encerrada' and primeiro_humano_em is null and exists (select 1 from public.pre_agendamentos x where x.conversa_id = p_conversa and x.agendado_origem = 'chat_api');
   end if;
 end $function$;
 

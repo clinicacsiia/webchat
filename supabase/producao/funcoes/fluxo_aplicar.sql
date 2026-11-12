@@ -10,7 +10,7 @@ declare
   v text := case when jsonb_typeof(p_valor) = 'string' then p_valor #>> '{}' else null end;
   o jsonb := case when jsonb_typeof(p_valor) = 'object' then p_valor else '{}'::jsonb end;
   c public.conversas; pa public.pre_agendamentos; ctx jsonb := public.fluxo_ctx(p_conversa);
-  v_dt date; v_pac jsonb := '{}'::jsonb; v_err text[] := '{}'; v_ok boolean; v_med text[]; k text; x text; v_uni text;
+  v_n int; v_dt date; v_pac jsonb := '{}'::jsonb; v_err text[] := '{}'; v_ok boolean; v_med text[]; k text; x text; v_uni text;
 begin
   select * into c from public.conversas where id = p_conversa;
   select * into pa from public.pre_agendamentos where conversa_id = p_conversa;
@@ -21,6 +21,17 @@ begin
     if v_dt is null or v_dt > current_date or v_dt < date '1900-01-01' then return jsonb_build_object('ok', false, 'erro', public.fluxo_t('identidade_erro')); end if;
     perform public.fluxo_pre(p_conversa, jsonb_build_object('paciente', jsonb_build_object('dt_nasc', v_dt::text)));
     perform public.fluxo_set(p_conversa, jsonb_build_object('identidade_feita', true, 'digitado', coalesce((select dados -> 'digitado' from public.conversa_fluxo where conversa_id = p_conversa), '{}'::jsonb) || jsonb_build_object('dt_nasc', to_char(v_dt, 'DD/MM/YYYY'))));
+  when 'cpf_confirma' then   -- klingo-auto
+    if coalesce((o ->> 'pular')::boolean, false) then perform public.klingo_nao_sou_eu(p_conversa); return '{"ok": true}'::jsonb; end if;
+    x := regexp_replace(coalesce(o ->> 'cpf', ''), '\D', '', 'g');
+    if public.fluxo_cpf_ok(x) and x = regexp_replace(coalesce(pa.paciente ->> 'cpf', ''), '\D', '', 'g') then
+      perform public.fluxo_set(p_conversa, '{"cpf_confirmado": true}');
+    else
+      select coalesce((f.dados ->> 'cpf_tentativas')::int, 0) + 1 into v_n from public.conversa_fluxo f where f.conversa_id = p_conversa;
+      if v_n >= 3 then perform public.klingo_nao_sou_eu(p_conversa); return '{"ok": true}'::jsonb; end if;
+      perform public.fluxo_set(p_conversa, jsonb_build_object('cpf_tentativas', v_n));
+      return jsonb_build_object('ok', false, 'erro', 'Esse CPF não confere com o cadastro. Confira os números e tente de novo, ou toque em "Não sou eu".');
+    end if;
   when 'cpf_nasc' then   -- klingo-auto
     x := regexp_replace(coalesce(o ->> 'cpf', ''), '\D', '', 'g');
     v_dt := public.fluxo_ler_data(o ->> 'dt_nasc');
@@ -127,7 +138,7 @@ begin
       return '{"ok": true}';
     end if;
     foreach k in array case p_passo
-        when 'dados_ident' then array['nome','sexo','dt_nasc','cpf']
+        when 'dados_ident' then array['nome','sexo','dt_nasc','cpf','mae']
         when 'dados_contato' then array['celular','telefone','email']
         when 'dados_endereco' then array['cep','endereco','numero','complemento','bairro','cidade','uf']
         else array['matricula','validade'] end loop
@@ -155,8 +166,8 @@ begin
         if x not in ('M', 'F') then v_err := array_append(v_err, 'o sexo'::text); continue; end if;
       elsif k = 'uf' then
         x := upper(left(x, 2));
-      elsif k = 'nome' and length(x) < 5 then
-        v_err := array_append(v_err, 'o nome completo'::text); continue;
+      elsif k in ('nome', 'mae') and length(x) < 5 then
+        v_err := array_append(v_err, case k when 'mae' then 'o nome da mãe' else 'o nome completo' end); continue;
       end if;
       v_pac := v_pac || jsonb_build_object(k, left(x, 200));
     end loop;

@@ -16,11 +16,11 @@ begin
   if v_ev_id is null then return jsonb_build_object('ok', true, 'duplicado', true); end if;
   select * into pa from public.pre_agendamentos where klingo_marcacoes @> array[v_id] limit 1;
   if pa.id is not null then
-    if v_nova ~ '^[0-9]+$' then   -- remarcação: o pedido passa a apontar para a marcação nova
+    if v_nova ~ '^[0-9]+$' then
       update public.pre_agendamentos set klingo_marcacoes = array_replace(klingo_marcacoes, v_id, v_nova) where id = pa.id;
       perform public.fluxo_nota(pa.conversa_id, 'Klingo avisou: a marcação foi remarcada (a nova é a ' || v_nova || ').');
       v_res := 'remarcada';
-    elsif v_st = 'C' and pa.status = 'agendado' then   -- cancelada no Klingo
+    elsif v_st = 'C' and pa.status = 'agendado' then
       update public.pre_agendamentos set status = 'cancelado', conferencia_status = 'sumiu', atualizado_em = now() where id = pa.id;
       perform public.fluxo_nota(pa.conversa_id, 'Klingo avisou: a marcação ' || v_id || ' foi CANCELADA.');
       v_res := 'cancelada';

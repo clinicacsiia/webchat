@@ -1,5 +1,5 @@
 {
- "gerado_em": "2026-11-12 (atualizado a partir das migrações klingo-auto-parte1..9; o próximo retrato completo normaliza o texto das funções novas)",
+ "gerado_em": "2026-11-12T21:30:41.963892+00:00",
  "postgres": "17.11",
  "tabelas": [
   {
@@ -573,7 +573,8 @@
     "gabarito_por",
     "gabarito_em",
     "klingo_conferido_em",
-    "klingo_conferido_por"
+    "klingo_conferido_por",
+    "nome"
    ],
    "rls": true,
    "politicas": 0
@@ -1099,6 +1100,180 @@
    "politicas": 1
   },
   {
+   "nome": "klingo_convenio",
+   "colunas": [
+    "plano_id",
+    "convenio_id",
+    "convenio",
+    "plano",
+    "convenio_norm",
+    "padrao",
+    "visto_em"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "klingo_conversa_ident",
+   "colunas": [
+    "conversa_id",
+    "chave",
+    "em"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "klingo_cota",
+   "colunas": [
+    "id",
+    "fichas",
+    "max_fichas",
+    "reposicao_por_s",
+    "reposto_em",
+    "pausado_ate",
+    "ultimo_429_em"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "klingo_decisao",
+   "colunas": [
+    "id",
+    "em",
+    "chave",
+    "de",
+    "para",
+    "motivo"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "klingo_especialidade",
+   "colunas": [
+    "cbos",
+    "nome",
+    "codigo",
+    "procedimentos",
+    "liberada_api",
+    "atualizado_em"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "klingo_evento",
+   "colunas": [
+    "id",
+    "hash",
+    "evento",
+    "id_marcacao",
+    "status",
+    "recebido_em",
+    "processado_em",
+    "resultado"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "klingo_identidade",
+   "colunas": [
+    "id",
+    "chave",
+    "cpf_hash",
+    "tipo",
+    "klingo_id",
+    "situacao",
+    "faltando",
+    "plano_id",
+    "conferido_em",
+    "convertido_em",
+    "criado_pela_operacao"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "klingo_medida",
+   "colunas": [
+    "dia",
+    "tipo",
+    "n",
+    "soma_ms"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "klingo_oferta",
+   "colunas": [
+    "id",
+    "conversa_id",
+    "chave",
+    "procedimento",
+    "plano",
+    "data",
+    "hora",
+    "profissional",
+    "profissional_id",
+    "unidade",
+    "unidade_id",
+    "ordem_chegada",
+    "criado_em",
+    "expira_em"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "klingo_operacao",
+   "colunas": [
+    "id",
+    "conversa_id",
+    "pre_agendamento_id",
+    "tipo",
+    "estado",
+    "chave_idem",
+    "tentativas",
+    "voucher_id",
+    "http_status",
+    "caminho",
+    "codigo",
+    "detalhe",
+    "origem",
+    "criado_em",
+    "iniciado_em",
+    "concluido_em"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "klingo_plano_map",
+   "colunas": [
+    "operadora",
+    "convenio_id",
+    "plano_id",
+    "origem",
+    "atualizado_em"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "klingo_proc_api",
+   "colunas": [
+    "procedimento_id",
+    "com_horario_em",
+    "vazio_em"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
    "nome": "medico_aviso",
    "colunas": [
     "id",
@@ -1584,180 +1759,6 @@
    ],
    "rls": true,
    "politicas": 0
-  },
-  {
-   "nome": "klingo_convenio",
-   "colunas": [
-    "plano_id",
-    "convenio_id",
-    "convenio",
-    "plano",
-    "convenio_norm",
-    "padrao",
-    "visto_em"
-   ],
-   "rls": true,
-   "politicas": 0
-  },
-  {
-   "nome": "klingo_conversa_ident",
-   "colunas": [
-    "conversa_id",
-    "chave",
-    "em"
-   ],
-   "rls": true,
-   "politicas": 0
-  },
-  {
-   "nome": "klingo_cota",
-   "colunas": [
-    "id",
-    "fichas",
-    "max_fichas",
-    "reposicao_por_s",
-    "reposto_em",
-    "pausado_ate",
-    "ultimo_429_em"
-   ],
-   "rls": true,
-   "politicas": 0
-  },
-  {
-   "nome": "klingo_decisao",
-   "colunas": [
-    "id",
-    "em",
-    "chave",
-    "de",
-    "para",
-    "motivo"
-   ],
-   "rls": true,
-   "politicas": 0
-  },
-  {
-   "nome": "klingo_especialidade",
-   "colunas": [
-    "cbos",
-    "nome",
-    "codigo",
-    "procedimentos",
-    "liberada_api",
-    "atualizado_em"
-   ],
-   "rls": true,
-   "politicas": 0
-  },
-  {
-   "nome": "klingo_evento",
-   "colunas": [
-    "id",
-    "hash",
-    "evento",
-    "id_marcacao",
-    "status",
-    "recebido_em",
-    "processado_em",
-    "resultado"
-   ],
-   "rls": true,
-   "politicas": 0
-  },
-  {
-   "nome": "klingo_identidade",
-   "colunas": [
-    "id",
-    "chave",
-    "cpf_hash",
-    "tipo",
-    "klingo_id",
-    "situacao",
-    "faltando",
-    "plano_id",
-    "conferido_em",
-    "convertido_em",
-    "criado_pela_operacao"
-   ],
-   "rls": true,
-   "politicas": 0
-  },
-  {
-   "nome": "klingo_medida",
-   "colunas": [
-    "dia",
-    "tipo",
-    "n",
-    "soma_ms"
-   ],
-   "rls": true,
-   "politicas": 0
-  },
-  {
-   "nome": "klingo_oferta",
-   "colunas": [
-    "id",
-    "conversa_id",
-    "chave",
-    "procedimento",
-    "plano",
-    "data",
-    "hora",
-    "profissional",
-    "profissional_id",
-    "unidade",
-    "unidade_id",
-    "ordem_chegada",
-    "criado_em",
-    "expira_em"
-   ],
-   "rls": true,
-   "politicas": 0
-  },
-  {
-   "nome": "klingo_operacao",
-   "colunas": [
-    "id",
-    "conversa_id",
-    "pre_agendamento_id",
-    "tipo",
-    "estado",
-    "chave_idem",
-    "tentativas",
-    "voucher_id",
-    "http_status",
-    "caminho",
-    "codigo",
-    "detalhe",
-    "origem",
-    "criado_em",
-    "iniciado_em",
-    "concluido_em"
-   ],
-   "rls": true,
-   "politicas": 0
-  },
-  {
-   "nome": "klingo_plano_map",
-   "colunas": [
-    "operadora",
-    "convenio_id",
-    "plano_id",
-    "origem",
-    "atualizado_em"
-   ],
-   "rls": true,
-   "politicas": 0
-  },
-  {
-   "nome": "klingo_proc_api",
-   "colunas": [
-    "procedimento_id",
-    "com_horario_em",
-    "vazio_em"
-   ],
-   "rls": true,
-   "politicas": 0
   }
  ],
  "visoes": [
@@ -1835,6 +1836,12 @@
    "comando": "select public.chat_corpo_atualizar()"
   },
   {
+   "nome": "convenio-seguir-klingo",
+   "quando": "10 7 * * *",
+   "ativa": true,
+   "comando": "select public.convenio_seguir_klingo()"
+  },
+  {
    "nome": "convenios-revisar",
    "quando": "5 11 * * *",
    "ativa": true,
@@ -1871,34 +1878,16 @@
    "comando": "select public.jornada_vigiar()"
   },
   {
-   "nome": "klingo-ligar-pendentes",
-   "quando": "4-59/10 * * * *",
-   "ativa": true,
-   "comando": "select public.paciente_klingo_ligar_pendentes()"
-  },
-  {
-   "nome": "manutencao-limpeza",
-   "quando": "17 7 * * *",
-   "ativa": true,
-   "comando": "select public.manutencao_limpar()"
-  },
-  {
-   "nome": "pessoa-agrupar",
-   "quando": "*/5 * * * *",
-   "ativa": true,
-   "comando": "select public.pessoa_agrupar_pendentes()"
-  },
-  {
-   "nome": "sync-catalogo-klingo",
-   "quando": "0 6 * * *",
-   "ativa": true,
-   "comando": "select net.http_post( url := 'https://nrvuynjwcgwpjdptkiay.supabase.co/functions/v1/sync-catalogo-klingo', headers := jsonb_build_object('Content-Type', 'application/json', 'x-sync-key', (select valor from public.config where chave = 'ia_segredo')), body := '{}'::jsonb, timeout_milliseconds := 120000);"
-  },
-  {
    "nome": "klingo-autogestao",
    "quando": "*/10 * * * *",
    "ativa": true,
    "comando": "select public.klingo_autogestao()"
+  },
+  {
+   "nome": "klingo-ligar-pendentes",
+   "quando": "4-59/10 * * * *",
+   "ativa": true,
+   "comando": "select public.paciente_klingo_ligar_pendentes()"
   },
   {
    "nome": "klingo-limpeza",
@@ -1923,6 +1912,24 @@
    "quando": "50 6 * * *",
    "ativa": true,
    "comando": "select public.klingo_sincronizar_disparar()"
+  },
+  {
+   "nome": "manutencao-limpeza",
+   "quando": "17 7 * * *",
+   "ativa": true,
+   "comando": "select public.manutencao_limpar()"
+  },
+  {
+   "nome": "pessoa-agrupar",
+   "quando": "*/5 * * * *",
+   "ativa": true,
+   "comando": "select public.pessoa_agrupar_pendentes()"
+  },
+  {
+   "nome": "sync-catalogo-klingo",
+   "quando": "0 6 * * *",
+   "ativa": true,
+   "comando": "select net.http_post( url := 'https://nrvuynjwcgwpjdptkiay.supabase.co/functions/v1/sync-catalogo-klingo', headers := jsonb_build_object('Content-Type', 'application/json', 'x-sync-key', (select valor from public.config where chave = 'ia_segredo')), body := '{}'::jsonb, timeout_milliseconds := 120000);"
   }
  ],
  "gatilhos": [
@@ -2008,6 +2015,7 @@
   "cadastro_equipe_sem_convite",
   "chat_push_url",
   "checkin_sem_login_max_dia",
+  "convenio_seguir_klingo",
   "convenio_suspenso_texto",
   "despedida_configurada",
   "despedida_inatividade_ativa",
@@ -2033,9 +2041,11 @@
   "klingo_api_pos",
   "klingo_api_pre_cadastro",
   "klingo_api_telefones_teste",
+  "klingo_auto",
   "klingo_autogestao",
   "klingo_funcoes_base",
   "klingo_paciente_url",
+  "klingo_reconfirmar_dias",
   "klingo_webhook",
   "login_paciente",
   "motor",
@@ -4257,7 +4267,7 @@
    "anon": true,
    "authenticated": true,
    "publico": false,
-   "md5": "edafeae125ef0fa79b2ce60cc44bcd42"
+   "md5": "fc0180d1495f22afb7cf984e785fdaac"
   },
   {
    "nome": "checkin_publico",
@@ -4731,6 +4741,16 @@
    "authenticated": true,
    "publico": false,
    "md5": "568fbc51f03eccbfb31e82b9ca69e8c1"
+  },
+  {
+   "nome": "convenio_seguir_klingo",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "ee0d85aeac844ecb0dd66f36e0e998f9"
   },
   {
    "nome": "convenio_suspender",
@@ -5799,7 +5819,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "8bae410c5cc5e298fddaf532a96a3357"
+   "md5": "08d6c9a308dd6af7e95cb40cca68fd44"
   },
   {
    "nome": "fluxo_assunto_aplicar",
@@ -6153,7 +6173,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "7b744d5277540af4c99a8ce5243e9538"
+   "md5": "2c7ac9c6c373c31c3ef7748ad69e8325"
   },
   {
    "nome": "fluxo_pos_aplicar",
@@ -6233,7 +6253,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "4a9d4b4c8759ef2ccc9b699a85722b7d"
+   "md5": "f9277ec205aa2d48b83f974b4f205192"
   },
   {
    "nome": "fluxo_pre",
@@ -6286,7 +6306,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "f7edbeaaab0e2d8330126af78a13876c"
+   "md5": "05f83d386b02390dd7bb9e93d2e9e763"
   },
   {
    "nome": "fluxo_proximo_assunto",
@@ -7473,7 +7493,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "7ad5f9436c9a623752dcf37fd121ed75"
+   "md5": "c9c2219f66d90e3ae84f2263ba522039"
   },
   {
    "nome": "klingo_autogestao",
@@ -7483,7 +7503,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "63393e2995ed30a02385b62683e9fb7a"
+   "md5": "49861cf1452a0ab82af1407211868190"
   },
   {
    "nome": "klingo_avisar_gestao",
@@ -7633,7 +7653,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "6aeca009ed2028676c1dcb30dc91d06d"
+   "md5": "f39d7b4347921eca68ff63ac738b02dd"
   },
   {
    "nome": "klingo_hash",
@@ -7690,7 +7710,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "6ff1e6e3e1d426b4c40e2fe74867ba5f"
+   "md5": "0a5a1c76fe8a9b24556a47a509f7b5e8"
   },
   {
    "nome": "klingo_identificar_agendar",
@@ -7705,7 +7725,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "277c2ab57551353eb7c04df884432f95"
+   "md5": "6bc9f25a4a186fe0b55059439dbf689f"
   },
   {
    "nome": "klingo_limpar",
@@ -7760,6 +7780,31 @@
    "md5": "106162bacfc341997cde6f330a79b7a1"
   },
   {
+   "nome": "klingo_mestre",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "95a213e4d5ead8b9d2a98851c59bb107"
+  },
+  {
+   "nome": "klingo_nao_sou_eu",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "1d660a7b9e29c5f586e2b2adb4d490b5"
+  },
+  {
    "nome": "klingo_oferta_gravar",
    "args": [
     {
@@ -7807,7 +7852,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "02c9d65904f339f8ab30d36e6fdc1fcb"
+   "md5": "5bb44ece792dad59555b750d25cf4878"
   },
   {
    "nome": "klingo_operacao_criar",
@@ -7822,7 +7867,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "a9f54abb6e019ec031f1a20816a624c8"
+   "md5": "7961437f7665efd1fcd004318a064727"
   },
   {
    "nome": "klingo_operacao_disparar",
@@ -7862,7 +7907,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "0dbf2100323ed7fc5afc919aac26b666"
+   "md5": "ca6b1bab2bd1f59c7c012cc47d406233"
   },
   {
    "nome": "klingo_plano_mapear_auto",
@@ -7906,7 +7951,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "dff6ff8a97a641b823862bbd4b61ac33"
+   "md5": "e6f5d872c0a5a6e73131b6d11dea193d"
   },
   {
    "nome": "klingo_pre_gravar",
@@ -7933,7 +7978,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "ed659b92bf76fa4e88fb6188304d3e3d"
+   "md5": "4e6afb50e8683c8356935b3783f15224"
   },
   {
    "nome": "klingo_pre_reservar",
@@ -7956,7 +8001,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "65cbd9b203e9a15879524e10f4001ee1"
+   "md5": "73094170a3e18a28ca3b909bd6904a71"
   },
   {
    "nome": "klingo_prof_confere",
@@ -9105,7 +9150,7 @@
    "anon": false,
    "authenticated": true,
    "publico": false,
-   "md5": "97502a6dd83953d234a778e62cfa554e"
+   "md5": "0dd31fe2bda521470825e3b9ea2b8b39"
   },
   {
    "nome": "painel_conversa_pessoa_un",

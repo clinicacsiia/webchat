@@ -17,7 +17,6 @@ begin
     perform public.klingo_operacao_concluir(r.id, 'incerto', jsonb_build_object('codigo', 'sem_resposta_do_executor'));
     v_inc := v_inc + 1;
   end loop;
-  -- conversa resolvida pela automação e parada há 2 h: encerra (motivo agendado, origem sistema)
   for r in select c.id from public.conversas c join public.pre_agendamentos pa on pa.conversa_id = c.id
             where c.status <> 'encerrada' and pa.agendado_origem = 'chat_api' and pa.agendado_auto_em < now() - interval '2 hours'
               and coalesce((select max(m.criado_em) from public.mensagens m where m.conversa_id = c.id and m.autor = 'cliente'), pa.agendado_auto_em) < now() - interval '2 hours'

@@ -1,5 +1,5 @@
 -- public.chat_horarios(p_conversa uuid, p_token text, p_grupo integer, p_de date, p_ate date, p_unidade text, p_periodo text, p_excluir jsonb)
--- Pode executar: anon, authenticated
+-- Pode executar: anon, authenticated, service_role
 CREATE OR REPLACE FUNCTION public.chat_horarios(p_conversa uuid, p_token text, p_grupo integer DEFAULT 1, p_de date DEFAULT NULL::date, p_ate date DEFAULT NULL::date, p_unidade text DEFAULT NULL::text, p_periodo text DEFAULT NULL::text, p_excluir jsonb DEFAULT '[]'::jsonb)
  RETURNS jsonb
  LANGUAGE plpgsql

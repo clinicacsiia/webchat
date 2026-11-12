@@ -14,6 +14,12 @@ begin
   select f.dados -> 'remarcando' into v_rem from public.conversa_fluxo f where f.conversa_id = p_conversa;
   v_tipo := case when jsonb_typeof(v_rem) = 'object' then 'remarcar' else 'marcar' end;
   v_chave := v_tipo || ':' || pa.id::text || ':' || coalesce(v_rem ->> 'voucher', '') || ':' || (e ->> 'klingo_chave');
+  -- klingo-auto: um pedido nunca tem duas operações do mesmo tipo em andamento ou concluídas (mudar o horário não abre uma 2ª reserva)
+  select id into v_op from public.klingo_operacao where pre_agendamento_id = pa.id and tipo = v_tipo and estado in ('pendente', 'executando', 'incerto', 'sucesso') and (v_tipo = 'remarcar' or true)
+   order by criado_em desc limit 1;
+  if v_op is not null and v_tipo = 'marcar' then return v_op; end if;
+  if v_op is not null and v_tipo = 'remarcar' and exists (select 1 from public.klingo_operacao where id = v_op and estado in ('pendente', 'executando', 'incerto')) then return v_op; end if;
+  v_op := null;
   insert into public.klingo_operacao (conversa_id, pre_agendamento_id, tipo, chave_idem, detalhe)
   values (p_conversa, pa.id, v_tipo, v_chave, jsonb_build_object('chave', e ->> 'klingo_chave', 'data', e ->> 'data', 'hora', e ->> 'hora', 'procedimento', o.procedimento, 'plano', o.plano)
           || case when v_tipo = 'remarcar' then jsonb_build_object('remarcacao', v_rem ->> 'voucher') else '{}'::jsonb end)

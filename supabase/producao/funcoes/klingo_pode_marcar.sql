@@ -35,7 +35,6 @@ begin
   if (v_pl ->> 'plano_id') is not null and (v_pl ->> 'plano_id')::int is distinct from o.plano and (v_pl ->> 'via') = 'padrao' and o.plano <> (v_pl ->> 'plano_id')::int and v_id is not null then
     return jsonb_build_object('ok', false, 'motivo', 'plano_mudou_depois_da_oferta');
   end if;
-  -- exame só pelo Particular até a regra de autorização/preparo por convênio existir (decisão registrada em docs/klingo-autoatendimento.md)
   if pa.tipo = 'exame' and public.norm_nome(pa.plano) <> 'PARTICULAR' and public.klingo_cfg('klingo_api_exame_convenio', 'nao') <> 'sim' then
     return jsonb_build_object('ok', false, 'motivo', 'exame_com_convenio');
   end if;

@@ -1,5 +1,5 @@
 -- public.chat_voltar(p_conversa uuid, p_token text)
--- Pode executar: anon, authenticated
+-- Pode executar: anon, authenticated, service_role
 CREATE OR REPLACE FUNCTION public.chat_voltar(p_conversa uuid, p_token text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -13,6 +13,9 @@ begin
   select passo into v_passo from public.conversa_fluxo where conversa_id = p_conversa;
   if c.motor <> 'fluxo' or not (c.ia_ativa and c.status = 'aguardando') or v_passo is null then
     raise exception 'Não dá para voltar agora. Veja a última mensagem.' using errcode = '22023';
+  end if;
+  if v_passo in ('marcando', 'marcado', 'pos_menu', 'pos_cancelar', 'cancelado') or exists (select 1 from public.klingo_operacao o where o.conversa_id = p_conversa and o.estado in ('pendente', 'executando')) then
+    raise exception 'Depois de confirmar não dá para voltar por aqui. Use as opções da mensagem.' using errcode = '22023';   -- klingo-auto: voltar durante ou depois da marcação poderia gerar uma 2ª reserva
   end if;
   if v_passo in ('identidade', 'atalho', 'motivo', 'pronto', 'humano', 'assunto_fim') then
     raise exception 'Esta é a primeira pergunta: não há o que corrigir antes dela.' using errcode = '22023';

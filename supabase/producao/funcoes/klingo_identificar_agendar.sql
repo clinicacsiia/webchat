@@ -17,7 +17,7 @@ begin
   insert into public.klingo_conversa_ident (conversa_id, chave) values (p_conversa, v_chave)
     on conflict (conversa_id) do update set chave = excluded.chave, em = now() where public.klingo_conversa_ident.chave is distinct from excluded.chave
     returning conversa_id into v_novo;
-  if v_novo is null then return; end if;   -- este par já foi mandado conferir nesta conversa
+  if v_novo is null then return; end if;
   select * into v_i from public.klingo_identidade where chave = v_chave;
   if v_i.id is not null and v_i.conferido_em > now() - interval '1 day' and v_i.situacao <> 'erro' then
     perform public.klingo_identidade_registrar(v_cpf, v_dt, jsonb_build_object('situacao', v_i.situacao, 'klingo_id', v_i.klingo_id, 'faltando', to_jsonb(v_i.faltando), 'plano_id', v_i.plano_id), p_conversa);

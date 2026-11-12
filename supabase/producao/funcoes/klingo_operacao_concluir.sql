@@ -85,6 +85,12 @@ begin
   v_plano := coalesce(pa.plano, '');
   if v_est = 'incerto' then
     perform public.fluxo_finalizar_humano(op.conversa_id, 'ATENÇÃO: a marcação automática ficou INCERTA (o Klingo não confirmou). Conferir na agenda do Klingo se o horário ' || to_char(coalesce((op.detalhe ->> 'data')::date, current_date), 'DD/MM') || ' ' || coalesce(op.detalhe ->> 'hora', '?') || ' foi marcado ANTES de marcar de novo. Código: ' || coalesce(v_cod, '?'), 'media', 'marcar_incerto');
+  elsif v_cod like 'divergencia_2:%' then
+    perform public.fluxo_nota(op.conversa_id, 'Cadastro com 2 ou mais campos diferentes do Klingo (' || substr(v_cod, 15) || '). Nada foi marcado. O paciente foi orientado a comparecer à CSI com documento com foto para marcar e atualizar o cadastro.');
+    perform public.fluxo_dizer(op.conversa_id, public.fluxo_t('divergencia_clinica', ctx));
+    perform public.fluxo_transferir(op.conversa_id, 'Cadastro do paciente diverge do Klingo em mais de um campo (' || substr(v_cod, 15) || '). Paciente orientado a vir à clínica.', 'baixa', false);
+  elsif v_cod like 'divergencia_1:%' then
+    perform public.fluxo_finalizar_humano(op.conversa_id, 'Um campo do cadastro diverge do Klingo (' || substr(v_cod, 15) || '). Validar com o paciente: corrigir no Klingo se estiver certo no chat, ou pedir que atualize quando vier à clínica. Nada foi marcado.', 'baixa', 'marcar_equipe');
   elsif v_cod in ('plano_inativo', 'plano_desconhecido', 'sem_medico') then
     perform public.fluxo_finalizar_humano(op.conversa_id, 'Marcação automática não feita: convênio ' || v_plano || ' não aceito para este horário (' || v_cod || '). Resolver o convênio com o paciente.', 'baixa', 'marcar_plano');
   else
