@@ -81,9 +81,9 @@ await caso('B (próprio): CPF diferente vira conflito; e-mail que o chat tem e o
   const b = await k('102');
   return { ok: JSON.stringify(b.conflito) === '["cpf"]' && JSON.stringify(b.falta_no_klingo) === '["email"]', detalhe: JSON.stringify([b.conflito, b.falta_no_klingo]) };
 });
-await caso('C (FILHO): CPF, e-mail diferentes são do responsável: sem conflito, e nunca se sugere CPF; celular do responsável pode faltar', async () => {
+await caso('C (FILHO): CPF e e-mail diferentes são do responsável: sem conflito; celular que falta no Klingo NÃO vira dado faltando (não se cobra contato do responsável)', async () => {
   const c = await k('103');
-  return { ok: c.paciente_tipo === 'filho' && c.conflito.length === 0 && JSON.stringify(c.responsavel_diferente) === '["cpf","email"]' && JSON.stringify(c.falta_no_klingo) === '["celular"]', detalhe: JSON.stringify([c.conflito, c.responsavel_diferente, c.falta_no_klingo]) };
+  return { ok: c.paciente_tipo === 'filho' && c.conflito.length === 0 && JSON.stringify(c.responsavel_diferente) === '["cpf","email"]' && c.falta_no_klingo.length === 0 && c.vazios.includes('celular'), detalhe: JSON.stringify([c.conflito, c.responsavel_diferente, c.falta_no_klingo]) };
 });
 await caso('D (FILHO): nome da criança diferente continua sendo conflito; CPF do responsável que falta no Klingo NÃO é sugerido', async () => {
   const d = await k('104');
@@ -100,19 +100,20 @@ await caso('F/G: sem conversa não tem conflito nem aviso; origem em branco vira
 
 const a1 = await um(`select public.klingo_conferir_avisos() as r`);
 const av = await avisos();
-await caso('avisos: B (conflito e faltando), C (só faltando, filho), D (só conflito); A e F sem aviso', async () => {
+await caso('avisos: B (conflito e faltando, pedido próprio) e D (conflito, filho); C (filho, só contato do responsável), A e F sem aviso', async () => {
   const por = (c, t) => av.find((x) => x.conversa_id === c && x.tipo === t);
-  const ok = por(cB, 'klingo_conflito') && por(cB, 'klingo_dado_faltando') && !por(cC, 'klingo_conflito') && por(cC, 'klingo_dado_faltando') && por(cD, 'klingo_conflito') && !por(cA, 'klingo_conflito') && !por(cA, 'klingo_dado_faltando');
-  return { ok: !!ok && av.length === 4, detalhe: `${av.length} avisos: ${JSON.stringify(a1.r)}` };
+  const ok = por(cB, 'klingo_conflito') && por(cB, 'klingo_dado_faltando') && !por(cC, 'klingo_conflito') && !por(cC, 'klingo_dado_faltando') && por(cD, 'klingo_conflito') && !por(cD, 'klingo_dado_faltando') && !por(cA, 'klingo_conflito') && !por(cA, 'klingo_dado_faltando');
+  return { ok: !!ok && av.length === 3, detalhe: `${av.length} avisos: ${JSON.stringify(a1.r)}` };
 });
-await caso('aviso do filho: marca filho=true e nunca lista CPF como campo a cadastrar', async () => {
-  const c = av.find((x) => x.conversa_id === cC && x.tipo === 'klingo_dado_faltando');
-  return { ok: c && c.detalhe.filho === true && !c.detalhe.campos.includes('cpf') && JSON.stringify(c.detalhe.campos) === '["celular"]', detalhe: JSON.stringify(c && c.detalhe) };
+await caso('aviso do filho: só conflito da criança (nome), marcado filho=true; filho nunca recebe aviso de dado faltando', async () => {
+  const d = av.find((x) => x.conversa_id === cD && x.tipo === 'klingo_conflito');
+  const falt = av.filter((x) => x.tipo === 'klingo_dado_faltando' && x.detalhe.filho === true).length;
+  return { ok: d && d.detalhe.filho === true && JSON.stringify(d.detalhe.campos) === '["nome"]' && falt === 0, detalhe: JSON.stringify(d && d.detalhe) };
 });
 await caso('rodar de novo não duplica avisos (idempotente)', async () => {
   await lote(L); await um(`select public.klingo_conferir_avisos() as r`);
   const n = (await avisos()).length;
-  return { ok: n === 4, detalhe: `${n} avisos` };
+  return { ok: n === 3, detalhe: `${n} avisos` };
 });
 
 await caso('"Conferido" pela equipe não reabre o aviso enquanto os dados forem os mesmos', async () => {
@@ -123,6 +124,17 @@ await caso('"Conferido" pela equipe não reabre o aviso enquanto os dados forem 
   await lote(L); await um(`select public.klingo_conferir_avisos() as r`);
   const abertos = (await db.query(`select count(*)::int n from public.paciente_aviso where conversa_id = $1 and tipo = 'klingo_conflito' and resolvido_em is null`, [cD])).rows[0].n;
   return { ok: abertos === 0, detalhe: `abertos=${abertos}` };
+});
+
+await caso('paciente_avisos devolve a ficha do chat (nome e nascimento da criança) só nos avisos do Klingo, e só para a equipe', async () => {
+  await db.query(`insert into public.paciente_aviso (conversa_id, tipo, detalhe) values ($1, 'klingo_conflito', '{"marcacoes":["104"],"campos":["nome"],"filho":true}'::jsonb) on conflict do nothing`, [cD]);
+  await como(ATE);
+  const r = (await um(`select public.paciente_avisos() as r`)).r;
+  await como(null);
+  const kl = r.find((x) => x.tipo === 'klingo_conflito' && x.conversa_id === cD);
+  const outro = r.find((x) => x.tipo !== 'klingo_conflito' && x.tipo !== 'klingo_dado_faltando');
+  let negou = false; try { await db.exec(`set role anon;`); await db.query(`select public.paciente_avisos()`); } catch { negou = true; } finally { await db.exec(`reset role;`); }
+  return { ok: !!kl && kl.ficha && kl.ficha.tipo === 'filho' && /Davi/i.test(kl.ficha.nome) && String(kl.ficha.nasc) === '2019-01-20' && (!outro || outro.ficha === null || outro.ficha === undefined) && negou, detalhe: JSON.stringify(kl && kl.ficha) + ' anon negado=' + negou };
 });
 
 await caso('quando o Klingo é corrigido, o aviso fecha sozinho', async () => {
@@ -153,8 +165,8 @@ await caso('o indicador mostra o webchat: ligadas, por tipo de ligação, situa�
 });
 await caso('o indicador lista, marcação por marcação, os problemas e as ligadas; filho identificado', async () => {
   const r = await ler('painel_indicadores_conferencia', `current_date, current_date`);
-  const c = r.lista_problemas.find((x) => x.m === '103'), d = r.lista_ligadas.find((x) => x.m === '104');
-  return { ok: r.lista_ligadas.length === 5 && r.lista_problemas.length >= 2 && c && c.tipo === 'filho' && d.tipo === 'filho', detalhe: `${r.lista_ligadas.length} ligadas, ${r.lista_problemas.length} com problema` };
+  const pd = r.lista_problemas.find((x) => x.m === '104'), pc = r.lista_problemas.find((x) => x.m === '103'), d = r.lista_ligadas.find((x) => x.m === '104');
+  return { ok: r.lista_ligadas.length === 5 && pd && pd.tipo === 'filho' && JSON.stringify(pd.conflito) === '["nome"]' && !pc && d.tipo === 'filho' && d.problema === true, detalhe: `${r.lista_ligadas.length} ligadas, ${r.lista_problemas.length} com problema` };
 });
 await caso('período sem leitura avisa os dias sem dado', async () => {
   const r = await ler('painel_indicadores_conferencia', `current_date - 10, current_date - 8`);

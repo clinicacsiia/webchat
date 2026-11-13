@@ -1,4 +1,5 @@
 -- FLUXOGRAMA: entrada (a Edge Function `klingo-conferir` lê o relatório #14554 do Klingo e manda, em lotes, uma linha por marcação com MARCAS e não com dados: origem, status, datas, nome, hash do celular/CPF/e-mail, nascimento e quais campos vieram vazios) -> validação (id numérico, data de marcação válida; chave interna) -> lógica (liga a marcação à conversa do webchat pelo pedido (`pre_agendamentos.klingo_marcacoes`) ou por celular + nome; compara nome, nascimento, CPF, celular e e-mail com o que o paciente informou no chat; caso de FILHO: CPF, celular e e-mail do chat são do responsável, então diferença neles é esperada e nunca vira conflito nem pedido de cadastro) -> saída (tabela `klingo_conferencia` só com marcas e nomes de campos; avisos `klingo_conflito` e `klingo_dado_faltando` na aba Avisos; função `painel_indicadores_conferencia` para o bloco do painel)
+-- Versão 1.1 — 13/11/2026 / Mudança: em pedido de filho(a) não há mais aviso de dado faltando (só conflito de nome ou nascimento); `paciente_avisos` devolve a ficha do chat para o atendente consultar (parte 7)
 -- Versão 1.0 — 13/11/2026 / Mudança: conferência Klingo x webchat (explica a divergência do indicador, mostra conflitos e dado faltando, manda aviso à equipe)
 -- Pré-requisitos: jornada-paciente.sql (jornada_exame), pre-agendamentos.sql (klingo_marcacoes), pessoa-unica.sql (pessoa_ficha), paciente-aviso (paciente_aviso), indicadores-decisao.sql (ind_decisao_periodo), fila-unidade.sql (unidade_chave).
 -- Privacidade: a tabela NÃO guarda CPF, e-mail, telefone nem nascimento. A Edge Function manda hash (SHA-256 de dado + `config.ia_segredo`, mesma conta do `fone_chave` da Jornada) e o banco só compara e descarta. O nome já existia em `jornada_paciente.nome`.
@@ -6,10 +7,11 @@
 --   * Origem da marcação = coluna "Marcação - Origem" do Klingo (Whatsapp, Telefone, Recepção); em branco vira `sem_origem`.
 --   * Ligação com o webchat: 1º pelo pedido (`pre_agendamentos.klingo_marcacoes`); 2º por celular da conversa + nome que confere (`nome_confere`), conversa criada até o dia da marcação.
 --   * Conflito (próprio): nome, nascimento, CPF, celular ou e-mail diferentes do chat. Conflito (filho): só nome e nascimento (a criança). CPF, celular e e-mail diferentes em filho ficam em `responsavel_diferente` (esperado).
---   * Dado faltando no Klingo: o chat tem celular/e-mail (e CPF, só se for pedido próprio) e o Klingo está vazio. Em filho nunca se sugere CPF; celular e e-mail são o contato do responsável.
+--   * Dado faltando no Klingo: SÓ em pedido próprio (o chat tem celular, e-mail ou CPF e o Klingo está vazio). Em pedido de filho(a) não há aviso nem lista de dado faltando: os contatos do chat são do responsável e o dono pediu para não cobrar isso da equipe (13/11/2026). Os campos vazios continuam contados em `vazios` (cadastro incompleto).
 --   * Avisos: um por conversa e tipo; atualizam sozinhos; fecham sozinhos quando o Klingo é corrigido; "Conferido" pela equipe não reabre enquanto os dados forem os mesmos.
 -- ROLLBACK:
 --   select cron.unschedule('klingo-conferir');
+--   -- (versão 1.1) voltar paciente_avisos para a de antes: supabase/producao/funcoes/paciente_avisos.sql no commit anterior (sem a chave 'ficha').
 --   drop function public.painel_indicadores_conferencia(date, date, text, boolean);
 --   drop function public.klingo_conferencia_agendar(integer); drop function public.klingo_conferir_avisos(); drop function public.klingo_conferir_lote(jsonb);
 --   update public.paciente_aviso set resolvido_em = now() where tipo in ('klingo_conflito', 'klingo_dado_faltando') and resolvido_em is null;
@@ -125,10 +127,10 @@ begin
                             case when not r.filho and r.r_mail = 'diferente' then 'email' end]::text[], null),
          array_remove(array[case when r.filho and r.r_cpf = 'diferente' then 'cpf' end, case when r.filho and r.r_cel = 'diferente' then 'celular' end,
                             case when r.filho and r.r_mail = 'diferente' then 'email' end]::text[], null),
-         case when r.conversa_id is null then '{}'::text[] else array_remove(array[
+         case when r.conversa_id is null or r.filho then '{}'::text[] else array_remove(array[
               case when 'celular' = any (r.vz) and cardinality(r.ccel) > 0 then 'celular' end,
               case when 'email' = any (r.vz) and r.cemail is not null then 'email' end,
-              case when 'cpf' = any (r.vz) and not r.filho and r.ccpfh is not null then 'cpf' end]::text[], null) end,
+              case when 'cpf' = any (r.vz) and r.ccpfh is not null then 'cpf' end]::text[], null) end,
          r.vz, now()
     from r
   on conflict (m) do update set marcado_em = excluded.marcado_em, exame_em = excluded.exame_em, origem = excluded.origem, status_klingo = excluded.status_klingo,
@@ -275,6 +277,20 @@ begin
 end $$;
 revoke all on function public.painel_indicadores_conferencia(date, date, text, boolean) from public, anon;
 grant execute on function public.painel_indicadores_conferencia(date, date, text, boolean) to authenticated;
+
+-- ===== PARTE 7 (versão 1.1): o aviso mostra o que o chat registrou, para o atendente consultar =====
+-- Mesma função de antes, com a chave `ficha` (nome, nascimento e tipo do pedido) só nos avisos klingo_conflito e klingo_dado_faltando. Só a equipe lê (pessoa_equipe()).
+create or replace function public.paciente_avisos() returns jsonb
+language plpgsql stable security definer set search_path to '' as $$
+begin
+  perform public.pessoa_equipe();
+  return coalesce((select jsonb_agg(jsonb_build_object('id', a.id, 'conversa_id', a.conversa_id, 'tipo', a.tipo, 'detalhe', a.detalhe, 'criado_em', a.criado_em,
+                    'nome', public.pessoa_ficha(a.conversa_id) ->> 'nome',
+                    'ficha', case when a.tipo in ('klingo_conflito', 'klingo_dado_faltando')
+                                  then (select jsonb_build_object('nome', q.f ->> 'nome', 'nasc', q.f ->> 'nasc', 'tipo', q.f ->> 'tipo') from (select public.pessoa_ficha(a.conversa_id) as f) q) end)
+                    order by a.criado_em desc)
+                     from public.paciente_aviso a where a.resolvido_em is null), '[]'::jsonb);
+end $$;
 
 -- ===== PARTE 6 (aplicada à parte, depois de validar com a semana de 06 a 12/11/2026; não entra no clone de teste) =====
 -- select cron.schedule('klingo-conferir', '23 9-23 * * *', $job$select public.klingo_conferencia_agendar(4)$job$);   -- de hora em hora, 06h23 às 20h23 de Brasília

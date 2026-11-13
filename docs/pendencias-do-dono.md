@@ -89,7 +89,7 @@ Quando o paciente toca em "Nenhum horário serve" (ou recusa as duas ofertas), o
 - **Até lá, três coisas esperam sua decisão:** aplicar os textos novos (`supabase/textos-acolhimento.sql` e `textos-acolhimento-botao.sql`) junto com a tela nova; reordenar as opções por uso; escrever na política de privacidade que as conversas ajudam a melhorar o serviço (revisão jurídica).
 
 ### 2.12 Conferência Klingo × webchat (13/11/2026)
-- **Equipe:** abrir a aba **Avisos** e resolver os cartões "Conflito entre o chat e o Klingo" e "Falta dado no cadastro do Klingo" (36 abertos na primeira leitura, quase todos de filho(a): faltava o e-mail do responsável). Em filho(a), nunca cadastrar o CPF do responsável na criança.
+- **Equipe:** abrir a aba **Avisos** e resolver os cartões "Conflito entre o chat e o Klingo" (nome ou nascimento da criança diferente) e, em pedido próprio, "Falta dado no cadastro do Klingo". Filho(a) não gera mais aviso de dado faltando. Em filho(a), nunca cadastrar o CPF do responsável na criança.
 - **Você decide:** "atendido" deve valer mesmo quando a marcação está **cancelada** no Klingo? (14 casos em 09 a 12/11.) Hoje o banco conta como atendido.
 - **Apagar no painel do Supabase** (https://supabase.com/dashboard/project/nrvuynjwcgwpjdptkiay/functions): a função temporária `klingo-comparar-14554`.
 - **Apagar no banco** quando o Supabase pedir a confirmação: `drop function public.klingo_conferir_agendar(integer);` (não mexer na de mesmo nome com `uuid`). Detalhes em `klingo-conferencia.md`.

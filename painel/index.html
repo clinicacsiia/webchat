@@ -2092,8 +2092,24 @@
   // Avisos do paciente: ligado ao Klingo, mais de um prontuário, dado diferente do cadastro (com o CPF conferido), CPF diferente.
   const prontuarioTxt = (p) => (String(p || '').startsWith('n:') ? 'sem prontuário, identificado por nome e telefone' : 'prontuário ' + p);
   const ROT_CAMPO = { email: 'e-mail', dt_nasc: 'nascimento', telefone: 'celular' };
-  async function resolverAvisoPaciente(av, aplicar) {
-    await rpcPessoa('paciente_aviso_resolver', { p_id: av.id, p_aplicar: aplicar }, aplicar ? 'Cadastro atualizado.' : 'Aviso conferido.');
+  async function resolverAvisoPaciente(av, aplicar, msg) {
+    await rpcPessoa('paciente_aviso_resolver', { p_id: av.id, p_aplicar: aplicar }, msg || (aplicar ? 'Cadastro atualizado.' : 'Aviso conferido.'));
+  }
+  // Avisos da conferência com o Klingo: o atendente resolve (corrigiu no Klingo, ou está certo assim) ou consulta (o que o chat registrou, conversa, WhatsApp, lista da Conferência).
+  function acoesKlingo(av) {
+    const ct = (S.conversas.find((x) => x.id === av.conversa_id) || {}).contatos || {};
+    return h('div', { class: 'sug-acoes' },
+      h('button', { class: 'btn prim', type: 'button', onclick: () => resolverAvisoPaciente(av, false, 'Certo, aviso fechado: corrigido no Klingo.') }, 'Corrigi no Klingo'),
+      h('button', { class: 'btn', type: 'button', onclick: () => resolverAvisoPaciente(av, false, 'Certo, aviso fechado: está certo como está.') }, 'Está certo, manter'),
+      h('button', { class: 'btn', type: 'button', onclick: () => abrirConversaDoAviso(av.conversa_id) }, 'Ver conversa'),
+      ct.telefone ? h('a', { class: 'btn', href: 'https://wa.me/55' + soDigitos(ct.telefone), target: '_blank', rel: 'noopener noreferrer' }, 'Chamar no WhatsApp') : null,
+      h('button', { class: 'btn', type: 'button', onclick: () => { IND.preset = IND.preset === 'hoje' ? '7' : IND.preset; S.aba = 'indicadores'; renderAba(); } }, 'Ver na Conferência'));
+  }
+  // O que o chat registrou (nome e nascimento), para o atendente comparar com a ficha do Klingo.
+  function fichaDoChat(av) {
+    const f = av.ficha || {};
+    if (!f.nome && !f.nasc) return null;
+    return h('div', { class: 'dica' }, `No chat${f.tipo === 'filho' ? ' (criança)' : ''}: ${f.nome ? nomeBonito(f.nome) : 'sem nome'}${f.nasc ? ', nascimento ' + dataBR(String(f.nasc).slice(0, 10)) : ''}. Compare com a ficha do Klingo.`);
   }
   function renderAvisosPaciente(tudo) {
     const lista = avisosPacV();
@@ -2109,7 +2125,7 @@
         return h('div', { class: 'sug' }, h('b', {}, 'Conflito entre o chat e o Klingo'),
           h('div', {}, `${quem(av)} (marcação ${marc}${d.filho ? ', filho(a)' : ''}): ${campoTxt(d.campos)} ${(d.campos || []).length > 1 ? 'diferentes' : 'diferente'} entre o que foi informado no chat e o cadastro do Klingo. Confira com o paciente e corrija onde estiver errado.`
             + (d.filho ? ' Pedido de filho(a): só o nome e o nascimento da criança são comparados; CPF, celular e e-mail do responsável diferentes são normais.' : '')),
-          h('div', { class: 'sug-acoes' }, ok));
+          fichaDoChat(av), acoesKlingo(av));
       }
       if (av.tipo === 'klingo_dado_faltando') {
         const marc = (d.marcacoes || []).join(', ');
@@ -2117,7 +2133,7 @@
           h('div', {}, d.filho
             ? `${quem(av)} (marcação ${marc}, filho(a)): o chat tem ${campoTxt(d.campos)} do responsável e o Klingo está sem. Se for o contato do responsável, cadastre como contato. Não coloque o CPF do responsável no cadastro da criança.`
             : `${quem(av)} (marcação ${marc}): o chat tem ${campoTxt(d.campos)} e o Klingo está sem. Adicione no cadastro do Klingo.`),
-          h('div', { class: 'sug-acoes' }, ok));
+          fichaDoChat(av), acoesKlingo(av));
       }
       const campos = Object.entries(d.campos || {}).map(([k, v]) => `${ROT_CAMPO[k] || k}: ${v.cadastro ? dataOuTxt(v.cadastro) + ' → ' : ''}${dataOuTxt(v.novo)}`);
       return h('div', { class: 'sug' }, h('b', {}, 'Dado diferente do cadastro'), h('div', {}, `${quem(av)} confirmou o CPF e informou dado novo: ${campos.join('; ')}.`),

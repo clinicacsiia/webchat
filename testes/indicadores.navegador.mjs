@@ -81,7 +81,8 @@ const CONFERENCIA = {
   lista_sem_marcacao: [{ conversa_id: 'c-9', nome: 'JOSE DE TESTE', atualizado_em: `${HOJE}T12:00:00Z` }],
 };
 const AVISOS_CONF = [
-  { id: 71, conversa_id: 'c-1', tipo: 'klingo_conflito', detalhe: { marcacoes: ['900001'], campos: ['cpf'], filho: false }, criado_em: `${HOJE}T15:00:00Z`, nome: 'MARIA DE TESTE' },
+  { id: 71, conversa_id: 'c-1', tipo: 'klingo_conflito', detalhe: { marcacoes: ['900001'], campos: ['cpf'], filho: false }, criado_em: `${HOJE}T15:00:00Z`, nome: 'MARIA DE TESTE', ficha: { nome: 'MARIA DE TESTE', nasc: '1990-05-17', tipo: 'proprio' } },
+  { id: 74, conversa_id: 'c-5', tipo: 'klingo_conflito', detalhe: { marcacoes: ['900005'], campos: ['nascimento'], filho: true }, criado_em: `${HOJE}T15:00:00Z`, nome: 'CAIO DE TESTE', ficha: { nome: 'CAIO DE TESTE', nasc: '2018-09-09', tipo: 'filho' } },
   { id: 72, conversa_id: 'c-2', tipo: 'klingo_dado_faltando', detalhe: { marcacoes: ['900002'], campos: ['celular'], filho: true }, criado_em: `${HOJE}T15:00:00Z`, nome: 'PEDRO DE TESTE' },
   { id: 73, conversa_id: 'c-4', tipo: 'klingo_dado_faltando', detalhe: { marcacoes: ['900004'], campos: ['celular', 'email'], filho: false }, criado_em: `${HOJE}T15:00:00Z`, nome: 'LUCIA DE TESTE' }];
 
@@ -302,6 +303,22 @@ await caso('Sem o SQL novo no banco, mostra a mensagem com o arquivo a aplicar e
   return { ok: /supabase\/indicadores-decisao\.sql/.test(txt) && !t.reg.excecoes.length };
 });
 
+await caso('Avisos da conferência: o atendente tem opções de resolver (Corrigi no Klingo, Está certo/manter) e de consultar (o que o chat registrou, Ver conversa, Ver na Conferência)', async () => {
+  const t = await abrir({ conf: true }); await t.page.click('.nav button[data-aba=avisos]'); await t.page.waitForSelector('#avisosPaciente .sug');
+  const cartao = t.page.locator('#avisosPaciente .sug', { hasText: 'Caio de Teste' });
+  const botoes = await cartao.locator('button').allInnerTexts(), texto = (await cartao.innerText()).replace(/\s+/g, ' ');
+  const resolver = t.page.locator('#avisosPaciente .sug', { hasText: 'Maria de Teste' }).locator('button', { hasText: 'Está certo, manter' });
+  const temResolver = (await resolver.count()) === 1;
+  await t.page.locator('#avisosPaciente .sug', { hasText: 'Maria de Teste' }).locator('button', { hasText: 'Corrigi no Klingo' }).click();
+  await t.page.waitForTimeout(400);
+  await t.page.locator('#avisosPaciente .sug', { hasText: 'Caio de Teste' }).locator('button', { hasText: 'Ver na Conferência' }).click();
+  await t.page.waitForSelector('.ind-conf-passo');
+  const naConf = await t.page.locator('.ind-conf-passo').count();
+  await t.ctx.close();
+  return { ok: ['Corrigi no Klingo', 'Está certo, manter', 'Ver conversa', 'Ver na Conferência'].every((b) => botoes.includes(b)) && /No chat \(criança\): Caio de Teste, nascimento 09\/09\/2018\. Compare com a ficha do Klingo\./.test(texto)
+    && /Falta|CPF diferente|nascimento diferente/.test(texto) && naConf >= 5 && temResolver, detalhe: botoes.join('|') + ' :: ' + texto };
+});
+
 await caso('Conferência Klingo x webchat: sem o SQL novo, a aba avisa em vez de mostrar números errados (e não quebra nada)', async () => {
   const t = await abrir(); await abaInd(t);
   const txt = await textoAba(t); await t.ctx.close();
@@ -354,8 +371,8 @@ await caso('Avisos: conflito, dado faltando (adulto) e dado faltando de FILHO ch
   const cartoes = await t.page.locator('#avisosPaciente .sug').evaluateAll((l) => l.map((c) => c.innerText.replace(/\s+/g, ' ')));
   await t.ctx.close();
   const conf = cartoes.find((x) => /Conflito entre o chat e o Klingo/.test(x)) || '', filho = cartoes.find((x) => /filho\(a\)/.test(x) && /Falta dado/.test(x)) || '', adulto = cartoes.find((x) => /Lucia/i.test(x)) || '';
-  return { ok: cartoes.length === 3 && /CPF diferente/.test(conf) && /marcação 900001/.test(conf) && /do responsável e o Klingo está sem/.test(filho) && /Não coloque o CPF do responsável no cadastro da criança/.test(filho)
-    && /celular e e-mail e o Klingo está sem\. Adicione no cadastro do Klingo/.test(adulto) && /Conferido/.test(conf), detalhe: cartoes.join(' || ') };
+  return { ok: cartoes.length === 4 && /CPF diferente/.test(conf) && /marcação 900001/.test(conf) && /do responsável e o Klingo está sem/.test(filho) && /Não coloque o CPF do responsável no cadastro da criança/.test(filho)
+    && /celular e e-mail e o Klingo está sem\. Adicione no cadastro do Klingo/.test(adulto) && /Corrigi no Klingo/.test(conf) && /Está certo, manter/.test(conf), detalhe: cartoes.join(' || ') };
 });
 
 

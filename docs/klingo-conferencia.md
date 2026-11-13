@@ -1,6 +1,6 @@
 # Conferência Klingo × webchat (13/11/2026)
 
-Versão 1.0 — 13/11/2026 / Mudança: Implementação inicial. Pedido do dono: explicar por que os números dos Indicadores não batem com o Klingo, conferir marcação por marcação e mandar para a aba **Avisos** o que a equipe precisa resolver.
+Versão 1.1 — 13/11/2026 (tarde) / Mudança: filho(a) não gera mais aviso de dado faltando (só conflito de nome ou nascimento da criança); cartões de aviso com mais opções de resolver e consultar. Versão 1.0 — 13/11/2026 / Mudança: Implementação inicial. Pedido do dono: explicar por que os números dos Indicadores não batem com o Klingo, conferir marcação por marcação e mandar para a aba **Avisos** o que a equipe precisa resolver.
 
 ## Para que serve
 O dono desconfiava dos números porque "tem gente se perdendo" e faltam informações. Esta conferência lê o relatório **#14554** do Klingo (todas as marcações, pela data em que foram marcadas) e responde, na aba **Indicadores > seção 3**:
@@ -15,11 +15,11 @@ O dono desconfiava dos números porque "tem gente se perdendo" e faltam informa�
 ## Regras (caso de filho)
 - **Pedido próprio:** nome, nascimento, CPF, celular e e-mail do chat são comparados com o Klingo. Diferente = **conflito**.
 - **Pedido de filho(a):** o chat guarda a criança (nome, nascimento) e os **contatos do responsável** (CPF, celular, e-mail). Só nome e nascimento da criança são comparados. CPF, celular e e-mail diferentes ficam como "responsável diferente, esperado" e **não são conflito**.
-- **Dado faltando no Klingo** (o chat tem e o Klingo está vazio): celular, e-mail e, só em pedido próprio, CPF. Em filho **nunca se sugere CPF**; celular e e-mail aparecem como contato do responsável, com o aviso "não coloque o CPF do responsável no cadastro da criança".
-- Medido em 06 a 12/11/2026: 96 de 1.990 marcações ligadas ao chat (94 de filho); 7 com conflito (5 filho, só nascimento); 35 com dado faltando (34 filho, sempre e-mail; nenhum CPF sugerido para criança).
+- **Dado faltando no Klingo** (o chat tem e o Klingo está vazio): celular, e-mail e CPF, **só em pedido próprio**. Em pedido de filho(a) **não há aviso nem lista de dado faltando** (decisão do dono em 13/11/2026: os contatos do chat são do responsável). Os campos vazios continuam contados em "Cadastro incompleto no Klingo".
+- Medido em 06 a 12/11/2026: 96 de 1.990 marcações ligadas ao chat (94 de filho); 7 com conflito (5 filho, só nascimento). Na primeira versão saíram 32 avisos de e-mail do responsável faltando em filho: foram retirados e a equipe já tinha resolvido os 4 de conflito.
 
 ## Avisos
-Dois tipos novos em `paciente_aviso`: `klingo_conflito` e `klingo_dado_faltando`, um por conversa e tipo, na aba **Avisos** com os botões **Conferido** e **Ver conversa**. Eles se atualizam sozinhos, **fecham sozinhos quando o Klingo é corrigido** e, se a equipe marcar "Conferido", **não reabrem** enquanto os dados forem os mesmos. Só entram marcações abertas (não canceladas) dos últimos 30 dias e conversas que não são de teste. Não há notificação push: o aviso só aparece na aba.
+Dois tipos novos em `paciente_aviso`: `klingo_conflito` e `klingo_dado_faltando` (só pedido próprio), um por conversa e tipo, na aba **Avisos**. Cada cartão mostra **o que o chat registrou** (nome e nascimento, para comparar com a ficha do Klingo; vem da chave `ficha` de `paciente_avisos`) e tem as opções **Corrigi no Klingo** e **Está certo, manter** (as duas fecham o aviso), **Ver conversa**, **Chamar no WhatsApp** e **Ver na Conferência** (abre a lista da seção 3). Eles se atualizam sozinhos, **fecham sozinhos quando o Klingo é corrigido** e, se a equipe marcar "Conferido", **não reabrem** enquanto os dados forem os mesmos. Só entram marcações abertas (não canceladas) dos últimos 30 dias e conversas que não são de teste. Não há notificação push: o aviso só aparece na aba.
 
 ## Privacidade
 - A tabela `klingo_conferencia` **não guarda CPF, e-mail, telefone nem nascimento**: só origem, status, datas, ligação com a conversa e **quais campos** divergem ou faltam.
