@@ -11,6 +11,8 @@
 //   fam_convidar / fam_convite_usar   outro responsável: código de 8 números, 15 min, uso único (sem digitar CPF).
 //   fam_dados         "eu sei todos os dados" (CPF, nascimento, nome completo e celular do cadastro): abre a espera de 24 h com aviso aos outros celulares.
 //   fam_aviso         quem já abre o laudo responde "Liberar" ou "Bloquear".
+//   fam_cancelar / fam_checkin   "Não vou poder ir" (com a regra das 24 horas do chat; perto da hora a recepção resolve) e "Cheguei" (só no dia).
+//   fam_marcar com `remarcar`   troca a marcação de UMA pessoa: a antiga só sai quando a nova está confirmada.
 //   fam_desligar      desliga ESTE celular.
 //   fam_laudo         abre o laudo (só celular de nível 2 e só se AGENDAMENTO_RESULTADO=1: o laudo pronto de verdade ainda NÃO foi testado com o Klingo).
 //   fam_sincronizar   (rotina do pg_cron, com FAMILIA_SYNC_CHAVE) lê a fila lenta: no máximo 3 leituras por minuto, só 1 se o Klingo reclamou.
@@ -268,7 +270,7 @@ async function popularidade(ctx: CtxFam): Promise<Contagem> {
   return v;
 }
 
-type Item = { pessoa: Pessoa; sessao: Sessao; marca: Marca; reserva: string | null; idExterno: string; hint: { medico: string | null; unidade: string | null } };
+type Item = { pessoa: Pessoa; sessao: Sessao; marca: Marca; reserva: string | null; idExterno: string; remarcar: string | null; hint: { medico: string | null; unidade: string | null } };
 const soltarReserva = async (ctx: CtxFam, it: Item) => { if (it.reserva) await ctx.api.chamar("DELETE", "/agenda/reservar", { sessao: it.sessao.token, corpo: { id: Number(it.reserva) } }).catch(() => {}); };
 
 async function marcarJuntos(ctx: CtxFam, c: Record<string, unknown>): Promise<Resp> {
@@ -287,7 +289,13 @@ async function marcarJuntos(ctx: CtxFam, c: Record<string, unknown>): Promise<Re
     if ("status" in marca) return marca as Resp;
     const s = await sessaoDaPessoa(ctx, p);
     if (ehResp(s)) { for (const x of prontos) await soltarReserva(ctx, x); return s; }
-    prontos.push({ pessoa: p, sessao: s, marca, reserva: null, idExterno: `pagina-${grupo}-${i}`, hint: { medico: curto(it.medico, 80), unidade: curto(it.unidade, 80) } });
+    let remarcar: string | null = null;
+    if (it.remarcar !== undefined && it.remarcar !== null && it.remarcar !== "") {      // remarcar vale para uma pessoa por vez e só a marcação ativa dela
+      remarcar = digitos(it.remarcar, 1, 12);
+      if (!remarcar || itens.length !== 1) return invalido("remarcar");
+      if (!(await vouchersAtivos(ctx, s)).some((v) => String(v.id) === remarcar)) return nega("voucher_nao_encontrado", { mensagem: "Não achamos esta marcação entre as suas marcações ativas." });
+    }
+    prontos.push({ pessoa: p, sessao: s, marca, reserva: null, idExterno: `pagina-${grupo}-${i}`, remarcar, hint: { medico: curto(it.medico, 80), unidade: curto(it.unidade, 80) } });
   }
   // 1) reservar todos (nenhum é marcado antes de todos estarem seguros)
   for (let i = 0; i < prontos.length; i++) {
@@ -305,7 +313,7 @@ async function marcarJuntos(ctx: CtxFam, c: Record<string, unknown>): Promise<Re
   // 2) marcar todos; se um falhar, desfaz os que já foram (tudo ou nada)
   const feitos: Array<{ it: Item; voucher: ReturnType<typeof resumoVoucher> }> = [];
   for (const it of prontos) {
-    const r = await marcarComSessao(ctx, it.sessao, it.marca, it.reserva, null, it.idExterno);
+    const r = await marcarComSessao(ctx, it.sessao, it.marca, it.reserva, it.remarcar, it.idExterno);
     const voucher = (r.corpo as { voucher?: ReturnType<typeof resumoVoucher> }).voucher;
     if (r.corpo.ok === true && voucher?.id) { feitos.push({ it, voucher }); continue; }
     const desfeitas: string[] = [], presas: string[] = [];
@@ -318,6 +326,7 @@ async function marcarJuntos(ctx: CtxFam, c: Record<string, unknown>): Promise<Re
   }
   for (const { it, voucher } of feitos) {
     await ctx.fam.db!.marcacaoGravar({ voucher_id: voucher.id, pessoa_id: it.pessoa.id, grupo_id: prontos.length > 1 ? grupo : null, procedimento: voucher.procedimento, profissional: voucher.profissional ?? it.hint.medico, unidade: voucher.unidade ?? it.hint.unidade, data: voucher.data, hora: voucher.hora, status: "agendado" });
+    if (it.remarcar) await ctx.fam.db!.marcacaoGravar({ voucher_id: it.remarcar, pessoa_id: it.pessoa.id, status: "remarcado" });
     await ctx.fam.db!.filaPedir(`vouchers:${it.pessoa.id}`, { tipo: "vouchers", pessoa: it.pessoa.id }, 2);
   }
   return ok({ grupo, marcacoes: feitos.map(({ it, voucher }) => ({ pessoa: it.pessoa.id, nome: it.pessoa.primeiroNome, voucher })) });
@@ -389,6 +398,56 @@ export async function rodarFila(ctx: CtxFam, max = TETO_FILA_POR_MINUTO): Promis
     }
   }
   return { feitas, adiadas, falhas, freio };
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------------------------
+// Cancelar, "Cheguei" (check-in) e a regra das 24 horas
+// ---------------------------------------------------------------------------------------------------------------------------------------------
+const PRAZO_CANCELAR_H = 24;
+/** A marcação é de uma pessoa deste celular? Devolve a marcação e a pessoa com a sessão aberta no Klingo. */
+async function minhaMarcacao(ctx: CtxFam, c: Record<string, unknown>): Promise<{ ap: Aparelho; m: MarcacaoVista; p: Pessoa; s: Sessao } | Resp> {
+  const ap = await aparelhoDe(ctx, c);
+  if (ehResposta(ap)) return ap;
+  if (c.confirmar !== true) return nega("sem_confirmacao", { mensagem: "Ação não confirmada." }, 400);
+  const voucher = digitos(c.voucher, 1, 12);
+  if (!voucher) return invalido("voucher");
+  const m = (await ctx.fam.db!.acompanhar(ap.id)).find((x) => x.voucher === voucher);
+  if (!m) return nega("voucher_nao_encontrado", { mensagem: "Não achamos esta marcação entre as dos seus pacientes." }, 403);
+  const p = await pessoaPlena(ctx, ap.id, m.pessoa);
+  if (!p) return nega("pessoa_nao_encontrada", { mensagem: "Esta pessoa não está ligada a este celular." }, 403);
+  const s = await sessaoDaPessoa(ctx, p);
+  if (ehResp(s)) return s;
+  if (!(await vouchersAtivos(ctx, s)).some((v) => String(v.id) === voucher)) return nega("voucher_nao_encontrado", { mensagem: "Esta marcação já não está ativa." });
+  return { ap, m, p, s };
+}
+
+async function cancelar(ctx: CtxFam, c: Record<string, unknown>): Promise<Resp> {
+  const x = await minhaMarcacao(ctx, c);
+  if (ehResposta(x)) return x;
+  // mesma regra do chat (24 h): perto da hora quem resolve é uma pessoa da recepção, com carinho
+  if (x.m.data && x.m.hora) {
+    const falta = (Date.parse(`${x.m.data}T${x.m.hora.slice(0, 5)}:00-03:00`) - ctx.agora()) / 3_600_000;
+    if (falta < PRAZO_CANCELAR_H) return nega("perto_demais", { mensagem: "Falta pouco tempo para o atendimento. Fale com a recepção que a gente resolve junto com você." });
+  }
+  try { await ctx.api.chamar("DELETE", "/voucher", { sessao: x.s.token, corpo: { id: x.m.voucher } }); } catch (e) {
+    if (e instanceof KlingoErro && e.tipo === "ja_cancelado") { /* já estava: segue e marca */ }
+    else if (e instanceof KlingoErro && e.incerto) {
+      if ((await vouchersAtivos(ctx, x.s)).some((v) => String(v.id) === x.m.voucher)) return nega("incerto", { mensagem: "Não conseguimos confirmar o cancelamento. Veja o acompanhamento daqui a pouco." }, 502);
+    } else throw e;
+  }
+  await ctx.fam.db!.marcacaoGravar({ voucher_id: x.m.voucher, pessoa_id: x.p.id, status: "cancelado" });
+  return ok({ cancelado: x.m.voucher });
+}
+
+async function checkin(ctx: CtxFam, c: Record<string, unknown>): Promise<Resp> {
+  const x = await minhaMarcacao(ctx, c);
+  if (ehResposta(x)) return x;
+  try {
+    const r = await ctx.api.chamar<Record<string, unknown>>("POST", "/checkin", { sessao: x.s.token, corpo: { id: Number(x.m.voucher), expresso: false, preferencial: c.preferencial === true } });
+    const ck = ((r as { checkinrealizado?: Record<string, unknown> })?.checkinrealizado ?? r) as Record<string, unknown>;
+    await ctx.fam.db!.marcacaoGravar({ voucher_id: x.m.voucher, pessoa_id: x.p.id, status: "chegou" });
+    return ok({ chegou: x.m.voucher, recepcao: ck?.recepcao ?? null, local: ck?.local ?? null });
+  } catch (e) { return traduzir(e); }
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------
@@ -497,7 +556,7 @@ async function laudo(ctx: CtxFam, c: Record<string, unknown>): Promise<Resp> {
 // ---------------------------------------------------------------------------------------------------------------------------------------------
 const ACOES: Record<string, (ctx: CtxFam, c: Record<string, unknown>) => Promise<Resp>> = {
   fam_entrar: entrar, fam_eu: eu, fam_dependente: dependente, fam_buscar: buscar, fam_marcar: marcarJuntos, fam_acompanhar: acompanhar, fam_convidar: convidar, fam_convite_usar: usarConvite,
-  fam_dados: porDados, fam_aviso: responderAviso, fam_desligar: desligar, fam_laudo: laudo,
+  fam_dados: porDados, fam_aviso: responderAviso, fam_desligar: desligar, fam_laudo: laudo, fam_cancelar: cancelar, fam_checkin: checkin,
 };
 
 export async function tratarFamilia(ctx: Ctx & { fam?: CtxFam["fam"] }, c: Record<string, unknown>): Promise<Resp> {

@@ -59,7 +59,7 @@ function klingoFalso() {
   add('P100', 'MARIA TESTE DA SILVA', NASC_MAE, CPF_MAE, CEL_MAE); add('P200', 'PEDRO TESTE DA SILVA', NASC_PAI, CPF_PAI, '71999990002');
   let proximoPre = 7960, proximaReserva = 555, proximoVoucher = 26700;
   const reservas = new Map(), vouchers = new Map(), ocupados = new Set(), chamadas = [];
-  const cfg = { resultado: 'pendente', falharMarcarPara: null, limite429: false, vouchersStatus: null };
+  const cfg = { resultado: 'pendente', falharMarcarPara: null, limite429: false, vouchersStatus: null, hojeKlingo: '2026-11-16' };
   const chave = (d, m, u, h) => `${d}|${m}|308|${u}|${h}`;
   const dias = [
     { data: D1, med: 63, nome: 'DRA ANA PEDIATRA', uni: { id: 2, nome: 'DESENVOAR', sigla: 'PEDIATRIA' }, horas: ['09:00', '09:20', '09:40', '10:00'] },
@@ -89,11 +89,13 @@ function klingoFalso() {
       ocupados.add(k); for (const [r, kk] of reservas) if (kk === k) reservas.delete(r);
       const [data, med, , uni, hora] = k.split('|'), d = dias.find((x) => x.data === data && String(x.med) === med);
       const v = { id: proximoVoucher++, status: 'agendado', data, hora: hora + ':00', procedimento: { id: 1132, descr: 'CONSULTA' }, unidade: { nome: d.uni.nome }, realizador: { nome: d.nome }, id_externo: corpo.id_externo, chave: k };
+      if (corpo.remarcacao) { const l = vouchers.get(p.id) ?? [], velho = l.find((x) => String(x.id) === String(corpo.remarcacao)); if (velho) { ocupados.delete(velho.chave); vouchers.set(p.id, l.filter((x) => x !== velho)); } }
       vouchers.set(p.id, [...(vouchers.get(p.id) ?? []), v]);
       return resp(200, v);
     }
     if (rota === 'GET /vouchers') { const p = donoDaSessao(init); return resp(200, (vouchers.get(p?.id) ?? []).map((v) => ({ ...v, status: cfg.vouchersStatus?.[v.id] ?? v.status }))); }
     if (rota === 'DELETE /voucher') { const p = donoDaSessao(init); const l = vouchers.get(p.id) ?? []; const v = l.find((x) => String(x.id) === String(corpo.id)); if (v) ocupados.delete(v.chave); vouchers.set(p.id, l.filter((x) => String(x.id) !== String(corpo.id))); return resp(200, 'ok'); }
+    if (rota === 'POST /checkin') { const p = donoDaSessao(init), v = (vouchers.get(p.id) ?? []).find((x) => String(x.id) === String(corpo.id)); if (!v || v.data !== cfg.hojeKlingo) return resp(403, { msg: `Agendamento para outra data: ${corpo.id} / ${v?.data}` }); return resp(200, { checkinrealizado: { recepcao: 'Recepção 1', local: 'Térreo' } }); }
     if (caminho.startsWith('/resultado/')) return cfg.resultado === 'pronto' ? resp(200, { pronto: true, status: 'F', html: '<p>LAUDO DE TESTE</p>' }) : resp(403, '<html>sem laudo</html>', 'text/html');
     return resp(404, { msg: 'rota inesperada ' + rota });
   };
@@ -319,6 +321,39 @@ await caso('o limite de celulares por pessoa (3) vale: o quarto celular que tent
   const c = await M.chamar({ acao: 'fam_entrar', cpf: CPF_MAE, nascimento: NASC_MAE });          // 4º
   return { ok: a.ok && b.ok && c.ok === false && c.motivo === 'limite_aparelhos' && /3 celulares/.test(c.mensagem), detalhe: JSON.stringify([a.ok, b.ok, c.motivo]) };
 });
+// ---------------------------------------------------------------- cancelar, remarcar e "cheguei"
+let pedroV;
+await caso('o pai marca para si, remarca para outro horário (a marcação antiga sai e fica "remarcado") e o horário velho volta a ficar livre', async () => {
+  const busca = await M.chamar({ acao: 'fam_buscar', token: pai.token, pessoas: [pai.id], especialidade: '225124' });
+  const ana = busca.medicos.find((m) => m.nome === 'DRA ANA PEDIATRA'), carol = busca.medicos.find((m) => m.nome === 'DRA CAROL NOVA');
+  const a = await M.chamar({ acao: 'fam_marcar', token: pai.token, confirmar: true, itens: [{ pessoa: pai.id, horario: carol.proximos[0].id, procedimento: '1132' }] });
+  pedroV = a.marcacoes[0].voucher.id;
+  const r = await M.chamar({ acao: 'fam_marcar', token: pai.token, confirmar: true, itens: [{ pessoa: pai.id, horario: ana.proximos.find((s) => s.hora === '09:40').id, procedimento: '1132', remarcar: pedroV }] });
+  const antigo = await um(`select status from public.familia_marcacao where voucher_id = $1`, [pedroV]), novo = await um(`select status, hora from public.familia_marcacao where voucher_id = $1`, [r.marcacoes?.[0]?.voucher?.id]);
+  pedroV = r.marcacoes[0].voucher.id;
+  const outraPessoa = await M.chamar({ acao: 'fam_marcar', token: pai.token, confirmar: true, itens: [{ pessoa: pai.id, horario: ana.proximos[3].id, procedimento: '1132', remarcar: '99999' }] });
+  return { ok: a.ok && r.ok && antigo.status === 'remarcado' && novo.status === 'agendado' && !M.k.ocupados.has(carol.proximos[0].id) && outraPessoa.motivo === 'voucher_nao_encontrado', detalhe: JSON.stringify([antigo, novo, outraPessoa.motivo]) };
+});
+await caso('"Cheguei" só vale no dia (o Klingo diz "outra data"); no dia, a recepção é informada e o rastreio vira "chegou"', async () => {
+  const fora = await M.chamar({ acao: 'fam_checkin', token: pai.token, voucher: pedroV, confirmar: true });
+  M.k.cfg.hojeKlingo = '2026-11-17';
+  const dia = await M.chamar({ acao: 'fam_checkin', token: pai.token, voucher: pedroV, confirmar: true });
+  M.k.cfg.hojeKlingo = '2026-11-16';
+  const sem = await M.chamar({ acao: 'fam_checkin', token: pai.token, voucher: pedroV });
+  return { ok: fora.motivo === 'outra_data' && dia.ok && dia.recepcao === 'Recepção 1' && (await um(`select status from public.familia_marcacao where voucher_id = $1`, [pedroV])).status === 'chegou' && sem.motivo === 'sem_confirmacao', detalhe: JSON.stringify([fora.motivo, dia.recepcao, sem.motivo]) };
+});
+await caso('cancelar: perto da hora (menos de 24 h) a recepção resolve; com antecedência cancela, libera o horário e registra; marcação que não é de ninguém do celular não cancela', async () => {
+  const relogioReal = M.ctx.agora;
+  M.ctx.agora = () => Date.parse('2026-11-16T20:00:00-03:00');             // 13 h antes das 09:40 de amanhã
+  const perto = await M.chamar({ acao: 'fam_cancelar', token: pai.token, voucher: pedroV, confirmar: true });
+  M.ctx.agora = () => Date.parse('2026-11-15T09:00:00-03:00');             // 48 h antes
+  const alheia = await M.chamar({ acao: 'fam_cancelar', token: pai.token, voucher: '99999', confirmar: true });
+  const r = await M.chamar({ acao: 'fam_cancelar', token: pai.token, voucher: pedroV, confirmar: true });
+  M.ctx.agora = relogioReal;
+  const st = (await um(`select status from public.familia_marcacao where voucher_id = $1`, [pedroV])).status;
+  return { ok: perto.motivo === 'perto_demais' && /recepção/i.test(perto.mensagem) && alheia.status === 403 && r.ok && st === 'cancelado' && ![...M.k.vouchers.values()].flat().some((v) => String(v.id) === pedroV), detalhe: JSON.stringify([perto.motivo, alheia.motivo, r.ok, st]) };
+});
+
 await caso('desligar este celular: o código deixa de valer na hora, e o dos outros continua', async () => {
   const r = await M.chamar({ acao: 'fam_desligar', token: pai.token }), depois = await M.chamar({ acao: 'fam_eu', token: pai.token }), mae2 = await M.chamar({ acao: 'fam_eu', token: mae.token });
   return { ok: r.ok && depois.status === 401 && mae2.ok === true, detalhe: JSON.stringify([r.ok, depois.motivo]) };
