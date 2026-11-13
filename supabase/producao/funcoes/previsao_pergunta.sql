@@ -18,7 +18,7 @@ begin
       jsonb_build_object('valor', 'proximo_mes', 'rotulo', 'No mês que vem'), jsonb_build_object('valor', 'tres_meses', 'rotulo', 'Daqui a 2 ou 3 meses'), jsonb_build_object('valor', 'depois', 'rotulo', 'Mais para frente'));
   when 'previsao_decide' then
     v_txt := coalesce((select valor from public.config where chave = 'previsao_decide_texto'), '');
-    v_itens := jsonb_build_array(jsonb_build_object('valor', 'lista', 'rotulo', 'Quero ficar na lista de previsão'), jsonb_build_object('valor', 'calendario', 'rotulo', 'Prefiro escolher outra data no calendário'));
+    v_itens := jsonb_build_array(jsonb_build_object('valor', 'lista', 'rotulo', 'Quero ficar na lista de espera'), jsonb_build_object('valor', 'calendario', 'rotulo', 'Prefiro escolher outra data no calendário'));
   when 'previsao_antecedencia' then
     v_txt := 'Se surgir uma vaga, com quanto tempo de antecedência você consegue ser chamado?';
     v_itens := jsonb_build_array(jsonb_build_object('valor', 'imediato', 'rotulo', 'Posso ir em até 24 horas'), jsonb_build_object('valor', '1_dia', 'rotulo', 'Preciso de 1 dia de antecedência'),
