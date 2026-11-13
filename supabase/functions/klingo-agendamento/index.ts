@@ -57,6 +57,7 @@ function familiaDb(rpc: (n: string, a: Record<string, unknown>) => PromiseLike<{
     popularidade: (d) => chamar("agenda_popularidade", { p_dias: d }),
     pessoasAtivas: (m) => chamar("familia_pessoas_ativas", { p_minutos: m }),
     marcacoesAbertas: (p) => chamar("familia_marcacoes_abertas", { p_pessoa: p }),
+    planosEmUso: () => chamar("familia_planos_em_uso", {}),
     acessoRegistrar: (a, p, v) => chamar("familia_acesso_registrar", { p_aparelho: a, p_pessoa: p, p_voucher: v }),
     cacheLer: (c) => chamar("agenda_cache_ler", { p_chave: c }),
     cacheGravar: async (c, d, s) => { await chamar("agenda_cache_gravar", { p_chave: c, p_dados: d, p_valido_seg: s }); },

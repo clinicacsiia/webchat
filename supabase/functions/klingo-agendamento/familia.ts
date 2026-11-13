@@ -55,6 +55,7 @@ export type FamiliaDb = {
   popularidade(dias: number): Promise<Contagem>;
   pessoasAtivas(minutos: number): Promise<string[]>;
   marcacoesAbertas(pessoa: string): Promise<Array<{ voucher: string; status: string; data: string | null }>>;
+  planosEmUso(): Promise<number[]>;
   acessoRegistrar(aparelho: string, pessoa: string, voucher: string): Promise<{ ok: boolean; motivo?: string }>;
   cacheLer(chave: string): Promise<{ dados: unknown; buscado_em: string; vencido: boolean } | null>;
   cacheGravar(chave: string, dados: unknown, validoSeg: number): Promise<void>;
@@ -227,8 +228,11 @@ async function lerPessoasDoPedido(ctx: CtxFam, ap: Aparelho, c: Record<string, u
   return saida;
 }
 
+/** A chave do cache de horários: a mesma na busca da página e na pré-carga lenta. */
+export const chaveHorarios = (q: Record<string, string>) => "h:" + Object.entries(q).sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => `${k}=${v}`).join("&");
+
 async function horariosDoCache(ctx: CtxFam, q: Record<string, string>): Promise<{ lista: Horario[]; atualizadoEm: string; desatualizado: boolean; motivo?: string }> {
-  const chave = "h:" + Object.entries(q).sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => `${k}=${v}`).join("&");
+  const chave = chaveHorarios(q);
   const db = ctx.fam.db!, c = await db.cacheLer(chave);
   if (c && Array.isArray(c.dados) && (!c.vencido || ctx.agora() - Date.parse(c.buscado_em) < CACHE_ACEITO_MS)) {
     if (c.vencido) await db.filaPedir(chave, { tipo: "horarios", q }, 3);       // mostra o que tem agora e manda atualizar (a rotina lenta cuida)
@@ -375,6 +379,7 @@ export async function atualizarPessoa(ctx: CtxFam, pessoaId: string): Promise<{ 
 export async function rodarFila(ctx: CtxFam, max = TETO_FILA_POR_MINUTO): Promise<{ feitas: number; adiadas: number; falhas: number; freio: boolean }> {
   const db = ctx.fam.db!, tarefas = await db.filaPegar(Math.min(max, TETO_FILA_POR_MINUTO));
   let feitas = 0, adiadas = 0, falhas = 0, freio = false;
+  if (!tarefas.length) { await precarregar(ctx).catch(() => {}); return { feitas, adiadas, falhas, freio }; }
   const ativas = tarefas.some((t) => t.params.tipo === "vouchers") ? new Set(await db.pessoasAtivas(60)) : new Set<string>();
   for (const t of tarefas) {
     if (freio) { await db.filaFim(t.id, true, null, 60); adiadas++; continue; }
@@ -398,6 +403,23 @@ export async function rodarFila(ctx: CtxFam, max = TETO_FILA_POR_MINUTO): Promis
     }
   }
   return { feitas, adiadas, falhas, freio };
+}
+
+/** Quando a fila está vazia, deixa a agenda pronta para quem chegar: as especialidades × os planos que as famílias usam (mais o particular), uma janela de 10 dias, sem pressa (prioridade 9).
+ *  Cada combinação só é pedida de novo quando o cache dela tem mais de 5 minutos; assim são poucas leituras por minuto, e a pessoa encontra tudo pronto. */
+export async function precarregar(ctx: CtxFam): Promise<number> {
+  const db = ctx.fam.db!, r = await ctx.api.chamar<unknown>("GET", "/agenda/especialidades");
+  const lista = Array.isArray(r) ? r : Array.isArray((r as { dados?: unknown })?.dados) ? (r as { dados: unknown[] }).dados : [];
+  const cbos = lista.map((e) => String((e as Record<string, unknown>)?.cbos ?? "")).filter((c) => /^\d{4,8}$/.test(c)).slice(0, 8);
+  const planos = [...new Set([1, ...(await db.planosEmUso())])].slice(0, 6), inicio = ctx.hoje();
+  let pedidos = 0;
+  for (const plano of planos) for (const c of cbos) {
+    if (pedidos >= 3) return pedidos;
+    const q = { especialidade: c, fim: somarDias(inicio, 9), inicio, plano: String(plano) }, chave = chaveHorarios(q), vivo = await db.cacheLer(chave);
+    if (vivo && ctx.agora() - Date.parse(vivo.buscado_em) < 5 * 60_000) continue;
+    await db.filaPedir(chave, { tipo: "horarios", q }, 9); pedidos++;
+  }
+  return pedidos;
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------

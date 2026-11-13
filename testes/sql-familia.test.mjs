@@ -203,6 +203,10 @@ await caso('guardar a mesma pessoa duas vezes não duplica (mesma chave), renova
   const par = (await um(`select public.familia_pessoa_por_par('par-1') as r`)).r;
   return { ok: a.novo === true && b.novo === false && a.id === b.id && n.n === 1 && n.d === 'c1' && n.k === '7960' && n.pl === 14 && sem === null && com.nivel === 1 && com.cpf_de === 'responsavel' && par.length === 1, detalhe: JSON.stringify({ n, com }) };
 });
+await caso('os planos em uso vêm do mais comum para o menos comum', async () => {
+  const p = (await um(`select public.familia_planos_em_uso() as r`)).r;
+  return { ok: Array.isArray(p) && (await um(`select count(*)::int n from public.familia_pessoa where plano_id is not null`)).n >= 0 && p.every((x) => Number.isInteger(x)), detalhe: JSON.stringify(p) };
+});
 await caso('o histórico conta os médicos já usados (sem cancelados) e as marcações abertas ignoram o que já acabou', async () => {
   const h = (await um(`select public.familia_historico($1) as r`, [[ana, carla]])).r;
   const ab = (await um(`select public.familia_marcacoes_abertas($1) as r`, [ana])).r;

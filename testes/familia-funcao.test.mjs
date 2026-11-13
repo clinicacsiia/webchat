@@ -42,6 +42,7 @@ const familiaDb = {
   popularidade: (d) => rpc('agenda_popularidade', { p_dias: d }),
   pessoasAtivas: (m) => rpc('familia_pessoas_ativas', { p_minutos: m }),
   marcacoesAbertas: (p) => rpc('familia_marcacoes_abertas', { p_pessoa: p }),
+  planosEmUso: () => rpc('familia_planos_em_uso', {}),
   acessoRegistrar: (a, p, v) => rpc('familia_acesso_registrar', { p_aparelho: a, p_pessoa: p, p_voucher: v }),
   cacheLer: (c) => rpc('agenda_cache_ler', { p_chave: c }),
   cacheGravar: (c, d, s) => um(`select public.agenda_cache_gravar($1, $2::jsonb, $3) as r`, [c, JSON.stringify(d), s]),
@@ -78,6 +79,7 @@ function klingoFalso() {
     if (rota === 'POST /externo/login') { const p = pacientes.get(String(corpo.id)); return p ? resp(200, { access_token: `tok-${p.id}`, user: { id: p.id, nome: p.nome, nascimento: p.nasc, id_paciente: p.id.startsWith('P') ? p.id : '', plano: p.plano } }) : resp(403, { msg: 'x' }); }
     if (rota === 'POST /externo/register') { const id = String(proximoPre++), pc = corpo.paciente; pacientes.set(id, { id, nome: pc.nome, nasc: pc.dt_nasc, cpf: pc.docs.cpf, cel: pc.contatos?.celular, plano: { id: 1, nome: 'PARTICULAR' } }); return resp(200, { id }); }
     if (rota === 'GET /paciente') { const p = donoDaSessao(init); return p ? resp(200, { nome: p.nome, dt_nasc: p.nasc, sexo: 'F', contatos: { celular: p.cel }, convenio: { id_plano: 14, nome: 'AMIL' } }) : resp(401, { msg: 'x' }); }
+    if (rota === 'GET /agenda/especialidades') return resp(200, [{ id: 1, cbos: '225124', descr: 'PEDIATRIA' }, { id: 2, cbos: '225112', descr: 'NEUROLOGIA' }]);
     if (rota === 'GET /agenda/horarios') return resp(200, { horarios: dias.map((d, i) => ({ id: `d${i}`, data: d.data, procedimento: 1132, profissional: { id: d.med, nome: d.nome }, unidade: d.uni,
       horarios: Object.fromEntries(d.horas.map((h) => [chave(d.data, d.med, d.uni.id, h), h]).filter(([k]) => !ocupados.has(k))) })) });
     if (rota === 'POST /agenda/reservar') { const k = corpo.id; if (ocupados.has(k) || [...reservas.values()].includes(k)) return resp(403, { msg: 'Horário já ocupado. [reservado]' }); const id = String(proximaReserva++); reservas.set(id, k); return resp(200, { id }); }
@@ -321,6 +323,17 @@ await caso('o limite de celulares por pessoa (3) vale: o quarto celular que tent
   const c = await M.chamar({ acao: 'fam_entrar', cpf: CPF_MAE, nascimento: NASC_MAE });          // 4º
   return { ok: a.ok && b.ok && c.ok === false && c.motivo === 'limite_aparelhos' && /3 celulares/.test(c.mensagem), detalhe: JSON.stringify([a.ok, b.ok, c.motivo]) };
 });
+// ---------------------------------------------------------------- pré-carga lenta da agenda (para a pessoa encontrar tudo pronto)
+await caso('com a fila vazia a rotina deixa a agenda pronta: especialidades × planos da família, no máximo 3 por vez, sem repetir o que o cache já tem', async () => {
+  await db.query(`delete from public.agenda_fila`); await db.query(`delete from public.agenda_cache`);
+  const a = await M.chamar({ acao: 'fam_sincronizar', segredo: SYNC });                       // fila vazia: só pede as leituras
+  const pedidas = await q(`select chave, prioridade from public.agenda_fila order by id`);
+  const b = await M.chamar({ acao: 'fam_sincronizar', segredo: SYNC });                       // agora executa (no máximo 3) e grava no cache
+  const noCache = (await um(`select count(*)::int n from public.agenda_cache`)).n;
+  const c = await M.chamar({ acao: 'fam_sincronizar', segredo: SYNC });                       // o que está fresco não é pedido de novo
+  return { ok: a.ok && pedidas.length === 3 && pedidas.every((x) => x.prioridade === 9 && x.chave.startsWith('h:especialidade=')) && b.feitas === 3 && noCache === 3 && c.ok, detalhe: JSON.stringify([pedidas.length, b, noCache]) };
+});
+
 // ---------------------------------------------------------------- cancelar, remarcar e "cheguei"
 let pedroV;
 await caso('o pai marca para si, remarca para outro horário (a marcação antiga sai e fica "remarcado") e o horário velho volta a ficar livre', async () => {
@@ -331,7 +344,7 @@ await caso('o pai marca para si, remarca para outro horário (a marcação antig
   const r = await M.chamar({ acao: 'fam_marcar', token: pai.token, confirmar: true, itens: [{ pessoa: pai.id, horario: ana.proximos.find((s) => s.hora === '09:40').id, procedimento: '1132', remarcar: pedroV }] });
   const antigo = await um(`select status from public.familia_marcacao where voucher_id = $1`, [pedroV]), novo = await um(`select status, hora from public.familia_marcacao where voucher_id = $1`, [r.marcacoes?.[0]?.voucher?.id]);
   pedroV = r.marcacoes[0].voucher.id;
-  const outraPessoa = await M.chamar({ acao: 'fam_marcar', token: pai.token, confirmar: true, itens: [{ pessoa: pai.id, horario: ana.proximos[3].id, procedimento: '1132', remarcar: '99999' }] });
+  const outraPessoa = await M.chamar({ acao: 'fam_marcar', token: pai.token, confirmar: true, itens: [{ pessoa: pai.id, horario: ana.proximos[1].id, procedimento: '1132', remarcar: '99999' }] });
   return { ok: a.ok && r.ok && antigo.status === 'remarcado' && novo.status === 'agendado' && !M.k.ocupados.has(carol.proximos[0].id) && outraPessoa.motivo === 'voucher_nao_encontrado', detalhe: JSON.stringify([antigo, novo, outraPessoa.motivo]) };
 });
 await caso('"Cheguei" só vale no dia (o Klingo diz "outra data"); no dia, a recepção é informada e o rastreio vira "chegou"', async () => {

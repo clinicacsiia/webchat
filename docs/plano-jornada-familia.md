@@ -1,5 +1,6 @@
 # Plano: a jornada da família, da marcação ao laudo (tudo na página, tudo automático)
 
+Versão 1.2 — 13/11/2026 (noite) / Mudança: decisões do dono depois da 1.1: até 3 responsáveis por pessoa ("máximo entre aspas"), levar e buscar o laudo com o paciente, rastreio tipo Correios com atualização de 1 minuto, pai/mãe conectando a si mesmos e aos filhos, **criança sem CPF usa o CPF do responsável**, sem SMS (só e-mail, mais tarde), agenda carregada devagar para o banco, médicos ordenados pelo histórico da família e depois pelos mais marcados, e **nada de depender do suporte do Klingo** (a documentação que a clínica já recebeu é a base). **Parte do plano já foi programada: ver `docs/familia-agendamento.md`.**
 Versão 1.1 — 13/11/2026 / Mudança: acrescenta o outro responsável e outros aparelhos (3 portas para o nível 2, seção 3.1). A 1.0 era a primeira versão, escrita a partir das decisões do dono de 13/11/2026. **É um plano: nada disto está no ar.** Página atual: `agendamento/index.html` (ver `docs/agendamento-pagina.md`).
 
 ## 1. Decisões do dono (13/11/2026)

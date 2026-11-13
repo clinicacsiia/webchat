@@ -326,15 +326,18 @@ create or replace function public.familia_historico(p_pessoas uuid[]) returns js
 create or replace function public.familia_pessoas_ativas(p_minutos integer default 60) returns jsonb language sql stable security definer set search_path to '' as $$
   select coalesce(jsonb_agg(distinct v.pessoa_id), '[]'::jsonb) from public.familia_vinculo v join public.familia_aparelho a on a.id = v.aparelho_id
    where a.desligado_em is null and a.ultimo_uso >= now() - make_interval(mins => least(1440, greatest(1, p_minutos))) $$;
+-- Planos que as famílias usam (para a pré-carga lenta da agenda carregar só o que alguém pode precisar).
+create or replace function public.familia_planos_em_uso() returns jsonb language sql stable security definer set search_path to '' as $$
+  select coalesce(jsonb_agg(plano_id order by n desc), '[]'::jsonb) from (select plano_id, count(*) n from public.familia_pessoa where plano_id is not null group by plano_id order by n desc limit 8) t $$;
 -- Marcações de uma pessoa que ainda valem acompanhar (futuras ou sem laudo), para a rotina conferir.
 create or replace function public.familia_marcacoes_abertas(p_pessoa uuid) returns jsonb language sql stable security definer set search_path to '' as $$
   select coalesce(jsonb_agg(jsonb_build_object('voucher', voucher_id, 'status', status, 'data', data)), '[]'::jsonb) from public.familia_marcacao
    where pessoa_id = p_pessoa and status not in ('cancelado', 'remarcado', 'laudo_pronto', 'faltou') $$;
 
 revoke all on function public.familia_pessoa_guardar(jsonb), public.familia_pessoa_ler(uuid, uuid), public.familia_pessoa_ler_servico(uuid), public.familia_pessoa_por_par(text), public.familia_pessoas_novas_hoje(),
-  public.familia_historico(uuid[]), public.familia_pessoas_ativas(integer), public.familia_marcacoes_abertas(uuid) from public, anon, authenticated;
+  public.familia_historico(uuid[]), public.familia_pessoas_ativas(integer), public.familia_marcacoes_abertas(uuid), public.familia_planos_em_uso() from public, anon, authenticated;
 grant execute on function public.familia_pessoa_guardar(jsonb), public.familia_pessoa_ler(uuid, uuid), public.familia_pessoa_ler_servico(uuid), public.familia_pessoa_por_par(text), public.familia_pessoas_novas_hoje(),
-  public.familia_historico(uuid[]), public.familia_pessoas_ativas(integer), public.familia_marcacoes_abertas(uuid) to service_role;
+  public.familia_historico(uuid[]), public.familia_pessoas_ativas(integer), public.familia_marcacoes_abertas(uuid), public.familia_planos_em_uso() to service_role;
 
 -- ============================================================================================================================ PARTE 7: registro de quem abriu laudo (sem conteúdo) e freio
 create table if not exists public.familia_acesso (
@@ -361,6 +364,6 @@ grant execute on function public.familia_acesso_registrar(uuid, uuid, text) to s
 --   public.familia_avisos(uuid), public.familia_aviso_responder(uuid, bigint, boolean), public.familia_marcacao_gravar(jsonb), public.familia_acompanhar(uuid), public.familia_previsao_laudo(text),
 --   public.agenda_fila_pedir(text, jsonb, integer), public.agenda_fila_pegar(integer), public.agenda_fila_fim(bigint, boolean, text, interval), public.agenda_cache_ler(text),
 --   public.agenda_cache_gravar(text, jsonb, integer), public.agenda_popularidade(integer), public.familia_pessoa_guardar(jsonb), public.familia_pessoa_ler(uuid, uuid), public.familia_pessoa_ler_servico(uuid),
---   public.familia_pessoa_por_par(text), public.familia_pessoas_novas_hoje(), public.familia_historico(uuid[]), public.familia_pessoas_ativas(integer), public.familia_marcacoes_abertas(uuid), public.familia_acesso_registrar(uuid, uuid, text);
+--   public.familia_pessoa_por_par(text), public.familia_pessoas_novas_hoje(), public.familia_historico(uuid[]), public.familia_pessoas_ativas(integer), public.familia_marcacoes_abertas(uuid), public.familia_planos_em_uso(), public.familia_acesso_registrar(uuid, uuid, text);
 -- drop table public.familia_acesso, public.familia_evento, public.familia_marcacao, public.familia_aviso, public.familia_convite, public.familia_vinculo, public.familia_aparelho, public.familia_pessoa, public.agenda_fila, public.agenda_cache;
 -- delete from public.config where chave in ('familia_max_aparelhos', 'familia_espera_horas', 'familia_dorme_meses');
