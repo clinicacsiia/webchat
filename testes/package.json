@@ -84,7 +84,8 @@
     "test:equipe-agora": "node equipe-agora.navegador.mjs",
     "test:agendou-credito": "node sql-agendou-credito.test.mjs",
     "test:previsao": "node previsao.navegador.mjs",
-    "test:textos-acolhimento": "node sql-textos-acolhimento.test.mjs"
+    "test:textos-acolhimento": "node sql-textos-acolhimento.test.mjs",
+    "test:ordem-opcoes": "node sql-ordem-opcoes.test.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.2.17",
