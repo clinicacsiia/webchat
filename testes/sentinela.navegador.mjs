@@ -104,15 +104,15 @@ await caso('privacidade: o incidente enviado não leva o texto das mensagens nem
   return { ok: mundo.incidentes.length > 0 && vazou.length === 0, detalhe: vazou.length ? `vazou: ${vazou.join(', ')}` : `${bruto.length} caracteres, sem dados pessoais nem token` };
 });
 
-await caso('aviso de IA: o assistente se apresenta como IA, diz que uma pessoa acompanha, que é previsão, e o botão de atendente fica à vista', async () => {
+await caso('aviso de IA: o assistente se apresenta como IA, diz que uma pessoa acompanha, que quem confirma é um atendente, e o botão de atendente fica à vista', async () => {
   const mundo = criarMundo(); const { page, ctx } = await abrir(mundo);
   const aviso = await page.$eval('#avisoIA', (n) => n.textContent), status = await page.$eval('#status', (n) => n.textContent), barra = await page.$eval('#barraHumano', (n) => !n.hidden);
   await ctx.close();
-  return { ok: /assistente autom[aá]tico/.test(aviso) && /previsão/.test(aviso) && /quem confirma é um atendente/.test(aviso) && /autom[aá]tico/.test(status) && barra,
+  return { ok: /assistente autom[aá]tico/.test(aviso) && /equidade/.test(aviso) && !/previsão/i.test(aviso) && /Quem confirma o agendamento é um atendente/.test(aviso) && /autom[aá]tico/.test(status) && barra,
     detalhe: `status="${status}", botão de atendente visível=${barra}` };
 });
 
-await caso('formulário inicial: avisa que é uma PREVISÃO, que uma pessoa confirma, e exige o "estou ciente" (a menção à IA saiu da tela inicial de propósito)', async () => {
+await caso('formulário inicial: fala da missão (equidade, família), avisa que uma pessoa confirma, e exige o "estou ciente" (a menção à IA saiu da tela inicial de propósito)', async () => {
   const mundo = criarMundo(); const { page, ctx } = await novaPaginaChat(browser, mundo);
   await page.goto(`${base}/index.html`); await page.waitForSelector('#avisoForm', { state: 'visible', timeout: 8000 });
   const t = await page.$eval('#avisoForm', (n) => n.textContent);
@@ -120,16 +120,16 @@ await caso('formulário inicial: avisa que é uma PREVISÃO, que uma pessoa conf
   await page.click('#fQuem .unidade >> nth=0'); await page.fill('#fNome', 'Ana'); await page.fill('#fTel', '71999998888'); await page.fill('#fEmail', 'a@b.co'); await page.check('#fAceite');
   await page.click('#btnIniciar'); await page.waitForTimeout(300);
   const erro = (await page.locator('#erroForm').innerText()).trim(); const iniciou = mundo.chamadas.some((c) => c.nome === 'chat_iniciar'); await ctx.close();
-  return { ok: /previsão/.test(t) && /pessoa da equipe/.test(t) && caixa && /ciente/.test(erro) && !iniciou, detalhe: `${t.slice(0, 60)} | erro="${erro}"` };
+  return { ok: /equidade/.test(t) && /família/.test(t) && !/previsão/i.test(t) && /pessoa da equipe/.test(t) && caixa && /ciente/.test(erro) && !iniciou, detalhe: `${t.slice(0, 60)} | erro="${erro}"` };
 });
 
-await caso('mensagem final: deixa claro que é PREVISÃO, que ainda não está confirmado e que um atendente vai confirmar', async () => {
+await caso('mensagem final: deixa claro que ainda não está confirmado (sem a palavra previsão) e que um atendente vai confirmar', async () => {
   const mundo = criarMundo(); const { page, ctx } = await abrir(mundo);
   await page.click('#msgs .op >> text=Exame'); await page.waitForSelector('#msgs .op >> text=Particular');
   await page.click('#msgs .op >> text=Particular'); await page.waitForSelector('#msgs .acomp', { timeout: 6000 });
-  await page.waitForFunction(() => /previsão/i.test(document.querySelector('#msgs .acomp').textContent), null, { timeout: 6000 });
+  await page.waitForFunction(() => /ainda NÃO está confirmado/.test(document.querySelector('#msgs .acomp').textContent), null, { timeout: 6000 });
   const t = await page.$eval('#msgs .acomp', (n) => n.textContent); await ctx.close();
-  return { ok: /previsão de agendamento/.test(t) && /NÃO está confirmado/.test(t) && /uma pessoa da equipe/.test(t) && /confirmação de data, horário e valor/.test(t) && /a qualquer momento/.test(t), detalhe: t.slice(0, 120) };
+  return { ok: !/previsão/i.test(t) && /NÃO está confirmado/.test(t) && /uma pessoa da equipe/.test(t) && /confirmação de data, horário e valor/.test(t) && /a qualquer momento/.test(t), detalhe: t.slice(0, 120) };
 });
 
 await caso('letra: o tamanho padrão é maior que antes (17 px) e o menu aumenta mais', async () => {
