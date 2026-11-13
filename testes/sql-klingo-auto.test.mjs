@@ -866,6 +866,48 @@ await caso('TUDO CERTO depois de agendado pela API: a conversa é encerrada (age
   return { ok: ca.status === 'encerrada' && ca.motivo_encerramento === 'agendado' && ca.encerramento_origem === 'sistema' && cb.status !== 'encerrada', detalhe: `sem humano=${ca.status}/${ca.motivo_encerramento}/${ca.encerramento_origem}; com humano=${cb.status} (antes ${antesB.status}/${antesB.primeiro_humano_em ? 'humano' : 'sem humano'})` };
 });
 
+// ---------------------------------------------------------------- 13/11/2026: ligar a API como fluxo principal (o dono liga o interruptor geral em "sim")
+const ligar = async (m) => { await cfg('klingo_auto', 'sim'); await cfg('klingo_api_horarios', 'sombra'); await cfg('klingo_api_percentual', '100'); await cfg('klingo_api_telefones_teste', '');
+  for (const k of ['klingo_api_marcar', 'klingo_api_pre_cadastro', 'klingo_api_pos']) await cfg(k, m); };
+await db.query(`insert into public.fluxo_texto (chave, texto, descricao) values
+  ('pronto_online', 'Pronto, {nome}! Recebemos tudo e montamos a PREVISÃO do seu agendamento. Atenção: ainda não está confirmado.', 't'),
+  ('pronto_offline', 'Pronto, {nome}! Montamos a PREVISÃO do seu agendamento e ela já está com a equipe. Ainda não está confirmado.', 't'),
+  ('marcar_equipe', 'Não consegui concluir o agendamento sozinho, mas já passei tudo para a nossa equipe e uma pessoa confirma com você em instantes.', 't'),
+  ('marcar_incerto', 'O sistema da clínica demorou a responder. Já pedi para a equipe conferir a sua marcação, então você não precisa repetir nada.', 't'),
+  ('marcar_plano', 'Não consegui agendar pelo convênio {plano} agora. Já passei para a equipe, que resolve com você e confirma o horário.', 't')
+  on conflict (chave) do update set texto = excluded.texto`);
+await db.exec(readFileSync(`${REPO}/supabase/textos-acolhimento.sql`, 'utf8'));
+let lig;
+await caso('LIGADO ("sim" + horários "sombra"): a API vira o fluxo principal do calendário; com a marcação desligada o pedido vai à equipe, dizendo que é uma PREVISÃO ainda não confirmada', async () => {
+  await ligar('nao');
+  lig = await ateOFim(await iniciar('Ligado Principal Teste'), { motivo: 'exame', plano: 'Particular', confirmar: 'ok', antesDoHorario: async (x) => { await ofertar(x); } });
+  const pa = await pedidoDe(lig.c), n = (await um(`select count(*)::int n from public.klingo_operacao where conversa_id = $1`, [lig.c])).n;
+  const msgs = (await q(`select texto from public.mensagens where conversa_id = $1 and autor = 'agente' order by id desc limit 3`, [lig.c])).map((m) => m.texto).join(' | ');
+  return { ok: lig.horarios.klingo_api === true && pa.status === 'pronto' && n === 0 && /previsão/i.test(msgs) && /ainda não está confirmado/i.test(msgs), detalhe: `klingo_api=${lig.horarios.klingo_api}; pedido ${pa.status}; operações ${n}` };
+});
+await caso('LIGADO e a API sem horário para o paciente (ou fora do ar): o calendário volta à grade, o pedido segue para a equipe e nada é marcado', async () => {
+  await ligar('sim');
+  const p = await ateOFim(await iniciar('Ligado Sem Oferta Teste'), { motivo: 'exame', plano: 'Particular', confirmar: 'ok' });
+  const pa = await pedidoDe(p.c), n = (await um(`select count(*)::int n from public.klingo_operacao where conversa_id = $1`, [p.c])).n;
+  const msgs = (await q(`select texto from public.mensagens where conversa_id = $1 and autor = 'agente' order by id desc limit 3`, [p.c])).map((m) => m.texto).join(' | ');
+  return { ok: p.horarios.klingo_api === false && pa.status === 'pronto' && n === 0 && /previsão/i.test(msgs), detalhe: `klingo_api=${p.horarios.klingo_api}; pedido ${pa.status}; operações ${n}` };
+});
+await caso('AVISO IMPORTANTE: "sim" no interruptor geral liga também marcar/cadastro/remarcar para todos; só a chave individual em "nao" segura cada um', async () => {
+  await ligar('teste'); await db.query(`update public.pre_agendamentos set status = 'rascunho' where conversa_id = $1`, [lig.c]);
+  const comTeste = await motivoDe(lig.c);
+  await cfg('klingo_api_marcar', 'nao'); const comNao = await motivoDe(lig.c);
+  return { ok: comTeste.ok === true && comNao.motivo === 'desligado', detalhe: `marcar="teste" -> ${comTeste.motivo || 'MARCA'}; marcar="nao" -> ${comNao.motivo}` };
+});
+await caso('LIGADO com a marcação ligada: cadastro com dúvida (divergente) NUNCA marca; o paciente é avisado e a equipe assume, sem operação no Klingo', async () => {
+  await ligar('sim');
+  const p = await ateOFim(await iniciar('Ligado Duvida Teste'), { motivo: 'exame', plano: 'Particular', confirmar: 'ok', antesDoHorario: async (x) => {
+    await ofertar(x); await rpc('klingo_identidade_registrar', { p_cpf: '11144477735', p_nasc: '1980-03-25', p_r: { situacao: 'divergente' }, p_conversa: null }); } });
+  const pa = await pedidoDe(p.c), n = (await um(`select count(*)::int n from public.klingo_operacao where conversa_id = $1`, [p.c])).n;
+  const cv = await conversaDe(p.c);
+  const msgs = (await q(`select texto from public.mensagens where conversa_id = $1 and autor = 'agente' order by id desc limit 4`, [p.c])).map((m) => m.texto).join(' | ');
+  return { ok: pa.status !== 'agendado' && n === 0 && p.passos.at(-1) !== 'marcando' && /equipe|atendente|CSI/i.test(msgs), detalhe: `último passo=${p.passos.at(-1)}; pedido ${pa.status}; operações ${n}; ia_ativa=${cv.ia_ativa}` };
+});
+
 const ok = resultados.filter(Boolean).length;
 console.log(`\n${ok} de ${resultados.length} verificações passaram.`);
 process.exit(ok === resultados.length ? 0 : 1);

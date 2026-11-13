@@ -656,7 +656,7 @@
   const CHAVE_HIST = 'webchat.historico.v1';   // as últimas conversas deste aparelho (cada uma com o seu token): dá para voltar a elas
   const MAX_HIST = 5;                          // mínimo pedido: 3
   // Muda a cada alteração do chat. Cópia de mensagens guardada por outra versão é descartada (era isso que mostrava conversa velha e travada).
-  const VERSAO_APP = '2026.11.13-2';
+  const VERSAO_APP = '2026.11.13-3';
   const ESCALAS = [1, 1.18, 1.36], TOAST_LETRA = ['Letra normal.', 'Letra grande.', 'Letra muito grande.'];
 
   // Chegou pelo link "esqueci a senha"? O supabase-js limpa o endereço ao ler o link, então a pergunta é feita antes de criá-lo.
@@ -2795,7 +2795,7 @@
     const v = V, semConferir = v.desligado || v.falhas.size > 0;
     const limitePerto = ymd(somaDias(new Date(), 13)), pertoFalhou = [...v.falhas].some((d) => d <= limitePerto || d === C.dia);
     if (r.klingo_api) corpo.append(h('p', { class: 'p-dica ao-vivo', role: 'status' }, '✔ Horários livres conferidos agora na agenda da clínica.'));
-    else corpo.append(h('p', { class: 'aviso-cal' }, 'Os horários abaixo são sugestões para facilitar a sua escolha. Um atendente confere tudo e confirma o dia e o horário.' + (r.aviso && semConferir ? ' ' + r.aviso : '')));
+    else corpo.append(h('p', { class: 'aviso-cal' }, 'Estes horários são uma previsão: ainda não foi possível conferir tudo na agenda da clínica. Um atendente confere e confirma o dia e o horário.' + (r.aviso && semConferir ? ' ' + r.aviso : '')));
     if (!v.desligado) {
       if (v.falhas.size) corpo.append(h('p', { class: 'aviso-cal', role: 'status' }, (pertoFalhou ? 'Não consegui conferir a agenda da clínica agora; os horários abaixo podem estar desatualizados. ' : 'Não consegui conferir algumas datas mais adiante; os horários delas podem estar desatualizados. '),
         h('button', { class: 'chip', type: 'button', onclick: () => carregarHorarios(false, true) }, 'Conferir de novo')));
