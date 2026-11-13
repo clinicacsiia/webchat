@@ -1,6 +1,6 @@
 # Documentação do Webchat da CSI
 
-Versão 1.1 — 12/11/2026 / Mudança: autoatendimento com a API do Klingo (CPF + nascimento obrigatórios, horários reais, marcação automática, revisão dos pacientes antigos); corrigidas as divergências D1 a D3 do planejamento. Versão 1.0 — 11/11/2026: primeira documentação única do sistema, escrita na auditoria de 11/11/2026
+Versão 1.2 — 13/11/2026 / Mudança: conferência Klingo × webchat (aba Indicadores seção 3 e dois avisos novos; ver `klingo-conferencia.md`). Versão 1.1 — 12/11/2026 / Mudança: autoatendimento com a API do Klingo (CPF + nascimento obrigatórios, horários reais, marcação automática, revisão dos pacientes antigos); corrigidas as divergências D1 a D3 do planejamento. Versão 1.0 — 11/11/2026: primeira documentação única do sistema, escrita na auditoria de 11/11/2026
 
 Este é o documento para **entender o sistema inteiro**: o que é cada pasta, cada arquivo, cada peça do banco e como elas se falam. Os outros arquivos de `docs/` contam a história de cada mudança; este diz **como as coisas são hoje**.
 
@@ -110,7 +110,7 @@ Algoritmo de referência (Python) da assinatura na tela, do módulo "Fila + assi
 
 ### 3.7 `docs/`
 
-Um documento por mudança ou decisão. Os mais úteis para começar: este; `auditoria-2026-11-11.md`; `pendencias-do-dono.md`; `planejamento-auditoria-2026-11-10.md` (decisões do dono, com as regras dos indicadores e das permissões); `klingo-relatorios-pendentes.md` (o que o Klingo entrega e o que falta); `klingo-api-externa/GUIA-COMPLETO.md` (manual da API externa do Klingo), `klingo-api-agendamento.md` e `klingo-api-externa/` (API externa do Klingo: documentação oficial, testes reais e plano do agendamento automático); `fase7-motor-implementado.md` (o motor do chat).
+Um documento por mudança ou decisão. Os mais úteis para começar: este; `auditoria-2026-11-11.md`; `pendencias-do-dono.md`; `planejamento-auditoria-2026-11-10.md` (decisões do dono, com as regras dos indicadores e das permissões); `klingo-relatorios-pendentes.md` (o que o Klingo entrega e o que falta); `klingo-conferencia.md` (por que os números do painel divergem do Klingo, conflitos e dados faltando); `klingo-api-externa/GUIA-COMPLETO.md` (manual da API externa do Klingo), `klingo-api-agendamento.md` e `klingo-api-externa/` (API externa do Klingo: documentação oficial, testes reais e plano do agendamento automático); `fase7-motor-implementado.md` (o motor do chat).
 
 ### 3.8 `supabase-emails/`
 
@@ -132,6 +132,7 @@ Números de 11/11/2026 (fim do dia): 101 tabelas, 5 visões, 425 funções, 56 g
 | Jornada (Klingo) | `jornada_paciente`, `jornada_card`, `jornada_exame`, `jornada_evento`, `jornada_tarefa` | `jornada_*` |
 | Equipe e permissões | `agentes`, `org_equipe`, `org_membro`, `permissao_observacao`, `equipe_notificacao` | `org_*`, `equipe_*`, `papel_atual` |
 | Indicadores | `ind_fechamento`, `ind_pessoa_dia`, `ind_conclusao_dia`, `ind_semhumano_dia` | `painel_indicadores_*`, `ind_*` |
+| Conferência Klingo × webchat | `klingo_conferencia` (uma linha por marcação do relatório #14554: origem, ligação com a conversa, campos que divergem ou faltam; sem dado pessoal) | `klingo_conferir_lote`, `klingo_conferir_avisos`, `klingo_conferencia_agendar`, `painel_indicadores_conferencia`; Edge Function `klingo-conferir`; avisos `klingo_conflito` e `klingo_dado_faltando` |
 | Fila de chegada | `fila_chegada`, `fila_aviso`, `push_inscricao` | `fila_*`, `checkin_publico` |
 | Diagnóstico | `incidente_chat` (códigos da Sentinela), `autoencerramento_execucao` | `chat_incidente`, `painel_incidentes` |
 | Autoatendimento Klingo | `klingo_identidade` (CPF conferido, só hash), `klingo_oferta` (horários que a API ofereceu à conversa), `klingo_operacao` (cada marcação: estado, voucher, código), `klingo_plano_map` e `klingo_convenio` (tradução convênio → plano), `klingo_especialidade`, `klingo_cota` (limite de chamadas), `klingo_medida`, `klingo_decisao` (o que a autogestão decidiu), `klingo_evento`, `klingo_proc_api`, `klingo_conversa_ident` | `klingo_*`, `painel_automacao_resumo` |
