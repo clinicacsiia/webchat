@@ -2814,7 +2814,14 @@
     if (!confirm(`Transferir esta conversa para ${nomeDestino}?`)) { renderTopoChat(); return; }
     const motivo = prompt('Motivo da transferência (opcional):');
     if (motivo === null) { renderTopoChat(); return; }
-    const ids = membrosDe(S.abertaId);
+    // Só as conversas abertas do grupo que realmente mudam: o servidor recusa o lote inteiro se uma estiver encerrada ou já com o destino.
+    const ids = membrosDe(S.abertaId).filter((i) => {
+      const c = S.conversas.find((x) => x.id === i);
+      if (!c || c.status === 'encerrada') return false;
+      if (unidade) return !(c.agente_id == null && (c.unidade_responsavel || c.unidade_inicial) === unidade);
+      return c.agente_id !== destino;
+    });
+    if (!ids.length) { toast('Nenhuma conversa aberta precisa ser transferida: já está com essa pessoa ou unidade, ou está encerrada.'); renderTopoChat(); return; }
     const { data, error } = await db.rpc('conversa_transferir', { p_conversas: ids, p_para_agente: unidade ? null : destino, p_para_unidade: unidade, p_motivo: motivo || null });
     if (error) { toast(msgErro(error)); renderTopoChat(); return; }
     if (!data || data.ok === false) { toast((data && data.mensagem) || 'Não foi possível transferir.'); renderTopoChat(); return; }
