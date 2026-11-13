@@ -85,7 +85,7 @@ Quando o paciente toca em "Nenhum horário serve" (ou recusa as duas ofertas), o
 ### 2.11 Revisão mensal das conversas com o Claude (criada em 13/11/2026)
 - **Regra:** se passar **1 mês sem a revisão**, a pendência vira "faça primeiro". **Última revisão feita: 13/11/2026** (primeira análise). **Próxima: até 13/12/2026.**
 - **Como fazer (5 minutos):** abra uma sessão do Claude neste repositório e cole: *"Rode o ciclo de melhoria do chat (`docs/ciclo-de-melhoria-com-claude.md`): compare com a revisão anterior, diga o que melhorou ou piorou, proponha mudanças de texto e de ordem das opções e deixe em arquivos novos para eu aprovar. Não aplique nada na produção sem eu mandar."*
-- **Depois:** o Claude anota aqui a nova data de "Última revisão". Quem for conferir a lista de pendências (a Isa, por exemplo) olha esta data: se tiver mais de 30 dias, avisar o dono.
+- **Depois:** o Claude anota aqui a nova data de "Última revisão". Quem for conferir a lista de pendências olha esta data: se tiver mais de 30 dias, avisar o dono.
 - **Até lá, três coisas esperam sua decisão:** aplicar os textos novos (`supabase/textos-acolhimento.sql` e `textos-acolhimento-botao.sql`) junto com a tela nova; reordenar as opções por uso; escrever na política de privacidade que as conversas ajudam a melhorar o serviço (revisão jurídica).
 
 ## 3. Contas e segurança
