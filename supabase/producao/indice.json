@@ -1099,6 +1099,28 @@
    "politicas": 1
   },
   {
+   "nome": "klingo_conferencia",
+   "colunas": [
+    "m",
+    "marcado_em",
+    "exame_em",
+    "origem",
+    "status_klingo",
+    "unidade",
+    "plano",
+    "conversa_id",
+    "ligacao",
+    "paciente_tipo",
+    "conflito",
+    "responsavel_diferente",
+    "falta_no_klingo",
+    "vazios",
+    "lido_em"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
    "nome": "medico_aviso",
    "colunas": [
     "id",
@@ -1888,6 +1910,12 @@
    "comando": "select public.jornada_vigiar()"
   },
   {
+   "nome": "klingo-conferir",
+   "quando": "23 9-23 * * *",
+   "ativa": true,
+   "comando": "select public.klingo_conferencia_agendar(4)"
+  },
+  {
    "nome": "klingo-ligar-pendentes",
    "quando": "4-59/10 * * * *",
    "ativa": true,
@@ -2063,6 +2091,7 @@
   "klingo_api_pre_cadastro",
   "klingo_api_telefones_teste",
   "klingo_autogestao",
+  "klingo_conferir_ativo",
   "klingo_funcoes_base",
   "klingo_paciente_url",
   "klingo_webhook",
@@ -7576,6 +7605,21 @@
    "md5": "60fc6a6e676e6a41dd5fc756178aa755"
   },
   {
+   "nome": "klingo_conferencia_agendar",
+   "args": [
+    {
+     "nome": "p_dias",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "e50400c07a7b2d2f2986dfd638b38eb8"
+  },
+  {
    "nome": "klingo_conferir_agendar",
    "args": [
     {
@@ -7589,6 +7633,46 @@
    "authenticated": false,
    "publico": false,
    "md5": "01a370894b23d26ec88d58e27d6b8182"
+  },
+  {
+   "nome": "klingo_conferir_agendar",
+   "args": [
+    {
+     "nome": "p_dias",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "e50400c07a7b2d2f2986dfd638b38eb8"
+  },
+  {
+   "nome": "klingo_conferir_avisos",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "c92619956755790ef9729d45b758e01b"
+  },
+  {
+   "nome": "klingo_conferir_lote",
+   "args": [
+    {
+     "nome": "p_linhas",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "da456ffa6f8ae79b15f3530d0ecf883b"
   },
   {
    "nome": "klingo_cota_429",
@@ -9233,6 +9317,33 @@
    "authenticated": true,
    "publico": false,
    "md5": "ee7874a90597fd8cfb708c36cab4dd0f"
+  },
+  {
+   "nome": "painel_indicadores_conferencia",
+   "args": [
+    {
+     "nome": "p_de",
+     "padrao": true
+    },
+    {
+     "nome": "p_ate",
+     "padrao": true
+    },
+    {
+     "nome": "p_unidade",
+     "padrao": true
+    },
+    {
+     "nome": "p_incluir_teste",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "a25c8391f29387b047d010a3effd2557"
   },
   {
    "nome": "painel_indicadores_decisao",

@@ -89,6 +89,9 @@ Busca de histórico sob demanda (B); verificação por CPF e pedido de atualiza�
 Envio de link e senha do resultado ao paciente (sem link/senha no C; depende do suporte).
 
 
+## Relatório #14554 (13/11/2026): todas as marcações com os dados do paciente
+Criado pelo dono ("Marcações pela data em que foram marcadas", filtros `periodo0` = marcado em e `parm1` = unidade). 17 colunas: Id, Agendado Em, Agendado Para, Origem, Portal, Responsável, Responsável - Classificação, Procedimento, Operadora, Unidade, Paciente - Nome, Status (Aberta/Cancelada/Bloqueada), CPF, Telefone, e-mail, Nascimento e **Celular**. **Não tem** prontuário, "Atendido S/N", confirmação nem motivo de cancelamento, então **não substitui** o #14359. É a fonte da conferência `docs/klingo-conferencia.md` (Edge Function `klingo-conferir`). Preenchimento medido em 06 a 12/11/2026 (1.990 linhas): nome e nascimento 100%, celular 98%, CPF 68%, e-mail 55%, telefone fixo 15%.
+
 ## Relatório por data do exame (#14359, 09/11/2026)
 Criado no Klingo ("Agendamentos - Visão Consolidada por Marcação Data Agendado"): é cópia do #13825 com o filtro de período trocado para **Data Agendado Para**. Conferido pela função (só estrutura e contagem, sem dado de paciente): mesmas 18 colunas (col0 a col17) na mesma ordem. **Atenção:** o id do filtro de período é **`periodo1`** (no #13825 é `periodo0`) e o filtro de unidade passou de `parm1` para `parm0`. A Edge Function `sync-jornada-klingo` (versão 5) usa `periodo1` quando `config.jornada_relatorio_filtro = 'exame'`.
 Em uso desde 09/11/2026: `config.jornada_relatorio_id = 14359` e `jornada_relatorio_filtro = exame`. Para voltar ao antigo: `13825` e `criacao`.

@@ -416,6 +416,11 @@
   .ind-minis { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; margin: 10px 0; }
   .ind-mini { background: var(--csi-surface); border: 1px solid var(--csi-border); border-radius: var(--radius-md); padding: 8px 12px; }
   .ind-mini b { display: block; font-size: 22px; line-height: 1.15; } .ind-mini span { font-size: 12.5px; color: var(--suave); }
+  .ind-conf-passo { margin: 14px 0 4px; font-size: 15px; } .ind-conf-passo span { display: inline-block; min-width: 22px; height: 22px; line-height: 22px; text-align: center; border-radius: 11px; background: var(--csi-primary-soft, #e6efff); color: var(--csi-primary, #1d4ed8); font-size: 13px; margin-right: 6px; }
+  .ind-conta { display: grid; grid-template-columns: 1fr auto; gap: 2px 14px; max-width: 560px; font-size: 14px; } .ind-conta b { text-align: right; font-variant-numeric: tabular-nums; } .ind-conta .tot { border-top: 1px solid var(--csi-border); padding-top: 4px; font-weight: 700; }
+  .ind-tab { width: 100%; border-collapse: collapse; font-size: 13px; } .ind-tab th, .ind-tab td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--csi-border); vertical-align: top; } .ind-tab th { color: var(--suave); font-weight: 600; }
+  .ind-tab-rolagem { max-height: 420px; overflow: auto; border: 1px solid var(--csi-border); border-radius: var(--radius-md); background: var(--csi-surface); }
+  .ind-tag { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 12px; background: var(--csi-border); } .ind-tag.alerta { background: var(--csi-warning-soft); color: var(--csi-warning-strong); } .ind-tag.filho { background: #e8f1ff; color: #1e40af; }
   .ind-como { margin: 20px 0 8px; font-size: 14px; color: var(--suave); } .ind-como summary { cursor: pointer; font-weight: 600; }
   @media (max-width: 640px) { .ind-grade { grid-template-columns: 1fr; } .ind-linha { grid-template-columns: 1fr auto; } .ind-linha .ind-trilho { grid-column: 1 / -1; order: 3; } }
   .barras-h { display: flex; align-items: flex-end; gap: 6px; padding: 10px 12px; background: var(--csi-surface); border: 1px solid var(--csi-border); border-radius: var(--radius-md); box-shadow: var(--shadow-sm); overflow-x: auto; }
@@ -2099,6 +2104,21 @@
       if (av.tipo === 'klingo_ligado') return h('div', { class: 'sug' }, h('b', {}, 'Paciente ligado ao Klingo'), h('div', {}, `${quem(av)} foi ligado ao cadastro do Klingo (${prontuarioTxt(d.prontuario)}), pelo nome e pelo telefone.`), h('div', { class: 'sug-acoes' }, ok));
       if (av.tipo === 'klingo_varios') return h('div', { class: 'sug' }, h('b', {}, 'Mais de um cadastro no Klingo'), h('div', {}, `${quem(av)} bate com ${(d.prontuarios || []).length} cadastros no Klingo. Confira qual é o certo; nada foi ligado.`), h('div', { class: 'sug-acoes' }, ok));
       if (av.tipo === 'cpf_diferente') return h('div', { class: 'sug' }, h('b', {}, 'CPF diferente do cadastro'), h('div', {}, `${quem(av)} informou um CPF que não é o do cadastro encontrado pelo nome e telefone. Não atualizar nenhum dado; confira o documento.`), h('div', { class: 'sug-acoes' }, ok));
+      if (av.tipo === 'klingo_conflito') {
+        const marc = (d.marcacoes || []).join(', ');
+        return h('div', { class: 'sug' }, h('b', {}, 'Conflito entre o chat e o Klingo'),
+          h('div', {}, `${quem(av)} (marcação ${marc}${d.filho ? ', filho(a)' : ''}): ${campoTxt(d.campos)} ${(d.campos || []).length > 1 ? 'diferentes' : 'diferente'} entre o que foi informado no chat e o cadastro do Klingo. Confira com o paciente e corrija onde estiver errado.`
+            + (d.filho ? ' Pedido de filho(a): só o nome e o nascimento da criança são comparados; CPF, celular e e-mail do responsável diferentes são normais.' : '')),
+          h('div', { class: 'sug-acoes' }, ok));
+      }
+      if (av.tipo === 'klingo_dado_faltando') {
+        const marc = (d.marcacoes || []).join(', ');
+        return h('div', { class: 'sug' }, h('b', {}, 'Falta dado no cadastro do Klingo'),
+          h('div', {}, d.filho
+            ? `${quem(av)} (marcação ${marc}, filho(a)): o chat tem ${campoTxt(d.campos)} do responsável e o Klingo está sem. Se for o contato do responsável, cadastre como contato. Não coloque o CPF do responsável no cadastro da criança.`
+            : `${quem(av)} (marcação ${marc}): o chat tem ${campoTxt(d.campos)} e o Klingo está sem. Adicione no cadastro do Klingo.`),
+          h('div', { class: 'sug-acoes' }, ok));
+      }
       const campos = Object.entries(d.campos || {}).map(([k, v]) => `${ROT_CAMPO[k] || k}: ${v.cadastro ? dataOuTxt(v.cadastro) + ' → ' : ''}${dataOuTxt(v.novo)}`);
       return h('div', { class: 'sug' }, h('b', {}, 'Dado diferente do cadastro'), h('div', {}, `${quem(av)} confirmou o CPF e informou dado novo: ${campos.join('; ')}.`),
         h('div', { class: 'sug-acoes' }, h('button', { class: 'btn prim', type: 'button', onclick: () => resolverAvisoPaciente(av, true) }, 'Atualizar cadastro'), h('button', { class: 'btn', type: 'button', onclick: () => resolverAvisoPaciente(av, false) }, 'Manter como está'), h('button', { class: 'btn', type: 'button', onclick: () => abrirConversaDoAviso(av.conversa_id) }, 'Ver conversa')));
@@ -4359,6 +4379,88 @@ h1.longo { font-size: 14mm; }
       (d.motivos_falha || []).length ? h('p', { class: 'dica' }, 'O que mandou para a equipe: ' + d.motivos_falha.map((x) => `${x.codigo} (${x.n})`).join(', ') + '.') : null,
       decisoes.length ? h('p', { class: 'dica' }, 'Últimas decisões automáticas: ' + decisoes.map((x) => `${fmtDataHora(x.em)} · ${nomeChave[x.chave] || x.chave}: ${x.de || '–'} → ${x.para}`).join(' | ')) : null);
   }
+  /* Conferência Klingo x webchat (supabase/klingo-conferencia.sql, relatório #14554): explica a divergência dos números e lista, marcação por marcação, o que precisa de atenção. Só números e códigos. */
+  const ROT_ORIGEM = { Whatsapp: 'WhatsApp', Telefone: 'Telefone', 'Recepção': 'Recepção', sem_origem: 'Sem origem (em branco no Klingo)' };
+  const ROT_CAMPO_CONF = { nome: 'nome', nascimento: 'nascimento', cpf: 'CPF', celular: 'celular', email: 'e-mail' };
+  const campoTxt = (xs) => listaPt((xs || []).map((x) => ROT_CAMPO_CONF[x] || x));
+  function textoProblema(x) {
+    const filho = x.tipo === 'filho', partes = [];
+    if ((x.conflito || []).length) partes.push(`Chat e Klingo discordam em ${campoTxt(x.conflito)}${filho ? ' (da criança)' : ''}.`);
+    if ((x.falta_no_klingo || []).length) partes.push(filho ? `O Klingo não tem ${campoTxt(x.falta_no_klingo)} do responsável; o chat tem.` : `Falta no Klingo (o chat tem): ${campoTxt(x.falta_no_klingo)}.`);
+    if (!partes.length && (x.responsavel_diferente || []).length) partes.push(`${campoTxt(x.responsavel_diferente)} do responsável diferem do cadastro da criança: esperado.`);
+    return partes.join(' ');
+  }
+  function blocoConferencia(d, c) {
+    const tit = h('h3', { class: 'ind-sec' }, '3. Conferência Klingo × webchat: de onde vêm as diferenças');
+    const intro = h('p', { class: 'dica' }, 'Cada marcação do relatório #14554 do Klingo (pela data em que foi marcada), conferida uma a uma com o chat. Só números e códigos: CPF, e-mail e telefone não ficam guardados aqui.');
+    if (!d || d.total == null) return h('div', {}, tit, intro, h('p', { class: 'ind-aviso' }, 'A conferência ainda não está disponível (falta aplicar o SQL supabase/klingo-conferencia.sql ou ligar a leitura do relatório #14554).'));
+    const T = d.total || 0, E = d.explicacao || {}, W = d.webchat || {}, X = W.exames || {}, Q = d.qualidade_klingo || {}, P = d.problemas || {};
+    const semLeitura = (d.dias_sem_leitura || []);
+    const origens = ['Whatsapp', 'Telefone', 'Recepção', 'sem_origem'].map((k) => [k, (d.por_origem || {})[k] || 0]);
+    const maxO = Math.max(1, ...origens.map((x) => x[1]));
+    const passo = (n, t) => h('h4', { class: 'ind-conf-passo' }, h('span', {}, String(n)), t);
+    const conta = (linhas) => h('div', { class: 'ind-conta' }, linhas.map(([rot, v, cls]) => [h('span', { class: cls || '' }, rot), h('b', { class: cls || '' }, nf(v))]).flat());
+    const abrir = (id) => id && abrirConversaDoAviso(id);
+    const quem = (x) => (x.conversa_id ? h('button', { class: 'btn', type: 'button', onclick: () => abrir(x.conversa_id) }, nomeBonito(x.nome || 'Paciente')) : '—');
+    const tipoTag = (x) => (x.tipo === 'filho' ? h('span', { class: 'ind-tag filho' }, 'Filho(a)') : x.tipo ? h('span', { class: 'ind-tag' }, 'Próprio') : '');
+    const probs = d.lista_problemas || [], lig = d.lista_ligadas || [], sem = d.lista_sem_marcacao || [];
+    const tabProb = probs.length ? h('div', { class: 'ind-tab-rolagem' }, h('table', { class: 'ind-tab' },
+      h('thead', {}, h('tr', {}, ['Marcação', 'Marcada em', 'Origem', 'Paciente', 'Tipo', 'O que fazer'].map((t) => h('th', {}, t)))),
+      h('tbody', {}, probs.map((x) => h('tr', {}, h('td', {}, x.m), h('td', {}, dmy(x.marcado_em)), h('td', {}, ROT_ORIGEM[x.origem] || x.origem), h('td', {}, quem(x)), h('td', {}, tipoTag(x)), h('td', {}, textoProblema(x))))))) : h('p', { class: 'dica' }, 'Nenhuma marcação com conflito ou dado faltando neste período.');
+    const ROT_EX = { atendido: 'Atendido', faltou: 'Faltou', agendado: 'Por vir', confirmado: 'Por vir (confirmado)', cancelado: 'Cancelado', remarcado: 'Remarcado', fora_do_banco: 'Ainda fora do banco (exame além de 30 dias)' };
+    const tabLig = lig.length ? h('details', { class: 'ind-como' }, h('summary', {}, `Conferir uma a uma: as ${nf(lig.length)} marcações que vieram de conversa do webchat`),
+      h('div', { class: 'ind-tab-rolagem' }, h('table', { class: 'ind-tab' },
+        h('thead', {}, h('tr', {}, ['Marcação', 'Marcada em', 'Origem', 'Ligada por', 'Paciente', 'Tipo', 'Exame', 'Conferência'].map((t) => h('th', {}, t)))),
+        h('tbody', {}, lig.map((x) => h('tr', {}, h('td', {}, x.m), h('td', {}, dmy(x.marcado_em)), h('td', {}, ROT_ORIGEM[x.origem] || x.origem), h('td', {}, x.ligacao === 'pedido' ? 'Pedido do chat' : 'Celular e nome'), h('td', {}, quem(x)), h('td', {}, tipoTag(x)),
+          h('td', {}, ROT_EX[x.exame] || x.exame), h('td', {}, x.problema ? h('span', { class: 'ind-tag alerta' }, 'Ver aviso') : 'Confere'))))))) : null;
+    return h('div', {}, tit, intro,
+      d.ultima_leitura ? h('p', { class: 'dica' }, `Última leitura do Klingo: ${fmtDataHora(d.ultima_leitura)}.`) : null,
+      semLeitura.length ? h('p', { class: 'ind-aviso' }, `Sem leitura do Klingo em ${semLeitura.length === 1 ? 'um dia' : semLeitura.length + ' dias'} deste período (${semLeitura.slice(0, 6).map(dmy).join(', ')}${semLeitura.length > 6 ? '…' : ''}): os números destes dias estão incompletos, não são zero.`) : null,
+      passo(1, 'Quantas marcações o Klingo tem, e por onde chegaram'),
+      h('div', { class: 'ind-grade' },
+        painel('Marcações feitas no período', 'Origem registrada no Klingo na hora de marcar.', h('div', { class: 'ind-minis' }, h('div', { class: 'ind-mini' }, h('b', {}, nf(T)), h('span', {}, 'marcações no Klingo'))),
+          origens.map(([k, v]) => barra(ROT_ORIGEM[k], v, maxO, `${nf(v)} · ${pTxt(taxa(v, T))}`, k === 'sem_origem' ? 'cinza' : 'azul'))),
+        painel('Por que o cartão "Marcações novas" mostra menos', 'Do total do Klingo até o número do cartão do topo.', conta([
+          ['Marcações no Klingo', T], ['− exame marcado para depois de 30 dias (ainda não entra no banco)', E.fora_do_banco || 0], ['= já estão no banco', E.no_banco || 0, 'tot'],
+          ['− marcações remarcadas', E.remarcadas || 0], ['= "Marcações novas" do cartão', E.novas_marcacoes_indicador || 0, 'tot']]),
+          h('p', { class: 'dica' }, `Das ${nf(T)}, ${nf(E.canceladas_no_klingo || 0)} estão canceladas no Klingo. As marcações para depois de 30 dias entram no banco quando o exame chega perto.`))),
+      passo(2, 'Quantas têm conversa no webchat'),
+      h('div', { class: 'ind-minis' },
+        h('div', { class: 'ind-mini' }, h('b', {}, nf(W.marcacoes_ligadas)), h('span', {}, `marcações com conversa no chat (${pTxt(taxa(W.marcacoes_ligadas || 0, T))})`)),
+        h('div', { class: 'ind-mini' }, h('b', {}, nf((W.por_ligacao || {}).pedido)), h('span', {}, 'ligadas pelo pedido do chat')),
+        h('div', { class: 'ind-mini' }, h('b', {}, nf((W.por_ligacao || {}).telefone_nome)), h('span', {}, 'ligadas por celular e nome')),
+        h('div', { class: 'ind-mini' }, h('b', {}, nf(T - (W.marcacoes_ligadas || 0))), h('span', {}, 'sem conversa no chat')),
+        h('div', { class: 'ind-mini' }, h('b', {}, nf(X.atendido)), h('span', {}, 'dessas, exame atendido')),
+        h('div', { class: 'ind-mini' }, h('b', {}, nf(X.faltou)), h('span', {}, 'faltaram')),
+        h('div', { class: 'ind-mini' }, h('b', {}, nf(X.por_vir)), h('span', {}, 'por vir')),
+        h('div', { class: 'ind-mini' }, h('b', {}, nf(X.cancelado_ou_remarcado)), h('span', {}, 'canceladas ou remarcadas')),
+        h('div', { class: 'ind-mini' }, h('b', {}, nf(X.ainda_fora_do_banco)), h('span', {}, 'ainda fora do banco'))),
+      h('p', { class: 'dica' }, 'Ligada pelo pedido: o chat registrou o número da marcação. Ligada por celular e nome: o celular da conversa e o nome batem com o cadastro do Klingo, e a conversa é de antes da marcação.'),
+      passo(3, 'O que aconteceu com quem procurou o webchat no período'),
+      h('div', { class: 'ind-minis' },
+        h('div', { class: 'ind-mini' }, h('b', {}, nf(W.pessoas_que_procuraram)), h('span', {}, 'pessoas procuraram o chat')),
+        h('div', { class: 'ind-mini' }, h('b', {}, nf(W.atendidas_pela_equipe)), h('span', {}, 'foram atendidas pela equipe')),
+        h('div', { class: 'ind-mini' }, h('b', {}, nf(W.com_pedido_pronto)), h('span', {}, 'chegaram ao pedido pronto')),
+        h('div', { class: 'ind-mini' }, h('b', {}, nf(W.agendaram_no_chat)), h('span', {}, 'geraram agendamento')),
+        h('div', { class: 'ind-mini' }, h('b', {}, nf(W.agendaram_e_ligadas_ao_klingo)), h('span', {}, 'agendamentos já ligados a uma marcação do Klingo')),
+        h('div', { class: 'ind-mini' }, h('b', {}, nf(W.agendadas_sem_marcacao_no_klingo)), h('span', {}, 'agendadas no chat, sem marcação no Klingo'))),
+      (W.agendadas_sem_marcacao_no_klingo || 0) > 0 ? h('div', {}, h('p', { class: 'ind-aviso' }, 'Estas pessoas aparecem como agendadas no chat, mas nenhuma marcação do Klingo foi ligada a elas. Confira se a marcação foi feita, em outro nome ou celular, ou se a pessoa se perdeu.'),
+        h('div', { class: 'ind-tab-rolagem' }, h('table', { class: 'ind-tab' }, h('thead', {}, h('tr', {}, ['Paciente', 'Última atualização'].map((t) => h('th', {}, t)))),
+          h('tbody', {}, sem.map((x) => h('tr', {}, h('td', {}, quem(x)), h('td', {}, fmtDataHora(x.atualizado_em)))))))) : null,
+      passo(4, 'Cadastro incompleto no Klingo'),
+      h('div', { class: 'ind-minis' },
+        h('div', { class: 'ind-mini' }, h('b', {}, nf(Q.sem_cpf)), h('span', {}, `sem CPF (${pTxt(taxa(Q.sem_cpf || 0, T))})`)),
+        h('div', { class: 'ind-mini' }, h('b', {}, nf(Q.sem_email)), h('span', {}, `sem e-mail (${pTxt(taxa(Q.sem_email || 0, T))})`)),
+        h('div', { class: 'ind-mini' }, h('b', {}, nf(Q.sem_celular)), h('span', {}, `sem celular nem telefone (${pTxt(taxa(Q.sem_celular || 0, T))})`))),
+      passo(5, 'Conflitos e dados faltando, para a equipe resolver'),
+      h('div', { class: 'ind-minis' },
+        h('div', { class: 'ind-mini' }, h('b', {}, nf(P.conflito)), h('span', {}, 'marcações com conflito entre chat e Klingo')),
+        h('div', { class: 'ind-mini' }, h('b', {}, nf(P.dado_faltando)), h('span', {}, 'com dado que o chat tem e o Klingo não')),
+        h('div', { class: 'ind-mini' }, h('b', {}, nf(P.responsavel_diferente_esperado)), h('span', {}, 'filhos com contato do responsável diferente (esperado)'))),
+      h('p', { class: 'dica' }, 'Cada caso abaixo também chega como aviso na aba Avisos. Em pedido de filho(a), CPF, celular e e-mail são do responsável: diferença neles não é conflito, e o CPF do responsável nunca deve ser cadastrado na criança. Só nome e nascimento da criança são comparados.'),
+      h('div', { class: 'ind-conf-acoes' }, h('button', { class: 'btn prim', type: 'button', onclick: () => { S.aba = 'avisos'; renderAba(); } }, 'Ver avisos')),
+      tabProb, tabLig);
+  }
   async function viewIndicadores(c, silencioso = false) {
     if (IND.preset !== 'livre') [IND.de, IND.ate] = periodoDe(IND.preset);
     const titulo = h('h2', {}, 'Indicadores');
@@ -4366,10 +4468,11 @@ h1.longo { font-size: 14mm; }
     const minha = viewIndicadores.seq = (viewIndicadores.seq || 0) + 1;   // só a última escolha pinta a tela
     const un = UN.sel || null;
     const args = { p_de: IND.de, p_ate: IND.ate, p_unidade: un, p_incluir_teste: IND.teste };
-    const [r, eq, ext, au] = await Promise.all([db.rpc('painel_indicadores_decisao', args),
+    const [r, eq, ext, au, cf] = await Promise.all([db.rpc('painel_indicadores_decisao', args),
       Promise.resolve(db.rpc('painel_indicadores_atendentes', args)).then((x) => x, () => ({ error: true, data: null })),
       Promise.resolve(db.rpc('painel_indicadores_extras_v2', args)).then((x) => x, () => ({ error: true, data: null })),
-      Promise.resolve(db.rpc('painel_automacao_resumo', { p_de: IND.de, p_ate: IND.ate })).then((x) => x, () => ({ error: true, data: null }))]);
+      Promise.resolve(db.rpc('painel_automacao_resumo', { p_de: IND.de, p_ate: IND.ate })).then((x) => x, () => ({ error: true, data: null })),
+      Promise.resolve(db.rpc('painel_indicadores_conferencia', args)).then((x) => x, () => ({ error: true, data: null }))]);
     if (S.aba !== 'indicadores' || minha !== viewIndicadores.seq) return;
     if (r.error || !r.data) {
       c.replaceChildren(h('div', { class: 'pagina' }, titulo, h('p', { class: 'erro' }, msgErro(r.error || { message: 'Sem resposta do banco.' })),
@@ -4453,6 +4556,7 @@ h1.longo { font-size: 14mm; }
         painelFalta('Faltas por unidade', null, KA.falta_unidade, tFA),
         painelFalta('Faltas por tipo de atendimento', null, KA.falta_plano, tFA)),
       painel('Motivos dos cancelamentos', 'Lidos do texto que a recepção digita no Klingo, então a classificação é aproximada. Remarcações não entram aqui.', canc.length ? canc.map(([k, v]) => barra(ROT_CANCEL[k] || k, v, maxC, `${nf(v)} · ${pTxt(taxa(v, totC))}`, k === 'erro_duplicidade' || k === 'sem_motivo' ? 'cinza' : 'azul')) : h('p', { class: 'dica' }, 'Nenhum cancelamento neste período.')),
+      blocoConferencia(cf && !cf.error ? cf.data : null, c),
       secaoEquipe(eq),
       secaoAvaliacoes(ext),
       h('details', { class: 'ind-como' }, h('summary', {}, 'Como ler estes números'),

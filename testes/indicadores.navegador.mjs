@@ -61,7 +61,31 @@ function servidor() {
   });
 }
 
-async function pagina(browser, { semSql = false, admin = false, semAtend = false } = {}) {
+
+// Respostas de painel_indicadores_conferencia (supabase/klingo-conferencia.sql) e de paciente_avisos com os dois tipos novos. Tudo inventado.
+const CONFERENCIA = {
+  periodo: { de: HOJE, ate: HOJE }, ultima_leitura: `${HOJE}T15:00:00Z`, dias_sem_leitura: [], total: 200,
+  por_origem: { Whatsapp: 90, Telefone: 60, 'Recepção': 30, sem_origem: 20 }, por_status: { Aberta: 170, Cancelada: 30 },
+  explicacao: { no_banco: 170, fora_do_banco: 30, remarcadas: 10, novas_marcacoes_indicador: 160, canceladas_no_klingo: 30 },
+  webchat: { marcacoes_ligadas: 40, conversas_ligadas: 38, por_ligacao: { pedido: 25, telefone_nome: 15 }, por_origem: { Whatsapp: 36, Telefone: 4 },
+    exames: { atendido: 15, faltou: 3, por_vir: 18, cancelado_ou_remarcado: 2, ainda_fora_do_banco: 2 },
+    pessoas_que_procuraram: 60, atendidas_pela_equipe: 52, com_pedido_pronto: 30, agendaram_no_chat: 25, agendaram_e_ligadas_ao_klingo: 22, agendadas_sem_marcacao_no_klingo: 3 },
+  qualidade_klingo: { sem_cpf: 64, sem_email: 92, sem_celular: 6 },
+  problemas: { conflito: 3, dado_faltando: 4, responsavel_diferente_esperado: 9, filho_nos_ligados: 30 },
+  lista_problemas: [
+    { m: '900001', marcado_em: HOJE, origem: 'Whatsapp', status: 'Aberta', conversa_id: 'c-1', nome: 'MARIA DE TESTE', tipo: 'proprio', conflito: ['cpf'], falta_no_klingo: ['email'], responsavel_diferente: [] },
+    { m: '900002', marcado_em: HOJE, origem: 'Telefone', status: 'Aberta', conversa_id: 'c-2', nome: 'PEDRO DE TESTE', tipo: 'filho', conflito: ['nome'], falta_no_klingo: ['celular'], responsavel_diferente: ['cpf', 'email'] }],
+  lista_ligadas: [
+    { m: '900001', marcado_em: HOJE, origem: 'Whatsapp', ligacao: 'pedido', conversa_id: 'c-1', nome: 'MARIA DE TESTE', tipo: 'proprio', exame: 'atendido', status: 'Aberta', problema: true },
+    { m: '900003', marcado_em: HOJE, origem: 'Whatsapp', ligacao: 'telefone_nome', conversa_id: 'c-3', nome: 'ANA DE TESTE', tipo: 'proprio', exame: 'agendado', status: 'Aberta', problema: false }],
+  lista_sem_marcacao: [{ conversa_id: 'c-9', nome: 'JOSE DE TESTE', atualizado_em: `${HOJE}T12:00:00Z` }],
+};
+const AVISOS_CONF = [
+  { id: 71, conversa_id: 'c-1', tipo: 'klingo_conflito', detalhe: { marcacoes: ['900001'], campos: ['cpf'], filho: false }, criado_em: `${HOJE}T15:00:00Z`, nome: 'MARIA DE TESTE' },
+  { id: 72, conversa_id: 'c-2', tipo: 'klingo_dado_faltando', detalhe: { marcacoes: ['900002'], campos: ['celular'], filho: true }, criado_em: `${HOJE}T15:00:00Z`, nome: 'PEDRO DE TESTE' },
+  { id: 73, conversa_id: 'c-4', tipo: 'klingo_dado_faltando', detalhe: { marcacoes: ['900004'], campos: ['celular', 'email'], filho: false }, criado_em: `${HOJE}T15:00:00Z`, nome: 'LUCIA DE TESTE' }];
+
+async function pagina(browser, { semSql = false, admin = false, semAtend = false, conf = false } = {}) {
   const eu = admin ? ADM : EU;
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 } });   // cartões do topo somem em telas baixas (<= 820 px)
   await ctx.addInitScript(([id, token, email]) => {
@@ -90,6 +114,8 @@ async function pagina(browser, { semSql = false, admin = false, semAtend = false
       const b = JSON.parse(req.postData() || '{}'); reg.rpcs.push(['decisao', b]);
       if (semSql) { status = 404; corpo = { code: 'PGRST202', message: 'Could not find the function public.painel_indicadores_decisao in the schema cache' }; } else corpo = DECISAO(b);
     }
+    else if (p.endsWith('/rpc/painel_indicadores_conferencia')) { const b = JSON.parse(req.postData() || '{}'); reg.rpcs.push(['conferencia', b]); corpo = conf ? CONFERENCIA : {}; }
+    else if (p.endsWith('/rpc/paciente_avisos')) corpo = conf ? AVISOS_CONF : [];
     else if (p.startsWith('/rest/v1/rpc/')) corpo = {};
     else if (p.startsWith('/rest/v1/')) corpo = objeto ? null : [];
     else corpo = {};
@@ -276,7 +302,65 @@ await caso('Sem o SQL novo no banco, mostra a mensagem com o arquivo a aplicar e
   return { ok: /supabase\/indicadores-decisao\.sql/.test(txt) && !t.reg.excecoes.length };
 });
 
+await caso('Conferência Klingo x webchat: sem o SQL novo, a aba avisa em vez de mostrar números errados (e não quebra nada)', async () => {
+  const t = await abrir(); await abaInd(t);
+  const txt = await textoAba(t); await t.ctx.close();
+  return { ok: /3\. Conferência Klingo × webchat/.test(txt) && /conferência ainda não está disponível/.test(txt) && !t.reg.excecoes.length, detalhe: t.reg.excecoes[0] ?? '' };
+});
+await caso('Conferência: pede o mesmo período e unidade dos outros blocos e mostra o total e as origens (WhatsApp, Telefone, Recepção, sem origem)', async () => {
+  const t = await abrir({ conf: true }); await abaInd(t); await t.page.waitForSelector('.ind-conf-passo');
+  const a = ultimo(t.reg, 'conferencia'), txt = await textoAba(t); await t.ctx.close();
+  return { ok: a.p_de === HOJE && a.p_ate === HOJE && a.p_unidade === null && /200\s*marcações no Klingo/.test(txt) && /WhatsApp/.test(txt) && /Telefone/.test(txt) && /Recepção/.test(txt) && /Sem origem \(em branco no Klingo\)/.test(txt) && /45% · 90|90 · 45%/.test(txt) && !t.reg.excecoes.length, detalhe: JSON.stringify(a) + (t.reg.excecoes[0] ?? '') };
+});
+await caso('Conferência: explica a divergência passo a passo (200 do Klingo, 30 fora do banco, 170 no banco, 10 remarcadas, 160 no cartão)', async () => {
+  const t = await abrir({ conf: true }); await abaInd(t); await t.page.waitForSelector('.ind-conta');
+  const conta = (await t.page.locator('.ind-conta').first().innerText()).replace(/\n+/g, ' | '); await t.ctx.close();
+  return { ok: /Marcações no Klingo \| 200/.test(conta) && /depois de 30 dias[^|]*\| 30/.test(conta) && /já estão no banco \| 170/.test(conta) && /remarcadas \| 10/.test(conta) && /Marcações novas" do cartão \| 160/.test(conta), detalhe: conta };
+});
+await caso('Conferência: marcações com conversa no webchat (40), por pedido (25) e por celular e nome (15), e o que aconteceu com o exame', async () => {
+  const t = await abrir({ conf: true }); await abaInd(t); await t.page.waitForSelector('.ind-conf-passo');
+  const txt = await textoAba(t); await t.ctx.close();
+  return { ok: /40\s*marcações com conversa no chat \(20%\)/.test(txt) && /25\s*ligadas pelo pedido do chat/.test(txt) && /15\s*ligadas por celular e nome/.test(txt) && /160\s*sem conversa no chat/.test(txt)
+    && /15\s*dessas, exame atendido/.test(txt) && /3\s*faltaram/.test(txt) && /18\s*por vir/.test(txt), detalhe: txt.slice(txt.indexOf('Quantas têm'), txt.indexOf('Quantas têm') + 300) };
+});
+await caso('Conferência: funil do webchat (60 procuraram, 52 atendidas pela equipe, 30 pedido pronto, 25 agendaram) e as 3 agendadas sem marcação no Klingo ficam à vista com o nome', async () => {
+  const t = await abrir({ conf: true }); await abaInd(t); await t.page.waitForSelector('.ind-conf-passo');
+  const txt = await textoAba(t); await t.ctx.close();
+  return { ok: /60\s*pessoas procuraram o chat/.test(txt) && /52\s*foram atendidas pela equipe/.test(txt) && /30\s*chegaram ao pedido pronto/.test(txt) && /25\s*geraram agendamento/.test(txt)
+    && /3\s*agendadas no chat, sem marcação no Klingo/.test(txt) && /Jose de Teste/i.test(txt), detalhe: '' };
+});
+await caso('Conferência: cadastro incompleto no Klingo (sem CPF 32%, sem e-mail 46%, sem celular 3%)', async () => {
+  const t = await abrir({ conf: true }); await abaInd(t); await t.page.waitForSelector('.ind-conf-passo');
+  const txt = await textoAba(t); await t.ctx.close();
+  return { ok: /64\s*sem CPF \(32%\)/.test(txt) && /92\s*sem e-mail \(46%\)/.test(txt) && /6\s*sem celular nem telefone \(3%\)/.test(txt), detalhe: '' };
+});
+await caso('Conferência: tabela de problemas marcação por marcação; FILHO identificado, com CPF/e-mail do responsável tratados como esperados e sem pedir CPF', async () => {
+  const t = await abrir({ conf: true }); await abaInd(t); await t.page.waitForSelector('.ind-tab');
+  const linhas = await t.page.locator('.ind-tab', { hasText: 'O que fazer' }).first().locator('tbody tr').evaluateAll((l) => l.map((r) => r.innerText.replace(/\s+/g, ' ')));
+  await t.ctx.close();
+  const maria = linhas.find((x) => x.includes('900001')) || '', pedro = linhas.find((x) => x.includes('900002')) || '';
+  return { ok: linhas.length === 2 && /Maria de Teste/i.test(maria) && /Próprio/.test(maria) && /discordam em CPF\./.test(maria) && /Falta no Klingo \(o chat tem\): e-mail/.test(maria)
+    && /Filho\(a\)/.test(pedro) && /discordam em nome \(da criança\)/.test(pedro) && /não tem celular do responsável/.test(pedro) && !/CPF/.test(pedro), detalhe: pedro };
+});
+await caso('Conferência: "Conferir uma a uma" lista as marcações do webchat e diz qual tem aviso', async () => {
+  const t = await abrir({ conf: true }); await abaInd(t); await t.page.waitForSelector('details.ind-como summary');
+  await t.page.locator('details.ind-como summary', { hasText: 'Conferir uma a uma' }).click();
+  const linhas = await t.page.locator('details.ind-como table tbody tr').evaluateAll((l) => l.map((r) => r.innerText.replace(/\s+/g, ' ')));
+  await t.ctx.close();
+  return { ok: linhas.length === 2 && /Pedido do chat/.test(linhas[0]) && /Atendido/.test(linhas[0]) && /Ver aviso/.test(linhas[0]) && /Celular e nome/.test(linhas[1]) && /Confere/.test(linhas[1]), detalhe: linhas.join(' || ') };
+});
+await caso('Avisos: conflito, dado faltando (adulto) e dado faltando de FILHO chegam como cartões na aba Avisos; no filho, o CPF do responsável não vai para a criança', async () => {
+  const t = await abrir({ conf: true }); await t.page.click('.nav button[data-aba=avisos]'); await t.page.waitForSelector('#avisosPaciente .sug');
+  const cartoes = await t.page.locator('#avisosPaciente .sug').evaluateAll((l) => l.map((c) => c.innerText.replace(/\s+/g, ' ')));
+  await t.ctx.close();
+  const conf = cartoes.find((x) => /Conflito entre o chat e o Klingo/.test(x)) || '', filho = cartoes.find((x) => /filho\(a\)/.test(x) && /Falta dado/.test(x)) || '', adulto = cartoes.find((x) => /Lucia/i.test(x)) || '';
+  return { ok: cartoes.length === 3 && /CPF diferente/.test(conf) && /marcação 900001/.test(conf) && /do responsável e o Klingo está sem/.test(filho) && /Não coloque o CPF do responsável no cadastro da criança/.test(filho)
+    && /celular e e-mail e o Klingo está sem\. Adicione no cadastro do Klingo/.test(adulto) && /Conferido/.test(conf), detalhe: cartoes.join(' || ') };
+});
+
+
 await browser.close(); srv.close();
+
 const ok = resultados.filter(Boolean).length;
 console.log(`\n${ok}/${resultados.length} verificações passaram`);
 process.exit(ok === resultados.length ? 0 : 1);
