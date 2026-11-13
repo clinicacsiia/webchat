@@ -2,7 +2,7 @@
 
 **Decisão do dono:** o chat **não aprende sozinho**. Quem analisa as conversas e atualiza o código é o Claude, a pedido do dono, conforme os dados crescem. Por isso os textos para o paciente dizem que **a equipe melhora o espaço ouvindo como as pessoas o usam** (e não que o chat "aprende").
 
-## Quando rodar
+## Quando rodar (lembrete na pendência 2.11 de `docs/pendencias-do-dono.md`)
 - Toda **semana** enquanto a base tem menos de 2 meses; depois, todo **mês**.
 - Sempre que mudar um texto, a ordem das opções ou um passo: rodar de novo uma semana depois e comparar.
 
