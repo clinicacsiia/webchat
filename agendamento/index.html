@@ -91,13 +91,13 @@
 <main id="app" tabindex="-1"></main>
 <footer>
   <p><span class="ponto" id="pontoApi"></span><span id="estadoApi">Verificando o sistema da clínica…</span></p>
-  <p>Usamos o CPF e a data de nascimento só para localizar o seu cadastro; não ficam guardados neste aparelho. <a href="../privacidade.html">Privacidade</a> · <a href="../termos.html">Termos</a> · <a href="../">Falar com a equipe pelo chat</a></p>
+  <p>Usamos o CPF (ou o telefone, ou o e-mail e a senha da conta) e a data de nascimento só para localizar o seu cadastro; não ficam guardados neste aparelho. <a href="../privacidade.html">Privacidade</a> · <a href="../termos.html">Termos</a> · <a href="../">Falar com a equipe pelo chat</a></p>
 </footer>
 
 <script>
 'use strict';
 const FN = 'https://nrvuynjwcgwpjdptkiay.supabase.co/functions/v1/klingo-agendamento';
-const VERSAO_PAGINA = '2026.11.13-1';
+const VERSAO_PAGINA = '2026.11.13-2';
 
 // ---------------------------------------------------------------- utilidades
 const $ = (s, r = document) => r.querySelector(s);
@@ -128,10 +128,10 @@ const lista = (x) => (Array.isArray(x) ? x : x && Array.isArray(x.dados) ? x.dad
 
 // ---------------------------------------------------------------- chamada à função (nunca direto ao Klingo)
 let ocupado = 0;
-async function api(acao, dados = {}) {
+async function api(acao, dados = {}, cabecalhos = {}) {
   ocupado++; document.body.setAttribute('aria-busy', 'true');
   try {
-    const r = await fetch(FN, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao, ...dados }) });
+    const r = await fetch(FN, { method: 'POST', headers: { 'Content-Type': 'application/json', ...cabecalhos }, body: JSON.stringify({ acao, ...dados }) });
     const j = await r.json().catch(() => null);
     if (!j || typeof j !== 'object') return { ok: false, motivo: 'resposta_invalida' };
     return j;
@@ -140,8 +140,8 @@ async function api(acao, dados = {}) {
 }
 const MSG = {
   sem_rede: 'Sem conexão com a internet. Confira o sinal e tente de novo.', resposta_invalida: 'O sistema respondeu algo inesperado. Tente de novo em instantes.',
-  nao_confere: 'Não encontramos um cadastro com este CPF e esta data de nascimento. Confira os números ou faça o cadastro de paciente novo.',
-  tentativas_demais: 'Muitas tentativas com este CPF. Tente de novo mais tarde ou procure a recepção.', limite: 'O sistema da clínica está muito ocupado. Tente de novo em alguns segundos.',
+  nao_confere: 'Não encontramos um cadastro com estes dados. Confira os números (ou o e-mail e a senha) ou faça o cadastro de paciente novo.',
+  tentativas_demais: 'Muitas tentativas. Tente de novo mais tarde ou procure a recepção.', limite: 'O sistema da clínica está muito ocupado. Tente de novo em alguns segundos.',
   horario_ocupado: 'Este horário acabou de ser ocupado. Escolha outro.', sem_medico: 'Nenhum médico atende com este convênio para esta consulta. Escolha outro plano ou fale com a equipe.',
   plano_inativo: 'Este plano está inativo no sistema. Escolha outro plano ou fale com a equipe.', plano_desconhecido: 'Este plano não foi reconhecido. Escolha outro.',
   ja_cancelado: 'Esta marcação já estava cancelada.', outra_data: 'O check-in só vale no dia do atendimento.', voucher_nao_encontrado: 'Não achamos esta marcação entre as suas marcações ativas.',
@@ -149,7 +149,7 @@ const MSG = {
   incerto: 'Não conseguimos confirmar se deu certo. Veja em “Minhas marcações” antes de tentar de novo.', limite_diario: 'Muitos cadastros hoje. Procure a recepção ou tente amanhã.',
   sessao_nao_confere: 'Não foi possível confirmar o cadastro. Procure a recepção.', sem_cadastro_definitivo: 'O cadastro precisa ser conferido pela recepção. Procure a clínica.',
   dados_invalidos: 'Alguns dados não estão no formato certo. Confira e tente de novo.', klingo_recusou: 'O sistema da clínica recusou o pedido. Tente de novo ou fale com a equipe.',
-  desligado: 'A entrega do resultado por aqui ainda não foi liberada pela clínica. Peça na recepção ou pelo chat.',
+  desligado: 'Este recurso ainda não foi liberado pela clínica. Peça na recepção ou pelo chat.', nao_autorizado: 'Esta área é só para a equipe da clínica. Confira a chave.',
   erro: 'Algo deu errado do nosso lado. Tente de novo em instantes.', em_andamento: 'Seu cadastro está sendo conferido. Procure a recepção se não puder continuar.',
 };
 const textoErro = (r) => r.mensagem || MSG[r.motivo] || MSG.erro;
@@ -159,10 +159,10 @@ const S = {
   aba: 'marcar', id: null,                                  // id = { cpf, nasc, nome, pre } só na memória
   passo: 1, tipo: 'consulta', especialidades: null, convenios: null, consultas: {}, espec: '', exameBusca: '', exames: null, exame: null,
   plano: { id: 1, nome: 'PARTICULAR' }, ini: hojeSP(), fim: somar(hojeSP(), 9),
-  horarios: null, filtro: { medico: '', unidade: '', turno: '' }, motivoVazio: null, escolhido: null, reserva: null, preco: null, remarcar: null, voucherNovo: null, ident: 'entrar',
+  horarios: null, filtro: { medico: '', unidade: '', turno: '' }, motivoVazio: null, escolhido: null, reserva: null, preco: null, remarcar: null, voucherNovo: null, ident: 'entrar', como: 'cpf', equipeChave: '',
   marcacoes: null, dados: null, avisos: [], catalogo: { k: 'unidades', resposta: null, valores: {} }, relogio: null,
 };
-const ABAS = [['marcar', 'Marcar'], ['marcacoes', 'Minhas marcações'], ['dados', 'Meus dados'], ['consultar', 'Consultar a clínica'], ['sobre', 'Sobre a API']];
+const ABAS = [['marcar', 'Marcar'], ['marcacoes', 'Minhas marcações'], ['dados', 'Meus dados'], ['consultar', 'Consultar a clínica'], ['equipe', 'Equipe'], ['sobre', 'Sobre a API']];
 
 function aviso(tipo, texto) { S.avisos.push({ tipo, texto }); }
 function trocarAba(a) { if (S.aba === 'marcar' && a !== 'marcar') soltarReserva(); S.aba = a; S.avisos = []; desenhar(); $('#app').focus({ preventScroll: true }); window.scrollTo(0, 0); }
@@ -171,35 +171,61 @@ function desenhar() {
   $('#quem').hidden = !S.id; if (S.id) $('#quemNome').textContent = S.id.nome ? `Olá, ${S.id.nome}` : 'Identificado';
   const app = $('#app'); const novo = [];
   for (const a of S.avisos) novo.push(h('div', { class: 'aviso ' + (a.tipo || ''), role: a.tipo === 'erro' ? 'alert' : 'status' }, a.texto));
-  const tela = { marcar: telaMarcar, marcacoes: telaMarcacoes, dados: telaDados, consultar: telaConsultar, sobre: telaSobre }[S.aba]();
+  const tela = { marcar: telaMarcar, marcacoes: telaMarcacoes, dados: telaDados, consultar: telaConsultar, equipe: telaEquipe, sobre: telaSobre }[S.aba]();
   novo.push(tela); app.replaceChildren(...novo);
 }
 async function tarefa(botao, fn) {
   if (botao) { botao.disabled = true; botao.classList.add('carregando'); }
   try { await fn(); } finally { if (botao && botao.isConnected) { botao.disabled = false; botao.classList.remove('carregando'); } }
 }
-const credenciais = () => ({ cpf: S.id.cpf, nascimento: S.id.nasc });
+/** Como o paciente se identifica a cada chamada (só na memória da aba): { cpf, nascimento } | { telefone, nascimento } | { portal_email, portal_senha }. */
+const credenciais = () => S.id.cred;
 function sair() { soltarReserva(); S.id = null; S.marcacoes = null; S.dados = null; S.passo = Math.min(S.passo, 2); S.avisos = []; aviso('ok', 'Você saiu. Seus dados não ficam guardados neste aparelho.'); desenhar(); }
 $('#sair').addEventListener('click', sair);
 
 // ---------------------------------------------------------------- identificação (compartilhada)
 function formIdentidade(aoEntrar, texto) {
+  const como = h('select', { id: 'idComo' }, [['cpf', 'CPF e data de nascimento'], ['telefone', 'Telefone e data de nascimento'], ['portal', 'E-mail e senha do portal']].map(([v, t]) => h('option', { value: v, selected: S.como === v }, t)));
+  como.addEventListener('change', () => { S.como = como.value; desenhar(); });
+  const msg = h('div', { role: 'alert', class: 'aviso erro', hidden: true });
+  const erro = (t, el) => { msg.textContent = t; msg.hidden = false; if (el) el.focus(); };
+  const nasc = h('input', { id: 'idNasc', type: 'date', autocomplete: 'off', max: hojeSP(), min: '1900-01-01' });
   const cpf = h('input', { id: 'idCpf', inputmode: 'numeric', autocomplete: 'off', placeholder: '000.000.000-00', maxlength: '14' });
   cpf.addEventListener('input', () => { cpf.value = maskCpf(cpf.value); });
-  const nasc = h('input', { id: 'idNasc', type: 'date', autocomplete: 'off', max: hojeSP(), min: '1900-01-01' });
-  const msg = h('div', { role: 'alert', class: 'aviso erro', hidden: true });
+  const tel = h('input', { id: 'idTel', type: 'tel', inputmode: 'tel', autocomplete: 'off', placeholder: '(71) 99999-0000', maxlength: '16' });
+  const mail = h('input', { id: 'idMail', type: 'email', autocomplete: 'username', maxlength: '120' }), senha = h('input', { id: 'idSenha', type: 'password', autocomplete: 'current-password', maxlength: '60' });
+  const campos = S.como === 'telefone' ? [h('label', { for: 'idTel' }, 'Telefone com DDD'), tel, h('label', { for: 'idNasc' }, 'Data de nascimento'), nasc]
+    : S.como === 'portal' ? [h('label', { for: 'idMail' }, 'E-mail da conta'), mail, h('label', { for: 'idSenha' }, 'Senha'), senha]
+    : [h('label', { for: 'idCpf' }, 'CPF'), cpf, h('label', { for: 'idNasc' }, 'Data de nascimento'), nasc];
   const entrar = h('button', { type: 'button', class: 'btn prim', onclick: () => tarefa(entrar, async () => {
-    msg.hidden = true;
-    if (!cpfOk(cpf.value)) { msg.textContent = 'O CPF não parece certo. Confira os números.'; msg.hidden = false; cpf.focus(); return; }
-    if (!nasc.value) { msg.textContent = 'Informe a data de nascimento.'; msg.hidden = false; nasc.focus(); return; }
-    const r = await api('identificar', { cpf: soDigitos(cpf.value), nascimento: nasc.value });
-    if (!r.ok) { msg.textContent = textoErro(r); msg.hidden = false; return; }
-    S.id = { cpf: soDigitos(cpf.value), nasc: nasc.value, nome: r.primeiro_nome || '', pre: !!r.pre_cadastro };
+    msg.hidden = true; let cred;
+    if (S.como === 'cpf') {
+      if (!cpfOk(cpf.value)) return erro('O CPF não parece certo. Confira os números.', cpf);
+      if (!nasc.value) return erro('Informe a data de nascimento.', nasc);
+      cred = { cpf: soDigitos(cpf.value), nascimento: nasc.value };
+    } else if (S.como === 'telefone') {
+      if (soDigitos(tel.value).length < 10) return erro('Informe o telefone com DDD.', tel);
+      if (!nasc.value) return erro('Informe a data de nascimento.', nasc);
+      cred = { telefone: soDigitos(tel.value), nascimento: nasc.value };
+    } else {
+      if (!/^\S+@\S+\.\S+$/.test(mail.value.trim())) return erro('O e-mail não parece certo.', mail);
+      if (senha.value.length < 4) return erro('Informe a senha.', senha);
+      cred = { portal_email: mail.value.trim().toLowerCase(), portal_senha: senha.value };
+    }
+    const r = await api('identificar', cred);
+    if (!r.ok) return erro(textoErro(r));
+    S.id = { cred, nome: r.primeiro_nome || '', pre: !!r.pre_cadastro };
     aoEntrar();
   }) }, 'Entrar');
+  const esqueci = S.como === 'portal' ? h('button', { type: 'button', class: 'btn', onclick: () => tarefa(esqueci, async () => {
+    msg.hidden = true;
+    if (!/^\S+@\S+\.\S+$/.test(mail.value.trim())) return erro('Escreva o e-mail da conta acima para receber as instruções.', mail);
+    const r = await api('portal_recuperar', { email: mail.value.trim().toLowerCase(), confirmar: true });
+    S.avisos = []; aviso(r.ok ? 'ok' : 'erro', r.ok ? r.mensagem : textoErro(r)); desenhar();
+  }) }, 'Esqueci a senha') : null;
   return h('div', {}, texto ? h('p', { class: 'suave' }, texto) : null,
-    h('label', { for: 'idCpf' }, 'CPF'), cpf, h('label', { for: 'idNasc' }, 'Data de nascimento'), nasc, msg,
-    h('div', { class: 'acoes' }, entrar, h('button', { type: 'button', class: 'btn', onclick: () => { S.ident = 'novo'; desenhar(); } }, 'Sou paciente novo')));
+    h('label', { for: 'idComo' }, 'Como quer entrar?'), como, campos, msg,
+    h('div', { class: 'acoes' }, entrar, esqueci, h('button', { type: 'button', class: 'btn', onclick: () => { S.ident = 'novo'; desenhar(); } }, 'Sou paciente novo')));
 }
 
 function formCadastro(aoCadastrar) {
@@ -208,6 +234,7 @@ function formCadastro(aoCadastrar) {
   cpf[1].addEventListener('input', () => { cpf[1].value = maskCpf(cpf[1].value); });
   const nasc = c('cdNasc', 'Data de nascimento', { type: 'date', max: hojeSP(), min: '1900-01-01' }), cel = c('cdCel', 'Celular com DDD', { inputmode: 'tel', placeholder: '(71) 99999-0000', maxlength: '16' });
   const mail = c('cdMail', 'E-mail (opcional)', { type: 'email', maxlength: '120' }), mae = c('cdMae', 'Nome da mãe (opcional)', { maxlength: '100' });
+  const querConta = h('input', { type: 'checkbox', id: 'cdConta' }), senhaNova = h('input', { id: 'cdSenha', type: 'password', autocomplete: 'new-password', maxlength: '60', placeholder: 'Mínimo de 6 caracteres' });
   const sexo = h('select', { id: 'cdSexo' }, h('option', { value: '' }, 'Escolha'), h('option', { value: 'F' }, 'Feminino'), h('option', { value: 'M' }, 'Masculino'));
   const msg = h('div', { role: 'alert', class: 'aviso erro', hidden: true });
   const ok = h('button', { type: 'button', class: 'btn prim', onclick: () => tarefa(ok, async () => {
@@ -218,14 +245,19 @@ function formCadastro(aoCadastrar) {
     if (!cpfOk(cpf[1].value)) return erro('O CPF não parece certo.', cpf[1]);
     if (!nasc[1].value) return erro('Informe a data de nascimento.', nasc[1]);
     if (soDigitos(cel[1].value).length < 10) return erro('Informe o celular com DDD.', cel[1]);
-    const r = await api('cadastrar', { nome: nome[1].value.trim(), sexo: sexo.value, cpf: soDigitos(cpf[1].value), nascimento: nasc[1].value, celular: soDigitos(cel[1].value), email: mail[1].value.trim() || undefined, mae: mae[1].value.trim() || undefined, confirmar: true });
+    const conta = querConta.checked;
+    if (conta && !/^\S+@\S+\.\S+$/.test(mail[1].value.trim())) return erro('Para criar a conta com senha, informe um e-mail válido.', mail[1]);
+    if (conta && senhaNova.value.length < 6) return erro('A senha precisa ter pelo menos 6 caracteres.', senhaNova);
+    const r = await api(conta ? 'portal_cadastrar' : 'cadastrar', { nome: nome[1].value.trim(), sexo: sexo.value, cpf: soDigitos(cpf[1].value), nascimento: nasc[1].value, celular: soDigitos(cel[1].value), email: mail[1].value.trim() || undefined, mae: mae[1].value.trim() || undefined, ...(conta ? { senha: senhaNova.value } : {}), confirmar: true });
     if (!r.ok) { msg.textContent = textoErro(r); msg.hidden = false; return; }
-    const e = await api('identificar', { cpf: soDigitos(cpf[1].value), nascimento: nasc[1].value });
-    if (!e.ok) { S.ident = 'entrar'; aviso('ok', 'Pré-cadastro feito. Agora entre com o CPF e a data de nascimento.'); desenhar(); return; }
-    S.id = { cpf: soDigitos(cpf[1].value), nasc: nasc[1].value, nome: e.primeiro_nome || '', pre: true }; S.ident = 'entrar'; aviso('ok', 'Pré-cadastro feito. A recepção completa os seus dados.'); aoCadastrar();
+    const cred = conta ? { portal_email: mail[1].value.trim().toLowerCase(), portal_senha: senhaNova.value } : { cpf: soDigitos(cpf[1].value), nascimento: nasc[1].value };
+    const e = await api('identificar', cred);
+    if (!e.ok) { S.ident = 'entrar'; S.como = conta ? 'portal' : 'cpf'; aviso('ok', 'Pré-cadastro feito. Agora entre com ' + (conta ? 'o e-mail e a senha.' : 'o CPF e a data de nascimento.')); desenhar(); return; }
+    S.id = { cred, nome: e.primeiro_nome || '', pre: true }; S.ident = 'entrar'; aviso('ok', 'Pré-cadastro feito. A recepção completa os seus dados.'); aoCadastrar();
   }) }, 'Fazer o cadastro');
   return h('div', {}, h('p', { class: 'suave' }, 'Cadastro rápido de paciente novo. A recepção completa o restante depois. Se você já foi atendido na CSI, use “Entrar”.'),
-    nome, h('label', { for: 'cdSexo' }, 'Sexo do cadastro'), sexo, cpf, nasc, cel, mail, mae, msg,
+    nome, h('label', { for: 'cdSexo' }, 'Sexo do cadastro'), sexo, cpf, nasc, cel, mail, mae,
+    h('label', {}, querConta, ' Criar também uma conta com e-mail e senha (para entrar sem o CPF)'), h('div', { class: 'suave' }, 'Precisa do e-mail acima. Se a clínica ainda não liberou a conta com senha, o cadastro avisa.'), h('label', { for: 'cdSenha' }, 'Senha da conta (só se marcou a opção acima)'), senhaNova, msg,
     h('div', { class: 'acoes' }, ok, h('button', { type: 'button', class: 'btn', onclick: () => { S.ident = 'entrar'; desenhar(); } }, 'Já tenho cadastro')));
 }
 const blocoIdentidade = (aoEntrar, texto) => S.ident === 'novo' ? h('div', { class: 'cartao' }, h('h2', {}, 'Paciente novo'), formCadastro(aoEntrar)) : h('div', { class: 'cartao' }, h('h2', {}, 'Quem é você?'), formIdentidade(aoEntrar, texto));
@@ -383,6 +415,7 @@ function telaMarcacoes() {
   if (!S.marcacoes.length) caixa.append(h('div', { class: 'cartao' }, h('p', {}, 'Você não tem marcações ativas.'), h('button', { type: 'button', class: 'btn prim', onclick: () => trocarAba('marcar') }, 'Marcar agora')));
   for (const v of S.marcacoes) caixa.append(cartaoMarcacao(v));
   caixa.append(h('div', { class: 'acoes' }, h('button', { type: 'button', class: 'btn', onclick: () => { S.marcacoes = null; desenhar(); } }, 'Atualizar a lista'), h('button', { type: 'button', class: 'btn', onclick: () => trocarAba('marcar') }, 'Nova marcação')));
+  caixa.append(formResultadoImagem());
   return caixa;
 }
 function cartaoMarcacao(v) {
@@ -428,6 +461,25 @@ async function verResultado(v, saida) {
   saida.replaceChildren(partes.length ? h('div', { style: 'margin-top:10px' }, partes) : h('div', { class: 'aviso atencao' }, 'O resultado está pronto, mas não veio em um formato que a página consegue mostrar. Peça a retirada na recepção.'));
 }
 
+/** Resultado de exame de imagem pelo número de acesso (GET /resultado/pdf/an/{número}). Só se a clínica liberar a entrega de resultados. */
+function formResultadoImagem() {
+  const num = h('input', { id: 'anNum', autocomplete: 'off', maxlength: '40', placeholder: 'Número de acesso do exame' }), saida = h('div', { 'aria-live': 'polite' });
+  const b = h('button', { type: 'button', class: 'btn peq', onclick: () => tarefa(b, async () => {
+    const an = num.value.trim();
+    if (!/^[A-Za-z0-9._-]{3,40}$/.test(an)) { saida.replaceChildren(h('div', { class: 'aviso erro' }, 'Informe o número de acesso do exame (letras, números, ponto, traço).')); return; }
+    saida.replaceChildren(h('p', { class: 'carregando suave' }, 'Consultando o resultado'));
+    const r = await api('resultado_imagem', { ...credenciais(), accession: an });
+    if (!r.ok) { saida.replaceChildren(h('div', { class: 'aviso erro' }, textoErro(r))); return; }
+    if (!r.pronto) { saida.replaceChildren(h('div', { class: 'aviso atencao' }, 'Não encontramos um resultado pronto para este número. Confira o número ou procure a recepção.')); return; }
+    const c = acharConteudo(r.resultado);
+    if (!c.pdf) { saida.replaceChildren(h('div', { class: 'aviso atencao' }, 'O resultado está pronto, mas não veio em um formato que a página consegue mostrar. Peça a retirada na recepção.')); return; }
+    const bytes = Uint8Array.from(atob(c.pdf), (ch) => ch.charCodeAt(0)); const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
+    saida.replaceChildren(h('a', { class: 'btn prim peq', href: url, target: '_blank', rel: 'noopener', download: 'resultado-imagem.pdf' }, 'Abrir o resultado em PDF'));
+  }) }, 'Ver o resultado');
+  return h('div', { class: 'cartao' }, h('h2', {}, 'Resultado de exame de imagem ', h('span', { class: 'etiqueta nt', title: 'Ainda não testado em produção' }, 'não testado')),
+    h('p', { class: 'suave' }, 'Digite o número de acesso que veio no seu protocolo. O Klingo confere se o exame é do cadastro com que você entrou.'), h('label', { for: 'anNum' }, 'Número de acesso'), num, h('div', { class: 'acoes' }, b), saida);
+}
+
 // ---------------------------------------------------------------- aba MEUS DADOS
 function telaDados() {
   if (!S.id) return blocoIdentidade(() => desenhar(), 'Entre para ver e atualizar os seus dados de contato.');
@@ -467,6 +519,7 @@ const CAT = [
   { k: 'precos', t: 'Tabela de preços de um plano', campos: [['id_plano', 'Número do plano', 1], ['page', 'Página (opcional)']] },
   { k: 'recepcoes', t: 'Recepções', campos: [['cnes', 'Unidade (na CSI use 1)', 1]] },
   { k: 'regioes_cd', t: 'Regiões de coleta domiciliar', campos: [['cnes', 'Unidade (na CSI use 1)', 1]] },
+  { k: 'verificar_horario', acao: 'verificar_horario', t: 'Convênios e procedimentos de um horário (verificar horário)', campos: [['horario', 'Chave do horário (data|médico|agenda|unidade|hora)', 1]] },
   { k: 'horario_procedimentos', t: 'Procedimentos aceitos por um horário', campos: [['horario', 'Chave do horário (data|médico|agenda|unidade|hora)', 1]] },
   { k: 'requisicao', acao: 'requisicao', t: 'Requisição de exames do pedido médico', campos: [['id', 'Número da requisição', 1], ['origem', 'Origem', 1], ['token', 'Código da requisição', 1]] },
 ];
@@ -503,11 +556,53 @@ const MAPA = [
   ['ok', 'Ver e cancelar marcações (GET /vouchers, DELETE /voucher)', 'Minhas marcações'], ['nt', 'Check-in e desfazer check-in (POST e DELETE /checkin)', 'Minhas marcações'],
   ['nt', 'Resultado de exame (GET /resultado/{id} e /resultado/pdf/{id}): só se o Klingo disser que está pronto. A função vem com a entrega DESLIGADA até a clínica liberar', 'Minhas marcações'], ['nt', 'Requisição de exames (GET /requisicao)', 'Consultar'], ['ok', 'Ver se a API está no ar (GET /live)', 'Rodapé'],
   ['no', 'Adiantamento, pagamento, registrar atendimento e formas de pagamento (/adiantamento(s), /pagamento(s), /registrar_atendimento, /formas_de_pagamento)', 'Mexem em dinheiro: o guia manda validar com o suporte do Klingo antes'],
-  ['no', 'Lista de atendimentos do dia (GET /atendimentos)', 'Devolve os dados de todos os pacientes do dia'], ['no', 'Entrar só pelo telefone (POST /paciente/identificar)', 'Telefone é fácil de saber; usamos CPF + nascimento'],
-  ['no', 'Conta do portal e recuperação de senha (POST /externo/portal/register, /login, /recuperar)', 'Cria conta e dispara e-mail; não é preciso para marcar'],
-  ['no', 'Resultado de imagem por número de acesso (GET /resultado/pdf/an/{número}) e verificar horário (GET /agenda/verificar_horario)', 'GET com corpo, nunca testado; usamos as rotas acima'],
-  ['no', 'Aviso automático de mudança (POST /webhook-configurado)', 'É o Klingo que chama a clínica; não é ação desta página'],
+  ['nt', 'Totais dos atendimentos do dia (GET /atendimentos): só números por médico, plano e procedimento, nunca dados de paciente, e só com a chave da equipe', 'Equipe'],
+  ['nt', 'Entrar pelo telefone + nascimento (POST /paciente/identificar). Vem DESLIGADO até a clínica liberar (AGENDAMENTO_TELEFONE=1); cinco erros travam o telefone por 1 hora', 'Entrar'],
+  ['nt', 'Conta do portal: cadastrar com e-mail e senha, entrar e recuperar a senha (POST /externo/portal/register, /login, /recuperar). Vem DESLIGADO até a clínica liberar (AGENDAMENTO_PORTAL=1)', 'Paciente novo e Entrar'],
+  ['nt', 'Convênios e procedimentos de um horário (GET /agenda/verificar_horario): a documentação pede um corpo num GET; a página manda o dado na consulta', 'Consultar'],
+  ['nt', 'Resultado de imagem pelo número de acesso (GET /resultado/pdf/an/{número}); junto do interruptor do resultado, que vem DESLIGADO', 'Minhas marcações'],
+  ['nt', 'API de Confirmação / telefonia (GET /telefonia/live, /lista, /{id}, /bloqueios; POST /confirmar, /nps): em 12/11/2026 respondeu “não encontrado”, provavelmente não habilitada. Ficou de fora só a lista por CPF e a entrada de chamada', 'Equipe'],
+  ['no', 'Aviso automático de mudança (POST /webhook-configurado)', 'É o Klingo que chama a clínica. O receptor já existe (função klingo-webhook); falta o Klingo cadastrar o endereço'],
 ];
+// ---------------------------------------------------------------- aba EQUIPE (só com a chave da equipe; nada de dado de paciente)
+function telaEquipe() {
+  const chave = h('input', { id: 'eqChave', type: 'password', autocomplete: 'off', value: S.equipeChave, maxlength: '120' });
+  chave.addEventListener('input', () => { S.equipeChave = chave.value; });
+  const cab = () => ({ 'x-equipe-chave': S.equipeChave });
+  const saidaAt = h('div', { 'aria-live': 'polite' }), saidaTel = h('div', { 'aria-live': 'polite' });
+  const data = h('input', { id: 'eqData', type: 'date', value: hojeSP() });
+  const tabela = (r) => h('div', {}, h('p', {}, h('b', {}, `${r.total} atendimento(s) em ${fmtData(r.data)}`)),
+    [['Por médico', r.por_medico], ['Por plano', r.por_plano], ['Por procedimento', r.por_procedimento]].map(([t, l]) => h('details', { class: 'dia', open: true }, h('summary', {}, t), h('div', { class: 'conteudo' }, resultadoTabela(l)))));
+  const bAt = h('button', { type: 'button', class: 'btn prim', onclick: () => tarefa(bAt, async () => {
+    if (!S.equipeChave) { saidaAt.replaceChildren(h('div', { class: 'aviso erro' }, 'Digite a chave da equipe.')); return; }
+    const r = await api('equipe_atendimentos', { data: data.value || hojeSP() }, cab());
+    saidaAt.replaceChildren(r.ok ? tabela(r) : h('div', { class: 'aviso erro' }, textoErro(r)));
+  }) }, 'Ver os totais do dia');
+  const campo = (id, rot, attrs = {}) => [h('label', { for: id }, rot), h('input', { id, autocomplete: 'off', ...attrs })];
+  const rota = h('select', { id: 'eqRota' }, [['live', 'Está no ar?'], ['lista', 'Marcações de um dia (sem dados do paciente)'], ['marcacao', 'Uma marcação'], ['bloqueios', 'Bloqueios de agenda'], ['confirmar', 'Registrar confirmação da marcação'], ['nps', 'Registrar nota NPS']].map(([v, t]) => h('option', { value: v }, t)));
+  const tData = campo('eqTData', 'Data (opcional)', { type: 'date' }), tAte = campo('eqTAte', 'Até (opcional; na lista, no máximo 7 dias)', { type: 'date' });
+  const tId = campo('eqTId', 'Número da marcação', { inputmode: 'numeric', maxlength: '12' }), tMed = campo('eqTMed', 'Número do médico (bloqueios, opcional)', { inputmode: 'numeric', maxlength: '9' });
+  const tStatus = h('select', { id: 'eqTStatus' }, [['C', 'C – Confirmado'], ['S', 'S – Sem resposta'], ['N', 'N – Não confirmado (CANCELA a marcação)']].map(([v, t]) => h('option', { value: v }, t)));
+  const tNota = campo('eqTNota', 'Nota NPS (0 a 10)', { type: 'number', min: '0', max: '10' }), tObs = campo('eqTObs', 'Observação (opcional)', { maxlength: '200' });
+  const bTel = h('button', { type: 'button', class: 'btn prim', onclick: () => tarefa(bTel, async () => {
+    if (!S.equipeChave) { saidaTel.replaceChildren(h('div', { class: 'aviso erro' }, 'Digite a chave da equipe.')); return; }
+    const r0 = rota.value, d = { rota: r0 }, v = (el) => el.value.trim();
+    if (r0 === 'lista') { if (v(tData[1])) d.data = v(tData[1]); if (v(tAte[1])) d.ate = v(tAte[1]); }
+    if (r0 === 'bloqueios') { if (v(tData[1])) d.de = v(tData[1]); if (v(tAte[1])) d.ate = v(tAte[1]); if (v(tMed[1])) d.id_medico = v(tMed[1]); }
+    if (r0 === 'marcacao') d.id = v(tId[1]);
+    if (r0 === 'confirmar') { Object.assign(d, { id_marcacao: v(tId[1]), status: tStatus.value, obs: v(tObs[1]) || undefined, confirmar: true }); if (tStatus.value === 'N') { if (!confirm('O status N CANCELA a marcação no Klingo. Continuar?')) return; d.cancelar_marcacao = true; } }
+    if (r0 === 'nps') Object.assign(d, { id_marcacao: v(tId[1]), nota: Number(v(tNota[1])), obs: v(tObs[1]) || undefined, confirmar: true });
+    const r = await api('equipe_telefonia', d, cab());
+    saidaTel.replaceChildren(r.ok ? h('div', {}, r.marcacoes ? resultadoTabela(r.marcacoes) : h('pre', {}, JSON.stringify(r, null, 2))) : h('div', { class: 'aviso erro' }, textoErro(r)));
+  }) }, 'Enviar');
+  return h('div', {}, h('h1', {}, 'Equipe'),
+    h('div', { class: 'aviso atencao' }, 'Área só para a equipe da clínica. A chave fica só na memória desta aba. Aqui saem apenas totais e dados da agenda: nunca nome, CPF, telefone ou endereço de paciente.'),
+    h('div', { class: 'cartao' }, h('label', { for: 'eqChave' }, 'Chave da equipe'), chave),
+    h('div', { class: 'cartao' }, h('h2', {}, 'Atendimentos do dia ', h('span', { class: 'etiqueta nt' }, 'não testado')), h('p', { class: 'suave' }, 'Mostra quantos atendimentos houve, por médico, plano e procedimento.'), h('label', { for: 'eqData' }, 'Dia'), data, h('div', { class: 'acoes' }, bAt), saidaAt),
+    h('div', { class: 'cartao' }, h('h2', {}, 'API de Confirmação (telefonia) ', h('span', { class: 'etiqueta nt' }, 'não testado')), h('p', { class: 'suave' }, 'Em 12/11/2026 o Klingo respondeu “não encontrado” para esta API: ela provavelmente não está habilitada para a CSI. Peça a habilitação ao suporte do Klingo.'),
+      h('label', { for: 'eqRota' }, 'O que fazer'), rota, tData, tAte, tId, tMed, h('label', { for: 'eqTStatus' }, 'Status (só para confirmação)'), tStatus, tNota, tObs, h('div', { class: 'acoes' }, bTel), saidaTel));
+}
+
 function telaSobre() {
   const et = { ok: ['ok', 'Na página'], nt: ['nt', 'Não testado'], no: ['no', 'Fora de propósito'] };
   return h('div', {}, h('h1', {}, 'O que a API do Klingo faz e o que esta página usa'), h('p', { class: 'suave' }, 'Versão da página ' + VERSAO_PAGINA + '. Fonte: documentação oficial guardada pela clínica (API Externa 1.0.0) e testes reais de 12/11/2026.'),

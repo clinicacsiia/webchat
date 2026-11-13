@@ -222,16 +222,33 @@ export class KlingoApi {
     return { token: r.access_token, user: r.user ?? {} };
   }
 
-  /** POST /externo/register — cria um PRÉ-CADASTRO. A API não evita duplicar o mesmo CPF: quem chama trava por CPF antes. */
-  async registrar(p: { nome: string; sexo: string; nascimento: string; cpf: string; celular?: string; email?: string; mae?: string }): Promise<{ id: string }> {
-    const r = await this.chamar<{ id?: number | string }>("POST", "/externo/register", {
-      corpo: { paciente: { nome: p.nome, sexo: p.sexo, dt_nasc: p.nascimento, ...(p.mae ? { mae: p.mae } : {}), docs: { cpf: p.cpf },
-        contatos: { ...(p.celular ? { celular: p.celular } : {}), ...(p.email ? { email: p.email } : {}) } } },
-    });
-    const id = String(r?.id ?? "");
-    if (!/^\d+$/.test(id)) throw new KlingoErro(200, "/externo/register", "outro");
+  /** POST /externo/register — cria um PRÉ-CADASTRO. A API não evita duplicar o mesmo CPF: quem chama trava por CPF antes.
+   *  Com `portal` cria o pré-cadastro como usuário do portal (POST /externo/portal/register, e-mail + senha). */
+  async registrar(p: { nome: string; sexo: string; nascimento: string; cpf: string; celular?: string; email?: string; mae?: string }, portal?: { senha: string }): Promise<{ id: string }> {
+    const paciente = { nome: p.nome, sexo: p.sexo, dt_nasc: p.nascimento, ...(p.mae ? { mae: p.mae } : {}), docs: { cpf: p.cpf },
+      contatos: { ...(p.celular ? { celular: p.celular } : {}), ...(p.email ? { email: p.email } : {}) } };
+    const r = await this.chamar<{ id?: number | string; user?: { id?: number | string } }>("POST", portal ? "/externo/portal/register" : "/externo/register", { corpo: portal ? { senha: portal.senha, paciente } : { paciente } });
+    const id = String(r?.id ?? r?.user?.id ?? "");
+    if (!/^\d+$/.test(id)) throw new KlingoErro(200, portal ? "/externo/portal/register" : "/externo/register", "outro");
     return { id };
   }
+
+  /** POST /paciente/identificar — telefone + data de nascimento (nunca `apenas_telefone`). Devolve a sessão do paciente. */
+  async identificarPorTelefone(telefone: string, nascimento: string): Promise<{ token: string; user: Record<string, unknown> }> {
+    const r = await this.chamar<{ access_token?: string; user?: Record<string, unknown> }>("POST", "/paciente/identificar", { corpo: { telefone, dt_nascimento: nascimento } });
+    if (!r?.access_token) throw new KlingoErro(0, "/paciente/identificar", "outro");
+    return { token: r.access_token, user: r.user ?? {} };
+  }
+
+  /** POST /externo/portal/login — e-mail + senha do portal de agendamentos do Klingo. */
+  async loginPortal(email: string, senha: string): Promise<{ token: string; user: Record<string, unknown> }> {
+    const r = await this.chamar<{ access_token?: string; user?: Record<string, unknown> }>("POST", "/externo/portal/login", { corpo: { email, senha } });
+    if (!r?.access_token) throw new KlingoErro(0, "/externo/portal/login", "outro");
+    return { token: r.access_token, user: r.user ?? {} };
+  }
+
+  /** POST /externo/portal/recuperar — o Klingo manda o e-mail de recuperação de senha. */
+  recuperarPortal(email: string) { return this.chamar<unknown>("POST", "/externo/portal/recuperar", { corpo: { email } }); }
 }
 
 /**

@@ -1,10 +1,11 @@
 // FLUXOGRAMA: entrada (POST JSON {"acao": "...", ...} vindo da página pública /agendamento/, sem login) -> validação (tamanho do corpo, ação conhecida, campos conferidos um a um,
 //   CPF com dígito verificador, travas por CPF) -> lógica (regras.ts: catálogos e horários só leem; ações do paciente conferem CPF + nascimento no Klingo antes e depois do login;
 //   toda chamada passa pela cota global do banco) -> saída (JSON enxuto; nunca corpo de erro do Klingo, CPF, RG, foto nem contato sem máscara; nada de paciente vai para log)
-// Versão 1.0 — 13/11/2026 / Mudança: primeira versão (página de agendamento com tudo o que a API externa do Klingo permite, menos dinheiro).
+// Versão 1.1 — 13/11/2026 / Mudança: acrescenta verificar_horario, resultado por accession, entrada por telefone, conta do portal, totais do dia e API de telefonia (a equipe), tudo menos dinheiro. A 1.0 era a primeira versão.
 //
 // Publicar com verify_jwt=false (a página é pública; quem protege é a conferência de CPF + nascimento e as travas em regras.ts).
-// Secrets: KLINGO_APP_TOKEN (o mesmo das outras funções) e, opcional, AGENDAMENTO_RESULTADO=1 (liga a entrega de laudo; desligada por padrão). Tabela usada: klingo_identidade (já existe); RPCs: klingo_hash, klingo_cota_pegar, klingo_cota_429,
+// Secrets: KLINGO_APP_TOKEN (o mesmo das outras funções) e, opcionais e DESLIGADOS por padrão: AGENDAMENTO_RESULTADO=1 (entrega de laudo), AGENDAMENTO_TELEFONE=1 (entrar por telefone + nascimento),
+// AGENDAMENTO_PORTAL=1 (conta e senha do portal) e AGENDAMENTO_EQUIPE_CHAVE=<texto longo> (libera as ações equipe_* para quem mandar o mesmo valor no cabeçalho x-equipe-chave). Tabela usada: klingo_identidade (já existe); RPCs: klingo_hash, klingo_cota_pegar, klingo_cota_429,
 // klingo_identidade_registrar, klingo_pre_gravar. NÃO cria tabela nem função no banco.
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { cotaGlobal, KlingoApi } from "./api.ts";
@@ -15,7 +16,7 @@ const MAX_CORPO = 16 * 1024;
 
 const cors = (origem: string | null): Record<string, string> => ({
   ...(origem && ORIGENS.includes(origem) ? { "Access-Control-Allow-Origin": origem, Vary: "Origin" } : {}),
-  "Access-Control-Allow-Headers": "content-type, apikey, authorization, x-client-info",
+  "Access-Control-Allow-Headers": "content-type, apikey, authorization, x-client-info, x-equipe-chave",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Cache-Control": "no-store",
 });
@@ -26,6 +27,8 @@ const dataSP = () => new Intl.DateTimeFormat("sv-SE", { timeZone: "America/Sao_P
 const OPERACAO_PAGINA = "00000000-0000-4000-8000-0000000a9e11";
 
 const cache = new Map<string, { ate: number; v: unknown }>();
+/** Comparação em tempo constante (a chave da equipe não vaza por tempo de resposta). */
+const igual = (a: string, b: string) => { if (a.length !== b.length) return false; let r = 0; for (let i = 0; i < a.length; i++) r |= a.charCodeAt(i) ^ b.charCodeAt(i); return r === 0; };
 
 Deno.serve(async (req: Request) => {
   const origem = req.headers.get("origin");
@@ -75,6 +78,11 @@ Deno.serve(async (req: Request) => {
     async soltarPre(cpf, nascimento) {
       await supabase.from("klingo_identidade").delete().eq("chave", await hash(`${cpf}|${nascimento}`)).eq("tipo", "pre").is("klingo_id", null);
     },
+    async registrarTentativa(chave) {
+      // tentativa recusada por telefone ou e-mail+senha: uma linha por tentativa (chave única por uuid); só hashes, sem telefone, e-mail nem senha
+      const { error } = await supabase.from("klingo_identidade").insert({ chave: await hash(`${chave}|${crypto.randomUUID()}`), cpf_hash: await hash(chave), tipo: null, klingo_id: null, situacao: "divergente" });
+      if (error) throw new Error("tentativa");   // na dúvida a ação falha (500); não libera
+    },
     async precadastrosRecentes() {
       const desde = new Date(Date.now() - 86_400_000).toISOString();
       const { count } = await supabase.from("klingo_identidade").select("id", { count: "exact", head: true }).eq("tipo", "pre").or(`criado_pela_operacao.is.null,criado_pela_operacao.eq.${OPERACAO_PAGINA}`).gte("conferido_em", desde);
@@ -83,7 +91,12 @@ Deno.serve(async (req: Request) => {
   };
 
   const api = new KlingoApi(token, (u, i) => fetch(u, i), { antes: cotaGlobal(rpc), aoLimite: async () => { await supabase.rpc("klingo_cota_429"); } });
-  const ctx: Ctx = { api, db, hoje: dataSP, agora: () => Date.now(), uuid: () => crypto.randomUUID(), cache, resultado: Deno.env.get("AGENDAMENTO_RESULTADO") === "1" };
+  const chaveEquipe = Deno.env.get("AGENDAMENTO_EQUIPE_CHAVE") ?? "", enviada = req.headers.get("x-equipe-chave") ?? "";
+  const ctx: Ctx = {
+    api, db, hoje: dataSP, agora: () => Date.now(), uuid: () => crypto.randomUUID(), cache,
+    resultado: Deno.env.get("AGENDAMENTO_RESULTADO") === "1", telefone: Deno.env.get("AGENDAMENTO_TELEFONE") === "1", portal: Deno.env.get("AGENDAMENTO_PORTAL") === "1",
+    equipe: chaveEquipe.length >= 20 && igual(chaveEquipe, enviada),   // sem o secret (ou curto demais) a área da equipe fica fechada
+  };
   try {
     const r = await tratar(ctx, corpo);
     return json(r.corpo, r.status, origem);

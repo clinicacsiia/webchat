@@ -7,8 +7,12 @@
 //  B) COM IDENTIDADE (cpf + nascimento a cada chamada; a função confere no Klingo ANTES e DEPOIS do login): identificar, meus_dados, atualizar_contato,
 //     minhas_marcacoes, reservar, soltar, marcar, remarcar, cancelar, trocar_procedimento, checkin, cancelar_checkin, resultado, autorizacoes, e cadastrar (paciente novo).
 //
-// O QUE NUNCA FAZ (de propósito): adiantamento, pagamento, registrar_atendimento, formas_de_pagamento (dinheiro: validar com o suporte do Klingo antes),
-// /atendimentos (devolve os dados de todos os pacientes do dia), portal (cria conta e manda e-mail), identificar só por telefone, GET com corpo.
+// ACRESCENTADO EM 13/11/2026 (pedido do dono: tudo o que a documentação tem, menos dinheiro):
+//  - verificar_horario (sem identidade); resultado_imagem (identidade; mesmo interruptor do laudo); identificar por telefone + nascimento (AGENDAMENTO_TELEFONE=1);
+//  - portal_cadastrar, portal_recuperar e entrada por e-mail + senha do portal (AGENDAMENTO_PORTAL=1);
+//  - equipe_atendimentos e equipe_telefonia (só com a chave da equipe; devolvem totais e dados da agenda, NUNCA nome, CPF, telefone, mãe ou endereço de paciente).
+// GET com corpo (verificar_horario, resultado por accession, telefonia): o fetch não envia corpo em GET; os campos vão na query (suposição NÃO testada com o Klingo).
+// O QUE NUNCA FAZ (de propósito): adiantamento, pagamento, registrar_atendimento, formas_de_pagamento (dinheiro: validar com o suporte do Klingo antes).
 //
 // Segurança embutida (ver docs/klingo-api-externa/GUIA-COMPLETO.md, itens 2.2, 2.3 e 8):
 //  - o id de login vem do Klingo EXATAMENTE como veio (definitivo "P123", pré-cadastro número puro) e a sessão é conferida (id e nascimento) antes de qualquer ação;
@@ -31,9 +35,15 @@ export type Banco = {
   gravarPre(cpf: string, nascimento: string, klingoId: string): Promise<void>;
   soltarPre(cpf: string, nascimento: string): Promise<void>;
   precadastrosRecentes(): Promise<number>;
+  /** Registra uma tentativa recusada de entrada por telefone ou por e-mail+senha (a mesma trava por hora do CPF). `chave` é "tel:<número>" ou "mail:<e-mail>"; só o hash fica guardado. */
+  registrarTentativa(chave: string): Promise<void>;
 };
 /** `resultado`: entrega de laudo ligada? Desligada por padrão (decisão do dono de 03/11/2026: link e senha do resultado são passados pela equipe); liga com o secret AGENDAMENTO_RESULTADO=1. */
-export type Ctx = { api: KlingoApi; db: Banco; hoje: () => string; agora: () => number; uuid: () => string; cache: Map<string, { ate: number; v: unknown }>; resultado?: boolean };
+export type Ctx = { api: KlingoApi; db: Banco; hoje: () => string; agora: () => number; uuid: () => string; cache: Map<string, { ate: number; v: unknown }>; resultado?: boolean;
+  /** Entrar só pelo telefone + nascimento (AGENDAMENTO_TELEFONE=1) e conta/senha do portal (AGENDAMENTO_PORTAL=1): desligados por padrão. */
+  telefone?: boolean; portal?: boolean;
+  /** Pedido feito pela equipe: o cabeçalho x-equipe-chave bate com o secret AGENDAMENTO_EQUIPE_CHAVE (index.ts confere em tempo constante). Libera só as ações `equipe_*`. */
+  equipe?: boolean };
 
 const MAX_TENTATIVAS_CPF = 5, MAX_PRE_DIA = 40, TTL_CATALOGO_MS = 60_000, TTL_HORARIOS_MS = 20_000, MAX_DIAS = 31;
 
@@ -160,23 +170,65 @@ async function requisicao(ctx: Ctx, c: Record<string, unknown>): Promise<Resp> {
 // B) Com identidade
 // ---------------------------------------------------------------------------------------------------------------------------------------------
 type Sessao = { token: string; id: string; tipo: "definitivo" | "pre"; user: Record<string, unknown>; cpf: string; nascimento: string };
+type Ident = { via: "cpf"; cpf: string; nascimento: string } | { via: "telefone"; telefone: string; nascimento: string } | { via: "portal"; email: string; senha: string };
 
 const naoConfere = (): Resp => nega("nao_confere", { mensagem: "Não encontramos um cadastro com este CPF e esta data de nascimento." });
+const desligado = (o: string): Resp => nega("desligado", { mensagem: `${o} ainda não foi liberado pela clínica. Use o CPF e a data de nascimento.` });
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const lerEmail = (v: unknown): string | null => { const e = curto(v, 120); return e && EMAIL.test(e) ? e.toLowerCase() : null; };
+const lerSenha = (v: unknown): string | null => typeof v === "string" && v.length >= 4 && v.length <= 60 && !/[\u0000-\u001f\u007f]/.test(v) ? v : null;
 
-function lerIdentidade(c: Record<string, unknown>): { cpf: string; nascimento: string } | Resp {
+/** Quem é o paciente: CPF + nascimento (padrão), telefone + nascimento (interruptor) ou e-mail + senha do portal (interruptor). */
+function lerIdentidade(ctx: Ctx, c: Record<string, unknown>): Ident | Resp {
+  if (c.portal_email !== undefined || c.portal_senha !== undefined) {
+    if (!ctx.portal) return desligado("A entrada pela conta do portal");
+    const email = lerEmail(c.portal_email), senha = lerSenha(c.portal_senha);
+    if (!email) return invalido("portal_email");
+    if (!senha) return invalido("portal_senha");
+    return { via: "portal", email, senha };
+  }
+  if (c.telefone !== undefined && c.cpf === undefined) {
+    if (!ctx.telefone) return desligado("A entrada pelo telefone");
+    const telefone = digitos(String(c.telefone).replace(/\D/g, ""), 10, 11), nascimento = dataIso(c.nascimento);
+    if (!telefone) return invalido("telefone");
+    if (!nascimento) return invalido("nascimento");
+    return { via: "telefone", telefone, nascimento };
+  }
   const cpf = cpfValido(c.cpf), nascimento = dataIso(c.nascimento);
   if (!cpf) return invalido("cpf");
   if (!nascimento) return invalido("nascimento");
-  return { cpf, nascimento };
+  return { via: "cpf", cpf, nascimento };
 }
 
-async function travado(ctx: Ctx, cpf: string): Promise<boolean> {
-  return (await ctx.db.divergentesRecentes(await ctx.db.hash(cpf))) >= MAX_TENTATIVAS_CPF;
+/** `chave` é o CPF (só dígitos), "tel:<número>" ou "mail:<e-mail>": a trava é a mesma para os três. */
+async function travado(ctx: Ctx, chave: string): Promise<boolean> {
+  return (await ctx.db.divergentesRecentes(await ctx.db.hash(chave))) >= MAX_TENTATIVAS_CPF;
 }
-const travaResp = (): Resp => nega("tentativas_demais", { mensagem: "Muitas tentativas com este CPF. Tente de novo mais tarde ou procure a recepção." }, 429);
+const travaResp = (): Resp => nega("tentativas_demais", { mensagem: "Muitas tentativas. Tente de novo mais tarde ou procure a recepção." }, 429);
+
+/** Abre a sessão pelo meio escolhido. Nunca segue com identidade duvidosa. */
+async function abrirSessao(ctx: Ctx, i: Ident): Promise<Sessao | Resp> {
+  if (i.via === "cpf") return await abrirSessaoCpf(ctx, i.cpf, i.nascimento);
+  const chave = i.via === "telefone" ? "tel:" + i.telefone : "mail:" + i.email;
+  if (await travado(ctx, chave)) return travaResp();
+  const falha = async (): Promise<Resp> => {
+    await ctx.db.registrarTentativa(chave);
+    return nega("nao_confere", { mensagem: i.via === "portal" ? "E-mail ou senha não conferem." : "Não encontramos um cadastro com este telefone e esta data de nascimento." });
+  };
+  try {
+    const { token, user } = i.via === "telefone" ? await ctx.api.identificarPorTelefone(i.telefone, i.nascimento) : await ctx.api.loginPortal(i.email, i.senha);
+    const id = String(user.id ?? ""), nasc = dataIso(user.nascimento);
+    if (!id) return nega("sessao_nao_confere", { mensagem: "Não foi possível confirmar o cadastro. Procure a recepção." });
+    if (i.via === "telefone" && nasc !== i.nascimento) return await falha();
+    return { token, id, tipo: /^P\d+$/.test(id) ? "definitivo" : "pre", user, cpf: "", nascimento: nasc ?? "" };
+  } catch (e) {
+    if (e instanceof KlingoErro && (e.status === 403 || e.status === 404 || e.status === 422) && e.tipo !== "limite") return await falha();
+    return traduzir(e);
+  }
+}
 
 /** Confere o paciente no Klingo e abre a sessão dele. Devolve a sessão ou a resposta que explica por que parou (nunca segue com identidade duvidosa). */
-async function abrirSessao(ctx: Ctx, cpf: string, nascimento: string): Promise<Sessao | Resp> {
+async function abrirSessaoCpf(ctx: Ctx, cpf: string, nascimento: string): Promise<Sessao | Resp> {
   if (await travado(ctx, cpf)) return travaResp();
   let pac: Record<string, unknown> | null = null;
   try { pac = await ctx.api.pacientePorCpf(cpf) as Record<string, unknown> | null; } catch (e) {
@@ -264,7 +316,7 @@ async function meuVoucher(ctx: Ctx, s: Sessao, c: Record<string, unknown>): Prom
 }
 const ehMeu = (x: { id: string } | Resp): x is Resp => "corpo" in x;
 
-async function cadastrar(ctx: Ctx, c: Record<string, unknown>): Promise<Resp> {
+async function cadastrar(ctx: Ctx, c: Record<string, unknown>, portal: { senha: string } | null = null): Promise<Resp> {
   const nome = curto(c.nome, 100, 5), sexo = String(c.sexo ?? "").toUpperCase(), cpf = cpfValido(c.cpf), nascimento = dataIso(c.nascimento);
   const celular = digitos(String(c.celular ?? "").replace(/\D/g, ""), 10, 11);
   const email = c.email ? curto(c.email, 120) : null, mae = c.mae ? curto(c.mae, 100, 3) : null;
@@ -297,9 +349,9 @@ async function cadastrar(ctx: Ctx, c: Record<string, unknown>): Promise<Resp> {
     return generico;
   }
   try {
-    const novo = await ctx.api.registrar({ nome, sexo, nascimento, cpf, celular, ...(email ? { email } : {}), ...(mae ? { mae } : {}) });
+    const novo = await ctx.api.registrar({ nome, sexo, nascimento, cpf, celular, ...(email ? { email } : {}), ...(mae ? { mae } : {}) }, portal ?? undefined);
     await ctx.db.gravarPre(cpf, nascimento, novo.id);
-    return ok({ tipo: "pre", primeiro_nome: primeiroNome(nome), mensagem: "Pré-cadastro feito. A recepção completa os seus dados." });
+    return ok({ tipo: "pre", ...(portal ? { portal: true } : {}), primeiro_nome: primeiroNome(nome), mensagem: portal ? "Pré-cadastro e conta feitos. Entre com o e-mail e a senha." : "Pré-cadastro feito. A recepção completa os seus dados." });
   } catch (e) {
     // resposta perdida: o pré-cadastro PODE ter sido criado. A marca fica (nunca registra de novo) e a equipe confere.
     if (e instanceof KlingoErro && e.incerto) return nega("incerto", { mensagem: "Não conseguimos confirmar o seu cadastro. Procure a recepção, por favor." }, 502);
@@ -318,17 +370,16 @@ const lerContato = (c: Record<string, unknown>): { celular?: string; telefone?: 
 
 async function comIdentidade(ctx: Ctx, acao: string, c: Record<string, unknown>): Promise<Resp> {
   if (acao === "cadastrar") return await cadastrar(ctx, c);
-  const idt = lerIdentidade(c);
+  const idt = lerIdentidade(ctx, c);
   if ("status" in idt) return idt as Resp;
-  const { cpf, nascimento } = idt;
-  const s = await abrirSessao(ctx, cpf, nascimento);
+  const s = await abrirSessao(ctx, idt);
   if (ehResp(s)) return s;
   try {
     switch (acao) {
       case "identificar": {
-        if (s.tipo === "definitivo") await ctx.db.registrarIdentidade(cpf, nascimento, { situacao: "confere", klingo_id: s.id });
+        if (s.tipo === "definitivo" && s.cpf) await ctx.db.registrarIdentidade(s.cpf, s.nascimento, { situacao: "confere", klingo_id: s.id });
         const u = s.user, pl = (u.plano ?? {}) as Record<string, unknown>;
-        return ok({ situacao: "confere", tipo: s.tipo, pre_cadastro: s.tipo === "pre", primeiro_nome: primeiroNome(u.nome), plano: pl.id !== undefined ? { id: Number(pl.id) || null, nome: pl.nome ?? null } : null });
+        return ok({ situacao: "confere", via: idt.via, tipo: s.tipo, pre_cadastro: s.tipo === "pre", primeiro_nome: primeiroNome(u.nome), plano: pl.id !== undefined ? { id: Number(pl.id) || null, nome: pl.nome ?? null } : null });
       }
       case "meus_dados": {
         if (s.tipo === "pre") { const u = s.user; return ok({ pre_cadastro: true, dados: { nome: u.nome ?? null, nascimento: dataIso(u.nascimento) } }); }
@@ -401,6 +452,21 @@ async function comIdentidade(ctx: Ctx, acao: string, c: Record<string, unknown>)
         await ctx.api.chamar("DELETE", "/checkin", { sessao: s.token, corpo: { id: Number(v.id) } });
         return ok({ checkin_cancelado: v.id });
       }
+      case "resultado_imagem": {
+        // GET /resultado/pdf/an/{accession_number}: o Klingo confere o nascimento (o da sessão, já conferido). A doc manda `dtnasc` no corpo de um GET: aqui vai na query (NÃO testado).
+        const an = curto(c.accession, 40);
+        if (!an || !/^[A-Za-z0-9._-]+$/.test(an)) return invalido("accession");
+        if (!s.nascimento) return nega("sessao_nao_confere", { mensagem: "Não foi possível confirmar o cadastro. Procure a recepção." });
+        try {
+          const r = await ctx.api.chamar<Record<string, unknown>>("GET", `/resultado/pdf/an/${encodeURIComponent(an)}`, { sessao: s.token, query: { dtnasc: s.nascimento } });
+          const o = (typeof r === "object" && r ? r : {}) as Record<string, unknown>;
+          const pronto = typeof o.pdf_base64 === "string" && o.pdf_base64.length > 0;
+          return ok({ pronto, formato: "pdf", ...(pronto ? { resultado: { pdf_base64: o.pdf_base64 } } : { motivo: "sem_resultado" }) });
+        } catch (e) {
+          if (e instanceof KlingoErro && (e.tipo === "html" || e.status === 403 || e.status === 404)) return ok({ pronto: false, motivo: "sem_resultado" });
+          throw e;
+        }
+      }
       case "resultado": {
         const v = await meuVoucher(ctx, s, c); if (ehMeu(v)) return v;
         const pdf = c.formato === "pdf";
@@ -421,7 +487,124 @@ async function comIdentidade(ctx: Ctx, acao: string, c: Record<string, unknown>)
   return nega("acao_invalida", {}, 400);
 }
 
-const ACOES_IDENTIDADE = new Set(["identificar", "meus_dados", "atualizar_contato", "minhas_marcacoes", "autorizacoes", "reservar", "soltar", "marcar", "remarcar", "cancelar", "trocar_procedimento", "checkin", "cancelar_checkin", "resultado", "cadastrar"]);
+// ---------------------------------------------------------------------------------------------------------------------------------------------
+// C) Conta do portal, verificar horário e ações da equipe
+// ---------------------------------------------------------------------------------------------------------------------------------------------
+/** Contador por janela (na memória da instância: freio simples, não é garantia). */
+function dentroDoLimite(ctx: Ctx, chave: string, max: number, janelaMs: number): boolean {
+  const c = ctx.cache.get(chave), vivo = c && c.ate > ctx.agora();
+  const n = vivo ? Number(c!.v) : 0;
+  if (n >= max) return false;
+  ctx.cache.set(chave, { ate: vivo ? c!.ate : ctx.agora() + janelaMs, v: n + 1 });
+  return true;
+}
+
+/** Conta do portal para paciente novo: mesmo caminho do cadastro (trava por CPF, teto diário, resposta perdida), mas com e-mail e senha. */
+async function portalCadastrar(ctx: Ctx, c: Record<string, unknown>): Promise<Resp> {
+  if (!ctx.portal) return desligado("A conta do portal");
+  const senha = lerSenha(c.senha); if (!senha || senha.length < 6) return invalido("senha");
+  const email = lerEmail(c.email); if (!email) return invalido("email");
+  return await cadastrar(ctx, { ...c, email }, { senha });
+}
+
+/** Recuperar senha do portal: a resposta é a MESMA exista ou não a conta (não revela quem é paciente) e há freio por e-mail e geral. */
+async function portalRecuperar(ctx: Ctx, c: Record<string, unknown>): Promise<Resp> {
+  if (!ctx.portal) return desligado("A conta do portal");
+  const email = lerEmail(c.email); if (!email) return invalido("email");
+  if (c.confirmar !== true) return nega("sem_confirmacao", {}, 400);
+  const h = await ctx.db.hash("rec:" + email);
+  if (!dentroDoLimite(ctx, "rec:" + h, 3, 3_600_000) || !dentroDoLimite(ctx, "rec:todos", 30, 3_600_000)) return nega("limite", { mensagem: "Muitos pedidos de recuperação. Tente de novo mais tarde." }, 429);
+  try { await ctx.api.recuperarPortal(email); } catch (e) { if (e instanceof KlingoErro && e.tipo === "limite") return traduzir(e); /* qualquer outra falha: mesma resposta */ }
+  return ok({ mensagem: "Se este e-mail tiver uma conta, enviamos as instruções para criar uma nova senha." });
+}
+
+/** GET /agenda/verificar_horario: a doc pede o corpo {id} num GET; aqui vai na query (NÃO testado). */
+async function verificarHorario(ctx: Ctx, c: Record<string, unknown>): Promise<Resp> {
+  const id = String(c.horario ?? "");
+  if (!CHAVE_HORARIO.test(id)) return invalido("horario");
+  try { return ok({ dados: limparCatalogo(await comCache(ctx, "vh:" + id, TTL_CATALOGO_MS, () => ctx.api.chamar("GET", "/agenda/verificar_horario", { query: { id } }))) }); } catch (e) { return traduzir(e); }
+}
+
+const naoEquipe = (): Resp => nega("nao_autorizado", { mensagem: "Esta área é só para a equipe da clínica." }, 403);
+const nomeCurto = (o: unknown): string | null => { const x = (o && typeof o === "object" ? (o as Record<string, unknown>).nome ?? (o as Record<string, unknown>).descr ?? (o as Record<string, unknown>).descricao : o); const t = String(x ?? "").trim(); return t ? t.slice(0, 80) : null; };
+const topo = (m: Map<string, number>, n = 40) => [...m].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, n).map(([nome, total]) => ({ nome, total }));
+const somaUm = (m: Map<string, number>, k: string | null) => { const nome = k ?? "(sem nome)"; m.set(nome, (m.get(nome) ?? 0) + 1); };
+
+/** GET /atendimentos: o Klingo devolve os dados completos dos pacientes do dia; aqui só saem TOTAIS por médico, plano e procedimento. Nenhum dado de paciente sai. */
+async function equipeAtendimentos(ctx: Ctx, c: Record<string, unknown>): Promise<Resp> {
+  if (!ctx.equipe) return naoEquipe();
+  const data = c.data ? dataIso(c.data) : ctx.hoje(); if (!data) return invalido("data");
+  try {
+    const r = await ctx.api.chamar<unknown>("GET", "/atendimentos", { query: { data } });
+    const lista = Array.isArray(r) ? r as Array<Record<string, unknown>> : [];
+    const medicos = new Map<string, number>(), planos = new Map<string, number>(), procs = new Map<string, number>();
+    for (const a of lista) {
+      somaUm(medicos, nomeCurto(a.medico)); somaUm(planos, nomeCurto(a.plano));
+      for (const p of Array.isArray(a.procedimento) ? a.procedimento : []) somaUm(procs, nomeCurto(p));
+    }
+    return ok({ data, total: lista.length, por_medico: topo(medicos), por_plano: topo(planos), por_procedimento: topo(procs) });
+  } catch (e) { return traduzir(e); }
+}
+
+/** Marcação da API de telefonia SEM nome, CPF, telefone, celular nem id de paciente. */
+const marcacaoSemPaciente = (m: Record<string, unknown>) => ({
+  id_marcacao: m.id_marcacao === undefined ? null : String(m.id_marcacao), data: m.data ?? null, hora: m.hora ?? null, procedimento: m.procedimento ?? null,
+  medico: m.medico ?? null, unidade: m.unidade ?? null, status: m.status ?? null, confirmacao: m.confirmacao ?? null,
+});
+
+/** API de Confirmação ("telefonia", https://api-externa.klingo.app/api/telefonia). Em 12/11/2026 respondeu 404 (não habilitada para a CSI): nada aqui foi testado de verdade. */
+async function equipeTelefonia(ctx: Ctx, c: Record<string, unknown>): Promise<Resp> {
+  if (!ctx.equipe) return naoEquipe();
+  const rota = String(c.rota ?? "");
+  try {
+    switch (rota) {
+      case "live": return ok({ api: await ctx.api.chamar<unknown>("GET", "/telefonia/live") });
+      case "lista": {
+        const data = dataIso(c.data) ?? ctx.hoje(), ate = c.ate ? dataIso(c.ate) : null;
+        if (c.ate && (!ate || ate < data || diasEntre(data, ate) > 7)) return invalido("ate");
+        const q: Record<string, string | undefined> = { ate: ate ?? undefined };
+        for (const k of ["atendidos", "cancelados"]) if (c[k] !== undefined) q[k] = booleano(c[k]) ? "1" : "0";
+        const r = await ctx.api.chamar<unknown>("GET", `/telefonia/lista/${data}`, { query: q });
+        const l = Array.isArray(r) ? r as Array<Record<string, unknown>> : [];
+        return ok({ data, total: l.length, marcacoes: l.slice(0, 300).map(marcacaoSemPaciente) });
+      }
+      case "marcacao": {
+        const id = digitos(c.id, 1, 12); if (!id) return invalido("id");
+        const r = await ctx.api.chamar<Record<string, unknown>>("GET", `/telefonia/${id}`);
+        return ok({ marcacao: marcacaoSemPaciente(((r as { item?: Record<string, unknown> })?.item ?? r) as Record<string, unknown>) });
+      }
+      case "bloqueios": {
+        const q: Record<string, string> = {};
+        if (c.id_medico) { const d = digitos(c.id_medico, 1, 9); if (!d) return invalido("id_medico"); q.id_medico = d; }
+        for (const k of ["de", "ate"]) if (c[k]) { const d = dataIso(c[k]); if (!d) return invalido(k); q[k] = d; }
+        if (c.ref !== undefined) { if (c.ref !== "I" && c.ref !== "R") return invalido("ref"); q.ref = String(c.ref); }
+        return ok({ dados: limparCatalogo(await ctx.api.chamar<unknown>("GET", "/telefonia/bloqueios", { query: q })) });
+      }
+      case "confirmar": {
+        const sem = exigeConfirmacao(c); if (sem) return sem;
+        const id = digitos(c.id_marcacao, 1, 12), status = String(c.status ?? "");
+        if (!id) return invalido("id_marcacao");
+        if (!["C", "S", "N"].includes(status)) return invalido("status");
+        if (status === "N" && c.cancelar_marcacao !== true) return nega("sem_confirmacao", { mensagem: "O status N cancela a marcação. Confirme o cancelamento." }, 400);
+        const obs = c.obs ? curto(c.obs, 200) : null; if (c.obs && !obs) return invalido("obs");
+        await ctx.api.chamar("POST", "/telefonia/confirmar", { corpo: { id_marcacao: Number(id), status, ...(obs ? { obs } : {}) } });
+        return ok({ confirmado: id, status });
+      }
+      case "nps": {
+        const sem = exigeConfirmacao(c); if (sem) return sem;
+        const id = digitos(c.id_marcacao, 1, 12), nota = Number(c.nota);
+        if (!id) return invalido("id_marcacao");
+        if (!Number.isInteger(nota) || nota < 0 || nota > 10) return invalido("nota");
+        const obs = c.obs ? curto(c.obs, 300) : null; if (c.obs && !obs) return invalido("obs");
+        await ctx.api.chamar("POST", "/telefonia/nps", { corpo: { id_marcacao: Number(id), nota, ...(obs ? { obs } : {}) } });
+        return ok({ nps: id, nota });
+      }
+    }
+  } catch (e) { return traduzir(e); }
+  return invalido("rota");
+}
+
+const ACOES_IDENTIDADE = new Set(["identificar", "meus_dados", "atualizar_contato", "minhas_marcacoes", "autorizacoes", "reservar", "soltar", "marcar", "remarcar", "cancelar", "trocar_procedimento", "checkin", "cancelar_checkin", "resultado", "resultado_imagem", "cadastrar"]);
 
 /** Ponto único de entrada: recebe o corpo JSON já lido e devolve status + corpo. */
 export async function tratar(ctx: Ctx, c: Record<string, unknown>): Promise<Resp> {
@@ -431,8 +614,13 @@ export async function tratar(ctx: Ctx, c: Record<string, unknown>): Promise<Resp
     if (acao === "horarios") return await horarios(ctx, c);
     if (acao === "catalogo") return await catalogo(ctx, c, String(c.catalogo ?? ""));
     if (acao === "requisicao") return await requisicao(ctx, c);
-    if (acao === "resultado" && !ctx.resultado) return nega("desligado", { mensagem: "A entrega do resultado por aqui ainda não foi liberada pela clínica. Peça na recepção ou pelo chat." });
+    if (acao === "verificar_horario") return await verificarHorario(ctx, c);
+    if (acao === "portal_cadastrar") return await portalCadastrar(ctx, c);
+    if (acao === "portal_recuperar") return await portalRecuperar(ctx, c);
+    if (acao === "equipe_atendimentos") return await equipeAtendimentos(ctx, c);
+    if (acao === "equipe_telefonia") return await equipeTelefonia(ctx, c);
+    if ((acao === "resultado" || acao === "resultado_imagem") && !ctx.resultado) return nega("desligado", { mensagem: "A entrega do resultado por aqui ainda não foi liberada pela clínica. Peça na recepção ou pelo chat." });
     if (ACOES_IDENTIDADE.has(acao)) return await comIdentidade(ctx, acao, c);
   } catch (e) { return traduzir(e); }
-  return nega("acao_invalida", { acoes: ["versao", "horarios", "catalogo", "requisicao", ...ACOES_IDENTIDADE] }, 400);
+  return nega("acao_invalida", { acoes: ["versao", "horarios", "catalogo", "requisicao", "verificar_horario", "portal_cadastrar", "portal_recuperar", "equipe_atendimentos", "equipe_telefonia", ...ACOES_IDENTIDADE] }, 400);
 }

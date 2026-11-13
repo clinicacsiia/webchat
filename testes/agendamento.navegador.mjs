@@ -29,7 +29,7 @@ async function abrir({ ocupadoNaMarcacao = false, vazio = false, malicioso = fal
   const estado = { chamadas: [], vouchers: [{ id: '26638', status: 'agendado', data: '2026-11-20', hora: '09:40', procedimento: 'CONSULTA', profissional: 'DRA TESTE', unidade: 'DESENVOAR' }], pre: false };
   await ctx.route('**/functions/v1/klingo-agendamento', async (r) => {
     if (r.request().method() === 'OPTIONS') return r.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*' } });
-    const c = JSON.parse(r.request().postData() || '{}'); estado.chamadas.push(c);
+    const c = JSON.parse(r.request().postData() || '{}'); c.__chave = r.request().headers()['x-equipe-chave']; estado.chamadas.push(c);
     const j = (corpo, status = 200) => r.fulfill({ status, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(corpo) });
     switch (c.acao) {
       case 'versao': return j({ ok: true, api: 'OK [API1]' });
@@ -44,6 +44,8 @@ async function abrir({ ocupadoNaMarcacao = false, vazio = false, malicioso = fal
         { id: CHAVE, data: '2026-11-20', hora: '09:40', procedimento: '1096', ordem_chegada: false, profissional: { nome: 'DRA TESTE' }, unidade: { nome: 'DESENVOAR', sigla: 'PEDIATRIA' } },
         { id: CHAVE2, data: '2026-11-20', hora: '10:00', procedimento: '1096', ordem_chegada: false, profissional: { nome: 'DRA TESTE' }, unidade: { nome: 'DESENVOAR', sigla: 'PEDIATRIA' } }] });
       case 'identificar':
+        if (c.telefone === '71999998888' && c.nascimento === NASC) return j({ ok: true, situacao: 'confere', via: 'telefone', tipo: 'definitivo', pre_cadastro: false, primeiro_nome: 'Maria', plano: null });
+        if (c.portal_email === 'maria@exemplo.com' && c.portal_senha === 'senha123') return j({ ok: true, situacao: 'confere', via: 'portal', tipo: 'definitivo', pre_cadastro: false, primeiro_nome: 'Maria', plano: null });
         if (c.cpf === CPF_D && c.nascimento === NASC) return j({ ok: true, situacao: 'confere', tipo: estado.pre ? 'pre' : 'definitivo', pre_cadastro: estado.pre, primeiro_nome: 'Maria', plano: { id: 1, nome: 'PARTICULAR' } });
         return j({ ok: false, motivo: 'nao_confere', mensagem: 'Não encontramos um cadastro com este CPF e esta data de nascimento.' });
       case 'reservar': return j({ ok: true, reserva: { id: '555', expira: null, data: '2026-11-20', hora: '09:40', instrucao: { procedimento: 'Chegar com 15 minutos de antecedência', profissional: null } } });
@@ -56,6 +58,11 @@ async function abrir({ ocupadoNaMarcacao = false, vazio = false, malicioso = fal
       case 'cancelar': estado.vouchers = estado.vouchers.filter((v) => v.id !== c.voucher); return j({ ok: true, cancelado: c.voucher });
       case 'meus_dados': return j({ ok: true, pre_cadastro: false, dados: { nome: 'Maria Teste', nascimento: NASC, celular: '(••) •••••-8888', email: 'm•••@exemplo.com', convenio: 'PLANSERV', plano: 'PLANSERV' } });
       case 'cadastrar': estado.pre = true; return j({ ok: true, tipo: 'pre', primeiro_nome: 'Joana' });
+      case 'verificar_horario': return j({ ok: true, dados: { operadoras: [{ id: 1, nome: 'PARTICULAR' }], procedimentos: [{ id: 1096, descr: 'CONSULTA' }] } });
+      case 'resultado_imagem': return c.accession === 'AN1' ? j({ ok: true, pronto: true, formato: 'pdf', resultado: { pdf_base64: 'JVBERi0xLjQK' + 'A'.repeat(200) } }) : j({ ok: true, pronto: false, motivo: 'sem_resultado' });
+      case 'portal_recuperar': return j({ ok: true, mensagem: 'Se este e-mail tiver uma conta, enviamos as instruções para criar uma nova senha.' });
+      case 'portal_cadastrar': estado.pre = true; return j({ ok: true, tipo: 'pre', portal: true, primeiro_nome: 'Joana' });
+      case 'equipe_atendimentos': return c.__chave === 'chave-da-equipe-bem-longa' ? j({ ok: true, data: c.data, total: 7, por_medico: [{ nome: 'DRA TESTE', total: 7 }], por_plano: [{ nome: 'PARTICULAR', total: 7 }], por_procedimento: [{ nome: 'CONSULTA', total: 7 }] }) : j({ ok: false, motivo: 'nao_autorizado' }, 403);
       case 'resultado': return j({ ok: true, pronto: false, motivo: 'sem_resultado' });
       default: return j({ ok: false, motivo: 'acao_invalida' }, 400);
     }
@@ -70,10 +77,10 @@ const clicar = (p, nome) => p.getByRole('button', { name: nome, exact: false }).
 const entrar = async (p) => { await p.fill('#idCpf', CPF); await p.fill('#idNasc', NASC); await clicar(p, 'Entrar'); };
 async function ateHorarios(p) { await p.waitForSelector('#selEsp'); await p.selectOption('#selEsp', '225112'); await clicar(p, 'Ver horários'); await p.getByText('Escolha o dia e a hora').waitFor(); }
 
-await caso('abre, mostra o sistema no ar e as cinco abas', async () => {
+await caso('abre, mostra o sistema no ar e as seis abas', async () => {
   const { pagina, erros, ctx } = await abrir(); await pagina.waitForFunction(() => document.querySelector('#estadoApi').textContent.includes('no ar'));
   const abas = await pagina.locator('nav.abas button').allTextContents(); await ctx.close();
-  return { ok: abas.length === 5 && abas[0] === 'Marcar' && erros.length === 0, detalhe: abas.join(' | ') + (erros[0] || '') };
+  return { ok: abas.length === 6 && abas[4] === 'Equipe' && abas[0] === 'Marcar' && erros.length === 0, detalhe: abas.join(' | ') + (erros[0] || '') };
 });
 
 await caso('marcar consulta de ponta a ponta: horários → entrar → reserva → confirmar → "Agendado!"', async () => {
@@ -143,7 +150,57 @@ await caso('consultar a clínica: preço pede os campos obrigatórios e mostra o
 
 await caso('sobre a API: lista o que fica de fora (dinheiro e dados de outros pacientes)', async () => {
   const { pagina, ctx } = await abrir(); await pagina.getByRole('tab', { name: 'Sobre a API' }).click();
-  const fora = await pagina.getByText('Fora de propósito').count(); const dinheiro = await pagina.getByText('/adiantamento(s)').count(); await ctx.close(); return { ok: fora >= 5 && dinheiro === 1, detalhe: `fora=${fora}` };
+  const fora = await pagina.getByText('Fora de propósito').count(); const dinheiro = await pagina.getByText('/adiantamento(s)').count(); const naoTestado = await pagina.getByText('Não testado').count(); const telefonia = await pagina.getByText('API de Confirmação / telefonia').count(); await ctx.close(); return { ok: fora === 2 && dinheiro === 1 && naoTestado >= 7 && telefonia === 1, detalhe: `fora=${fora} nt=${naoTestado}` };
+});
+
+await caso('entrar pelo telefone: manda telefone + nascimento (sem CPF) e as ações seguintes repetem a mesma identidade', async () => {
+  const { pagina, estado, ctx } = await abrir(); await pagina.getByRole('tab', { name: 'Minhas marcações' }).click(); await pagina.selectOption('#idComo', 'telefone');
+  await pagina.fill('#idTel', '(71) 99999-8888'); await pagina.fill('#idNasc', NASC); await clicar(pagina, 'Entrar'); await pagina.getByText('Marcação 26638').waitFor();
+  const i = estado.chamadas.find((x) => x.acao === 'identificar'), m = estado.chamadas.find((x) => x.acao === 'minhas_marcacoes'); await ctx.close();
+  return { ok: i.telefone === '71999998888' && i.nascimento === NASC && !('cpf' in i) && m.telefone === '71999998888' && !('cpf' in m), detalhe: JSON.stringify(Object.keys(i)) };
+});
+
+await caso('entrar pela conta do portal: e-mail + senha, senha só na memória, e "Esqueci a senha" pede o e-mail', async () => {
+  const { pagina, estado, ctx } = await abrir(); await pagina.getByRole('tab', { name: 'Meus dados' }).click(); await pagina.selectOption('#idComo', 'portal');
+  await clicar(pagina, 'Esqueci a senha'); const pediuEmail = await pagina.getByText('Escreva o e-mail da conta').isVisible();
+  await pagina.fill('#idMail', 'Maria@Exemplo.com'); await clicar(pagina, 'Esqueci a senha'); await pagina.getByText('Se este e-mail tiver uma conta').waitFor();
+  const rec = estado.chamadas.find((x) => x.acao === 'portal_recuperar');
+  await pagina.selectOption('#idComo', 'portal'); await pagina.fill('#idMail', 'maria@exemplo.com'); await pagina.fill('#idSenha', 'senha123'); await clicar(pagina, 'Entrar'); await pagina.getByText('Maria Teste').first().waitFor();
+  const guardado = await pagina.evaluate(() => JSON.stringify([{ ...localStorage }, { ...sessionStorage }, document.cookie, location.href])); const d = estado.chamadas.find((x) => x.acao === 'meus_dados'); await ctx.close();
+  return { ok: pediuEmail && rec.email === 'maria@exemplo.com' && rec.confirmar === true && d.portal_email === 'maria@exemplo.com' && d.portal_senha === 'senha123' && !guardado.includes('senha123') && !guardado.includes('maria@exemplo'), detalhe: guardado };
+});
+
+await caso('paciente novo: a conta com senha usa portal_cadastrar e entra com e-mail + senha', async () => {
+  const { pagina, estado, ctx } = await abrir(); await pagina.getByRole('tab', { name: 'Meus dados' }).click(); await clicar(pagina, 'Sou paciente novo');
+  await pagina.fill('#cdNome', 'Joana da Silva'); await pagina.selectOption('#cdSexo', 'F'); await pagina.fill('#cdCpf', CPF); await pagina.fill('#cdNasc', NASC); await pagina.fill('#cdCel', '71999990000');
+  await pagina.check('#cdConta'); await clicar(pagina, 'Fazer o cadastro'); const barrou = await pagina.getByText('informe um e-mail válido').isVisible();
+  await pagina.fill('#cdMail', 'joana@exemplo.com'); await pagina.fill('#cdSenha', '123'); await clicar(pagina, 'Fazer o cadastro'); const senhaCurta = await pagina.getByText('pelo menos 6 caracteres').isVisible();
+  await pagina.fill('#cdSenha', 'senha123'); await clicar(pagina, 'Fazer o cadastro'); await pagina.getByText('Pré-cadastro feito').first().waitFor();
+  const c = estado.chamadas.find((x) => x.acao === 'portal_cadastrar'), i = estado.chamadas.filter((x) => x.acao === 'identificar').pop(); await ctx.close();
+  return { ok: barrou && senhaCurta && c.senha === 'senha123' && c.email === 'joana@exemplo.com' && i.portal_email === 'joana@exemplo.com' && !('cpf' in i) };
+});
+
+await caso('consultar: "verificar horário" manda a chave do horário e mostra o resultado', async () => {
+  const { pagina, estado, ctx } = await abrir(); await pagina.getByRole('tab', { name: 'Consultar a clínica' }).click(); await pagina.selectOption('#catSel', 'verificar_horario');
+  await pagina.fill('#cat_horario', CHAVE); await clicar(pagina, 'Consultar'); await pagina.locator('pre').first().waitFor(); const c = estado.chamadas.find((x) => x.acao === 'verificar_horario'); const txt = await pagina.locator('pre').first().textContent(); await ctx.close();
+  return { ok: c.horario === CHAVE && txt.includes('PARTICULAR') };
+});
+
+await caso('resultado de imagem: número de acesso, link do PDF e aviso quando não tem resultado', async () => {
+  const { pagina, estado, ctx } = await abrir(); await pagina.getByRole('tab', { name: 'Minhas marcações' }).click(); await entrar(pagina); await pagina.waitForSelector('#anNum');
+  await pagina.fill('#anNum', '../x'); await clicar(pagina, 'Ver o resultado'); const barrou = await pagina.getByText('Informe o número de acesso').isVisible(); const antes = estado.chamadas.filter((x) => x.acao === 'resultado_imagem').length;
+  await pagina.fill('#anNum', 'AN9'); await clicar(pagina, 'Ver o resultado'); await pagina.getByText('Não encontramos um resultado pronto').waitFor();
+  await pagina.fill('#anNum', 'AN1'); await clicar(pagina, 'Ver o resultado'); await pagina.getByRole('link', { name: 'Abrir o resultado em PDF' }).waitFor();
+  const c = estado.chamadas.filter((x) => x.acao === 'resultado_imagem').pop(); await ctx.close(); return { ok: barrou && antes === 0 && c.accession === 'AN1' && c.cpf === CPF_D };
+});
+
+await caso('equipe: sem a chave não chama; com a chave manda o cabeçalho e mostra só totais', async () => {
+  const { pagina, estado, ctx } = await abrir(); await pagina.getByRole('tab', { name: 'Equipe' }).click(); await clicar(pagina, 'Ver os totais do dia');
+  const pediu = await pagina.getByText('Digite a chave da equipe').first().isVisible(); const semChamada = estado.chamadas.filter((x) => x.acao === 'equipe_atendimentos').length === 0;
+  await pagina.fill('#eqChave', 'errada'); await clicar(pagina, 'Ver os totais do dia'); await pagina.getByText('só para a equipe').nth(1).waitFor();
+  await pagina.fill('#eqChave', 'chave-da-equipe-bem-longa'); await clicar(pagina, 'Ver os totais do dia'); await pagina.getByText('7 atendimento(s)').waitFor();
+  const corpo = await pagina.locator('#app').textContent(); const guardado = await pagina.evaluate(() => JSON.stringify([{ ...localStorage }, { ...sessionStorage }, document.cookie, location.href])); await ctx.close();
+  return { ok: pediu && semChamada && corpo.includes('DRA TESTE') && !guardado.includes('chave-da-equipe') };
 });
 
 await caso('texto da API com HTML NÃO é interpretado (nenhum script roda)', async () => {
