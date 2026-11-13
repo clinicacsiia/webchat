@@ -1,0 +1,7 @@
+-- FLUXOGRAMA: entrada (toda madrugada, 06:55, o banco chama a função klingo-catalogo-api) -> validação (segredo do cofre; só catálogo, nenhum dado de paciente, CPF e foto dos médicos nunca são guardados)
+--   -> lógica (a função lê /unidades, /profissionais e /agenda/exames na API do Klingo e klingo_catalogo_normalizar monta klingo_profissional, klingo_unidade_api e klingo_exame_api) -> saída (listas do chat podem ser filtradas pela API).
+-- Versão 1.0 — 13/11/2026 / Mudança: pedido do dono ("extrair o máximo da API"). Já aplicado na produção em 13/11/2026 (migrações api_catalogo_parte1, parte2 e parte3). Ainda NÃO ligado a nenhuma pergunta do chat.
+-- Medido em 13/11/2026: 69 profissionais (10 com limite de idade do paciente), 1 unidade (CSI), 760 exames; 537 dos 584 exames do chat existem na API (274 dos 278 com demanda); 100% dos médicos da grade da Desenvoar existem na API.
+-- ROLLBACK: select cron.unschedule('klingo-catalogo-api'); drop table public.klingo_profissional, public.klingo_unidade_api, public.klingo_exame_api, public.klingo_catalogo_cru;
+--           drop function public.klingo_catalogo_normalizar(), public.klingo_catalogo_cru_disparar(text), public.klingo_catalogo_cru_gravar(text, jsonb, integer);  (e apagar a função klingo-catalogo-api)
+-- O texto completo das funções está nas migrações aplicadas (supabase_migrations.schema_migrations: api_catalogo_parte1_tabela_e_disparo, parte2_tabelas_normalizadas, parte3_rotina_da_madrugada).

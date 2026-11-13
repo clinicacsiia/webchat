@@ -32,6 +32,8 @@ Feita sobre o código da branch `ccr-9adf6e2b-p1p009` e a produção (só estrut
 
 ## 3. Ordem das perguntas
 
+> **Correção de 13/11/2026:** a ordem real na produção é **CPF e nascimento primeiro**, antes do menu (ver `api-em-todo-o-processo.md`). O texto abaixo partiu do retrato antigo do banco; a conclusão (CPF antes de plano e horário) continua valendo.
+
 Ordem real (`fluxo_proximo`):
 
 `identidade (só quem já tem cadastro) → atalho (repetir pedido anterior) → motivo → consulta/exame → médico (só se houver mais de um) → CPF e nascimento → plano → horário → "mudou?" (só cadastro antigo) → identificação → contato → confirmar → pronto`
