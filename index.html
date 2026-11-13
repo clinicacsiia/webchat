@@ -458,6 +458,7 @@
   .barra-humano button.sec { border-color: var(--linha); color: #33506e; font-weight: 600; }
   .barra-humano button[hidden] { display: none; }
   .barra-humano[hidden] { display: none; }
+  .boas-vindas { margin: 0 0 10px; line-height: 1.45; }
   .nota-previsao { margin: 8px 0 0; padding: 9px 11px; border-radius: 10px; background: #fff; border: 1.5px dashed #c9a24a; color: var(--texto); font-size: calc(15.5px * var(--esc)); }
 
   /* Pedido de exames: mesmas opções grandes em todos os passos */
@@ -589,9 +590,10 @@
         </label>
       </div>
       <div class="aviso-form" id="avisoForm">
+        <p class="boas-vindas">💚 Estamos criando uma solução para facilitar o seu dia a dia e levar equidade para todos. Este espaço aprende com o jeito que cada pessoa o usa, e queremos você como parte da nossa família, ajudando a construir um lugar melhor.</p>
         <label class="aceite">
           <input type="checkbox" id="fPrevisao">
-          <span>Entendi: os horários são só uma <b>previsão</b>. Uma <b>pessoa da equipe</b> confirma.</span>
+          <span>Entendi: os horários só valem depois que uma <b>pessoa da equipe</b> <b>confirma</b>.</span>
         </label>
       </div>
       <p class="erro-form" id="erroForm" role="alert"></p>
@@ -654,7 +656,7 @@
   const CHAVE_HIST = 'webchat.historico.v1';   // as últimas conversas deste aparelho (cada uma com o seu token): dá para voltar a elas
   const MAX_HIST = 5;                          // mínimo pedido: 3
   // Muda a cada alteração do chat. Cópia de mensagens guardada por outra versão é descartada (era isso que mostrava conversa velha e travada).
-  const VERSAO_APP = '2026.11.12-15';
+  const VERSAO_APP = '2026.11.13-1';
   const ESCALAS = [1, 1.18, 1.36], TOAST_LETRA = ['Letra normal.', 'Letra grande.', 'Letra muito grande.'];
 
   // Chegou pelo link "esqueci a senha"? O supabase-js limpa o endereço ao ler o link, então a pergunta é feita antes de criá-lo.
@@ -922,16 +924,16 @@
       if (ult && ult.texto) registrarHistorico(conv, { ultima: String(ult.texto).replace(/\s+/g, ' ').slice(0, 90) });
     }, 300);
   }
-  // Aviso fixo no começo da conversa: quem fala (assistente automático, sem IA), que dá para chamar uma pessoa e que o resultado é uma PREVISÃO.
+  // Aviso fixo no começo da conversa: quem fala (assistente automático), a missão (equidade, aprende com o uso) e que quem confirma é uma pessoa.
   function preencherAvisoIA(caixa) {
     caixa = caixa || document.getElementById('avisoIA'); if (!caixa) return;
     if (statusAtual === 'em_atendimento') {
       caixa.replaceChildren(h('p', {}, h('b', {}, 'Agora você está falando com uma pessoa da nossa equipe.'), ' Pode escrever à vontade, no campo aqui embaixo.'));
     } else if (motorAtivo) {
       caixa.replaceChildren(
-        h('p', {}, h('b', {}, 'Sou o assistente automático da CSI.'), ' Isto é uma ', h('b', {}, 'previsão'), ' de agendamento: ', h('b', {}, 'quem confirma é um atendente'), '.'));
+        h('p', {}, h('b', {}, 'Sou o assistente automático da CSI.'), ' Estamos criando uma solução para facilitar o seu dia a dia e levar equidade para todos: este espaço aprende com o jeito que as pessoas o usam. ', h('b', {}, 'Quem confirma o agendamento é um atendente'), ', sempre.'));
     } else {
-      caixa.replaceChildren(h('p', {}, h('b', {}, 'Recebemos o seu pedido.'), ' Uma pessoa da equipe vai responder aqui. O que você já escolheu fica registrado como ', h('b', {}, 'previsão'), ' de agendamento, e o atendente confirma com você.'));
+      caixa.replaceChildren(h('p', {}, h('b', {}, 'Recebemos o seu pedido.'), ' Uma pessoa da equipe vai responder aqui. O que você já escolheu fica registrado e o ', h('b', {}, 'atendente confirma com você'), '.'));
     }
   }
   function montarTopo() {
@@ -1206,7 +1208,7 @@
     if (tel.length < 10) { el.erroForm.textContent = 'Informe o telefone com DDD.'; el.fTel.focus(); return; }
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { el.erroForm.textContent = 'Informe um e-mail válido.'; el.fEmail.focus(); return; }
     if (!salvo && !el.fAceite.checked) { el.erroForm.textContent = 'Marque a caixa de concordância para continuar.'; el.fAceite.focus(); return; }
-    if (!el.fPrevisao.checked) { el.erroForm.textContent = 'Marque que você está ciente de que os horários são uma previsão.'; el.fPrevisao.focus(); return; }
+    if (!el.fPrevisao.checked) { el.erroForm.textContent = 'Marque que você está ciente de que uma pessoa da equipe precisa confirmar os horários.'; el.fPrevisao.focus(); return; }
     const respostaAvisos = pedirAvisos();
     el.btnIniciar.disabled = true; el.btnIniciar.textContent = 'Começando…';
     const t0 = performance.now();
@@ -1865,11 +1867,11 @@
       filhos.push(h('b', {}, `${d.agente || 'Um atendente'} (da nossa equipe) está atendendo você`), h('p', {}, 'Responda aqui mesmo, no campo de mensagem. Sua previsão de agendamento já está com ele.'));
     } else {
       b.className = 'acomp';
-      filhos.push(h('b', {}, d.pedido === 'pronto' ? 'Previsão enviada · aguardando a confirmação do atendente' : 'Aguardando um atendente'),
+      filhos.push(h('b', {}, d.pedido === 'pronto' ? 'Pedido enviado · aguardando a confirmação do atendente' : 'Aguardando um atendente'),
         h('p', { class: 'nota-previsao' }, d.pedido === 'pronto'
-          ? 'Isto é uma previsão de agendamento e ainda NÃO está confirmado. Um atendente (uma pessoa da equipe) vai conferir tudo e enviar a confirmação de data, horário e valor aqui neste chat.'
+          ? 'O seu pedido já está com a equipe e ainda NÃO está confirmado. Um atendente (uma pessoa da equipe) vai conferir tudo e enviar a confirmação de data, horário e valor aqui neste chat.'
           : 'Um atendente (uma pessoa da equipe) vai continuar com você aqui neste chat.'),
-        ...(horarios.length ? [h('p', {}, 'Horário escolhido (previsão, a confirmar): ' + horarios.join('; '))] : []),
+        ...(horarios.length ? [h('p', {}, 'Horário escolhido (a confirmar): ' + horarios.join('; '))] : []),
         // Sem relógio e sem promessa de presença: só o estado real. O aviso de fila vem do banco (uma vez, depois de 20 min sem resposta de uma pessoa).
         h('p', {}, d.em_horario === false
           ? 'No momento não estamos em horário de trabalho, mas a sua solicitação está registrada. Assim que a equipe iniciar o atendimento, entraremos em contato com você por aqui.'
@@ -2401,7 +2403,7 @@
     if (P.carrinho.length || P.fotos) corpo.append(blocoCarrinho());
     if (P.passo === 'exames') passoExames(corpo); else if (P.passo === 'mapa' && modAtual()) passoMapa(corpo); else passoTipo(corpo);
     rodape.append(h('button', { class: 'btn-w', type: 'button', disabled: !P.carrinho.length, onclick: enviarPedido }, `Enviar pedido (${P.carrinho.length} ${P.carrinho.length === 1 ? 'exame' : 'exames'})`),
-      h('p', { class: 'w-nota' }, 'Vira uma previsão: um atendente confirma depois.'));
+      h('p', { class: 'w-nota' }, 'Seu pedido segue para a equipe, que confirma tudo com você.'));
     corpo.scrollTop = rolagem;
   }
   function rotuloItem(i) {
@@ -2793,7 +2795,7 @@
     const v = V, semConferir = v.desligado || v.falhas.size > 0;
     const limitePerto = ymd(somaDias(new Date(), 13)), pertoFalhou = [...v.falhas].some((d) => d <= limitePerto || d === C.dia);
     if (r.klingo_api) corpo.append(h('p', { class: 'p-dica ao-vivo', role: 'status' }, '✔ Horários livres conferidos agora na agenda da clínica.'));
-    else corpo.append(h('p', { class: 'aviso-cal' }, 'Os horários abaixo são uma previsão. Um atendente confere tudo e confirma o dia e o horário.' + (r.aviso && semConferir ? ' ' + r.aviso : '')));
+    else corpo.append(h('p', { class: 'aviso-cal' }, 'Os horários abaixo são sugestões para facilitar a sua escolha. Um atendente confere tudo e confirma o dia e o horário.' + (r.aviso && semConferir ? ' ' + r.aviso : '')));
     if (!v.desligado) {
       if (v.falhas.size) corpo.append(h('p', { class: 'aviso-cal', role: 'status' }, (pertoFalhou ? 'Não consegui conferir a agenda da clínica agora; os horários abaixo podem estar desatualizados. ' : 'Não consegui conferir algumas datas mais adiante; os horários delas podem estar desatualizados. '),
         h('button', { class: 'chip', type: 'button', onclick: () => carregarHorarios(false, true) }, 'Conferir de novo')));
