@@ -13,6 +13,7 @@ begin
   select * into pa from public.pre_agendamentos where conversa_id = p_conversa;
   select count(*) into n_itens from public.pre_agendamento_itens where conversa_id = p_conversa and ativo;
   if jsonb_typeof(d -> 'oferta_pendente') = 'object' then return 'horario_oferta'; end if;   -- pedido-sem-horario
+  if jsonb_typeof(d -> 'previsao') = 'object' then return 'previsao_' || (d -> 'previsao' ->> 'etapa'); end if;   -- pedido-previsao
 
   if not coalesce((d ->> 'identidade_feita')::boolean, false) then
     v_conf := public.paciente_conferir(p_conversa);

@@ -91,8 +91,11 @@ const erroDe = async (fn) => { try { await fn(); return null; } catch (e) { retu
 // ---------------------------------------------------------------- aplica a mudança ao clone (cron fica de fora)
 const sql = readFileSync(`${REPO}/supabase/pedido-sem-horario.sql`, 'utf8');
 for (const c of separarSql(sql)) { if (/cron\.schedule/.test(c)) continue; await db.exec(c + ';'); }
+const sql2 = readFileSync(`${REPO}/supabase/pedido-previsao.sql`, 'utf8');
+for (const c of separarSql(sql2)) { if (/cron\.schedule/.test(c)) continue; await db.exec(c + ';'); }
 await db.query(`insert into public.config (chave, valor) values ('pedido_horario_modo', 'teste') on conflict (chave) do update set valor = 'teste'`);
 
+const vigiarPrev = async () => { await como(''); return (await um(`select public.previsao_vigiar() r`)).r; };
 const vigiar = async () => { await como(''); return (await um(`select public.pedido_horario_vigiar() r`)).r; };
 const lista = async (...tels) => db.query(`insert into public.config (chave, valor) values ('klingo_api_telefones_teste', $1) on conflict (chave) do update set valor = excluded.valor`, [tels.join(',')]);
 // pedido pronto com o horário "perdido": volta a data escolhida para 3 dias atrás
@@ -107,8 +110,8 @@ const estado = async (c) => { await como(''); return um(`select c.status, c.ia_a
   from public.conversas c join public.conversa_fluxo f on f.conversa_id = c.id join public.pre_agendamentos p on p.conversa_id = c.id where c.id = $1`, [c]); };
 
 const novo = async (nome, tel) => { const p = await ateOFim(await iniciar(nome, tel), { motivo: 'exame', plano: 'Particular', confirmar: 'ok' }); return p; };
-const T1 = '71988881001', T2 = '71988881002', T3 = '71988881003', T4 = '71988881004', FORA = '71977776666';
-await lista(T1, T2, T3, T4);
+const T1 = '71988881001', T2 = '71988881002', T3 = '71988881003', T4 = '71988881004', T5 = '71988881005', FORA = '71977776666', FORA2 = '71977775555';
+await lista(T1, T2, T3, T4, T5);
 
 // ---------------------------------------------------------------- 1. recusa duas vezes
 let a;
@@ -130,13 +133,21 @@ await caso('"Não posso": oferece o PRÓXIMO horário, em outro dia', async () =
   const seg = m.texto.split('Temos também ')[1];
   return { ok: e.passo === 'horario_oferta' && e.n === '2' && !!seg && seg.split('.')[0] !== primeira.split('.')[0] && m.opcoes.passo === 'horario_oferta', detalhe: `1ª: ${primeira.split('.')[0]} | 2ª: ${(seg || '').split('.')[0]}` };
 });
-await caso('recusou de novo: o assistente pede que o paciente escolha data e hora no calendário (sem pedir desculpa)', async () => {
+await caso('recusou de novo: o assistente pergunta o TURNO (filtro da previsão), sem pedir desculpa', async () => {
   await responder(a, { horario_oferta: 'nao' });
   const e = await estado(a.c); const m = await ultimaDoAssistente(a);
-  return { ok: e.passo === 'horario' && e.ps === 'rascunho' && m.opcoes.tipo === 'calendario' && /Escolha no calendário/.test(m.texto) && !/desculp/i.test(m.texto), detalhe: m.texto.slice(0, 120) };
+  return { ok: e.passo === 'previsao_turno' && e.ps === 'rascunho' && m.opcoes.itens.map((x) => x.valor).join() === 'manha,tarde,qualquer' && !/desculp/i.test(m.texto), detalhe: m.texto };
 });
-await caso('o paciente escolhe no calendário e o pedido volta pronto para a equipe, com o horário novo', async () => {
-  await ateOFim(a, { confirmar: 'ok' });
+await caso('turno e período: acha horário dentro do filtro e oferece (Sim/Não); recusando 2 vezes pergunta da LISTA DE PREVISÃO com texto claro (NÃO confirma o dia)', async () => {
+  await responder(a, { previsao_turno: 'manha' }); const m1 = await ultimaDoAssistente(a);
+  await responder(a, { previsao_periodo: 'quinze' }); const m2 = await ultimaDoAssistente(a);
+  await responder(a, { horario_oferta: 'nao' }); await responder(a, { horario_oferta: 'nao' });
+  const e = await estado(a.c); const m3 = await ultimaDoAssistente(a);
+  return { ok: m1.opcoes.passo === 'previsao_periodo' && m2.opcoes.passo === 'horario_oferta' && /dentro do que você pediu/.test(m2.texto) && e.passo === 'previsao_decide'
+    && /NÃO confirma o dia do atendimento/.test(m3.texto) && m3.opcoes.itens.map((x) => x.valor).join() === 'lista,calendario', detalhe: m2.texto.slice(0, 90) };
+});
+await caso('"Prefiro escolher no calendário": o paciente escolhe e o pedido volta pronto para a equipe, com o horário novo', async () => {
+  await ateOFim(a, { previsao_decide: 'calendario', confirmar: 'ok' });
   const e = await estado(a.c);
   return { ok: e.ps === 'pronto' && e.ia_ativa === false && Array.isArray(e.escolha_horario) && e.escolha_horario.length === 1 && e.dd >= dia(0), detalhe: JSON.stringify({ ps: e.ps, dd: e.dd }) };
 });
@@ -182,13 +193,49 @@ await caso('rodar de novo não repete mensagem nem oferta', async () => {
 await caso('horário livre e pedido parado há 30 h: faixa "Pedido parado", pedido continua pronto e a conferência da agenda não apaga a faixa', async () => {
   const f = await novo('Fabi Parada Teste', T1); 
   await como(''); await db.query(`update public.pre_agendamentos set atualizado_em = now() - interval '30 hours' where conversa_id = $1`, [f.c]);
-  await db.query(`insert into public.config (chave, valor) values ('klingo_api_telefones_teste', $1) on conflict (chave) do update set valor = excluded.valor`, [[T1, T2, T3, T4].join(',')]);
+  await db.query(`insert into public.config (chave, valor) values ('klingo_api_telefones_teste', $1) on conflict (chave) do update set valor = excluded.valor`, [[T1, T2, T3, T4, T5].join(',')]);
   await vigiar(); const e = await estado(f.c);
   const pid = (await um(`select id from public.pre_agendamentos where conversa_id = $1`, [f.c])).id;
   const sl = (await um(`select escolha_horario from public.pre_agendamentos where id = $1`, [pid])).escolha_horario;
   await db.query(`select public.agenda_conferencia_aplicar($1::jsonb)`, [JSON.stringify([{ id: pid, slots: sl.map((_, i) => ({ idx: i, r: 'livre' })) }])]);
   const e2 = await estado(f.c);
   return { ok: e.ps === 'pronto' && /^Pedido parado/.test(e.a || '') && /^Pedido parado/.test(e2.a || ''), detalhe: e2.a };
+});
+// ---------------------------------------------------------------- 4. lista de previsão
+let L;
+await caso('"Nenhum horário serve para mim" (celular do modo teste): turno > período > lista de previsão > antecedência, e o pedido chega à equipe SEM horário', async () => {
+  L = await ateOFim(await iniciar('Lia Previsao Teste', T5), { motivo: 'exame', plano: 'Particular', horario: 'sem_horario', previsao_turno: 'tarde', previsao_periodo: 'quinze', previsao_decide: 'lista', previsao_antecedencia: '1_semana', confirmar: 'ok' });
+  const pa = await pedidoDe(L.c); await como('');
+  const prev = await um(`select turno, antecedencia, status from public.pedido_previsao where conversa_id = $1`, [L.c]);
+  const nota = await um(`select count(*)::int n from public.mensagens where conversa_id = $1 and texto like '%PREVISÃO (NÃO É AGENDAMENTO)%'`, [L.c]).catch(() => ({ n: -1 }));
+  const nota2 = (await um(`select dados::text t from public.conversa_fluxo where conversa_id = $1`, [L.c])).t;
+  const i = (n) => L.passos.indexOf(n);
+  return { ok: i('previsao_turno') > i('horario') && i('previsao_periodo') > i('previsao_turno') && i('previsao_decide') > i('previsao_periodo') && i('previsao_antecedencia') > i('previsao_decide')
+    && pa.status === 'pronto' && pa.horarios === 0 && prev.turno === 'tarde' && prev.antecedencia === '1_semana' && prev.status === 'aguardando' && /PREVISÃO \(NÃO É AGENDAMENTO\)/.test(nota2),
+    detalhe: L.passos.join(' > ') };
+});
+await caso('o texto final repete que a previsão NÃO confirma o dia do atendimento', async () => {
+  await como(''); const t = (await q(`select texto from public.mensagens where conversa_id = $1 and autor = 'agente' and texto like 'Anotado!%'`, [L.c]));
+  return { ok: t.length === 1 && /NÃO confirma o dia do atendimento/.test(t[0].texto) };
+});
+await caso('celular fora do modo teste: "Nenhum horário serve" continua como sempre (sem filtro, sem lista)', async () => {
+  const x = await ateOFim(await iniciar('Fora Do Teste', FORA2), { motivo: 'exame', plano: 'Particular', horario: 'sem_horario', confirmar: 'ok' });
+  return { ok: !x.passos.some((n) => String(n).startsWith('previsao_')) && x.passos.at(-1) === 'acompanhar', detalhe: x.passos.join(' > ') };
+});
+await caso('abre vaga à tarde dentro da previsão: a ATENDENTE recebe a faixa "Vaga aberta" (nada é marcado sozinho)', async () => {
+  await como('');
+  await db.exec(`create temp table agenda_tarde as select procedimento_id, procedimento, unidade, local, profissional, especialidade, dia_num, '14:00'::text hora_ini, '17:00'::text hora_fim, duracao_min, vig_ini, vig_fim from public.catalogo_agenda where procedimento_id = 201;`);
+  const antes = (await vigiarPrev()); 
+  await db.exec(`insert into public.catalogo_agenda (procedimento_id, procedimento, unidade, local, profissional, especialidade, dia_num, hora_ini, hora_fim, duracao_min, vig_ini, vig_fim) select * from agenda_tarde;`);
+  const r = await vigiarPrev(); const e = await estado(L.c); const pv = await um(`select status from public.pedido_previsao where conversa_id = $1`, [L.c]);
+  return { ok: antes.vagas_novas === 0 && r.vagas_novas >= 1 && pv.status === 'vaga_encontrada' && /^Vaga aberta dentro da previsão/.test(e.a || '') && e.ps === 'pronto' && e.escolha_horario === null, detalhe: e.a };
+});
+await caso('a vaga some: a faixa sai e o paciente volta a "aguardando"; pedido agendado sai da lista', async () => {
+  await como(''); await db.exec(`delete from public.catalogo_agenda where hora_ini = '14:00';`);
+  const r = await vigiarPrev(); const e = await estado(L.c); const pv = await um(`select status from public.pedido_previsao where conversa_id = $1`, [L.c]);
+  await db.query(`update public.pre_agendamentos set status = 'agendado' where conversa_id = $1`, [L.c]);
+  const r2 = await vigiarPrev(); const pv2 = await um(`select status from public.pedido_previsao where conversa_id = $1`, [L.c]);
+  return { ok: r.vagas_que_sumiram === 1 && pv.status === 'aguardando' && !e.a && pv2.status === 'atendida' && r2.encerradas_da_lista === 1, detalhe: JSON.stringify([r, r2]) };
 });
 await caso('só o sistema executa a rotina (anon e authenticated não)', async () => {
   const x = await um(`select has_function_privilege('anon','public.pedido_horario_vigiar()','execute') a, has_function_privilege('authenticated','public.pedido_horario_vigiar()','execute') b, has_function_privilege('service_role','public.pedido_horario_vigiar()','execute') c`);

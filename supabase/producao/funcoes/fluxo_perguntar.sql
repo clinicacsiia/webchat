@@ -89,6 +89,8 @@ begin
       case when lower(btrim(x)) = 'particular' then 'particular' else 'pelo convênio ' || initcap(lower(x)) end));
     v_op := public.fluxo_escolha(p_passo, jsonb_build_array(jsonb_build_object('valor', 'sim', 'rotulo', 'Sim, é o mesmo'),
                                                             jsonb_build_object('valor', 'nao', 'rotulo', 'Não, mudou')));
+  when 'previsao_turno', 'previsao_periodo', 'previsao_decide', 'previsao_antecedencia' then   -- pedido-previsao
+    v_ult := public.previsao_pergunta(p_conversa, p_passo); v_txt := v_ult ->> 'texto'; v_op := v_ult -> 'opcoes';
   when 'horario_oferta' then   -- pedido-sem-horario
     v_txt := coalesce(d -> 'oferta_pendente' ->> 'texto', 'Esse horário serve para você?');
     v_op := public.fluxo_escolha(p_passo, jsonb_build_array(jsonb_build_object('valor', 'sim', 'rotulo', 'Sim, pode ser esse'),
