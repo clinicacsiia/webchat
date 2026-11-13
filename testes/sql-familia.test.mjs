@@ -192,6 +192,31 @@ await caso('a popularidade soma os horários marcados por médico (bloqueios nã
   return { ok: p[0].profissional === 'DRA POPULAR' && p[0].total === 2 && p.length === 2 && !p.some((x) => /BLOQ|ANTIGO/.test(x.profissional)), detalhe: JSON.stringify(p) };
 });
 
+// ---------------------------------------------------------------- pessoa
+await caso('guardar a mesma pessoa duas vezes não duplica (mesma chave), renova plano e id do Klingo; ler exige vínculo do aparelho', async () => {
+  const a = (await um(`select public.familia_pessoa_guardar($1::jsonb) as r`, [JSON.stringify({ chave: 'k-teo', par_hash: 'par-1', primeiro_nome: 'Teo', dados_cifrados: 'c1', cpf_de: 'responsavel', klingo_id: '', plano_id: '1', plano_nome: 'PARTICULAR' })])).r;
+  const b = (await um(`select public.familia_pessoa_guardar($1::jsonb) as r`, [JSON.stringify({ chave: 'k-teo', par_hash: 'par-1', primeiro_nome: 'Teo', dados_cifrados: 'c2', klingo_id: '7960', plano_id: '14', plano_nome: 'AMIL' })])).r;
+  const n = (await um(`select count(*)::int n, max(dados_cifrados) d, max(klingo_id) k, max(plano_id) pl from public.familia_pessoa where chave = 'k-teo'`));
+  const sem = (await um(`select public.familia_pessoa_ler($1, $2) as r`, [celCarla, a.id])).r;
+  await vinc(celCarla, a.id, 'responsavel', 'cpf', 1);
+  const com = (await um(`select public.familia_pessoa_ler($1, $2) as r`, [celCarla, a.id])).r;
+  const par = (await um(`select public.familia_pessoa_por_par('par-1') as r`)).r;
+  return { ok: a.novo === true && b.novo === false && a.id === b.id && n.n === 1 && n.d === 'c1' && n.k === '7960' && n.pl === 14 && sem === null && com.nivel === 1 && com.cpf_de === 'responsavel' && par.length === 1, detalhe: JSON.stringify({ n, com }) };
+});
+await caso('o histórico conta os médicos já usados (sem cancelados) e as marcações abertas ignoram o que já acabou', async () => {
+  const h = (await um(`select public.familia_historico($1) as r`, [[ana, carla]])).r;
+  const ab = (await um(`select public.familia_marcacoes_abertas($1) as r`, [ana])).r;
+  const ativos = (await um(`select public.familia_pessoas_ativas(60) as r`)).r;
+  return { ok: h[0].profissional === 'DRA TESTE' && h.every((x) => x.total >= 1) && ab.length === 0 && Array.isArray(ativos) && ativos.length > 0, detalhe: JSON.stringify({ h, ab }) };
+});
+
+await caso('o registro de abertura de laudo guarda só quem, qual e quando, e passa a recusar a partir da 6ª abertura no mesmo minuto', async () => {
+  const r = [];
+  for (let i = 0; i < 6; i++) r.push((await um(`select public.familia_acesso_registrar($1, $2, $3) as r`, [celCarla, ana, String(26700 + i)])).r);
+  const gravou = await q(`select * from public.familia_acesso where aparelho_id = $1`, [celCarla]);
+  return { ok: r.slice(0, 5).every((x) => x.ok) && r[5].ok === false && r[5].motivo === 'devagar' && gravou.length === 5 && !('conteudo' in gravou[0]), detalhe: JSON.stringify(r[5]) };
+});
+
 // ---------------------------------------------------------------- segurança
 await caso('visitante (anon) e logado do painel não leem as tabelas da família nem executam as funções', async () => {
   const falhou = async (papel, sql) => { await db.exec(`reset role; set role ${papel};`); try { await db.query(sql); return false; } catch { return true; } finally { await db.exec(`reset role;`); } };

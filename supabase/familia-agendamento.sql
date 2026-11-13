@@ -10,6 +10,7 @@
 create table if not exists public.familia_pessoa (
   id uuid primary key default gen_random_uuid(),
   chave text not null unique,                       -- hash(cpf usado no login | nascimento | nome normalizado): impede duplicar a mesma pessoa
+  par_hash text,                                    -- hash(cpf | nascimento): acha a pessoa quando o outro responsável entra pelos dados (gêmeos dividem este valor, por isso não é único)
   primeiro_nome text not null check (char_length(primeiro_nome) between 1 and 40),
   dados_cifrados text not null,                     -- AES-GCM (feito na Edge Function): {cpf, nascimento, nome}; o banco nunca vê o texto
   cpf_de text not null default 'proprio' check (cpf_de in ('proprio', 'responsavel')),   -- criança sem CPF usa o do responsável
@@ -35,6 +36,7 @@ create table if not exists public.familia_vinculo (
   primary key (aparelho_id, pessoa_id),
   constraint familia_vinculo_nivel2_ck check (nivel = 1 or liberado_em is not null)
 );
+create index if not exists familia_pessoa_par_idx on public.familia_pessoa (par_hash);
 create index if not exists familia_vinculo_pessoa_idx on public.familia_vinculo (pessoa_id);
 create table if not exists public.familia_convite (
   codigo_hash text primary key,
@@ -286,11 +288,79 @@ grant execute on function public.familia_cfg(text, integer), public.familia_apar
   public.agenda_fila_pedir(text, jsonb, integer), public.agenda_fila_pegar(integer), public.agenda_fila_fim(bigint, boolean, text, interval), public.agenda_cache_ler(text),
   public.agenda_cache_gravar(text, jsonb, integer), public.agenda_popularidade(integer) to service_role;
 
+-- ============================================================================================================================ PARTE 6: pessoa (leitura e gravação só pela Edge Function)
+-- Cria ou atualiza a pessoa pela chave. Quando já existe, só renova plano e id do Klingo (os dados cifrados antigos continuam; quem muda o contato é a própria pessoa no Klingo).
+create or replace function public.familia_pessoa_guardar(p jsonb) returns jsonb language plpgsql security definer set search_path to '' as $$
+declare v_id uuid; v_novo boolean := false;
+begin
+  select id into v_id from public.familia_pessoa where chave = p ->> 'chave';
+  if not found then
+    insert into public.familia_pessoa (chave, par_hash, primeiro_nome, dados_cifrados, cpf_de, klingo_id, plano_id, plano_nome)
+    values (p ->> 'chave', p ->> 'par_hash', left(p ->> 'primeiro_nome', 40), p ->> 'dados_cifrados', coalesce(nullif(p ->> 'cpf_de', ''), 'proprio'), nullif(p ->> 'klingo_id', ''), nullif(p ->> 'plano_id', '')::integer, left(p ->> 'plano_nome', 80))
+    returning id into v_id; v_novo := true;
+  else
+    update public.familia_pessoa set klingo_id = coalesce(nullif(p ->> 'klingo_id', ''), klingo_id), plano_id = coalesce(nullif(p ->> 'plano_id', '')::integer, plano_id),
+           plano_nome = coalesce(left(p ->> 'plano_nome', 80), plano_nome), atualizado_em = now() where id = v_id;
+  end if;
+  return jsonb_build_object('id', v_id, 'novo', v_novo);
+end $$;
+
+-- Lê a pessoa SÓ se o aparelho tem vínculo com ela (devolve o texto cifrado: quem decifra é a Edge Function).
+create or replace function public.familia_pessoa_ler(p_aparelho uuid, p_pessoa uuid) returns jsonb language sql stable security definer set search_path to '' as $$
+  select jsonb_build_object('id', p.id, 'primeiro_nome', p.primeiro_nome, 'dados_cifrados', p.dados_cifrados, 'cpf_de', p.cpf_de, 'klingo_id', p.klingo_id, 'plano_id', p.plano_id, 'plano', p.plano_nome,
+         'papel', v.papel, 'nivel', case when v.nivel = 2 and v.liberado_em <= now() then 2 else 1 end)
+    from public.familia_pessoa p join public.familia_vinculo v on v.pessoa_id = p.id join public.familia_aparelho a on a.id = v.aparelho_id
+   where p.id = p_pessoa and v.aparelho_id = p_aparelho and a.desligado_em is null $$;
+-- Leitura da rotina lenta (sem aparelho): só a Edge Function com a chave de serviço chama.
+create or replace function public.familia_pessoa_ler_servico(p_pessoa uuid) returns jsonb language sql stable security definer set search_path to '' as $$
+  select jsonb_build_object('id', p.id, 'primeiro_nome', p.primeiro_nome, 'dados_cifrados', p.dados_cifrados, 'klingo_id', p.klingo_id, 'plano_id', p.plano_id) from public.familia_pessoa p where p.id = p_pessoa $$;
+create or replace function public.familia_pessoa_por_par(p_par_hash text) returns jsonb language sql stable security definer set search_path to '' as $$
+  select coalesce(jsonb_agg(jsonb_build_object('id', id, 'primeiro_nome', primeiro_nome, 'dados_cifrados', dados_cifrados, 'klingo_id', klingo_id) order by criado_em), '[]'::jsonb) from public.familia_pessoa where par_hash = p_par_hash $$;
+create or replace function public.familia_pessoas_novas_hoje() returns integer language sql stable security definer set search_path to '' as $$
+  select count(*)::integer from public.familia_pessoa where cpf_de = 'responsavel' and criado_em >= now() - interval '24 hours' $$;
+-- O que a(s) pessoa(s) já marcaram (sem cancelar): serve para colocar primeiro o médico que a família já conhece.
+create or replace function public.familia_historico(p_pessoas uuid[]) returns jsonb language sql stable security definer set search_path to '' as $$
+  select coalesce(jsonb_agg(jsonb_build_object('profissional', profissional, 'total', total) order by total desc), '[]'::jsonb)
+    from (select profissional, count(*)::int as total from public.familia_marcacao where pessoa_id = any (p_pessoas) and profissional is not null and status not in ('cancelado', 'remarcado') group by profissional) t $$;
+-- Quem precisa ser relido no Klingo agora: pessoas de aparelhos usados na última hora (o resto espera a próxima visita).
+create or replace function public.familia_pessoas_ativas(p_minutos integer default 60) returns jsonb language sql stable security definer set search_path to '' as $$
+  select coalesce(jsonb_agg(distinct v.pessoa_id), '[]'::jsonb) from public.familia_vinculo v join public.familia_aparelho a on a.id = v.aparelho_id
+   where a.desligado_em is null and a.ultimo_uso >= now() - make_interval(mins => least(1440, greatest(1, p_minutos))) $$;
+-- Marcações de uma pessoa que ainda valem acompanhar (futuras ou sem laudo), para a rotina conferir.
+create or replace function public.familia_marcacoes_abertas(p_pessoa uuid) returns jsonb language sql stable security definer set search_path to '' as $$
+  select coalesce(jsonb_agg(jsonb_build_object('voucher', voucher_id, 'status', status, 'data', data)), '[]'::jsonb) from public.familia_marcacao
+   where pessoa_id = p_pessoa and status not in ('cancelado', 'remarcado', 'laudo_pronto', 'faltou') $$;
+
+revoke all on function public.familia_pessoa_guardar(jsonb), public.familia_pessoa_ler(uuid, uuid), public.familia_pessoa_ler_servico(uuid), public.familia_pessoa_por_par(text), public.familia_pessoas_novas_hoje(),
+  public.familia_historico(uuid[]), public.familia_pessoas_ativas(integer), public.familia_marcacoes_abertas(uuid) from public, anon, authenticated;
+grant execute on function public.familia_pessoa_guardar(jsonb), public.familia_pessoa_ler(uuid, uuid), public.familia_pessoa_ler_servico(uuid), public.familia_pessoa_por_par(text), public.familia_pessoas_novas_hoje(),
+  public.familia_historico(uuid[]), public.familia_pessoas_ativas(integer), public.familia_marcacoes_abertas(uuid) to service_role;
+
+-- ============================================================================================================================ PARTE 7: registro de quem abriu laudo (sem conteúdo) e freio
+create table if not exists public.familia_acesso (
+  id bigint generated always as identity primary key,
+  voucher_id text not null, aparelho_id uuid not null references public.familia_aparelho (id) on delete cascade, pessoa_id uuid not null references public.familia_pessoa (id) on delete cascade,
+  em timestamptz not null default now()
+);
+create index if not exists familia_acesso_aparelho_idx on public.familia_acesso (aparelho_id, em desc);
+alter table public.familia_acesso enable row level security;
+revoke all on public.familia_acesso from anon, authenticated;
+-- Registra a abertura de um laudo. Mais de 5 por minuto no mesmo celular: recusa (freio contra quem tenta abrir tudo de uma vez).
+create or replace function public.familia_acesso_registrar(p_aparelho uuid, p_pessoa uuid, p_voucher text) returns jsonb language plpgsql security definer set search_path to '' as $$
+begin
+  if (select count(*) from public.familia_acesso where aparelho_id = p_aparelho and em > now() - interval '1 minute') >= 5 then return jsonb_build_object('ok', false, 'motivo', 'devagar'); end if;
+  insert into public.familia_acesso (voucher_id, aparelho_id, pessoa_id) values (p_voucher, p_aparelho, p_pessoa);
+  return jsonb_build_object('ok', true);
+end $$;
+revoke all on function public.familia_acesso_registrar(uuid, uuid, text) from public, anon, authenticated;
+grant execute on function public.familia_acesso_registrar(uuid, uuid, text) to service_role;
+
 -- ============================================================================================================================ COMO VOLTAR ATRÁS
 -- drop function public.familia_cfg(text, integer), public.familia_aparelho_criar(text, text), public.familia_aparelho_ler(text), public.familia_vincular(uuid, uuid, text, text, integer, timestamptz),
 --   public.familia_aparelho_desligar(uuid), public.familia_convite_criar(uuid, uuid[], text), public.familia_convite_usar(text, uuid), public.familia_pedir_por_dados(uuid, uuid, text),
 --   public.familia_avisos(uuid), public.familia_aviso_responder(uuid, bigint, boolean), public.familia_marcacao_gravar(jsonb), public.familia_acompanhar(uuid), public.familia_previsao_laudo(text),
 --   public.agenda_fila_pedir(text, jsonb, integer), public.agenda_fila_pegar(integer), public.agenda_fila_fim(bigint, boolean, text, interval), public.agenda_cache_ler(text),
---   public.agenda_cache_gravar(text, jsonb, integer), public.agenda_popularidade(integer);
--- drop table public.familia_evento, public.familia_marcacao, public.familia_aviso, public.familia_convite, public.familia_vinculo, public.familia_aparelho, public.familia_pessoa, public.agenda_fila, public.agenda_cache;
+--   public.agenda_cache_gravar(text, jsonb, integer), public.agenda_popularidade(integer), public.familia_pessoa_guardar(jsonb), public.familia_pessoa_ler(uuid, uuid), public.familia_pessoa_ler_servico(uuid),
+--   public.familia_pessoa_por_par(text), public.familia_pessoas_novas_hoje(), public.familia_historico(uuid[]), public.familia_pessoas_ativas(integer), public.familia_marcacoes_abertas(uuid), public.familia_acesso_registrar(uuid, uuid, text);
+-- drop table public.familia_acesso, public.familia_evento, public.familia_marcacao, public.familia_aviso, public.familia_convite, public.familia_vinculo, public.familia_aparelho, public.familia_pessoa, public.agenda_fila, public.agenda_cache;
 -- delete from public.config where chave in ('familia_max_aparelhos', 'familia_espera_horas', 'familia_dorme_meses');
