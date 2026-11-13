@@ -89,6 +89,9 @@ test("o erro nunca carrega o corpo da resposta (CPF/nome) e é classificado por 
   assert.equal(classificar(403, "Plano BRADESCO SAUDE inativo."), "plano_inativo");
   assert.equal(classificar(403, '{"plano":["Plano não identificado."]}'), "plano_desconhecido");
   assert.equal(classificar(403, "Nenhum médico credenciado para CONSULTA (68), para operadora X."), "sem_medico");
+  assert.equal(classificar(403, '{"msg":"Nenhum m\\u00e9dico credenciado para CONSULTA (68), para operadora PLANSERV.","status_code":403}'), "sem_medico");   // acentos escapados (caso real de 13/11/2026)
+  assert.equal(classificar(403, '{"msg":"Plano BRADESCO SAUDE inativo."}'), "plano_inativo");
+  assert.equal(classificar(400, '"Hor\\u00e1rio j\\u00e1 ocupado. [reservado]"'), "horario_ocupado");
   assert.equal(classificar(400, "Horário já ocupado. …"), "horario_ocupado");
   assert.equal(classificar(403, "Agendamento já cancelado."), "ja_cancelado");
   assert.equal(classificar(403, "<html>"), "html");

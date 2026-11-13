@@ -1,5 +1,5 @@
 // FLUXOGRAMA: entrada (o chat chega ao passo do horário: POST {conversa, token}) -> validação (token da conversa; interruptor klingo_api_horarios = sombra ou sim; 1 procedimento; convênio traduzido para plano do Klingo)
-//   -> lógica (cota global; GET /agenda/horarios por 28 dias com sexo e nascimento do paciente; grava as ofertas em klingo_oferta; no modo sombra mede a divergência contra a grade) -> saída ({ok, modo, ofertas}; nunca dado de paciente)
+//   -> lógica (cota global; GET /agenda/horarios por 14 dias com sexo e nascimento do paciente; grava as ofertas em klingo_oferta; no modo sombra mede a divergência contra a grade) -> saída ({ok, modo, ofertas}; nunca dado de paciente)
 // Versão 1.0 — 12/11/2026 / Mudança: primeira versão (autoatendimento Klingo, etapa 1: horários reais). Só LEITURA: não reserva nem marca nada.
 //
 // Nunca trava o chat: qualquer problema (limite de chamadas, Klingo lento ou fora, convênio sem tradução) devolve ok:false/motivo e o chat usa a grade, como sempre.
@@ -13,7 +13,7 @@ import { identificar } from "./identificar.ts";
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info", "Access-Control-Allow-Methods": "POST, OPTIONS" };
 const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { ...CORS, "Content-Type": "application/json" } });
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const JANELA_DIAS = 28;
+const JANELA_DIAS = 14;   // o Klingo recusa períodos maiores que 15 dias (403 "Período excedido. Máximo 15 dias.", provado em 12/11/2026)
 const VALIDADE_CACHE_S = 45;
 
 Deno.serve(async (req: Request) => {
@@ -27,6 +27,9 @@ Deno.serve(async (req: Request) => {
   const { error: eTok } = await supabase.rpc("chat_valida", { p_conversa: conversa, p_token: tokenConversa });
   if (eTok) return json({ error: "Conversa não encontrada" }, 403);
 
+  // Deixa o motivo (ou limpa, com motivo nulo) na conversa: é por ele que a equipe lê POR QUE a marcação sozinha não aconteceu. Nunca leva dado do paciente.
+  const motivar = (motivo: string | null, detalhe?: string) => supabase.rpc("klingo_horarios_motivo", { p_conversa: conversa, p_motivo: motivo, p_detalhe: detalhe ?? null }).then(() => {}, () => {});
+  const recusar = async (motivo: string, detalhe?: string) => { await motivar(motivo, detalhe); return json({ ok: false, motivo, ...(detalhe ? { detalhe } : {}) }); };
   const medir = (tipo: string, ms?: number) => supabase.rpc("klingo_medir", { p_tipo: tipo, p_n: 1, p_ms: ms ?? null }).then(() => {}, () => {});
   // Interruptor geral (config.klingo_auto): nao = desligado; teste/sim = a API vale (o banco, em klingo_ativo, separa só os telefones de teste de todos); legado = a chave antiga.
   const mestre = String((await supabase.rpc("klingo_mestre")).data ?? "nao");
@@ -39,18 +42,18 @@ Deno.serve(async (req: Request) => {
     if (ativo !== true) return json({ ok: false, motivo: "fora_do_grupo" });
   }
   const tokenKlingo = Deno.env.get("KLINGO_APP_TOKEN");
-  if (!tokenKlingo) return json({ ok: false, motivo: "sem_chave" });
+  if (!tokenKlingo) return await recusar("sem_chave");
 
   // Modo sombra: o paciente não espera (a medição roda em segundo plano, depois da resposta). Modo sim: o chat espera a lista.
   const trabalho = async (): Promise<Response> => {
   try {
     const { data: d } = await supabase.rpc("klingo_dados_conversa", { p_conversa: conversa });
     const dados = d as DadosConversa | null;
-    if (!dados) return json({ ok: false, motivo: "sem_pedido" });
+    if (!dados) return await recusar("sem_pedido");
     const { data: esps } = await supabase.from("klingo_especialidade").select("cbos, procedimentos").eq("liberada_api", true);
     const pedido = pedidoDaApi(dados, (esps ?? []) as Esp[]);
-    if (!pedido) return json({ ok: false, motivo: "fora_do_escopo" });
-    if (!dados.cpf || !dados.nascimento || !dados.plano) return json({ ok: false, motivo: "dados_incompletos" });
+    if (!pedido) return await recusar("fora_do_escopo");
+    if (!dados.cpf || !dados.nascimento || !dados.plano) return await recusar("dados_incompletos");
 
     // Cache curto: o chat pede de novo quando a paciente volta de um passo; a mesma lista vale por 45 s.
     const { data: ult } = await supabase.from("klingo_oferta").select("criado_em").eq("conversa_id", conversa).order("criado_em", { ascending: false }).limit(1);
@@ -71,7 +74,7 @@ Deno.serve(async (req: Request) => {
     }
     const { data: pl } = await supabase.rpc("klingo_plano_resolver", { p_operadora: dados.plano, p_plano_cadastro: ident?.situacao === "confere" ? ident.plano_id : null });
     const planoId = (pl as { plano_id?: number | null } | null)?.plano_id ?? null;
-    if (!planoId) return json({ ok: false, motivo: (pl as { motivo?: string } | null)?.motivo ?? "sem_traducao" });
+    if (!planoId) return await recusar((pl as { motivo?: string } | null)?.motivo ?? "sem_traducao");
 
     const hoje = hojeBahia();
     const hs = await api.horarios({
@@ -80,7 +83,8 @@ Deno.serve(async (req: Request) => {
     });
     const ofertas = montarOfertas(hs);
     const proc = ofertas.find((o) => o.procedimento)?.procedimento ?? dados.procedimento ?? 0;
-    const { data: n } = await supabase.rpc("klingo_oferta_gravar", { p_conversa: conversa, p_procedimento: proc, p_plano: planoId, p_ofertas: ofertas });
+    const { data: n, error: eGravar } = await supabase.rpc("klingo_oferta_gravar", { p_conversa: conversa, p_procedimento: proc, p_plano: planoId, p_ofertas: ofertas });
+    if (eGravar) throw new Error("gravar_oferta");
     // exame: aprende sozinho se a API tem horário para ele
     if (dados.tipo === "exame" && dados.procedimento) {
       await supabase.from("klingo_proc_api").upsert({ procedimento_id: dados.procedimento, [ofertas.length ? "com_horario_em" : "vazio_em"]: new Date().toISOString() }, { onConflict: "procedimento_id" });
@@ -89,13 +93,21 @@ Deno.serve(async (req: Request) => {
     const ms = Date.now() - t0;
     await medir("horarios_api_ok", ms);
     await medir(ms < 1000 ? "horarios_ms_lt1s" : ms < 3000 ? "horarios_ms_lt3s" : "horarios_ms_ge3s");
+    // A API respondeu, mas sem nenhum horário para este pedido: também é um motivo que a equipe precisa ver.
+    if (ofertas.length === 0) await motivar("api_sem_horario"); else await motivar(null);
     return json({ ok: true, modo, ofertas: Number(n ?? 0) });
   } catch (e) {
     const tipo = e instanceof KlingoErro ? e.tipo : "erro";
+    // Nunca engolir o erro em silêncio: o log guarda só status, caminho e tipo (nunca corpo, CPF ou nome) e a resposta devolve o motivo técnico.
+    const detalhe = e instanceof KlingoErro ? `${e.tipo} (HTTP ${e.status}) em ${e.caminho}${e.resumo ? `: ${e.resumo}` : ""}` : `erro interno: ${(e as Error)?.name ?? "?"}`;
+    console.error(`chat-agenda-api: ${detalhe}`);
+    // 403 de plano/médico é regra de negócio, não falha técnica: não entra na conta de erros (que faz o sistema recuar sozinho) e a equipe é avisada do motivo.
+    if (e instanceof KlingoErro && (e.tipo === "sem_medico" || e.tipo === "plano_inativo" || e.tipo === "plano_desconhecido")) {
+      await medir("horarios_api_regra");
+      return await recusar(e.tipo, e.resumo);
+    }
     await medir(tipo === "limite" ? "horarios_api_limite" : "horarios_api_erro");
-    // 403 de plano/médico é regra de negócio: sem horários para este convênio (o chat usa a grade e a equipe resolve)
-    if (e instanceof KlingoErro && (e.tipo === "sem_medico" || e.tipo === "plano_inativo" || e.tipo === "plano_desconhecido")) return json({ ok: false, motivo: e.tipo });
-    return json({ ok: false, motivo: tipo === "limite" ? "limite" : "indisponivel" });
+    return await recusar(tipo === "limite" ? "limite" : "indisponivel", detalhe);
   }
   };
   if (modo === "sombra") {

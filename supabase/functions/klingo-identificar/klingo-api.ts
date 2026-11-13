@@ -22,6 +22,8 @@ export class KlingoErro extends Error {
   status: number;
   caminho: string;
   tipo: TipoErro;
+  /** Só para /agenda/horarios (a consulta não leva CPF nem nome): trecho curto da mensagem do Klingo, para a equipe saber o motivo do 403. */
+  resumo?: string;
   constructor(status: number, caminho: string, tipo: TipoErro = "outro") {
     super(`Klingo ${status} em ${caminho} (${tipo})`);
     this.status = status;
@@ -32,8 +34,15 @@ export class KlingoErro extends Error {
   get incerto() { return this.tipo === "timeout" || this.tipo === "rede" || this.tipo === "servidor" || this.tipo === "html" || this.tipo === "limite"; }
 }
 
+/** JSON -> texto corrido com os acentos de verdade (para casar as frases conhecidas). Não é JSON? devolve vazio. */
+function decodificarJson(t: string): string {
+  try { const j = JSON.parse(t) as unknown; return typeof j === "string" ? j : JSON.stringify(j); } catch { return ""; }
+}
+
 /** Olha o texto do erro SÓ para classificar; o texto nunca sai daqui. */
-export function classificar(status: number, texto: string): TipoErro {
+export function classificar(status: number, bruto: string): TipoErro {
+  // A API às vezes manda os acentos escapados no JSON (\u00e9): lê o texto cru E o decodificado (11/13/2026: "Nenhum m\u00e9dico credenciado" virava "outro").
+  const texto = `${bruto} ${decodificarJson(bruto)}`;
   if (status === 429) return "limite";
   if (/Plano .{0,80}inativ/i.test(texto)) return "plano_inativo";
   if (/Plano n[ãa]o identificado/i.test(texto)) return "plano_desconhecido";
@@ -46,6 +55,20 @@ export function classificar(status: number, texto: string): TipoErro {
   if (status === 401) return "nao_autorizado";
   if (status >= 500) return "servidor";
   return "outro";
+}
+
+/** Trecho curto e sem quebras da mensagem de erro (JSON {msg} ou campos de validação). Usado só onde a requisição não carrega dado pessoal. */
+export function resumirMensagem(texto: string, max = 160): string {
+  let m = String(texto ?? "");
+  try {
+    const j = JSON.parse(m) as unknown;
+    if (typeof j === "string") m = j;
+    else if (j && typeof j === "object") {
+      const o = j as Record<string, unknown>;
+      m = typeof o.msg === "string" ? o.msg : JSON.stringify(j);
+    }
+  } catch { /* texto puro */ }
+  return m.replace(/\s+/g, " ").trim().slice(0, max);
 }
 
 export type Opcoes = {
@@ -235,7 +258,11 @@ export class KlingoApi {
         if (tentativa < this.o.tentativas429) { await esperar(800 * 2 ** tentativa); continue; }
         throw new KlingoErro(429, caminho, "limite");
       }
-      if (!res.ok) throw new KlingoErro(res.status, caminho, classificar(res.status, t));
+      if (!res.ok) {
+        const e = new KlingoErro(res.status, caminho, classificar(res.status, t));
+        if (caminho === "/agenda/horarios") e.resumo = resumirMensagem(t);
+        throw e;
+      }
       if (/^\s*</.test(t) && /html/i.test(res.headers.get("content-type") ?? "html")) throw new KlingoErro(res.status, caminho, "html");
       try { return JSON.parse(t) as T; } catch { return t as unknown as T; }
     }

@@ -1955,6 +1955,26 @@ CREATE INDEX klingo_conferencia_conversa_idx ON public.klingo_conferencia USING 
 CREATE INDEX klingo_conferencia_marcado_idx ON public.klingo_conferencia USING btree (marcado_em);
 alter table public.klingo_conferencia enable row level security;
 
+create table public.klingo_horarios_falha (
+  conversa_id uuid not null,
+  motivo text not null,
+  detalhe text,
+  em timestamp with time zone default now() not null,
+  constraint klingo_horarios_falha_pkey PRIMARY KEY (conversa_id)
+);
+comment on table public.klingo_horarios_falha is 'Último motivo pelo qual o chat não recebeu horários reais do Klingo nesta conversa (só código e trecho curto; sem dado de paciente).';
+alter table public.klingo_horarios_falha enable row level security;
+
+create table public.klingo_saude (
+  tipo text not null,
+  ok boolean not null,
+  ms integer,
+  detalhe text,
+  em timestamp with time zone default now() not null,
+  constraint klingo_saude_pkey PRIMARY KEY (tipo)
+);
+alter table public.klingo_saude enable row level security;
+
 create table public.klingo_convenio (
   plano_id integer primary key,
   convenio_id integer not null,
@@ -2167,6 +2187,7 @@ alter table public.registro_assinaturas add constraint registro_assinaturas_aten
 alter table public.vinculo_solicitacoes add constraint vinculo_solicitacoes_conta_id_fkey FOREIGN KEY (conta_id) REFERENCES auth.users(id) ON DELETE CASCADE;
 alter table public.vinculo_solicitacoes add constraint vinculo_solicitacoes_decidido_por_fkey FOREIGN KEY (decidido_por) REFERENCES auth.users(id) ON DELETE SET NULL;
 alter table public.vinculo_solicitacoes add constraint vinculo_solicitacoes_paciente_id_fkey FOREIGN KEY (paciente_id) REFERENCES pacientes(id) ON DELETE CASCADE;
+alter table public.klingo_horarios_falha add constraint klingo_horarios_falha_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES public.conversas(id) ON DELETE CASCADE;
 alter table public.klingo_conferencia add constraint klingo_conferencia_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES public.conversas(id) ON DELETE SET NULL;
 
 -- ===== Visões (5) =====

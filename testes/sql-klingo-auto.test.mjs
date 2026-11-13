@@ -13,11 +13,11 @@ const caso = async (nome, fn) => { try { const r = await fn(); registrar(nome, r
 const { db, falhas } = await criarBancoProducao();
 const { q, um, como, anonimo } = ajudantes(db);
 await db.exec(`insert into vault.secrets_tbl (name, secret) values ('klingo_hash_sal', 'sal-de-teste'), ('klingo_interno_segredo', 'interno-de-teste')`);
-for (const f of ['klingo-auto-parte1-tabelas', 'klingo-auto-parte2-base', 'klingo-auto-parte3-identidade', 'klingo-auto-parte4a-operacao', 'klingo-auto-parte4b-motor', 'klingo-auto-parte5-autogestao', 'klingo-auto-parte6-novo-e-eventos', 'klingo-auto-parte7-indicadores', 'klingo-auto-parte8-pos-marcacao', 'klingo-auto-parte9-voltar', 'klingo-auto-parte10-interruptor-geral', 'klingo-auto-parte11-voltar-mae-divergencia', 'klingo-auto-parte12-convenio-segue-klingo', 'klingo-auto-parte13-paciente-conhecido-cpf', 'klingo-auto-parte14-quadros-encerrar-agendado']) {
+for (const f of ['klingo-auto-parte1-tabelas', 'klingo-auto-parte2-base', 'klingo-auto-parte3-identidade', 'klingo-auto-parte4a-operacao', 'klingo-auto-parte4b-motor', 'klingo-auto-parte5-autogestao', 'klingo-auto-parte6-novo-e-eventos', 'klingo-auto-parte7-indicadores', 'klingo-auto-parte8-pos-marcacao', 'klingo-auto-parte9-voltar', 'klingo-auto-parte10-interruptor-geral', 'klingo-auto-parte11-voltar-mae-divergencia', 'klingo-auto-parte12-convenio-segue-klingo', 'klingo-auto-parte13-paciente-conhecido-cpf', 'klingo-auto-parte14-quadros-encerrar-agendado', 'klingo-horarios-motivo']) {
   try { await db.exec(readFileSync(`${REPO}/supabase/${f}.sql`, 'utf8')); } catch (e) { registrar(`aplicar ${f}.sql no clone da produção`, false, String(e.message).split('\n')[0]); }
 }
 await db.exec(`insert into public.config (chave, valor) values ('klingo_auto', 'legado') on conflict (chave) do update set valor = 'legado'`);   // os casos abaixo testam as regras por chave; o interruptor geral tem casos próprios no fim
-registrar('o retrato da produção monta inteiro e as 15 partes novas aplicam sem erro', falhas.length === 0 && resultados.every(Boolean));
+registrar('o retrato da produção monta inteiro e as 16 partes novas aplicam sem erro', falhas.length === 0 && resultados.every(Boolean));
 
 const UNIDADE = 'CLÍNICA DE SAÚDE E IMAGEM - CSI';
 await db.exec(`
@@ -906,6 +906,36 @@ await caso('LIGADO com a marcação ligada: cadastro com dúvida (divergente) NU
   const cv = await conversaDe(p.c);
   const msgs = (await q(`select texto from public.mensagens where conversa_id = $1 and autor = 'agente' order by id desc limit 4`, [p.c])).map((m) => m.texto).join(' | ');
   return { ok: pa.status !== 'agendado' && n === 0 && p.passos.at(-1) !== 'marcando' && /equipe|atendente|CSI/i.test(msgs), detalhe: `último passo=${p.passos.at(-1)}; pedido ${pa.status}; operações ${n}; ia_ativa=${cv.ia_ativa}` };
+});
+
+await caso('MOTIVO VISÍVEL: o Klingo sem médico para o convênio vira nota clara na conversa; quando a busca dá certo o motivo é apagado; sem motivo gravado, a nota explica que veio da grade', async () => {
+  await ligar('sim');
+  const nota = async (c) => ((await um(`select dados -> 'notas' n from public.conversa_fluxo where conversa_id = $1`, [c])).n || []).join(' | ');
+  // 1) a Edge Function gravou "sem_medico": a nota da equipe diz o motivo em português
+  const a = await ateOFim(await iniciar('Sem Medico Teste'), { motivo: 'exame', plano: 'Particular', confirmar: 'ok', antesDoHorario: async (x) => {
+    await como('');
+    await rpc('klingo_horarios_motivo', { p_conversa: x.c, p_motivo: 'sem_medico', p_detalhe: 'Nenhum médico credenciado para CONSULTA (68), para operadora X.' }); } });
+  const na = await nota(a.c);
+  // 2) nada gravado: mensagem padrão (o horário veio da grade)
+  const b = await ateOFim(await iniciar('Sem Motivo Teste'), { motivo: 'exame', plano: 'Particular', confirmar: 'ok' });
+  const nb = await nota(b.c);
+  // 3) gravar e depois limpar (busca deu certo): a tabela fica sem linha da conversa
+  const c = await iniciar('Limpa Motivo Teste'); await como('');
+  await rpc('klingo_horarios_motivo', { p_conversa: c.c, p_motivo: 'indisponivel', p_detalhe: 'outro (HTTP 403) em /agenda/horarios' });
+  const t1 = (await um(`select public.klingo_motivo_texto($1) t`, [c.c])).t;
+  await rpc('klingo_horarios_motivo', { p_conversa: c.c, p_motivo: null });
+  const t2 = (await um(`select public.klingo_motivo_texto($1) t`, [c.c])).t;
+  return { ok: /Automação não aplicada: sem_oferta_da_api — o Klingo não tem médico credenciado/.test(na) && /Automação não aplicada: sem_oferta_da_api — o chat não recebeu horários reais/.test(nb)
+    && /falha técnica/.test(t1) && t2 === null, detalhe: `${na.slice(-150)} || ${nb.slice(-110)} || ${t1} || ${t2}` };
+});
+await caso('MOTIVO VISÍVEL: só a Edge Function (service_role) grava o motivo; paciente anônimo e equipe não podem', async () => {
+  await anonimo();
+  let negou = 0;
+  for (const sql of [`select public.klingo_horarios_motivo(gen_random_uuid(), 'x', null)`, `select public.klingo_motivo_texto(gen_random_uuid())`, `select count(*) from public.klingo_horarios_falha`]) {
+    try { await db.query(sql); } catch (e) { negou++; }
+  }
+  await como('');
+  return { ok: negou === 3, detalhe: `${negou} de 3 acessos negados` };
 });
 
 const ok = resultados.filter(Boolean).length;

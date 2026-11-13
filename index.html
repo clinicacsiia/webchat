@@ -659,7 +659,7 @@
   const CHAVE_HIST = 'webchat.historico.v1';   // as últimas conversas deste aparelho (cada uma com o seu token): dá para voltar a elas
   const MAX_HIST = 5;                          // mínimo pedido: 3
   // Muda a cada alteração do chat. Cópia de mensagens guardada por outra versão é descartada (era isso que mostrava conversa velha e travada).
-  const VERSAO_APP = '2026.11.13-6';
+  const VERSAO_APP = '2026.11.13-7';
   // Mesmas regras do banco (fluxo_nome_ok, fluxo_telefone_ok, fluxo_email_ok): o banco confere de novo, aqui é só para avisar logo.
   const LET = 'A-Za-zÀ-ÖØ-öø-ÿ';
   const nomeCompletoOk = (v) => { const t = String(v || '').trim(); return t.length >= 5 && t.length <= 120 && new RegExp(`^[${LET}][${LET}'’.-]*( +[${LET}][${LET}'’.-]*)+$`).test(t) && t.split(/ +/).filter((w) => w.replace(new RegExp(`[^${LET}]`, 'g'), '').length >= 2).length >= 2; };
@@ -2746,12 +2746,13 @@
   }
   /* Autoatendimento (Klingo): pede à API os horários REAIS desta conversa. Nunca trava o chat: se falhar ou estiver desligada, vale a grade de sempre.
      Em modo "sombra" a função responde na hora e só mede em segundo plano. */
-  let apiHorariosOff = false;
+  // "Desligado" vale só por 1 minuto: a gestão pode ligar o autoatendimento com a página aberta (antes ficava desligado até recarregar e o teste de 13/11 nunca chamava o Klingo).
+  let apiHorariosOffAte = 0;
   async function chamarAgendaApi() {
-    if (!conv || apiHorariosOff) return;
+    if (!conv || Date.now() < apiHorariosOffAte) return;
     try {
       const { data } = await comLimite(db.functions.invoke('chat-agenda-api', { body: { conversa: conv.id, token: conv.token } }), 7000);
-      if (data && data.motivo === 'desligado') apiHorariosOff = true;
+      if (data && data.motivo === 'desligado') apiHorariosOffAte = Date.now() + 60000;
     } catch { /* usa a grade */ }
   }
   async function buscarHorarios() {
