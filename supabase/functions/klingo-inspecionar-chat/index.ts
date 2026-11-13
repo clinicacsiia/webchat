@@ -1,9 +1,9 @@
-// FLUXOGRAMA: entrada (POST com x-sync-key = config.ia_segredo e {"id","filtros"?}) -> validação (só relatórios 14024..14028) -> lógica (lê o relatório do Klingo na memória) -> saída (SÓ estrutura: filtros, colunas e contagem de linhas; nunca valores de linhas)
-// Versão 1.0 — 03/11/2026 / Mudança: Implementação inicial (teste dos relatórios CHAT A-E)
+// FLUXOGRAMA: entrada (POST com x-sync-key = config.ia_segredo e {"id","filtros"?}) -> validação (só relatórios 14024..14028, 13825, 14359 e 14554) -> lógica (lê o relatório do Klingo na memória) -> saída (SÓ estrutura: filtros, colunas e contagem de linhas; nunca valores de linhas)
+// Versão 1.2 — 13/11/2026 / Mudança: libera o #14554 (conferir marcações do dia vindas do webchat) só estrutura e contagem; #13825 e #14359 liberados em 09/11/2026
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const KLINGO_URL = "https://api-externa.klingo.app/api/info/relatorio";
-const PERMITIDOS = new Set(["14024", "14025", "14026", "14027", "14028"]);
+const PERMITIDOS = new Set(["14024", "14025", "14026", "14027", "14028", "13825", "14359", "14554"]);
 const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { "Content-Type": "application/json" } });
 
 Deno.serve(async (req: Request) => {
