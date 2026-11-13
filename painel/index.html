@@ -1818,6 +1818,48 @@
     const t2 = setInterval(() => { if (!dlg.open || dlg.dataset.equipe !== '1') { clearInterval(t2); return; } carregarMarcouHoje(); }, 60000);
     dlg.addEventListener('close', () => { delete dlg.dataset.equipe; clearInterval(t); clearInterval(t2); }, { once: true });
   }
+  /* ---------- Lista de previsão (13/11/2026) ---------- */
+  // Pacientes que não tinham data disponível e aceitaram esperar uma vaga. NÃO é agendamento. Quando o sistema acha uma vaga dentro do pedido do paciente,
+  // a linha fica em destaque ("Vaga aberta") e a atendente oferece. Só leitura: a lista vem de painel_previsao_lista (admin e atendente).
+  const PREV_TURNO = { manha: 'Manhã', tarde: 'Tarde', qualquer: 'Tanto faz' };
+  const PREV_ANTEC = { imediato: 'Até 24 h', '1_dia': '1 dia', '1_semana': '1 semana', '1_mes': '1 mês' };
+  const dataPrev = (iso) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || '')); return m ? `${m[3]}/${m[2]}/${m[1]}` : '—'; };
+  const vagaTxt = (v) => (v && v.data ? `${dataPrev(v.data)} às ${String(v.hora || '').slice(0, 5)}` : null);
+  function renderPrevisao(linhas, erro) {
+    if (!dlg.open || dlg.dataset.previsao !== '1') return;
+    const cab = ['Paciente', 'Pedido', 'Turno', 'Período pedido', 'Pode ser chamado com', 'Situação', ''];
+    const tr = (l) => h('tr', { class: l.status === 'vaga_encontrada' ? 'eq-livre' : '' },
+      h('th', { scope: 'row' }, l.paciente || 'Paciente'),
+      h('td', {}, [l.pedido, l.plano].filter(Boolean).join(' · ') || '—'),
+      h('td', {}, PREV_TURNO[l.turno] || '—'),
+      h('td', {}, `${dataPrev(l.de)} a ${dataPrev(l.ate)}`),
+      h('td', {}, PREV_ANTEC[l.antecedencia] || '—'),
+      h('td', {}, l.status === 'vaga_encontrada' ? h('b', {}, 'Vaga aberta: ' + (vagaTxt(l.vaga) || '—')) : 'Aguardando vaga'),
+      h('td', {}, h('button', { class: 'btn', type: 'button', onclick: () => { dlg.close(); abrirConversaDoAviso(l.conversa_id); } }, 'Abrir conversa')));
+    dlg.replaceChildren(h('h3', {}, 'Lista de previsão'),
+      h('p', { class: 'dica', style: 'margin:-8px 0 10px' }, 'Pacientes sem data disponível que aceitaram esperar uma vaga. Isto NÃO é agendamento: quando abrir uma vaga dentro do que o paciente pediu, a linha fica em destaque e a atendente oferece.'),
+      erro ? h('p', { class: 'dica', role: 'alert' }, erro)
+        : linhas === null ? h('p', { class: 'dica' }, 'Carregando…')
+        : linhas.length === 0 ? h('p', { class: 'dica' }, 'Ninguém na lista de previsão agora.')
+        : h('div', { class: 'eq-rolagem' }, h('table', { class: 'tab eq-tab', id: 'tabPrevisao' },
+            h('thead', {}, h('tr', {}, cab.map((t) => h('th', { scope: 'col' }, t)))),
+            h('tbody', {}, linhas.map(tr)))),
+      h('div', { class: 'rodape' }, h('button', { class: 'btn', type: 'button', onclick: () => dlg.close() }, 'Fechar')));
+  }
+  async function abrirPrevisao() {
+    if (!podeAtender()) return;
+    dlg.className = 'equipe'; dlg.dataset.previsao = '1';
+    renderPrevisao(null, null); dlg.showModal();
+    const carregar = async () => {
+      try {
+        const { data, error } = await db.rpc('painel_previsao_lista');
+        renderPrevisao(error ? [] : (data || []), error ? 'Não foi possível carregar a lista agora. Tente de novo em instantes.' : null);
+      } catch { renderPrevisao([], 'Não foi possível carregar a lista agora. Tente de novo em instantes.'); }
+    };
+    await carregar();
+    const t = setInterval(() => { if (!dlg.open || dlg.dataset.previsao !== '1') { clearInterval(t); return; } carregar(); }, 60000);
+    dlg.addEventListener('close', () => { delete dlg.dataset.previsao; clearInterval(t); }, { once: true });
+  }
   const totalAvisos = () => avisosSug().length + avisosDat().length + avisosPacV().length + (S.pedidosAcesso || []).length;
   function atualizarSeloAvisos() { const s = document.getElementById('seloAvisos'), n = totalAvisos(); if (s) { s.textContent = n; s.hidden = n === 0; } }
   function atualizarSelo() {
@@ -2200,6 +2242,7 @@
       h('div', { class: 'cab-linha' },
         h('div', {}, h('h2', {}, icone('fone'), 'Painel de Atendimento'), h('p', { class: 'sub' }, 'Acompanhe as conversas do dia, o que está em espera e os alertas.')),
         h('div', { class: 'cab-acoes' },
+          podeAtender() ? h('button', { class: 'btn', type: 'button', id: 'btnPrevisao', title: 'Pacientes sem data disponível que aceitaram esperar uma vaga (não é agendamento)', onclick: abrirPrevisao }, icone('calendario'), 'Lista de previsão') : null,
           ehChefia() ? h('button', { class: 'btn', type: 'button', id: 'btnEquipe', title: 'Quanto cada atendente está atendendo agora (só TI, gerência e supervisão)', onclick: abrirEquipe }, icone('pessoas'), 'Equipe agora') : null,
           h('div', { class: 'data-hoje' }, icone('calendario'), 'Hoje, ' + new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'short', year: 'numeric' })))),
       h('div', { class: 'kpis', id: 'kpis', 'aria-label': 'Indicadores do dia' }));

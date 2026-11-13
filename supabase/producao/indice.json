@@ -9437,6 +9437,16 @@
    "md5": "7a369842b305d32b45ac436cea9a6b05"
   },
   {
+   "nome": "painel_previsao_lista",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": ""
+  },
+  {
    "nome": "papel_atual",
    "args": [],
    "definer": true,

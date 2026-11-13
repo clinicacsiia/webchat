@@ -76,6 +76,7 @@ Três ideias que explicam quase tudo:
 | Atendimento > Equipe agora | Botão no alto da aba, **só para TI, gerência e supervisão** (`org_nivel()`): por atendente, quantas conversas tem, quantos pacientes esperam resposta (e há quanto tempo), quantos a equipe espera, quantos para chamar no zap, quantos marcou hoje. Sai das conversas já carregadas no painel; só "Marcou hoje" usa `painel_indicadores_atendentes` | chefia |
 | Jornada | Onde está cada paciente (dados do Klingo + chat), com alertas de atraso | admin e atendente |
 | Fila | Fila de chegada da recepção | admin e atendente |
+| Lista de previsão | Pacientes sem data que aceitaram esperar vaga (NÃO é agendamento); vaga aberta em destaque | admin e atendente |
 | Avisos | "Mesma pessoa?", data de nascimento diferente, paciente × Klingo, pedidos de acesso | admin e atendente |
 | Indicadores | Pessoas atendidas, reentradas, concluídas, sem atendimento humano; por dia e por equipe | admin e atendente |
 | Contatos | Busca, etiquetas, exportação CSV | todos (inclusive marketing) |
