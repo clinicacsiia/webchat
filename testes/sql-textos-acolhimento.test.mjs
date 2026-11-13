@@ -14,6 +14,9 @@ const antigos = {
   confirmar: 'Confira se está tudo certo:\n{resumo}\n\nAo confirmar, você envia uma PREVISÃO de agendamento. Quem confirma data, horário e valor é um atendente (uma pessoa da equipe).',
   pronto_online: 'Pronto, {nome}! Recebemos tudo e montamos a PREVISÃO do seu agendamento. Atenção: ainda não está confirmado.',
   pronto_offline: 'Pronto, {nome}! Montamos a PREVISÃO do seu agendamento e ela já está com a equipe. Ainda não está confirmado.',
+  marcar_equipe: 'Não consegui concluir o agendamento sozinho, mas já passei tudo para a nossa equipe e uma pessoa confirma com você em instantes.',
+  marcar_incerto: 'O sistema da clínica demorou a responder. Já pedi para a equipe conferir a sua marcação, então você não precisa repetir nada.',
+  marcar_plano: 'Não consegui agendar pelo convênio {plano} agora. Já passei para a equipe, que resolve com você e confirma o horário.',
   preco_previsao: 'Previsão de valor ({plano}):\n{itens}\n{total}Atenção: é só uma previsão. O valor final e a forma de pagamento são confirmados pelo atendente.',
 };
 for (const [c, t] of Object.entries(antigos)) await db.query(`insert into public.fluxo_texto (chave, texto, descricao) values ($1, $2, 'teste') on conflict (chave) do update set texto = excluded.texto`, [c, t]);
@@ -30,10 +33,13 @@ for (const c of Object.keys(antigos).filter((x) => x !== 'ola_filho')) registrar
 registrar('ola_filho editado pela equipe NÃO foi sobrescrito', ft.ola_filho === 'Olá, {nome}! Texto próprio da equipe para {paciente}.');
 const marc = (t) => [...new Set(t.match(/\{[a-z_]+\}/g) || [])].sort().join(',');
 for (const c of Object.keys(antigos).filter((x) => x !== 'ola_filho')) registrar(`marcadores de ${c} preservados`, marc(ft[c]) === marc(antigos[c]), `${marc(antigos[c])} -> ${marc(ft[c])}`);
-registrar('nenhum texto novo do paciente tem "previsão"', ![...Object.keys(antigos).filter((x) => x !== 'ola_filho').map((c) => ft[c]), ...Object.values(cfg)].some((t) => /previs[ãa]o/i.test(t)));
+const DUVIDA = ['pronto_online', 'pronto_offline', 'marcar_equipe', 'marcar_incerto', 'marcar_plano'];
+registrar('"previsão" aparece SÓ nos textos de dúvida/entrega para a equipe', Object.keys(antigos).filter((x) => x !== 'ola_filho').every((c) => /previs[ãa]o/i.test(ft[c]) === DUVIDA.includes(c)) && Object.values(cfg).every((t) => !/previs[ãa]o/i.test(t)),
+  Object.keys(antigos).filter((c) => /previs[ãa]o/i.test(ft[c])).join(','));
+registrar('os textos de dúvida dizem que é uma previsão ainda não confirmada e que a equipe confirma', DUVIDA.every((c) => /previs[ãa]o/i.test(ft[c]) && /(não est[áa] confirmad|n[ãa]o confirmada|ainda n[ãa]o)/i.test(ft[c]) && /(equipe|atendente)/i.test(ft[c])));
 registrar('config de previsão trocada', Object.values(cfg).every((t) => !/previs[ãa]o/i.test(t)), JSON.stringify(cfg).slice(0, 80));
 registrar('texto editado pela equipe foi preservado', ft.ola_proprio_editado === 'Texto editado pela equipe, sem mudança.' && ft.horario_x === 'x');
-registrar('os textos novos dizem que não está confirmado', /ainda não está confirmado/i.test(ft.pronto_online) && /ainda não está confirmado/i.test(ft.pronto_offline) && /confirmar com você|confirma tudo|uma pessoa vai conferir/i.test(ft.confirmar + ft.horario));
+registrar('os textos novos de entrega dizem que não está confirmado', /ainda não está confirmado/i.test(ft.pronto_online) && /ainda não está confirmado/i.test(ft.pronto_offline) && /confirmar com você|confirma tudo|uma pessoa vai conferir/i.test(ft.confirmar + ft.horario));
 const antes = JSON.stringify(ft); await db.exec(A); await db.exec(B);
 const ft2 = Object.fromEntries((await q(`select chave, texto from public.fluxo_texto`)).map((r) => [r.chave, r.texto]));
 registrar('rodar duas vezes não muda nada', JSON.stringify(ft2) === antes);
