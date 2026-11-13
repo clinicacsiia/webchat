@@ -56,9 +56,11 @@ Versão 1.0 — 13/11/2026 / Mudança: primeira versão. Página pública com tu
 - **Não há limite por aparelho/IP.** O limite é por CPF, pela cota global do Klingo e pelo teto diário de cadastros. Se houver abuso, o caminho é um limite no Supabase/Cloudflare ou um teste anti-robô na página.
 - **Pré-cadastro falso** (alguém inventando CPFs válidos): o teto de 40/dia limita o estrago; a recepção continua juntando duplicados.
 
-## O que NÃO foi provado com o Klingo de verdade
+## O que foi e o que NÃO foi provado com o Klingo de verdade
 
-A página e a função foram testadas com um Klingo de mentira (dados inventados). **Não foi feita nenhuma chamada real ao Klingo**, e a função ainda não foi publicada. Estão marcadas como "não testado" na tela as rotas que o `GUIA-COMPLETO.md` (itens 2.5, 2.6 e 5.1) lista como nunca exercitadas: check-in no dia, desfazer check-in, laudo pronto, e-mail de confirmação, requisição e o envio exato do `PUT /paciente` (a função manda `{"paciente":{"contatos":{…}}}`, que segue o padrão do `register`). Os nomes dos campos dos catálogos (`/convenios`, `/agenda/especialidades`) foram lidos do guia; a página tem alternativas se algum nome for diferente e mostra o JSON bruto na aba Consultar.
+**Função publicada em 13/11/2026** (`klingo-agendamento`, versão 2, `verify_jwt=false`). Provado ao vivo, só com leitura e sem dado de paciente: CORS da página (`clinicacsiia.github.io`), `versao` (API no ar), ação inexistente (400), CPF inválido (400, barrado antes do Klingo), resultado desligado, `catalogo` (unidades, especialidades, convênios, consultas, exames, preço) e `horarios` (29 horários de neurologia). Os nomes dos campos dos catálogos conferem com o que a página espera.
+
+**Ainda não exercitado de verdade:** entrar com CPF, marcar, remarcar, cancelar, cadastrar paciente novo, check-in, meus dados e resultado. Esses foram testados só com um Klingo de mentira (dados inventados). Estão marcadas como "não testado" na tela as rotas que o `GUIA-COMPLETO.md` (itens 2.5, 2.6 e 5.1) lista como nunca exercitadas: check-in no dia, desfazer check-in, laudo pronto, e-mail de confirmação, requisição e o envio exato do `PUT /paciente` (a função manda `{"paciente":{"contatos":{…}}}`, que segue o padrão do `register`).
 
 ## Testes
 
@@ -68,7 +70,7 @@ A página e a função foram testadas com um Klingo de mentira (dados inventados
 
 ## Para colocar no ar (passos do dono)
 
-1. **Publicar a função** `klingo-agendamento` com `verify_jwt=false`: https://supabase.com/dashboard/project/nrvuynjwcgwpjdptkiay/functions (usa o secret `KLINGO_APP_TOKEN` que já existe).
-2. **Testar de verdade, com um paciente que autorize**: horários (só leitura), depois uma marcação e o cancelamento logo em seguida (avisar o call center). Ver `GUIA-COMPLETO.md`, item 8.
+1. ~~Publicar a função~~ (feito em 13/11/2026; painel: https://supabase.com/dashboard/project/nrvuynjwcgwpjdptkiay/functions).
+2. **Testar de verdade, com um paciente que autorize**: entrar com CPF, uma marcação e o cancelamento logo em seguida (avisar o call center). Ver `GUIA-COMPLETO.md`, item 8.
 3. **Publicar a página** (junta na `main`; o GitHub Pages serve `/agendamento/`).
 4. Decidir se liga o resultado de exame (`AGENDAMENTO_RESULTADO=1`) e se quer algum limite por aparelho.
