@@ -1,6 +1,6 @@
 // Service worker do chat do cliente: abre na hora com a cópia guardada e busca a versão nova por trás (vale na próxima abertura).
 // O link pode vir do WhatsApp, do e-mail ou da bio com ?origem=...: a cópia é a mesma para todos.
-const VERSAO = 'webchat-cliente-v36';
+const VERSAO = 'webchat-cliente-v37';
 const BASE = ['./', 'index.html', 'privacidade.html', 'termos.html', 'sentinela.js', 'nomes-exame.js', 'icon-192.png', 'img/logo-csi.svg', 'img/logo-csi-sem-anel.svg', 'img/logo-csi-anel.svg', 'img/logo-csi-simbolo.svg', 'manifest.webmanifest'];
 
 self.addEventListener('install', (e) => {
@@ -19,9 +19,9 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   const r = e.request;
   const url = new URL(r.url);
-  // /painel/, /fila/ e /minha-vez/ ficam fora do cache. A URL da fila leva o token de assinatura (não pode ser guardada no dispositivo)
+  // /painel/, /fila/, /minha-vez/ e /agendamento/ ficam fora do cache. A URL da fila leva o token de assinatura (não pode ser guardada no dispositivo)
   // e a chave única './' abaixo serviria a página do chat no lugar da fila.
-  if (r.method !== 'GET' || url.origin !== location.origin || url.pathname.includes('/painel/') || url.pathname.includes('/fila/') || url.pathname.includes('/minha-vez/')) return;
+  if (r.method !== 'GET' || url.origin !== location.origin || url.pathname.includes('/painel/') || url.pathname.includes('/fila/') || url.pathname.includes('/minha-vez/') || url.pathname.includes('/agendamento/')) return;
   const pagina = r.mode === 'navigate';
   const chave = pagina ? new Request(new URL('./', self.registration.scope)) : r;
   e.respondWith(caches.open(VERSAO).then(async (c) => {
