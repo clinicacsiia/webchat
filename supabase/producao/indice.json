@@ -2056,7 +2056,9 @@
   "vinculo_manual_quem",
   "pedido_horario_modo",
   "pedido_parado_horas",
-  "pedido_sem_horario_texto"
+  "pedido_sem_horario_texto",
+  "pedido_oferta2_texto",
+  "pedido_escolha_texto"
  ],
  "funcoes": [
   {
@@ -9427,6 +9429,20 @@
    "authenticated": false,
    "publico": false,
    "md5": "d7e90169ed640a84f4b0d383917b1479"
+  },
+  {
+   "nome": "pedido_oferta_texto",
+   "args": [
+    "jsonb",
+    "integer",
+    "text"
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": ""
   },
   {
    "nome": "permissao_modo_definir",

@@ -171,7 +171,7 @@ O servidor só aceita resposta a uma pergunta do motor enquanto **o motor conduz
 | `convenios-revisar` | 08:05 | Avisa a gestão de convênio suspenso há 1 mês |
 | `manutencao-limpeza` | 04:17 | Apaga o histórico técnico de execuções com mais de 3 dias |
 | `klingo-operacao-vigia` | 1 min | Refaz chamada perdida do executor, marca como INCERTO o que ficou preso e encerra a conversa resolvida sozinha há 2 h |
-| `pedido-horario-vigia` | 5 min | Pedido pronto sem horário (passou ou ocupado): cancela, avisa o paciente e encerra; horário livre e parado 24 h: faixa para o atendente. Começa em `teste` (`pedido_horario_modo`). Ver `pedido-sem-horario.sql` |
+| `pedido-horario-vigia` | 5 min | Pedido pronto sem horário (passou ou ocupado): o assistente oferece o horário livre mais próximo, depois o seguinte, depois pede que o paciente escolha no calendário (passo `horario_oferta`); horário livre e parado 24 h: faixa para o atendente. Começa em `teste` (`pedido_horario_modo`). Ver `pedido-sem-horario.sql` |
 | `klingo-autogestao` | 10 min | Avança ou recua sozinha os interruptores `klingo_api_*` conforme as medidas e avisa a gestão |
 | `klingo-revisar-pacientes` | 5 min | Confere na API do Klingo quem deixou CPF + nascimento e ainda não foi conferido |
 | `klingo-sincronizar` | 03:50 | Copia convênios, planos e especialidades da API e traduz o convênio do chat |

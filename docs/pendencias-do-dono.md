@@ -77,7 +77,7 @@ Detalhes e números em [`klingo-autoatendimento.md`](klingo-autoatendimento.md).
 - **Código por SMS/e-mail** (segundo fator): sem ele, resultado de exame e troca de telefone ficam com a equipe (plano, etapa 6).
 
 ### 2.9 Pedido sem horário (13/11/2026): ligar para todos
-Está em modo `teste` (só o celular da lista de teste). Quando você aprovar o comportamento, rode em Configurações/SQL: `update public.config set valor = 'ligado' where chave = 'pedido_horario_modo';` Texto que o paciente recebe: chave `pedido_sem_horario_texto`. Prazo do aviso ao atendente: `pedido_parado_horas` (24). Atenção: horário "ocupado no Klingo" também cancela, e pode ser a própria equipe que marcou com outro nome ou telefone.
+Está em modo `teste` (só o celular da lista de teste). Quando você aprovar o comportamento, rode em Configurações/SQL: `update public.config set valor = 'ligado' where chave = 'pedido_horario_modo';` Textos que o paciente recebe (oferta do horário mais próximo, do seguinte e pedido para escolher no calendário): chaves `pedido_sem_horario_texto`, `pedido_oferta2_texto` e `pedido_escolha_texto`. Prazo do aviso ao atendente: `pedido_parado_horas` (24). Atenção: horário "ocupado no Klingo" também dispara a oferta, e pode ser a própria equipe que marcou com outro nome ou telefone.
 
 ## 3. Contas e segurança
 

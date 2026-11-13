@@ -89,6 +89,10 @@ begin
       case when lower(btrim(x)) = 'particular' then 'particular' else 'pelo convênio ' || initcap(lower(x)) end));
     v_op := public.fluxo_escolha(p_passo, jsonb_build_array(jsonb_build_object('valor', 'sim', 'rotulo', 'Sim, é o mesmo'),
                                                             jsonb_build_object('valor', 'nao', 'rotulo', 'Não, mudou')));
+  when 'horario_oferta' then   -- pedido-sem-horario
+    v_txt := coalesce(d -> 'oferta_pendente' ->> 'texto', 'Esse horário serve para você?');
+    v_op := public.fluxo_escolha(p_passo, jsonb_build_array(jsonb_build_object('valor', 'sim', 'rotulo', 'Sim, pode ser esse'),
+                                                            jsonb_build_object('valor', 'nao', 'rotulo', 'Não posso nesse horário')));
   when 'horario' then
     v_txt := public.fluxo_t('horario', ctx);
     if jsonb_array_length(coalesce(pa.escolha_horario, '[]'::jsonb)) > 0 then
@@ -158,5 +162,5 @@ begin
   v_etapa := case when p_passo in ('motivo','exame','consulta','atalho','medico') then 'pedido' when p_passo in ('plano', 'plano_confirma', 'cpf_nasc') then 'plano' when p_passo = 'horario' then 'data_hora'
                   when p_passo in ('mudou','dados_ident','dados_contato','dados_endereco','dados_carteira','identidade') then 'dados' when p_passo = 'confirmar' then 'confirmacao' end;
   if v_etapa is not null then update public.pre_agendamentos set etapa = v_etapa where conversa_id = p_conversa and status = 'rascunho'; end if;
-end $function$;
-
+end $function$
+;
