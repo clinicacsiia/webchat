@@ -6,7 +6,7 @@ Feita sobre o código da branch `ccr-9adf6e2b-p1p009` e a produção (só estrut
 
 | Pergunta | Resposta |
 |---|---|
-| Algo vai quebrar com as mudanças de texto? | **Não encontrei quebra.** Todas as suítes de banco passaram; o teste novo dos textos passou (19 de 19). Os testes de navegador estão na tabela da seção 2. |
+| Algo vai quebrar com as mudanças de texto? | **Não encontrei quebra.** Todas as suítes de banco passaram; o teste novo dos textos passou (19 de 19). Os 27 testes de tela também passaram. |
 | A ordem das perguntas está perfeita? | **A ordem está correta para o que o sistema precisa**, com 3 ajustes pequenos (seção 3). Não vale inverter CPF e horário: a API exige CPF, nascimento e plano **antes** de mostrar horários. |
 | Tudo consulta a API de agenda? | **Não. Hoje quase nada consulta a API de horários.** A API de horários nunca gravou uma oferta (0 linhas em `klingo_oferta`) e está limitada ao telefone de teste. A tela mostra a agenda "ao vivo" pelos relatórios do Klingo. Detalhes e como ligar de forma segura na seção 4. |
 
@@ -20,9 +20,9 @@ Feita sobre o código da branch `ccr-9adf6e2b-p1p009` e a produção (só estrut
 | Navegador do chat (`sentinela.navegador`) | 19 de 19, incluindo a tela inicial nova e a mensagem final |
 | Edge functions (`test:edge`) | passou |
 | `test:python` (biometria) | **não rodou aqui**: falta `pytest` no ambiente. Não tem relação com o chat |
-| Navegador do painel e demais telas | ver a lista no fim desta seção |
+| Navegador do painel e demais telas | **27 de 27 suítes passaram** |
 
-Testes de tela: em andamento no momento deste commit; o resultado final entra na próxima versão deste arquivo.
+**Testes de tela (27 suítes de navegador): todas passaram**, incluindo chat (corrida, voltar, encerramento, despedida, avaliação, agenda ao vivo, equipe assume, histórico, login, foto do pedido), painel (quadro, jornada, indicadores, convênios, catálogo, médicos, recarga, equipe agora) e o monitor do chat (19/19). Os arquivos de teste de navegador do chat rodaram com a tela nova de 13/11/2026.
 
 ### Riscos que encontrei no código
 1. **`supabase-js@2` sem versão fixa e sem integridade**, carregado de CDN (`index.html:644`). Uma versão nova pode quebrar o chat sem ninguém mexer. Fixar a versão exata e guardar no cache do `sw.js`.
