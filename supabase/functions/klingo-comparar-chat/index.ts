@@ -1,5 +1,5 @@
 // FLUXOGRAMA: entrada (POST com x-sync-key = config.ia_segredo e {"de","ate","ids":[marcações que o chat diz ter agendado]}) -> validação (chave; datas AAAA-MM-DD; só o relatório #14554) -> lógica (lê o relatório na memória, soma por origem/portal/status e cruza o Id da Marcação com a lista do chat) -> saída (SÓ contagens por categoria e Ids de marcação; nunca nome nem dado de paciente)
-// Versão 1.1 — 13/11/2026 / Mudança: função temporária para auditar "Agendaram pelo chat" contra o relatório #14554 (apagar depois da auditoria). 1.1: devolve, por Id de marcação do chat achado, origem, status e dias até o exame
+// Versão 1.1 — 13/11/2026 / Mudança: função temporária para auditar "Agendaram pelo chat" contra o relatório #14554 (apagar depois da auditoria). 1.1: devolve, por Id de marcação do chat achado, origem, status e dias até o exame. 1.2: procura qual filtro (1 ou 2 colunas) reproduz uma contagem por origem informada em "alvo"
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const KLINGO_URL = "https://api-externa.klingo.app/api/info/relatorio";
@@ -38,11 +38,23 @@ Deno.serve(async (req: Request) => {
       const d = dias(dia(x.col1), dia(x.col2)); soma(antec, d == null ? "?" : d > 30 ? ">30" : "<=30");
       if (chat.has(id)) { achouIds++; chatLinhas.push({ id, origem, status, dias: d }); soma(achadas, `${origem} | ${portal}`); soma(achadasStatus, status); }
     }
+    const achados: Record<string, unknown>[] = [];
+    if (c?.alvo && typeof c.alvo === "object") {
+      const alvo = c.alvo as Record<string, number>, cols = ["col1", "col5", "col6", "col7", "col8", "col9", "col11"];
+      const val = (x: Record<string, unknown>, k: string) => (k === "col1" ? (dia(x.col1) ?? "?") : cat(x[k]));
+      const igual = (m: Map<string, number>) => { const a = Object.keys(alvo); return m.size === a.length && a.every((k) => m.get(k) === alvo[k]); };
+      for (let i = 0; i < cols.length; i++) for (let j = i; j < cols.length; j++) {
+        const g = new Map<string, Map<string, number>>();
+        for (const x of rows) { const k = i === j ? val(x, cols[i]) : `${val(x, cols[i])} + ${val(x, cols[j])}`; const m = g.get(k) ?? new Map<string, number>(); soma(m, cat(x.col3)); g.set(k, m); }
+        for (const [k, m] of g) if (igual(m)) achados.push({ colunas: i === j ? [cols[i]] : [cols[i], cols[j]], valor: k });
+      }
+    }
     const naoAchadas = [...chat].filter((i) => !idsRelatorio.has(i));
     return json({
       http: res.status, error: p?.error ?? null, limit: p?.limit ?? null, linhas: rows.length,
       ids_do_chat_enviados: chat.size, ids_do_chat_no_relatorio: achouIds, ids_do_chat_fora_do_relatorio: naoAchadas.length, ids_fora: naoAchadas.slice(0, 60),
       por_origem: topo(porOrigem), por_portal: topo(porPortal), por_origem_e_portal: topo(porOP), por_status: topo(porStatus), por_classificacao: topo(porClass),
+      filtros_que_dao_o_alvo: achados.slice(0, 20),
       antecedencia_relatorio: topo(antec), chat_linhas: chatLinhas, chat_por_origem_e_portal: topo(achadas), chat_por_status: topo(achadasStatus),
     });
   } catch (e) {
