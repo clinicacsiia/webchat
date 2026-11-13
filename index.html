@@ -656,7 +656,12 @@
   const CHAVE_HIST = 'webchat.historico.v1';   // as últimas conversas deste aparelho (cada uma com o seu token): dá para voltar a elas
   const MAX_HIST = 5;                          // mínimo pedido: 3
   // Muda a cada alteração do chat. Cópia de mensagens guardada por outra versão é descartada (era isso que mostrava conversa velha e travada).
-  const VERSAO_APP = '2026.11.13-3';
+  const VERSAO_APP = '2026.11.13-4';
+  // Mesmas regras do banco (fluxo_nome_ok, fluxo_telefone_ok, fluxo_email_ok): o banco confere de novo, aqui é só para avisar logo.
+  const LET = 'A-Za-zÀ-ÖØ-öø-ÿ';
+  const nomeCompletoOk = (v) => { const t = String(v || '').trim(); return t.length >= 5 && t.length <= 120 && new RegExp(`^[${LET}][${LET}'’.-]*( +[${LET}][${LET}'’.-]*)+$`).test(t) && t.split(/ +/).filter((w) => w.replace(new RegExp(`[^${LET}]`, 'g'), '').length >= 2).length >= 2; };
+  const telefoneOk = (v) => { let d = String(v || '').replace(/\D/g, ''); if ([12, 13].includes(d.length) && d.startsWith('55')) d = d.slice(2); return [10, 11].includes(d.length) && /^[1-9][1-9]/.test(d) && (d.length === 10 || d[2] === '9') && d[2] !== '0' && !/^(\d)\1+$/.test(d); };
+  const emailOk = (v) => { const t = String(v || '').trim(); return t.length >= 6 && t.length <= 200 && /^[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}$/.test(t) && !/\.\./.test(t); };
   const ESCALAS = [1, 1.18, 1.36], TOAST_LETRA = ['Letra normal.', 'Letra grande.', 'Letra muito grande.'];
 
   // Chegou pelo link "esqueci a senha"? O supabase-js limpa o endereço ao ler o link, então a pergunta é feita antes de criá-lo.
@@ -1201,12 +1206,12 @@
     const email = salvo ? salvo.email : el.fEmail.value.trim();
     if (!escolha) { el.erroForm.textContent = 'Toque em "Para mim" ou em "Para meu filho(a)".'; el.blocoQuem.scrollIntoView({ block: 'center' }); return; }
     const filho = escolha.tipo === 'filho', nomeFilho = el.fFilho.value.trim();
-    if (nome.length < 2) { el.erroForm.textContent = filho ? 'Informe o seu nome (responsável).' : 'Informe seu nome.'; el.fNome.focus(); return; }
+    if (!nomeCompletoOk(nome)) { el.erroForm.textContent = filho ? 'Informe o seu nome completo (responsável), com nome e sobrenome.' : 'Informe seu nome completo, com nome e sobrenome.'; el.fNome.focus(); return; }
     if (filho && nomeFilho.length < 2) { el.erroForm.textContent = 'Informe o nome da criança.'; el.fFilho.focus(); return; }
     const irmaos = filho ? irmaosForm.map((x) => x.trim()).filter((x) => x.length >= 2) : [];
     if (filho && irmaosForm.some((x) => x.trim() && x.trim().length < 2)) { el.erroForm.textContent = 'Confira o nome dos outros filhos.'; return; }
-    if (tel.length < 10) { el.erroForm.textContent = 'Informe o telefone com DDD.'; el.fTel.focus(); return; }
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { el.erroForm.textContent = 'Informe um e-mail válido.'; el.fEmail.focus(); return; }
+    if (!telefoneOk(tel)) { el.erroForm.textContent = 'Informe o celular com DDD, por exemplo (71) 91234-5678.'; el.fTel.focus(); return; }
+    if (!emailOk(email)) { el.erroForm.textContent = 'Informe um e-mail válido, por exemplo nome@email.com.'; el.fEmail.focus(); return; }
     if (!salvo && !el.fAceite.checked) { el.erroForm.textContent = 'Marque a caixa de concordância para continuar.'; el.fAceite.focus(); return; }
     if (!el.fPrevisao.checked) { el.erroForm.textContent = 'Marque que você está ciente de que uma pessoa da equipe precisa confirmar os horários.'; el.fPrevisao.focus(); return; }
     const respostaAvisos = pedirAvisos();
@@ -1787,10 +1792,10 @@
         if (!v) { if (c.obrigatorio) msg = c.tipo === 'sexo' ? 'Toque em uma opção.' : 'Preencha este campo.'; }
         else if (c.tipo === 'data' && !dataOk(v)) msg = 'Data inválida. Use dia/mês/ano, por exemplo 25/03/1980.';
         else if (c.tipo === 'cpf' && !cpfOk(v)) msg = 'Os números do CPF não conferem. Confira, por favor.';
-        else if (c.tipo === 'email' && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)) msg = 'E-mail inválido. Confira, por favor.';
-        else if (c.tipo === 'tel' && ![10, 11].includes(v.replace(/\D/g, '').length)) msg = 'Informe o DDD e o número.';
+        else if (c.tipo === 'email' && !emailOk(v)) msg = 'E-mail inválido. Confira, por favor.';
+        else if (c.tipo === 'tel' && !telefoneOk(v)) msg = 'Informe o DDD e o número do celular.';
         else if (c.tipo === 'cep' && v.replace(/\D/g, '').length !== 8) msg = 'O CEP tem 8 números.';
-        else if (c.nome === 'nome' && v.split(/\s+/).length < 2) msg = 'Escreva o nome completo (nome e sobrenome).';
+        else if ((c.nome === 'nome' || c.nome === 'mae') && !nomeCompletoOk(v)) msg = 'Escreva o nome completo (nome e sobrenome).';
         erros[c.nome].textContent = msg; erros[c.nome].hidden = !msg;
         if (ins[c.nome]) ins[c.nome].classList.toggle('ruim', !!msg);
         if (msg && !primeiro) primeiro = ins[c.nome] || erros[c.nome];

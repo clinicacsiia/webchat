@@ -10,7 +10,7 @@ async function abrir(permissao) {
   const mundo = criarMundo();
   const { page, ctx } = await novaPaginaChat(browser, mundo, { init: [[(p) => { try { Object.defineProperty(Notification, 'permission', { get: () => p, configurable: true }); Notification.requestPermission = async () => p; } catch { /* sem Notification */ } }, permissao]] });
   await page.goto(`${base}/index.html`); await page.waitForSelector('#formInicio', { state: 'visible', timeout: 8000 });
-  await page.click('#fQuem .unidade >> nth=0'); await page.fill('#fNome', 'Ana'); await page.fill('#fTel', '71999998888'); await page.fill('#fEmail', 'a@b.co');
+  await page.click('#fQuem .unidade >> nth=0'); await page.fill('#fNome', 'Ana Souza'); await page.fill('#fTel', '71999998888'); await page.fill('#fEmail', 'a@b.co');
   await page.check('#fAceite'); await page.check('#fPrevisao'); await page.click('#btnIniciar'); await page.waitForSelector('#msgs .msg.agente .op', { timeout: 8000 });
   return { mundo, page, ctx };
 }

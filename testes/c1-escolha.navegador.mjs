@@ -14,7 +14,7 @@ async function comConversa(estado) {
   const mundo = criarMundo(); mundo.estadoReentrada = estado;
   const { page, ctx } = await novaPaginaChat(browser, mundo);
   await page.goto(`${base}/index.html`); await page.waitForSelector('#formInicio', { state: 'visible', timeout: 8000 });
-  await page.click('#fQuem .unidade >> nth=0'); await page.fill('#fNome', 'Ana'); await page.fill('#fTel', '71999998888'); await page.fill('#fEmail', 'a@b.co');
+  await page.click('#fQuem .unidade >> nth=0'); await page.fill('#fNome', 'Ana Souza'); await page.fill('#fTel', '71999998888'); await page.fill('#fEmail', 'a@b.co');
   await page.check('#fAceite'); await page.check('#fPrevisao'); await page.click('#btnIniciar');
   await page.waitForSelector('#msgs .msg.agente .op', { timeout: 8000 });
   await page.click('#btnMenu'); await page.click('#btnNova');
@@ -76,7 +76,7 @@ await caso('servidor sem a função nova (cache antigo): cai no jeito de antes, 
   mundo.tratar = async (n, ...a) => (n === 'chat_reentrada_estado' ? { status: 404, body: { message: 'Not Found' } } : orig(n, ...a));
   const { page, ctx } = await novaPaginaChat(browser, mundo);
   await page.goto(`${base}/index.html`); await page.waitForSelector('#formInicio', { state: 'visible', timeout: 8000 });
-  await page.click('#fQuem .unidade >> nth=0'); await page.fill('#fNome', 'Ana'); await page.fill('#fTel', '71999998888'); await page.fill('#fEmail', 'a@b.co');
+  await page.click('#fQuem .unidade >> nth=0'); await page.fill('#fNome', 'Ana Souza'); await page.fill('#fTel', '71999998888'); await page.fill('#fEmail', 'a@b.co');
   await page.check('#fAceite'); await page.check('#fPrevisao'); await page.click('#btnIniciar'); await page.waitForSelector('#msgs .msg.agente .op', { timeout: 8000 });
   await page.click('#btnMenu'); await page.click('#btnNova'); await page.waitForTimeout(500);
   const form = await visivel(page, '#formInicio'); await ctx.close();
