@@ -22,7 +22,7 @@ As consultas usadas estão no histórico desta sessão e em `docs/analise-conver
 
 ## O que o Claude atualiza (sempre em arquivo novo, com teste e rollback)
 - Textos (`fluxo_texto`, `config`) e telas (`index.html`, trocando `VERSAO_APP` e `VERSAO` do `sw.js`).
-- Ordem das opções (motivo, plano, assunto). Médico só com muito mais dados.
+- Ordem das opções (motivo, plano, assunto): **já está ligada desde 13/11/2026**. Os pesos ficam na tabela `fluxo_opcao_ordem` (maior peso aparece antes; sem peso vai para o fim, na ordem de sempre). A cada rodada o Claude conta os cliques reais por opção e propõe o `update` dos pesos (arquivo novo em `supabase/`, sem mexer no código). Para voltar à ordem antiga: `delete from public.fluxo_opcao_ordem;`. Médico só com muito mais dados.
 - Respostas prontas para a equipe, quando uma frase passar de ~20 repetições.
 
 ## Regras que não mudam

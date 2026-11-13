@@ -117,7 +117,7 @@ await caso('formulário inicial: fala da missão (equidade, família), avisa que
   await page.goto(`${base}/index.html`); await page.waitForSelector('#avisoForm', { state: 'visible', timeout: 8000 });
   const t = await page.$eval('#avisoForm', (n) => n.textContent);
   const caixa = (await page.$('#avisoForm #fPrevisao')) !== null;
-  await page.click('#fQuem .unidade >> nth=0'); await page.fill('#fNome', 'Ana'); await page.fill('#fTel', '71999998888'); await page.fill('#fEmail', 'a@b.co'); await page.check('#fAceite');
+  await page.click('#fQuem .unidade >> nth=0'); await page.fill('#fNome', 'Ana Souza'); await page.fill('#fTel', '71999998888'); await page.fill('#fEmail', 'a@b.co'); await page.check('#fAceite');
   await page.click('#btnIniciar'); await page.waitForTimeout(300);
   const erro = (await page.locator('#erroForm').innerText()).trim(); const iniciou = mundo.chamadas.some((c) => c.nome === 'chat_iniciar'); await ctx.close();
   return { ok: /equidade/.test(t) && /família/.test(t) && !/previsão/i.test(t) && /pessoa da equipe/.test(t) && caixa && /ciente/.test(erro) && !iniciou, detalhe: `${t.slice(0, 60)} | erro="${erro}"` };
