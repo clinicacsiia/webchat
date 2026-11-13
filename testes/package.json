@@ -76,6 +76,7 @@
     "test:retrato": "node retrato.test.mjs",
     "test:producao-sql": "node sql-producao.test.mjs",
     "test:ponta-a-ponta": "node sql-ponta-a-ponta.test.mjs",
+    "test:sem-duplicata": "node sql-sem-duplicata.test.mjs",
     "test:klingo-auto-sql": "node sql-klingo-auto.test.mjs",
     "test:marcado": "node marcado.navegador.mjs",
     "test:equipe-assume": "node chat-equipe-assume.navegador.mjs",

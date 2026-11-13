@@ -8,7 +8,7 @@ CREATE OR REPLACE FUNCTION public.chat_iniciar(p_nome text, p_telefone text, p_e
 AS $function$
 declare
   v_tel text; v_contato uuid; v_conv uuid; v_token text; v_url text;
-  v_nome text; v_msg text; v_recentes int; v_uni text; v_med text; v_tipo text; v_pnome text; v_irm jsonb := '[]'::jsonb; v_modo text; v_motor text;
+  v_nome text; v_msg text; v_recentes int; v_uni text; v_med text; v_tipo text; v_pnome text; v_irm jsonb := '[]'::jsonb; v_modo text; v_motor text; v_ant record; v_antigas uuid[] := '{}';
 begin
   v_tipo := coalesce(nullif(btrim(p_paciente_tipo), ''), 'proprio');
   if v_tipo not in ('proprio', 'filho') then raise exception 'Tipo de paciente inválido.' using errcode = '22023'; end if;
@@ -51,9 +51,27 @@ begin
   on conflict (telefone) do update set ultimo_contato_em = now(), email = coalesce(public.contatos.email, excluded.email),
     aceitou_lgpd_em = coalesce(public.contatos.aceitou_lgpd_em, now())
   returning id into v_contato;
+  -- Sem duplicata: a mesma pessoa (telefone) e o mesmo paciente (para mim / mesma criança), com conversa ainda SEM atendente,
+  -- fica com uma só. A antiga é encerrada como 'nova_conversa' (igual ao botão "Abrir uma nova conversa"). Nunca mexe em conversa
+  -- que a equipe já assumiu ou que tem exame em aberto; o histórico não é apagado.
+  for v_ant in
+    select c.id from public.conversas c
+     where c.contato_id = v_contato and c.teste = false and c.status = 'aguardando' and c.agente_id is null and c.primeiro_humano_em is null
+       and c.criado_em > now() - interval '2 days'
+       and c.paciente_tipo = v_tipo
+       and coalesce(lower(btrim(c.paciente_nome)), '') = coalesce(lower(btrim(v_pnome)), '')
+       and not exists (select 1 from public.v_agendamento_aberto v where v.conversa_id = c.id)
+     for update of c
+  loop
+    begin
+      update public.conversas set status = 'encerrada', ia_ativa = false, atualizado_em = now(), motivo_encerramento = 'nova_conversa', encerramento_origem = 'sistema' where id = v_ant.id;
+      v_antigas := v_antigas || v_ant.id;
+    exception when others then null; end;
+  end loop;
   insert into public.conversas (contato_id, nome_informado, email_informado, unidade_inicial, medico_preferido, paciente_tipo, paciente_nome, irmaos, irmaos_modo)
   values (v_contato, left(v_nome, 120), nullif(left(btrim(coalesce(p_email, '')), 200), ''), v_uni, v_med, v_tipo, v_pnome, v_irm, v_modo)
   returning id, motor into v_conv, v_motor;
+  if cardinality(v_antigas) > 0 then update public.conversas set reentrada_de = v_antigas[1] where id = v_conv; end if;
   insert into public.conversa_segredo (conversa_id) values (v_conv) returning token into v_token;
   if v_msg = '' and v_tipo = 'filho' and v_pnome is not null and v_motor = 'ia' then v_msg := 'Olá! Quero agendar para ' || v_pnome || '.'; end if;
   if v_msg <> '' then
