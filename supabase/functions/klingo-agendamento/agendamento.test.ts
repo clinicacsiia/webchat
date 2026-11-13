@@ -12,12 +12,12 @@ const timeout = () => { const e = new Error("t"); e.name = "TimeoutError"; retur
 type Cena = {
   paciente?: Record<string, unknown> | null; loginUser?: Record<string, unknown>; vouchers?: Array<Record<string, unknown>>;
   marcar?: "ok" | "ocupado" | "timeout" | "timeout_mas_criou"; reservar?: "ok" | "ocupado"; cancelar?: "ok" | "ja_cancelado";
-  register?: "ok" | "timeout"; horarios?: "ok" | "sem_medico" | "plano_inativo"; resultado?: "html403" | "pronto" | "pendente";
+  register?: "ok" | "timeout"; horarios?: "ok" | "sem_medico" | "plano_inativo"; resultado?: "html403" | "pronto" | "pendente"; recuperar?: "ok" | "erro";
 };
 function klingo(c: Cena = {}) {
-  const chamadas: string[] = []; const corpos: Array<{ rota: string; corpo: any }> = []; let criouComIdExterno: string | null = null;
+  const chamadas: string[] = []; const urls: string[] = []; const corpos: Array<{ rota: string; corpo: any }> = []; let criouComIdExterno: string | null = null;
   const f = async (url: string, init?: RequestInit) => {
-    const u = new URL(url); const rota = `${init?.method ?? "GET"} ${u.pathname.replace("/api", "")}`; chamadas.push(rota);
+    const u = new URL(url); const rota = `${init?.method ?? "GET"} ${u.pathname.replace("/api", "")}`; chamadas.push(rota); urls.push(String(url));
     const corpo = init?.body ? JSON.parse(String(init.body)) : undefined; corpos.push({ rota, corpo });
     if (rota === "GET /live") return resp(200, "OK [API1]");
     if (rota === "GET /paciente/cpf") return c.paciente ? resp(200, c.paciente) : resp(403, { msg: "Paciente não identificado", code: "PACIENTE_NAO_IDENTIFICADO" });
@@ -43,15 +43,29 @@ function klingo(c: Cena = {}) {
     if (rota === "DELETE /checkin") return resp(200, "ok");
     if (rota === "PUT /paciente") return resp(200, {});
     if (rota === "GET /paciente") return resp(200, { id: "P123", nome: "Maria Teste", sexo: "F", dt_nasc: NASC, mae: "Mãe Teste", docs: { cpf: CPF, rg: "123" }, contatos: { celular: "71999998888", email: "maria@exemplo.com" }, endereco: { endereco: "Rua X" }, convenio: { nome: "PLANSERV", id_plano: 28 } });
-    if (rota.startsWith("GET /resultado/")) return c.resultado === "html403" ? resp(403, "<html>proibido</html>", "text/html") : resp(200, { pronto: c.resultado === "pronto", status: "ok", pdf: "QUJD" });
+    if (rota.startsWith("GET /resultado/") && !rota.includes("/an/")) return c.resultado === "html403" ? resp(403, "<html>proibido</html>", "text/html") : resp(200, { pronto: c.resultado === "pronto", status: "ok", pdf: "QUJD" });
+    if (rota === "POST /paciente/identificar") return corpo.dt_nascimento === NASC ? resp(200, { access_token: "tokT", user: { id: "P123", nome: "Maria Teste", nascimento: NASC } }) : resp(403, { msg: "credenciais inválidas" });
+    if (rota === "POST /externo/portal/login") return corpo.senha === "senha123" ? resp(200, { access_token: "tokP", user: { id: "7961", nome: "Joana Teste", nascimento: NASC, id_paciente: "" } }) : resp(403, { msg: "dados inválidos" });
+    if (rota === "POST /externo/portal/register") return resp(200, { id: 7961 });
+    if (rota === "POST /externo/portal/recuperar") return c.recuperar === "erro" ? resp(403, { msg: "email não existe" }) : resp(200, { level: "success", msg: "enviado" });
+    if (rota === "GET /agenda/verificar_horario") return resp(200, { operadoras: [{ id: 1, nome: "PARTICULAR", cpf: "11144477735" }], procedimentos: [{ id: 1096, descr: "CONSULTA" }] });
+    if (rota === "GET /resultado/pdf/an/AN1") return resp(200, { id_marcacao: "1", id_atendimento: "2", pdf_base64: "QUJD" });
+    if (rota.startsWith("GET /resultado/pdf/an/")) return resp(403, "<html>nada</html>", "text/html");
+    if (rota === "GET /atendimentos") return resp(200, [
+      { id: "1", paciente: { nome: "Fulano Sigiloso", docs: { cpf: "99999999999" }, mae: "Mãe Sigilo", contatos: { celular: "71988887777" } }, medico: { nome: "DRA TESTE" }, plano: { nome: "PARTICULAR" }, procedimento: [{ descr: "CONSULTA" }] },
+      { id: "2", paciente: { nome: "Beltrano Sigiloso" }, medico: { nome: "DRA TESTE" }, plano: { nome: "PLANSERV" }, procedimento: [{ descr: "CONSULTA" }, { descr: "ECG" }] }]);
+    if (rota === "GET /telefonia/live") return resp(200, "OK");
+    if (rota.startsWith("GET /telefonia/lista/")) return resp(200, [{ id_marcacao: "9", nome: "Fulano Sigiloso", cpf: "99999999999", celular: "71988887777", id_paciente: "5", data: "2026-11-13", hora: "09:00", procedimento: "CONSULTA", medico: "DRA TESTE", unidade: "CSI", status: "A" }]);
+    if (rota === "GET /telefonia/bloqueios") return resp(200, [{ id: 1, medico: "DRA TESTE", de: "2026-11-20", ate: "2026-11-21" }]);
+    if (rota === "POST /telefonia/confirmar" || rota === "POST /telefonia/nps") return resp(200, "OK");
     if (rota === "GET /unidades") return resp(200, [{ id: 1, nome: "CSI", medico: { nome: "X", cpf: "11144477735", foto: "base64..." } }]);
     return resp(404, "nao");
   };
-  return { f, chamadas, corpos };
+  return { f, chamadas, urls, corpos };
 }
 
 function banco(inicial: { divergentes?: number; pre?: Array<{ chave: string; cpf: string; klingo_id: string | null }>; precadastros?: number } = {}) {
-  const pre = [...(inicial.pre ?? [])]; const regs: any[] = []; const gravados: string[] = []; let soltou = 0; let divergentes = inicial.divergentes ?? 0;
+  const pre = [...(inicial.pre ?? [])]; const tentativas: string[] = []; const regs: any[] = []; const gravados: string[] = []; let soltou = 0; let divergentes = inicial.divergentes ?? 0;
   const db: Banco = {
     hash: async (t) => "h:" + t,
     divergentesRecentes: async () => divergentes,
@@ -65,14 +79,15 @@ function banco(inicial: { divergentes?: number; pre?: Array<{ chave: string; cpf
     gravarPre: async (cpf, nasc, id) => { gravados.push(id); const p = pre.find((x) => x.cpf === cpf); if (p) p.klingo_id = id; },
     soltarPre: async (cpf) => { soltou++; const i = pre.findIndex((x) => x.cpf === cpf && x.klingo_id === null); if (i >= 0) pre.splice(i, 1); },
     precadastrosRecentes: async () => inicial.precadastros ?? 0,
+    registrarTentativa: async (chave) => { tentativas.push(chave); divergentes++; },
   };
-  return { db, regs, gravados, pre, get soltou() { return soltou; } };
+  return { db, regs, tentativas, gravados, pre, get soltou() { return soltou; } };
 }
 
-function montar(c: Cena = {}, b = banco()) {
+function montar(c: Cena = {}, b = banco(), extra: Partial<Ctx> = {}) {
   const k = klingo(c); let n = 0;
   const api = new KlingoApi("clinicacsi:xxxx", k.f);
-  const ctx: Ctx = { api, db: b.db, hoje: () => "2026-11-13", agora: () => Date.now(), uuid: () => `u${++n}`, cache: new Map(), resultado: true };
+  const ctx: Ctx = { api, db: b.db, hoje: () => "2026-11-13", agora: () => Date.now(), uuid: () => `u${++n}`, cache: new Map(), resultado: true, ...extra };
   return { ctx, k, b };
 }
 const paciente = (extra: Record<string, unknown> = {}) => ({ id: "P123", nome: "Maria Teste", dt_nasc: NASC, ...extra });
@@ -106,7 +121,7 @@ test("catálogo: tira CPF e foto, exige parâmetros e recusa catálogo desconhec
 });
 test("dinheiro e rotas perigosas NÃO existem", async () => {
   const { ctx, k } = montar();
-  for (const a of ["adiantamento", "pagamento", "registrar_atendimento", "formas_de_pagamento", "atendimentos", "portal_recuperar", "identificar_telefone"]) {
+  for (const a of ["adiantamento", "pagamento", "registrar_atendimento", "formas_de_pagamento", "atendimentos", "identificar_telefone", "pagamentos"]) {
     const r = await tratar(ctx, { acao: a, ...ident, confirmar: true }); assert.equal(r.status, 400, a); assert.equal(r.corpo.motivo, "acao_invalida");
   }
   assert.equal(k.chamadas.length, 0, "nenhuma chamada ao Klingo");
@@ -281,4 +296,115 @@ test("cadastrar: validações, confirmação e teto diário", async () => {
 });
 test("limparCatalogo tira só o que é pessoal", () => {
   assert.deepEqual(limparCatalogo([{ id: 1, nome: "A", cpf: "1", foto: "x", contatos: { a: 1 }, especialidades: [{ cbos: "1", email: "e" }] }]), [{ id: 1, nome: "A", especialidades: [{ cbos: "1" }] }]);
+});
+
+// ----------------------------------------------------------------------------------------------------------------------- acrescentado em 13/11/2026 (tudo da documentação, menos dinheiro)
+test("verificar_horario: valida a chave e manda o id na query (a doc pede corpo num GET)", async () => {
+  const { ctx, k } = montar();
+  assert.equal((await tratar(ctx, { acao: "verificar_horario", horario: "x" })).status, 400);
+  const r = await tratar(ctx, { acao: "verificar_horario", horario: CHAVE });
+  assert.equal(r.corpo.ok, true); assert.ok(!JSON.stringify(r.corpo).includes("11144477735"), "CPF do catálogo é tirado");
+  assert.ok(k.urls.some((u) => u.includes("/agenda/verificar_horario?id=")));
+});
+test("telefone: DESLIGADO por padrão; ligado, exige telefone + nascimento e confere o nascimento da sessão", async () => {
+  const desl = montar({ paciente: paciente() });
+  const r0 = await tratar(desl.ctx, { acao: "minhas_marcacoes", telefone: "71999998888", nascimento: NASC }); assert.equal(r0.corpo.motivo, "desligado"); assert.equal(desl.k.chamadas.length, 0);
+  const m = montar({}, banco(), { telefone: true });
+  assert.equal((await tratar(m.ctx, { acao: "identificar", telefone: "123", nascimento: NASC })).status, 400);
+  const ok = await tratar(m.ctx, { acao: "identificar", telefone: "(71) 99999-8888", nascimento: NASC });
+  assert.equal(ok.corpo.ok, true); assert.equal(ok.corpo.via, "telefone"); assert.equal(ok.corpo.primeiro_nome, "Maria");
+  const corpo = m.k.corpos.find((x) => x.rota === "POST /paciente/identificar")!.corpo;
+  assert.deepEqual(corpo, { telefone: "71999998888", dt_nascimento: NASC }, "nunca manda apenas_telefone");
+  const errado = await tratar(m.ctx, { acao: "identificar", telefone: "71999998888", nascimento: "1990-01-01" });
+  assert.equal(errado.corpo.motivo, "nao_confere"); assert.deepEqual(m.b.tentativas, ["tel:71999998888"]);
+});
+test("telefone: cinco recusas travam aquele telefone (e não chamam mais o Klingo)", async () => {
+  const m = montar({}, banco(), { telefone: true });
+  for (let i = 0; i < 5; i++) await tratar(m.ctx, { acao: "identificar", telefone: "71999998888", nascimento: `1990-01-0${i + 1}` });
+  const antes = m.k.chamadas.length;
+  const r = await tratar(m.ctx, { acao: "identificar", telefone: "71999998888", nascimento: NASC });
+  assert.equal(r.status, 429); assert.equal(r.corpo.motivo, "tentativas_demais"); assert.equal(m.k.chamadas.length, antes);
+});
+test("telefone: a sessão serve para as ações do paciente (cancelar só marcação dele)", async () => {
+  const m = montar({ vouchers: [{ id: 26638, status: "agendado", data: "2026-11-20", hora: "09:40" }] }, banco(), { telefone: true });
+  const t = { telefone: "71999998888", nascimento: NASC, confirmar: true };
+  assert.equal((await tratar(m.ctx, { acao: "cancelar", ...t, voucher: "26638" })).corpo.cancelado, "26638");
+  assert.equal((await tratar(m.ctx, { acao: "cancelar", ...t, voucher: "99999" })).corpo.motivo, "voucher_nao_encontrado");
+});
+test("portal: DESLIGADO por padrão; ligado, entra com e-mail + senha e uma senha errada conta para a trava", async () => {
+  const desl = montar();
+  assert.equal((await tratar(desl.ctx, { acao: "identificar", portal_email: "a@b.com", portal_senha: "senha123" })).corpo.motivo, "desligado");
+  assert.equal((await tratar(desl.ctx, { acao: "portal_recuperar", email: "a@b.com", confirmar: true })).corpo.motivo, "desligado");
+  assert.equal((await tratar(desl.ctx, { ...novo, acao: "portal_cadastrar", email: "a@b.com", senha: "senha123" })).corpo.motivo, "desligado");
+  assert.equal(desl.k.chamadas.length, 0);
+  const m = montar({}, banco(), { portal: true });
+  const ok = await tratar(m.ctx, { acao: "identificar", portal_email: "Joana@Exemplo.com", portal_senha: "senha123" });
+  assert.equal(ok.corpo.ok, true); assert.equal(ok.corpo.via, "portal"); assert.equal(ok.corpo.pre_cadastro, true);
+  assert.deepEqual(m.k.corpos.find((x) => x.rota === "POST /externo/portal/login")!.corpo, { email: "joana@exemplo.com", senha: "senha123" });
+  const ruim = await tratar(m.ctx, { acao: "identificar", portal_email: "joana@exemplo.com", portal_senha: "errada1" });
+  assert.equal(ruim.corpo.motivo, "nao_confere"); assert.deepEqual(m.b.tentativas, ["mail:joana@exemplo.com"]);
+  assert.ok(!JSON.stringify(m.b.tentativas).includes("errada1"), "a senha nunca é guardada");
+  assert.equal((await tratar(m.ctx, { acao: "identificar", portal_email: "x", portal_senha: "senha123" })).status, 400);
+});
+test("portal: cadastrar usa a rota do portal, exige e-mail e senha, e guarda a marca uma vez por CPF", async () => {
+  const m = montar({ paciente: null }, banco(), { portal: true });
+  assert.equal((await tratar(m.ctx, { ...novo, acao: "portal_cadastrar", email: "j@e.com", senha: "123" })).status, 400);
+  assert.equal((await tratar(m.ctx, { ...novo, acao: "portal_cadastrar", senha: "senha123" })).status, 400);
+  const r = await tratar(m.ctx, { ...novo, acao: "portal_cadastrar", email: "J@e.com", senha: "senha123" });
+  assert.equal(r.corpo.ok, true); assert.equal(r.corpo.portal, true); assert.deepEqual(m.b.gravados, ["7961"]);
+  const corpo = m.k.corpos.find((x) => x.rota === "POST /externo/portal/register")!.corpo;
+  assert.equal(corpo.senha, "senha123"); assert.equal(corpo.paciente.docs.cpf, CPF); assert.equal(corpo.paciente.contatos.email, "j@e.com");
+  assert.ok(!m.k.chamadas.includes("POST /externo/register"));
+  assert.equal((await tratar(m.ctx, { ...novo, acao: "portal_cadastrar", email: "j@e.com", senha: "senha123" })).corpo.motivo, "ja_cadastrado");
+});
+test("portal: recuperar senha dá a MESMA resposta exista ou não a conta e tem freio por e-mail", async () => {
+  const bom = await tratar(montar({}, banco(), { portal: true }).ctx, { acao: "portal_recuperar", email: "a@b.com", confirmar: true });
+  const ruim = await tratar(montar({ recuperar: "erro" }, banco(), { portal: true }).ctx, { acao: "portal_recuperar", email: "a@b.com", confirmar: true });
+  assert.deepEqual(bom, ruim);
+  const m = montar({}, banco(), { portal: true });
+  assert.equal((await tratar(m.ctx, { acao: "portal_recuperar", email: "a@b.com" })).corpo.motivo, "sem_confirmacao");
+  for (let i = 0; i < 3; i++) assert.equal((await tratar(m.ctx, { acao: "portal_recuperar", email: "a@b.com", confirmar: true })).corpo.ok, true);
+  assert.equal((await tratar(m.ctx, { acao: "portal_recuperar", email: "a@b.com", confirmar: true })).status, 429);
+  assert.equal((await tratar(m.ctx, { acao: "portal_recuperar", email: "outro@b.com", confirmar: true })).corpo.ok, true, "o freio é por e-mail");
+});
+test("resultado de imagem: só com o interruptor do laudo, com identidade, e a sessão manda o nascimento", async () => {
+  const off = montar({ paciente: paciente() }, banco(), { resultado: false });
+  assert.equal((await tratar(off.ctx, { acao: "resultado_imagem", ...ident, accession: "AN1" })).corpo.motivo, "desligado");
+  const m = montar({ paciente: paciente() });
+  assert.equal((await tratar(m.ctx, { acao: "resultado_imagem", ...ident, accession: "../x" })).status, 400);
+  const r = await tratar(m.ctx, { acao: "resultado_imagem", ...ident, accession: "AN1" });
+  assert.equal(r.corpo.ok, true); assert.equal(r.corpo.pronto, true); assert.equal((r.corpo.resultado as any).pdf_base64, "QUJD");
+  assert.ok(m.k.urls.some((u) => u.includes("/resultado/pdf/an/AN1?dtnasc=" + NASC)));
+  const sem = await tratar(m.ctx, { acao: "resultado_imagem", ...ident, accession: "AN2" });
+  assert.equal(sem.corpo.pronto, false); assert.equal(sem.corpo.motivo, "sem_resultado");
+});
+test("equipe: sem a chave tudo é recusado e nada chega ao Klingo", async () => {
+  const m = montar();
+  for (const a of ["equipe_atendimentos", "equipe_telefonia"]) { const r = await tratar(m.ctx, { acao: a, rota: "live" }); assert.equal(r.status, 403, a); assert.equal(r.corpo.motivo, "nao_autorizado"); }
+  assert.equal(m.k.chamadas.length, 0);
+});
+test("equipe: atendimentos do dia saem só como totais, sem nenhum dado de paciente", async () => {
+  const m = montar({}, banco(), { equipe: true });
+  const r = await tratar(m.ctx, { acao: "equipe_atendimentos", data: "2026-11-13" });
+  assert.equal(r.corpo.ok, true); assert.equal(r.corpo.total, 2);
+  assert.deepEqual(r.corpo.por_medico, [{ nome: "DRA TESTE", total: 2 }]);
+  assert.deepEqual((r.corpo.por_procedimento as any[]).map((x) => [x.nome, x.total]), [["CONSULTA", 2], ["ECG", 1]]);
+  const txt = JSON.stringify(r.corpo); for (const x of ["Sigiloso", "99999999999", "Sigilo", "71988887777"]) assert.ok(!txt.includes(x), x);
+  assert.equal((await tratar(m.ctx, { acao: "equipe_atendimentos", data: "ontem" })).status, 400);
+});
+test("equipe: telefonia devolve a lista sem nome, CPF, telefone nem id de paciente; confirmar e NPS exigem confirmação", async () => {
+  const m = montar({}, banco(), { equipe: true });
+  assert.equal((await tratar(m.ctx, { acao: "equipe_telefonia", rota: "live" })).corpo.ok, true);
+  const l = await tratar(m.ctx, { acao: "equipe_telefonia", rota: "lista", data: "2026-11-13" });
+  assert.equal(l.corpo.total, 1); const txt = JSON.stringify(l.corpo); for (const x of ["Sigiloso", "99999999999", "71988887777", "id_paciente"]) assert.ok(!txt.includes(x), x);
+  assert.equal((l.corpo.marcacoes as any[])[0].hora, "09:00");
+  assert.equal((await tratar(m.ctx, { acao: "equipe_telefonia", rota: "lista", data: "2026-11-13", ate: "2026-12-30" })).status, 400);
+  assert.equal((await tratar(m.ctx, { acao: "equipe_telefonia", rota: "bloqueios", de: "2026-11-01" })).corpo.ok, true);
+  assert.equal((await tratar(m.ctx, { acao: "equipe_telefonia", rota: "confirmar", id_marcacao: "9", status: "C" })).corpo.motivo, "sem_confirmacao");
+  assert.equal((await tratar(m.ctx, { acao: "equipe_telefonia", rota: "confirmar", id_marcacao: "9", status: "N", confirmar: true })).corpo.motivo, "sem_confirmacao", "N cancela a marcação: pede confirmação extra");
+  assert.equal((await tratar(m.ctx, { acao: "equipe_telefonia", rota: "confirmar", id_marcacao: "9", status: "X", confirmar: true })).status, 400);
+  assert.equal((await tratar(m.ctx, { acao: "equipe_telefonia", rota: "confirmar", id_marcacao: "9", status: "C", confirmar: true })).corpo.ok, true);
+  assert.equal((await tratar(m.ctx, { acao: "equipe_telefonia", rota: "nps", id_marcacao: "9", nota: 11, confirmar: true })).status, 400);
+  assert.equal((await tratar(m.ctx, { acao: "equipe_telefonia", rota: "nps", id_marcacao: "9", nota: 10, confirmar: true })).corpo.ok, true);
+  assert.equal((await tratar(m.ctx, { acao: "equipe_telefonia", rota: "ultimo_por_cpf" })).status, 400);
 });
