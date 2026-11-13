@@ -1,16 +1,16 @@
 -- FLUXOGRAMA: entrada (textos que o paciente lê no chat) -> validação (só troca se o texto ainda for o atual; edição da equipe é preservada)
 --   -> saída (textos acolhedores, sem a palavra "previsão", que dizem que nada está confirmado até uma pessoa da equipe confirmar).
--- Versão 1.0 — 13/11/2026 / Mudança: textos de acolhimento (equidade, aprendizado com o uso, confiança, "família"); tira "previsão" do que o paciente lê.
+-- Versão 1.1 — 13/11/2026 / Mudança: textos de acolhimento (equidade, melhoria contínua feita pela equipe, confiança, "família"); tira "previsão" do que o paciente lê.
 -- Tela interna da equipe (painel) e notas internas continuam com "previsão" de propósito.
 -- ROLLBACK: o texto anterior de cada linha está em supabase/producao/ (retrato) e no comentário "-- antes:" de cada comando abaixo.
 -- Aplicar em partes (a ferramenta de migração expira em 60 s); nenhum comando é destrutivo.
 
 -- Parte 1: saudação (o aviso fixo do topo da tela já se apresenta como assistente automático)
 -- antes: Olá, {nome}! Vamos com calma, é só tocar nas opções.
-update public.fluxo_texto set texto = $t$Olá, {nome}! Que bom ter você aqui. 💚 Estamos criando uma solução para facilitar o atendimento e levar equidade para todos, e este espaço aprende com o jeito que cada pessoa usa para ficar mais simples a cada dia. É só tocar nas opções, com calma.$t$
+update public.fluxo_texto set texto = $t$Olá, {nome}! Que bom ter você aqui. 💚 Estamos criando uma solução para facilitar o atendimento e levar equidade para todos, e a nossa equipe melhora este espaço a cada dia, ouvindo como as pessoas o usam. É só tocar nas opções, com calma.$t$
  where chave = 'ola_proprio' and texto = 'Olá, {nome}! Vamos com calma, é só tocar nas opções.';
 -- antes: Olá, {nome}! Vamos organizar o atendimento de {paciente}. É só tocar nas opções.
-update public.fluxo_texto set texto = $t$Olá, {nome}! Que bom ter você e {paciente} aqui. 💚 Estamos criando uma solução para facilitar o atendimento e levar equidade para todos, e este espaço aprende com o jeito que cada pessoa usa para ficar mais simples a cada dia. Vamos organizar o atendimento de {paciente}: é só tocar nas opções.$t$
+update public.fluxo_texto set texto = $t$Olá, {nome}! Que bom ter você e {paciente} aqui. 💚 Estamos criando uma solução para facilitar o atendimento e levar equidade para todos, e a nossa equipe melhora este espaço a cada dia, ouvindo como as pessoas o usam. Vamos organizar o atendimento de {paciente}: é só tocar nas opções.$t$
  where chave = 'ola_filho' and texto = 'Olá, {nome}! Vamos organizar o atendimento de {paciente}. É só tocar nas opções.';
 
 -- Parte 2: horário, confirmação e pedido pronto

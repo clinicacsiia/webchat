@@ -590,7 +590,7 @@
         </label>
       </div>
       <div class="aviso-form" id="avisoForm">
-        <p class="boas-vindas">💚 Estamos criando uma solução para facilitar o seu dia a dia e levar equidade para todos. Este espaço aprende com o jeito que cada pessoa o usa, e queremos você como parte da nossa família, ajudando a construir um lugar melhor.</p>
+        <p class="boas-vindas">💚 Estamos criando uma solução para facilitar o seu dia a dia e levar equidade para todos. A nossa equipe melhora este espaço a cada dia, ouvindo como as pessoas o usam, e queremos você como parte da nossa família, ajudando a construir um lugar melhor.</p>
         <label class="aceite">
           <input type="checkbox" id="fPrevisao">
           <span>Entendi: os horários só valem depois que uma <b>pessoa da equipe</b> <b>confirma</b>.</span>
@@ -656,7 +656,7 @@
   const CHAVE_HIST = 'webchat.historico.v1';   // as últimas conversas deste aparelho (cada uma com o seu token): dá para voltar a elas
   const MAX_HIST = 5;                          // mínimo pedido: 3
   // Muda a cada alteração do chat. Cópia de mensagens guardada por outra versão é descartada (era isso que mostrava conversa velha e travada).
-  const VERSAO_APP = '2026.11.13-1';
+  const VERSAO_APP = '2026.11.13-2';
   const ESCALAS = [1, 1.18, 1.36], TOAST_LETRA = ['Letra normal.', 'Letra grande.', 'Letra muito grande.'];
 
   // Chegou pelo link "esqueci a senha"? O supabase-js limpa o endereço ao ler o link, então a pergunta é feita antes de criá-lo.
@@ -924,14 +924,14 @@
       if (ult && ult.texto) registrarHistorico(conv, { ultima: String(ult.texto).replace(/\s+/g, ' ').slice(0, 90) });
     }, 300);
   }
-  // Aviso fixo no começo da conversa: quem fala (assistente automático), a missão (equidade, aprende com o uso) e que quem confirma é uma pessoa.
+  // Aviso fixo no começo da conversa: quem fala (assistente automático), a missão (equidade, melhoria contínua feita pela equipe) e que quem confirma é uma pessoa.
   function preencherAvisoIA(caixa) {
     caixa = caixa || document.getElementById('avisoIA'); if (!caixa) return;
     if (statusAtual === 'em_atendimento') {
       caixa.replaceChildren(h('p', {}, h('b', {}, 'Agora você está falando com uma pessoa da nossa equipe.'), ' Pode escrever à vontade, no campo aqui embaixo.'));
     } else if (motorAtivo) {
       caixa.replaceChildren(
-        h('p', {}, h('b', {}, 'Sou o assistente automático da CSI.'), ' Estamos criando uma solução para facilitar o seu dia a dia e levar equidade para todos: este espaço aprende com o jeito que as pessoas o usam. ', h('b', {}, 'Quem confirma o agendamento é um atendente'), ', sempre.'));
+        h('p', {}, h('b', {}, 'Sou o assistente automático da CSI.'), ' Estamos criando uma solução para facilitar o seu dia a dia e levar equidade para todos: a nossa equipe melhora este espaço a cada dia, ouvindo como as pessoas o usam. ', h('b', {}, 'Quem confirma o agendamento é um atendente'), ', sempre.'));
     } else {
       caixa.replaceChildren(h('p', {}, h('b', {}, 'Recebemos o seu pedido.'), ' Uma pessoa da equipe vai responder aqui. O que você já escolheu fica registrado e o ', h('b', {}, 'atendente confirma com você'), '.'));
     }
