@@ -12,6 +12,6 @@
 - **A verdade do banco é `supabase/producao/`** (retrato da produção, uma função por arquivo). Os arquivos `supabase/*.sql` são o histórico das mudanças e podem estar diferentes do banco. Para mexer numa função, parta de `supabase/producao/funcoes/<nome>.sql`.
 - **Toda mudança de banco:** arquivo novo em `supabase/` (fluxograma, versão, rollback) → testar no clone (`testes/sql-producao.test.mjs`, `testes/sql-ponta-a-ponta.test.mjs`) → aplicar em partes → medir o efeito na produção → **refazer o retrato** (`supabase/producao/LEIAME.md`) → `npm run test:retrato`.
 - **Toda mudança de tela:** trocar `VERSAO_APP` (chat) e `VERSAO` nos `sw.js`; `npm run test:retrato` acusa função ou parâmetro que não existe no banco.
-- Na produção, ler só estrutura, contagens, tempos e erros técnicos. Nunca nome, telefone, CPF ou texto de conversa.
+- Na produção, por padrão ler só estrutura, contagens, tempos e erros técnicos. **Exceção autorizada pelo dono (13/11/2026):** quando o dono pedir para validar paciente por paciente, pode-se trazer nome, CPF, telefone, e-mail e nascimento **só em arquivo entregue ao dono** (nunca no texto da conversa, no repositório, em commit, em página publicada, em log ou em função que continue publicada). Texto de conversa de paciente continua proibido. Depois de entregar, desfazer qualquer função temporária que devolva esses dados.
 - O dono trabalha em várias sessões ao mesmo tempo: **antes de continuar um trabalho parado, `git fetch` e comparar com a `main` e com as migrações aplicadas** (`supabase_migrations.schema_migrations`).
 
