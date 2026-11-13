@@ -255,6 +255,20 @@ create policy autoencerramento_execucao_select on public.autoencerramento_execuc
 -- concessão a anon: DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
 -- concessão a authenticated: DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
 
+create table public.pedido_previsao (
+  conversa_id uuid NOT NULL,
+  turno text NOT NULL,
+  de date NOT NULL,
+  ate date NOT NULL,
+  antecedencia text NOT NULL,
+  status text NOT NULL DEFAULT 'aguardando'::text,
+  vaga jsonb,
+  vaga_em timestamp with time zone,
+  criada_em timestamp with time zone NOT NULL DEFAULT now(),
+  atualizada_em timestamp with time zone NOT NULL DEFAULT now(),
+  constraint pedido_previsao_pkey PRIMARY KEY (conversa_id)
+);
+alter table public.pedido_previsao enable row level security;
 create table public.autoencerramento_fechada (
   conversa_id uuid not null,
   fechada_em timestamp with time zone default now() not null,
@@ -2364,6 +2378,8 @@ CREATE TRIGGER vinculo_log_imutavel BEFORE DELETE OR UPDATE ON public.vinculo_lo
 -- agendamento-reconhecer-klingo · 30 seconds · ativa
 --   select public.agendamento_reconhecer_disparar()
 -- autoencerrar-vigia · */5 * * * * · ativa
+-- pedido-horario-vigia · */5 * * * * · ativa
+-- previsao-vigia · */10 * * * * · ativa
 --   select public.autoencerrar_vigiar()
 -- catalogo-precos-convenio · 10 6 * * * · ativa
 --   select net.http_post( url := 'https://nrvuynjwcgwpjdptkiay.supabase.co/functions/v1/sync-catalogo-klingo', headers := jsonb_build_object('Content-Type', 'application/json', 'x-sync-key', (select valor from public.config where chave = 'ia_segredo')), body := '{"precos":"convenio"}'::jsonb, timeout_milliseconds := 150000);
@@ -2404,4 +2420,4 @@ CREATE TRIGGER vinculo_log_imutavel BEFORE DELETE OR UPDATE ON public.vinculo_lo
 --   select public.klingo_sincronizar_disparar()
 
 -- ===== Chaves existentes em public.config (só os nomes; os valores não são copiados) =====
--- agenda_ao_vivo, agenda_ao_vivo_max_dias, agenda_ao_vivo_trava_s, agenda_ao_vivo_validade_s, agendado_conferir_prazo_min, agendamento_reconhecer, agendamento_reconhecer_msg_encerradas, autoencerrar_horas, autoencerrar_modo, avaliacao_ativa, boas_vindas, cadastro_equipe_sem_convite, chat_push_url, checkin_sem_login_max_dia, convenio_suspenso_texto, despedida_configurada, despedida_inatividade_ativa, despedida_inatividade_texto, despedida_versao_atual, encerramento_exige_motivo, encerramento_valida_agendado, equipe_push_url, fila_autochegada, fila_aviso_antes, fila_push_url, fila_vapid_publica, horario_trabalho, ia_ativa, ia_segredo, indicadores_fechar, jornada_identidade_klingo, jornada_relatorio_filtro, jornada_relatorio_id, klingo_paciente_url, login_paciente, motor, motor_telefones_teste, nome_empresa, permissao_modo, previsao_texto, reabrir_dias, reaproveitar_cadastro_convidado, teste_agentes, teste_marcadores, vinculo_manual_quem, klingo_api_horarios, klingo_api_marcar, klingo_api_pre_cadastro, klingo_api_pos, klingo_api_telefones_teste, klingo_api_percentual, klingo_webhook, klingo_autogestao, klingo_funcoes_base
+-- agenda_ao_vivo, agenda_ao_vivo_max_dias, agenda_ao_vivo_trava_s, agenda_ao_vivo_validade_s, agendado_conferir_prazo_min, agendamento_reconhecer, agendamento_reconhecer_msg_encerradas, autoencerrar_horas, autoencerrar_modo, avaliacao_ativa, boas_vindas, cadastro_equipe_sem_convite, chat_push_url, checkin_sem_login_max_dia, convenio_suspenso_texto, despedida_configurada, despedida_inatividade_ativa, despedida_inatividade_texto, despedida_versao_atual, encerramento_exige_motivo, encerramento_valida_agendado, equipe_push_url, fila_autochegada, fila_aviso_antes, fila_push_url, fila_vapid_publica, horario_trabalho, ia_ativa, ia_segredo, indicadores_fechar, jornada_identidade_klingo, jornada_relatorio_filtro, jornada_relatorio_id, klingo_paciente_url, login_paciente, motor, motor_telefones_teste, nome_empresa, permissao_modo, previsao_texto, reabrir_dias, reaproveitar_cadastro_convidado, teste_agentes, teste_marcadores, vinculo_manual_quem, klingo_api_horarios, klingo_api_marcar, klingo_api_pre_cadastro, klingo_api_pos, klingo_api_telefones_teste, klingo_api_percentual, klingo_webhook, klingo_autogestao, klingo_funcoes_base, pedido_horario_modo, pedido_parado_horas, pedido_sem_horario_texto, pedido_oferta2_texto, pedido_escolha_texto, previsao_oferta_texto, previsao_decide_texto, previsao_final_texto

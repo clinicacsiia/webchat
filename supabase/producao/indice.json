@@ -1758,6 +1758,23 @@
    ],
    "rls": true,
    "politicas": 0
+  },
+  {
+   "nome": "pedido_previsao",
+   "colunas": [
+    "conversa_id",
+    "turno",
+    "de",
+    "ate",
+    "antecedencia",
+    "status",
+    "vaga",
+    "vaga_em",
+    "criada_em",
+    "atualizada_em"
+   ],
+   "rls": true,
+   "politicas": 0
   }
  ],
  "visoes": [
@@ -1923,6 +1940,18 @@
    "quando": "50 6 * * *",
    "ativa": true,
    "comando": "select public.klingo_sincronizar_disparar()"
+  },
+  {
+   "nome": "pedido-horario-vigia",
+   "quando": "*/5 * * * *",
+   "ativa": true,
+   "comando": "select public.pedido_horario_vigiar()"
+  },
+  {
+   "nome": "previsao-vigia",
+   "quando": "*/10 * * * *",
+   "ativa": true,
+   "comando": "select public.previsao_vigiar()"
   }
  ],
  "gatilhos": [
@@ -2047,7 +2076,15 @@
   "reaproveitar_cadastro_convidado",
   "teste_agentes",
   "teste_marcadores",
-  "vinculo_manual_quem"
+  "vinculo_manual_quem",
+  "pedido_horario_modo",
+  "pedido_parado_horas",
+  "pedido_sem_horario_texto",
+  "pedido_oferta2_texto",
+  "pedido_escolha_texto",
+  "previsao_oferta_texto",
+  "previsao_decide_texto",
+  "previsao_final_texto"
  ],
  "funcoes": [
   {
@@ -10204,6 +10241,143 @@
    "authenticated": false,
    "publico": false,
    "md5": "8ba37c7ebfa3803770d772078a6a4ac5"
+  },
+  {
+   "nome": "painel_previsao_lista",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": ""
+  },
+  {
+   "nome": "pedido_horario_vigiar",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "d7e90169ed640a84f4b0d383917b1479"
+  },
+  {
+   "nome": "pedido_oferta_texto",
+   "args": [
+    "jsonb",
+    "integer",
+    "text"
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": ""
+  },
+  {
+   "nome": "pedido_slot_texto",
+   "args": [
+    "jsonb"
+   ],
+   "definer": false,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": ""
+  },
+  {
+   "nome": "previsao_antec_min",
+   "args": [
+    "text"
+   ],
+   "definer": false,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": ""
+  },
+  {
+   "nome": "previsao_ativa",
+   "args": [
+    "uuid"
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": ""
+  },
+  {
+   "nome": "previsao_buscar",
+   "args": [
+    "uuid",
+    "text",
+    "date",
+    "date",
+    "integer"
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": ""
+  },
+  {
+   "nome": "previsao_iniciar",
+   "args": [
+    "uuid",
+    "boolean",
+    "text"
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": ""
+  },
+  {
+   "nome": "previsao_pergunta",
+   "args": [
+    "uuid",
+    "text"
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": ""
+  },
+  {
+   "nome": "previsao_responder",
+   "args": [
+    "uuid",
+    "text",
+    "text"
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": ""
+  },
+  {
+   "nome": "previsao_vigiar",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": ""
   }
  ]
 }

@@ -82,7 +82,8 @@
     "retrato:montar": "node banco-producao.mjs",
     "test:painel-recarga": "node painel-recarga.navegador.mjs",
     "test:equipe-agora": "node equipe-agora.navegador.mjs",
-    "test:agendou-credito": "node sql-agendou-credito.test.mjs"
+    "test:agendou-credito": "node sql-agendou-credito.test.mjs",
+    "test:previsao": "node previsao.navegador.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.2.17",

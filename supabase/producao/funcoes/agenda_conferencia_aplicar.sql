@@ -85,7 +85,7 @@ begin
           update public.pre_agendamentos set conferencia_status = v_conf, conferencia_detalhe = v_det, conferencia_em = now(), conferencia_falhas = v_falhas where id = pa.id;
         end if;
         if v_alerta is not null then v_alertas := v_alertas + 1; end if;
-        update public.conversas set alerta_agenda = v_alerta, atualizado_em = now() where id = pa.conversa_id and alerta_agenda is distinct from v_alerta;
+        update public.conversas set alerta_agenda = v_alerta, atualizado_em = now() where id = pa.conversa_id and alerta_agenda is distinct from v_alerta and not (v_alerta is null and alerta_agenda like 'Pedido parado%');
       exception when others then
         raise warning 'agenda_conferencia_aplicar: % (%)', sqlerrm, e ->> 'id';
       end;

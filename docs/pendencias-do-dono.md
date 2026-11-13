@@ -76,6 +76,12 @@ Detalhes e números em [`klingo-autoatendimento.md`](klingo-autoatendimento.md).
 - **Revisar `privacidade.html`** para citar a marcação automática e o envio de CPF ao Klingo (junto com o item 2.5).
 - **Código por SMS/e-mail** (segundo fator): sem ele, resultado de exame e troca de telefone ficam com a equipe (plano, etapa 6).
 
+### 2.9 Pedido sem horário (13/11/2026): ligar para todos
+Está em modo `teste` (só o celular da lista de teste). Quando você aprovar o comportamento, rode em Configurações/SQL: `update public.config set valor = 'ligado' where chave = 'pedido_horario_modo';` Textos que o paciente recebe (oferta do horário mais próximo, do seguinte e pedido para escolher no calendário): chaves `pedido_sem_horario_texto`, `pedido_oferta2_texto` e `pedido_escolha_texto`. Prazo do aviso ao atendente: `pedido_parado_horas` (24). Atenção: horário "ocupado no Klingo" também dispara a oferta, e pode ser a própria equipe que marcou com outro nome ou telefone.
+
+### 2.10 Lista de previsão (13/11/2026)
+Quando o paciente toca em "Nenhum horário serve" (ou recusa as duas ofertas), o assistente pergunta turno e período, oferece horário dentro do filtro e, se não houver, pergunta se quer ficar na LISTA DE PREVISÃO (texto: não confirma o dia). Quem fica diz com que antecedência pode ser chamado. Está em modo `teste` (mesma chave `pedido_horario_modo`). No painel há o botão **Lista de previsão** (admin e atendente): mostra quem espera, turno, período, antecedência e destaca a linha quando abre vaga; só leitura, com botão para abrir a conversa. A tabela `pedido_previsao` guarda os dados. Decida o prazo que a equipe se compromete a responder e revise os textos `previsao_*` em `config`.
+
 ## 3. Contas e segurança
 
 ### 3.1 Plano do Supabase e proteção contra senha vazada

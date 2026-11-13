@@ -109,7 +109,41 @@ begin
     elsif v = 'nao' then
       perform public.fluxo_set(p_conversa, '{"plano_anterior": null}');
     else return '{"ok": false}'; end if;
+  when 'previsao_turno', 'previsao_periodo', 'previsao_decide', 'previsao_antecedencia' then   -- pedido-previsao
+    return public.previsao_responder(p_conversa, p_passo, v);
+  when 'horario_oferta' then   -- pedido-sem-horario
+    declare v_p jsonb; v_n int; v_s jsonb; v_livre boolean := false; v_aviso text;
+    begin
+      select dados -> 'oferta_pendente' into v_p from public.conversa_fluxo where conversa_id = p_conversa;
+      if jsonb_typeof(v_p) is distinct from 'object' or v not in ('sim', 'nao') then return '{"ok": false}'::jsonb; end if;
+      v_n := coalesce((v_p ->> 'n')::int, 1); v_s := v_p -> 'slots' -> (v_n - 1);
+      if v = 'sim' and v_s is not null then
+        perform set_config('app.conversa', p_conversa::text, true);
+        select true into v_livre from public.agenda_horarios(public.fluxo_procs(p_conversa), (v_s ->> 'data')::date, (v_s ->> 'data')::date, null, null, null, '[]'::jsonb) h where h.hora = v_s ->> 'hora' limit 1;
+        if coalesce(v_livre, false) then
+          update public.pre_agendamentos set escolha_horario = jsonb_build_array(jsonb_build_object('grupo', 1, 'data', v_s ->> 'data', 'hora', v_s ->> 'hora', 'unidade', v_s ->> 'unidade', 'profissional', v_s ->> 'profissional',
+                                         'local', v_s ->> 'local', 'min', coalesce((v_s ->> 'min')::int, 30), 'chegada', coalesce((v_s ->> 'chegada')::boolean, false))),
+            data_desejada = (v_s ->> 'data')::date, hora_desejada = v_s ->> 'hora', unidade = coalesce(unidade, v_s ->> 'unidade'), etapa = 'confirmacao', atualizado_em = now()
+           where conversa_id = p_conversa;
+          perform public.fluxo_set(p_conversa, jsonb_build_object('oferta_pendente', null, 'sem_horario', false, 'confirmado', true, 'previsao', null));
+          perform public.fluxo_nota(p_conversa, 'Paciente aceitou o horário oferecido pelo assistente: ' || (v_s ->> 'data') || ' ' || (v_s ->> 'hora') || '.');
+          return jsonb_build_object('ok', true, 'aviso', 'Combinado! Troquei o horário do seu pedido.');
+        end if;
+        v_aviso := 'Esse horário acabou de ser ocupado.';
+      end if;
+      v_s := v_p -> 'slots' -> v_n;   -- índice v_n (0-based) = o próximo da lista
+      if v_s is not null and v_n < 2 then
+        perform public.fluxo_set(p_conversa, jsonb_build_object('oferta_pendente', v_p || jsonb_build_object('n', v_n + 1, 'texto', public.pedido_oferta_texto(v_s, v_n + 1, v_p ->> 'original'))));
+        return jsonb_build_object('ok', true, 'aviso', v_aviso);
+      end if;
+      if public.previsao_ativa(p_conversa) then return public.previsao_iniciar(p_conversa, coalesce(v_p ->> 'origem', '') = 'previsao', v_aviso); end if;   -- pedido-previsao
+      perform public.fluxo_set(p_conversa, jsonb_build_object('oferta_pendente', null, 'sem_horario', false, 'confirmado', false));
+      update public.pre_agendamentos set escolha_horario = null, data_desejada = null, hora_desejada = null, etapa = 'data_hora' where conversa_id = p_conversa;
+      perform public.fluxo_nota(p_conversa, 'Paciente não pôde nos horários oferecidos: pediu-se que escolha data e hora no calendário.');
+      return jsonb_build_object('ok', true, 'aviso', coalesce(v_aviso || ' ', '') || coalesce((select valor from public.config where chave = 'pedido_escolha_texto'), ''));
+    end;
   when 'horario' then
+    if v = 'sem_horario' and public.previsao_ativa(p_conversa) then return public.previsao_iniciar(p_conversa, false); end if;   -- pedido-previsao
     if v = 'sem_horario' then
       perform public.fluxo_set(p_conversa, '{"sem_horario": true}');
       perform public.fluxo_nota(p_conversa, 'Nenhum horário do calendário serviu: procurar outro com o paciente');
@@ -190,5 +224,5 @@ begin
     return '{"ok": false}';
   end case;
   return '{"ok": true}';
-end $function$;
-
+end $function$
+;
