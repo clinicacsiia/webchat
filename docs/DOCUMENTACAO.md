@@ -7,6 +7,7 @@ Este é o documento para **entender o sistema inteiro**: o que é cada pasta, ca
 - O que foi auditado e corrigido em 11/11/2026: [`auditoria-2026-11-11.md`](auditoria-2026-11-11.md)
 - O que depende do dono: [`pendencias-do-dono.md`](pendencias-do-dono.md)
 - **Autoatendimento com a API do Klingo (12/11/2026):** [`klingo-autoatendimento.md`](klingo-autoatendimento.md); desenho completo e riscos em [`planejamento-autoatendimento-klingo.md`](planejamento-autoatendimento-klingo.md)
+- **Página de agendamento com a API do Klingo (13/11/2026):** [`agendamento-pagina.md`](agendamento-pagina.md) (`agendamento/index.html` + Edge Function `klingo-agendamento`; ainda não publicada)
 - A estrutura real do banco de produção: [`../supabase/producao/`](../supabase/producao/LEIAME.md)
 
 ---

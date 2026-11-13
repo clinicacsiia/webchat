@@ -55,6 +55,7 @@ const casos = [
   ['/fila/ sem token NÃO passa pelo cache', { method: 'GET', url: `${ESCOPO}fila/`, mode: 'navigate' }, false],
   ['/minha-vez/ (portal da fila) NÃO passa pelo cache do chat', { method: 'GET', url: `${ESCOPO}minha-vez/`, mode: 'navigate' }, false],
   ['arquivos de /fila/ (js e css) NÃO passam pelo cache', { method: 'GET', url: `${ESCOPO}fila/fila.js`, mode: 'cors' }, false],
+  ['/agendamento/ (página de agendamento) NÃO passa pelo cache do chat', { method: 'GET', url: `${ESCOPO}agendamento/`, mode: 'navigate' }, false],
   ['/painel/ NÃO passa pelo cache', { method: 'GET', url: `${ESCOPO}painel/`, mode: 'navigate' }, false],
   ['POST NÃO passa pelo cache', { method: 'POST', url: `${ESCOPO}`, mode: 'cors' }, false],
   ['outra origem NÃO passa pelo cache', { method: 'GET', url: 'https://nrvuynjwcgwpjdptkiay.supabase.co/rest/v1/rpc/chat_config', mode: 'cors' }, false],
