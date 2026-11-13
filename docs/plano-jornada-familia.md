@@ -1,6 +1,6 @@
 # Plano: a jornada da família, da marcação ao laudo (tudo na página, tudo automático)
 
-Versão 1.0 — 13/11/2026 / Mudança: primeira versão, escrita a partir das decisões do dono de 13/11/2026. **É um plano: nada disto está no ar.** Página atual: `agendamento/index.html` (ver `docs/agendamento-pagina.md`).
+Versão 1.1 — 13/11/2026 / Mudança: acrescenta o outro responsável e outros aparelhos (3 portas para o nível 2, seção 3.1). A 1.0 era a primeira versão, escrita a partir das decisões do dono de 13/11/2026. **É um plano: nada disto está no ar.** Página atual: `agendamento/index.html` (ver `docs/agendamento-pagina.md`).
 
 ## 1. Decisões do dono (13/11/2026)
 
@@ -51,6 +51,27 @@ Versão 1.0 — 13/11/2026 / Mudança: primeira versão, escrita a partir das de
 - Para chamar o Klingo, a função precisa fazer o login do paciente (CPF + nascimento). Por isso esses dois dados ficam **cifrados no banco** (a chave só no secret da função), nunca no celular, nunca em log. **Decisão do dono e revisão jurídica**: é o primeiro dado de saúde guardado por esta página.
 - Fica pendente a pergunta ao Klingo de como identificar **criança sem CPF** (seção 8).
 
+### 3.1 Outro responsável e outro aparelho (acrescentado em 13/11/2026)
+
+**Regra do dono:** o outro responsável (pai, mãe, avó, quem cuida) que **sabe todos os dados** também pode ver o resultado, **no celular dele**. Quem trocou ou perdeu o celular também. Por isso há **três portas** para um aparelho chegar ao nível 2. Todas valem para **um paciente de cada vez** e nenhuma depende de o primeiro celular estar à mão.
+
+| Porta | Quem usa | O que a pessoa faz | Espera |
+|---|---|---|---|
+| **1. QR do balcão** | Quem está na clínica | Lê o QR no check-in | Nenhuma |
+| **2. Convite de quem já está ligado** | Pai e mãe, avó, o próprio paciente com celular novo | No celular já ligado: toca "Dar acesso a outra pessoa", aparece um **QR e um código de 6 números (15 min, uso único)**. A outra pessoa lê o QR ou digita **só os 6 números**. | Nenhuma |
+| **3. "Eu sei todos os dados"** | O outro responsável, **sem ninguém por perto** | Informa **CPF do paciente, nascimento, nome da mãe e celular do cadastro** (os quatro precisam bater com o Klingo; conferido pela função, nada mostrado) | Veja abaixo |
+
+**Como a porta 3 se protege** (porque saber os dados é uma prova mais fraca que estar na clínica):
+- **Aviso aos celulares já ligados.** Chega Web Push e aviso na página: "Alguém quer acompanhar a Ana. Foi você que autorizou? [Sim, liberar agora] [Não, bloquear]".
+- **Espera de 24 horas** se já existe celular ligado e ninguém respondeu. **Quem aprova no aviso libera na hora.** Se **não existe** nenhum celular ligado, ou se o paciente tem menos de 18 anos e quem pede é o responsável, a espera cai para **0** (não há quem avisar). Enquanto espera, a pessoa já marca, remarca e vê o acompanhamento, só não abre o laudo.
+- **3 tentativas erradas** travam **aquele paciente na porta 3 por 1 hora**. **Os celulares já ligados não são afetados**, ao contrário de hoje, em que erro de nascimento tranca o CPF até para o dono.
+- **Tudo registrado** sem conteúdo (R5): quando, qual aparelho, qual porta.
+- A recepção vê no painel quem entrou pela porta 3 e pode **desligar** qualquer aparelho.
+
+**Pai e mãe são iguais.** Cada pessoa **desliga só o seu próprio celular**. **Quem tira outra pessoa é só a recepção** (evita briga entre pais separados e dá um ponto de decisão humana). Na lista "Aparelhos conectados" cada celular aparece com o apelido que a pessoa escolheu ("Celular do Pedro") e a data da última vez que abriu.
+
+**Paciente adulto.** Por escolha do dono, quem sabe todos os dados também vê o laudo de um adulto. **Risco assumido:** um parente ou ex-parceiro que conheça CPF, nascimento, mãe e celular vê o laudo depois da espera de 24 h, a menos que o próprio paciente bloqueie no aviso. Há um interruptor (`config`, valor sugerido `acesso_por_dados_adultos`, padrão `sim`) para exigir QR ou convite só para adultos, se um dia for preciso.
+
 ## 4. Marcar: o melhor jeito com a API
 
 **Regra: o paciente diz o que precisa; o sistema resolve o resto.**
@@ -86,8 +107,8 @@ Versão 1.0 — 13/11/2026 / Mudança: primeira versão, escrita a partir das de
 
 | # | Regra |
 |---|---|
-| R1 | **Só celular de confiança (nível 2)** vê laudo. Celular nível 1 vê "Seu laudo está pronto. Para abrir, leia o QR na recepção ou peça ajuda aqui", **nunca** o arquivo. |
-| R2 | **Só as pessoas daquele vínculo.** O laudo de um filho só aparece no celular ligado a esse filho. Mãe e pai ligam cada um o seu celular na visita. |
+| R1 | **Só celular de confiança (nível 2)** vê laudo, por qualquer das **3 portas** da seção 3.1. Celular nível 1 vê "Seu laudo está pronto. Para abrir, leia o QR na recepção, peça um convite a quem já acompanha ou entre com todos os dados", **nunca** o arquivo. |
+| R2 | **Só as pessoas daquele vínculo.** O laudo de um filho só aparece nos celulares ligados a esse filho. Pai, mãe e outros responsáveis ligam cada um o seu (portas 1, 2 ou 3). |
 | R3 | **Só com `pronto = true`**, nunca laudo parcial. Se for refeito, aparece "Atualizado em dd/mm" (como o laudo é lido ao vivo, vale sempre o último). |
 | R4 | **Sem guardar o arquivo.** A função lê, entrega e esquece. **Nada do conteúdo vai para log**, e o erro 403 com página HTML é tratado como "ainda não está pronto". |
 | R5 | **Todo acesso é registrado sem conteúdo**: data, hora, aparelho e exame. Serve para auditoria e para o paciente ver "quem abriu". |
@@ -121,7 +142,7 @@ Perguntas ao suporte do Klingo (juntar às de `roteiro-reuniao-suporte.md`):
 |---|---|---|
 | **A** | Palavras, telas calmas, fim do "não testado", botão "Falar com uma pessoa", nascimento em 3 caixas, esconder abas técnicas, tela final com calendário e WhatsApp, 3 primeiros horários sem perguntar médico/unidade, plano do cadastro | Não (só página e função) |
 | **B** | **Minha família:** pessoas ligadas ao celular, "Quem vai?", criança sem CPF | Sim |
-| **C** | **Celular de confiança** (nível 1) e **QR do balcão** (nível 2) no painel | Sim |
+| **C** | **Celular de confiança** (nível 1), **QR do balcão**, **convite** e **"Eu sei todos os dados"** com aviso e espera (nível 2), e "Aparelhos conectados" | Sim |
 | **D** | **Marcar a família** de uma vez (tudo ou nada) e "Avise-me" | Sim |
 | **E** | **Acompanhamento de 1 min** com previsão aprendida e Web Push | Sim |
 | **F** | **Laudo automático** (R1 a R10), depois do teste real da seção 8 | Sim |
@@ -131,5 +152,6 @@ Cada mudança de banco segue o procedimento do `CLAUDE.md`: arquivo novo em `sup
 ## 10. Riscos que o dono aceita ao escolher este caminho
 - **Dado de saúde guardado:** CPF e nascimento cifrados no banco (necessário para entrar no Klingo por quem já está ligado). Precisa de revisão jurídica e atualização de `privacidade.html`.
 - **Celular perdido ou emprestado:** quem tem o celular ligado vê os laudos até alguém desligá-lo. Mitigação: botão de desligar, 12 meses sem uso e desligamento pela recepção. Opção futura: pedir a **digital ou senha do próprio celular** antes de abrir um laudo (nível de proteção do aparelho, sem digitar nada no site).
-- **Pai e mãe separados:** cada um liga o seu celular na visita. Quem está na visita decide quem vê.
+- **Pai e mãe separados:** cada um liga o seu celular por uma das 3 portas. Ninguém tira o outro; só a recepção.
+- **Porta 3 (todos os dados):** é a mais fraca. Foi aceita pelo dono em 13/11/2026 com aviso aos celulares ligados e espera de 24 h. Para os campos nome da mãe e celular, **conferir os nomes reais no retorno do `/paciente`** (nada foi testado).
 - **Laudo sensível visto sem aviso humano:** a chave R8 existe para isso, mas é opcional.
