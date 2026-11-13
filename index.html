@@ -72,6 +72,9 @@
   .ponto { width: 8px; height: 8px; border-radius: 50%; background: #9aa7b6; flex: none; }
   .ponto.aguardando { background: #f2b84b; }
   .ponto.atendendo { background: #4ade80; }
+  /* saúde do Klingo na tela inicial: verde = API no ar; laranja = só os relatórios; vermelho = fora do ar */
+  .ponto.verde { background: #22c55e; } .ponto.laranja { background: #f59e0b; } .ponto.vermelho { background: #ef4444; }
+  .ponto.vermelho + #status { color: #b91c1c; font-weight: 600; }
   .btn-menu {
     background: transparent; border: 0; color: var(--csi-sidebar-bg); width: 44px; height: 44px; border-radius: 50%; cursor: pointer; font-size: calc(23px * var(--esc)); line-height: 1;
   }
@@ -656,7 +659,7 @@
   const CHAVE_HIST = 'webchat.historico.v1';   // as últimas conversas deste aparelho (cada uma com o seu token): dá para voltar a elas
   const MAX_HIST = 5;                          // mínimo pedido: 3
   // Muda a cada alteração do chat. Cópia de mensagens guardada por outra versão é descartada (era isso que mostrava conversa velha e travada).
-  const VERSAO_APP = '2026.11.13-4';
+  const VERSAO_APP = '2026.11.13-5';
   // Mesmas regras do banco (fluxo_nome_ok, fluxo_telefone_ok, fluxo_email_ok): o banco confere de novo, aqui é só para avisar logo.
   const LET = 'A-Za-zÀ-ÖØ-öø-ÿ';
   const nomeCompletoOk = (v) => { const t = String(v || '').trim(); return t.length >= 5 && t.length <= 120 && new RegExp(`^[${LET}][${LET}'’.-]*( +[${LET}][${LET}'’.-]*)+$`).test(t) && t.split(/ +/).filter((w) => w.replace(new RegExp(`[^${LET}]`, 'g'), '').length >= 2).length >= 2; };
@@ -763,11 +766,30 @@
     const p = lerLocal(CHAVE_PERFIL);
     return p && p.nome && p.telefone && p.email && p.aceite ? p : null;
   }
+  // Saúde do Klingo no topo da tela inicial (o banco confere a API a cada 2 min; chat_saude só devolve verde, laranja ou vermelho, sem dado de paciente).
+  const SAUDE_TXT = { verde: 'Online', laranja: 'Online', vermelho: 'Offline', '': 'Verificando…' };
+  const SAUDE_DICA = { verde: 'A API do Klingo está no ar.', laranja: 'A API do Klingo não respondeu; os dados vêm dos relatórios.', vermelho: 'O Klingo está fora do ar.', '': 'Verificando a conexão com o Klingo…' };
+  let saudeAtual = '';
+  function aplicarSaude() {
+    if (!el.telaInicio.hidden) {
+      el.ponto.className = 'ponto' + (saudeAtual ? ' ' + saudeAtual : ''); el.status.textContent = SAUDE_TXT[saudeAtual];
+      el.ponto.parentElement.title = SAUDE_DICA[saudeAtual]; el.ponto.parentElement.setAttribute('aria-label', SAUDE_TXT[saudeAtual] + '. ' + SAUDE_DICA[saudeAtual]);
+    }
+  }
+  async function atualizarSaude() {
+    if (el.telaInicio.hidden) return;
+    try {
+      const { data, error } = await comLimite(db.rpc('chat_saude'), 8000);
+      saudeAtual = !error && data && ['verde', 'laranja', 'vermelho'].includes(data.estado) ? data.estado : 'vermelho';
+    } catch { saudeAtual = 'vermelho'; }   // sem conseguir falar nem com o nosso servidor: fora do ar
+    aplicarSaude();
+  }
+  setInterval(atualizarSaude, 60000);
   function mostrarForm(manterEscolha) {
     fecharCanal(); pararAcompanhar();
     el.telaChat.hidden = true; el.telaChat.style.display = 'none';
     el.telaInicio.hidden = false; el.btnMenu.hidden = true; el.btnVoltarInicio.hidden = true; el.menu.hidden = true;
-    el.ponto.className = 'ponto'; el.status.textContent = 'Online';
+    aplicarSaude(); atualizarSaude();
     const p = lerLocal(CHAVE_PERFIL) || {}, salvo = perfilSalvo();
     el.fNome.value = p.nome || ''; el.fTel.value = p.telefone || ''; el.fEmail.value = p.email || '';
     el.fAceite.checked = !!salvo; el.fPrevisao.checked = false; el.erroForm.textContent = ''; el.fFilho.value = '';

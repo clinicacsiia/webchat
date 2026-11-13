@@ -110,6 +110,7 @@ export function criarMundo(opcoes = {}) {
     if (falha && (falha.vezes == null || falha.vezes > 0)) { if (falha.vezes != null) falha.vezes--; return { status: falha.status ?? 400, body: falha.corpo ?? { code: 'XX000', message: 'falha simulada' } }; }
     switch (nome) {
       case 'chat_config': return { body: { nome_empresa: 'Clínica de Teste', boas_vindas: 'Olá!' } };
+      case 'chat_saude': return { body: { estado: m.saude || 'verde', api: (m.saude || 'verde') === 'verde', relatorio: (m.saude || 'verde') !== 'vermelho' } };
       case 'chat_reentrada_estado': return { body: m.estadoReentrada || { status: 'aguardando', aberta: true, pode_voltar: true, mesmo_dia: false, janela_dias: 2, teve_resposta_humana: false, em_atendimento: false } };
       case 'chat_previsao_aceitar': return { body: true };
       case 'chat_push_estado': return { body: { inscrito: true, silenciado: !!m.silenciado } };

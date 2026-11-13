@@ -1,0 +1,6 @@
+-- FLUXOGRAMA: entrada (a cada 2 min o banco chama a função klingo-saude, que faz 1 chamada leve à API do Klingo) -> validação (cota global; segredo do cofre; nenhum dado de paciente)
+--   -> lógica (klingo_saude guarda a última checagem; chat_saude junta com a última leitura dos relatórios em jornada_sync_estado) -> saída (a tela inicial mostra o ponto: verde, laranja ou vermelho).
+-- Versão 1.0 — 13/11/2026 / Mudança: pedido do dono. VERDE e "Online" = a API respondeu há menos de 6 min. LARANJA e "Online" = a API não respondeu mas os relatórios foram lidos há menos de 10 min. VERMELHO e "Offline" = nenhum dos dois.
+-- Já aplicado na produção em 13/11/2026 (migração saude_api_parte1_tabela_e_funcoes + rotina klingo-saude). O texto completo das funções está nas migrações aplicadas.
+-- ROLLBACK: select cron.unschedule('klingo-saude'); a tela volta a mostrar "Online" cinza se chat_saude não existir (a tela trata erro como vermelho: por isso primeiro publicar a tela antiga, depois remover as funções).
+--           drop function public.chat_saude(), public.klingo_saude_disparar(), public.klingo_saude_gravar(text, boolean, integer, text); drop table public.klingo_saude;
