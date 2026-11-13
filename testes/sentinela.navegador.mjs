@@ -123,6 +123,20 @@ await caso('formulário inicial: fala da missão (equidade, família), avisa que
   return { ok: /equidade/.test(t) && /família/.test(t) && !/previsão/i.test(t) && /pessoa da equipe/.test(t) && caixa && /ciente/.test(erro) && !iniciou, detalhe: `${t.slice(0, 60)} | erro="${erro}"` };
 });
 
+await caso('saúde do Klingo no topo da tela inicial: verde "Online" com a API no ar, laranja "Online" só com relatórios, vermelho "Offline" fora do ar', async () => {
+  const saida = {};
+  for (const estado of ['verde', 'laranja', 'vermelho']) {
+    const mundo = criarMundo(); mundo.saude = estado; const { page, ctx } = await novaPaginaChat(browser, mundo);
+    await page.goto(`${base}/index.html`); await page.waitForSelector('#avisoForm', { state: 'visible', timeout: 8000 });
+    await page.waitForFunction((e) => document.querySelector('#ponto').classList.contains(e), estado, { timeout: 6000 });
+    saida[estado] = { txt: (await page.$eval('#status', (n) => n.textContent)).trim(), cor: await page.$eval('#ponto', (n) => getComputedStyle(n).backgroundColor) };
+    await ctx.close();
+  }
+  const ok = saida.verde.txt === 'Online' && saida.laranja.txt === 'Online' && saida.vermelho.txt === 'Offline'
+    && saida.verde.cor === 'rgb(34, 197, 94)' && saida.laranja.cor === 'rgb(245, 158, 11)' && saida.vermelho.cor === 'rgb(239, 68, 68)';
+  return { ok, detalhe: JSON.stringify(saida) };
+});
+
 await caso('mensagem final: deixa claro que ainda não está confirmado (sem a palavra previsão) e que um atendente vai confirmar', async () => {
   const mundo = criarMundo(); const { page, ctx } = await abrir(mundo);
   await page.click('#msgs .op >> text=Exame'); await page.waitForSelector('#msgs .op >> text=Particular');
