@@ -255,6 +255,20 @@ create policy autoencerramento_execucao_select on public.autoencerramento_execuc
 -- concessão a anon: DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
 -- concessão a authenticated: DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
 
+create table public.pedido_previsao (
+  conversa_id uuid NOT NULL,
+  turno text NOT NULL,
+  de date NOT NULL,
+  ate date NOT NULL,
+  antecedencia text NOT NULL,
+  status text NOT NULL DEFAULT 'aguardando'::text,
+  vaga jsonb,
+  vaga_em timestamp with time zone,
+  criada_em timestamp with time zone NOT NULL DEFAULT now(),
+  atualizada_em timestamp with time zone NOT NULL DEFAULT now(),
+  constraint pedido_previsao_pkey PRIMARY KEY (conversa_id)
+);
+alter table public.pedido_previsao enable row level security;
 create table public.autoencerramento_fechada (
   conversa_id uuid not null,
   fechada_em timestamp with time zone default now() not null,

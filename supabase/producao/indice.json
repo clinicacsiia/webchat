@@ -1099,6 +1099,180 @@
    "politicas": 1
   },
   {
+   "nome": "klingo_convenio",
+   "colunas": [
+    "plano_id",
+    "convenio_id",
+    "convenio",
+    "plano",
+    "convenio_norm",
+    "padrao",
+    "visto_em"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "klingo_conversa_ident",
+   "colunas": [
+    "conversa_id",
+    "chave",
+    "em"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "klingo_cota",
+   "colunas": [
+    "id",
+    "fichas",
+    "max_fichas",
+    "reposicao_por_s",
+    "reposto_em",
+    "pausado_ate",
+    "ultimo_429_em"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "klingo_decisao",
+   "colunas": [
+    "id",
+    "em",
+    "chave",
+    "de",
+    "para",
+    "motivo"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "klingo_especialidade",
+   "colunas": [
+    "cbos",
+    "nome",
+    "codigo",
+    "procedimentos",
+    "liberada_api",
+    "atualizado_em"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "klingo_evento",
+   "colunas": [
+    "id",
+    "hash",
+    "evento",
+    "id_marcacao",
+    "status",
+    "recebido_em",
+    "processado_em",
+    "resultado"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "klingo_identidade",
+   "colunas": [
+    "id",
+    "chave",
+    "cpf_hash",
+    "tipo",
+    "klingo_id",
+    "situacao",
+    "faltando",
+    "plano_id",
+    "conferido_em",
+    "convertido_em",
+    "criado_pela_operacao"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "klingo_medida",
+   "colunas": [
+    "dia",
+    "tipo",
+    "n",
+    "soma_ms"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "klingo_oferta",
+   "colunas": [
+    "id",
+    "conversa_id",
+    "chave",
+    "procedimento",
+    "plano",
+    "data",
+    "hora",
+    "profissional",
+    "profissional_id",
+    "unidade",
+    "unidade_id",
+    "ordem_chegada",
+    "criado_em",
+    "expira_em"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "klingo_operacao",
+   "colunas": [
+    "id",
+    "conversa_id",
+    "pre_agendamento_id",
+    "tipo",
+    "estado",
+    "chave_idem",
+    "tentativas",
+    "voucher_id",
+    "http_status",
+    "caminho",
+    "codigo",
+    "detalhe",
+    "origem",
+    "criado_em",
+    "iniciado_em",
+    "concluido_em"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "klingo_plano_map",
+   "colunas": [
+    "operadora",
+    "convenio_id",
+    "plano_id",
+    "origem",
+    "atualizado_em"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "klingo_proc_api",
+   "colunas": [
+    "procedimento_id",
+    "com_horario_em",
+    "vazio_em"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
    "nome": "medico_aviso",
    "colunas": [
     "id",
@@ -1362,6 +1536,23 @@
    "politicas": 2
   },
   {
+   "nome": "pedido_previsao",
+   "colunas": [
+    "conversa_id",
+    "turno",
+    "de",
+    "ate",
+    "antecedencia",
+    "status",
+    "vaga",
+    "vaga_em",
+    "criada_em",
+    "atualizada_em"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
    "nome": "permissao_observacao",
    "colunas": [
     "id",
@@ -1581,180 +1772,6 @@
     "decidido_por",
     "novo_email",
     "novo_telefone"
-   ],
-   "rls": true,
-   "politicas": 0
-  },
-  {
-   "nome": "klingo_convenio",
-   "colunas": [
-    "plano_id",
-    "convenio_id",
-    "convenio",
-    "plano",
-    "convenio_norm",
-    "padrao",
-    "visto_em"
-   ],
-   "rls": true,
-   "politicas": 0
-  },
-  {
-   "nome": "klingo_conversa_ident",
-   "colunas": [
-    "conversa_id",
-    "chave",
-    "em"
-   ],
-   "rls": true,
-   "politicas": 0
-  },
-  {
-   "nome": "klingo_cota",
-   "colunas": [
-    "id",
-    "fichas",
-    "max_fichas",
-    "reposicao_por_s",
-    "reposto_em",
-    "pausado_ate",
-    "ultimo_429_em"
-   ],
-   "rls": true,
-   "politicas": 0
-  },
-  {
-   "nome": "klingo_decisao",
-   "colunas": [
-    "id",
-    "em",
-    "chave",
-    "de",
-    "para",
-    "motivo"
-   ],
-   "rls": true,
-   "politicas": 0
-  },
-  {
-   "nome": "klingo_especialidade",
-   "colunas": [
-    "cbos",
-    "nome",
-    "codigo",
-    "procedimentos",
-    "liberada_api",
-    "atualizado_em"
-   ],
-   "rls": true,
-   "politicas": 0
-  },
-  {
-   "nome": "klingo_evento",
-   "colunas": [
-    "id",
-    "hash",
-    "evento",
-    "id_marcacao",
-    "status",
-    "recebido_em",
-    "processado_em",
-    "resultado"
-   ],
-   "rls": true,
-   "politicas": 0
-  },
-  {
-   "nome": "klingo_identidade",
-   "colunas": [
-    "id",
-    "chave",
-    "cpf_hash",
-    "tipo",
-    "klingo_id",
-    "situacao",
-    "faltando",
-    "plano_id",
-    "conferido_em",
-    "convertido_em",
-    "criado_pela_operacao"
-   ],
-   "rls": true,
-   "politicas": 0
-  },
-  {
-   "nome": "klingo_medida",
-   "colunas": [
-    "dia",
-    "tipo",
-    "n",
-    "soma_ms"
-   ],
-   "rls": true,
-   "politicas": 0
-  },
-  {
-   "nome": "klingo_oferta",
-   "colunas": [
-    "id",
-    "conversa_id",
-    "chave",
-    "procedimento",
-    "plano",
-    "data",
-    "hora",
-    "profissional",
-    "profissional_id",
-    "unidade",
-    "unidade_id",
-    "ordem_chegada",
-    "criado_em",
-    "expira_em"
-   ],
-   "rls": true,
-   "politicas": 0
-  },
-  {
-   "nome": "klingo_operacao",
-   "colunas": [
-    "id",
-    "conversa_id",
-    "pre_agendamento_id",
-    "tipo",
-    "estado",
-    "chave_idem",
-    "tentativas",
-    "voucher_id",
-    "http_status",
-    "caminho",
-    "codigo",
-    "detalhe",
-    "origem",
-    "criado_em",
-    "iniciado_em",
-    "concluido_em"
-   ],
-   "rls": true,
-   "politicas": 0
-  },
-  {
-   "nome": "klingo_plano_map",
-   "colunas": [
-    "operadora",
-    "convenio_id",
-    "plano_id",
-    "origem",
-    "atualizado_em"
-   ],
-   "rls": true,
-   "politicas": 0
-  },
-  {
-   "nome": "klingo_proc_api",
-   "colunas": [
-    "procedimento_id",
-    "com_horario_em",
-    "vazio_em"
    ],
    "rls": true,
    "politicas": 0
