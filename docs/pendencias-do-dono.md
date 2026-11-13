@@ -76,6 +76,9 @@ Detalhes e números em [`klingo-autoatendimento.md`](klingo-autoatendimento.md).
 - **Revisar `privacidade.html`** para citar a marcação automática e o envio de CPF ao Klingo (junto com o item 2.5).
 - **Código por SMS/e-mail** (segundo fator): sem ele, resultado de exame e troca de telefone ficam com a equipe (plano, etapa 6).
 
+### 2.9 Pedido sem horário (13/11/2026): ligar para todos
+Está em modo `teste` (só o celular da lista de teste). Quando você aprovar o comportamento, rode em Configurações/SQL: `update public.config set valor = 'ligado' where chave = 'pedido_horario_modo';` Texto que o paciente recebe: chave `pedido_sem_horario_texto`. Prazo do aviso ao atendente: `pedido_parado_horas` (24). Atenção: horário "ocupado no Klingo" também cancela, e pode ser a própria equipe que marcou com outro nome ou telefone.
+
 ## 3. Contas e segurança
 
 ### 3.1 Plano do Supabase e proteção contra senha vazada

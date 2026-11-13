@@ -1923,6 +1923,12 @@
    "quando": "50 6 * * *",
    "ativa": true,
    "comando": "select public.klingo_sincronizar_disparar()"
+  },
+  {
+   "nome": "pedido-horario-vigia",
+   "quando": "*/5 * * * *",
+   "ativa": true,
+   "comando": "select public.pedido_horario_vigiar()"
   }
  ],
  "gatilhos": [
@@ -2047,7 +2053,10 @@
   "reaproveitar_cadastro_convidado",
   "teste_agentes",
   "teste_marcadores",
-  "vinculo_manual_quem"
+  "vinculo_manual_quem",
+  "pedido_horario_modo",
+  "pedido_parado_horas",
+  "pedido_sem_horario_texto"
  ],
  "funcoes": [
   {
@@ -2197,7 +2206,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "f0be7a5dd1926306f88e9a8e12f3fade"
+   "md5": "5b037108bc7536df211220b8beb9ae36"
   },
   {
    "nome": "agenda_conferencia_ha_trabalho",
@@ -9408,6 +9417,16 @@
    "authenticated": true,
    "publico": false,
    "md5": "cfab3c0b8fea36fa74f8df02093c5026"
+  },
+  {
+   "nome": "pedido_horario_vigiar",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "d7e90169ed640a84f4b0d383917b1479"
   },
   {
    "nome": "permissao_modo_definir",
