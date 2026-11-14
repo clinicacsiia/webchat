@@ -43,7 +43,7 @@ begin
   if v_todos <> 1 then v_estado := 'nao_integrado'; v_motivo := 'varios_procedimentos';
   elsif not public.klingo_ativo(p_conversa, 'klingo_api_horarios') then v_estado := 'nao_integrado'; v_motivo := 'api_desligada';
   else
-    select * into v_ult from public.klingo_consulta where conversa_id = p_conversa and modo <> 'sombra' and em > now() - interval '30 minutes' order by id desc limit 1;
+    select * into v_ult from public.klingo_consulta where conversa_id = p_conversa and modo not in ('sombra', 'monitor') and em > now() - interval '30 minutes' order by id desc limit 1;   -- 'monitor' = consulta do motor de vagas, não da tela
     v_motivo := v_ult.resultado;
     v_estado := case when v_ult.id is null then 'sem_consulta'
                      when v_ult.resultado in ('ok_com_horarios', 'api_sem_horarios', 'todos_filtrados') then 'com_horarios'

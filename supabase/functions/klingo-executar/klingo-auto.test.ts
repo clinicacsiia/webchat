@@ -118,9 +118,10 @@ test("resumo do cadastro: só id, nascimento, o que falta e o plano (nenhum nome
   assert.deepEqual(resumoPaciente({ id: "P9", convenio: { plano: { id: 28 } } }).planoId, 28);
   assert.deepEqual(resumoPaciente(null), { id: null, nascimento: null, faltando: ["email", "celular", "telefone"], planoId: null });
 });
-test("as 4 cópias do klingo-api.ts são idênticas (cada Edge Function publica a pasta isolada)", () => {
+test("as 5 cópias do klingo-api.ts (e as 2 do oferta.ts) são idênticas (cada Edge Function publica a pasta isolada)", () => {
   const base = readFileSync(new URL("./klingo-api.ts", import.meta.url), "utf8");
-  for (const f of ["klingo-identificar", "chat-agenda-api", "klingo-sincronizar"]) assert.equal(readFileSync(new URL(`../${f}/klingo-api.ts`, import.meta.url), "utf8"), base, f);
+  for (const f of ["klingo-identificar", "chat-agenda-api", "klingo-sincronizar", "disponibilidade-vigia"]) assert.equal(readFileSync(new URL(`../${f}/klingo-api.ts`, import.meta.url), "utf8"), base, f);
+  assert.equal(readFileSync(new URL("../chat-agenda-api/oferta.ts", import.meta.url), "utf8"), readFileSync(new URL("../disponibilidade-vigia/oferta.ts", import.meta.url), "utf8"));
   assert.equal(readFileSync(new URL("../chat-agenda-api/identificar.ts", import.meta.url), "utf8"), readFileSync(new URL("../klingo-identificar/identificar.ts", import.meta.url), "utf8"));
 });
 

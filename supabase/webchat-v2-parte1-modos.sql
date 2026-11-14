@@ -291,7 +291,8 @@ as $function$
 begin
   insert into public.klingo_consulta (conversa_id, modo, tipo, procedimento, plano, resultado, http_status, n_recebidos, n_validos, n_filtrados, n_gravados, ms, detalhe)
   values (p_conversa, left(p_modo, 12), left(p_tipo, 12), p_procedimento, p_plano, p_resultado, p_http, p_recebidos, p_validos, p_filtrados, p_gravados, p_ms, left(p_detalhe, 200));
-  perform public.klingo_medir('consulta_' || p_resultado);
+  perform public.klingo_medir(case when p_modo = 'monitor' then 'monitor_' else 'consulta_' end || p_resultado);
+  if p_modo = 'monitor' then return; end if;   -- as consultas do motor de vagas não entram nas métricas da tela (nem no que a autogestão recomenda)
   -- "ok" só quando a API respondeu e a estrutura era válida; "com_horarios" só quando sobrou pelo menos um horário gravável.
   if p_resultado in ('ok_com_horarios', 'api_sem_horarios', 'todos_filtrados') then perform public.klingo_medir('horarios_api_ok', 1, p_ms); end if;
   if p_resultado = 'ok_com_horarios' then perform public.klingo_medir('horarios_api_com_horarios'); end if;
