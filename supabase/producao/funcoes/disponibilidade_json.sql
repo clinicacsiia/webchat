@@ -1,6 +1,6 @@
 -- public.disponibilidade_json(p disponibilidade_pedido)
 -- Pode executar: service_role
-CREATE OR REPLACE FUNCTION public.disponibilidade_json(p disponibilidade_pedido)
+CREATE OR REPLACE FUNCTION public.disponibilidade_json(p public.disponibilidade_pedido)
  RETURNS jsonb
  LANGUAGE sql
  STABLE SECURITY DEFINER

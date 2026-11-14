@@ -51,7 +51,9 @@ Versão 1.0 — 14/11/2026 / Mudança: primeira versão. Implementado em `supaba
 
 Só por `klingo_promover(chave, valor, justificativa)`: administrador logado, justificativa ≥ 10 letras, grava `config_auditoria` (origem `promocao:<uid>`) e `klingo_decisao`. `klingo_decidir` (usada pela autogestão) **recusa** subir um modo. A recomendação da autogestão fica em `klingo_decisao` (`recomendacao:<chave>`) e avisa a gestão, no máximo 1 por chave a cada 7 dias. **Não existe tela** para chamar `klingo_promover` ainda: hoje o administrador chama pelo SQL (pendência listada).
 
-## Configuração para o público (decisão do dono, 14/11/2026) — `supabase/webchat-v2-config-publica.sql` (NÃO aplicada)
+> **SUBSTITUÍDA em 14/11/2026:** o dono decidiu que o v2 fica ligado para sempre. As chaves de modo desta matriz deixaram de decidir qualquer coisa (`supabase/webchat-v2-sempre-ligado.sql`, aplicada). Mantém-se só `klingo_api_resultado` (laudo, sem integração), `agendamento_externo_modo` e os limites da página pública. O texto abaixo é o histórico do plano anterior.
+
+## Configuração para o público (decisão do dono, 14/11/2026) — `supabase/webchat-v2-config-publica.sql` (ARQUIVO APAGADO)
 
 O dono decidiu que o agendamento automático fica disponível para **todos**. Na nova lógica de chaves isso **não** se obtém com o mestre `klingo_auto = sim` (ele não promove nada). Cada capacidade precisa estar em `sim`; o script grava, uma por linha e com justificativa em `config_auditoria`:
 

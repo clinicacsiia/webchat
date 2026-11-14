@@ -19,7 +19,7 @@ O chat passou a mostrar **somente horários que a API do Klingo devolveu** (cale
 |---|---|
 | `klingo-agendamento` preservada e segurança verificada | ✅ Preservada (não apaguei, não desativei, **não publiquei nada nela**). Auditada, com chamada direta testada; trava no servidor pronta (v1.1). **Segundo fator não feito (decisão sua).** `07` |
 | Agendamento existente continua autorizado para todos | ✅ A configuração produtiva **não foi tocada** (`klingo_auto` continua `sim`). |
-| Nova configuração preparada para o público | ✅ `supabase/webchat-v2-config-publica.sql` (**não aplicado**) + teste com paciente fora de qualquer lista (10/10). |
+| Ativação para o público | ✅ SUBSTITUÍDA em 14/11/2026: o v2 ficou sempre ligado (`supabase/webchat-v2-sempre-ligado.sql`, **aplicada**, teste 11/11). O arquivo `webchat-v2-config-publica.sql` foi apagado. |
 | Telefone removido dos arquivos e histórico da branch tratado | ✅ na minha branch (0 ocorrências, push controlado). ⚠️ **O mesmo número já estava no histórico da `main` desde 10/11 e em branches antigas; o GitHub guarda commits antigos por SHA.** Não afirmo que sumiu da internet. `08` |
 | Nenhum horário estimado aparece como disponível | ✅ Testado em calendário, escolha, previsão, lista de médicos, aceite de oferta antiga. A grade só serve de **catálogo** (quais exames e médicos existem). |
 | Todos os horários reserváveis vêm da API | ✅ (mesmos testes). |
@@ -49,7 +49,7 @@ O chat passou a mostrar **somente horários que a API do Klingo devolveu** (cale
 | Próximo horário do médico, oferta antiga | `webchat-v2-parte4-medicos-api.sql` (a tela não chama mais `chat-agenda-ao-vivo`) |
 | Disponibilidade futura | `webchat-v2-parte3-disponibilidade-futura.sql`, `disponibilidade-vigia`, painel |
 | Pós-agendamento, resultado, "não fica preso" | `webchat-v2-parte5-pos-agendamento.sql`, `klingo-executar` v1.1 (`ler_vouchers`, conferência do antigo), `klingo-api.ts` (5 cópias iguais) |
-| Configuração pública (não aplicada) | `webchat-v2-config-publica.sql` |
+| Sempre ligado (aplicada em 14/11/2026) | `webchat-v2-sempre-ligado.sql` |
 | Telas | `index.html` (`VERSAO_APP 2026.11.14-2`, `sw v40`), `painel/index.html` (`sw v25`) |
 | Testes | `testes/` (ver `04` e `testes/README.md`) |
 

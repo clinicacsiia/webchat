@@ -1,6 +1,6 @@
 -- public.fila_situacao_linha(r fila_chegada)
 -- Pode executar: service_role
-CREATE OR REPLACE FUNCTION public.fila_situacao_linha(r fila_chegada)
+CREATE OR REPLACE FUNCTION public.fila_situacao_linha(r public.fila_chegada)
  RETURNS jsonb
  LANGUAGE plpgsql
  STABLE SECURITY DEFINER

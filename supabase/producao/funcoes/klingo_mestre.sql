@@ -5,5 +5,5 @@ CREATE OR REPLACE FUNCTION public.klingo_mestre()
  LANGUAGE sql
  STABLE SECURITY DEFINER
  SET search_path TO ''
-AS $function$ select case when m in ('teste', 'sim', 'legado') then m else 'nao' end from (select coalesce((select valor from public.config where chave = 'klingo_auto'), 'nao') as m) x $function$;
+AS $function$ select 'sim'::text $function$;
 

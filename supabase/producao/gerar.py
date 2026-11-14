@@ -60,12 +60,26 @@ def cabecalho(defn):
     return args
 
 
-def gerar_funcoes(funcoes):
+def qualificar_tipos_de_tabela(defn, tabelas):
+    """pg_get_functiondef imprime o tipo-linha de uma tabela sem esquema (depende do search_path de quem gerou). Qualifica no cabeçalho (argumentos e RETURNS) para o arquivo valer em qualquer sessão."""
+    corte = defn.find('\nAS $function$')
+    if corte < 0:
+        return defn
+    cab, resto = defn[:corte], defn[corte:]
+    for t in tabelas:
+        cab = re.sub(r'(?<=[(,]\s)(\w+)\s+' + re.escape(t) + r'(?=[,)\s])', r'\1 public.' + t, cab)
+        cab = re.sub(r'(?<=\()(\w+)\s+' + re.escape(t) + r'(?=[,)\s])', r'\1 public.' + t, cab)
+        cab = re.sub(r'RETURNS (SETOF )?' + re.escape(t) + r'\b', r'RETURNS \1public.' + t, cab)
+    return cab + resto
+
+
+def gerar_funcoes(funcoes, tabelas=()):
     pasta = os.path.join(AQUI, 'funcoes')
     shutil.rmtree(pasta, ignore_errors=True)
     os.makedirs(pasta)
     por_nome, indice = {}, []
     for f in funcoes:
+        f['def'] = qualificar_tipos_de_tabela(f['def'], tabelas)
         por_nome.setdefault(f['n'], []).append(f)
         corpo = re.search(r'AS \$function\$(.*)\$function\$\s*$', f['def'], re.S)
         indice.append({
@@ -101,7 +115,13 @@ def sql_tabela(t):
     for k in (t['restricoes'] or []):
         if k['tipo'] != 'f':
             linhas.append(f"  constraint {k['nome']} {k['def']}")
-    out = [f"create table public.{t['nome']} (", ',\n'.join(linhas), ');']
+    out = []
+    # tabelas com bigserial/serial: o padrão é nextval('<seq>'::regclass), então a sequência precisa existir antes (v1.1)
+    for c in t['colunas']:
+        m = re.search(r"nextval\('([\w.]+)'::regclass\)", c.get('padrao') or '')
+        if m and not c.get('identidade'):
+            out.append(f"create sequence if not exists public.{m.group(1).split('.')[-1]};")
+    out += [f"create table public.{t['nome']} (", ',\n'.join(linhas), ');']
     if t.get('comentario'):
         out.append("comment on table public." + t['nome'] + " is '" + t['comentario'].replace("'", "''") + "';")
     for i in (t['indices'] or []):
@@ -161,7 +181,7 @@ def main():
     funcoes = json.load(open(sys.argv[1], encoding='utf-8'))
     estrutura = json.load(open(sys.argv[2], encoding='utf-8'))
     conferir_privacidade(json.dumps(funcoes, ensure_ascii=False) + json.dumps(estrutura, ensure_ascii=False))
-    indice = gerar_funcoes(funcoes)
+    indice = gerar_funcoes(funcoes, [t['nome'] for t in estrutura['tabelas']])
     with open(os.path.join(AQUI, 'estrutura.sql'), 'w', encoding='utf-8') as arq:
         arq.write(gerar_estrutura(estrutura))
     resumo = {

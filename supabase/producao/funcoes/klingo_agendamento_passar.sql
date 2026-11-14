@@ -27,7 +27,7 @@ AS $function$
 
                                                           -- 1) chaves de desligamento (a gestão pode recuar sem publicar nada)
                                                             if v_modo = 'nao' then v_motivo := 'desligado';
-                                                              elsif v_escrita and (v_modo = 'leitura' or v_mestre = 'nao') then v_motivo := 'escrita_desligada';
+                                                              elsif v_escrita and v_modo = 'leitura' then v_motivo := 'escrita_desligada';
                                                                 end if;
 
                                                                   -- 2) ritmo por IP (qualquer ação)

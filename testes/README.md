@@ -97,14 +97,14 @@ Os testes do Python ficam em `biometria/test_avaliar_assinatura.py` e os da Edge
 
 | Arquivo | O que prova |
 |---|---|
-| `sql-webchat-v2-modos.test.mjs` | Matriz mestre × chave × telefone (`klingo_modo`): o mestre só limita, sombra só mede, auditoria de config, recuo/recomendação/promoção, catálogo, `klingo_consulta`. |
+| `sql-webchat-v2-sempre-ligado.test.mjs` | Desde 14/11/2026 o autoatendimento do Klingo é SEMPRE LIGADO (`supabase/webchat-v2-sempre-ligado.sql`): chaves de modo, mestre e lista de teste não decidem mais nada; laudo (`klingo_api_resultado`) segue a configuração; autogestão removida; proteção da página pública e auditoria de config continuam. (Substitui o antigo `sql-webchat-v2-modos.test.mjs`, apagado.) |
 | `sql-webchat-v2-calendario.test.mjs` | O calendário só mostra ofertas da API; sem oferta não vira vaga da grade; escolha só de oferta válida. |
 | `sql-webchat-v2-disponibilidade.test.mjs` | Solicitação de disponibilidade futura: criar, editar, cancelar, expirar, vaga compatível/incompatível, aviso sem duplicar, sem autorização, filhos diferentes, acesso cruzado, motor em sombra. |
 | `sql-webchat-v2-agendamento.test.mjs` | Pipeline de marcação **existente** (`klingo_operacao`): duplo clique, duas chamadas, incerto, retentativa, horário tomado, divergência, vários exames. Klingo **simulado**. |
 | `sql-webchat-v2-rollback.test.mjs` | A migração preserva dados e o rollback (reaplicar as funções do retrato) devolve o comportamento anterior. |
 | `sql-webchat-v2-medicos.test.mjs` | Próximo horário de cada médico só da API (a grade nunca vira horário) e aceite de oferta antiga só pela API. |
 | `sql-webchat-v2-pos.test.mjs` | Pós-agendamento com o Klingo **simulado**: ver minhas marcações, cancelar (confirmação, 24 h, incerto), remarcar (antigo ativo/cancelado, incerto, ocupado, sem pedido original), resultado de exame, "não fica preso", webhook, auditoria de coerência. |
-| `sql-webchat-v2-publico.test.mjs` | Configuração pública (`webchat-v2-config-publica.sql`): paciente fora de qualquer lista tem cada capacidade em `sim`; mestre é teto; chaves independentes. |
+| `sql-webchat-v2-publico.test.mjs` | HISTÓRICO: configuração pública antiga (arquivo `webchat-v2-config-publica.sql`, apagado em 14/11/2026 porque o v2 ficou sempre ligado). Aplica as partes antigas em cima do banco e descreve o caminho que existiu, não o de hoje. |
 | `sql-klingo-agendamento-seguranca.test.mjs` | Trava no servidor da função pública `klingo-agendamento` (IP, CPF, escritas, desligamento, só hashes, permissões). Testes da função em si: `../supabase/functions/klingo-agendamento/agendamento.test.ts`. |
 | `pos-agendamento.navegador.mjs` | Tela do chat: espera com título, lista de marcações, confirmação de cancelamento. |
 | `painel-v2.navegador.mjs` | Painel (admin): Disponibilidade futura (filtros e cancelar), chaves do autoatendimento por capacidade, indicadores do pós-agendamento. |

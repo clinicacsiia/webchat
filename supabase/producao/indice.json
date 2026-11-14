@@ -1,5 +1,5 @@
 {
- "gerado_em": "2026-11-14T20:00:03.847786+00:00",
+ "gerado_em": "2026-11-14T20:32:54.165875+00:00",
  "postgres": "17.11",
  "tabelas": [
   {
@@ -2159,12 +2159,6 @@
    "quando": "* * * * *",
    "ativa": true,
    "comando": "select public.jornada_vigiar()"
-  },
-  {
-   "nome": "klingo-autogestao",
-   "quando": "*/10 * * * *",
-   "ativa": true,
-   "comando": "select public.klingo_autogestao()"
   },
   {
    "nome": "klingo-catalogo-api",
@@ -8430,7 +8424,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "854d6d67b31356e7b3749336ecd8b2b1"
+   "md5": "72687c15c0cabe18a53f80606645d609"
   },
   {
    "nome": "klingo_agendamento_resultado",
@@ -8478,7 +8472,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "2bd042efc61a29a6fafe3a54a4bbe39d"
+   "md5": "bcfc2924dc0255468952b82b2e02bd71"
   },
   {
    "nome": "klingo_automatizavel",
@@ -9141,7 +9135,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "95a213e4d5ead8b9d2a98851c59bb107"
+   "md5": "4b434122593ffffdadff779a64a17c77"
   },
   {
    "nome": "klingo_modo",
@@ -9160,7 +9154,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "ab6046046c6425e6d6a08d3a93723fed"
+   "md5": "f8dc94271ffd678570b270a4ebd0429c"
   },
   {
    "nome": "klingo_modo_chave",

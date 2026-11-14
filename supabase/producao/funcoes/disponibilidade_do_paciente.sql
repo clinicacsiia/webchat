@@ -1,7 +1,7 @@
 -- public.disponibilidade_do_paciente(p_conversa uuid, p_id uuid)
 -- Pode executar: service_role
 CREATE OR REPLACE FUNCTION public.disponibilidade_do_paciente(p_conversa uuid, p_id uuid)
- RETURNS disponibilidade_pedido
+ RETURNS public.disponibilidade_pedido
  LANGUAGE plpgsql
  STABLE SECURITY DEFINER
  SET search_path TO ''

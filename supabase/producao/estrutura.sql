@@ -1,5 +1,5 @@
 -- RETRATO DA ESTRUTURA DO BANCO DE PRODUÇÃO (projeto webchat-atendimento). GERADO: não editar à mão.
--- Tirado em 2026-11-14T20:00:03.847786+00:00 · Postgres 17.11. Só estrutura: nenhuma linha de tabela, nenhum valor de configuração.
+-- Tirado em 2026-11-14T20:32:54.165875+00:00 · Postgres 17.11. Só estrutura: nenhuma linha de tabela, nenhum valor de configuração.
 -- Serve de referência e para os testes. NÃO rodar inteiro sobre a produção. Como refazer: supabase/producao/LEIAME.md.
 
 -- ===== Extensões =====
@@ -1470,6 +1470,7 @@ create policy jornada_transicao_select on public.jornada_transicao as permissive
   using (( SELECT jornada_pode() AS jornada_pode));
 -- concessão a authenticated: SELECT
 
+create sequence if not exists public.klingo_agendamento_evento_id_seq;
 create table public.klingo_agendamento_evento (
   id bigint default nextval('klingo_agendamento_evento_id_seq'::regclass) not null,
   em timestamp with time zone default now() not null,
@@ -1670,6 +1671,7 @@ alter table public.klingo_identidade enable row level security;
 -- concessão a anon: DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
 -- concessão a authenticated: DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
 
+create sequence if not exists public.klingo_marcacao_id_seq;
 create table public.klingo_marcacao (
   id bigint default nextval('klingo_marcacao_id_seq'::regclass) not null,
   conversa_id uuid not null,
@@ -2733,7 +2735,7 @@ CREATE TRIGGER vinculo_log_imutavel BEFORE DELETE OR UPDATE ON public.vinculo_lo
 -- public.jornada_tarefa
 -- public.mensagens
 
--- ===== Rotinas agendadas (pg_cron): 33 =====
+-- ===== Rotinas agendadas (pg_cron): 32 =====
 -- agenda-conferir · 15 seconds · ativa
 --   select net.http_post( url := 'https://nrvuynjwcgwpjdptkiay.supabase.co/functions/v1/sync-catalogo-klingo', headers := jsonb_build_object('Content-Type', 'application/json', 'x-sync-key', (select valor from public.config where chave = 'ia_segredo')), body := '{"agenda":"conferir"}'::jsonb, timeout_milliseconds := 40000) where public.agenda_conferencia_ha_trabalho(false);
 -- agenda-ocupacao · */10 8-23,0,1 * * * · ativa
@@ -2770,8 +2772,6 @@ CREATE TRIGGER vinculo_log_imutavel BEFORE DELETE OR UPDATE ON public.vinculo_lo
 --   select public.jornada_klingo_agendar()
 -- jornada-vigia · * * * * * · ativa
 --   select public.jornada_vigiar()
--- klingo-autogestao · */10 * * * * · ativa
---   select public.klingo_autogestao()
 -- klingo-catalogo-api · 55 6 * * * · ativa
 --   select public.klingo_catalogo_cru_disparar('catalogo')
 -- klingo-conferir · 23 9-23 * * * · ativa
