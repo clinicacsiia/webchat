@@ -1,6 +1,6 @@
 # Pendências que dependem do dono
 
-Versão 1.2 — 13/11/2026 / Mudança: seção 2.11 (revisão mensal das conversas). Versão 1.1 — 12/11/2026: seção 2.8 (autoatendimento Klingo). Versão 1.0 — 11/11/2026: lista única, conferida na produção em 11/11/2026 às 14:50 (Brasília)
+Versão 1.3 — 14/11/2026 / Mudança: seção 1.3 (risco ativo) e 2.13 (reestruturação do WebChat); 2.10 substituída. Versão 1.2 — 13/11/2026 / Mudança: seção 2.11 (revisão mensal das conversas). Versão 1.1 — 12/11/2026: seção 2.8 (autoatendimento Klingo). Versão 1.0 — 11/11/2026: lista única, conferida na produção em 11/11/2026 às 14:50 (Brasília)
 
 Só entra aqui o que **só você consegue fazer**: decidir, colar um segredo, autorizar, falar com terceiros. O que é técnico e não depende de você está no fim, para você saber que não está esquecido. Cada item tem o link direto da tela onde a ação acontece.
 
@@ -23,6 +23,12 @@ A mesma lista existe como página (com caixas de marcar): peça ao Claude "abra 
 - **O que acontece:** as correções das telas estão prontas e testadas na branch `ccr-52cd66b5-sduxnt`, mas o site só muda quando ela entra na `main`. Enquanto isso o chat antigo continua gerando o erro "Essa pergunta já foi respondida" (7 vezes nas últimas 8 horas).
 - **Como resolver (2 minutos):** abra a PR e junte: https://github.com/clinicacsiia/webchat/compare/main...ccr-52cd66b5-sduxnt?expand=1 — ou diga ao Claude "abra a PR".
 - Depois de juntar, o GitHub publica sozinho em cerca de 1 minuto: https://github.com/clinicacsiia/webchat/actions
+
+
+### 1.3 Risco ativo: função pública que marca no Klingo (14/11/2026)
+- **O que acontece:** a função `klingo-agendamento` (versão 2) continua publicada **sem login** e consegue marcar, remarcar, cancelar e criar pré-cadastro no Klingo só com CPF + nascimento. Ela **não obedece** às chaves de teste. A página que a usava foi removida.
+- **Como resolver (30 segundos):** apague a função: https://supabase.com/dashboard/project/nrvuynjwcgwpjdptkiay/functions/klingo-agendamento (se precisar, o código está no git: commits `8890756` e `d389d3c`).
+- **Também (enquanto a migração nova não entra):** em Configurações, ou no editor SQL https://supabase.com/dashboard/project/nrvuynjwcgwpjdptkiay/sql/new, rode `update public.config set valor = 'teste' where chave = 'klingo_auto';`. Hoje o valor `sim` faz as chaves "em teste" valerem para **todos os pacientes** (nenhuma marcação real foi criada até agora: 0 operações). Para voltar: `sim`.
 
 ---
 
@@ -79,7 +85,7 @@ Detalhes e números em [`klingo-autoatendimento.md`](klingo-autoatendimento.md).
 ### 2.9 Pedido sem horário (13/11/2026): ligar para todos
 Está em modo `teste` (só o celular da lista de teste). Quando você aprovar o comportamento, rode em Configurações/SQL: `update public.config set valor = 'ligado' where chave = 'pedido_horario_modo';` Textos que o paciente recebe (oferta do horário mais próximo, do seguinte e pedido para escolher no calendário): chaves `pedido_sem_horario_texto`, `pedido_oferta2_texto` e `pedido_escolha_texto`. Prazo do aviso ao atendente: `pedido_parado_horas` (24). Atenção: horário "ocupado no Klingo" também dispara a oferta, e pode ser a própria equipe que marcou com outro nome ou telefone.
 
-### 2.10 Lista de previsão (13/11/2026)
+### 2.10 Lista de previsão (13/11/2026) — **substituída em 14/11/2026 pela "Disponibilidade futura" (ver 2.13)**
 Quando o paciente toca em "Nenhum horário serve" (ou recusa as duas ofertas), o assistente pergunta turno e período, oferece horário dentro do filtro e, se não houver, pergunta se quer ficar na LISTA DE PREVISÃO (texto: não confirma o dia). Quem fica diz com que antecedência pode ser chamado. Está em modo `teste` (mesma chave `pedido_horario_modo`). No painel há o botão **Lista de previsão** (admin e atendente): mostra quem espera, turno, período, antecedência e destaca a linha quando abre vaga; só leitura, com botão para abrir a conversa. A tabela `pedido_previsao` guarda os dados. Decida o prazo que a equipe se compromete a responder e revise os textos `previsao_*` em `config`.
 
 ### 2.11 Revisão mensal das conversas com o Claude (criada em 13/11/2026)
@@ -93,6 +99,15 @@ Quando o paciente toca em "Nenhum horário serve" (ou recusa as duas ofertas), o
 - **Você decide:** "atendido" deve valer mesmo quando a marcação está **cancelada** no Klingo? (14 casos em 09 a 12/11.) Hoje o banco conta como atendido.
 - **Apagar no painel do Supabase** (https://supabase.com/dashboard/project/nrvuynjwcgwpjdptkiay/functions): a função temporária `klingo-comparar-14554`.
 - **Apagar no banco** quando o Supabase pedir a confirmação: `drop function public.klingo_conferir_agendar(integer);` (não mexer na de mesmo nome com `uuid`). Detalhes em `klingo-conferencia.md`.
+
+### 2.13 Reestruturação do WebChat (14/11/2026) — tudo pronto no repositório, **nada na produção**
+Resumo e plano completo: [`reestruturacao-2026-11-14/00-leia-primeiro.md`](reestruturacao-2026-11-14/00-leia-primeiro.md). O que só você decide ou autoriza:
+1. **Autorizar a publicação** das 3 migrações (`supabase/webchat-v2-parte1..3`), das 2 Edge Functions (`chat-agenda-api` v2 e `disponibilidade-vigia`) e das telas (merge): ordem e reversão em [`06-plano-de-publicacao.md`](reestruturacao-2026-11-14/06-plano-de-publicacao.md). A migração **mexe nos efeitos** de `klingo_auto = sim` (passa a só limitar), então vale ler a tabela "o que acontece na produção" em [`03-matriz-de-configuracao.md`](reestruturacao-2026-11-14/03-matriz-de-configuracao.md).
+2. **Piloto**: indicar um paciente que autorize (e a agenda/procedimento de teste) para as 20+ marcações de teste. Nenhuma marcação real foi feita nesta rodada.
+3. **Decidir a política de encerramento** de conversa quando o paciente registra disponibilidade futura (chave `disponibilidade_encerra_conversa`, hoje `nao`) e a inatividade de 24 h.
+4. **Suporte do Klingo**: webhook, endpoints de resultado de exame, remarcação atômica, `/vouchers` com `id_externo`, limite por minuto, catálogo (lista em [`05-pendencias.md`](reestruturacao-2026-11-14/05-pendencias.md), seção A).
+5. **Jurídico**: `privacidade.html` precisa citar a solicitação de disponibilidade, o aviso no chat, a retenção e o opt-out (item 2.5).
+6. Apagar também as funções temporárias `klingo-comparar-chat`, `klingo-comparar-14554`, `klingo-teste-api` e `klingo-inspecionar-chat` (lista em 4).
 
 ## 3. Contas e segurança
 

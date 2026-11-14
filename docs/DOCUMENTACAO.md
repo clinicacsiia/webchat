@@ -1,6 +1,6 @@
 # Documentação do Webchat da CSI
 
-Versão 1.2 — 13/11/2026 / Mudança: conferência Klingo × webchat (aba Indicadores seção 3 e dois avisos novos; ver `klingo-conferencia.md`). Versão 1.1 — 12/11/2026 / Mudança: autoatendimento com a API do Klingo (CPF + nascimento obrigatórios, horários reais, marcação automática, revisão dos pacientes antigos); corrigidas as divergências D1 a D3 do planejamento. Versão 1.0 — 11/11/2026: primeira documentação única do sistema, escrita na auditoria de 11/11/2026
+Versão 1.3 — 14/11/2026 / Mudança: reestruturação do WebChat (calendário só com horários reais da API; previsão virou solicitação de disponibilidade futura; modos por capacidade e trilha de configuração; retrato refeito). Ver [`reestruturacao-2026-11-14/`](reestruturacao-2026-11-14/00-leia-primeiro.md); **as migrações `supabase/webchat-v2-parte1..3` ainda NÃO estão aplicadas na produção** (aprovação do dono). Versão 1.2 — 13/11/2026 / Mudança: conferência Klingo × webchat (aba Indicadores seção 3 e dois avisos novos; ver `klingo-conferencia.md`). Versão 1.1 — 12/11/2026 / Mudança: autoatendimento com a API do Klingo (CPF + nascimento obrigatórios, horários reais, marcação automática, revisão dos pacientes antigos); corrigidas as divergências D1 a D3 do planejamento. Versão 1.0 — 11/11/2026: primeira documentação única do sistema, escrita na auditoria de 11/11/2026
 
 Este é o documento para **entender o sistema inteiro**: o que é cada pasta, cada arquivo, cada peça do banco e como elas se falam. Os outros arquivos de `docs/` contam a história de cada mudança; este diz **como as coisas são hoje**.
 
@@ -8,13 +8,14 @@ Este é o documento para **entender o sistema inteiro**: o que é cada pasta, ca
 - O que depende do dono: [`pendencias-do-dono.md`](pendencias-do-dono.md)
 - **Autoatendimento com a API do Klingo (12/11/2026):** [`klingo-autoatendimento.md`](klingo-autoatendimento.md); desenho completo e riscos em [`planejamento-autoatendimento-klingo.md`](planejamento-autoatendimento-klingo.md)
 - **Páginas de agendamento (abandonadas e removidas em 14/11/2026):** a página nova da família e a página técnica `/agendamento/completo/` foram apagadas do repositório, junto com a Edge Function `klingo-agendamento` e os testes delas. O código está no histórico do git (commits `8890756`, `d389d3c` e anteriores). **A função `klingo-agendamento` (versão 2) continua publicada no Supabase até o dono apagá-la** em https://supabase.com/dashboard/project/nrvuynjwcgwpjdptkiay/functions. Nada de banco foi criado por elas.
+- **Reestruturação de 14/11/2026 (diagnóstico, arquitetura, matrizes, plano de publicação, pendências):** [`reestruturacao-2026-11-14/`](reestruturacao-2026-11-14/00-leia-primeiro.md)
 - A estrutura real do banco de produção: [`../supabase/producao/`](../supabase/producao/LEIAME.md)
 
 ---
 
 ## 1. O que o sistema faz
 
-Um paciente abre o chat no celular, diz se quer **exame**, **consulta** ou **outro assunto**, escolhe o exame (por foto do pedido médico, pelo mapa do corpo ou pelo nome), o plano, um dia e horário **previstos** e informa os dados do cadastro. O pedido chega pronto ao **painel** da equipe, que marca no Klingo e confirma com o paciente. Desde 12/11/2026 o chat também pede **CPF e data de nascimento** (obrigatórios), confere o cadastro na **API do Klingo** e, quando liberado (`config.klingo_api_marcar`), **marca sozinho** consultas e exames Particular com um horário real, mostrando o cartão do agendamento; tudo que não for seguro continua indo para a equipe. As rotinas de relatório continuam só lendo. Ver [`klingo-autoatendimento.md`](klingo-autoatendimento.md).
+Um paciente abre o chat no celular, diz se quer **exame**, **consulta** ou **outro assunto**, escolhe o exame (por foto do pedido médico, pelo mapa do corpo ou pelo nome), o plano, um dia e horário **que a API do Klingo devolveu como livre** (desde 14/11/2026 o calendário nunca mostra horário calculado pela grade; sem horário o paciente registra a **disponibilidade futura** ou fala com a equipe) e informa os dados do cadastro. O pedido chega pronto ao **painel** da equipe, que marca no Klingo e confirma com o paciente, ou o chat marca sozinho quando liberado. Desde 12/11/2026 o chat também pede **CPF e data de nascimento** (obrigatórios), confere o cadastro na **API do Klingo** e, quando liberado (`config.klingo_api_marcar`), **marca sozinho** consultas e exames Particular com um horário real, mostrando o cartão do agendamento; tudo que não for seguro continua indo para a equipe. As rotinas de relatório continuam só lendo. Ver [`klingo-autoatendimento.md`](klingo-autoatendimento.md).
 
 Três telas, um banco:
 
@@ -77,7 +78,7 @@ Três ideias que explicam quase tudo:
 | Atendimento > Equipe agora | Botão no alto da aba, **só para TI, gerência e supervisão** (`org_nivel()`): por atendente, quantas conversas tem, quantos pacientes esperam resposta (e há quanto tempo), quantos a equipe espera, quantos para chamar no zap, quantos marcou hoje. Sai das conversas já carregadas no painel; só "Marcou hoje" usa `painel_indicadores_atendentes` | chefia |
 | Jornada | Onde está cada paciente (dados do Klingo + chat), com alertas de atraso | admin e atendente |
 | Fila | Fila de chegada da recepção | admin e atendente |
-| Lista de previsão | Pacientes sem data que aceitaram esperar vaga (NÃO é agendamento); vaga aberta em destaque | admin e atendente |
+| Disponibilidade futura (antiga Lista de previsão) | Solicitações de pacientes que pediram aviso quando surgir vaga (NÃO é agendamento nem reserva), com filtros por situação, histórico e "Precisa de pessoa" | admin e atendente |
 | Avisos | "Mesma pessoa?", data de nascimento diferente, paciente × Klingo, pedidos de acesso | admin e atendente |
 | Indicadores | Pessoas atendidas, reentradas, concluídas, sem atendimento humano; por dia e por equipe | admin e atendente |
 | Contatos | Busca, etiquetas, exportação CSV | todos (inclusive marketing) |
@@ -127,7 +128,7 @@ Números de 11/11/2026 (fim do dia): 101 tabelas, 5 visões, 425 funções, 56 g
 | Motor do chat | `conversa_fluxo` (em que passo está), `fluxo_texto` (as frases), `fluxo_evento` | `fluxo_*` |
 | Pedido | `pre_agendamentos` (1 por conversa), `pre_agendamento_itens`, `conversa_anexo` (fotos) | `chat_pedido_*`, `chat_exames_*`, `ia_pre_agendar` |
 | Paciente e pessoa | `pacientes`, `contas_paciente`, `conversa_grupo` (conversas da mesma pessoa), `paciente_klingo_vinculo`, `pessoa_klingo_vinculo`, `vinculo_log` | `paciente_*`, `pessoa_*`, `conta_*` |
-| Agenda | `catalogo_agenda` (grade), `agenda_ocupacao` (o que o Klingo tem marcado), `agenda_ao_vivo`, regras de duração e sala | `agenda_*`, `chat_horarios`, `chat_horario_escolher` |
+| Agenda | `catalogo_agenda` (grade) e `agenda_ocupacao` (o que o Klingo tem marcado): **só planejamento, conferência e diagnóstico, nunca vaga reservável**; `agenda_ao_vivo`, regras de duração e sala | `agenda_*`; `chat_horarios` e `chat_horario_escolher` leem **só** `klingo_oferta` (API) |
 | Catálogo e preços | `catalogo_procedimento`, `catalogo_plano`, `catalogo_preco`, `catalogo_regiao`, `catalogo_mudanca`, `consulta_config` (quais consultas aparecem no chat), `chat_cache` (respostas prontas) | `catalogo_*`, `preco_*`, `consultas_*` |
 | Convênios e médicos | `convenio_config`, `medico_*`, `profissional_bloqueio` | `convenio_*`, `medico_*` |
 | Jornada (Klingo) | `jornada_paciente`, `jornada_card`, `jornada_exame`, `jornada_evento`, `jornada_tarefa` | `jornada_*` |
@@ -136,6 +137,8 @@ Números de 11/11/2026 (fim do dia): 101 tabelas, 5 visões, 425 funções, 56 g
 | Conferência Klingo × webchat | `klingo_conferencia` (uma linha por marcação do relatório #14554: origem, ligação com a conversa, campos que divergem ou faltam; sem dado pessoal) | `klingo_conferir_lote`, `klingo_conferir_avisos`, `klingo_conferencia_agendar`, `painel_indicadores_conferencia`; Edge Function `klingo-conferir`; avisos `klingo_conflito` e `klingo_dado_faltando` |
 | Fila de chegada | `fila_chegada`, `fila_aviso`, `push_inscricao` | `fila_*`, `checkin_publico` |
 | Diagnóstico | `incidente_chat` (códigos da Sentinela), `autoencerramento_execucao` | `chat_incidente`, `painel_incidentes` |
+| Disponibilidade futura (v2.0) | `disponibilidade_pedido` (estados `ativa`, `oportunidade_identificada`, `notificada`, `aguardando_resposta`, `convertida_em_agendamento`, `expirada`, `cancelada`), `disponibilidade_evento`, `disponibilidade_oportunidade`, `disponibilidade_notificacao`; `pedido_previsao` ficou sem uso (0 linhas) | `chat_disponibilidade_*`, `disponibilidade_*`, `painel_disponibilidade_*`, rotina `previsao_vigiar` |
+| Modos e auditoria (v2.0) | `config_auditoria` (toda mudança de config), `klingo_consulta` (resultado de cada consulta à API, sem dado pessoal), `klingo_oferta.sombra` | `klingo_modo`, `klingo_ativo`, `klingo_sombra`, `klingo_promover`, `klingo_recomendar` |
 | Autoatendimento Klingo | `klingo_identidade` (CPF conferido, só hash), `klingo_oferta` (horários que a API ofereceu à conversa), `klingo_operacao` (cada marcação: estado, voucher, código), `klingo_plano_map` e `klingo_convenio` (tradução convênio → plano), `klingo_especialidade`, `klingo_cota` (limite de chamadas), `klingo_medida`, `klingo_decisao` (o que a autogestão decidiu), `klingo_evento`, `klingo_proc_api`, `klingo_conversa_ident` | `klingo_*`, `painel_automacao_resumo` |
 | Configuração | `config` (chave → valor) | — |
 
@@ -175,8 +178,8 @@ O servidor só aceita resposta a uma pergunta do motor enquanto **o motor conduz
 | `manutencao-limpeza` | 04:17 | Apaga o histórico técnico de execuções com mais de 3 dias |
 | `klingo-operacao-vigia` | 1 min | Refaz chamada perdida do executor, marca como INCERTO o que ficou preso e encerra a conversa resolvida sozinha há 2 h |
 | `pedido-horario-vigia` | 5 min | Pedido pronto sem horário (passou ou ocupado): o assistente oferece o horário livre mais próximo, depois o seguinte, depois pede que o paciente escolha no calendário (passo `horario_oferta`); horário livre e parado 24 h: faixa para o atendente. Começa em `teste` (`pedido_horario_modo`). Ver `pedido-sem-horario.sql` |
-| `previsao-vigia` | 10 min | Procura vaga dentro da lista de previsão e põe a faixa "Vaga aberta" na conversa para a atendente oferecer (não marca nada). Ver `pedido-previsao.sql` |
-| `klingo-autogestao` | 10 min | Avança ou recua sozinha os interruptores `klingo_api_*` conforme as medidas e avisa a gestão |
+| `previsao-vigia` | 10 min | (v2.0) Motor de **disponibilidade futura**: expira solicitações, devolve oportunidade vencida, entrega avisos autorizados e dispara a Edge `disponibilidade-vigia` (procura vaga REAL na API). Nunca marca nada. Ver `webchat-v2-parte3-disponibilidade-futura.sql` |
+| `klingo-autogestao` | 10 min | (v2.0) **Só recua** (suspende por risco) e **recomenda**; nunca avança chave. Promover = `klingo_promover` (administrador, com justificativa) |
 | `klingo-revisar-pacientes` | 5 min | Confere na API do Klingo quem deixou CPF + nascimento e ainda não foi conferido |
 | `klingo-sincronizar` | 03:50 | Copia convênios, planos e especialidades da API e traduz o convênio do chat |
 | `klingo-limpeza` | 04:27 | Apaga ofertas, medidas e avisos antigos do autoatendimento |
@@ -196,7 +199,8 @@ Todas publicadas **sem exigir JWT** e cada uma confere o próprio segredo.
 | `chat-agenda-ao-vivo` | o chat, ao chegar no calendário | token da conversa | sim |
 | `chat-avisar`, `avisar-equipe`, `fila-avisar` | o banco (pg_net) | segredo do Vault `fila_aviso_segredo` | sim |
 | `klingo-agenda-api` | diagnóstico: só **lê** horários (versão 0.4, sem escrita; marcar responde 410) | `x-sync-key` | sim |
-| `chat-agenda-api` | o chat, ao chegar no horário (só leitura: grava as ofertas da API) | token da conversa | sim |
+| `chat-agenda-api` | o chat, ao chegar no horário (só leitura: grava as ofertas da API; v2.0: registra o resultado de cada etapa em `klingo_consulta`) | token da conversa | sim |
+| `disponibilidade-vigia` | o banco (`previsao_vigiar`, pg_net) | segredo do cofre | **não ainda** (nova, v2.0) |
 | `klingo-executar` | só o banco (pg_net), com o id de uma operação | segredo próprio do cofre (`klingo_interno_segredo`) | sim |
 | `klingo-identificar` | o banco (gatilho do CPF e rotina de revisão) | segredo do cofre | sim |
 | `klingo-sincronizar` | pg_cron (03:50) | segredo do cofre | sim |
@@ -226,8 +230,8 @@ Liga/desliga e textos. Só o administrador lê e altera (aba Configurações ou 
 | `agendamento_reconhecer` | `sim` | Reconhecer agendamento no Klingo |
 | `vinculo_manual_quem` | `equipe` | Quem liga paciente a prontuário |
 | `jornada_relatorio_id` / `_filtro` | `14359` / `exame` | Relatório do Klingo usado na Jornada |
-| `klingo_api_horarios` | `sombra` | Horários reais da API: `nao` / `sombra` (só mede) / `sim` |
-| `klingo_api_marcar`, `klingo_api_pre_cadastro`, `klingo_api_pos` | `teste` | Marcar sozinho (com cadastro / paciente novo / pós): `nao` / `teste` (só os telefones da lista) / `sim` |
+| `klingo_api_horarios` | `sombra` | Horários reais da API: `nao` / `sombra` (só mede; não expõe) / `teste` / `sim` |
+| `klingo_api_marcar`, `klingo_api_pre_cadastro`, `klingo_api_pos` (v2.0: `klingo_api_cancelar`, `klingo_api_remarcar`, `klingo_api_resultado`, `previsao_modo`, `previsao_monitor_modo`, `notificacao_modo`) | `teste` | Uma chave por capacidade: `nao` / `teste` (só os telefones da lista) / `sim`. O mestre `klingo_auto` só **limita**, nunca promove (ver `reestruturacao-2026-11-14/03-matriz-de-configuracao.md`) |
 | `klingo_api_telefones_teste` | vazio | Celulares (só números, vírgula) que sempre usam a automação nos modos `teste` |
 | `klingo_api_percentual` | `100` | No modo `sim`, que parte das conversas usa a automação (a autogestão sobe 10 → 50 → 100) |
 | `klingo_autogestao` | `sim` | O sistema pode avançar/recuar os interruptores acima |
@@ -274,7 +278,8 @@ Ferramentas: `mock-chat.mjs` (servidor de mentira do chat, com atraso, erro e qu
 
 - **Motor / fluxo**: as regras no banco que conduzem a conversa por botões.
 - **Pedido (pré-agendamento)**: o que o paciente montou; vira agendamento quando a equipe marca no Klingo.
-- **Previsão**: dia e horário que o chat mostra. Só vale depois da confirmação de uma pessoa.
+- **Horário da API**: horário que o Klingo devolveu como livre agora; é o único que o chat mostra como opção. Só fica marcado depois da confirmação e do protocolo.
+- **Disponibilidade futura** (antiga "previsão"): pedido do paciente para ser avisado quando surgir vaga compatível. Não é agendamento, reserva nem promessa de vaga.
 - **Jornada**: o quadro que acompanha o paciente do primeiro contato ao resultado.
 - **RLS**: regra de acesso por linha do Postgres. É o que impede um papel de ler o que não deve.
 - **Retrato**: a cópia da estrutura da produção em `supabase/producao/`.

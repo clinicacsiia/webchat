@@ -30,8 +30,11 @@ create index if not exists config_auditoria_chave_em_idx on public.config_audito
 alter table public.config_auditoria enable row level security;
 revoke all on table public.config_auditoria from anon, authenticated;
 grant select on table public.config_auditoria to authenticated;
-drop policy if exists config_auditoria_select on public.config_auditoria;
-create policy config_auditoria_select on public.config_auditoria as permissive for select to authenticated using (((select public.papel_atual()) = 'admin'::text));
+do $p$ begin   -- criação condicional (sem "drop": a ferramenta de migração do Supabase pede confirmação em drop e expira em 60 s)
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'config_auditoria' and policyname = 'config_auditoria_select') then
+    create policy config_auditoria_select on public.config_auditoria as permissive for select to authenticated using (((select public.papel_atual()) = 'admin'::text));
+  end if;
+end $p$;
 comment on table public.config_auditoria is 'Toda mudança em public.config: quem (origem), quando, valor antes/depois (segredos e endereços saem como "(oculto)"), justificativa e versão. Só o admin lê.';
 
 create or replace function public.config_auditar() returns trigger
@@ -55,8 +58,11 @@ begin
 end $function$;
 revoke all on function public.config_auditar() from public, anon, authenticated;
 
-drop trigger if exists config_auditar_trg on public.config;
-create trigger config_auditar_trg after insert or update or delete on public.config for each row execute function public.config_auditar();
+do $t$ begin
+  if not exists (select 1 from pg_trigger where tgname = 'config_auditar_trg' and tgrelid = 'public.config'::regclass) then
+    create trigger config_auditar_trg after insert or update or delete on public.config for each row execute function public.config_auditar();
+  end if;
+end $t$;
 
 -- ---------------------------------------------------------------------------------------------------------------------------------------------
 -- 2. Modos por capacidade

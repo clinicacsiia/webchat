@@ -95,8 +95,9 @@ do $r$ declare t text; begin
     execute format('alter table public.%I enable row level security', t);
     execute format('revoke all on table public.%I from anon, authenticated', t);
     execute format('grant select on table public.%I to authenticated', t);
-    execute format('drop policy if exists %I on public.%I', t || '_equipe', t);
-    execute format('create policy %I on public.%I as permissive for select to authenticated using (((select public.papel_atual()) = any (array[''admin'', ''atendente''])))', t || '_equipe', t);
+    if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = t and policyname = t || '_equipe') then
+      execute format('create policy %I on public.%I as permissive for select to authenticated using (((select public.papel_atual()) = any (array[''admin'', ''atendente''])))', t || '_equipe', t);
+    end if;
   end loop;
 end $r$;
 comment on table public.disponibilidade_pedido is 'Solicitação de disponibilidade futura: PREFERÊNCIA do paciente, nunca reserva nem promessa de vaga. Sem CPF/nome/telefone (só hash da pessoa e id da conversa).';
@@ -117,8 +118,11 @@ begin
   end if;
   return new;
 end $function$;
-drop trigger if exists disponibilidade_transicao_trg on public.disponibilidade_pedido;
-create trigger disponibilidade_transicao_trg before update on public.disponibilidade_pedido for each row execute function public.disponibilidade_transicao_trg();
+do $t$ begin
+  if not exists (select 1 from pg_trigger where tgname = 'disponibilidade_transicao_trg') then
+    create trigger disponibilidade_transicao_trg before update on public.disponibilidade_pedido for each row execute function public.disponibilidade_transicao_trg();
+  end if;
+end $t$;
 
 -- ---------------------------------------------------------------------------------------------------------------------------------------------
 -- 2. Funções internas
@@ -466,8 +470,11 @@ begin
   end if;
   return new;
 end $function$;
-drop trigger if exists disponibilidade_converter_trg on public.pre_agendamentos;
-create trigger disponibilidade_converter_trg after update of status on public.pre_agendamentos for each row execute function public.disponibilidade_converter_trg();
+do $t$ begin
+  if not exists (select 1 from pg_trigger where tgname = 'disponibilidade_converter_trg') then
+    create trigger disponibilidade_converter_trg after update of status on public.pre_agendamentos for each row execute function public.disponibilidade_converter_trg();
+  end if;
+end $t$;
 
 -- A rotina "previsao-vigia" (pg_cron, 10 min) continua com o mesmo nome e passa a rodar o motor novo. A lista de previsão antiga (grade) não é mais usada.
 create or replace function public.previsao_vigiar() returns jsonb
