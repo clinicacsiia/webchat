@@ -24,3 +24,4 @@ begin
       join public.pre_agendamentos pa on pa.conversa_id = p.conversa_id
      where p.status in ('aguardando', 'vaga_encontrada') and pa.status = 'pronto' and c.status in ('aguardando', 'em_atendimento')), '[]'::jsonb);
 end $function$;
+

@@ -99,5 +99,5 @@ begin
     end;
   end loop;
   return jsonb_build_object('modo', v_modo, 'vistos', v_vistos, 'ofertas', v_ofertas, 'pediu_calendario', v_calendario, 'avisos_sem_horario', v_avisos_sem, 'avisos_parado', v_avisos_parado);
-end $function$
-;
+end $function$;
+

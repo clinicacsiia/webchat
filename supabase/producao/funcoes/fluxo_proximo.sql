@@ -15,6 +15,9 @@ begin
   if jsonb_typeof(d -> 'oferta_pendente') = 'object' then return 'horario_oferta'; end if;   -- pedido-sem-horario
   if jsonb_typeof(d -> 'previsao') = 'object' then return 'previsao_' || (d -> 'previsao' ->> 'etapa'); end if;   -- pedido-previsao
 
+  -- cpf-primeiro: CPF e data de nascimento válidos são a PRIMEIRA coisa da conversa (antes do menu Exame/Consulta/Outro assunto)
+  if coalesce((d ->> 'nao_sou_eu')::boolean, false) and not coalesce((d ->> 'g_contato')::boolean, false) then return 'dados_contato'; end if;   -- identidade em fases: "não sou eu" = fase 1 (nome, celular, e-mail)
+  if not public.fluxo_cpf_ok(pa.paciente ->> 'cpf') or public.fluxo_ler_data(pa.paciente ->> 'dt_nasc') is null or coalesce((d ->> 'cpf_nasc_refazer')::boolean, false) then return 'cpf_nasc'; end if;
   if not coalesce((d ->> 'identidade_feita')::boolean, false) then
     v_conf := public.paciente_conferir(p_conversa);
     if v_conf ->> 'situacao' = 'completo' and v_conf ->> 'dt_nasc_conferida' is null then return 'identidade'; end if;
@@ -43,6 +46,16 @@ begin
     if coalesce(cardinality(v_med), 0) > 1 then return 'medico'; end if;
     perform public.fluxo_set(p_conversa, '{"medico_feito": true}');
   end if;
+  -- klingo-auto: paciente que o chat já conhecia (dados guardados de antes, nada digitado nesta conversa) confirma só o CPF; conferência velha ou "não sou eu" = tudo de novo
+  if public.klingo_ativo(p_conversa, 'klingo_api_marcar') and not coalesce((d ->> 'nao_sou_eu')::boolean, false) and not coalesce((d ->> 'cpf_confirmado')::boolean, false)
+     and public.fluxo_cpf_ok(pa.paciente ->> 'cpf') and public.fluxo_ler_data(pa.paciente ->> 'dt_nasc') is not null and (d -> 'digitado' ->> 'cpf') is null then
+    if exists (select 1 from public.klingo_identidade i where i.chave = public.klingo_hash(regexp_replace(pa.paciente ->> 'cpf', '\D', '', 'g') || '|' || public.fluxo_ler_data(pa.paciente ->> 'dt_nasc')::text)
+                and i.situacao = 'confere' and i.conferido_em > now() - make_interval(days => coalesce(nullif(public.klingo_cfg('klingo_reconfirmar_dias', '90'), '')::int, 90))) then
+      return 'cpf_confirma';
+    end if;
+    perform public.klingo_nao_sou_eu(p_conversa);
+    return public.fluxo_proximo(p_conversa);
+  end if;
   -- klingo-auto: CPF e data de nascimento válidos são obrigatórios antes do plano (a agenda real e a marcação dependem deles)
   if not public.fluxo_cpf_ok(pa.paciente ->> 'cpf') or public.fluxo_ler_data(pa.paciente ->> 'dt_nasc') is null or coalesce((d ->> 'cpf_nasc_refazer')::boolean, false) then return 'cpf_nasc'; end if;
   if pa.plano is null then return 'plano'; end if;
@@ -63,5 +76,5 @@ begin
   -- carteirinha-removida: o passo 'dados_carteira' não é mais perguntado; o atendente confere o convênio depois.
   if not coalesce((d ->> 'confirmado')::boolean, false) then return 'confirmar'; end if;
   return 'pronto';
-end $function$
-;
+end $function$;
+

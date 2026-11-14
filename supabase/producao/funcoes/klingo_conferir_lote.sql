@@ -80,10 +80,10 @@ begin
                             case when not r.filho and r.r_mail = 'diferente' then 'email' end]::text[], null),
          array_remove(array[case when r.filho and r.r_cpf = 'diferente' then 'cpf' end, case when r.filho and r.r_cel = 'diferente' then 'celular' end,
                             case when r.filho and r.r_mail = 'diferente' then 'email' end]::text[], null),
-         case when r.conversa_id is null then '{}'::text[] else array_remove(array[
+         case when r.conversa_id is null or r.filho then '{}'::text[] else array_remove(array[
               case when 'celular' = any (r.vz) and cardinality(r.ccel) > 0 then 'celular' end,
               case when 'email' = any (r.vz) and r.cemail is not null then 'email' end,
-              case when 'cpf' = any (r.vz) and not r.filho and r.ccpfh is not null then 'cpf' end]::text[], null) end,
+              case when 'cpf' = any (r.vz) and r.ccpfh is not null then 'cpf' end]::text[], null) end,
          r.vz, now()
     from r
   on conflict (m) do update set marcado_em = excluded.marcado_em, exame_em = excluded.exame_em, origem = excluded.origem, status_klingo = excluded.status_klingo,

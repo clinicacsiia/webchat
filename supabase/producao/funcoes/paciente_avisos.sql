@@ -9,7 +9,10 @@ AS $function$
 begin
   perform public.pessoa_equipe();
   return coalesce((select jsonb_agg(jsonb_build_object('id', a.id, 'conversa_id', a.conversa_id, 'tipo', a.tipo, 'detalhe', a.detalhe, 'criado_em', a.criado_em,
-                    'nome', public.pessoa_ficha(a.conversa_id) ->> 'nome') order by a.criado_em desc)
+                    'nome', public.pessoa_ficha(a.conversa_id) ->> 'nome',
+                    'ficha', case when a.tipo in ('klingo_conflito', 'klingo_dado_faltando')
+                                  then (select jsonb_build_object('nome', q.f ->> 'nome', 'nasc', q.f ->> 'nasc', 'tipo', q.f ->> 'tipo') from (select public.pessoa_ficha(a.conversa_id) as f) q) end)
+                    order by a.criado_em desc)
                      from public.paciente_aviso a where a.resolvido_em is null), '[]'::jsonb);
 end $function$;
 

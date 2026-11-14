@@ -14,6 +14,6 @@ begin
   return jsonb_build_object('medico_preferido', v_med, 'consultas', coalesce((
     select jsonb_agg(jsonb_build_object('id', x.id, 'rotulo', x.rotulo, 'do_medico', coalesce(v_med = any(x.medicos), false))
                      order by coalesce(v_med = any(x.medicos), false) desc, x.profissionais desc, x.rotulo)
-    from (select * from public.consultas_da_unidade(v_cat) limit 24) x), '[]'::jsonb));
+    from (select * from public.consultas_da_unidade(v_cat) cu where public.klingo_liberado(p_conversa, cu.id, 'consulta') limit 24) x), '[]'::jsonb));
 end $function$;
 

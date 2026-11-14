@@ -12,7 +12,6 @@ declare
 begin
   if v_modo not in ('teste', 'ligado') then return jsonb_build_object('modo', 'desligado'); end if;
   if not pg_try_advisory_xact_lock(hashtext('previsao_vigiar')) then return jsonb_build_object('modo', v_modo, 'ocupado', true); end if;
-  -- pedido que virou agendado ou cancelado, ou conversa encerrada: sai da lista
   update public.pedido_previsao p set status = case when pa.status = 'agendado' then 'atendida' else 'cancelada' end, atualizada_em = now()
     from public.pre_agendamentos pa, public.conversas c
    where pa.conversa_id = p.conversa_id and c.id = p.conversa_id and p.status in ('aguardando', 'vaga_encontrada')
@@ -47,5 +46,5 @@ begin
     end;
   end loop;
   return jsonb_build_object('modo', v_modo, 'vistos', v_vistos, 'vagas_novas', v_novas, 'vagas_que_sumiram', v_perdidas, 'encerradas_da_lista', v_fechadas);
-end $function$
-;
+end $function$;
+

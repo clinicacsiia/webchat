@@ -18,7 +18,10 @@ begin
   if jsonb_typeof(pa.escolha_horario) <> 'array' or jsonb_array_length(pa.escolha_horario) <> 1 then return jsonb_build_object('ok', false, 'motivo', 'horario_nao_unico'); end if;
   e := pa.escolha_horario -> 0;
   select * into o from public.klingo_oferta where conversa_id = p_conversa and chave = e ->> 'klingo_chave' and expira_em > now() - interval '20 minutes';
-  if o.id is null then return jsonb_build_object('ok', false, 'motivo', 'sem_oferta_da_api'); end if;
+  if o.id is null then
+    return jsonb_build_object('ok', false, 'motivo', 'sem_oferta_da_api',
+      'detalhe', coalesce(public.klingo_motivo_texto(p_conversa), 'o chat não recebeu horários reais do Klingo nesta conversa (o horário escolhido veio da grade)'));
+  end if;
   if o.procedimento is distinct from (d ->> 'procedimento')::int
      and not exists (select 1 from public.klingo_especialidade e where (d ->> 'procedimento')::int = any (e.procedimentos) and o.procedimento = any (e.procedimentos)) then
     return jsonb_build_object('ok', false, 'motivo', 'oferta_de_outro_procedimento');
@@ -35,7 +38,6 @@ begin
   if (v_pl ->> 'plano_id') is not null and (v_pl ->> 'plano_id')::int is distinct from o.plano and (v_pl ->> 'via') = 'padrao' and o.plano <> (v_pl ->> 'plano_id')::int and v_id is not null then
     return jsonb_build_object('ok', false, 'motivo', 'plano_mudou_depois_da_oferta');
   end if;
-  -- exame só pelo Particular até a regra de autorização/preparo por convênio existir (decisão registrada em docs/klingo-autoatendimento.md)
   if pa.tipo = 'exame' and public.norm_nome(pa.plano) <> 'PARTICULAR' and public.klingo_cfg('klingo_api_exame_convenio', 'nao') <> 'sim' then
     return jsonb_build_object('ok', false, 'motivo', 'exame_com_convenio');
   end if;

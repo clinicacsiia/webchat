@@ -16,5 +16,5 @@ begin
   v_oferta := v_dias[extract(dow from v_data)::int + 1] || ', ' || to_char(v_data, 'DD/MM') || ' às ' || left(p_slot ->> 'hora', 5)
               || coalesce(' na unidade ' || initcap(lower(nullif(p_slot ->> 'unidade', ''))), '');
   return replace(replace(v_modelo, '{original}', coalesce(p_original, 'o horário anterior')), '{oferta}', v_oferta);
-end $function$
-;
+end $function$;
+

@@ -1,5 +1,5 @@
 -- public.painel_indicadores_conferencia(p_de date, p_ate date, p_unidade text, p_incluir_teste boolean)
--- Pode executar: authenticated
+-- Pode executar: authenticated, service_role
 CREATE OR REPLACE FUNCTION public.painel_indicadores_conferencia(p_de date DEFAULT NULL::date, p_ate date DEFAULT NULL::date, p_unidade text DEFAULT NULL::text, p_incluir_teste boolean DEFAULT false)
  RETURNS jsonb
  LANGUAGE plpgsql

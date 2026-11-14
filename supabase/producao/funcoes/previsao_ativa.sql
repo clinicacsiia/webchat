@@ -12,5 +12,5 @@ begin
   if v_modo <> 'teste' then return false; end if;
   select right(regexp_replace(coalesce(ct.telefone, ''), '\D', '', 'g'), 8) into v_fone from public.conversas c join public.contatos ct on ct.id = c.contato_id where c.id = p_conversa;
   return coalesce(length(v_fone) = 8 and exists (select 1 from regexp_split_to_table(coalesce((select valor from public.config where chave = 'klingo_api_telefones_teste'), ''), '[^0-9]+') t where length(t) >= 8 and right(t, 8) = v_fone), false);
-end $function$
-;
+end $function$;
+

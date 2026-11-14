@@ -54,5 +54,5 @@ begin
     return jsonb_build_object('ok', true, 'aviso', coalesce((select valor from public.config where chave = 'previsao_final_texto'), ''));
   end if;
   return '{"ok": false}'::jsonb;
-end $function$
-;
+end $function$;
+

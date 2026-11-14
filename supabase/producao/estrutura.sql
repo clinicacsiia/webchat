@@ -1,5 +1,5 @@
 -- RETRATO DA ESTRUTURA DO BANCO DE PRODUÇÃO (projeto webchat-atendimento). GERADO: não editar à mão.
--- Tirado em 2026-11-11T23:06:02+00:00 · Postgres 17.11. Só estrutura: nenhuma linha de tabela, nenhum valor de configuração.
+-- Tirado em 2026-11-14T16:28:10.423154+00:00 · Postgres 17.11. Só estrutura: nenhuma linha de tabela, nenhum valor de configuração.
 -- Serve de referência e para os testes. NÃO rodar inteiro sobre a produção. Como refazer: supabase/producao/LEIAME.md.
 
 -- ===== Extensões =====
@@ -18,7 +18,7 @@
 -- authenticator: session_preload_libraries=supautils, safeupdate, statement_timeout=8s, lock_timeout=8s
 -- service_role: sem limite
 
--- ===== Tabelas (114) =====
+-- ===== Tabelas (123) =====
 
 create table public.agenda_ao_vivo (
   dia date not null,
@@ -255,20 +255,6 @@ create policy autoencerramento_execucao_select on public.autoencerramento_execuc
 -- concessão a anon: DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
 -- concessão a authenticated: DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
 
-create table public.pedido_previsao (
-  conversa_id uuid NOT NULL,
-  turno text NOT NULL,
-  de date NOT NULL,
-  ate date NOT NULL,
-  antecedencia text NOT NULL,
-  status text NOT NULL DEFAULT 'aguardando'::text,
-  vaga jsonb,
-  vaga_em timestamp with time zone,
-  criada_em timestamp with time zone NOT NULL DEFAULT now(),
-  atualizada_em timestamp with time zone NOT NULL DEFAULT now(),
-  constraint pedido_previsao_pkey PRIMARY KEY (conversa_id)
-);
-alter table public.pedido_previsao enable row level security;
 create table public.autoencerramento_fechada (
   conversa_id uuid not null,
   fechada_em timestamp with time zone default now() not null,
@@ -708,6 +694,7 @@ create table public.conversa_anexo (
   gabarito_em timestamp with time zone,
   klingo_conferido_em timestamp with time zone,
   klingo_conferido_por uuid,
+  nome text,
   constraint conversa_anexo_pkey PRIMARY KEY (id)
 );
 comment on table public.conversa_anexo is 'Foto do pedido médico enviada pelo paciente. Sem policy: o chat grava por chat_anexo_enviar e a equipe lê por painel_anexo.';
@@ -988,6 +975,16 @@ create policy fluxo_evento_select on public.fluxo_evento as permissive for selec
   using ((( SELECT papel_atual() AS papel_atual) = 'admin'::text));
 -- concessão a anon: DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
 -- concessão a authenticated: DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+
+create table public.fluxo_opcao_ordem (
+  passo text not null,
+  valor text not null,
+  peso numeric default 0 not null,
+  atualizado_em timestamp with time zone default now() not null,
+  constraint fluxo_opcao_ordem_pkey PRIMARY KEY (passo, valor)
+);
+comment on table public.fluxo_opcao_ordem is 'Peso de cada botão do chat (maior = aparece antes). Preenchido pelo ciclo de melhoria com base nos cliques reais; sem linha = ordem original, depois dos que têm peso.';
+alter table public.fluxo_opcao_ordem enable row level security;
 
 create table public.fluxo_texto (
   chave text not null,
@@ -1345,6 +1342,291 @@ create policy jornada_transicao_select on public.jornada_transicao as permissive
   using (( SELECT jornada_pode() AS jornada_pode));
 -- concessão a authenticated: SELECT
 
+create table public.klingo_catalogo_cru (
+  endpoint text not null,
+  dados jsonb,
+  status integer,
+  itens integer,
+  atualizado_em timestamp with time zone default now() not null,
+  constraint klingo_catalogo_cru_pkey PRIMARY KEY (endpoint)
+);
+comment on table public.klingo_catalogo_cru is 'Resposta bruta (só catálogo: unidades, profissionais, exames, regiões; nenhum dado de paciente) dos GET da API do Klingo, para montar as listas do chat. Escrita só pela função klingo-catalogo-api.';
+alter table public.klingo_catalogo_cru enable row level security;
+
+create table public.klingo_conferencia (
+  m text not null,
+  marcado_em date not null,
+  exame_em date,
+  origem text default 'sem_origem'::text not null,
+  status_klingo text,
+  unidade text,
+  plano text,
+  conversa_id uuid,
+  ligacao text,
+  paciente_tipo text,
+  conflito text[] default '{}'::text[] not null,
+  responsavel_diferente text[] default '{}'::text[] not null,
+  falta_no_klingo text[] default '{}'::text[] not null,
+  vazios text[] default '{}'::text[] not null,
+  lido_em timestamp with time zone default now() not null,
+  constraint klingo_conferencia_ligacao_check CHECK ((ligacao = ANY (ARRAY['pedido'::text, 'telefone_nome'::text]))),
+  constraint klingo_conferencia_pkey PRIMARY KEY (m)
+);
+comment on table public.klingo_conferencia is 'Uma linha por marcação do relatório #14554 do Klingo: origem, status, ligação com a conversa do webchat e QUAIS campos divergem ou faltam. Nunca guarda CPF, e-mail, telefone nem nascimento.';
+CREATE INDEX klingo_conferencia_conversa_idx ON public.klingo_conferencia USING btree (conversa_id) WHERE (conversa_id IS NOT NULL);
+CREATE INDEX klingo_conferencia_marcado_idx ON public.klingo_conferencia USING btree (marcado_em);
+alter table public.klingo_conferencia enable row level security;
+-- concessão a anon: DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+-- concessão a authenticated: DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+
+create table public.klingo_convenio (
+  plano_id integer not null,
+  convenio_id integer not null,
+  convenio text not null,
+  plano text not null,
+  convenio_norm text not null,
+  padrao boolean default false not null,
+  visto_em timestamp with time zone default now() not null,
+  constraint klingo_convenio_pkey PRIMARY KEY (plano_id)
+);
+CREATE INDEX klingo_convenio_conv_idx ON public.klingo_convenio USING btree (convenio_id);
+alter table public.klingo_convenio enable row level security;
+-- concessão a anon: DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+-- concessão a authenticated: DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+
+create table public.klingo_conversa_ident (
+  conversa_id uuid not null,
+  chave text not null,
+  em timestamp with time zone default now() not null,
+  constraint klingo_conversa_ident_pkey PRIMARY KEY (conversa_id)
+);
+alter table public.klingo_conversa_ident enable row level security;
+-- concessão a anon: DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+-- concessão a authenticated: DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+
+create table public.klingo_cota (
+  id boolean default true not null,
+  fichas numeric default 10 not null,
+  max_fichas numeric default 10 not null,
+  reposicao_por_s numeric default 1 not null,
+  reposto_em timestamp with time zone default clock_timestamp() not null,
+  pausado_ate timestamp with time zone,
+  ultimo_429_em timestamp with time zone,
+  constraint klingo_cota_id_check CHECK (id),
+  constraint klingo_cota_pkey PRIMARY KEY (id)
+);
+alter table public.klingo_cota enable row level security;
+-- concessão a anon: DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+-- concessão a authenticated: DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+
+create table public.klingo_decisao (
+  id bigint generated always as identity not null,
+  em timestamp with time zone default now() not null,
+  chave text not null,
+  de text,
+  para text,
+  motivo jsonb default '{}'::jsonb not null,
+  constraint klingo_decisao_pkey PRIMARY KEY (id)
+);
+alter table public.klingo_decisao enable row level security;
+-- concessão a anon: DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+-- concessão a authenticated: DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+
+create table public.klingo_especialidade (
+  cbos text not null,
+  nome text not null,
+  codigo text,
+  procedimentos integer[] default '{}'::integer[] not null,
+  liberada_api boolean default true not null,
+  atualizado_em timestamp with time zone default now() not null,
+  constraint klingo_especialidade_pkey PRIMARY KEY (cbos)
+);
+alter table public.klingo_especialidade enable row level security;
+-- concessão a anon: DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+-- concessão a authenticated: DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+
+create table public.klingo_evento (
+  id bigint generated always as identity not null,
+  hash text not null,
+  evento text,
+  id_marcacao text,
+  status text,
+  recebido_em timestamp with time zone default now() not null,
+  processado_em timestamp with time zone,
+  resultado text,
+  constraint klingo_evento_pkey PRIMARY KEY (id),
+  constraint klingo_evento_hash_key UNIQUE (hash)
+);
+alter table public.klingo_evento enable row level security;
+-- concessão a anon: DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+-- concessão a authenticated: DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+
+create table public.klingo_exame_api (
+  id integer not null,
+  descr text not null,
+  cbos text,
+  classes text[] default '{}'::text[] not null,
+  visto_em timestamp with time zone default now() not null,
+  constraint klingo_exame_api_pkey PRIMARY KEY (id)
+);
+alter table public.klingo_exame_api enable row level security;
+
+create table public.klingo_horarios_falha (
+  conversa_id uuid not null,
+  motivo text not null,
+  detalhe text,
+  em timestamp with time zone default now() not null,
+  constraint klingo_horarios_falha_pkey PRIMARY KEY (conversa_id)
+);
+comment on table public.klingo_horarios_falha is 'Último motivo pelo qual o chat não recebeu horários reais do Klingo nesta conversa (só código e trecho curto; sem dado de paciente).';
+alter table public.klingo_horarios_falha enable row level security;
+
+create table public.klingo_identidade (
+  id uuid default gen_random_uuid() not null,
+  chave text not null,
+  cpf_hash text not null,
+  tipo text,
+  klingo_id text,
+  situacao text not null,
+  faltando text[] default '{}'::text[] not null,
+  plano_id integer,
+  conferido_em timestamp with time zone default now() not null,
+  convertido_em timestamp with time zone,
+  criado_pela_operacao uuid,
+  constraint klingo_identidade_id_ck CHECK (((klingo_id IS NULL) OR ((tipo = 'definitivo'::text) AND (klingo_id ~ '^P[0-9]+$'::text)) OR ((tipo = 'pre'::text) AND (klingo_id ~ '^[0-9]+$'::text)))),
+  constraint klingo_identidade_situacao_check CHECK ((situacao = ANY (ARRAY['confere'::text, 'divergente'::text, 'nao_encontrado'::text, 'sem_id_definitivo'::text, 'erro'::text, 'pre_cadastro'::text]))),
+  constraint klingo_identidade_tipo_check CHECK ((tipo = ANY (ARRAY['definitivo'::text, 'pre'::text]))),
+  constraint klingo_identidade_pkey PRIMARY KEY (id),
+  constraint klingo_identidade_chave_key UNIQUE (chave)
+);
+CREATE INDEX klingo_identidade_cpf_idx ON public.klingo_identidade USING btree (cpf_hash);
+CREATE UNIQUE INDEX klingo_identidade_pre_uq ON public.klingo_identidade USING btree (cpf_hash) WHERE (tipo = 'pre'::text);
+alter table public.klingo_identidade enable row level security;
+-- concessão a anon: DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+-- concessão a authenticated: DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+
+create table public.klingo_medida (
+  dia date not null,
+  tipo text not null,
+  n bigint default 0 not null,
+  soma_ms bigint default 0 not null,
+  constraint klingo_medida_pkey PRIMARY KEY (dia, tipo)
+);
+alter table public.klingo_medida enable row level security;
+-- concessão a anon: DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+-- concessão a authenticated: DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+
+create table public.klingo_oferta (
+  id bigint generated always as identity not null,
+  conversa_id uuid not null,
+  chave text not null,
+  procedimento integer not null,
+  plano integer not null,
+  data date not null,
+  hora text not null,
+  profissional text,
+  profissional_id text,
+  unidade text,
+  unidade_id text,
+  ordem_chegada boolean default false not null,
+  criado_em timestamp with time zone default now() not null,
+  expira_em timestamp with time zone not null,
+  constraint klingo_oferta_pkey PRIMARY KEY (id),
+  constraint klingo_oferta_conversa_id_chave_key UNIQUE (conversa_id, chave)
+);
+CREATE INDEX klingo_oferta_exp_idx ON public.klingo_oferta USING btree (expira_em);
+alter table public.klingo_oferta enable row level security;
+-- concessão a anon: DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+-- concessão a authenticated: DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+
+create table public.klingo_operacao (
+  id uuid default gen_random_uuid() not null,
+  conversa_id uuid not null,
+  pre_agendamento_id uuid,
+  tipo text not null,
+  estado text default 'pendente'::text not null,
+  chave_idem text not null,
+  tentativas integer default 0 not null,
+  voucher_id text,
+  http_status integer,
+  caminho text,
+  codigo text,
+  detalhe jsonb default '{}'::jsonb not null,
+  origem text default 'chat'::text not null,
+  criado_em timestamp with time zone default now() not null,
+  iniciado_em timestamp with time zone,
+  concluido_em timestamp with time zone,
+  constraint klingo_operacao_estado_check CHECK ((estado = ANY (ARRAY['pendente'::text, 'executando'::text, 'sucesso'::text, 'falha'::text, 'incerto'::text, 'horario_tomado'::text, 'cancelada'::text]))),
+  constraint klingo_operacao_origem_check CHECK ((origem = ANY (ARRAY['chat'::text, 'equipe'::text, 'sistema'::text]))),
+  constraint klingo_operacao_tipo_check CHECK ((tipo = ANY (ARRAY['marcar'::text, 'cancelar'::text, 'remarcar'::text, 'ler_vouchers'::text]))),
+  constraint klingo_operacao_pkey PRIMARY KEY (id),
+  constraint klingo_operacao_chave_idem_key UNIQUE (chave_idem)
+);
+CREATE INDEX klingo_operacao_conv_idx ON public.klingo_operacao USING btree (conversa_id, criado_em DESC);
+CREATE INDEX klingo_operacao_estado_idx ON public.klingo_operacao USING btree (estado, criado_em);
+alter table public.klingo_operacao enable row level security;
+-- concessão a anon: DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+-- concessão a authenticated: DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+
+create table public.klingo_plano_map (
+  operadora text not null,
+  convenio_id integer,
+  plano_id integer,
+  origem text not null,
+  atualizado_em timestamp with time zone default now() not null,
+  constraint klingo_plano_map_origem_check CHECK ((origem = ANY (ARRAY['auto'::text, 'manual'::text, 'nao_atende'::text]))),
+  constraint klingo_plano_map_pkey PRIMARY KEY (operadora)
+);
+alter table public.klingo_plano_map enable row level security;
+-- concessão a anon: DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+-- concessão a authenticated: DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+
+create table public.klingo_proc_api (
+  procedimento_id integer not null,
+  com_horario_em timestamp with time zone,
+  vazio_em timestamp with time zone,
+  constraint klingo_proc_api_pkey PRIMARY KEY (procedimento_id)
+);
+alter table public.klingo_proc_api enable row level security;
+-- concessão a anon: DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+-- concessão a authenticated: DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+
+create table public.klingo_profissional (
+  id bigint not null,
+  nome text not null,
+  nome_norm text not null,
+  conselho text,
+  numero text,
+  uf text,
+  cbos text[] default '{}'::text[] not null,
+  idade_max integer,
+  subespecialidade text,
+  visto_em timestamp with time zone default now() not null,
+  constraint klingo_profissional_pkey PRIMARY KEY (id)
+);
+comment on table public.klingo_profissional is 'Profissionais como a API do Klingo os lista (GET /profissionais), com especialidades (CBOS) e idade máxima do paciente. Atualizada toda madrugada.';
+alter table public.klingo_profissional enable row level security;
+
+create table public.klingo_saude (
+  tipo text not null,
+  ok boolean not null,
+  ms integer,
+  detalhe text,
+  em timestamp with time zone default now() not null,
+  constraint klingo_saude_pkey PRIMARY KEY (tipo)
+);
+comment on table public.klingo_saude is 'Última checagem da API do Klingo (uma linha por tipo: api). Escrita só pela função klingo-saude. O estado dos relatórios vem de jornada_sync_estado.';
+alter table public.klingo_saude enable row level security;
+
+create table public.klingo_unidade_api (
+  id integer not null,
+  nome text not null,
+  cnes text,
+  visto_em timestamp with time zone default now() not null,
+  constraint klingo_unidade_api_pkey PRIMARY KEY (id)
+);
+alter table public.klingo_unidade_api enable row level security;
+
 create table public.medico_aviso (
   id bigint generated always as identity not null,
   criado_em timestamp with time zone default now() not null,
@@ -1572,8 +1854,9 @@ comment on table public.paciente_aviso is 'Avisos para a equipe sobre o paciente
 CREATE UNIQUE INDEX paciente_aviso_aberto ON public.paciente_aviso USING btree (conversa_id, tipo) WHERE (resolvido_em IS NULL);
 alter table public.paciente_aviso enable row level security;
 create policy paciente_aviso_select on public.paciente_aviso as permissive for select to public
-  using ((( SELECT public.papel_atual() AS papel_atual) = ANY (ARRAY['admin'::text, 'atendente'::text])));
--- concessão a authenticated: DELETE,INSERT,SELECT,UPDATE
+  using ((( SELECT papel_atual() AS papel_atual) = ANY (ARRAY['admin'::text, 'atendente'::text])));
+-- concessão a anon: REFERENCES,SELECT,TRIGGER,TRUNCATE
+-- concessão a authenticated: REFERENCES,SELECT,TRIGGER,TRUNCATE
 
 create table public.paciente_historico (
   id bigint generated always as identity not null,
@@ -1649,6 +1932,25 @@ create policy pacientes_update on public.pacientes as permissive for update to p
   with check ((( SELECT papel_atual() AS papel_atual) = ANY (ARRAY['admin'::text, 'atendente'::text])));
 -- concessão a anon: DELETE,INSERT,REFERENCES,TRIGGER,TRUNCATE
 -- concessão a authenticated: DELETE,INSERT,REFERENCES,TRIGGER,TRUNCATE
+
+create table public.pedido_previsao (
+  conversa_id uuid not null,
+  turno text not null,
+  de date not null,
+  ate date not null,
+  antecedencia text not null,
+  status text default 'aguardando'::text not null,
+  vaga jsonb,
+  vaga_em timestamp with time zone,
+  criada_em timestamp with time zone default now() not null,
+  atualizada_em timestamp with time zone default now() not null,
+  constraint pedido_previsao_antecedencia_check CHECK ((antecedencia = ANY (ARRAY['imediato'::text, '1_dia'::text, '1_semana'::text, '1_mes'::text]))),
+  constraint pedido_previsao_status_check CHECK ((status = ANY (ARRAY['aguardando'::text, 'vaga_encontrada'::text, 'atendida'::text, 'cancelada'::text]))),
+  constraint pedido_previsao_turno_check CHECK ((turno = ANY (ARRAY['manha'::text, 'tarde'::text, 'qualquer'::text]))),
+  constraint pedido_previsao_pkey PRIMARY KEY (conversa_id)
+);
+comment on table public.pedido_previsao is 'Lista de previsão: paciente sem data disponível que aceitou esperar uma vaga (NÃO é agendamento). Só funções do sistema leem e gravam.';
+alter table public.pedido_previsao enable row level security;
 
 create table public.permissao_observacao (
   id bigint generated always as identity not null,
@@ -1931,166 +2233,6 @@ CREATE INDEX vinculo_solicitacoes_conta ON public.vinculo_solicitacoes USING btr
 CREATE UNIQUE INDEX vinculo_solicitacoes_uma_aberta ON public.vinculo_solicitacoes USING btree (conta_id, tipo) WHERE (status = 'aberta'::text);
 alter table public.vinculo_solicitacoes enable row level security;
 
-create table public.klingo_conferencia (
-  m text not null,
-  marcado_em date not null,
-  exame_em date,
-  origem text default 'sem_origem'::text not null,
-  status_klingo text,
-  unidade text,
-  plano text,
-  conversa_id uuid,
-  ligacao text,
-  paciente_tipo text,
-  conflito text[] default '{}'::text[] not null,
-  responsavel_diferente text[] default '{}'::text[] not null,
-  falta_no_klingo text[] default '{}'::text[] not null,
-  vazios text[] default '{}'::text[] not null,
-  lido_em timestamp with time zone default now() not null,
-  constraint klingo_conferencia_ligacao_check CHECK ((ligacao = ANY (ARRAY['pedido'::text, 'telefone_nome'::text]))),
-  constraint klingo_conferencia_pkey PRIMARY KEY (m)
-);
-comment on table public.klingo_conferencia is 'Uma linha por marcação do relatório #14554 do Klingo: origem, status, ligação com a conversa do webchat e QUAIS campos divergem ou faltam. Nunca guarda CPF, e-mail, telefone nem nascimento.';
-CREATE INDEX klingo_conferencia_conversa_idx ON public.klingo_conferencia USING btree (conversa_id) WHERE (conversa_id IS NOT NULL);
-CREATE INDEX klingo_conferencia_marcado_idx ON public.klingo_conferencia USING btree (marcado_em);
-alter table public.klingo_conferencia enable row level security;
-
-create table public.klingo_convenio (
-  plano_id integer primary key,
-  convenio_id integer not null,
-  convenio text not null,
-  plano text not null,
-  convenio_norm text not null,
-  padrao boolean not null default false,
-  visto_em timestamptz not null default now()
-);
-alter table public.klingo_convenio enable row level security;
-create table public.klingo_conversa_ident (
-  conversa_id uuid primary key references public.conversas (id) on delete cascade,
-  chave text not null,
-  em timestamptz not null default now()
-);
-alter table public.klingo_conversa_ident enable row level security;
-create table public.klingo_cota (
-  id boolean primary key default true check (id),
-  fichas numeric not null default 10,
-  max_fichas numeric not null default 10,
-  reposicao_por_s numeric not null default 1,
-  reposto_em timestamptz not null default clock_timestamp(),
-  pausado_ate timestamptz,
-  ultimo_429_em timestamptz
-);
-alter table public.klingo_cota enable row level security;
-create table public.klingo_decisao (
-  id bigint generated always as identity primary key,
-  em timestamptz not null default now(),
-  chave text not null,
-  de text,
-  para text,
-  motivo jsonb not null default '{}'::jsonb
-);
-alter table public.klingo_decisao enable row level security;
-create table public.klingo_especialidade (
-  cbos text primary key,
-  nome text not null,
-  codigo text,
-  procedimentos integer[] not null default '{}',
-  liberada_api boolean not null default true,
-  atualizado_em timestamptz not null default now()
-);
-alter table public.klingo_especialidade enable row level security;
-create table public.klingo_evento (
-  id bigint generated always as identity primary key,
-  hash text not null unique,
-  evento text,
-  id_marcacao text,
-  status text,
-  recebido_em timestamptz not null default now(),
-  processado_em timestamptz,
-  resultado text
-);
-alter table public.klingo_evento enable row level security;
-create table public.klingo_identidade (
-  id uuid primary key default gen_random_uuid(),
-  chave text not null unique,
-  cpf_hash text not null,
-  tipo text check (tipo in ('definitivo', 'pre')),
-  klingo_id text,
-  situacao text not null check (situacao in ('confere', 'divergente', 'nao_encontrado', 'sem_id_definitivo', 'erro', 'pre_cadastro')),
-  faltando text[] not null default '{}',
-  plano_id integer,
-  conferido_em timestamptz not null default now(),
-  convertido_em timestamptz,
-  criado_pela_operacao uuid,
-  constraint klingo_identidade_id_ck check (klingo_id is null or (tipo = 'definitivo' and klingo_id ~ '^P[0-9]+$') or (tipo = 'pre' and klingo_id ~ '^[0-9]+$'))
-);
-alter table public.klingo_identidade enable row level security;
-create table public.klingo_medida (
-  dia date not null,
-  tipo text not null,
-  n bigint not null default 0,
-  soma_ms bigint not null default 0,
-  primary key (dia, tipo)
-);
-alter table public.klingo_medida enable row level security;
-create table public.klingo_oferta (
-  id bigint generated always as identity primary key,
-  conversa_id uuid not null references public.conversas (id) on delete cascade,
-  chave text not null,
-  procedimento integer not null,
-  plano integer not null,
-  data date not null,
-  hora text not null,
-  profissional text,
-  profissional_id text,
-  unidade text,
-  unidade_id text,
-  ordem_chegada boolean not null default false,
-  criado_em timestamptz not null default now(),
-  expira_em timestamptz not null,
-  unique (conversa_id, chave)
-);
-alter table public.klingo_oferta enable row level security;
-create table public.klingo_operacao (
-  id uuid primary key default gen_random_uuid(),
-  conversa_id uuid not null references public.conversas (id) on delete cascade,
-  pre_agendamento_id uuid references public.pre_agendamentos (id) on delete set null,
-  tipo text not null check (tipo in ('marcar', 'cancelar', 'remarcar', 'ler_vouchers')),
-  estado text not null default 'pendente' check (estado in ('pendente', 'executando', 'sucesso', 'falha', 'incerto', 'horario_tomado', 'cancelada')),
-  chave_idem text not null unique,
-  tentativas integer not null default 0,
-  voucher_id text,
-  http_status integer,
-  caminho text,
-  codigo text,
-  detalhe jsonb not null default '{}'::jsonb,
-  origem text not null default 'chat' check (origem in ('chat', 'equipe', 'sistema')),
-  criado_em timestamptz not null default now(),
-  iniciado_em timestamptz,
-  concluido_em timestamptz
-);
-alter table public.klingo_operacao enable row level security;
-create table public.klingo_plano_map (
-  operadora text primary key,
-  convenio_id integer,
-  plano_id integer,
-  origem text not null check (origem in ('auto', 'manual', 'nao_atende')),
-  atualizado_em timestamptz not null default now()
-);
-alter table public.klingo_plano_map enable row level security;
-create table public.klingo_proc_api (
-  procedimento_id integer primary key,
-  com_horario_em timestamptz,
-  vazio_em timestamptz
-);
-alter table public.klingo_proc_api enable row level security;
-create unique index klingo_identidade_pre_uq on public.klingo_identidade using btree (cpf_hash) where (tipo = 'pre');
-create index klingo_identidade_cpf_idx on public.klingo_identidade using btree (cpf_hash);
-create index klingo_convenio_conv_idx on public.klingo_convenio using btree (convenio_id);
-create index klingo_oferta_exp_idx on public.klingo_oferta using btree (expira_em);
-create index klingo_operacao_conv_idx on public.klingo_operacao using btree (conversa_id, criado_em desc);
-create index klingo_operacao_estado_idx on public.klingo_operacao using btree (estado, criado_em);
-
 -- ===== Chaves estrangeiras (depois de todas as tabelas) =====
 alter table public.agendamento_fechamento add constraint agendamento_fechamento_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE CASCADE;
 alter table public.agendamento_fechamento add constraint agendamento_fechamento_por_fkey FOREIGN KEY (por) REFERENCES agentes(id) ON DELETE SET NULL;
@@ -2145,6 +2287,12 @@ alter table public.jornada_mensagem add constraint jornada_mensagem_card_id_fkey
 alter table public.jornada_tarefa add constraint jornada_tarefa_card_id_fkey FOREIGN KEY (card_id) REFERENCES jornada_card(id);
 alter table public.jornada_transicao add constraint jornada_transicao_de_fkey FOREIGN KEY (de) REFERENCES jornada_coluna(id);
 alter table public.jornada_transicao add constraint jornada_transicao_para_fkey FOREIGN KEY (para) REFERENCES jornada_coluna(id);
+alter table public.klingo_conferencia add constraint klingo_conferencia_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE SET NULL;
+alter table public.klingo_conversa_ident add constraint klingo_conversa_ident_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE CASCADE;
+alter table public.klingo_horarios_falha add constraint klingo_horarios_falha_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE CASCADE;
+alter table public.klingo_oferta add constraint klingo_oferta_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE CASCADE;
+alter table public.klingo_operacao add constraint klingo_operacao_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE CASCADE;
+alter table public.klingo_operacao add constraint klingo_operacao_pre_agendamento_id_fkey FOREIGN KEY (pre_agendamento_id) REFERENCES pre_agendamentos(id) ON DELETE SET NULL;
 alter table public.mensagens add constraint mensagens_agente_id_fkey FOREIGN KEY (agente_id) REFERENCES agentes(id) ON DELETE SET NULL;
 alter table public.mensagens add constraint mensagens_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE CASCADE;
 alter table public.ocr_aprendido add constraint ocr_aprendido_procedimento_id_fkey FOREIGN KEY (procedimento_id) REFERENCES catalogo_procedimento(id) ON DELETE CASCADE;
@@ -2157,6 +2305,7 @@ alter table public.paciente_historico add constraint paciente_historico_paciente
 alter table public.paciente_historico add constraint paciente_historico_pre_agendamento_id_fkey FOREIGN KEY (pre_agendamento_id) REFERENCES pre_agendamentos(id) ON DELETE SET NULL;
 alter table public.paciente_klingo_vinculo add constraint paciente_klingo_vinculo_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE CASCADE;
 alter table public.pacientes add constraint pacientes_origem_conversa_fkey FOREIGN KEY (origem_conversa) REFERENCES conversas(id) ON DELETE SET NULL;
+alter table public.pedido_previsao add constraint pedido_previsao_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE CASCADE;
 alter table public.pessoa_klingo_vinculo add constraint pessoa_klingo_vinculo_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE CASCADE;
 alter table public.pessoa_klingo_vinculo add constraint pessoa_klingo_vinculo_por_fkey FOREIGN KEY (por) REFERENCES agentes(id) ON DELETE SET NULL;
 alter table public.pre_agendamento_itens add constraint pre_agendamento_itens_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE CASCADE;
@@ -2167,7 +2316,6 @@ alter table public.registro_assinaturas add constraint registro_assinaturas_aten
 alter table public.vinculo_solicitacoes add constraint vinculo_solicitacoes_conta_id_fkey FOREIGN KEY (conta_id) REFERENCES auth.users(id) ON DELETE CASCADE;
 alter table public.vinculo_solicitacoes add constraint vinculo_solicitacoes_decidido_por_fkey FOREIGN KEY (decidido_por) REFERENCES auth.users(id) ON DELETE SET NULL;
 alter table public.vinculo_solicitacoes add constraint vinculo_solicitacoes_paciente_id_fkey FOREIGN KEY (paciente_id) REFERENCES pacientes(id) ON DELETE CASCADE;
-alter table public.klingo_conferencia add constraint klingo_conferencia_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES public.conversas(id) ON DELETE SET NULL;
 
 -- ===== Visões (5) =====
 
@@ -2327,6 +2475,7 @@ CREATE TRIGGER catalogo_agenda_hash BEFORE INSERT ON public.catalogo_agenda FOR 
 CREATE TRIGGER medico_detectar_meta AFTER INSERT OR UPDATE ON public.catalogo_meta FOR EACH ROW EXECUTE FUNCTION medico_detectar_trg();
 CREATE TRIGGER convenio_evento_catalogo AFTER INSERT ON public.catalogo_mudanca FOR EACH ROW EXECUTE FUNCTION convenio_evento_catalogo_trg();
 CREATE TRIGGER catalogo_preco_confianca BEFORE INSERT OR UPDATE ON public.catalogo_preco FOR EACH ROW EXECUTE FUNCTION catalogo_preco_confianca_trg();
+CREATE TRIGGER config_catalogo_aplicar BEFORE INSERT OR UPDATE OF valor ON public.config FOR EACH ROW WHEN ((new.chave ~~ 'catalogo\_%'::text)) EXECUTE FUNCTION catalogo_config_aplicar();
 CREATE TRIGGER conversa_fluxo_klingo_trg AFTER INSERT OR UPDATE OF dados ON public.conversa_fluxo FOR EACH ROW EXECUTE FUNCTION conversa_fluxo_klingo_trg();
 CREATE TRIGGER conversa_exame_aberto BEFORE UPDATE OF status ON public.conversas FOR EACH ROW EXECUTE FUNCTION conversa_exame_aberto_trg();
 CREATE TRIGGER conversa_limpa_aguarda_paciente BEFORE UPDATE OF status ON public.conversas FOR EACH ROW EXECUTE FUNCTION conversa_limpa_aguarda_paciente_trg();
@@ -2386,7 +2535,7 @@ CREATE TRIGGER vinculo_log_imutavel BEFORE DELETE OR UPDATE ON public.vinculo_lo
 -- public.jornada_tarefa
 -- public.mensagens
 
--- ===== Rotinas agendadas (pg_cron): 27 =====
+-- ===== Rotinas agendadas (pg_cron): 33 =====
 -- agenda-conferir · 15 seconds · ativa
 --   select net.http_post( url := 'https://nrvuynjwcgwpjdptkiay.supabase.co/functions/v1/sync-catalogo-klingo', headers := jsonb_build_object('Content-Type', 'application/json', 'x-sync-key', (select valor from public.config where chave = 'ia_segredo')), body := '{"agenda":"conferir"}'::jsonb, timeout_milliseconds := 40000) where public.agenda_conferencia_ha_trabalho(false);
 -- agenda-ocupacao · */10 8-23,0,1 * * * · ativa
@@ -2402,8 +2551,6 @@ CREATE TRIGGER vinculo_log_imutavel BEFORE DELETE OR UPDATE ON public.vinculo_lo
 -- agendamento-reconhecer-klingo · 30 seconds · ativa
 --   select public.agendamento_reconhecer_disparar()
 -- autoencerrar-vigia · */5 * * * * · ativa
--- pedido-horario-vigia · */5 * * * * · ativa
--- previsao-vigia · */10 * * * * · ativa
 --   select public.autoencerrar_vigiar()
 -- catalogo-precos-convenio · 10 6 * * * · ativa
 --   select net.http_post( url := 'https://nrvuynjwcgwpjdptkiay.supabase.co/functions/v1/sync-catalogo-klingo', headers := jsonb_build_object('Content-Type', 'application/json', 'x-sync-key', (select valor from public.config where chave = 'ia_segredo')), body := '{"precos":"convenio"}'::jsonb, timeout_milliseconds := 150000);
@@ -2411,6 +2558,8 @@ CREATE TRIGGER vinculo_log_imutavel BEFORE DELETE OR UPDATE ON public.vinculo_lo
 --   select net.http_post( url := 'https://nrvuynjwcgwpjdptkiay.supabase.co/functions/v1/sync-catalogo-klingo', headers := jsonb_build_object('Content-Type', 'application/json', 'x-sync-key', (select valor from public.config where chave = 'ia_segredo')), body := '{"precos":"particular"}'::jsonb, timeout_milliseconds := 150000);
 -- chat-corpo-cache · */10 * * * * · ativa
 --   select public.chat_corpo_atualizar()
+-- convenio-seguir-klingo · 10 7 * * * · ativa
+--   select public.convenio_seguir_klingo()
 -- convenios-revisar · 5 11 * * * · ativa
 --   select public.convenios_revisar()
 -- espera-vigia · * * * * * · ativa
@@ -2423,27 +2572,36 @@ CREATE TRIGGER vinculo_log_imutavel BEFORE DELETE OR UPDATE ON public.vinculo_lo
 --   select public.jornada_klingo_agendar()
 -- jornada-vigia · * * * * * · ativa
 --   select public.jornada_vigiar()
--- klingo-ligar-pendentes · 4-59/10 * * * * · ativa
---   select public.paciente_klingo_ligar_pendentes()
--- manutencao-limpeza · 17 7 * * * · ativa
---   select public.manutencao_limpar()
--- pessoa-agrupar · */5 * * * * · ativa
---   select public.pessoa_agrupar_pendentes()
--- sync-catalogo-klingo · 0 6 * * * · ativa
---   select net.http_post( url := 'https://nrvuynjwcgwpjdptkiay.supabase.co/functions/v1/sync-catalogo-klingo', headers := jsonb_build_object('Content-Type', 'application/json', 'x-sync-key', (select valor from public.config where chave = 'ia_segredo')), body := '{}'::jsonb, timeout_milliseconds := 120000);
-
 -- klingo-autogestao · */10 * * * * · ativa
 --   select public.klingo_autogestao()
+-- klingo-catalogo-api · 55 6 * * * · ativa
+--   select public.klingo_catalogo_cru_disparar('catalogo')
+-- klingo-conferir · 23 9-23 * * * · ativa
+--   select public.klingo_conferencia_agendar(4)
+-- klingo-ligar-pendentes · 4-59/10 * * * * · ativa
+--   select public.paciente_klingo_ligar_pendentes()
 -- klingo-limpeza · 27 7 * * * · ativa
 --   select public.klingo_limpar()
 -- klingo-operacao-vigia · * * * * * · ativa
 --   select public.klingo_operacao_vigiar()
 -- klingo-revisar-pacientes · */5 * * * * · ativa
 --   select public.klingo_revisao_disparar()
+-- klingo-saude · */2 * * * * · ativa
+--   select public.klingo_saude_disparar()
 -- klingo-sincronizar · 50 6 * * * · ativa
 --   select public.klingo_sincronizar_disparar()
--- klingo-conferir · 23 9-23 * * * · ativa
---   select public.klingo_conferencia_agendar(4)
+-- klingo-sondar-exames · */10 * * * * · ativa
+--   select public.klingo_sondar_disparar()
+-- manutencao-limpeza · 17 7 * * * · ativa
+--   select public.manutencao_limpar()
+-- pedido-horario-vigia · */5 * * * * · ativa
+--   select public.pedido_horario_vigiar()
+-- pessoa-agrupar · */5 * * * * · ativa
+--   select public.pessoa_agrupar_pendentes()
+-- previsao-vigia · */10 * * * * · ativa
+--   select public.previsao_vigiar()
+-- sync-catalogo-klingo · 0 6 * * * · ativa
+--   select net.http_post( url := 'https://nrvuynjwcgwpjdptkiay.supabase.co/functions/v1/sync-catalogo-klingo', headers := jsonb_build_object('Content-Type', 'application/json', 'x-sync-key', (select valor from public.config where chave = 'ia_segredo')), body := '{}'::jsonb, timeout_milliseconds := 120000);
 
 -- ===== Chaves existentes em public.config (só os nomes; os valores não são copiados) =====
--- agenda_ao_vivo, agenda_ao_vivo_max_dias, agenda_ao_vivo_trava_s, agenda_ao_vivo_validade_s, agendado_conferir_prazo_min, agendamento_reconhecer, agendamento_reconhecer_msg_encerradas, autoencerrar_horas, autoencerrar_modo, avaliacao_ativa, boas_vindas, cadastro_equipe_sem_convite, chat_push_url, checkin_sem_login_max_dia, convenio_suspenso_texto, despedida_configurada, despedida_inatividade_ativa, despedida_inatividade_texto, despedida_versao_atual, encerramento_exige_motivo, encerramento_valida_agendado, equipe_push_url, fila_autochegada, fila_aviso_antes, fila_push_url, fila_vapid_publica, horario_trabalho, ia_ativa, ia_segredo, indicadores_fechar, jornada_identidade_klingo, jornada_relatorio_filtro, jornada_relatorio_id, klingo_api_horarios, klingo_api_marcar, klingo_api_percentual, klingo_api_pos, klingo_api_pre_cadastro, klingo_api_telefones_teste, klingo_autogestao, klingo_conferir_ativo, klingo_funcoes_base, klingo_paciente_url, klingo_webhook, login_paciente, motor, motor_telefones_teste, nome_empresa, pedido_escolha_texto, pedido_horario_modo, pedido_oferta2_texto, pedido_parado_horas, pedido_sem_horario_texto, permissao_modo, previsao_decide_texto, previsao_final_texto, previsao_oferta_texto, previsao_texto, reabrir_dias, reaproveitar_cadastro_convidado, teste_agentes, teste_marcadores, vinculo_manual_quem
+-- agenda_ao_vivo, agenda_ao_vivo_max_dias, agenda_ao_vivo_trava_s, agenda_ao_vivo_validade_s, agendado_conferir_prazo_min, agendamento_reconhecer, agendamento_reconhecer_msg_encerradas, autoencerrar_horas, autoencerrar_modo, avaliacao_ativa, boas_vindas, cadastro_equipe_sem_convite, catalogo_csi, catalogo_desenvoar, catalogo_rmtc, chat_push_url, checkin_sem_login_max_dia, convenio_seguir_klingo, convenio_suspenso_texto, despedida_configurada, despedida_inatividade_ativa, despedida_inatividade_texto, despedida_versao_atual, encerramento_exige_motivo, encerramento_valida_agendado, equipe_push_url, fila_autochegada, fila_aviso_antes, fila_push_url, fila_vapid_publica, horario_trabalho, ia_ativa, ia_segredo, indicadores_fechar, jornada_identidade_klingo, jornada_relatorio_filtro, jornada_relatorio_id, klingo_api_horarios, klingo_api_marcar, klingo_api_percentual, klingo_api_pos, klingo_api_pre_cadastro, klingo_api_telefones_teste, klingo_auto, klingo_autogestao, klingo_conferir_ativo, klingo_funcoes_base, klingo_paciente_url, klingo_reconfirmar_dias, klingo_so_liberados, klingo_webhook, login_paciente, motor, motor_telefones_teste, nome_empresa, pedido_escolha_texto, pedido_horario_modo, pedido_oferta2_texto, pedido_parado_horas, pedido_sem_horario_texto, permissao_modo, previsao_decide_texto, previsao_final_texto, previsao_oferta_texto, previsao_texto, reabrir_dias, reaproveitar_cadastro_convidado, teste_agentes, teste_marcadores, vinculo_manual_quem

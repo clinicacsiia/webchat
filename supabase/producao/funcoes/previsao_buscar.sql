@@ -17,5 +17,5 @@ begin
   if v_s1 is null then return '[]'::jsonb; end if;
   select s into v_s2 from jsonb_array_elements(v_todos) with ordinality t(s, ord) where ord > 1 order by (s ->> 'data' = v_s1 ->> 'data'), ord limit 1;
   return case when v_s2 is null then jsonb_build_array(v_s1) else jsonb_build_array(v_s1, v_s2) end;
-end $function$
-;
+end $function$;
+
