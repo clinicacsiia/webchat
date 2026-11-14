@@ -343,6 +343,55 @@ await caso('RESULTADO: nenhuma operação no Klingo é criada (a integração de
   return { ok: x.n === 0 && y.valor === 'nao', detalhe: `klingo_api_resultado=${y.valor}` };
 });
 
+// ---------------------------------------------------------------------------------------------- 5.5 Outros assuntos
+await caso('NÃO FICA PRESO: depois de 3 respostas que o assistente não entende na mesma pergunta, a conversa vai para a equipe com o contexto (e a pergunta não se repete para sempre)', async () => {
+  const Q = await novo(); await ateAssunto(Q);
+  const antes = await q(`select count(*)::int n from public.mensagens where conversa_id = $1 and autor = 'agente'`, [Q.c]);
+  const respostas = [];
+  for (const t of ['asdkjh', 'qwerty zzz', 'lkjhg 123']) { await anonimo(); await rpc('chat_enviar', { p_conversa: Q.c, p_token: Q.t, p_texto: t }); await como(''); respostas.push((await nota(Q.c)).ia_ativa); }
+  const n = await nota(Q.c), m = await um(`select texto from public.mensagens where conversa_id = $1 and texto ilike '%não consegui entender%' limit 1`, [Q.c]);
+  return { ok: respostas[0] === true && respostas[1] === true && respostas[2] === false && n.ia_ativa === false && !!m && /assunto/.test(n.t), detalhe: `equipe depois de 1,2,3 = ${respostas.map((x) => (x ? 'não' : 'sim'))}` };
+});
+await caso('PEDIR ATENDENTE a qualquer momento (texto livre) transfere com contexto, inclusive no meio de "Ver minhas marcações"', async () => {
+  const Q = await novo(); await ateAssunto(Q); await clicar(Q, 'Minhas marcações');
+  await executor((await opsDe(Q.c, 'ler_vouchers'))[0].id, 'sucesso', respMarc(marc(37001)));
+  await anonimo(); await rpc('chat_enviar', { p_conversa: Q.c, p_token: Q.t, p_texto: 'quero falar com um atendente' }); await como('');
+  const n = await nota(Q.c);
+  return { ok: n.ia_ativa === false && /atendente/i.test(n.t), detalhe: n.t.slice(0, 60) };
+});
+await caso('EMERGÊNCIA escrita no meio de qualquer pergunta: orienta e chama a equipe com urgência alta', async () => {
+  const Q = await novo(); await ateAssunto(Q);
+  await anonimo(); await rpc('chat_enviar', { p_conversa: Q.c, p_token: Q.t, p_texto: 'estou com dor forte no peito e falta de ar' }); await como('');
+  const n = await nota(Q.c);
+  return { ok: n.ia_ativa === false && n.u === 'alta', detalhe: `urgência=${n.u}` };
+});
+await caso('PAINEL: o resumo do painel passa a contar cancelar/remarcar/ver marcações (só números)', async () => {
+  const d = (await um(`select pg_get_functiondef('public.painel_automacao_resumo(date, date)'::regprocedure) f`)).f;
+  return { ok: /'pos'/.test(d) && /ler_vouchers/.test(d) };
+});
+
+// ---------------------------------------------------------------------------------------------- 7.3 Aviso do Klingo (webhook; continua DESLIGADO na produção — aqui só a regra do banco)
+await caso('WEBHOOK (regra do banco): aviso repetido é ignorado; cancelamento avisado atualiza o pedido E a lista de marcações; remarcação aponta para o voucher novo; id inválido é recusado', async () => {
+  const A = await novo(); await ateMarcando(A); const [oa] = await opsDe(A.c, 'marcar'); const vou = String(++nVou);
+  await executor(oa.id, 'sucesso', JSON.stringify({ voucher: { id: vou, status: 'agendado', data: dia(3), hora: '09:00', procedimento: 'RM JOELHO', unidade: 'CSI', profissional: 'X' } }));
+  const B = await novo(A.nasc); await ateAssunto(B); await clicar(B, 'Minhas marcações');
+  await executor((await opsDe(B.c, 'ler_vouchers'))[0].id, 'sucesso', respMarc(marc(vou, { data: dia(3), hora: '09:00' })));
+  const ev = (p) => um(`select public.klingo_evento_aplicar($1::jsonb) r`, [JSON.stringify(p)]).then((x) => x.r);
+  const e1 = await ev({ evento: 'agenda.cancelada', id_marcacao: vou, status: 'C', checkin: null, nova: null }), e2 = await ev({ evento: 'agenda.cancelada', id_marcacao: vou, status: 'C', checkin: null, nova: null });
+  const pa = await pedidoDe(A.c), ret = (await retrato(B.c)).find((x) => x.voucher === vou), ruim = await ev({ id_marcacao: 'abc; drop' });
+  return { ok: e1.resultado === 'cancelada' && e2.duplicado === true && pa.status === 'cancelado' && ret.situacao === 'cancelada' && ruim.ok === false, detalhe: `${e1.resultado}; repetido=${e2.duplicado}; pedido=${pa.status}; lista=${ret.situacao}` };
+});
+
+// ---------------------------------------------------------------------------------------------- 9. Coerência entre chat, painel e Klingo (auditoria no banco depois de TODOS os fluxos acima)
+await caso('AUDITORIA DE COERÊNCIA depois de todos os cenários: nenhum pedido "agendado" com marcação cancelada; nenhum voucher valendo em dois pedidos; todo agendado do chat tem operação com sucesso e voucher', async () => {
+  const a = await um(`select count(*)::int n from public.pre_agendamentos pa where pa.status = 'agendado' and exists (select 1 from public.klingo_marcacao m where m.voucher = any(pa.klingo_marcacoes) and m.situacao = 'cancelada')`);
+  const b = await um(`select count(*)::int n from (select v, count(*) from (select unnest(klingo_marcacoes) v from public.pre_agendamentos where status = 'agendado' and conferencia_status is distinct from 'remarcado') x group by v having count(*) > 1) y`);
+  const c = await um(`select count(*)::int n from public.klingo_operacao where tipo in ('marcar', 'remarcar') and estado = 'sucesso' and voucher_id is null`);
+  const d = await um(`select count(*)::int n from public.pre_agendamentos pa where pa.agendado_origem = 'chat_api' and pa.status = 'agendado' and not exists (select 1 from public.klingo_operacao o where o.pre_agendamento_id = pa.id and o.estado = 'sucesso')`);
+  const e = await um(`select count(*)::int n from public.klingo_operacao where estado = 'sucesso' and tipo = 'cancelar' and not exists (select 1 from public.klingo_marcacao m where m.voucher = klingo_operacao.detalhe ->> 'voucher' and m.situacao = 'cancelada') and detalhe ->> 'origem' = 'marcacoes'`);
+  return { ok: a.n === 0 && b.n === 0 && c.n === 0 && d.n === 0 && e.n === 0, detalhe: `agendado+cancelada=${a.n}; voucher duplicado=${b.n}; sucesso sem voucher=${c.n}; agendado sem operação=${d.n}; cancelamento sem retrato=${e.n}` };
+});
+
 const ok = resultados.filter(Boolean).length;
 console.log(`\n${ok} de ${resultados.length} verificações passaram.`);
 process.exit(ok === resultados.length ? 0 : 1);

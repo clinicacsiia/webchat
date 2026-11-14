@@ -555,6 +555,7 @@ grant execute on function public.fluxo_marc_ativo(uuid, jsonb), public.fluxo_mar
 create or replace function pg_temp.encaixar(p_assinatura text, p_antigo text, p_novo text) returns void language plpgsql as $f$
 declare d text := pg_get_functiondef(p_assinatura::regprocedure); n integer;
 begin
+  if position(p_novo in d) > 0 then return; end if;   -- já encaixado (reaplicar a migração é seguro)
   n := (length(d) - length(replace(d, p_antigo, ''))) / length(p_antigo);
   if n <> 1 then raise exception '%: trecho esperado achado % vez(es) (esperado 1): %', p_assinatura, n, left(p_antigo, 70); end if;
   execute replace(d, p_antigo, p_novo);
@@ -604,3 +605,14 @@ select pg_temp.encaixar('public.klingo_operacao_criar(uuid)',
 select pg_temp.encaixar('public.painel_automacao_resumo(date, date)',
   E'    \'cadastros\', (select coalesce(jsonb_object_agg(situacao, n)',
   E'    \'pos\', (select coalesce(jsonb_object_agg(k, n), \'{}\'::jsonb) from (select tipo || \':\' || estado k, count(*) n from public.klingo_operacao where tipo in (\'cancelar\', \'remarcar\', \'ler_vouchers\') and (criado_em at time zone \'America/Sao_Paulo\')::date between v_de and v_ate group by 1) x),\n    \'cadastros\', (select coalesce(jsonb_object_agg(situacao, n)');
+-- (i) paciente preso em pergunta que não entende: depois de N respostas não compreendidas no MESMO passo (padrão 3), a conversa vai para a equipe com o contexto (nada se perde: o resumo e as notas seguem)
+insert into public.fluxo_texto (chave, texto, descricao) values
+  ('nao_entendi_equipe', 'Desculpe, não consegui entender. Vou chamar uma pessoa da nossa equipe para continuar com você, já com tudo o que conversamos até aqui.', 'Depois de várias respostas não compreendidas')
+on conflict (chave) do nothing;
+select pg_temp.encaixar('public.fluxo_avancar(uuid, jsonb)',
+  E'        update public.conversa_fluxo set tentativas = tentativas + 1 where conversa_id = p_conversa;',
+  E'        update public.conversa_fluxo set tentativas = tentativas + 1 where conversa_id = p_conversa;\n        if (select tentativas from public.conversa_fluxo where conversa_id = p_conversa) >= coalesce(nullif(public.klingo_cfg(\'fluxo_max_nao_entendi\', \'3\'), \'\')::integer, 3) then   -- v2.1: não deixa o paciente preso\n          perform public.fluxo_dizer(p_conversa, public.fluxo_t(\'nao_entendi_equipe\', ctx), jsonb_build_object(\'tipo\', \'acompanhar\'));\n          perform public.fluxo_transferir(p_conversa, \'Paciente não conseguiu responder à pergunta (passo \' || coalesce(v_passo, \'-\') || \') depois de várias tentativas.\', \'baixa\', true);\n          insert into public.fluxo_evento (conversa_id, passo, entrada, entendido, ms, ms_cliente) values (p_conversa, v_passo, \'nao_entendido_repetido\', false, extract(milliseconds from clock_timestamp() - v_t0), (p_entrada ->> \'ms\')::int);\n          return;\n        end if;');
+-- (j) aviso do Klingo (webhook, ainda desligado): a lista de marcações acompanha cancelamento e remarcação avisados pelo Klingo
+select pg_temp.encaixar('public.klingo_evento_aplicar(jsonb)',
+  E'  select * into pa from public.pre_agendamentos where klingo_marcacoes @> array[v_id] limit 1;',
+  E'  if v_nova ~ \'^[0-9]+$\' then update public.klingo_marcacao set situacao = \'remarcada\' where voucher = v_id and situacao = \'ativa\';   -- v2.1\n  elsif v_st = \'C\' then update public.klingo_marcacao set situacao = \'cancelada\' where voucher = v_id and situacao = \'ativa\'; end if;\n  select * into pa from public.pre_agendamentos where klingo_marcacoes @> array[v_id] limit 1;');

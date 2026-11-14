@@ -22,7 +22,8 @@ Versão 1.0 — 14/11/2026 / Mudança: primeira versão. Implementado em `supaba
 | `klingo_api_pre_cadastro` | `nao` · `teste` · `sim` | `nao` | `teste` | Pré-cadastro de paciente novo. |
 | `klingo_api_cancelar` | `nao` · `teste` · `sim` | **novo**, copia `klingo_api_pos` | `teste` | Cancelamento. |
 | `klingo_api_remarcar` | `nao` · `teste` · `sim` | **novo**, copia `klingo_api_pos` | `teste` | Remarcação. |
-| `klingo_api_pos` | `nao` · `teste` · `sim` | (legado) | `teste` | Mantida só como herança enquanto as duas acima não existirem. |
+| `klingo_api_consultar` | `nao` · `teste` · `sim` | **novo**, copia `klingo_api_pos` | — | Ver minhas marcações (consulta o Klingo pela sessão do próprio paciente). |
+| `klingo_api_pos` | `nao` · `teste` · `sim` | (legado) | `teste` | Mantida só como herança enquanto as três acima não existirem. |
 | `klingo_api_resultado` | `nao` · `sombra` · `teste` · `sim` | **novo**, `nao` | — | Resultado de exame (**sem integração**: não faz nada hoje). |
 | `previsao_modo` | `nao` · `teste` · `sim` | **novo**, `teste` | — | Registrar solicitação de disponibilidade. |
 | `previsao_monitor_modo` | `nao` · `sombra` · `teste` · `sim` | **novo**, `nao` | — | Motor que procura vagas na API (consome cota). |
@@ -49,3 +50,25 @@ Versão 1.0 — 14/11/2026 / Mudança: primeira versão. Implementado em `supaba
 ## Promoção de teste para público (item 9.4)
 
 Só por `klingo_promover(chave, valor, justificativa)`: administrador logado, justificativa ≥ 10 letras, grava `config_auditoria` (origem `promocao:<uid>`) e `klingo_decisao`. `klingo_decidir` (usada pela autogestão) **recusa** subir um modo. A recomendação da autogestão fica em `klingo_decisao` (`recomendacao:<chave>`) e avisa a gestão, no máximo 1 por chave a cada 7 dias. **Não existe tela** para chamar `klingo_promover` ainda: hoje o administrador chama pelo SQL (pendência listada).
+
+## Configuração para o público (decisão do dono, 14/11/2026) — `supabase/webchat-v2-config-publica.sql` (NÃO aplicada)
+
+O dono decidiu que o agendamento automático fica disponível para **todos**. Na nova lógica de chaves isso **não** se obtém com o mestre `klingo_auto = sim` (ele não promove nada). Cada capacidade precisa estar em `sim`; o script grava, uma por linha e com justificativa em `config_auditoria`:
+
+| Chave | Valor | O que libera |
+|---|---|---|
+| `klingo_api_percentual` | `100` | todas as conversas |
+| `klingo_api_horarios` | `sim` | calendário com horários da API |
+| `klingo_api_marcar` | `sim` | marcação automática |
+| `klingo_api_pre_cadastro` | `sim` | paciente novo (apague a linha para deixar com a equipe) |
+| `klingo_api_consultar` · `klingo_api_cancelar` · `klingo_api_remarcar` | `sim` | pós-agendamento |
+| `previsao_modo` · `notificacao_modo` | `sim` | solicitação de disponibilidade futura e aviso no chat |
+| `previsao_monitor_modo` | `sim` | motor de vagas (começar em `sombra` por 24 h é o recomendado: consome a cota) |
+
+**Não** altera `klingo_auto` (continua `sim`), `klingo_api_resultado` (`nao`: não existe integração) nem `klingo_webhook` (`nao`: o Klingo ainda não cadastrou a URL). A configuração **atual da produção não foi tocada**. Teste: `testes/sql-webchat-v2-publico.test.mjs` (10 verificações): o público comum fora de qualquer lista recebe todas as capacidades; o mestre `teste` vira teto; `nao` desliga tudo; chaves independentes; `teste`/`sombra` nunca viram `sim`.
+
+Painel: *Configurações > Autoatendimento com o Klingo* agora mostra o mestre (teto) e uma chave por capacidade, cada uma com seu modo.
+
+## Função pública `klingo-agendamento` (outras chaves)
+
+`agendamento_externo_modo` (`sim`/`leitura`/`nao`), `agendamento_ip_por_minuto` (60), `agendamento_ip_escritas_hora` (30), `agendamento_cpf_escritas_hora` (8), `agendamento_ip_divergentes_hora` (15), `agendamento_cpf_divergentes_dia` (10): ver `07-auditoria-klingo-agendamento.md`. Pós-agendamento: `klingo_pos_prazo_horas` (24), `klingo_marc_validade_min` (30), `fluxo_max_nao_entendi` (3).

@@ -26,19 +26,24 @@ const antigoAtivo = (await um(`select public.klingo_ativo($1, 'klingo_api_marcar
 registrar('ANTES da migração o defeito existe (retrato da produção): mestre "sim" + marcar "teste" libera o paciente comum', falhas.length === 0 && antigoAtivo === true, `klingo_ativo(comum, marcar) = ${antigoAtivo}`);
 
 let erro = null;
-for (const f of ['webchat-v2-parte1-modos', 'webchat-v2-parte2-calendario-api', 'webchat-v2-parte3-disponibilidade-futura']) {
+for (const f of ['webchat-v2-parte1-modos', 'webchat-v2-parte2-calendario-api', 'webchat-v2-parte4-medicos-api', 'webchat-v2-parte3-disponibilidade-futura', 'webchat-v2-parte5-pos-agendamento', 'klingo-agendamento-seguranca']) {
   try { await db.exec(readFileSync(`${REPO}/supabase/${f}.sql`, 'utf8')); } catch (e) { erro = `${f}: ${String(e.message).split('\n')[0]}`; }
 }
-registrar('as 3 migrações aplicam sem erro sobre um banco que já tem dados', !erro, erro ?? '');
+registrar('as 6 migrações, na ordem do plano de publicação, aplicam sem erro sobre um banco que já tem dados', !erro, erro ?? '');
+// reaplicar tudo de novo não pode falhar (o plano manda aplicar em partes e repetir se o Supabase expirar)
+let erro2 = null; const erros2 = [];
+for (const f of ['webchat-v2-parte1-modos', 'webchat-v2-parte2-calendario-api', 'webchat-v2-parte4-medicos-api', 'webchat-v2-parte3-disponibilidade-futura', 'webchat-v2-parte5-pos-agendamento', 'klingo-agendamento-seguranca']) { try { await db.exec(readFileSync(`${REPO}/supabase/${f}.sql`, 'utf8')); } catch (e) { erros2.push(`${f}: ${String(e.message).split('\n')[0]}`); } }
+erro2 = erros2.join(' || ') || null;
+registrar('reaplicar as 6 migrações uma segunda vez também funciona (idempotentes)', !erro2, erro2 ?? '');
 
 await caso('MIGRAÇÃO PRESERVA DADOS: nenhuma linha existente foi apagada ou alterada (configuração, conversas, contatos, ofertas, previsão antiga); só entram chaves novas', async () => {
   const depois = await um(`select (select count(*) from public.config)::int cfg, (select count(*) from public.conversas)::int conv, (select count(*) from public.contatos)::int cont, (select count(*) from public.pedido_previsao)::int prev`);
   const oferta = await um(`select sombra, chave from public.klingo_oferta where conversa_id = $1`, [comum]);
   const mantidas = await q(`select chave, valor from public.config where chave in ('klingo_auto', 'klingo_api_horarios', 'klingo_api_marcar', 'klingo_api_pos', 'klingo_api_pre_cadastro', 'klingo_webhook', 'pedido_horario_modo', 'klingo_api_telefones_teste') order by chave`);
   const v = Object.fromEntries(mantidas.map((x) => [x.chave, x.valor]));
-  const novas = await q(`select chave, valor from public.config where chave in ('klingo_api_cancelar', 'klingo_api_remarcar', 'klingo_api_resultado', 'previsao_modo', 'previsao_monitor_modo', 'notificacao_modo')`);
+  const novas = await q(`select chave, valor from public.config where chave in ('klingo_api_cancelar', 'klingo_api_remarcar', 'klingo_api_consultar', 'klingo_api_resultado', 'previsao_modo', 'previsao_monitor_modo', 'notificacao_modo')`);
   return { ok: depois.conv === antes.conv && depois.cont === antes.cont && depois.prev === antes.prev && depois.cfg >= antes.cfg && oferta.sombra === false && oferta.chave === 'k1'
-                && v.klingo_auto === 'sim' && v.klingo_api_horarios === 'sombra' && v.klingo_api_marcar === 'teste' && v.klingo_webhook === 'nao' && novas.length === 6,
+                && v.klingo_auto === 'sim' && v.klingo_api_horarios === 'sombra' && v.klingo_api_marcar === 'teste' && v.klingo_webhook === 'nao' && novas.length === 7,
            detalhe: `chaves ${antes.cfg}->${depois.cfg}; oferta antiga sombra=${oferta.sombra}; novas=${novas.map((x) => x.chave + '=' + x.valor).join(',')}` };
 });
 await caso('DEPOIS da migração o paciente comum NÃO é liberado (mesmos valores de configuração, comportamento corrigido)', async () => {
@@ -48,10 +53,10 @@ await caso('DEPOIS da migração o paciente comum NÃO é liberado (mesmos valor
 
 // ROLLBACK documentado: reaplicar as definições do retrato (a produção antes da migração)
 let erroRb = null;
-for (const f of ['klingo_ativo', 'klingo_liberado', 'klingo_decidir', 'klingo_autogestao', 'klingo_pode_marcar', 'klingo_limpar', 'chat_horarios', 'chat_horario_escolher', 'previsao_buscar', 'pedido_horario_vigiar', 'previsao_ativa', 'previsao_vigiar']) {
+for (const f of ['klingo_ativo', 'klingo_liberado', 'klingo_decidir', 'klingo_autogestao', 'klingo_pode_marcar', 'klingo_limpar', 'chat_horarios', 'chat_horario_escolher', 'previsao_buscar', 'pedido_horario_vigiar', 'previsao_ativa', 'previsao_vigiar', 'medicos_disponiveis_interno', 'fluxo_aplicar', 'fluxo_proximo', 'fluxo_perguntar', 'fluxo_avancar', 'fluxo_ler_texto', 'chat_voltar', 'klingo_operacao_concluir', 'klingo_operacao_criar', 'klingo_evento_aplicar', 'painel_automacao_resumo']) {
   try { await db.exec(readFileSync(`${REPO}/supabase/producao/funcoes/${f}.sql`, 'utf8')); } catch (e) { erroRb = `${f}: ${String(e.message).split('\n')[0]}`; }
 }
-registrar('ROLLBACK: reaplicar as 12 funções do retrato executa sem erro', !erroRb, erroRb ?? '');
+registrar('ROLLBACK: reaplicar as funções do retrato (todas as que as migrações trocaram) executa sem erro', !erroRb, erroRb ?? '');
 await caso('ROLLBACK devolve o comportamento anterior (inclusive o defeito, que é o que "voltar atrás" significa) e as tabelas novas ficam sem uso nem dano', async () => {
   const a = (await um(`select public.klingo_ativo($1, 'klingo_api_marcar') a`, [comum])).a;
   const lib = (await um(`select pg_get_functiondef('public.klingo_liberado(uuid,integer,text)'::regprocedure) d`)).d;

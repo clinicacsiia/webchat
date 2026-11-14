@@ -43,10 +43,9 @@ await caso('escritas por CPF: a 9ª tentativa de marcar/cancelar do mesmo CPF na
   return { ok: r.ok === false && r.motivo === 'cpf_escritas' && outroCpf.ok === true, detalhe: r.motivo };
 });
 
-await caso('escritas por IP: um IP não passa de 12 escritas por hora, nem trocando de CPF', async () => {
+await caso('escritas por IP: um IP não passa de 30 escritas por hora, nem trocando de CPF', async () => {
   await limpar(); let r;
-  const cpfs = ['11144477735', '52998224725', '39053344705', '12345678909'];
-  for (let i = 0; i < 13; i++) r = await passar('203.0.113.200', 'marcar', cpfs[i % 4]);
+  for (let i = 0; i < 31; i++) r = await passar('203.0.113.200', 'marcar', String(20000000000 + i));   // CPFs diferentes a cada vez: só o IP é que segura
   return { ok: r.ok === false && r.motivo === 'ip_escritas', detalhe: r.motivo };
 });
 

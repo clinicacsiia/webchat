@@ -87,15 +87,50 @@ Mantido e preservado a qualquer momento (`pedirAtendente`). A tela passa a levar
 
 [NÃO feito] a separação *completa* dos três primeiros (ex.: "Dependente de equipe" como estado próprio do pedido, "Conciliada" como estado da operação): continuam implícitos em combinações de campos. Está em `05-pendencias.md`.
 
-## 6. Pós-agendamento — estado honesto
+## 6. Pós-agendamento — implementado em 14/11/2026 (parte 5; **não publicado**)
 
-| Fluxo | Estado |
-|---|---|
-| Ver minha marcação | [existe] cartão `marcado`/`pos_menu`; consulta ao Klingo antes de mostrar [NÃO feito]. |
-| Cancelar | [existe] pipeline `klingo_operacao` tipo `cancelar` + regra de 24 h (`pos_prazo`); incerto → equipe. Não alterado nesta rodada. |
-| Remarcar | [existe] tipo `remarcar` envia o voucher antigo (`remarcacao`) para o Klingo cancelar sozinho. **A unificação com o caminho antigo "equipe cancela depois" e a estratégia compensatória [NÃO foram feitas].** |
-| Resultado de exame | [NÃO feito]. Não há endpoint confirmado; ver `05-pendencias.md`. |
-| Outros assuntos / emergência | [existe, não alterado]. |
+```
+Outro assunto → "Ver minhas marcações" | Remarcar | Cancelar        (aparece quando klingo_api_consultar vale para a conversa)
+        │ CPF + nascimento já conferidos no chat
+        ▼
+ klingo_marcacoes_pedir ──► operação ler_vouchers ──► klingo-executar (identidade e sessão conferidas no Klingo; GET /vouchers só do próprio paciente)
+        ▼  resultado
+ sucesso com marcações ──► retrato em klingo_marcacao (sem CPF/nome) ──► lista "Qual marcação?"  ──► detalhes (serviço, unidade, profissional, data, hora, protocolo)
+ sem marcação futura   ──► "não encontrei" + nova marcação / equipe
+ Klingo fora do ar     ──► diz a limitação, mostra só o histórico do chat (marcado como possivelmente desatualizado) e chama a equipe
+ identidade não confere──► não mostra nada, não revela o que falhou, equipe confere
+        ▼ ação escolhida
+ CANCELAR: regra de 24 h → confirmação → operação cancelar (DELETE /voucher) → Klingo confirma?
+              sim ──► marcação "cancelada" + pedido do chat "cancelado" + mensagem "o sistema confirmou"
+              não/incerto ──► nada muda, nota "conferir ANTES de nova tentativa", equipe assume
+ REMARCAR: regra de 24 h → só se o pedido original (serviço e convênio) existe no nosso banco (mesmo CPF) → calendário só com horários da API
+              → operação remarcar (marca o novo COM o voucher antigo; o Klingo cancela o antigo) → o executor CONFERE o antigo:
+              antigo cancelado ──► ok · antigo ainda ativo ──► DOIS agendamentos: aviso ao paciente + equipe com prioridade ALTA
+              resposta perdida ──► incerto: se o antigo já sumiu, URGENTE ("pode estar sem agendamento"); nunca marca de novo sozinho
+              horário novo ocupado ──► nada muda, volta a escolher
+              marcação feita fora do chat ──► equipe (sem o serviço e o convênio não dá para remarcar com segurança)
+```
+
+| Situação do tipo | Onde | Estado |
+|---|---|---|
+| Ver minhas marcações | `klingo_marcacoes_pedir/aplicar`, `fluxo_marc_*`, executor `executarConsulta` | [feito, testado com Klingo simulado] |
+| Cancelar (qualquer marcação da lista) | `fluxo_marc_aplicar`, `klingo_cancelamento_aplicar` | [feito] |
+| Remarcar (unificado) | `fluxo_marc_aplicar` + caminho `remarcar` do pipeline; o antigo "equipe cancela depois" deixa de existir para quem tem a chave ligada | [feito; remarcação atômica no Klingo **não comprovada**: ver `05-pendencias.md` E3] |
+| Resultado de exame | `fluxo_marc_pergunta/aplicar` (passos `resultado_*`) | [experiência pronta, **integração do Klingo pendente**: não há endpoint confirmado; nada é simulado] |
+| Menu depois de marcar pelo chat (`pos_menu`) | `fluxo_pos_*` | [existe, não alterado] |
+| Aviso do Klingo (webhook) | `klingo_evento_aplicar` | [pronto e **desligado**; agora também atualiza `klingo_marcacao`] |
+
+### Estados (quem é dono de quê)
+
+| Máquina | Campo | Valores | Quem muda |
+|---|---|---|---|
+| Conversa | `conversas.status` | aguardando · em_atendimento · encerrada | chat, equipe, vigias. Cancelar **não** encerra mais a conversa sozinha para quem usa "Ver minhas marcações". |
+| Pedido | `pre_agendamentos.status` / `etapa` | rascunho · pronto · agendado · cancelado | `agendado` só em `klingo_operacao_concluir` (sucesso com voucher) ou pela equipe; `cancelado` só quando o Klingo confirma. Antigo remarcado fica `agendado` com `conferencia_status = remarcado` (não conta duas vezes). |
+| Operação | `klingo_operacao.estado` | pendente · executando · sucesso · falha · incerto · horario_tomado · cancelada | executor e vigia; tipos `marcar`, `remarcar`, `cancelar`, `ler_vouchers` |
+| Marcação vista | `klingo_marcacao.situacao` | ativa · cancelada · remarcada · nao_listada | consulta ao Klingo, cancelamento confirmado, remarcação, webhook |
+| Solicitação futura | `disponibilidade_pedido.estado` | ver §3 | gatilho de transição |
+
+[NÃO feito] a separação *completa* em colunas próprias de "dependente de equipe" (pedido) e "conciliada" (operação): continuam sendo combinações de `ia_ativa`, `incerto` e as notas. Cada estado novo acima tem dono e teste, mas a lista não é uma máquina única.
 
 ## 7. Painel [feito]
 

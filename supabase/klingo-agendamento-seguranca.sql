@@ -24,7 +24,7 @@ revoke all on public.klingo_agendamento_evento from public, anon, authenticated;
 insert into public.config (chave, valor) values
   ('agendamento_externo_modo', 'sim'),            -- sim | leitura (só consulta, nada escreve no Klingo) | nao (tudo recusado)
   ('agendamento_ip_por_minuto', '60'),
-  ('agendamento_ip_escritas_hora', '12'),
+  ('agendamento_ip_escritas_hora', '30'),
   ('agendamento_ip_divergentes_hora', '15'),
   ('agendamento_cpf_escritas_hora', '8'),
   ('agendamento_cpf_divergentes_dia', '10')
@@ -47,7 +47,7 @@ begin
   select coalesce(valor, 'sim') into v_mestre from public.config where chave = 'klingo_auto';
   v_modo := coalesce(v_modo, 'sim');
   v_lim_min := coalesce((select nullif(valor, '')::int from public.config where chave = 'agendamento_ip_por_minuto'), 60);
-  v_lim_esc_ip := coalesce((select nullif(valor, '')::int from public.config where chave = 'agendamento_ip_escritas_hora'), 12);
+  v_lim_esc_ip := coalesce((select nullif(valor, '')::int from public.config where chave = 'agendamento_ip_escritas_hora'), 30);
   v_lim_div_ip := coalesce((select nullif(valor, '')::int from public.config where chave = 'agendamento_ip_divergentes_hora'), 15);
   v_lim_esc_cpf := coalesce((select nullif(valor, '')::int from public.config where chave = 'agendamento_cpf_escritas_hora'), 8);
   v_lim_div_cpf := coalesce((select nullif(valor, '')::int from public.config where chave = 'agendamento_cpf_divergentes_dia'), 10);

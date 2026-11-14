@@ -352,6 +352,7 @@ $function$;
 do $m$
 declare d text := pg_get_functiondef('public.klingo_pode_marcar(uuid)'::regprocedure); n integer;
 begin
+  if position('and not sombra and expira_em' in d) > 0 then return; end if;   -- já aplicado (reaplicar é seguro)
   n := (length(d) - length(replace(d, 'and expira_em > now() - interval ''20 minutes'';', ''))) / length('and expira_em > now() - interval ''20 minutes'';');
   if n <> 1 then raise exception 'klingo_pode_marcar: trecho da oferta nao encontrado exatamente uma vez (%)', n; end if;
   d := replace(d, 'and expira_em > now() - interval ''20 minutes'';', 'and not sombra and expira_em > now() - interval ''20 minutes'';');

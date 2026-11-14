@@ -47,6 +47,7 @@ declare
   a3 text := E'''chegada'', coalesce((v_s ->> ''chegada'')::boolean, false))),';
   n integer;
 begin
+  if position('v_chave text' in d) > 0 then return; end if;   -- já aplicado (reaplicar é seguro)
   foreach n in array array[(length(d) - length(replace(d, a1, ''))) / length(a1), (length(d) - length(replace(d, a2, ''))) / length(a2), (length(d) - length(replace(d, a3, ''))) / length(a3)] loop
     if n <> 1 then raise exception 'fluxo_aplicar: trecho esperado não encontrado exatamente uma vez (%)', n; end if;
   end loop;

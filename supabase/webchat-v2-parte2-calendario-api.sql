@@ -189,6 +189,7 @@ end $function$;
 do $m$
 declare d text := pg_get_functiondef('public.pedido_horario_vigiar()'::regprocedure); k text := 'if r.cstatus = ''aguardando'' and r.motor = ''fluxo'' and v_procs is not null and jsonb_array_length(public.agenda_grupos(v_procs)) = 1 then'; n integer;
 begin
+  if position('if false then   -- v2.0' in d) > 0 then return; end if;   -- já aplicado (reaplicar é seguro)
   n := (length(d) - length(replace(d, k, ''))) / length(k);
   if n <> 1 then raise exception 'pedido_horario_vigiar: trecho da oferta automática não encontrado exatamente uma vez (%)', n; end if;
   execute replace(d, k, 'if false then   -- v2.0: a oferta automática saía da grade (não é vaga); agora só a equipe é avisada');

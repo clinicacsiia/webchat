@@ -124,6 +124,20 @@ await caso('AVISO DE VAGA no chat: mostra que NÃO está reservado; "Ver horári
   await ctx.close();
   return { ok: /ainda não está reservado|NÃO está reservado/.test(t) && resp.some((r) => r.aceita === false) && resp.some((r) => r.aceita === true) && mundo.chamadasApi.length >= 1, detalhe: `respostas=${JSON.stringify(resp)}` };
 });
+await caso('AVISO DE VAGA sobrevive a fechar e reabrir o navegador: ao recarregar a página o aviso volta UMA vez (não duplica), ainda dizendo que o horário NÃO está reservado', async () => {
+  const mundo = criarMundo(); mundo.api.estado = 'com_horarios';
+  const { page, ctx, erros } = await novaPaginaChat(browser, mundo, {});
+  await comecarConversa(page, base);
+  mundo.inserir('agente', 'Encontramos uma possibilidade de horário compatível com a sua solicitação. O horário ainda NÃO está reservado para você.', { tipo: 'disponibilidade_oportunidade', solicitacao: 'sol-9', oportunidade: 'op-9' });
+  await page.evaluate(() => dispatchEvent(new Event('online')));
+  await page.waitForSelector('#msgs .widget[data-tipo="disponibilidade_oportunidade"]', { timeout: 8000 });
+  await page.reload(); await page.waitForSelector('#msgs .widget[data-tipo="disponibilidade_oportunidade"]', { timeout: 10000 });
+  await new Promise((r) => setTimeout(r, 500));
+  const n = await page.$$eval('#msgs .widget[data-tipo="disponibilidade_oportunidade"]', (x) => x.length);
+  const t = await page.$eval('#msgs .widget[data-tipo="disponibilidade_oportunidade"]', (x) => x.parentElement.textContent);
+  await ctx.close();
+  return { ok: n === 1 && /NÃO está reservado/.test(t) && erros.excecoes.length === 0, detalhe: `avisos na tela depois de reabrir=${n}` };
+});
 await caso('MENU "Minha disponibilidade": lista as solicitações, deixa alterar e cancelar, e explica que não é agendamento', async () => {
   const mundo = criarMundo(); mundo.disp.lista = [{ id: 'sol-1', estado: 'ativa', procedimento: 'RM JOELHO', data_ini: '2026-12-01', data_fim: '2026-12-31', aceita_notificacao: true, dias_semana: [1, 2], turno: 'manha' }];
   const { page, ctx } = await novaPaginaChat(browser, mundo, {});
