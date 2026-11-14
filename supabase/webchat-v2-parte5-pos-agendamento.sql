@@ -8,6 +8,8 @@
 --     ainda ativo = DOIS agendamentos (a equipe é avisada com prioridade alta); resposta perdida = conferência humana. Marcação feita fora do chat e sem o pedido original no nosso banco vai para a equipe (não dá para remarcar sem saber o serviço e o convênio).
 --   • Resultado de exame: experiência completa SEM inventar endpoint: situação (pronto? link/senha? problema?) + orientação configurável + passagem para a equipe com o contexto. A integração do Klingo continua PENDENTE.
 -- Depende de: webchat-v2-parte1-modos.sql (klingo_ativo, chave klingo_api_consultar). NÃO aplicada na produção.
+-- COMO APLICAR (limite de 60 s do Supabase): em DUAS partes. PARTE 5A = do começo até a seção 4 (tabela, textos, funções novas, klingo_operacao_concluir). PARTE 5B = da seção "5. Encaixe no motor existente" até o fim
+--   (ela cria a função temporária pg_temp.encaixar, que só existe na MESMA execução: copie a 5B inteira de uma vez). Cada encaixe confere que o trecho esperado existe exatamente uma vez e é seguro repetir.
 -- Reversão: reaplicar as funções de supabase/producao/funcoes/ (fluxo_proximo, fluxo_perguntar, fluxo_aplicar, fluxo_avancar, fluxo_ler_texto, chat_voltar, klingo_operacao_concluir) e
 --   `update public.config set valor = 'nao' where chave = 'klingo_api_consultar'`. A tabela klingo_marcacao pode ficar (só guarda o retrato da consulta; limpa em 7 dias).
 

@@ -44,7 +44,8 @@ Deno.serve(async (req: Request) => {
   const rpc = (n: string, a: Record<string, unknown>) => supabase.rpc(n, a);
   const hash = async (t: string) => { const { data, error } = await rpc("klingo_hash", { p_texto: t }); if (error || typeof data !== "string") throw new Error("hash"); return data; };
 
-  const ip = (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || req.headers.get("cf-connecting-ip") || req.headers.get("x-real-ip") || "desconhecido";
+  // IP de quem chamou: o que a borda (Cloudflare/Supabase) coloca vem primeiro; x-forwarded-for é o último recurso (o chamador pode escrever esse cabeçalho; por isso o limite por CPF vale mesmo que o IP seja forjado)
+  const ip = req.headers.get("cf-connecting-ip") || req.headers.get("x-real-ip") || (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || "desconhecido";
   const db: Banco = {
     hash,
     async passar(i, acao, cpf) {
