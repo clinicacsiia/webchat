@@ -172,13 +172,18 @@ create or replace function public.disponibilidade_gravar(p_conversa uuid, p_dado
 as $function$
 declare
   pa public.pre_agendamentos; c public.conversas; d jsonb := public.klingo_dados_conversa(p_conversa); v_procs integer[]; v_pessoa text; v_ini date; v_fim date; v_dias smallint[]; v_turno text; v_canais text[]; v_aceita boolean;
-  v_id uuid; v_novo boolean; v_nome text; v_hi text := nullif(p_dados ->> 'hora_ini', ''); v_hf text := nullif(p_dados ->> 'hora_fim', ''); v_tipo_pac text; r public.disponibilidade_pedido;
+  v_id uuid; v_novo boolean; v_nome text; v_hi text := nullif(p_dados ->> 'hora_ini', ''); v_hf text := nullif(p_dados ->> 'hora_fim', ''); v_tipo_pac text; r public.disponibilidade_pedido; v_total integer;
 begin
   select * into c from public.conversas where id = p_conversa;
   select * into pa from public.pre_agendamentos where conversa_id = p_conversa;
   if pa.id is null then raise exception 'Escolha o exame ou a consulta primeiro.' using errcode = '22023'; end if;
   select array_agg(distinct i.procedimento_id order by i.procedimento_id) into v_procs from public.pre_agendamento_itens i where i.conversa_id = p_conversa and i.ativo and i.procedimento_id is not null;
   if v_procs is null then raise exception 'Escolha o exame ou a consulta primeiro.' using errcode = '22023'; end if;
+  -- o motor só sabe procurar UM procedimento que a API reconhece; vários exames ou serviço sem integração seguem para a equipe (nada é prometido que não será procurado)
+  select count(*) into v_total from public.pre_agendamento_itens i, lateral generate_series(1, i.quantidade) g where i.conversa_id = p_conversa and i.ativo and i.procedimento_id is not null;   -- conta cada unidade (2 lados = 2)
+  if v_total <> 1 or not public.klingo_automatizavel(v_procs[1], coalesce(pa.tipo, 'exame')) then
+    raise exception 'Este atendimento é agendado pela nossa equipe: não há busca automática de vaga para ele.' using errcode = 'P0001';
+  end if;
   v_pessoa := public.disponibilidade_pessoa_chave(p_conversa);
   if v_pessoa is null then raise exception 'Informe o CPF e a data de nascimento antes.' using errcode = '22023'; end if;
   v_ini := greatest(coalesce(nullif(p_dados ->> 'data_ini', '')::date, current_date), current_date);

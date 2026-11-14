@@ -118,6 +118,14 @@ await caso('EDITAR e CONSULTAR: o paciente altera preferências e vê a solicita
   return { ok: e.ok && v.solicitacoes.length === 1 && v.solicitacoes[0].turno === 'manha' && JSON.stringify(v.solicitacoes[0].dias_semana) === '[2,4]' && !/111\.?444|Maria|1980|71988880077/.test(txt), detalhe: `turno=${v.solicitacoes[0].turno}; dias=${JSON.stringify(v.solicitacoes[0].dias_semana)}` };
 });
 
+await caso('SEM BUSCA AUTOMÁTICA: vários exames ou serviço sem integração NÃO viram solicitação (seguem para a equipe); nada é prometido que não será procurado', async () => {
+  const M = await ateOCalendario(); await ativar(M);
+  await db.query(`insert into public.pre_agendamento_itens (conversa_id, modalidade, regiao, lado, procedimento_id, procedimento) values ($1, 'RM', 'joelho', 'E', 201, 'RM JOELHO ESQUERDO')`, [M.c]);
+  const e = await erroDe(() => registrarPedido(M, base()));
+  const n = (await um(`select count(*)::int n from public.disponibilidade_pedido where conversa_id = $1`, [M.c])).n;
+  return { ok: e && e.code === 'P0001' && /equipe/.test(e.msg) && n === 0, detalhe: JSON.stringify(e) + `; solicitações=${n}` };
+});
+
 // ------------------------------------------------------------------ achar vaga
 await cfg('klingo_api_horarios', 'teste');
 await caso('VAGA COMPATÍVEL: oferta real que cruza com dia da semana, turno e período vira oportunidade (estado "oportunidade_identificada") e a notificação fica PENDENTE (nada foi enviado)', async () => {

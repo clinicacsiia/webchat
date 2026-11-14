@@ -26,7 +26,7 @@ Deno.serve(async (req: Request) => {
   const t0 = Date.now();
   const c = await req.json().catch(() => ({}));
   const conversa = String(c?.conversa ?? ""), tokenConversa = String(c?.token ?? "");
-  const janela = Math.min(Math.max(Number.isInteger(c?.janela) ? Number(c.janela) : 0, 0), 2);
+  const janela = Math.min(Math.max(Number.isInteger(c?.janela) ? Number(c.janela) : 0, 0), 2), fresco = c?.fresco === true;   // fresco = ignora a lista guardada há menos de 45 s (logo antes de confirmar)
   if (!UUID.test(conversa) || !tokenConversa || tokenConversa.length > 200) return json({ error: "Pedido inválido" }, 400);
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   const { error: eTok } = await supabase.rpc("chat_valida", { p_conversa: conversa, p_token: tokenConversa });
@@ -64,7 +64,7 @@ Deno.serve(async (req: Request) => {
       if (!dados.cpf || !dados.nascimento || !dados.plano) return await recusar("dados_incompletos");
 
       // Cache curto: o chat pede de novo quando a paciente volta de um passo; a mesma lista vale por 45 s (só para a janela inicial e para o mesmo tipo de modo).
-      if (janela === 0) {
+      if (janela === 0 && !fresco) {
         const { data: ult } = await supabase.from("klingo_oferta").select("criado_em").eq("conversa_id", conversa).eq("sombra", sombra).order("criado_em", { ascending: false }).limit(1);
         if (ult?.[0] && Date.now() - Date.parse(ult[0].criado_em) < VALIDADE_CACHE_S * 1000) return json({ ok: true, modo, cache: true, ...(sombra ? {} : { estado: "com_horarios" }) });
       }

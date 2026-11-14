@@ -86,8 +86,11 @@ export function criarMundo(opcoes = {}) {
   m.agenda = { livres: { [dataMais(2)]: ['08:00', '08:30', '09:00'], [dataMais(20)]: ['10:00'] },
     aoVivo: { falha: false, motivo: null, status: null, atraso: 0, retira: {}, libera: {} } };
   m.chamadasFuncao = [];
+  // API do Klingo (v2.0): estado que o banco devolveria em chat_horarios (com_horarios | sem_horarios | indisponivel | nao_integrado) e o registro de solicitações de disponibilidade.
+  m.api = { estado: 'com_horarios', atraso: 0 }; m.chamadasApi = []; m.disp = { lista: [], registros: [], respostas: [], cancelados: [] };
   m.tratarFuncao = async (nome, corpo) => {
     m.chamadas.push({ nome: 'fn:' + nome, corpo, t: Date.now() });
+    if (nome === 'chat-agenda-api') { m.chamadasApi.push({ corpo, t: Date.now() }); if (m.api.atraso) await espera(m.api.atraso); return { body: { ok: m.api.estado === 'com_horarios', estado: m.api.estado } }; }
     if (nome !== 'chat-agenda-ao-vivo') return { body: {} };   // outras funções (ex.: chat-agenda-api, do autoatendimento) respondem vazio e não contam como "leitura do Klingo"
     m.chamadasFuncao.push({ nome, corpo, t: Date.now() });
     const a = m.agenda.aoVivo;
@@ -144,9 +147,15 @@ export function criarMundo(opcoes = {}) {
         const dias = Object.entries(m.agenda.livres).filter(([, hs]) => hs.length).sort(([a], [b]) => (a < b ? -1 : 1))
           .map(([data, hs]) => ({ data, slots: hs.map((hora) => ({ hora, unidade: 'CLÍNICA DE SAÚDE E IMAGEM - CSI', profissional: 'DRA ANA', local: null, min: 30, chegada: false })) }));
         const janelas = {}; for (let i = 0; i < 7; i++) janelas[String(i)] = { ini: '08:00', fim: '12:00', passo: 30 };
-        return { body: { janelas, grupos: [{ indice: 1, procs: [1], nomes: ['CONSULTA'] }], grupo: 1, de: corpo.p_de, ate: corpo.p_ate, dias,
-          unidades: ['CLÍNICA DE SAÚDE E IMAGEM - CSI'], escolhas: [], sem_exame: 0, atualizado_em: agora(), aviso: null } };
+        const ok = m.api.estado === 'com_horarios';
+        return { body: { janelas, grupos: [{ indice: 1, procs: [1], nomes: ['CONSULTA'] }], grupo: 1, de: corpo.p_de, ate: corpo.p_ate, dias: ok ? dias : [],
+          unidades: ['CLÍNICA DE SAÚDE E IMAGEM - CSI'], escolhas: [], sem_exame: 0, atualizado_em: agora(), aviso: null, estado: m.api.estado, klingo_api: ok, origem: ok ? 'api_klingo' : 'nenhuma' } };
       }
+      case 'chat_disponibilidade_registrar': { m.disp.registros.push(corpo.p_dados); return { body: { ok: true, solicitacao: { id: 'sol-1', estado: 'ativa', ...corpo.p_dados } } }; }
+      case 'chat_disponibilidade_ver': return { body: { solicitacoes: m.disp.lista } };
+      case 'chat_disponibilidade_alterar': { m.disp.registros.push(corpo.p_dados); return { body: { ok: true } }; }
+      case 'chat_disponibilidade_cancelar': { m.disp.cancelados.push(corpo.p_id); return { body: { ok: true, estado: 'cancelada' } }; }
+      case 'chat_disponibilidade_responder': { m.disp.respostas.push({ id: corpo.p_id, aceita: corpo.p_aceita }); return { body: corpo.p_aceita ? { ok: true, acao: 'abrir_calendario' } : { ok: true, acao: 'continuar_procurando' } }; }
       case 'chat_horario_escolher': {
         if (!(m.agenda.livres[corpo.p_data] || []).includes(corpo.p_hora)) return { status: 400, body: { code: 'P0002', message: 'Esse horário acabou de ficar indisponível. Escolha outro, por favor.' } };
         m.escolhido = { data: corpo.p_data, hora: corpo.p_hora };
