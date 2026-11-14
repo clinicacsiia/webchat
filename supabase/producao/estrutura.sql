@@ -1,5 +1,5 @@
 -- RETRATO DA ESTRUTURA DO BANCO DE PRODUÇÃO (projeto webchat-atendimento). GERADO: não editar à mão.
--- Tirado em 2026-11-14T16:28:10.423154+00:00 · Postgres 17.11. Só estrutura: nenhuma linha de tabela, nenhum valor de configuração.
+-- Tirado em 2026-11-14T19:27:05.948845+00:00 · Postgres 17.11. Só estrutura: nenhuma linha de tabela, nenhum valor de configuração.
 -- Serve de referência e para os testes. NÃO rodar inteiro sobre a produção. Como refazer: supabase/producao/LEIAME.md.
 
 -- ===== Extensões =====
@@ -18,7 +18,7 @@
 -- authenticator: session_preload_libraries=supautils, safeupdate, statement_timeout=8s, lock_timeout=8s
 -- service_role: sem limite
 
--- ===== Tabelas (123) =====
+-- ===== Tabelas (125) =====
 
 create table public.agenda_ao_vivo (
   dia date not null,
@@ -526,6 +526,26 @@ create policy config_select on public.config as permissive for select to authent
 create policy config_update on public.config as permissive for update to authenticated
   using ((( SELECT papel_atual() AS papel_atual) = 'admin'::text))
   with check ((( SELECT papel_atual() AS papel_atual) = 'admin'::text));
+-- concessão a authenticated: SELECT
+
+create table public.config_auditoria (
+  id bigint generated always as identity not null,
+  em timestamp with time zone default now() not null,
+  chave text not null,
+  valor_antes text,
+  valor_depois text,
+  operacao text not null,
+  origem text not null,
+  justificativa text,
+  versao text default 'webchat-v2.0'::text not null,
+  constraint config_auditoria_operacao_check CHECK ((operacao = ANY (ARRAY['insert'::text, 'update'::text, 'delete'::text]))),
+  constraint config_auditoria_pkey PRIMARY KEY (id)
+);
+comment on table public.config_auditoria is 'Toda mudança em public.config: quem (origem), quando, valor antes/depois (segredos e endereços saem como "(oculto)"), justificativa e versão. Só o admin lê.';
+CREATE INDEX config_auditoria_chave_em_idx ON public.config_auditoria USING btree (chave, em DESC);
+alter table public.config_auditoria enable row level security;
+create policy config_auditoria_select on public.config_auditoria as permissive for select to authenticated
+  using ((( SELECT papel_atual() AS papel_atual) = 'admin'::text));
 -- concessão a authenticated: SELECT
 
 create table public.consulta_config (
@@ -1379,6 +1399,29 @@ alter table public.klingo_conferencia enable row level security;
 -- concessão a anon: DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
 -- concessão a authenticated: DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
 
+create table public.klingo_consulta (
+  id bigint generated always as identity not null,
+  em timestamp with time zone default now() not null,
+  conversa_id uuid,
+  modo text not null,
+  tipo text,
+  procedimento integer,
+  plano integer,
+  resultado text not null,
+  http_status integer,
+  n_recebidos integer,
+  n_validos integer,
+  n_filtrados integer,
+  n_gravados integer,
+  ms integer,
+  detalhe text,
+  constraint klingo_consulta_resultado_check CHECK ((resultado = ANY (ARRAY['ok_com_horarios'::text, 'api_sem_horarios'::text, 'todos_filtrados'::text, 'estrutura_invalida'::text, 'erro_api'::text, 'limite'::text, 'erro_gravacao'::text, 'sem_traducao_plano'::text, 'fora_do_escopo'::text, 'dados_incompletos'::text, 'sem_pedido'::text, 'desligado'::text]))),
+  constraint klingo_consulta_pkey PRIMARY KEY (id)
+);
+comment on table public.klingo_consulta is 'Uma linha por consulta de horários à API do Klingo, com o resultado de cada etapa. Sem CPF, nome, nascimento ou telefone. Apagada após 30 dias.';
+CREATE INDEX klingo_consulta_em_idx ON public.klingo_consulta USING btree (em DESC);
+alter table public.klingo_consulta enable row level security;
+
 create table public.klingo_convenio (
   plano_id integer not null,
   convenio_id integer not null,
@@ -1531,6 +1574,7 @@ create table public.klingo_oferta (
   ordem_chegada boolean default false not null,
   criado_em timestamp with time zone default now() not null,
   expira_em timestamp with time zone not null,
+  sombra boolean default false not null,
   constraint klingo_oferta_pkey PRIMARY KEY (id),
   constraint klingo_oferta_conversa_id_chave_key UNIQUE (conversa_id, chave)
 );
@@ -2475,6 +2519,7 @@ CREATE TRIGGER catalogo_agenda_hash BEFORE INSERT ON public.catalogo_agenda FOR 
 CREATE TRIGGER medico_detectar_meta AFTER INSERT OR UPDATE ON public.catalogo_meta FOR EACH ROW EXECUTE FUNCTION medico_detectar_trg();
 CREATE TRIGGER convenio_evento_catalogo AFTER INSERT ON public.catalogo_mudanca FOR EACH ROW EXECUTE FUNCTION convenio_evento_catalogo_trg();
 CREATE TRIGGER catalogo_preco_confianca BEFORE INSERT OR UPDATE ON public.catalogo_preco FOR EACH ROW EXECUTE FUNCTION catalogo_preco_confianca_trg();
+CREATE TRIGGER config_auditar_trg AFTER INSERT OR DELETE OR UPDATE ON public.config FOR EACH ROW EXECUTE FUNCTION config_auditar();
 CREATE TRIGGER config_catalogo_aplicar BEFORE INSERT OR UPDATE OF valor ON public.config FOR EACH ROW WHEN ((new.chave ~~ 'catalogo\_%'::text)) EXECUTE FUNCTION catalogo_config_aplicar();
 CREATE TRIGGER conversa_fluxo_klingo_trg AFTER INSERT OR UPDATE OF dados ON public.conversa_fluxo FOR EACH ROW EXECUTE FUNCTION conversa_fluxo_klingo_trg();
 CREATE TRIGGER conversa_exame_aberto BEFORE UPDATE OF status ON public.conversas FOR EACH ROW EXECUTE FUNCTION conversa_exame_aberto_trg();
@@ -2604,4 +2649,4 @@ CREATE TRIGGER vinculo_log_imutavel BEFORE DELETE OR UPDATE ON public.vinculo_lo
 --   select net.http_post( url := 'https://nrvuynjwcgwpjdptkiay.supabase.co/functions/v1/sync-catalogo-klingo', headers := jsonb_build_object('Content-Type', 'application/json', 'x-sync-key', (select valor from public.config where chave = 'ia_segredo')), body := '{}'::jsonb, timeout_milliseconds := 120000);
 
 -- ===== Chaves existentes em public.config (só os nomes; os valores não são copiados) =====
--- agenda_ao_vivo, agenda_ao_vivo_max_dias, agenda_ao_vivo_trava_s, agenda_ao_vivo_validade_s, agendado_conferir_prazo_min, agendamento_reconhecer, agendamento_reconhecer_msg_encerradas, autoencerrar_horas, autoencerrar_modo, avaliacao_ativa, boas_vindas, cadastro_equipe_sem_convite, catalogo_csi, catalogo_desenvoar, catalogo_rmtc, chat_push_url, checkin_sem_login_max_dia, convenio_seguir_klingo, convenio_suspenso_texto, despedida_configurada, despedida_inatividade_ativa, despedida_inatividade_texto, despedida_versao_atual, encerramento_exige_motivo, encerramento_valida_agendado, equipe_push_url, fila_autochegada, fila_aviso_antes, fila_push_url, fila_vapid_publica, horario_trabalho, ia_ativa, ia_segredo, indicadores_fechar, jornada_identidade_klingo, jornada_relatorio_filtro, jornada_relatorio_id, klingo_api_horarios, klingo_api_marcar, klingo_api_percentual, klingo_api_pos, klingo_api_pre_cadastro, klingo_api_telefones_teste, klingo_auto, klingo_autogestao, klingo_conferir_ativo, klingo_funcoes_base, klingo_paciente_url, klingo_reconfirmar_dias, klingo_so_liberados, klingo_webhook, login_paciente, motor, motor_telefones_teste, nome_empresa, pedido_escolha_texto, pedido_horario_modo, pedido_oferta2_texto, pedido_parado_horas, pedido_sem_horario_texto, permissao_modo, previsao_decide_texto, previsao_final_texto, previsao_oferta_texto, previsao_texto, reabrir_dias, reaproveitar_cadastro_convidado, teste_agentes, teste_marcadores, vinculo_manual_quem
+-- agenda_ao_vivo, agenda_ao_vivo_max_dias, agenda_ao_vivo_trava_s, agenda_ao_vivo_validade_s, agendado_conferir_prazo_min, agendamento_reconhecer, agendamento_reconhecer_msg_encerradas, autoencerrar_horas, autoencerrar_modo, avaliacao_ativa, boas_vindas, cadastro_equipe_sem_convite, catalogo_csi, catalogo_desenvoar, catalogo_rmtc, chat_push_url, checkin_sem_login_max_dia, convenio_seguir_klingo, convenio_suspenso_texto, despedida_configurada, despedida_inatividade_ativa, despedida_inatividade_texto, despedida_versao_atual, encerramento_exige_motivo, encerramento_valida_agendado, equipe_push_url, fila_autochegada, fila_aviso_antes, fila_push_url, fila_vapid_publica, horario_trabalho, ia_ativa, ia_segredo, indicadores_fechar, jornada_identidade_klingo, jornada_relatorio_filtro, jornada_relatorio_id, klingo_api_cancelar, klingo_api_consultar, klingo_api_horarios, klingo_api_marcar, klingo_api_percentual, klingo_api_pos, klingo_api_pre_cadastro, klingo_api_remarcar, klingo_api_resultado, klingo_api_telefones_teste, klingo_auto, klingo_autogestao, klingo_conferir_ativo, klingo_funcoes_base, klingo_paciente_url, klingo_reconfirmar_dias, klingo_so_liberados, klingo_webhook, login_paciente, motor, motor_telefones_teste, nome_empresa, notificacao_modo, pedido_escolha_texto, pedido_horario_modo, pedido_oferta2_texto, pedido_parado_horas, pedido_sem_horario_texto, permissao_modo, previsao_decide_texto, previsao_final_texto, previsao_modo, previsao_monitor_modo, previsao_oferta_texto, previsao_texto, reabrir_dias, reaproveitar_cadastro_convidado, teste_agentes, teste_marcadores, vinculo_manual_quem
