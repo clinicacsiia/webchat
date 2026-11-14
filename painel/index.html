@@ -730,7 +730,7 @@
     const topo = [['Tipo', p.tipo], ['Especialidade', p.especialidade], ['Procedimento', p.procedimento], ['Plano', p.plano], ['Unidade', p.unidade], ['Profissional', p.profissional], ['Preferência', p.preferencia_horario]];
     const exames = (S.preItens || []).map(linhaItem);
     const horarios = linhasHorario(p);
-    const extra = [...(exames.length ? ['Exames pedidos:', ...exames.map((x) => '• ' + x)] : []), ...(horarios.length ? ['Horário escolhido pelo paciente (previsão, confirmar no Klingo):', ...horarios.map((x) => '• ' + x)] : [])];
+    const extra = [...(exames.length ? ['Exames pedidos:', ...exames.map((x) => '• ' + x)] : []), ...(horarios.length ? ['Horário escolhido pelo paciente (confirmar no Klingo):', ...horarios.map((x) => '• ' + x)] : [])];
     return topo.concat(CAMPOS_PRE.map(([k, r]) => [r, (p.paciente || {})[k]])).filter(([, v]) => v).map(([r, v]) => r + ': ' + v).concat(extra).join('\n');
   }
   async function carregarPre() {
@@ -816,7 +816,7 @@
       (() => { const ds = (Array.isArray(p.escolha_horario) ? p.escolha_horario : []).map((e) => e.data); const mesmoDia = ds.some((d, i) => ds.indexOf(d) !== i);
         const mods = new Set((S.preItens || []).map((i) => i.modalidade)); return (mesmoDia || mods.size > 1) ? h('div', { class: 'urg media', style: 'display:block;margin-top:6px;border-radius:8px' },
           'Exames diferentes' + (mesmoDia ? ' no mesmo dia' : '') + ': confira a ordem, o preparo de cada um (jejum, bexiga cheia, contraste) e o deslocamento entre unidades antes de confirmar.') : null; })(),
-      linhasHorario(p).length ? h('div', { style: 'margin-top:6px' }, h('b', {}, 'Horário escolhido (previsão)'), h('ul', { style: 'margin:4px 0 0;padding-left:18px' }, linhasHorario(p).map((x) => h('li', {}, x))),
+      linhasHorario(p).length ? h('div', { style: 'margin-top:6px' }, h('b', {}, 'Horário escolhido pelo paciente'), h('ul', { style: 'margin:4px 0 0;padding-left:18px' }, linhasHorario(p).map((x) => h('li', {}, x))),
         h('div', { class: 'dica' }, 'Confirme a disponibilidade e o valor no Klingo antes de responder ao paciente.')) : null,
       (S.preHist || []).length ? h('details', {}, h('summary', {}, 'Histórico do paciente (' + S.preHist.length + ')'),
         h('ul', { style: 'margin:4px 0 0;padding-left:18px' }, S.preHist.map((x) => h('li', {}, linhaHist(x))))) : null,

@@ -326,7 +326,7 @@
     consulta: 'Se tiver dúvida sobre qual consulta escolher, uma pessoa da equipe pode orientar.',
     medico: 'Se não tiver preferência de médico, tudo bem: o atendente cuida disso.',
     plano: 'Se não souber o convênio agora, pode falar com um atendente.',
-    horario: 'Os horários são uma previsão. Se nenhum servir, há uma opção para o atendente procurar outro para você.',
+    horario: 'Os horários vêm da agenda da clínica. Se nenhum servir, há uma opção para o atendente procurar outro para você.',
     dados_ident: 'Pode pular o que não souber: o atendente completa depois.', dados_contato: 'Pode pular o que não souber: o atendente completa depois.',
     dados_endereco: 'Digite só o CEP que o resto se preenche sozinho. Pode pular se preferir.', dados_carteira: 'Pode pular a carteirinha: o atendente confere depois.',
     identidade: 'É só para localizar o seu cadastro. Se preferir, fale com um atendente.', confirmar: 'Confira o resumo com calma: se algo estiver errado, dá para corrigir antes de enviar.'
