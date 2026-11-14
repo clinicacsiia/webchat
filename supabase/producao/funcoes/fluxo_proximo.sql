@@ -34,7 +34,7 @@ begin
     end if;
   end if;
   if d ->> 'motivo' = 'assunto' then
-    return case when d ->> 'assunto' is null then 'assunto' else 'assunto_texto' end;
+    return public.fluxo_proximo_assunto(p_conversa, d);   -- v2.1
   end if;
   if n_itens = 0 and d ->> 'motivo' is null then return 'motivo'; end if;
   if n_itens = 0 or d ->> 'refazer' = 'pedido' then

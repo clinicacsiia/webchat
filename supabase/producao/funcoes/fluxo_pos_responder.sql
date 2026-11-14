@@ -20,7 +20,7 @@ begin
              || coalesce(E'\n' || nullif(e ->> 'unidade', ''), '') || coalesce(E'\nCom ' || nullif(e ->> 'profissional', ''), '') || coalesce(E'\nProtocolo: ' || v_vou, '');
     perform public.fluxo_pos_menu(p_conversa, 'Sua marcação:' || E'\n' || v_txt);
   elsif p_valor in ('cancelar', 'remarcar') then
-    if not (public.klingo_ativo(p_conversa, 'klingo_api_pos') and pa.agendado_origem = 'chat_api' and pa.status = 'agendado' and v_vou ~ '^[0-9]+$' and v_quando is not null) then
+    if not (public.klingo_ativo(p_conversa, case when p_valor = 'cancelar' then 'klingo_api_cancelar' else 'klingo_api_remarcar' end) and pa.agendado_origem = 'chat_api' and pa.status = 'agendado' and v_vou ~ '^[0-9]+$' and v_quando is not null) then
       perform public.fluxo_dizer(p_conversa, public.fluxo_t('pos_equipe', ctx));
       perform public.fluxo_transferir(p_conversa, 'Paciente quer remarcar, cancelar ou falar com a equipe depois da marcação automática.', 'baixa', true);
       return;
@@ -43,7 +43,7 @@ begin
       perform public.fluxo_perguntar(p_conversa, 'horario', public.fluxo_t('pos_remarcar_inicio', ctx));
     end if;
   elsif p_valor = 'cancelar_sim' then
-    if not (public.klingo_ativo(p_conversa, 'klingo_api_pos') and pa.agendado_origem = 'chat_api' and pa.status = 'agendado' and v_vou ~ '^[0-9]+$') then
+    if not (public.klingo_ativo(p_conversa, 'klingo_api_cancelar') and pa.agendado_origem = 'chat_api' and pa.status = 'agendado' and v_vou ~ '^[0-9]+$') then
       perform public.fluxo_dizer(p_conversa, public.fluxo_t('pos_equipe', ctx));
       perform public.fluxo_transferir(p_conversa, 'Paciente quer cancelar o agendamento depois da marcação automática.', 'baixa', true);
       return;

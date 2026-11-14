@@ -63,12 +63,16 @@ begin
     v_op := public.fluxo_escolha(p_passo, jsonb_build_array(jsonb_build_object('valor', '', 'rotulo', 'Tanto faz (qualquer médico)')) || v_it);
   when 'assunto' then
     v_txt := public.fluxo_t('assunto', ctx);
-    v_op := public.fluxo_escolha(p_passo, jsonb_build_array(
+    v_op := public.fluxo_escolha(p_passo, (case when public.klingo_ativo(p_conversa, 'klingo_api_consultar') then jsonb_build_array(jsonb_build_object('valor', 'Minhas marcações', 'rotulo', 'Ver minhas marcações')) else '[]'::jsonb end) || jsonb_build_array(
       jsonb_build_object('valor', 'Remarcar', 'rotulo', 'Remarcar um horário'), jsonb_build_object('valor', 'Cancelar', 'rotulo', 'Cancelar um horário'),
       jsonb_build_object('valor', 'Resultado de exame', 'rotulo', 'Resultado de exame'), jsonb_build_object('valor', 'Dúvida', 'rotulo', 'Tirar uma dúvida'),
       jsonb_build_object('valor', 'Reclamação', 'rotulo', 'Reclamação ou sugestão'), jsonb_build_object('valor', 'Outro', 'rotulo', 'Outro assunto')));
   when 'exame_aberto', 'remarcar_falta' then
     v_op := public.fluxo_pos_pergunta(p_conversa, p_passo);
+    v_txt := v_op ->> 'texto';
+    v_op := v_op -> 'op';
+  when 'marc_consultando', 'marc_lista', 'marc_acao', 'marc_cancelar', 'marc_vazio', 'marc_pos', 'resultado_situacao', 'resultado_orientacao' then   -- v2.1: pós-agendamento e resultado
+    v_op := public.fluxo_marc_pergunta(p_conversa, p_passo);
     v_txt := v_op ->> 'texto';
     v_op := v_op -> 'op';
   when 'assunto_qual', 'assunto_confirma', 'assunto_resultado', 'assunto_fim' then

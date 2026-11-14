@@ -14,6 +14,8 @@ begin
   v_hash := encode(sha256(convert_to(v_ev || '|' || v_id || '|' || v_st || '|' || coalesce(p ->> 'checkin', '') || '|' || v_nova, 'UTF8')), 'hex');
   insert into public.klingo_evento (hash, evento, id_marcacao, status) values (v_hash, v_ev, v_id, v_st) on conflict (hash) do nothing returning id into v_ev_id;
   if v_ev_id is null then return jsonb_build_object('ok', true, 'duplicado', true); end if;
+  if v_nova ~ '^[0-9]+$' then update public.klingo_marcacao set situacao = 'remarcada' where voucher = v_id and situacao = 'ativa';   -- v2.1
+  elsif v_st = 'C' then update public.klingo_marcacao set situacao = 'cancelada' where voucher = v_id and situacao = 'ativa'; end if;
   select * into pa from public.pre_agendamentos where klingo_marcacoes @> array[v_id] limit 1;
   if pa.id is not null then
     if v_nova ~ '^[0-9]+$' then

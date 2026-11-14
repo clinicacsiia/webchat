@@ -17,12 +17,13 @@ begin
   when 'motivo' then
     if t ~ '(exame|resson|reson|tomograf|ultras|ultrason|raio|\mrx\M|\mrm\M|\mtc\M|\musg?\M|mamograf|densitom|eletro|\mecg\M|\meeg\M|doppler|ecocard)' then return '"exame"'; end if;
     if t ~ '(consulta|medic|doutor|\mdra?\M|pediatr|cardiolog|ginecolog|ortoped|neuro|endocrin|gastro|urolog|nutri|puericult)' then return '"consulta"'; end if;
-    if t ~ '(remarc|cancel|desmarc|resultado|laudo|duvida|reclama)' then return '"assunto"'; end if;
+    if t ~ '(remarc|cancel|desmarc|resultado|laudo|duvida|reclama|minha marcacao|minhas marcacoes|meu agendamento|meus agendamentos)' then return '"assunto"'; end if;
   when 'atalho' then
     if t ~ '(repetir|mesmo|ultimo)' then return '"ultimo"'; end if;
     if t ~ '(continuar|metade|pendente)' then return '"pendente"'; end if;
     if t ~ '(outro|novo|nova|diferente)' then return '"outro"'; end if;
   when 'assunto' then
+    if t ~ '(minha marcacao|minhas marcacoes|meu agendamento|meus agendamentos|ver (a |as )?(minha|minhas|meu|meus))' then return '"Minhas marcações"'; end if;   -- v2.1
     if t ~ '(remarc|mudar (o )?(dia|horario))' then return '"Remarcar"'; end if;
     if t ~ '(cancel|desmarc)' then return '"Cancelar"'; end if;
     if t ~ '(resultado|laudo)' then return '"Resultado de exame"'; end if;
@@ -37,6 +38,26 @@ begin
     if t ~ '(atendente|pessoa|humano|ligar)' then return '"atendente"'; end if;
     if nao or t ~ '(nao quero|desisti|deixa)' then return '"nao"'; end if;
     if sim or t ~ '(remarc|quero)' then return '"sim"'; end if;
+  when 'marc_acao', 'marc_cancelar', 'marc_vazio', 'marc_pos' then   -- v2.1
+    if p_passo = 'marc_cancelar' then
+      if sim then return '"cancelar_sim"'; end if;
+      if nao then return '"cancelar_nao"'; end if;
+    end if;
+    if p_passo = 'marc_acao' and t ~ '(cancel|desmarc)' then return '"cancelar"'; end if;
+    if p_passo = 'marc_acao' and t ~ '(remarc|outro dia|outra data|mudar)' then return '"remarcar"'; end if;
+    if p_passo = 'marc_acao' and t ~ '(outra marcacao|outro agendamento|ver outra)' then return '"outra"'; end if;
+    if t ~ '(atendente|pessoa|humano|equipe)' then return '"equipe"'; end if;
+    if p_passo in ('marc_vazio', 'marc_pos') and t ~ '(nova marcacao|marcar|agendar|novo)' then return '"nova"'; end if;
+    if p_passo = 'marc_pos' and t ~ '(ver|consultar|minhas)' then return '"ver"'; end if;
+    if p_passo <> 'marc_cancelar' and t ~ '(obrigad|tudo certo|era so isso|so isso)' then return '"fim"'; end if;
+  when 'resultado_situacao' then
+    if t ~ '(pronto|saiu|liberad)' then return '"pronto"'; end if;
+    if t ~ '(link|senha|acesso|site)' then return '"acesso"'; end if;
+    if t ~ '(problema|erro|errado|trocado)' then return '"problema"'; end if;
+    if t ~ '(atendente|pessoa|humano|equipe)' then return '"equipe"'; end if;
+  when 'resultado_orientacao' then
+    if t ~ '(atendente|pessoa|humano|equipe)' or nao then return '"equipe"'; end if;
+    if sim or t ~ '(obrigad|resolv|valeu)' then return '"resolvido"'; end if;
   when 'assunto_confirma' then
     if sim then return '"sim"'; end if;
     if nao then return '"nao"'; end if;

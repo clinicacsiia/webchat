@@ -13,6 +13,8 @@ begin
   select * into o from public.klingo_oferta where conversa_id = p_conversa and chave = e ->> 'klingo_chave';
   select f.dados -> 'remarcando' into v_rem from public.conversa_fluxo f where f.conversa_id = p_conversa;
   v_tipo := case when jsonb_typeof(v_rem) = 'object' then 'remarcar' else 'marcar' end;
+  select id into v_op from public.klingo_operacao where pre_agendamento_id = pa.id and tipo in ('marcar', 'remarcar') and estado = 'incerto' order by criado_em desc limit 1;   -- v2.1
+  if v_op is not null then return v_op; end if;
   v_chave := v_tipo || ':' || pa.id::text || ':' || coalesce(v_rem ->> 'voucher', '') || ':' || (e ->> 'klingo_chave');
   -- klingo-auto: um pedido nunca tem duas operações do mesmo tipo em andamento ou concluídas (mudar o horário não abre uma 2ª reserva)
   select id into v_op from public.klingo_operacao where pre_agendamento_id = pa.id and tipo = v_tipo and estado in ('pendente', 'executando', 'incerto', 'sucesso') and (v_tipo = 'remarcar' or true)
