@@ -1,7 +1,7 @@
 // FLUXOGRAMA: entrada (POST do pg_cron com x-sync-key e {"modo":"rapido"|"completo"}) -> validação (chave = config.ia_segredo; token KLINGO_APP_TOKEN; relatório e filtro vindos da config) -> lógica (lê o relatório do Klingo na janela do modo, mapeia, manda em lotes para jornada_klingo_lote e fecha com jornada_klingo_fechar) -> saída (resumo SEM dado de paciente; em erro, jornada_klingo_falha)
-// Versão 1.1 — 09/11/2026 / Mudança: o filtro de período do relatório por data do exame (#14359) é periodo1; o #13825 segue periodo0
+// Versão 1.2 — 14/11/2026 / Mudança: o #14359 foi refeito (filtro periodo0 = Agendado Para; colunas novas) — filtro sempre periodo0 e colunas por layout
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { emLotes, filtroValido, hojeBrasilia, janelaLeitura, modoValido, prepararLinhas, relatorioValido, somaDias, CARTOES_ATRAS, CARTOES_FRENTE, type Row } from "./mapa.ts";
+import { emLotes, filtroValido, hojeBrasilia, janelaLeitura, layoutDe, modoValido, prepararLinhas, relatorioValido, somaDias, CARTOES_ATRAS, CARTOES_FRENTE, type Row } from "./mapa.ts";
 
 // Lê as marcações do Klingo e alimenta o quadro "Jornada" do painel. Quem chama é o pg_cron (todo minuto, mas o banco só dispara quando é a hora: jornada_klingo_agendar).
 // As linhas do relatório têm nome e telefone de pacientes: ficam só na memória desta função; o telefone vira uma marca (hash) e o valor em R$ nunca é lido.
@@ -13,7 +13,7 @@ const TAMANHO_LOTE = 400;
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
 // O relatório em uma faixa de datas; se o Klingo cortar (limite de linhas), divide a faixa ao meio e junta.
-// campo = id do filtro de período no relatório: o #13825 usa periodo0 (marcado_em); o relatório por data do exame (#14359) usa periodo1 (data_agendado_para).
+// campo = id do filtro de período no relatório: periodo0 nos dois (#13825 = marcado_em; #14359 refeito em 14/11/2026 = data_agendado_para).
 async function marcacoes(token: string, id: string, campo: string, de: string, ate: string, nivel = 0): Promise<Row[]> {
   const params = new URLSearchParams({ id, [`:${campo}`]: "l", [`:${campo}-from`]: de, [`:${campo}-to`]: ate });
   const res = await fetch(`${KLINGO_URL}?${params}`, { headers: { "X-APP-TOKEN": token }, signal: AbortSignal.timeout(90_000) });
@@ -49,7 +49,8 @@ Deno.serve(async (req: Request) => {
   const modo = modoValido(corpo?.modo);
   const filtro = filtroValido(config.jornada_relatorio_filtro);
   const relatorio = relatorioValido(config.jornada_relatorio_id);
-  const campo = filtro === "exame" ? "periodo1" : "periodo0";
+  // Desde 14/11/2026 o #14359 filtra por periodo0 ("Data Agendado Para"); o periodo1 não existe mais e devolvia vazio.
+  const campo = "periodo0";
   const hoje = hojeBrasilia();
   const { de, ate } = janelaLeitura(modo, filtro, hoje);
   const inicio = Date.now();
@@ -58,7 +59,7 @@ Deno.serve(async (req: Request) => {
     const brutas = await marcacoes(token, relatorio, campo, de, ate);
     // Uma leitura completa que volta vazia é quase sempre o Klingo fora do ar ou o relatório mudado: não finge que deu certo.
     if (modo === "completo" && brutas.length === 0) throw new Error("O relatório veio vazio na leitura completa");
-    const { linhas, descartadas, descartes, fora, semProntuario } = await prepararLinhas(brutas, config.ia_segredo, hoje);
+    const { linhas, descartadas, descartes, fora, semProntuario } = await prepararLinhas(brutas, config.ia_segredo, hoje, layoutDe(filtro));
 
     let lidas = 0, alteradas = 0, cartoesCriados = 0;
     for (const lote of emLotes(linhas, TAMANHO_LOTE)) {
