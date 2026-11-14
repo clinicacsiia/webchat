@@ -2692,7 +2692,7 @@
     const convId = conv.id, hoje = new Date();
     const nota = (b, texto, sem) => { const velho = b.querySelector('.disp'); if (velho) velho.remove(); b.append(h('span', { class: 'disp' + (sem ? ' sem' : '') }, texto)); };
     botoes.forEach((b) => { if (b.dataset.valor) nota(b, 'conferindo a agenda…'); });
-    await conferirAgenda(ymd(hoje), ymd(somaDias(hoje, 13)));
+    await chamarAgendaApi(0, false);   // v2.1: pede as ofertas à API do Klingo (a grade não é fonte); sem resposta da API a lista volta vazia e nada é escrito ao lado do médico
     if (!conv || conv.id !== convId) return;
     try {
       const { data, error } = await db.rpc('chat_medicos_disponiveis', { p_conversa: conv.id, p_token: conv.token });
@@ -2703,7 +2703,7 @@
         const x = por.get(b.dataset.valor);
         if (!x) { const velho = b.querySelector('.disp'); if (velho) velho.remove(); return; }
         if (x.proximo) nota(b, `Próximo horário: ${fmtProximo(x.proximo)}`, false);
-        else nota(b, 'Sem horário livre nos próximos dias', true);
+        else nota(b, 'Sem horário disponível nos próximos 15 dias', true);
       });
     } catch { botoes.forEach((b) => { const velho = b.querySelector('.disp'); if (velho) velho.remove(); }); }
   }
@@ -2721,32 +2721,8 @@
   /* Agenda AO VIVO (10/11/2026): dia, horário e médico que a paciente vê são conferidos no Klingo AGORA, quando ela chega ao passo.
      A função chat-agenda-ao-vivo lê o Klingo e atualiza a ocupação no banco; só depois o chat pede a lista (chat_horarios), que já enxerga a agenda de agora.
      Nunca trava o chat: se o Klingo não responder, mostra o que o banco já tem, com aviso e botão para conferir de novo. */
-  // Estado da conferência com o Klingo (vale para o calendário e para a lista de médicos): quando cada dia foi conferido, o que falhou, se está desligado.
-  const V = { ts: new Map(), falhas: new Set(), ultimo: null, desligado: false };
-  const VIVO_FRESCO_MS = (window.__WEBCHAT_TESTE__ && window.__WEBCHAT_TESTE__.vivoFrescoMs) || 20000;
-  const VIVO_CONFIRMA_MS = (window.__WEBCHAT_TESTE__ && window.__WEBCHAT_TESTE__.vivoConfirmaMs) || 8000;
   const somaDias = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
-  const diasYmd = (de, ate) => { const out = []; for (let d = dataLocal(de), f = dataLocal(ate); d <= f; d = somaDias(d, 1)) out.push(ymd(d)); return out; };
-  // Devolve true quando TODOS os dias pedidos estão conferidos agora (ou foram há menos de "idadeMs").
-  async function conferirAgenda(de, ate, idadeMs = VIVO_FRESCO_MS) {
-    if (!conv || V.desligado) return false;
-    const convId = conv.id;
-    const lista = diasYmd(de, ate).filter((d) => !(V.ts.get(d) > Date.now() - idadeMs));
-    if (!lista.length) return true;
-    try {
-      const { data, error } = await comLimite(db.functions.invoke('chat-agenda-ao-vivo', { body: { conversa: conv.id, token: conv.token, de: lista[0], ate: lista[lista.length - 1] } }), 24000);
-      if (error || !data) throw error || new Error('sem resposta');
-      if (data.motivo === 'desligado') { V.desligado = true; return false; }
-      if (data.motivo) throw new Error(data.motivo);
-      const falhas = new Set(data.falhas || []), agora = Date.now();
-      for (const d of lista) { if (falhas.has(d)) V.falhas.add(d); else { V.ts.set(d, agora); V.falhas.delete(d); } }
-      if (falhas.size < lista.length) V.ultimo = agora;
-      return falhas.size === 0;
-    } catch {
-      if (conv && conv.id === convId) for (const d of lista) V.falhas.add(d);
-      return false;
-    }
-  }
+  // v2.1 (14/11/2026): a antiga conferência da grade ("chat-agenda-ao-vivo") saiu do chat: nenhuma tela lê ocupação nem grade como vaga.
   /* Horários REAIS (API do Klingo): a única fonte de horário reservável. Sem oferta da API o chat NÃO mostra horário da grade (v2.0, 14/11/2026).
      A função devolve {estado: com_horarios | sem_horarios | indisponivel | nao_integrado}; o banco monta o calendário só com as ofertas guardadas.
      janela = 0, 1 ou 2 (cada uma soma mais ~15 dias); fresco = ignora a lista guardada há menos de 45 s (usado logo antes de confirmar). */
@@ -2799,19 +2775,6 @@
       if (meu.dia && !(dia && dia.slots && dia.slots.length)) meu.dia = null;
     } catch { /* mantém o que já está na tela */ }
     desenharCalendario();
-  }
-  // Depois da primeira tela, confere os dias seguintes (até 45) e atualiza a lista a cada janela conferida.
-  async function conferirRestoEmSegundoPlano() {
-    const meu = C; if (!meu || V.desligado || meu.segundoPlano) return;
-    meu.segundoPlano = true; desenharCalendario();
-    const hoje = new Date();
-    for (const [a, b] of [[14, 27], [28, 41], [42, 45]]) {
-      if (C !== meu) return;
-      const ok = await conferirAgenda(ymd(somaDias(hoje, a)), ymd(somaDias(hoje, b)));
-      if (C !== meu) return;
-      if (ok || V.falhas.size) await recarregarSilencioso();
-    }
-    if (C === meu) { meu.segundoPlano = false; desenharCalendario(); }
   }
   // A paciente tocou num dia: os horários dele já vieram da API (guardados no banco); não há mais conferência de grade.
   function selecionarDia(s) { const meu = C; if (!meu) return; meu.dia = s; meu.slot = null; desenharCalendario(); }
