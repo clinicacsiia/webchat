@@ -306,13 +306,13 @@ begin
   end if;
 end $function$;
 
--- Grava as ofertas de uma consulta. Só apaga as ofertas do MESMO tipo (reais x sombra) da conversa.
-create or replace function public.klingo_oferta_gravar_v2(p_conversa uuid, p_procedimento integer, p_plano integer, p_ofertas jsonb, p_sombra boolean default false) returns integer
+-- Grava as ofertas de uma consulta. Só apaga as ofertas do MESMO tipo (reais x sombra) da conversa, e só quando p_substituir (a 2ª janela de datas soma, não substitui).
+create or replace function public.klingo_oferta_gravar_v2(p_conversa uuid, p_procedimento integer, p_plano integer, p_ofertas jsonb, p_sombra boolean default false, p_substituir boolean default true) returns integer
   language plpgsql security definer set search_path to ''
 as $function$
 declare v_n integer;
 begin
-  delete from public.klingo_oferta where conversa_id = p_conversa and sombra = coalesce(p_sombra, false);
+  if coalesce(p_substituir, true) then delete from public.klingo_oferta where conversa_id = p_conversa and sombra = coalesce(p_sombra, false); end if;
   insert into public.klingo_oferta (conversa_id, chave, procedimento, plano, data, hora, profissional, profissional_id, unidade, unidade_id, ordem_chegada, expira_em, sombra)
   select p_conversa, left(o ->> 'chave', 120), p_procedimento, p_plano, (o ->> 'data')::date, left(o ->> 'hora', 5), left(o ->> 'profissional', 120), left(o ->> 'profissional_id', 20),
          left(o ->> 'unidade', 120), left(o ->> 'unidade_id', 20), coalesce((o ->> 'ordem_chegada')::boolean, false), now() + interval '30 minutes', coalesce(p_sombra, false)
@@ -323,9 +323,9 @@ begin
   return v_n;
 end $function$;
 revoke all on function public.klingo_consulta_registrar(uuid, text, text, integer, integer, text, integer, integer, integer, integer, integer, integer, text),
-                       public.klingo_oferta_gravar_v2(uuid, integer, integer, jsonb, boolean) from public, anon, authenticated;
+                       public.klingo_oferta_gravar_v2(uuid, integer, integer, jsonb, boolean, boolean) from public, anon, authenticated;
 grant execute on function public.klingo_consulta_registrar(uuid, text, text, integer, integer, text, integer, integer, integer, integer, integer, integer, text),
-                          public.klingo_oferta_gravar_v2(uuid, integer, integer, jsonb, boolean) to service_role;
+                          public.klingo_oferta_gravar_v2(uuid, integer, integer, jsonb, boolean, boolean) to service_role;
 
 -- Limpeza: acrescenta a retenção de 30 dias de klingo_consulta e da auditoria de config (1 ano) à rotina existente.
 create or replace function public.klingo_limpar() returns void
