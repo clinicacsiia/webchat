@@ -1,6 +1,6 @@
 # Pendências que dependem do dono
 
-Versão 1.3 — 14/11/2026 / Mudança: seção 1.3 (risco ativo) e 2.13 (reestruturação do WebChat); 2.10 substituída. Versão 1.2 — 13/11/2026 / Mudança: seção 2.11 (revisão mensal das conversas). Versão 1.1 — 12/11/2026: seção 2.8 (autoatendimento Klingo). Versão 1.0 — 11/11/2026: lista única, conferida na produção em 11/11/2026 às 14:50 (Brasília)
+Versão 1.4 — 14/11/2026 / Mudança: depois das decisões do dono: 1.3 reescrita (a função `klingo-agendamento` é MANTIDA e protegida no servidor), 2.13 atualizada (partes 4 e 5, configuração pública, histórico do telefone tratado). Versão 1.3 — 14/11/2026 / Mudança: seção 1.3 (risco ativo) e 2.13 (reestruturação do WebChat); 2.10 substituída. Versão 1.2 — 13/11/2026 / Mudança: seção 2.11 (revisão mensal das conversas). Versão 1.1 — 12/11/2026: seção 2.8 (autoatendimento Klingo). Versão 1.0 — 11/11/2026: lista única, conferida na produção em 11/11/2026 às 14:50 (Brasília)
 
 Só entra aqui o que **só você consegue fazer**: decidir, colar um segredo, autorizar, falar com terceiros. O que é técnico e não depende de você está no fim, para você saber que não está esquecido. Cada item tem o link direto da tela onde a ação acontece.
 
@@ -25,10 +25,11 @@ A mesma lista existe como página (com caixas de marcar): peça ao Claude "abra 
 - Depois de juntar, o GitHub publica sozinho em cerca de 1 minuto: https://github.com/clinicacsiia/webchat/actions
 
 
-### 1.3 Risco ativo: função pública que marca no Klingo (14/11/2026)
-- **O que acontece:** a função `klingo-agendamento` (versão 2) continua publicada **sem login** e consegue marcar, remarcar, cancelar e criar pré-cadastro no Klingo só com CPF + nascimento. Ela **não obedece** às chaves de teste. A página que a usava foi removida.
-- **Como resolver (30 segundos):** apague a função: https://supabase.com/dashboard/project/nrvuynjwcgwpjdptkiay/functions/klingo-agendamento (se precisar, o código está no git: commits `8890756` e `d389d3c`).
-- **Também (enquanto a migração nova não entra):** em Configurações, ou no editor SQL https://supabase.com/dashboard/project/nrvuynjwcgwpjdptkiay/sql/new, rode `update public.config set valor = 'teste' where chave = 'klingo_auto';`. Hoje o valor `sim` faz as chaves "em teste" valerem para **todos os pacientes** (nenhuma marcação real foi criada até agora: 0 operações). Para voltar: `sim`.
+### 1.3 Função pública `klingo-agendamento`: mantida (decisão sua de 14/11/2026), segurança no servidor pronta e **não publicada**
+- **Decisão:** a função **não é apagada nem desativada**. A auditoria (https://github.com/clinicacsiia/webchat/blob/ccr-462c5406-8n7vre/docs/reestruturacao-2026-11-14/07-auditoria-klingo-agendamento.md) confirmou que ela pode ser chamada direto, sem passar pelo site, e que CPF + nascimento são a única prova; marcar/cancelar/remarcar de **outra pessoa só** vale para quem souber esses dois dados.
+- **O que já está pronto (na branch, não publicado):** limite de pedidos por IP e por CPF, limite de escritas, trava de nascimentos errados por IP e por CPF, chave para desligar sem publicar (`agendamento_externo_modo`), registro de auditoria só com hashes. Mesmo contrato para quem já usa; três respostas novas possíveis (429/503 com `mensagem`).
+- **O que depende de você:** autorizar a publicação (primeiro `supabase/klingo-agendamento-seguranca.sql`, depois a função 1.1) e, se quiser, um **segundo fator** (SMS/e-mail) para ações que escrevem. Link da função: https://supabase.com/dashboard/project/nrvuynjwcgwpjdptkiay/functions/klingo-agendamento
+- **`klingo_auto = sim`:** mantido como está, por decisão sua (agendamento automático para todos). A nova versão atende o público por chaves separadas (`supabase/webchat-v2-config-publica.sql`).
 
 ---
 
@@ -102,13 +103,13 @@ Quando o paciente toca em "Nenhum horário serve" (ou recusa as duas ofertas), o
 
 ### 2.13 Reestruturação do WebChat (14/11/2026) — tudo pronto no repositório, **nada na produção**
 Resumo e plano completo: [`reestruturacao-2026-11-14/00-leia-primeiro.md`](reestruturacao-2026-11-14/00-leia-primeiro.md). O que só você decide ou autoriza:
-1. **Autorizar a publicação** das 3 migrações (`supabase/webchat-v2-parte1..3`), das 2 Edge Functions (`chat-agenda-api` v2 e `disponibilidade-vigia`) e das telas (merge): ordem e reversão em [`06-plano-de-publicacao.md`](reestruturacao-2026-11-14/06-plano-de-publicacao.md). A migração **mexe nos efeitos** de `klingo_auto = sim` (passa a só limitar), então vale ler a tabela "o que acontece na produção" em [`03-matriz-de-configuracao.md`](reestruturacao-2026-11-14/03-matriz-de-configuracao.md).
-2. **Piloto**: indicar um paciente que autorize (e a agenda/procedimento de teste) para as 20+ marcações de teste. Nenhuma marcação real foi feita nesta rodada.
-3. **Decidir a política de encerramento** de conversa quando o paciente registra disponibilidade futura (chave `disponibilidade_encerra_conversa`, hoje `nao`) e a inatividade de 24 h.
-4. **Suporte do Klingo**: webhook, endpoints de resultado de exame, remarcação atômica, `/vouchers` com `id_externo`, limite por minuto, catálogo (lista em [`05-pendencias.md`](reestruturacao-2026-11-14/05-pendencias.md), seção A).
-5. **Jurídico**: `privacidade.html` precisa citar a solicitação de disponibilidade, o aviso no chat, a retenção e o opt-out (item 2.5).
-6. **Decidir sobre um erro meu**: um telefone de teste real (o da lista `klingo_api_telefones_teste`) ficou nos commits antigos da branch `ccr-462c5406-8n7vre` (já removido da versão atual). Me autorize a **reescrever o histórico dessa branch** (ninguém mais depende dela) ou apague a branch no GitHub e eu a recrio limpa: https://github.com/clinicacsiia/webchat/branches . **Não faça merge antes disso.**
-7. Apagar também as funções temporárias `klingo-comparar-chat`, `klingo-comparar-14554`, `klingo-teste-api` e `klingo-inspecionar-chat` (lista em 4).
+1. **Autorizar a publicação**, na ordem de [`06-plano-de-publicacao.md`](reestruturacao-2026-11-14/06-plano-de-publicacao.md): segurança da `klingo-agendamento` → migrações (partes 1, 2, 4, 3, 5) → Edge Functions (`chat-agenda-api` v2, `klingo-executar` v1.1, `disponibilidade-vigia`) → tela e painel (merge) → **configuração pública** (`webchat-v2-config-publica.sql`). **Atenção:** entre a parte 1 e a configuração pública o público fica sem marcação automática; o plano concentra isso numa janela única.
+2. **Validação com o Klingo real**: todos os testes usam Klingo simulado. Indicar um paciente de teste e uma agenda que a equipe aceite cancelar para conferir marcar, ver, cancelar e remarcar de verdade (lista em `06`, seção 3). Nenhuma marcação real foi feita.
+3. **Decidir a política de encerramento** de conversa quando o paciente registra disponibilidade futura (`disponibilidade_encerra_conversa`, hoje `nao`).
+4. **Suporte do Klingo**: webhook, resultado de exame liberado, remarcação atômica, marcações do balcão em `/vouchers`, limite por minuto, catálogo (lista em [`05-pendencias.md`](reestruturacao-2026-11-14/05-pendencias.md), seção A).
+5. **Jurídico**: `privacidade.html` precisa citar solicitação de disponibilidade, consulta de marcações, aviso no chat, retenção e opt-out (item 2.5).
+6. **Telefone de teste no GitHub:** tratado na minha branch (histórico reescrito, com a sua autorização). **Sobra:** o mesmo número já estava na `main` desde 10/11 e nas branches antigas, e o GitHub guarda commits antigos por código. Decisão sua: ver [`08-limpeza-do-telefone-no-github.md`](reestruturacao-2026-11-14/08-limpeza-do-telefone-no-github.md). Trocar o telefone na lista de teste resolve o risco prático.
+7. Apagar as funções temporárias `klingo-comparar-chat`, `klingo-comparar-14554`, `klingo-teste-api` e `klingo-inspecionar-chat` (a `klingo-agendamento` **fica**).
 
 ## 3. Contas e segurança
 

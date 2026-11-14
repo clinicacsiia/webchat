@@ -53,6 +53,21 @@ await caso('FALHA TÉCNICA (API fora do ar) NÃO é "sem vaga": avisa que não f
   await ctx.close();
   return { ok: /Não foi possível consultar os horários agora/.test(t) && !/Não encontramos horários/.test(t) && b.some((x) => /Tentar de novo/.test(x)) && mundo.chamadasApi.length > antes && ultima.fresco === true && ultima.janela === 0, detalhe: `botões=${b.join(' | ')}; última chamada=${JSON.stringify(ultima).replace(/"(token|conversa)":"[^"]+",?/g, '')}` };
 });
+await caso('API LENTA (responde em 2,5 s): a tela mostra que está conferindo e depois os horários da API, sem travar nem mostrar horário antes da resposta', async () => {
+  const { mundo, page, ctx } = await abrir('com_horarios', (m) => { m.api.atraso = 2500; });
+  const durante = await page.waitForSelector('#folhaCorpo .carregando', { timeout: 4000 }).then(async () => (await texto(page)).includes('Conferindo'), () => false);
+  const semHorarioAntes = (await page.$$('#folhaCorpo .cal-dia.livre')).length === 0;
+  await page.waitForSelector('#folhaCorpo .cal-dia.livre', { timeout: 10000 });
+  await ctx.close();
+  return { ok: durante && semHorarioAntes && mundo.chamadasApi.length >= 1, detalhe: `conferindo=${durante}; horário antes da resposta=${!semHorarioAntes}` };
+});
+await caso('API LENTA DEMAIS (passa do limite de 14 s): a tela NÃO fica esperando para sempre nem inventa horário: mostra "não foi possível consultar" com "Tentar de novo"', async () => {
+  const { page, ctx } = await abrir('indisponivel', (m) => { m.api.atraso = 15500; });
+  await page.waitForSelector('#folhaCorpo .aviso-cal', { timeout: 22000 });
+  const t = await texto(page), b = await botoes(page), horarios = (await page.$$('#folhaCorpo .cal-dia.livre')).length;
+  await ctx.close();
+  return { ok: /Não foi possível consultar os horários agora/.test(t) && b.some((x) => /Tentar de novo/.test(x)) && horarios === 0, detalhe: `horários na tela=${horarios}` };
+});
 await caso('SERVIÇO SEM INTEGRAÇÃO: diz que é agendado pela equipe, NÃO oferece registrar disponibilidade (não seria procurado) e "Enviar meu pedido para a equipe" responde "sem_horario" ao assistente', async () => {
   const { mundo, page, ctx } = await abrir('nao_integrado');
   await page.waitForSelector('#folhaCorpo .aviso-cal', { timeout: 8000 });
