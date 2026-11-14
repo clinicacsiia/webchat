@@ -1,64 +1,65 @@
 # 05 — Pendências (o que NÃO está pronto) e dependências do suporte do Klingo
 
-Versão 1.0 — 14/11/2026 / Mudança: primeira versão. Nada aqui está marcado como concluído sem implementação e teste.
+Versão 2.0 — 14/11/2026 / Mudança: atualizado depois das decisões do dono de 14/11/2026 (pós-agendamento implementado, `klingo-agendamento` preservada, público geral). Nada aqui está marcado como concluído sem implementação **e** teste; "testado" sempre significa **com o Klingo simulado**.
 
 ## A. Pendências externas (dependem de resposta ou liberação do suporte do Klingo)
 
-Para cada uma: o que já foi investigado e o que falta confirmar. Texto-base do e-mail: `docs/klingo-api-externa/roteiro-reuniao-suporte.md`.
+Texto-base do e-mail: `docs/klingo-api-externa/roteiro-reuniao-suporte.md`.
 
-| # | Funcionalidade | Já investigado | Falta confirmar |
+| # | Funcionalidade | Já investigado (documentação e código) | Falta confirmar com o Klingo |
 |---|---|---|---|
-| E1 | **Webhook** | `klingo-webhook` pronta e desligada (token em tempo constante, idempotência por hash, chave `klingo_webhook`). | O Klingo cadastrar `https://nrvuynjwcgwpjdptkiay.supabase.co/functions/v1/klingo-webhook` com o `X-APP-TOKEN`; se o evento traz **id, hora ou assinatura** (hoje não traz: fora de ordem só se resolve por reconciliação). |
-| E2 | **Resultado de exame** | O código da função removida `klingo-agendamento` chamava `GET /resultado/{id}` e `GET /resultado/pdf/{id}` (sem sessão do paciente, 403 em HTML quando não há laudo). **Isso não foi validado nesta rodada**; o relatório C só diz "laudo pronto" e não tem link nem senha. | Se esses endpoints são oficiais e liberados; que identificador usam (voucher?); se exigem senha; como validar o responsável de menor. Sem isso `klingo_api_resultado` fica `nao` e **nenhuma consulta é simulada**. |
-| E3 | **Remarcação atômica** | O `POST /agenda/horario` aceita `remarcacao` (voucher antigo) e o Klingo "cancela sozinho" (pipeline atual). Não foi provado, em ambiente real, o que acontece se a nova marcação falhar depois do aceite, nem se existe janela com duas marcações. | Confirmar atomicidade e o erro em caso de conflito; sem isso vale a estratégia compensatória (ver B3). |
-| E4 | **Conciliação ativa de operação incerta** | Hoje a incerta vai para a equipe com a nota "conferir antes de marcar de novo". | Se `GET /vouchers` devolve o `id_externo` enviado na marcação (permitiria conferir sozinho). |
-| E5 | **Limite de chamadas** | Cota global do banco (10 fichas, 1/s) e tratamento de 429. | O limite real por minuto, para dimensionar o motor de vagas. |
-| E6 | **Catálogo da API** | Só 3 especialidades liberadas (neurologia, pediatria, radiologia). | Liberar as demais (ortopedia, endocrinologia…) e o plano da ASSEFAZ; uma agenda de teste. |
-| E7 | **Preço Particular, convênio inativado, hora real do atendimento** | Já listadas em `docs/pendencias-do-dono.md` 2.3. | Respostas do suporte. |
+| E1 | **Webhook** | `klingo-webhook` pronta e **desligada** (comparação do token em tempo constante; evento repetido é ignorado por hash; cancelamento/remarcação avisados agora também atualizam a lista de marcações do chat; testado no banco). **Autenticação lida no código, sem teste automático** (a função usa `Deno.serve` direto). | Cadastrar `https://nrvuynjwcgwpjdptkiay.supabase.co/functions/v1/klingo-webhook` com o `X-APP-TOKEN`; se o evento traz **id, hora ou assinatura** (hoje não traz: dois cancelamentos iguais da mesma marcação em sequência parecem repetidos; as rotinas de conferência continuam ligadas para isso). |
+| E2 | **Resultado de exame** | A documentação (`GUIA-COMPLETO.md` 2.6) lista `GET /resultado/{id_marcacao}` (devolve `pronto` e `status`; o laudo vem como arquivo, **não existe link nem senha**). Sem laudo a API responde **403 em HTML** (provado). Implementado: **só conferir se o laudo está liberado** (nunca o conteúdo), atrás da chave `klingo_api_resultado` (padrão `nao`). | (a) Se o formato de `pronto` para laudo liberado é o esperado (**nunca testado com laudo liberado real**). (b) Como entregar o acesso ao paciente (link/senha) sem expor o laudo no chat; hoje a equipe envia. (c) Validação do responsável quando o exame é de menor. |
+| E3 | **Remarcação atômica** | Provado (13/11): `POST /agenda/horario` com `remarcacao` devolve o voucher novo e **cancela o antigo sozinho**. A nova versão **confere o antigo depois** (ativo = duplicidade, cancelado = ok, incerto = equipe). | Garantia do lado deles quando a marcação nova falha depois do aceite, e se existe janela com duas marcações ativas. |
+| E4 | **Conciliação de operação incerta** | O executor reconcilia por `GET /vouchers` (campo `id_externo`, provado que fica gravado no voucher). | Confirmar que `id_externo` volta **sempre** em `/vouchers`. |
+| E5 | **Limite de chamadas** | Cota global do banco (10 fichas, 1/s) e tratamento de 429. | Limite real por minuto, para dimensionar o motor de vagas. |
+| E6 | **Catálogo da API** | Só 3 especialidades liberadas (neurologia, pediatria, radiologia). | Liberar as demais e o plano da ASSEFAZ; agenda de teste. |
+| E7 | **Preço Particular, convênio inativado, hora real do atendimento** | `docs/pendencias-do-dono.md` 2.3. | Respostas do suporte. |
+| E8 | **"Ver minhas marcações" inclui o que foi marcado no balcão?** | `GET /vouchers` lista as marcações **ativas do paciente** (documentação e testes de 13/11, feitos com marcações criadas pela API). | Confirmar que marcações criadas pela recepção aparecem na mesma lista. Se não aparecerem, o chat mostra só o que o Klingo devolve e **não afirma** que é tudo. |
+| E9 | **WhatsApp** | Procurei integração de mensagens reaproveitável no projeto: **não existe** (o n8n foi removido; o "Chamar no WhatsApp" é um link manual da equipe). Nada é simulado. | Escolher o provedor oficial (API do WhatsApp Business), validar base legal e modelos de mensagem. Enquanto isso o aviso de vaga é só no chat, e a equipe vê no painel (Disponibilidade futura) os avisos pendentes e as solicitações que "precisam de pessoa". |
 
 Relatórios do Klingo a criar/editar para esta tarefa: **nenhum** (regra do `CLAUDE.md`).
 
 ## B. Pendências do projeto
 
-### Bloqueantes (impedem ligar para o público)
+### Bloqueantes (antes de publicar)
 
 | # | Item | Por quê |
 |---|---|---|
-| B0 | **Apagar `klingo-agendamento`** | Risco ativo R1 (escrita real, pública, fora das chaves). Ação do dono: 1 clique. |
-| B1 | **Aprovar e aplicar as 3 migrações** (`webchat-v2-parte1/2/3`) em partes, no Supabase, depois publicar a tela e a Edge Function `chat-agenda-api` v2 e `disponibilidade-vigia` | Nada disso está na produção. Ver `06-plano-de-publicacao.md`. |
-| B2 | **Piloto**: ≥ 20 marcações de teste com paciente autorizado e agenda de teste, e conferência delas no Klingo | O motor de marcação nunca criou uma operação real (0 em `klingo_operacao`). Os testes desta rodada usam o Klingo simulado. **Nenhuma marcação real foi feita.** |
-| B5 | **Dado pessoal no histórico do git (meu erro, 14/11)** | Um número de telefone da lista de teste da produção entrou em 5 arquivos de teste dos 8 commits da branch `ccr-462c5406-8n7vre` e foi enviado ao GitHub (repositório público). **Já saiu da versão atual** (commit seguinte). **Continua no histórico dessa branch.** Resolver exige reescrever a história da branch (força o envio) ou apagar e recriar a branch: o sistema bloqueou e **depende da sua autorização** (mesma natureza da pendência 3.3 de `pendencias-do-dono.md`). **Não faça merge dessa branch antes de decidir.** |
-| B3 | **Remarcação: unificar** o caminho "preserva o horário anterior" com o "equipe cancela depois" e tratar o risco de dois agendamentos | [NÃO feito]. Depende de E3 para a versão atômica. Enquanto isso o pipeline atual (voucher antigo no corpo da marcação) é o único caminho automático. |
-| B4 | **Token da conversa guardado no aparelho como única prova** para operações sensíveis | [NÃO feito]. Hoje marcar/cancelar exigem CPF + nascimento conferidos, e a marcação só nasce de oferta válida, mas ver agendamento, cancelar e (no futuro) resultado deveriam exigir segundo fator (SMS/e-mail), já previsto em `planejamento-autoatendimento-klingo.md`. |
+| B1 | **Sua autorização** para aplicar as migrações e publicar as Edge Functions e a tela, na ordem de `06-plano-de-publicacao.md` | Nada foi publicado. A publicação tem uma janela em que o público fica sem marcação automática (ver o aviso no plano). |
+| B2 | **Validação com o Klingo real** (paciente e agenda de teste): marcar, cancelar, remarcar, ver marcações, conferir o voucher antigo | **Todos os testes usam Klingo simulado.** O motor de marcação nunca criou uma operação real (0 em `klingo_operacao`). |
+| B3 | **Decidir o histórico do telefone na `main`** | Ver `08-limpeza-do-telefone-no-github.md`: limpei a minha branch; o mesmo número já estava na `main` desde 10/11. |
+| B4 | **Aplicar o SQL de segurança e publicar a `klingo-agendamento` v1.1** (ou deixar como está, sabendo do risco do §5 de `07-auditoria-klingo-agendamento.md`) | A função **continua como estava** na produção. |
 
 ### Importantes
 
 | # | Item |
 |---|---|
-| I1 | Tela para o administrador chamar `klingo_promover` (hoje só SQL) e ver `config_auditoria` e as recomendações. |
-| I2 | Estados separados de forma explícita (conversa / pedido / operação): "dependente de equipe" e "conciliada" ainda são combinações de campos. |
-| I3 | Ver minha marcação consultando o Klingo antes de mostrar (hoje usa o que o chat guardou). |
-| I4 | Cancelamento e consulta com a regra de 24 h revalidadas com fuso (`America/Bahia`): a regra existe e é testada no legado; não foi reauditada aqui. |
-| I5 | Política de encerramento por solicitação futura: decidir `disponibilidade_encerra_conversa` (hoje `nao`) e a inatividade de 24 h (hoje "Chamar no WhatsApp"). |
-| I6 | Mais de um exame ou conjunto de procedimentos na solicitação futura (o modelo suporta; a busca automática ainda não): hoje segue para a equipe com a mensagem clara. |
-| I7 | Notificação por WhatsApp/SMS/e-mail (canais autorizados): só o chat existe. Exige integração validada e base legal revisada (item 2.5 das pendências do dono). |
-| I8 | Rate limit por IP nas funções públicas (`chat-agenda-api` já é limitada por token e cota global; não há limite por IP). |
-| I9 | Comparação linha a linha das demais Edge Functions publicadas × repositório (só `chat-agenda-api` foi comparada). |
-| I10 | `privacidade.html`: citar solicitação de disponibilidade, finalidade, base legal, retenção (`config_auditoria` 1 ano; `klingo_consulta` 30 dias; solicitações encerradas: definir prazo) e opt-out. Revisão jurídica. |
-| I11 | Comparação de segredo em tempo constante nas funções com `x-sync-key`. |
+| I1 | Tela para o administrador chamar `klingo_promover` (hoje só SQL). O painel já edita cada chave (e a trilha `config_auditoria` registra), mas sem a justificativa obrigatória. |
+| I2 | Estados em colunas próprias ("dependente de equipe" no pedido, "conciliada" na operação): continuam combinações de campos (ver `02-arquitetura-e-estados.md`). |
+| I3 | **Segundo fator** (SMS/e-mail) para ações que escrevem, no chat e na `klingo-agendamento` (`07`, §5). |
+| I4 | Rate limit **por IP nas funções do chat** (`chat-agenda-api` é limitada por token e cota global; a `klingo-agendamento` já tem limite por IP). |
+| I5 | Mais de um exame na solicitação futura e na marcação automática: segue para a equipe com mensagem clara. |
+| I6 | Remarcar **marcação feita no balcão** pelo chat (hoje vai para a equipe porque não sabemos serviço e convênio): exigiria mapear o procedimento do voucher no catálogo e perguntar o convênio. |
+| I7 | Reescrever o teste legado `sql-klingo-auto.test.mjs` (aposentado: 21 de 73 verificações assumem o fluxo de 12/11). O comportamento dele (marcação, divergência, voltar) está coberto pelos testes novos de pipeline e continua na produção. |
+| I8 | Comparar linha a linha as demais Edge Functions publicadas × repositório (só `chat-agenda-api` e `klingo-agendamento` foram comparadas). |
+| I9 | `privacidade.html`: citar solicitação de disponibilidade, consulta de marcações, finalidade, base legal, retenção (`config_auditoria` 1 ano; `klingo_consulta` 30 dias; `klingo_marcacao` 7 dias; `klingo_agendamento_evento` 30 dias; solicitações encerradas: definir) e opt-out. Revisão jurídica. |
+| I10 | Notificação por WhatsApp/SMS/e-mail (item E9). |
+| I11 | A `chat-agenda-ao-vivo` (leitura de ocupação por relatório) **não é mais chamada pelo chat**; fica publicada sem uso. Pode ser apagada depois da publicação. |
+| I12 | (resolvido em 14/11: o texto do painel sobre o interruptor geral foi reescrito). |
 
 ### Melhorias futuras
 
 * Painel de saúde do motor de vagas (taxa de oportunidade → aceite → conversão).
-* Unificar a lista da atendente com um indicador "tem solicitação futura ativa" no cartão do pedido (hoje o pedido continua indo à equipe como "sem horário" com a nota "nada a fazer agora").
-* Regressão visual automatizada além dos testes de navegador atuais.
-* Acessibilidade do novo formulário (foco preso na folha, anúncio de erro) revisada com leitor de tela.
+* Indicador "tem solicitação futura ativa" no cartão do pedido.
+* Regressão visual automatizada; acessibilidade dos formulários novos revisada com leitor de tela.
+* Reconhecer marcação cancelada **pelo balcão** durante uma conversa aberta (hoje só ao consultar de novo ou pelo webhook, quando existir).
 
-## C. Limitações conhecidas desta entrega (para não haver surpresa)
+## C. Limitações conhecidas desta entrega
 
-1. O teste legado `sql-klingo-auto.test.mjs` foi retirado da corrente (21 de 73 verificações assumem o fluxo de 12/11). O comportamento que ele cobria (marcação, cancelar, remarcar, incerto, divergência, voltar) **está na produção e não foi alterado**, mas ficou sem teste automatizado equivalente sobre o retrato novo. Reescrevê-lo contra o fluxo atual é item **importante**.
-2. `previsao_ativa` agora devolve sempre `false`: o assistente antigo da "lista de espera" (turno/período/antecedência) **deixa de existir**. A tabela `pedido_previsao` e suas funções (`previsao_iniciar`, `previsao_responder`, `previsao_pergunta`) ficam no banco, sem uso, por compatibilidade (0 linhas hoje).
-3. `chat-agenda-ao-vivo` (leitura da ocupação por relatório) continua publicada e usada na lista de médicos ("próximo horário de cada médico"), que **ainda vem da grade/ocupação**. É informação de apoio, não oferta, mas viola o espírito do item 5.3 se for lida como vaga: **[pendência I12]** trocá-la por ofertas da API ou rotular como "estimativa".
-4. Janela de datas: a API devolve ≤ 15 dias por consulta; a tela soma até 3 janelas (≈ 45 dias) sob demanda.
-5. Gêmeos com o mesmo responsável, mesma data de nascimento e mesmo nome se confundem na chave da solicitação (limitação do desenho sem guardar dado pessoal).
-6. **Ofertas antigas já criadas em `horario_oferta`** (assistente que oferecia o "horário mais próximo" da grade, só no modo `teste`): se um paciente tinha uma pendente e aceita, `fluxo_aplicar` ainda confere a grade e grava a escolha **sem `klingo_chave`**. Resultado seguro: `klingo_pode_marcar` recusa (`sem_oferta_da_api`/`horario_nao_unico`) e o pedido vai à equipe; nenhuma oferta nova é criada (a origem foi desligada). Revisar `fluxo_aplicar` para validar na API é item **importante** (I13).
+1. **Tudo que "vem do Klingo" nos testes é simulado.** O que fica sem prova real: formato de `GET /vouchers` para marcações do balcão (E8), laudo liberado (E2), remarcação com falha parcial (E3), resposta perdida em cada rota.
+2. `previsao_ativa` devolve sempre `false`: o assistente antigo da "lista de espera" deixa de existir; a tabela `pedido_previsao` e suas funções ficam sem uso (0 linhas).
+3. Janela de datas: a API devolve ≤ 15 dias por consulta; a tela soma até 3 janelas (≈ 45 dias) sob demanda. A lista de médicos mostra "Sem horário disponível nos próximos 15 dias" (a janela consultada).
+4. Gêmeos com o mesmo responsável, nascimento e nome se confundem na chave da solicitação futura.
+5. A reescrita do histórico limpou **só a minha branch**; o GitHub ainda guarda commits antigos por SHA e há cópias fora do meu alcance (`08`).
+6. `pytest` foi instalado **só no ambiente de teste desta sessão** (`pip install pytest`); nenhum arquivo de dependência do projeto foi alterado. Quem rodar os testes em outra máquina precisa do mesmo `pip install pytest`.

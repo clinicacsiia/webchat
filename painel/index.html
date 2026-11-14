@@ -4385,7 +4385,7 @@ h1.longo { font-size: 14mm; }
   function blocoAutoatendimento(d) {
     if (!d || !d.modos) return null;
     const m = d.modos, op = d.operacoes || {}, cad = d.cadastros || {}, ha = d.horarios_api || {}, pos = d.pos || {};   // v2.1: pos = cancelar/remarcar/ver marcações ("tipo:estado" → quantidade)
-    const modoHor = { nao: 'desligados', sombra: 'só medindo (a tela do paciente não muda)', sim: 'ligados' }[m.horarios] || m.horarios;
+    const modoHor = { nao: 'desligados', sombra: 'só medindo (a tela do paciente não muda)', teste: 'só nos telefones de teste', sim: 'ligados' }[m.horarios] || m.horarios;
     const geral = { nao: 'DESLIGADO (o chat funciona como antes)', teste: 'em TESTE (só os telefones da lista)', sim: 'LIGADO para todos', legado: 'regras antigas por chave' }[m.mestre] || 'DESLIGADO (o chat funciona como antes)';
     const modoMar = m.marcar === 'sim' ? `ligada para ${m.percentual}% das conversas` : m.marcar === 'teste' ? 'só nos telefones de teste' : 'desligada';
     const mini2 = (n, rot) => h('div', { class: 'ind-mini' }, h('b', {}, String(n ?? 0)), h('span', {}, rot));
@@ -4393,7 +4393,7 @@ h1.longo { font-size: 14mm; }
     const nomeChave = { klingo_api_horarios: 'Horários reais', klingo_api_marcar: 'Marcação automática', klingo_api_percentual: 'Parte das conversas' };
     return h('div', { class: 'ind-auto' },
       h('h3', { class: 'ind-sec' }, 'Autoatendimento (marcação automática pelo Klingo)'),
-      h('p', { class: 'dica' }, `Interruptor geral (Configurações > Autoatendimento com o Klingo): ${geral}. ` + (m.mestre === 'legado' ? `Horários reais do Klingo: ${modoHor}. Marcação automática: ${modoMar}. O sistema avança e recua sozinho conforme os números; você só é avisado quando ele recua.` : 'Ligado para todos, o sistema só vigia e volta sozinho para Teste se aparecerem marcações incertas ou falhas; ele não liga nada por conta própria.')),
+      h('p', { class: 'dica' }, `Interruptor geral (teto, em Configurações > Autoatendimento com o Klingo): ${geral}. Horários reais do Klingo: ${modoHor}. Marcação automática: ${modoMar}. Cada parte tem a sua própria chave nas Configurações. O sistema só RECUA sozinho quando aparecem falhas (e avisa a gestão); subir de Teste para Ligado é sempre decisão de uma pessoa.`),
       h('div', { class: 'ind-minis' }, mini2(d.agendadas_sozinhas, 'agendadas sozinhas'), mini2(d.resolvidas_sem_humano, 'resolvidas sem atendente'), mini2(op.sucesso, 'marcações certas'),
         mini2((op.incerto || 0) + (op.falha || 0), 'foram para a equipe'), mini2(op.horario_tomado, 'horário já ocupado'), mini2(d.tempo_medio_s != null ? d.tempo_medio_s + ' s' : '–', 'tempo médio para marcar')),
       h('div', { class: 'ind-minis' }, mini2(pos['ler_vouchers:sucesso'], 'consultas de marcações'), mini2(pos['cancelar:sucesso'], 'cancelamentos confirmados pelo Klingo'), mini2(pos['remarcar:sucesso'], 'remarcações confirmadas'),

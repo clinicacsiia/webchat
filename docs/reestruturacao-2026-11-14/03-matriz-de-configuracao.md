@@ -24,7 +24,7 @@ Versão 1.0 — 14/11/2026 / Mudança: primeira versão. Implementado em `supaba
 | `klingo_api_remarcar` | `nao` · `teste` · `sim` | **novo**, copia `klingo_api_pos` | `teste` | Remarcação. |
 | `klingo_api_consultar` | `nao` · `teste` · `sim` | **novo**, copia `klingo_api_pos` | — | Ver minhas marcações (consulta o Klingo pela sessão do próprio paciente). |
 | `klingo_api_pos` | `nao` · `teste` · `sim` | (legado) | `teste` | Mantida só como herança enquanto as três acima não existirem. |
-| `klingo_api_resultado` | `nao` · `sombra` · `teste` · `sim` | **novo**, `nao` | — | Resultado de exame (**sem integração**: não faz nada hoje). |
+| `klingo_api_resultado` | `nao` · `sombra` · `teste` · `sim` | **novo**, `nao` | — | Resultado de exame: com a chave ligada, **só confere no Klingo se o laudo está liberado** (`GET /resultado/{id}`, nunca o conteúdo); a entrega do link/senha continua com a equipe. Desligada, só a orientação da clínica. **Laudo liberado nunca foi testado com paciente real.** |
 | `previsao_modo` | `nao` · `teste` · `sim` | **novo**, `teste` | — | Registrar solicitação de disponibilidade. |
 | `previsao_monitor_modo` | `nao` · `sombra` · `teste` · `sim` | **novo**, `nao` | — | Motor que procura vagas na API (consome cota). |
 | `notificacao_modo` | `nao` · `teste` · `sim` | **novo**, `nao` | — | Entrega do aviso de vaga no chat. |
@@ -65,7 +65,7 @@ O dono decidiu que o agendamento automático fica disponível para **todos**. Na
 | `previsao_modo` · `notificacao_modo` | `sim` | solicitação de disponibilidade futura e aviso no chat |
 | `previsao_monitor_modo` | `sim` | motor de vagas (começar em `sombra` por 24 h é o recomendado: consome a cota) |
 
-**Não** altera `klingo_auto` (continua `sim`), `klingo_api_resultado` (`nao`: não existe integração) nem `klingo_webhook` (`nao`: o Klingo ainda não cadastrou a URL). A configuração **atual da produção não foi tocada**. Teste: `testes/sql-webchat-v2-publico.test.mjs` (10 verificações): o público comum fora de qualquer lista recebe todas as capacidades; o mestre `teste` vira teto; `nao` desliga tudo; chaves independentes; `teste`/`sombra` nunca viram `sim`.
+**Não** altera `klingo_auto` (continua `sim`), `klingo_api_resultado` (`nao`: nunca testado com laudo liberado real; ligar só depois de conferir com o suporte do Klingo) nem `klingo_webhook` (`nao`: o Klingo ainda não cadastrou a URL). A configuração **atual da produção não foi tocada**. Teste: `testes/sql-webchat-v2-publico.test.mjs` (10 verificações): o público comum fora de qualquer lista recebe todas as capacidades; o mestre `teste` vira teto; `nao` desliga tudo; chaves independentes; `teste`/`sombra` nunca viram `sim`.
 
 Painel: *Configurações > Autoatendimento com o Klingo* agora mostra o mestre (teto) e uma chave por capacidade, cada uma com seu modo.
 
