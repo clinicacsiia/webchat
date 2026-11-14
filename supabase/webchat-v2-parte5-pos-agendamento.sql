@@ -600,3 +600,7 @@ select pg_temp.encaixar('public.klingo_pode_marcar(uuid)',
 select pg_temp.encaixar('public.klingo_operacao_criar(uuid)',
   E'  v_tipo := case when jsonb_typeof(v_rem) = ''object'' then ''remarcar'' else ''marcar'' end;',
   E'  v_tipo := case when jsonb_typeof(v_rem) = ''object'' then ''remarcar'' else ''marcar'' end;\n  select id into v_op from public.klingo_operacao where pre_agendamento_id = pa.id and tipo in (''marcar'', ''remarcar'') and estado = ''incerto'' order by criado_em desc limit 1;   -- v2.1\n  if v_op is not null then return v_op; end if;');
+-- (h) painel: números do pós-agendamento (só contagens; nenhum dado de paciente)
+select pg_temp.encaixar('public.painel_automacao_resumo(date, date)',
+  E'    \'cadastros\', (select coalesce(jsonb_object_agg(situacao, n)',
+  E'    \'pos\', (select coalesce(jsonb_object_agg(k, n), \'{}\'::jsonb) from (select tipo || \':\' || estado k, count(*) n from public.klingo_operacao where tipo in (\'cancelar\', \'remarcar\', \'ler_vouchers\') and (criado_em at time zone \'America/Sao_Paulo\')::date between v_de and v_ate group by 1) x),\n    \'cadastros\', (select coalesce(jsonb_object_agg(situacao, n)');
