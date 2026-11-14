@@ -37,7 +37,7 @@ begin
       if r.ultimo < v_agora or r.conferencia_status = 'horario_tomado' then
         -- (A) sem horário
         v_procs := public.fluxo_procs(r.conversa_id);
-        if r.cstatus = 'aguardando' and r.motor = 'fluxo' and v_procs is not null and jsonb_array_length(public.agenda_grupos(v_procs)) = 1 then
+        if false then   -- v2.0: a oferta automática saía da grade (não é vaga); agora só a equipe é avisada
           -- o assistente oferece o horário livre mais perto do que o paciente tinha escolhido; depois o seguinte, em outro dia se houver
           perform set_config('app.conversa', r.conversa_id::text, true);
           select coalesce(jsonb_agg(to_jsonb(x) - 'ord' order by x.ord), '[]'::jsonb) into v_slots from (

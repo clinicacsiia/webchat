@@ -12,7 +12,7 @@ begin
   if not public.klingo_ativo(p_conversa, 'klingo_api_marcar') then return jsonb_build_object('ok', false, 'motivo', 'desligado'); end if;
   v_rem := coalesce((select jsonb_typeof(f.dados -> 'remarcando') = 'object' from public.conversa_fluxo f where f.conversa_id = p_conversa), false);
   if pa.id is null or (pa.status = 'agendado' and not v_rem) then return jsonb_build_object('ok', false, 'motivo', 'ja_agendado'); end if;
-  if v_rem and (pa.agendado_origem is distinct from 'chat_api' or not public.klingo_ativo(p_conversa, 'klingo_api_remarcar')) then return jsonb_build_object('ok', false, 'motivo', 'remarcar_desligado'); end if;
+  if v_rem and ((pa.agendado_origem is distinct from 'chat_api' and not exists (select 1 from public.klingo_marcacao km where km.conversa_id = p_conversa and km.situacao = 'ativa' and km.consultado_em > now() - interval '6 hours' and km.voucher = (select f2.dados -> 'remarcando' ->> 'voucher' from public.conversa_fluxo f2 where f2.conversa_id = p_conversa))) or not public.klingo_ativo(p_conversa, 'klingo_api_remarcar')) then return jsonb_build_object('ok', false, 'motivo', 'remarcar_desligado'); end if;
   d := public.klingo_dados_conversa(p_conversa);
   if (d ->> 'n_procedimentos')::int <> 1 then return jsonb_build_object('ok', false, 'motivo', 'varios_procedimentos'); end if;
   if jsonb_typeof(pa.escolha_horario) <> 'array' or jsonb_array_length(pa.escolha_horario) <> 1 then return jsonb_build_object('ok', false, 'motivo', 'horario_nao_unico'); end if;

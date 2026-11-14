@@ -1,5 +1,5 @@
 -- RETRATO DA ESTRUTURA DO BANCO DE PRODUÇÃO (projeto webchat-atendimento). GERADO: não editar à mão.
--- Tirado em 2026-11-14T19:27:05.948845+00:00 · Postgres 17.11. Só estrutura: nenhuma linha de tabela, nenhum valor de configuração.
+-- Tirado em 2026-11-14T20:00:03.847786+00:00 · Postgres 17.11. Só estrutura: nenhuma linha de tabela, nenhum valor de configuração.
 -- Serve de referência e para os testes. NÃO rodar inteiro sobre a produção. Como refazer: supabase/producao/LEIAME.md.
 
 -- ===== Extensões =====
@@ -18,7 +18,7 @@
 -- authenticator: session_preload_libraries=supautils, safeupdate, statement_timeout=8s, lock_timeout=8s
 -- service_role: sem limite
 
--- ===== Tabelas (125) =====
+-- ===== Tabelas (131) =====
 
 create table public.agenda_ao_vivo (
   dia date not null,
@@ -902,6 +902,114 @@ alter table public.despedida_versao enable row level security;
 -- concessão a anon: DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
 -- concessão a authenticated: DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
 
+create table public.disponibilidade_evento (
+  id bigint generated always as identity not null,
+  pedido_id uuid not null,
+  em timestamp with time zone default now() not null,
+  tipo text not null,
+  origem text default 'sistema'::text not null,
+  detalhe jsonb default '{}'::jsonb not null,
+  constraint disponibilidade_evento_pkey PRIMARY KEY (id)
+);
+CREATE INDEX disponibilidade_evento_idx ON public.disponibilidade_evento USING btree (pedido_id, em);
+alter table public.disponibilidade_evento enable row level security;
+create policy disponibilidade_evento_equipe on public.disponibilidade_evento as permissive for select to authenticated
+  using ((( SELECT papel_atual() AS papel_atual) = ANY (ARRAY['admin'::text, 'atendente'::text])));
+-- concessão a authenticated: SELECT
+
+create table public.disponibilidade_notificacao (
+  id uuid default gen_random_uuid() not null,
+  pedido_id uuid not null,
+  oportunidade_id uuid not null,
+  canal text not null,
+  estado text not null,
+  criado_em timestamp with time zone default now() not null,
+  entregue_em timestamp with time zone,
+  detalhe text,
+  constraint disponibilidade_notificacao_estado_check CHECK ((estado = ANY (ARRAY['pendente'::text, 'entregue_ao_chat'::text, 'bloqueada_sem_autorizacao'::text, 'bloqueada_limite'::text, 'falhou'::text]))),
+  constraint disponibilidade_notificacao_pkey PRIMARY KEY (id),
+  constraint disponibilidade_notificacao_oportunidade_id_key UNIQUE (oportunidade_id)
+);
+alter table public.disponibilidade_notificacao enable row level security;
+create policy disponibilidade_notificacao_equipe on public.disponibilidade_notificacao as permissive for select to authenticated
+  using ((( SELECT papel_atual() AS papel_atual) = ANY (ARRAY['admin'::text, 'atendente'::text])));
+-- concessão a authenticated: SELECT
+
+create table public.disponibilidade_oportunidade (
+  id uuid default gen_random_uuid() not null,
+  pedido_id uuid not null,
+  oferta_chave text not null,
+  data date not null,
+  hora text not null,
+  unidade text,
+  profissional text,
+  estado text default 'nova'::text not null,
+  encontrada_em timestamp with time zone default now() not null,
+  valida_ate timestamp with time zone not null,
+  constraint disponibilidade_oportunidade_estado_check CHECK ((estado = ANY (ARRAY['nova'::text, 'notificada'::text, 'aceita'::text, 'expirada'::text, 'descartada'::text]))),
+  constraint disponibilidade_oportunidade_pkey PRIMARY KEY (id),
+  constraint disponibilidade_oportunidade_uk UNIQUE (pedido_id, oferta_chave)
+);
+alter table public.disponibilidade_oportunidade enable row level security;
+create policy disponibilidade_oportunidade_equipe on public.disponibilidade_oportunidade as permissive for select to authenticated
+  using ((( SELECT papel_atual() AS papel_atual) = ANY (ARRAY['admin'::text, 'atendente'::text])));
+-- concessão a authenticated: SELECT
+
+create table public.disponibilidade_pedido (
+  id uuid default gen_random_uuid() not null,
+  conversa_id uuid not null,
+  pre_agendamento_id uuid,
+  pessoa_chave text not null,
+  paciente_tipo text default 'proprio'::text not null,
+  tipo text not null,
+  procedimentos integer[] not null,
+  procedimento_key text not null,
+  procedimento_nome text,
+  plano text,
+  unidade text,
+  aceita_outras_unidades boolean default true not null,
+  profissional_preferido text,
+  aceita_outros_profissionais boolean default true not null,
+  data_ini date not null,
+  data_fim date not null,
+  datas_alternativas boolean default false not null,
+  dias_semana smallint[] default '{0,1,2,3,4,5,6}'::smallint[] not null,
+  turno text default 'qualquer'::text not null,
+  hora_ini text,
+  hora_fim text,
+  aceita_notificacao boolean default false not null,
+  canais text[] default '{}'::text[] not null,
+  estado text default 'ativa'::text not null,
+  criado_em timestamp with time zone default now() not null,
+  atualizado_em timestamp with time zone default now() not null,
+  expira_em timestamp with time zone not null,
+  ultima_verificacao_em timestamp with time zone,
+  ultima_verificacao_resultado text,
+  ultima_oportunidade jsonb,
+  ultima_oportunidade_em timestamp with time zone,
+  convertida_em timestamp with time zone,
+  agendamento_pre_id uuid,
+  constraint disponibilidade_canais_ck CHECK ((aceita_notificacao OR (cardinality(canais) = 0))),
+  constraint disponibilidade_datas_ck CHECK ((data_fim >= data_ini)),
+  constraint disponibilidade_dias_ck CHECK (((dias_semana <@ ARRAY[(0)::smallint, (1)::smallint, (2)::smallint, (3)::smallint, (4)::smallint, (5)::smallint, (6)::smallint]) AND (cardinality(dias_semana) >= 1))),
+  constraint disponibilidade_pedido_canais_check CHECK ((canais <@ ARRAY['chat'::text, 'equipe_contato'::text])),
+  constraint disponibilidade_pedido_estado_check CHECK ((estado = ANY (ARRAY['ativa'::text, 'oportunidade_identificada'::text, 'notificada'::text, 'aguardando_resposta'::text, 'convertida_em_agendamento'::text, 'expirada'::text, 'cancelada'::text]))),
+  constraint disponibilidade_pedido_hora_fim_check CHECK (((hora_fim IS NULL) OR (hora_fim ~ '^\d{2}:\d{2}$'::text))),
+  constraint disponibilidade_pedido_hora_ini_check CHECK (((hora_ini IS NULL) OR (hora_ini ~ '^\d{2}:\d{2}$'::text))),
+  constraint disponibilidade_pedido_paciente_tipo_check CHECK ((paciente_tipo = ANY (ARRAY['proprio'::text, 'filho'::text, 'outro'::text]))),
+  constraint disponibilidade_pedido_tipo_check CHECK ((tipo = ANY (ARRAY['exame'::text, 'consulta'::text]))),
+  constraint disponibilidade_pedido_turno_check CHECK ((turno = ANY (ARRAY['manha'::text, 'tarde'::text, 'noite'::text, 'qualquer'::text]))),
+  constraint disponibilidade_pedido_pkey PRIMARY KEY (id)
+);
+comment on table public.disponibilidade_pedido is 'Solicitação de disponibilidade futura: PREFERÊNCIA do paciente, nunca reserva nem promessa de vaga. Sem CPF/nome/telefone (só hash da pessoa e id da conversa).';
+CREATE UNIQUE INDEX disponibilidade_aberta_uk ON public.disponibilidade_pedido USING btree (pessoa_chave, tipo, procedimento_key, COALESCE(plano, ''::text)) WHERE (estado <> ALL (ARRAY['convertida_em_agendamento'::text, 'expirada'::text, 'cancelada'::text]));
+CREATE INDEX disponibilidade_busca_idx ON public.disponibilidade_pedido USING btree (estado, ultima_verificacao_em NULLS FIRST);
+CREATE INDEX disponibilidade_conversa_idx ON public.disponibilidade_pedido USING btree (conversa_id);
+alter table public.disponibilidade_pedido enable row level security;
+create policy disponibilidade_pedido_equipe on public.disponibilidade_pedido as permissive for select to authenticated
+  using ((( SELECT papel_atual() AS papel_atual) = ANY (ARRAY['admin'::text, 'atendente'::text])));
+-- concessão a authenticated: SELECT
+
 create table public.equipe_convites (
   email text not null,
   papel text default 'atendente'::text not null,
@@ -1362,6 +1470,20 @@ create policy jornada_transicao_select on public.jornada_transicao as permissive
   using (( SELECT jornada_pode() AS jornada_pode));
 -- concessão a authenticated: SELECT
 
+create table public.klingo_agendamento_evento (
+  id bigint default nextval('klingo_agendamento_evento_id_seq'::regclass) not null,
+  em timestamp with time zone default now() not null,
+  ip_hash text not null,
+  cpf_hash text,
+  acao text not null,
+  escrita boolean default false not null,
+  resultado text,
+  constraint klingo_agendamento_evento_pkey PRIMARY KEY (id)
+);
+CREATE INDEX klingo_agendamento_evento_cpf_em ON public.klingo_agendamento_evento USING btree (cpf_hash, em DESC) WHERE (cpf_hash IS NOT NULL);
+CREATE INDEX klingo_agendamento_evento_ip_em ON public.klingo_agendamento_evento USING btree (ip_hash, em DESC);
+alter table public.klingo_agendamento_evento enable row level security;
+
 create table public.klingo_catalogo_cru (
   endpoint text not null,
   dados jsonb,
@@ -1547,6 +1669,28 @@ CREATE UNIQUE INDEX klingo_identidade_pre_uq ON public.klingo_identidade USING b
 alter table public.klingo_identidade enable row level security;
 -- concessão a anon: DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
 -- concessão a authenticated: DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+
+create table public.klingo_marcacao (
+  id bigint default nextval('klingo_marcacao_id_seq'::regclass) not null,
+  conversa_id uuid not null,
+  voucher text not null,
+  procedimento text,
+  procedimento_id text,
+  unidade text,
+  profissional text,
+  data date,
+  hora text,
+  situacao text default 'ativa'::text not null,
+  origem text default 'klingo'::text not null,
+  consultado_em timestamp with time zone default now() not null,
+  operacao_id uuid,
+  constraint klingo_marcacao_situacao_ck CHECK ((situacao = ANY (ARRAY['ativa'::text, 'cancelada'::text, 'remarcada'::text, 'nao_listada'::text]))),
+  constraint klingo_marcacao_pkey PRIMARY KEY (id),
+  constraint klingo_marcacao_unica UNIQUE (conversa_id, voucher)
+);
+CREATE INDEX klingo_marcacao_conversa_idx ON public.klingo_marcacao USING btree (conversa_id, situacao);
+CREATE INDEX klingo_marcacao_voucher_idx ON public.klingo_marcacao USING btree (voucher);
+alter table public.klingo_marcacao enable row level security;
 
 create table public.klingo_medida (
   dia date not null,
@@ -2311,6 +2455,13 @@ alter table public.conversas add constraint conversas_contato_id_fkey FOREIGN KE
 alter table public.conversas add constraint conversas_irmao_de_fkey FOREIGN KEY (irmao_de) REFERENCES conversas(id) ON DELETE SET NULL;
 alter table public.conversas add constraint conversas_reentrada_de_fkey FOREIGN KEY (reentrada_de) REFERENCES conversas(id) ON DELETE SET NULL;
 alter table public.conversas add constraint conversas_unidade_inicial_fkey FOREIGN KEY (unidade_inicial) REFERENCES unidade_config(chave);
+alter table public.disponibilidade_evento add constraint disponibilidade_evento_pedido_id_fkey FOREIGN KEY (pedido_id) REFERENCES disponibilidade_pedido(id) ON DELETE CASCADE;
+alter table public.disponibilidade_notificacao add constraint disponibilidade_notificacao_oportunidade_id_fkey FOREIGN KEY (oportunidade_id) REFERENCES disponibilidade_oportunidade(id) ON DELETE CASCADE;
+alter table public.disponibilidade_notificacao add constraint disponibilidade_notificacao_pedido_id_fkey FOREIGN KEY (pedido_id) REFERENCES disponibilidade_pedido(id) ON DELETE CASCADE;
+alter table public.disponibilidade_oportunidade add constraint disponibilidade_oportunidade_pedido_id_fkey FOREIGN KEY (pedido_id) REFERENCES disponibilidade_pedido(id) ON DELETE CASCADE;
+alter table public.disponibilidade_pedido add constraint disponibilidade_pedido_agendamento_pre_id_fkey FOREIGN KEY (agendamento_pre_id) REFERENCES pre_agendamentos(id) ON DELETE SET NULL;
+alter table public.disponibilidade_pedido add constraint disponibilidade_pedido_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE CASCADE;
+alter table public.disponibilidade_pedido add constraint disponibilidade_pedido_pre_agendamento_id_fkey FOREIGN KEY (pre_agendamento_id) REFERENCES pre_agendamentos(id) ON DELETE SET NULL;
 alter table public.equipe_convites add constraint equipe_convites_criado_por_fkey FOREIGN KEY (criado_por) REFERENCES auth.users(id) ON DELETE SET NULL;
 alter table public.equipe_notificacao add constraint equipe_notificacao_agente_id_fkey FOREIGN KEY (agente_id) REFERENCES agentes(id) ON DELETE CASCADE;
 alter table public.equipe_notificacao add constraint equipe_notificacao_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE CASCADE;
@@ -2533,6 +2684,7 @@ CREATE TRIGGER conversas_zz_evento AFTER INSERT OR UPDATE ON public.conversas FO
 CREATE TRIGGER conversas_zz_teste BEFORE INSERT OR UPDATE ON public.conversas FOR EACH ROW EXECUTE FUNCTION conversas_teste_trg();
 CREATE TRIGGER conversas_zz_transferencia BEFORE UPDATE OF agente_id ON public.conversas FOR EACH ROW EXECUTE FUNCTION conversa_transferida_reinicia_trg();
 CREATE TRIGGER pessoa_agrupar_conversa AFTER INSERT OR UPDATE OF nome_informado, email_informado, paciente_nome, conta_id ON public.conversas FOR EACH ROW EXECUTE FUNCTION pessoa_agrupar_conversa_trg();
+CREATE TRIGGER disponibilidade_transicao_trg BEFORE UPDATE ON public.disponibilidade_pedido FOR EACH ROW EXECUTE FUNCTION disponibilidade_transicao_trg();
 CREATE TRIGGER fila_chegada_aviso AFTER INSERT OR UPDATE OF status, conta_id ON public.fila_chegada FOR EACH STATEMENT EXECUTE FUNCTION fila_chegada_trg();
 CREATE TRIGGER ind_conclusao_dia_imutavel BEFORE DELETE OR UPDATE ON public.ind_conclusao_dia FOR EACH ROW EXECUTE FUNCTION ind_imutavel_trg();
 CREATE TRIGGER ind_conclusao_dia_imutavel_t BEFORE TRUNCATE ON public.ind_conclusao_dia FOR EACH STATEMENT EXECUTE FUNCTION ind_imutavel_trg();
@@ -2560,6 +2712,7 @@ CREATE TRIGGER mensagens_zz_teste AFTER INSERT ON public.mensagens FOR EACH ROW 
 CREATE TRIGGER org_alteracao_log_imutavel BEFORE DELETE OR UPDATE ON public.org_alteracao_log FOR EACH ROW EXECUTE FUNCTION org_log_imutavel_trg();
 CREATE TRIGGER pessoa_klingo_vinculo_log AFTER INSERT OR DELETE OR UPDATE ON public.pessoa_klingo_vinculo FOR EACH ROW EXECUTE FUNCTION vinculo_log_trg();
 CREATE TRIGGER agendamento_remarcacao_feita AFTER UPDATE OF status ON public.pre_agendamentos FOR EACH ROW EXECUTE FUNCTION agendamento_remarcacao_feita_trg();
+CREATE TRIGGER disponibilidade_converter_trg AFTER UPDATE OF status ON public.pre_agendamentos FOR EACH ROW EXECUTE FUNCTION disponibilidade_converter_trg();
 CREATE TRIGGER ia_evento_pre AFTER INSERT OR UPDATE OF status, conferencia_status ON public.pre_agendamentos FOR EACH ROW EXECUTE FUNCTION ia_evento_trg();
 CREATE TRIGGER pessoa_agrupar_pre AFTER INSERT OR UPDATE OF paciente ON public.pre_agendamentos FOR EACH ROW EXECUTE FUNCTION pessoa_agrupar_pre_trg();
 CREATE TRIGGER pre_agendamento_historico AFTER UPDATE OF status ON public.pre_agendamentos FOR EACH ROW EXECUTE FUNCTION pre_agendamento_historico_trg();
@@ -2649,4 +2802,4 @@ CREATE TRIGGER vinculo_log_imutavel BEFORE DELETE OR UPDATE ON public.vinculo_lo
 --   select net.http_post( url := 'https://nrvuynjwcgwpjdptkiay.supabase.co/functions/v1/sync-catalogo-klingo', headers := jsonb_build_object('Content-Type', 'application/json', 'x-sync-key', (select valor from public.config where chave = 'ia_segredo')), body := '{}'::jsonb, timeout_milliseconds := 120000);
 
 -- ===== Chaves existentes em public.config (só os nomes; os valores não são copiados) =====
--- agenda_ao_vivo, agenda_ao_vivo_max_dias, agenda_ao_vivo_trava_s, agenda_ao_vivo_validade_s, agendado_conferir_prazo_min, agendamento_reconhecer, agendamento_reconhecer_msg_encerradas, autoencerrar_horas, autoencerrar_modo, avaliacao_ativa, boas_vindas, cadastro_equipe_sem_convite, catalogo_csi, catalogo_desenvoar, catalogo_rmtc, chat_push_url, checkin_sem_login_max_dia, convenio_seguir_klingo, convenio_suspenso_texto, despedida_configurada, despedida_inatividade_ativa, despedida_inatividade_texto, despedida_versao_atual, encerramento_exige_motivo, encerramento_valida_agendado, equipe_push_url, fila_autochegada, fila_aviso_antes, fila_push_url, fila_vapid_publica, horario_trabalho, ia_ativa, ia_segredo, indicadores_fechar, jornada_identidade_klingo, jornada_relatorio_filtro, jornada_relatorio_id, klingo_api_cancelar, klingo_api_consultar, klingo_api_horarios, klingo_api_marcar, klingo_api_percentual, klingo_api_pos, klingo_api_pre_cadastro, klingo_api_remarcar, klingo_api_resultado, klingo_api_telefones_teste, klingo_auto, klingo_autogestao, klingo_conferir_ativo, klingo_funcoes_base, klingo_paciente_url, klingo_reconfirmar_dias, klingo_so_liberados, klingo_webhook, login_paciente, motor, motor_telefones_teste, nome_empresa, notificacao_modo, pedido_escolha_texto, pedido_horario_modo, pedido_oferta2_texto, pedido_parado_horas, pedido_sem_horario_texto, permissao_modo, previsao_decide_texto, previsao_final_texto, previsao_modo, previsao_monitor_modo, previsao_oferta_texto, previsao_texto, reabrir_dias, reaproveitar_cadastro_convidado, teste_agentes, teste_marcadores, vinculo_manual_quem
+-- agenda_ao_vivo, agenda_ao_vivo_max_dias, agenda_ao_vivo_trava_s, agenda_ao_vivo_validade_s, agendado_conferir_prazo_min, agendamento_cpf_divergentes_dia, agendamento_cpf_escritas_hora, agendamento_externo_modo, agendamento_ip_divergentes_hora, agendamento_ip_escritas_hora, agendamento_ip_por_minuto, agendamento_reconhecer, agendamento_reconhecer_msg_encerradas, autoencerrar_horas, autoencerrar_modo, avaliacao_ativa, boas_vindas, cadastro_equipe_sem_convite, catalogo_csi, catalogo_desenvoar, catalogo_rmtc, chat_push_url, checkin_sem_login_max_dia, convenio_seguir_klingo, convenio_suspenso_texto, despedida_configurada, despedida_inatividade_ativa, despedida_inatividade_texto, despedida_versao_atual, disponibilidade_encerra_conversa, disponibilidade_max_avisos_dia, disponibilidade_max_avisos_total, encerramento_exige_motivo, encerramento_valida_agendado, equipe_push_url, fila_autochegada, fila_aviso_antes, fila_push_url, fila_vapid_publica, horario_trabalho, ia_ativa, ia_segredo, indicadores_fechar, jornada_identidade_klingo, jornada_relatorio_filtro, jornada_relatorio_id, klingo_api_cancelar, klingo_api_consultar, klingo_api_horarios, klingo_api_marcar, klingo_api_percentual, klingo_api_pos, klingo_api_pre_cadastro, klingo_api_remarcar, klingo_api_resultado, klingo_api_telefones_teste, klingo_auto, klingo_autogestao, klingo_conferir_ativo, klingo_funcoes_base, klingo_paciente_url, klingo_reconfirmar_dias, klingo_so_liberados, klingo_webhook, login_paciente, motor, motor_telefones_teste, nome_empresa, notificacao_modo, pedido_escolha_texto, pedido_horario_modo, pedido_oferta2_texto, pedido_parado_horas, pedido_sem_horario_texto, permissao_modo, previsao_decide_texto, previsao_final_texto, previsao_modo, previsao_monitor_modo, previsao_oferta_texto, previsao_texto, reabrir_dias, reaproveitar_cadastro_convidado, teste_agentes, teste_marcadores, vinculo_manual_quem

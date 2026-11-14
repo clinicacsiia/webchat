@@ -20,7 +20,9 @@ begin
   perform public.klingo_medir('op_' || v_est, 1, extract(milliseconds from now() - op.iniciado_em)::bigint);
   v_rem := op.tipo = 'remarcar';
 
-  -- cancelar
+  if op.tipo = 'ler_vouchers' then return public.klingo_marcacoes_aplicar(op.id, v_est, p_r); end if;
+  if op.tipo = 'cancelar' and coalesce(op.detalhe ->> 'origem', '') = 'marcacoes' then return public.klingo_cancelamento_aplicar(op.id, v_est, v_cod); end if;
+
   if op.tipo = 'cancelar' then
     if v_est = 'sucesso' then
       update public.pre_agendamentos set status = 'cancelado', conferencia_status = 'sumiu', atualizado_em = now() where id = pa.id;
@@ -39,6 +41,7 @@ begin
     v_data := (v ->> 'data')::date;
     if v_rem then
       update public.pre_agendamentos set klingo_marcacoes = array[v ->> 'id'], conferencia_status = 'confirmado', conferencia_detalhe = null, conferencia_em = now(), etapa = 'pronto',
+             status = 'agendado', agendado_origem = coalesce(agendado_origem, 'chat_api'), agendado_auto_em = coalesce(agendado_auto_em, now()), escolha_horario_chat = coalesce(escolha_horario_chat, escolha_horario),
              escolha_horario = jsonb_build_array(jsonb_build_object('grupo', 1, 'data', v ->> 'data', 'hora', v ->> 'hora', 'min', 30, 'chegada', false, 'unidade', nullif(v ->> 'unidade', ''),
                                'profissional', nullif(v ->> 'profissional', ''), 'procedimento', nullif(v ->> 'procedimento', ''), 'origem', 'klingo_api', 'klingo_chave', op.detalhe ->> 'chave')), atualizado_em = now()
        where id = pa.id;
@@ -58,9 +61,21 @@ begin
              || coalesce(E'\n' || nullif(v ->> 'unidade', ''), '') || coalesce(E'\nCom ' || nullif(v ->> 'profissional', ''), '')
              || E'\n\nChegue com 15 minutos de antecedência, com documento com foto' || case when public.norm_nome(pa.plano) = 'PARTICULAR' then '.' else ' e a carteirinha do convênio.' end
              || E' Se precisar remarcar ou cancelar, é só tocar em um dos botões abaixo.';
+    if v_rem then
+      update public.pre_agendamentos set conferencia_status = 'remarcado', conferencia_detalhe = left('Remarcado pelo chat (conversa ' || op.conversa_id::text || ') em ' || to_char(now() at time zone 'America/Bahia', 'DD/MM HH24:MI'), 200), conferencia_em = now()
+       where id <> pa.id and klingo_marcacoes @> array[op.detalhe ->> 'remarcacao'] and status = 'agendado';
+      update public.klingo_marcacao set situacao = 'remarcada' where voucher = op.detalhe ->> 'remarcacao' and situacao = 'ativa';
+      if p_r ->> 'antigo' = 'ativo' then
+        perform public.fluxo_nota(op.conversa_id, 'ATENÇÃO: remarcação feita (voucher novo ' || (v ->> 'id') || '), mas o agendamento ANTIGO (voucher ' || coalesce(op.detalhe ->> 'remarcacao', '?') || ') continua ATIVO no Klingo: há DOIS agendamentos. Cancelar o antigo no Klingo e conferir com o paciente.');
+        v_txt := v_txt || E'\n\nAtenção: o sistema ainda mostra o horário anterior como ativo. Já avisei a nossa equipe para cancelar o anterior e conferir tudo com você.';
+      elsif p_r ->> 'antigo' = 'desconhecido' then
+        perform public.fluxo_nota(op.conversa_id, 'Remarcação feita (voucher novo ' || (v ->> 'id') || '). Não foi possível conferir se o agendamento antigo (voucher ' || coalesce(op.detalhe ->> 'remarcacao', '?') || ') foi cancelado: conferir no Klingo.');
+      end if;
+    end if;
     perform public.fluxo_dizer(op.conversa_id, v_txt, jsonb_build_object('tipo', 'marcado', 'voucher', jsonb_build_object('id', v ->> 'id', 'data', v ->> 'data', 'hora', v ->> 'hora',
       'procedimento', v ->> 'procedimento', 'unidade', v ->> 'unidade', 'profissional', v ->> 'profissional')));
     perform public.fluxo_pos_menu(op.conversa_id);
+    if v_rem and p_r ->> 'antigo' = 'ativo' then perform public.fluxo_transferir(op.conversa_id, 'Remarcação concluída, mas o agendamento antigo (voucher ' || coalesce(op.detalhe ->> 'remarcacao', '?') || ') continua ativo no Klingo: cancelar o antigo.', 'alta', false); end if;
     return jsonb_build_object('ok', true, 'estado', 'sucesso');
   end if;
 
@@ -72,12 +87,14 @@ begin
     return jsonb_build_object('ok', true, 'estado', 'horario_tomado');
   end if;
 
-  -- remarcação que não concluiu: a equipe assume, o agendamento anterior segue valendo
   if v_rem then
+    if v_est = 'incerto' and p_r ->> 'antigo' = 'cancelado' then
+      perform public.fluxo_nota(op.conversa_id, 'URGENTE: a remarcação ficou INCERTA e o agendamento ANTIGO (voucher ' || coalesce(op.detalhe ->> 'remarcacao', '?') || ') já NÃO aparece ativo, e o novo não foi confirmado: o paciente pode estar SEM agendamento. Conferir na agenda do Klingo agora, antes de marcar de novo.');
+    end if;
     perform public.fluxo_nota(op.conversa_id, 'Remarcação automática NÃO concluída (' || coalesce(v_cod, 'falha') || '). ' || case when v_est = 'incerto' then 'ATENÇÃO: o Klingo não confirmou; conferir na agenda se o horário novo foi marcado ANTES de repetir. ' else '' end
       || 'O agendamento anterior (voucher ' || coalesce(op.detalhe ->> 'remarcacao', '?') || ') pode continuar ativo.');
     perform public.fluxo_dizer(op.conversa_id, public.fluxo_t(case when v_est = 'incerto' then 'marcar_incerto' else 'marcar_equipe' end, ctx));
-    perform public.fluxo_transferir(op.conversa_id, 'Paciente quer remarcar o agendamento e a remarcação automática não concluiu (' || coalesce(v_cod, 'falha') || ').', case when v_est = 'incerto' then 'media' else 'baixa' end, false);
+    perform public.fluxo_transferir(op.conversa_id, 'Paciente quer remarcar o agendamento e a remarcação automática não concluiu (' || coalesce(v_cod, 'falha') || ').', case when v_est = 'incerto' and p_r ->> 'antigo' = 'cancelado' then 'alta' when v_est = 'incerto' then 'media' else 'baixa' end, false);
     update public.conversa_fluxo set dados = dados - 'remarcando', atualizado_em = now() where conversa_id = op.conversa_id;
     return jsonb_build_object('ok', true, 'estado', v_est);
   end if;

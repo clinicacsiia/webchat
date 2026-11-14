@@ -14,7 +14,7 @@ begin
   if c.motor <> 'fluxo' or not (c.ia_ativa and c.status = 'aguardando') or v_passo is null then
     raise exception 'Não dá para voltar agora. Veja a última mensagem.' using errcode = '22023';
   end if;
-  if v_passo in ('marcando', 'marcado', 'pos_menu', 'pos_cancelar', 'cancelado') or exists (select 1 from public.klingo_operacao o where o.conversa_id = p_conversa and o.estado in ('pendente', 'executando')) then
+  if v_passo in ('marcando', 'marcado', 'pos_menu', 'pos_cancelar', 'cancelado', 'marc_consultando', 'marc_lista', 'marc_acao', 'marc_cancelar', 'marc_vazio', 'marc_pos') or exists (select 1 from public.klingo_operacao o where o.conversa_id = p_conversa and o.estado in ('pendente', 'executando')) then
     raise exception 'Depois de confirmar não dá para voltar por aqui. Use as opções da mensagem.' using errcode = '22023';   -- klingo-auto: voltar durante ou depois da marcação poderia gerar uma 2ª reserva
   end if;
   if v_passo in ('cpf_nasc', 'identidade', 'atalho', 'motivo', 'pronto', 'humano', 'assunto_fim') then

@@ -1,5 +1,5 @@
 {
- "gerado_em": "2026-11-14T19:27:05.948845+00:00",
+ "gerado_em": "2026-11-14T20:00:03.847786+00:00",
  "postgres": "17.11",
  "tabelas": [
   {
@@ -736,6 +736,91 @@
    "politicas": 0
   },
   {
+   "nome": "disponibilidade_evento",
+   "colunas": [
+    "id",
+    "pedido_id",
+    "em",
+    "tipo",
+    "origem",
+    "detalhe"
+   ],
+   "rls": true,
+   "politicas": 1
+  },
+  {
+   "nome": "disponibilidade_notificacao",
+   "colunas": [
+    "id",
+    "pedido_id",
+    "oportunidade_id",
+    "canal",
+    "estado",
+    "criado_em",
+    "entregue_em",
+    "detalhe"
+   ],
+   "rls": true,
+   "politicas": 1
+  },
+  {
+   "nome": "disponibilidade_oportunidade",
+   "colunas": [
+    "id",
+    "pedido_id",
+    "oferta_chave",
+    "data",
+    "hora",
+    "unidade",
+    "profissional",
+    "estado",
+    "encontrada_em",
+    "valida_ate"
+   ],
+   "rls": true,
+   "politicas": 1
+  },
+  {
+   "nome": "disponibilidade_pedido",
+   "colunas": [
+    "id",
+    "conversa_id",
+    "pre_agendamento_id",
+    "pessoa_chave",
+    "paciente_tipo",
+    "tipo",
+    "procedimentos",
+    "procedimento_key",
+    "procedimento_nome",
+    "plano",
+    "unidade",
+    "aceita_outras_unidades",
+    "profissional_preferido",
+    "aceita_outros_profissionais",
+    "data_ini",
+    "data_fim",
+    "datas_alternativas",
+    "dias_semana",
+    "turno",
+    "hora_ini",
+    "hora_fim",
+    "aceita_notificacao",
+    "canais",
+    "estado",
+    "criado_em",
+    "atualizado_em",
+    "expira_em",
+    "ultima_verificacao_em",
+    "ultima_verificacao_resultado",
+    "ultima_oportunidade",
+    "ultima_oportunidade_em",
+    "convertida_em",
+    "agendamento_pre_id"
+   ],
+   "rls": true,
+   "politicas": 1
+  },
+  {
    "nome": "equipe_convites",
    "colunas": [
     "email",
@@ -1127,6 +1212,20 @@
    "politicas": 1
   },
   {
+   "nome": "klingo_agendamento_evento",
+   "colunas": [
+    "id",
+    "em",
+    "ip_hash",
+    "cpf_hash",
+    "acao",
+    "escrita",
+    "resultado"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
    "nome": "klingo_catalogo_cru",
    "colunas": [
     "endpoint",
@@ -1298,6 +1397,26 @@
     "conferido_em",
     "convertido_em",
     "criado_pela_operacao"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "klingo_marcacao",
+   "colunas": [
+    "id",
+    "conversa_id",
+    "voucher",
+    "procedimento",
+    "procedimento_id",
+    "unidade",
+    "profissional",
+    "data",
+    "hora",
+    "situacao",
+    "origem",
+    "consultado_em",
+    "operacao_id"
    ],
    "rls": true,
    "politicas": 0
@@ -2154,6 +2273,8 @@
   "CREATE TRIGGER conversas_zz_evento AFTER INSERT OR UPDATE ON public.conversas FOR EACH ROW EXECUTE FUNCTION conversas_evento_trg()",
   "CREATE TRIGGER conversas_zz_teste BEFORE INSERT OR UPDATE ON public.conversas FOR EACH ROW EXECUTE FUNCTION conversas_teste_trg()",
   "CREATE TRIGGER conversas_zz_transferencia BEFORE UPDATE OF agente_id ON public.conversas FOR EACH ROW EXECUTE FUNCTION conversa_transferida_reinicia_trg()",
+  "CREATE TRIGGER disponibilidade_converter_trg AFTER UPDATE OF status ON public.pre_agendamentos FOR EACH ROW EXECUTE FUNCTION disponibilidade_converter_trg()",
+  "CREATE TRIGGER disponibilidade_transicao_trg BEFORE UPDATE ON public.disponibilidade_pedido FOR EACH ROW EXECUTE FUNCTION disponibilidade_transicao_trg()",
   "CREATE TRIGGER fila_chegada_aviso AFTER INSERT OR UPDATE OF status, conta_id ON public.fila_chegada FOR EACH STATEMENT EXECUTE FUNCTION fila_chegada_trg()",
   "CREATE TRIGGER ia_evento_pre AFTER INSERT OR UPDATE OF status, conferencia_status ON public.pre_agendamentos FOR EACH ROW EXECUTE FUNCTION ia_evento_trg()",
   "CREATE TRIGGER ind_conclusao_dia_imutavel BEFORE DELETE OR UPDATE ON public.ind_conclusao_dia FOR EACH ROW EXECUTE FUNCTION ind_imutavel_trg()",
@@ -2208,6 +2329,12 @@
   "agenda_ao_vivo_trava_s",
   "agenda_ao_vivo_validade_s",
   "agendado_conferir_prazo_min",
+  "agendamento_cpf_divergentes_dia",
+  "agendamento_cpf_escritas_hora",
+  "agendamento_externo_modo",
+  "agendamento_ip_divergentes_hora",
+  "agendamento_ip_escritas_hora",
+  "agendamento_ip_por_minuto",
   "agendamento_reconhecer",
   "agendamento_reconhecer_msg_encerradas",
   "autoencerrar_horas",
@@ -2226,6 +2353,9 @@
   "despedida_inatividade_ativa",
   "despedida_inatividade_texto",
   "despedida_versao_atual",
+  "disponibilidade_encerra_conversa",
+  "disponibilidade_max_avisos_dia",
+  "disponibilidade_max_avisos_total",
   "encerramento_exige_motivo",
   "encerramento_valida_agendado",
   "equipe_push_url",
@@ -3684,6 +3814,125 @@
    "md5": "7512b1a37a61af8ebf3af07f0e472064"
   },
   {
+   "nome": "chat_disponibilidade_alterar",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_token",
+     "padrao": false
+    },
+    {
+     "nome": "p_id",
+     "padrao": false
+    },
+    {
+     "nome": "p_dados",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "d5bf8dd2ac9ca3a2e2c0fb0eb8cf0d8f"
+  },
+  {
+   "nome": "chat_disponibilidade_cancelar",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_token",
+     "padrao": false
+    },
+    {
+     "nome": "p_id",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "56569ee3c2c3c91091d1516fa4ff2855"
+  },
+  {
+   "nome": "chat_disponibilidade_registrar",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_token",
+     "padrao": false
+    },
+    {
+     "nome": "p_dados",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "95fbcee91194f4f96a9caf09e9b0130d"
+  },
+  {
+   "nome": "chat_disponibilidade_responder",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_token",
+     "padrao": false
+    },
+    {
+     "nome": "p_id",
+     "padrao": false
+    },
+    {
+     "nome": "p_aceita",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "c1f6fbe8acbade46058f404a07da45b0"
+  },
+  {
+   "nome": "chat_disponibilidade_ver",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_token",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "84496634e341b9aad432d38cdaf37720"
+  },
+  {
    "nome": "chat_enviar",
    "args": [
     {
@@ -3843,7 +4092,7 @@
    "anon": true,
    "authenticated": true,
    "publico": false,
-   "md5": "9bd1a5ee25bda5d98097f3ae3c61ebce"
+   "md5": "abe9dd5134b5c0e46d0ba2a50225ea2a"
   },
   {
    "nome": "chat_horarios",
@@ -3886,7 +4135,7 @@
    "anon": true,
    "authenticated": true,
    "publico": false,
-   "md5": "1249f477775de06e5e94647f7835d51a"
+   "md5": "276634362408c1f3738f4ee69e236e84"
   },
   {
    "nome": "chat_incidente",
@@ -4509,7 +4758,7 @@
    "anon": true,
    "authenticated": true,
    "publico": false,
-   "md5": "51a2b09449d75a7b6c6e9638fd6d9013"
+   "md5": "58bf533c53d122ed442304c544f2f42f"
   },
   {
    "nome": "checkin_publico",
@@ -5360,6 +5609,260 @@
    "md5": "2e414301dcbe8c007dcd7d9aceaea9f9"
   },
   {
+   "nome": "disponibilidade_alvos",
+   "args": [
+    {
+     "nome": "p_max",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "d193b763bc1faddf3c6c5a6bee49c947"
+  },
+  {
+   "nome": "disponibilidade_compativel",
+   "args": [
+    {
+     "nome": "r",
+     "padrao": false
+    },
+    {
+     "nome": "p_data",
+     "padrao": false
+    },
+    {
+     "nome": "p_hora",
+     "padrao": false
+    },
+    {
+     "nome": "p_unidade",
+     "padrao": false
+    },
+    {
+     "nome": "p_prof",
+     "padrao": false
+    }
+   ],
+   "definer": false,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "ce78975c9308b0731b1d62c70d15a87e"
+  },
+  {
+   "nome": "disponibilidade_converter_trg",
+   "args": [],
+   "definer": true,
+   "gatilho": true,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "a3bd5b954c72d7b331da17a3b168abe2"
+  },
+  {
+   "nome": "disponibilidade_do_paciente",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_id",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "80e0d11d800fa406e5f8dd4216c2ba5e"
+  },
+  {
+   "nome": "disponibilidade_entregar_pendentes",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "22bb847732d5a44b08bb13eee630b6ca"
+  },
+  {
+   "nome": "disponibilidade_evento_gravar",
+   "args": [
+    {
+     "nome": "p_pedido",
+     "padrao": false
+    },
+    {
+     "nome": "p_tipo",
+     "padrao": false
+    },
+    {
+     "nome": "p_origem",
+     "padrao": true
+    },
+    {
+     "nome": "p_detalhe",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "6ddbc2dac407d94cc41e020e3f945eda"
+  },
+  {
+   "nome": "disponibilidade_gravar",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_dados",
+     "padrao": false
+    },
+    {
+     "nome": "p_id",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "fe6ab66c75d1b4afc7f5a42ae5567421"
+  },
+  {
+   "nome": "disponibilidade_json",
+   "args": [
+    {
+     "nome": "p",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "cbb06fd920aa8cf627a6129df7d69bd6"
+  },
+  {
+   "nome": "disponibilidade_mudar_estado",
+   "args": [
+    {
+     "nome": "p_pedido",
+     "padrao": false
+    },
+    {
+     "nome": "p_para",
+     "padrao": false
+    },
+    {
+     "nome": "p_origem",
+     "padrao": true
+    },
+    {
+     "nome": "p_detalhe",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "75bb53adeebdd99ad61e87f8260beb2d"
+  },
+  {
+   "nome": "disponibilidade_oportunidades_gravar",
+   "args": [
+    {
+     "nome": "p_pedido",
+     "padrao": false
+    },
+    {
+     "nome": "p_ofertas",
+     "padrao": false
+    },
+    {
+     "nome": "p_sombra",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "d70c892d19e49a2fa0a215afd3e0115c"
+  },
+  {
+   "nome": "disponibilidade_pessoa_chave",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "ea7a052181b1c0640fbc50c492ef580c"
+  },
+  {
+   "nome": "disponibilidade_transicao_trg",
+   "args": [],
+   "definer": true,
+   "gatilho": true,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "47ca93c45d8e2424e3f752bcc7b5b144"
+  },
+  {
+   "nome": "disponibilidade_verificada",
+   "args": [
+    {
+     "nome": "p_pedido",
+     "padrao": false
+    },
+    {
+     "nome": "p_resultado",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "520b05d1df69624942ecf6eb2a4571fc"
+  },
+  {
+   "nome": "disponibilidade_vigiar",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "5e410602ff9d677312df72e02126005c"
+  },
+  {
    "nome": "encerramentos_resumo",
    "args": [
     {
@@ -6071,7 +6574,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "e5dc18e551bcaf80e3b3f302fd506754"
+   "md5": "129216caa17f647920c4abfa929dbec8"
   },
   {
    "nome": "fluxo_assunto_aplicar",
@@ -6147,7 +6650,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "2c1cb2969d5f8e2e453c277330320b09"
+   "md5": "019139aba8d4289a09b3b0f10ca5d2cb"
   },
   {
    "nome": "fluxo_cpf_ok",
@@ -6343,7 +6846,106 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "38fe4302adc28914d2fa1525f1cb4edd"
+   "md5": "83b8cfdcfc871b97c4965473586f2e12"
+  },
+  {
+   "nome": "fluxo_marc_aplicar",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_passo",
+     "padrao": false
+    },
+    {
+     "nome": "v",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "1b210384bfacbddc221a1029d877d4b7"
+  },
+  {
+   "nome": "fluxo_marc_ativo",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "d",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "ae74d683f196450181e1be26403fbb66"
+  },
+  {
+   "nome": "fluxo_marc_iniciar",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_assunto",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "2e517e29abda467a19762626f0e723d6"
+  },
+  {
+   "nome": "fluxo_marc_pergunta",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_passo",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "8593ccb75250a4c923119cb63ca7cc32"
+  },
+  {
+   "nome": "fluxo_marc_proximo",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "d",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "0d5ff1f3272dd638eb9060c5c07720ed"
   },
   {
    "nome": "fluxo_medicos",
@@ -6474,7 +7076,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "505701df6094d6a08bf5a3982c959d74"
+   "md5": "8d2f3ce7c74d72024ef7abe986ec9c6e"
   },
   {
    "nome": "fluxo_pos_aplicar",
@@ -6516,7 +7118,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "8e1caa47dddbe7df1f0a1ce4129cbc05"
+   "md5": "8c1d6243bc7ffeff295452548c7353e0"
   },
   {
    "nome": "fluxo_pos_pergunta",
@@ -6554,7 +7156,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "f9277ec205aa2d48b83f974b4f205192"
+   "md5": "0fec2fcef12d27657c4dec0e80ac9f65"
   },
   {
    "nome": "fluxo_pre",
@@ -6607,7 +7209,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "7c21b2f091c4b82c9147baba55a8767c"
+   "md5": "a3ca5d469857a94485457595119a56a3"
   },
   {
    "nome": "fluxo_proximo_assunto",
@@ -6626,7 +7228,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "b192a01f4b5f5232366f4b79b6d268f2"
+   "md5": "42d748d27c7dada80a47b86335fadb31"
   },
   {
    "nome": "fluxo_relatorio",
@@ -7808,6 +8410,48 @@
    "md5": "cb678be7530b4317561bd9f3638d6924"
   },
   {
+   "nome": "klingo_agendamento_passar",
+   "args": [
+    {
+     "nome": "p_ip",
+     "padrao": false
+    },
+    {
+     "nome": "p_acao",
+     "padrao": false
+    },
+    {
+     "nome": "p_cpf",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "854d6d67b31356e7b3749336ecd8b2b1"
+  },
+  {
+   "nome": "klingo_agendamento_resultado",
+   "args": [
+    {
+     "nome": "p_id",
+     "padrao": false
+    },
+    {
+     "nome": "p_resultado",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "e18e376e7bc7fc8dc788556e23236197"
+  },
+  {
    "nome": "klingo_ativo",
    "args": [
     {
@@ -7873,6 +8517,29 @@
    "authenticated": false,
    "publico": false,
    "md5": "62d8204e17671aa1baa4a3eb88552622"
+  },
+  {
+   "nome": "klingo_cancelamento_aplicar",
+   "args": [
+    {
+     "nome": "p_op",
+     "padrao": false
+    },
+    {
+     "nome": "p_estado",
+     "padrao": false
+    },
+    {
+     "nome": "p_cod",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "6be47e1a2de66ad99f0a4c69edec53fb"
   },
   {
    "nome": "klingo_catalogo_cru_disparar",
@@ -8184,7 +8851,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "f39d7b4347921eca68ff63ac738b02dd"
+   "md5": "b54c47f3529730caa7ab43ebdcc7f319"
   },
   {
    "nome": "klingo_exames_sondar",
@@ -8328,6 +8995,101 @@
    "authenticated": false,
    "publico": false,
    "md5": "f88b217518b0f7903ad1c37aaaf940ba"
+  },
+  {
+   "nome": "klingo_marc_prazo_ok",
+   "args": [
+    {
+     "nome": "p_data",
+     "padrao": false
+    },
+    {
+     "nome": "p_hora",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "fc5628d72fcbf00d4ad7c2e6ad6b3f12"
+  },
+  {
+   "nome": "klingo_marc_quando",
+   "args": [
+    {
+     "nome": "p_data",
+     "padrao": false
+    },
+    {
+     "nome": "p_hora",
+     "padrao": false
+    }
+   ],
+   "definer": false,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "d040fef17609b2f6eb5d7f034d73e161"
+  },
+  {
+   "nome": "klingo_marc_resumo",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_voucher",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "6f1699747954d6a090e69e8249f46d33"
+  },
+  {
+   "nome": "klingo_marcacoes_aplicar",
+   "args": [
+    {
+     "nome": "p_op",
+     "padrao": false
+    },
+    {
+     "nome": "p_estado",
+     "padrao": false
+    },
+    {
+     "nome": "p_r",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "78a40c5773709869b81efe06f7168912"
+  },
+  {
+   "nome": "klingo_marcacoes_pedir",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "138c1b994cd2530686c959ba2af252e7"
   },
   {
    "nome": "klingo_medida_soma",
@@ -8543,7 +9305,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "5bb44ece792dad59555b750d25cf4878"
+   "md5": "c2bbc84dc0078f29701dc0be0562aa4b"
   },
   {
    "nome": "klingo_operacao_criar",
@@ -8558,7 +9320,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "7961437f7665efd1fcd004318a064727"
+   "md5": "52aeefda86c59320b40ce085eed03596"
   },
   {
    "nome": "klingo_operacao_disparar",
@@ -8642,7 +9404,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "93208341090534066bcad1089007b55d"
+   "md5": "050de1239c680e49fed37c17a10e1279"
   },
   {
    "nome": "klingo_pre_gravar",
@@ -8762,6 +9524,44 @@
    "authenticated": false,
    "publico": false,
    "md5": "823a65d4caf7e724362a0b62b5c49eba"
+  },
+  {
+   "nome": "klingo_resultados_aplicar",
+   "args": [
+    {
+     "nome": "p_op",
+     "padrao": false
+    },
+    {
+     "nome": "p_estado",
+     "padrao": false
+    },
+    {
+     "nome": "p_r",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "f63394d5fff4e73795d23f1dac3e2be8"
+  },
+  {
+   "nome": "klingo_resultados_pedir",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "f5eed4ce02477f8d13750a57a0b99453"
   },
   {
    "nome": "klingo_revisao_disparar",
@@ -9262,7 +10062,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "d79ee11a82f713af2320bd3cacd21a6a"
+   "md5": "a55e97b4602d8fda68b4a7ff3514a45c"
   },
   {
    "nome": "medicos_mapa_salas",
@@ -9976,7 +10776,7 @@
    "anon": false,
    "authenticated": true,
    "publico": false,
-   "md5": "0dd31fe2bda521470825e3b9ea2b8b39"
+   "md5": "1f15fe58a3adeffbfb65a771fbe0a632"
   },
   {
    "nome": "painel_conversa_pessoa_un",
@@ -9987,6 +10787,40 @@
    "authenticated": false,
    "publico": false,
    "md5": "2b1797fd7fac26c8f1dd884058273ffa"
+  },
+  {
+   "nome": "painel_disponibilidade_cancelar",
+   "args": [
+    {
+     "nome": "p_id",
+     "padrao": false
+    },
+    {
+     "nome": "p_motivo",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "ccec4dedadeec4f233bac24716586132"
+  },
+  {
+   "nome": "painel_disponibilidade_lista",
+   "args": [
+    {
+     "nome": "p_estado",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "6f5e34063c422dbb9f5d460c33bc94e8"
   },
   {
    "nome": "painel_exames_buscar",
@@ -10325,7 +11159,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "640e0c014dfcbdb605c76af16ec3a82d"
+   "md5": "45b677d20ecc00c26879b3a2dfcdd928"
   },
   {
    "nome": "pedido_oferta_texto",
@@ -11001,7 +11835,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "a5501160aa69ed26eae961624410dd14"
+   "md5": "9f038cd8f856dc2fad5b866160f26637"
   },
   {
    "nome": "previsao_buscar",
@@ -11032,7 +11866,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "0e0b1164c44834c134e24cebdeefc015"
+   "md5": "e666273d36c787346c61c403b2e5295e"
   },
   {
    "nome": "previsao_iniciar",
@@ -11107,7 +11941,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "08e7a0210c6e9c4bc48109ca4e2e9782"
+   "md5": "e4b875f1985e129ff61988f9ae0d1812"
   },
   {
    "nome": "profissional_bloqueado",

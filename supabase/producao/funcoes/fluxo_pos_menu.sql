@@ -9,7 +9,7 @@ AS $function$
 declare v_it jsonb := jsonb_build_array(jsonb_build_object('valor', 'ver', 'rotulo', 'Ver a minha marcação'));
 begin
   update public.conversa_fluxo set passo = 'pos_menu', atualizado_em = now() where conversa_id = p_conversa;
-  if public.klingo_ativo(p_conversa, 'klingo_api_pos')
+  if (public.klingo_ativo(p_conversa, 'klingo_api_cancelar') or public.klingo_ativo(p_conversa, 'klingo_api_remarcar'))
      and exists (select 1 from public.pre_agendamentos pa where pa.conversa_id = p_conversa and pa.agendado_origem = 'chat_api' and pa.status = 'agendado') then
     v_it := v_it || jsonb_build_object('valor', 'remarcar', 'rotulo', 'Remarcar') || jsonb_build_object('valor', 'cancelar', 'rotulo', 'Cancelar') || jsonb_build_object('valor', 'equipe', 'rotulo', 'Falar com a equipe');
   else

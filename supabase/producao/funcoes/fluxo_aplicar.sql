@@ -73,8 +73,11 @@ begin
   when 'assunto' then
     if coalesce(v, '') = '' then return '{"ok": false}'; end if;
     perform public.fluxo_set(p_conversa, jsonb_build_object('assunto', left(v, 60)));
+    perform public.fluxo_marc_iniciar(p_conversa, left(v, 60));   -- v2.1: ver, cancelar e remarcar consultam o Klingo
   when 'exame_aberto', 'remarcar_falta' then
     return public.fluxo_pos_aplicar(p_conversa, p_passo, v);
+  when 'marc_consultando', 'marc_lista', 'marc_acao', 'marc_cancelar', 'marc_vazio', 'marc_pos', 'resultado_situacao', 'resultado_orientacao' then   -- v2.1
+    return public.fluxo_marc_aplicar(p_conversa, p_passo, v);
   when 'assunto_qual', 'assunto_confirma', 'assunto_resultado' then
     return public.fluxo_assunto_aplicar(p_conversa, p_passo, v);
   when 'assunto_texto' then
@@ -123,17 +126,18 @@ begin
   when 'previsao_turno', 'previsao_periodo', 'previsao_decide', 'previsao_antecedencia' then   -- pedido-previsao
     return public.previsao_responder(p_conversa, p_passo, v);
   when 'horario_oferta' then   -- pedido-sem-horario
-    declare v_p jsonb; v_n int; v_s jsonb; v_livre boolean := false; v_aviso text;
+    declare v_p jsonb; v_n int; v_s jsonb; v_livre boolean := false; v_aviso text; v_chave text;
     begin
       select dados -> 'oferta_pendente' into v_p from public.conversa_fluxo where conversa_id = p_conversa;
       if jsonb_typeof(v_p) is distinct from 'object' or v not in ('sim', 'nao') then return '{"ok": false}'::jsonb; end if;
       v_n := coalesce((v_p ->> 'n')::int, 1); v_s := v_p -> 'slots' -> (v_n - 1);
       if v = 'sim' and v_s is not null then
         perform set_config('app.conversa', p_conversa::text, true);
-        select true into v_livre from public.agenda_horarios(public.fluxo_procs(p_conversa), (v_s ->> 'data')::date, (v_s ->> 'data')::date, null, null, null, '[]'::jsonb) h where h.hora = v_s ->> 'hora' limit 1;
+        select o.chave into v_chave from public.klingo_oferta o where o.conversa_id = p_conversa and not o.sombra and o.expira_em > now() and o.data = (v_s ->> 'data')::date and o.hora = v_s ->> 'hora' and (o.data + o.hora::time) > (now() at time zone 'America/Bahia') order by o.id limit 1;
+        v_livre := v_chave is not null;   -- v2.1: vale só o que a API ainda oferece (a grade não é vaga)
         if coalesce(v_livre, false) then
           update public.pre_agendamentos set escolha_horario = jsonb_build_array(jsonb_build_object('grupo', 1, 'data', v_s ->> 'data', 'hora', v_s ->> 'hora', 'unidade', v_s ->> 'unidade', 'profissional', v_s ->> 'profissional',
-                                         'local', v_s ->> 'local', 'min', coalesce((v_s ->> 'min')::int, 30), 'chegada', coalesce((v_s ->> 'chegada')::boolean, false))),
+                                         'local', v_s ->> 'local', 'min', coalesce((v_s ->> 'min')::int, 30), 'chegada', coalesce((v_s ->> 'chegada')::boolean, false), 'origem', 'klingo_api', 'klingo_chave', v_chave)),
             data_desejada = (v_s ->> 'data')::date, hora_desejada = v_s ->> 'hora', unidade = coalesce(unidade, v_s ->> 'unidade'), etapa = 'confirmacao', atualizado_em = now()
            where conversa_id = p_conversa;
           perform public.fluxo_set(p_conversa, jsonb_build_object('oferta_pendente', null, 'sem_horario', false, 'confirmado', true, 'previsao', null));

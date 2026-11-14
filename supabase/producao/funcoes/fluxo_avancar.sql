@@ -60,7 +60,7 @@ begin
       return;
     end if;
     -- klingo-auto: texto livre enquanto a marcação roda ou depois dela
-    if v_passo = 'marcando' then
+    if v_passo in ('marcando', 'marc_consultando') then
       perform public.fluxo_dizer(p_conversa, public.fluxo_t('marcado_aguarde', ctx));
       insert into public.fluxo_evento (conversa_id, passo, entrada, entendido, ms, ms_cliente) values (p_conversa, v_passo, 'texto', true, extract(milliseconds from clock_timestamp() - v_t0), (p_entrada ->> 'ms')::int);
       return;
@@ -85,6 +85,12 @@ begin
         v_entendeu := false;
         perform public.fluxo_nota(p_conversa, 'Paciente escreveu (não entendido no passo ' || coalesce(v_passo, '-') || '): ' || left(v_texto, 200));
         update public.conversa_fluxo set tentativas = tentativas + 1 where conversa_id = p_conversa;
+        if (select tentativas from public.conversa_fluxo where conversa_id = p_conversa) >= coalesce(nullif(public.klingo_cfg('fluxo_max_nao_entendi', '3'), '')::integer, 3) then   -- v2.1: não deixa o paciente preso
+          perform public.fluxo_dizer(p_conversa, public.fluxo_t('nao_entendi_equipe', ctx), jsonb_build_object('tipo', 'acompanhar'));
+          perform public.fluxo_transferir(p_conversa, 'Paciente não conseguiu responder à pergunta (passo ' || coalesce(v_passo, '-') || ') depois de várias tentativas.', 'baixa', true);
+          insert into public.fluxo_evento (conversa_id, passo, entrada, entendido, ms, ms_cliente) values (p_conversa, v_passo, 'nao_entendido_repetido', false, extract(milliseconds from clock_timestamp() - v_t0), (p_entrada ->> 'ms')::int);
+          return;
+        end if;
         v_prefixo := public.fluxo_t('nao_entendi', ctx); v_prox := v_passo;
       end if;
     end if;
