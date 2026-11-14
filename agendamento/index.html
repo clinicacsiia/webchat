@@ -105,7 +105,7 @@
 <script>
 'use strict';
 const FN = 'https://nrvuynjwcgwpjdptkiay.supabase.co/functions/v1/klingo-agendamento';
-const VERSAO_PAGINA = '2026.11.13-3';
+const VERSAO_PAGINA = '2026.11.14-1';
 const CHAT = '../';
 const GUARDA = { celular: 'csi-celular-v1', aparencia: 'csi-aparencia-v1' };
 
@@ -189,6 +189,10 @@ const MSG = {
   perto_demais: 'Falta pouco tempo para o atendimento. Fale com a recepção que a gente resolve junto com você.', outra_data: 'O "Cheguei" só vale no dia do atendimento.', voucher_nao_encontrado: 'Não achamos esta marcação. Atualize e tente de novo.',
   desligado: 'Esta parte ainda não foi liberada pela clínica. A recepção ajuda enquanto isso.', limite_aparelhos: 'Este cadastro já está em 3 celulares. Peça a um deles para dar acesso, ou fale com a recepção.', erro: 'Algo deu errado do nosso lado. Tente de novo em instantes.',
   parcial: 'Marcamos só uma parte e não conseguimos desfazer. Fale com a recepção, por favor: eles resolvem rápido.', celular_necessario: 'Precisamos de um celular com DDD para o cadastro da criança.',
+  ja_tem_marcacao: 'Esta pessoa já tem este atendimento marcado. Use "Mudar o horário" se precisar de outro dia.', conflito_horario: 'Esta pessoa já tem outro atendimento nesse horário. Escolha um horário diferente.',
+  em_teste: 'A marcação por aqui ainda está em fase de testes. A recepção ou o chat marcam para você agora mesmo.', limite_pessoas: 'Para cadastrar mais pessoas, a recepção confere junto com você. É só para a segurança de todos.',
+  muitas_marcacoes: 'Você já tem muitas marcações por vir. Para marcar mais, fale com a recepção.', muitas_marcacoes_pessoa: 'Esta pessoa já tem várias marcações por vir. Para marcar outra, fale com a recepção.',
+  divergente: 'A marcação saiu diferente do pedido e foi desfeita. Vamos tentar de novo, sem pressa.', limite_espera: 'Esta pessoa já está em várias filas de espera. Saia de uma para entrar em outra.', oferta_vencida: 'O tempo desta oferta acabou. Você continua na fila e avisamos se abrir outro horário.', oferta_invalida: 'Esta oferta não vale mais.',
   devagar: 'Muitas aberturas seguidas. Espere um minuto e tente de novo.', convite_invalido: 'Este código não vale mais. Peça um novo para quem já acompanha.', klingo_recusou: 'O sistema da clínica não aceitou o pedido. Tente de novo ou fale com a recepção.',
 };
 const textoErro = (r) => r.mensagem || MSG[r.motivo] || MSG.erro;
@@ -239,6 +243,38 @@ function desenhar() {
   document.title = ($('#app h1') ? $('#app h1').textContent + ' · ' : '') + 'CSI';
 }
 
+
+// ---------------------------------------------------------------- pressa: fila de espera e oferta de horário que abriu
+const URG = [['hoje', 'Quero hoje, se abrir uma vaga'], ['semana', 'Quero nesta semana, se abrir'], ['qualquer', 'Me chame se abrir um horário mais cedo']];
+const URG_TEXTO = { hoje: 'hoje', semana: 'nesta semana', qualquer: 'qualquer dia mais cedo' };
+/** "Está com pressa?": entra na fila de espera de uma ou mais pessoas. `voucher` = o horário que já tem e quer adiantar. */
+function cartaoPressa({ pessoas, voucherDe, titulo }) {
+  const saida = h('div', { 'aria-live': 'polite' });
+  const entrar = (urg) => botao(urg[1], async () => {
+    saida.replaceChildren(); let falha = null;
+    for (const pid of pessoas) { const r = await api('fam_espera_entrar', { pessoa: pid, necessidade: S.necessidade, urgencia: urg[0], ...(voucherDe && voucherDe[pid] ? { voucher: voucherDe[pid] } : {}) }); if (!r.ok) { falha = r; break; } }
+    if (falha) return void saida.replaceChildren(h('div', { class: 'aviso erro', role: 'alert' }, textoErro(falha)));
+    saida.replaceChildren(h('div', { class: 'aviso ok', role: 'status' }, `Pronto! ${lerLista(nomesDe(pessoas))} entrou na fila de espera (${URG_TEXTO[urg[0]]}). Se alguém desmarcar, o horário fica reservado para você por 15 minutos. Volte aqui ou deixe esta página aberta.${voucherDe ? ' Seu horário de agora continua garantido até você aceitar outro.' : ''}`));
+  });
+  return h('div', { class: 'cartao' }, h('h2', {}, titulo || 'Está com pressa?'), h('p', { class: 'suave' }, 'Entre na fila de espera. Quando um horário mais cedo abrir (alguém desmarcou), a gente separa para você e mostra aqui. Quem tem mais pressa é chamado primeiro.'), h('div', { class: 'pilha' }, URG.map(entrar)), saida);
+}
+function cartaoOferta(e) {
+  const o = e.oferta, saida = h('div', { 'aria-live': 'polite' }), falta = Math.max(1, Math.round((Date.parse(e.oferta_ate) - Date.now()) / 60000));
+  return h('div', { class: 'aviso atencao', role: 'alert' }, h('h3', {}, `Abriu um horário para ${e.nome}!`), h('div', { style: 'font-size:1.2rem;font-weight:800' }, quando(o.data, o.hora)), h('div', {}, `${o.medico ? nomeBonito(o.medico) : 'Equipe da clínica'}${o.unidade ? ' · ' + o.unidade : ''}`),
+    e.data_atual ? h('p', { class: 'pequeno' }, `Se você aceitar, trocamos o horário de ${dataBonita(e.data_atual)} por este.`) : null, h('p', { class: 'pequeno' }, `Reservado só para você por mais ${falta} minuto${falta === 1 ? '' : 's'}.`),
+    h('div', { class: 'duas' }, botao('Quero este horário', async () => {
+      const r = await api('fam_espera_responder', { id: e.id, aceita: true });
+      if (!r.ok) { saida.replaceChildren(h('div', { class: 'aviso erro', role: 'alert' }, textoErro(r))); S.marcacoes = null; return void setTimeout(() => (S.tela === 'inicio' ? carregarEu().then(desenhar) : carregarRastreio()), 2500); }
+      S.necessidade = { nome: e.necessidade }; S.nomeNeed = e.necessidade; S.recemMarcadas = r.marcacoes.map((m) => ({ ...m, slot: { data: o.data, hora: o.hora, medico: o.medico, unidade: o.unidade }, necessidade: e.necessidade })); S.marcacoes = null; ir('pronto');
+    }, 'ok'), botao('Não quero', async () => { await api('fam_espera_responder', { id: e.id, aceita: false }); S.mensagem = { tipo: 'ok', texto: 'Tudo bem. Você continua na fila e avisamos se abrir outro horário.' }; if (S.tela === 'inicio') { await carregarEu(); desenhar(); } else { S.marcacoes = null; desenhar(); } })), saida);
+}
+function cartaoEspera(e) {
+  const saida = h('div', { 'aria-live': 'polite' });
+  return h('div', { class: 'cartao' }, h('h3', {}, `${e.nome} · fila de espera`), h('div', { class: 'suave' }, `${e.necessidade || 'Atendimento'} · você pediu: ${URG_TEXTO[e.urgencia] || ''}`),
+    e.data_atual ? h('p', { class: 'pequeno' }, `Seu horário atual (${dataBonita(e.data_atual)}, às ${horaBonita(e.hora_atual)}) continua garantido até você aceitar outro.`) : null, h('p', {}, e.posicao > 1 ? `Você é o ${e.posicao}º da fila.` : 'Você é o primeiro da fila: se abrir um horário, ele é seu.'),
+    botao('Sair da fila', async () => { const r = await api('fam_espera_sair', { id: e.id }); if (!r.ok) return void saida.replaceChildren(h('div', { class: 'aviso erro' }, textoErro(r))); S.marcacoes = null; desenhar(); }, 'leve'), saida);
+}
+
 // ---------------------------------------------------------------- 1) entrar (uma vez só)
 function telaBoasVindas() {
   const erro = caixaErro(), cpf = campoCpf('cpf', 'Seu CPF'), nasc = campoNascimento('n', 'Sua data de nascimento');
@@ -269,7 +305,7 @@ function telaConvite() {
 // ---------------------------------------------------------------- 2) início
 async function carregarEu() {
   const r = await api('fam_eu'); if (!r.ok) return false;
-  S.pessoas = r.pessoas; S.avisos = r.avisos || []; return true;
+  S.pessoas = r.pessoas; S.avisos = r.avisos || []; S.espera = r.espera || []; return true;
 }
 function telaInicio() {
   if (!S.token) return telaBoasVindas();
@@ -277,7 +313,9 @@ function telaInicio() {
   const meu = S.pessoas.find((p) => p.papel === 'proprio') || S.pessoas[0];
   const blocoAvisos = S.avisos.map((a) => h('div', { class: 'aviso atencao', role: 'alert' }, h('h3', {}, `Alguém quer acompanhar ${a.pessoa}.`), h('p', {}, 'Foi você que autorizou? Se não conhece, é só bloquear.'),
     h('div', { class: 'duas' }, botao('Sim, liberar', async () => { await api('fam_aviso', { aviso: a.id, liberar: true }); await carregarEu(); S.mensagem = { tipo: 'ok', texto: 'Liberado.' }; desenhar(); }, 'prim'), botao('Não, bloquear', async () => { await api('fam_aviso', { aviso: a.id, liberar: false }); await carregarEu(); S.mensagem = { tipo: 'ok', texto: 'Bloqueado. Ninguém recebeu acesso.' }; desenhar(); }, 'perigo'))));
-  return h('div', {}, h('h1', {}, `Oi, ${meu.nome}!`), h('p', { class: 'suave' }, 'O que você precisa hoje?'), fichas(S.pessoas.map((p) => p.nome)), blocoAvisos,
+  const ofertas = (S.espera || []).filter((e) => e.estado === 'oferecido' && e.oferta).map(cartaoOferta);
+  if (!S.relogio) iniciarRelogio();
+  return h('div', {}, h('h1', {}, `Oi, ${meu.nome}!`), ofertas, h('p', { class: 'suave' }, 'O que você precisa hoje?'), fichas(S.pessoas.map((p) => p.nome)), blocoAvisos,
     h('div', { class: 'pilha' },
       botao('Marcar uma consulta', () => começarMarcar('consulta'), 'prim'), botao('Marcar um exame', () => começarMarcar('exame'), 'prim'),
       botao('Acompanhar minhas marcações e resultados', () => ir('acompanhar', { marcacoes: null })),
@@ -342,7 +380,7 @@ function telaOque() {
 }
 
 async function procurar() {
-  S.busca = null; ir('quando'); const r = await api('fam_buscar', { pessoas: S.selecionadas, ...(S.tipo === 'consulta' ? { especialidade: S.espec } : { exame: String(S.exame.id) }) });
+  S.busca = null; S.necessidade = S.tipo === 'consulta' ? { especialidade: S.espec, nome: S.nomeNeed } : { exame: String(S.exame.id), nome: S.nomeNeed }; ir('quando'); const r = await api('fam_buscar', { pessoas: S.selecionadas, ...(S.tipo === 'consulta' ? { especialidade: S.espec } : { exame: String(S.exame.id) }) });
   if (S.tela !== 'quando') return;
   if (!r.ok) { S.busca = { erro: textoErro(r), motivo: r.motivo }; } else S.busca = r; desenhar();
 }
@@ -354,12 +392,14 @@ function telaQuando() {
   const avisoBusca = S.avisoBusca ? h('div', { class: `aviso ${S.avisoBusca.tipo || ''}`, role: 'status' }, S.avisoBusca.texto) : null;
   if (!b) return h('div', {}, avisoBusca, h('h1', {}, 'Procurando os melhores horários…'), fichas(nomes), h('p', { class: 'suave' }, 'Só um instante. Estamos olhando a agenda de verdade da clínica.'), h('div', { class: 'cartao carregando', 'aria-busy': 'true' }, 'Isso costuma levar poucos segundos.'));
   if (b.erro) return h('div', {}, avisoBusca, h('h1', {}, 'Não deu para ver os horários'), h('div', { class: 'aviso erro', role: 'alert' }, b.erro), h('div', { class: 'pilha' }, botao('Tentar de novo', () => procurar(), 'prim'), botao('Escolher outra coisa', () => ir('oque')), ajuda()));
-  if (!b.total) return h('div', {}, h('h1', {}, 'Sem horários livres por enquanto'), h('div', { class: 'aviso atencao' }, b.motivo ? (MSG[b.motivo] || MSG.sem_medico) : 'Procuramos nos próximos 30 dias e não há horário livre. A recepção pode colocar em lista de espera.'), h('div', { class: 'pilha' }, botao('Escolher outra coisa', () => ir('oque'), 'prim'), ajuda()));
+  if (!b.total) return h('div', {}, avisoBusca, h('h1', {}, 'Sem horários livres por enquanto'), h('div', { class: 'aviso atencao' }, b.motivo ? (MSG[b.motivo] || MSG.sem_medico) : 'Procuramos nos próximos 30 dias e não há horário livre agora. Mas pode abrir uma vaga se alguém desmarcar.'),
+    b.motivo ? null : cartaoPressa({ pessoas: S.selecionadas, titulo: 'Entre na fila de espera' }), h('div', { class: 'pilha' }, botao('Escolher outra coisa', () => ir('oque'), 'prim'), ajuda()));
   const nome = S.nomeNeed || (S.tipo === 'consulta' ? 'Consulta' : 'Exame');
-  const escolher = (itens) => { S.escolha = itens; ir('confirmar'); };
+  const escolher = (itens) => { S.alternativas = []; S.escolha = itens; ir('confirmar'); };
   const proc = (s) => String(s.procedimento || (S.exame && S.exame.id) || '');
   const slotLinha = (s) => [h('div', { class: 'quando' }, quando(s.data, s.hora)), h('div', { class: 'onde' }, `${s.medico ? nomeBonito(s.medico) : 'Equipe da clínica'}${s.unidade ? ' · ' + s.unidade : ''}${s.ordem_chegada ? ' · por ordem de chegada' : ''}`)];
-  const partes = [avisoBusca, h('h1', {}, nomes.length > 1 ? 'Horários para ' + lerLista(nomes) : `Horários para ${nome}`), fichas(nomes)];
+  const alt = (S.alternativas || []).slice(0, 3);
+  const partes = [avisoBusca, alt.length ? h('div', { class: 'cartao destaque' }, h('h2', {}, 'Estes estão livres agora'), h('div', { class: 'pilha' }, alt.map((a) => botao(`${quando(a.data, a.hora)} · ${a.medico ? nomeBonito(a.medico) : 'Equipe'}`, () => { S.alternativas = []; S.escolha = [{ pessoa: S.selecionadas[0], slot: a, procedimento: String(a.procedimento || (S.exame && S.exame.id) || '') }]; ir('confirmar'); })))) : null, h('h1', {}, nomes.length > 1 ? 'Horários para ' + lerLista(nomes) : `Horários para ${nome}`), fichas(nomes)];
   if (b.desatualizado) partes.push(h('div', { class: 'aviso atencao' }, 'Estes horários podem ter mudado há poucos minutos. Se algum já tiver sido ocupado, avisamos e mostramos outro.'));
   if (b.aviso === 'planos_diferentes') partes.push(h('div', { class: 'aviso atencao' }, 'Estas pessoas têm planos diferentes. Mostramos os horários do plano da primeira. A recepção confere os outros.'));
   if (S.selecionadas.length > 1) {
@@ -367,10 +407,12 @@ function telaQuando() {
     if (!b.combinacoes.length) partes.push(h('div', { class: 'aviso atencao' }, 'Não achamos horários próximos para todos no mesmo dia. Você pode marcar um de cada vez, ou falar com a recepção.'), botao('Marcar um de cada vez', () => { S.selecionadas = S.selecionadas.slice(0, 1); procurar(); }));
     b.combinacoes.forEach((c, i) => partes.push(cartaoHorario(i === 0 ? 'Melhor opção' : `Opção ${i + 1}`, [h('div', { class: 'quando' }, dataBonita(c.data)), c.itens.map((s, j) => h('div', { class: 'onde' }, `${nomesDe([S.selecionadas[j]])[0]}: ${horaBonita(s.hora)} · ${s.medico ? nomeBonito(s.medico) : 'Equipe'}${s.unidade ? ' · ' + s.unidade : ''}`))],
       () => escolher(c.itens.map((s, j) => ({ pessoa: S.selecionadas[j], slot: s, procedimento: proc(s) }))), 'Marcar estes horários')));
+    partes.push(cartaoPressa({ pessoas: S.selecionadas, titulo: 'Com pressa? Quer mais cedo?' }));
     return h('div', {}, partes, ajuda());
   }
   const p0 = S.selecionadas[0];
   if (b.primeiro) partes.push(cartaoHorario('O primeiro horário livre', slotLinha(b.primeiro), () => escolher([{ pessoa: p0, slot: b.primeiro, procedimento: proc(b.primeiro) }]), 'Marcar este horário'));
+  partes.push(cartaoPressa({ pessoas: S.selecionadas, titulo: 'Com pressa? Quer mais cedo?' }));
   partes.push(h('h2', { style: 'margin-top:22px' }, 'Ou escolha o médico'), h('p', { class: 'suave pequeno' }, 'Quem você já consultou vem primeiro; depois, os mais procurados.'));
   for (const m of b.medicos) partes.push(h('div', { class: 'cartao' }, h('h3', {}, nomeBonito(m.nome), m.motivo === 'ja_foi' ? h('span', { class: 'selo ok' }, 'Você já foi') : m.motivo === 'mais_procurado' ? h('span', { class: 'selo' }, 'Mais procurado') : null),
     h('div', { class: 'suave pequeno' }, `${m.unidade ? 'Onde: ' + m.unidade + ' · ' : ''}${m.total} horário${m.total > 1 ? 's' : ''} livre${m.total > 1 ? 's' : ''}`),
@@ -387,11 +429,12 @@ function telaConfirmar() {
     h('div', {}, `${nome} · ${x.slot.medico ? nomeBonito(x.slot.medico) : 'Equipe da clínica'}`), h('div', { class: 'suave' }, `Onde: ${x.slot.unidade || 'CSI'}${x.slot.ordem_chegada ? ' · por ordem de chegada' : ''}`), p && p.plano ? h('div', { class: 'suave pequeno' }, `Plano: ${nomeBonito(p.plano)}`) : null); });
   const confirmar = botao(S.remarcar ? 'Confirmar a remarcação' : it.length > 1 ? 'Confirmar todos' : 'Confirmar', async () => {
     erro.hidden = true;
-    const r = await api('fam_marcar', { confirmar: true, itens: it.map((x) => ({ pessoa: x.pessoa, horario: x.slot.id, procedimento: x.procedimento, medico: x.slot.medico, unidade: x.slot.unidade, ...(S.remarcar ? { remarcar: S.remarcar.voucher } : {}) })) });
+    const r = await api('fam_marcar', { confirmar: true, necessidade: S.necessidade, itens: it.map((x) => ({ pessoa: x.pessoa, horario: x.slot.id, procedimento: x.procedimento, medico: x.slot.medico, unidade: x.slot.unidade, ...(S.remarcar ? { remarcar: S.remarcar.voucher } : {}) })) });
     if (r.ok) { S.recemMarcadas = r.marcacoes.map((m, i) => ({ ...m, slot: it[i].slot, necessidade: nome })); S.remarcar = null; S.marcacoes = null; return ir('pronto'); }
-    if (r.motivo === 'horario_ocupado') { S.avisoBusca = { tipo: 'atencao', texto: r.mensagem || MSG.horario_ocupado }; return procurar(); }
+    if (r.motivo === 'horario_ocupado') { S.avisoBusca = { tipo: 'atencao', texto: r.mensagem || MSG.horario_ocupado }; S.alternativas = r.alternativas || []; return procurar(); }
     if (r.motivo === 'incerto') { S.mensagem = { tipo: 'atencao', texto: MSG.incerto }; return ir('acompanhar', { marcacoes: null }); }
     mostrar(erro, textoErro(r));
+    if (r.motivo === 'ja_tem_marcacao') erro.append(' ', h('button', { type: 'button', class: 'btn leve', style: 'min-height:44px;display:inline-flex;width:auto', onclick: () => ir('acompanhar', { marcacoes: null }) }, 'Ver essa marcação'));
   }, 'ok');
   return h('div', {}, h('h1', {}, it.length > 1 ? 'Confira e confirme' : 'Confira e confirme'), h('p', { class: 'suave' }, 'Está tudo certo? Se algo estiver errado, volte e escolha de novo. Nada é marcado antes de você tocar em confirmar.'), frases, erro,
     h('div', { class: 'rodape-acao' }, h('div', {}, confirmar, botao('Escolher outro horário', () => ir('quando')))));
@@ -413,6 +456,7 @@ function telaPronto() {
   return h('div', {}, h('div', { class: 'aviso ok', role: 'status' }, h('b', {}, itens.length > 1 ? 'Tudo marcado! ' : 'Marcado! '), 'Pode ficar tranquilo(a): está reservado.'), h('h1', {}, 'Agendamento confirmado'),
     itens.map((x) => h('div', { class: 'cartao destaque' }, h('h3', {}, x.nome), h('div', { style: 'font-size:1.2rem;font-weight:800' }, `${dataBonita(x.data)}, às ${horaBonita(x.hora)}`), h('div', {}, `${x.medico ? nomeBonito(x.medico) : 'Equipe da clínica'} · ${x.local}`))),
     h('div', { class: 'cartao' }, h('h2', {}, 'No dia, leve'), h('ul', { style: 'margin:.3em 0 0 1.1em;padding:0' }, h('li', {}, 'Um documento com foto (e o da criança, se for o caso)'), h('li', {}, 'A carteirinha do plano de saúde, se tiver'), h('li', {}, 'O pedido do médico e exames antigos, se tiver'), h('li', {}, 'Chegue 15 minutos antes'))),
+    cartaoPressa({ pessoas: lista.map((m) => m.pessoa), voucherDe: Object.fromEntries(lista.map((m) => [m.pessoa, (m.voucher || {}).id])), titulo: 'Quer um horário mais cedo?' }),
     h('div', { class: 'pilha' }, botao('Salvar no calendário do celular', () => baixar('agendamento-csi.ics', arquivoIcs(itens), 'text/calendar'), 'prim'), h('a', { class: 'btn', href: 'https://wa.me/?text=' + encodeURIComponent(texto), target: '_blank', rel: 'noopener' }, 'Mandar para a família no WhatsApp'),
       botao('Acompanhar a marcação', () => ir('acompanhar', { marcacoes: null })), botao('Fazer outra marcação', () => ir('inicio'), 'leve')));
 }
@@ -453,12 +497,12 @@ function cartaoRastreio(m) {
 }
 async function carregarRastreio(silencioso = false) {
   const r = await api('fam_acompanhar'); if (!r.ok) { if (!silencioso) { S.marcacoes = []; S.mensagem = { tipo: 'erro', texto: textoErro(r) }; } return; }
-  S.marcacoes = r.marcacoes; S.previsoes = r.previsoes || {}; S.atualizadoEm = Date.now(); if (S.tela === 'acompanhar') desenhar();
+  S.marcacoes = r.marcacoes; S.previsoes = r.previsoes || {}; S.espera = r.espera || []; S.atualizadoEm = Date.now(); if (S.tela === 'acompanhar') desenhar();
 }
 function pararRelogio() { if (S.relogio) { clearInterval(S.relogio.a); clearInterval(S.relogio.b); document.removeEventListener('visibilitychange', S.relogio.v); } S.relogio = null; }
 function iniciarRelogio() {
   pararRelogio();
-  const atualiza = () => { if (S.tela === 'acompanhar' && !document.hidden) carregarRastreio(true); };
+  const atualiza = () => { if (document.hidden) return; if (S.tela === 'acompanhar') carregarRastreio(true); else if (S.tela === 'inicio') carregarEu().then((ok) => { if (ok && S.tela === 'inicio') desenhar(); }); };
   const v = () => { if (!document.hidden && Date.now() - S.atualizadoEm > 55000) atualiza(); };
   document.addEventListener('visibilitychange', v);
   S.relogio = { a: setInterval(atualiza, 60000), b: setInterval(() => { const e = $('#idade'); if (e) e.textContent = textoIdade(); }, 15000), v };
@@ -471,8 +515,8 @@ function telaAcompanhar() {
   if (!S.relogio) iniciarRelogio();
   const ativas = S.marcacoes.filter((m) => !['cancelado', 'remarcado'].includes(m.status)), antigas = S.marcacoes.filter((m) => ['cancelado', 'remarcado'].includes(m.status));
   return h('div', {}, topo, h('p', { class: 'suave' }, h('span', { class: 'ponto', 'aria-hidden': 'true' }), 'Atualizando sozinho a cada minuto. Última vez: ', h('span', { id: 'idade' }, textoIdade()), '.'),
-    ativas.length ? ativas.map(cartaoRastreio) : h('div', { class: 'cartao' }, h('p', {}, 'Você ainda não tem marcações por aqui.'), botao('Marcar agora', () => ir('inicio'), 'prim')),
-    antigas.length ? h('details', { class: 'cartao' }, h('summary', { style: 'cursor:pointer;font-weight:700;min-height:44px' }, `Canceladas ou trocadas (${antigas.length})`), antigas.map(cartaoRastreio)) : null,
+    (S.espera || []).filter((e) => e.estado === 'oferecido' && e.oferta).map(cartaoOferta), ativas.length ? ativas.map(cartaoRastreio) : h('div', { class: 'cartao' }, h('p', {}, 'Você ainda não tem marcações por aqui.'), botao('Marcar agora', () => ir('inicio'), 'prim')),
+    (S.espera || []).filter((e) => e.estado === 'esperando').map(cartaoEspera), antigas.length ? h('details', { class: 'cartao' }, h('summary', { style: 'cursor:pointer;font-weight:700;min-height:44px' }, `Canceladas ou trocadas (${antigas.length})`), antigas.map(cartaoRastreio)) : null,
     h('div', { class: 'pilha' }, botao('Atualizar agora', () => carregarRastreio()), botao('Voltar ao início', () => ir('inicio')), ajuda()));
 }
 

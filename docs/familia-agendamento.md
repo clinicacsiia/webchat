@@ -1,6 +1,6 @@
 # Agendamento da família (página nova `/agendamento/`)
 
-Versão 1.0 — 13/11/2026 / Mudança: primeira versão. Escrita a partir das decisões do dono de 13/11/2026 (plano em `docs/plano-jornada-familia.md`). **Está pronta e testada com Klingo de mentira; NADA foi aplicado em produção ainda.** A página técnica anterior (todas as abas) foi para `/agendamento/completo/` (continua igual).
+Versão 1.1 — 14/11/2026 / Mudança: horário conferido ao vivo e livro-caixa (ninguém marca o mesmo horário), fila de espera por pressa, proteção contra abuso e chave de segurança para o primeiro uso com dados reais (seções novas abaixo). A 1.0 era a primeira versão. Escrita a partir das decisões do dono de 13/11/2026 (plano em `docs/plano-jornada-familia.md`). **Está pronta e testada com Klingo de mentira; NADA foi aplicado em produção ainda.** A página técnica anterior (todas as abas) foi para `/agendamento/completo/` (continua igual).
 
 ## O que o paciente vê (e por que é assim)
 
@@ -40,10 +40,57 @@ Versão 1.0 — 13/11/2026 / Mudança: primeira versão. Escrita a partir das de
 
 1. Abre a sessão de cada pessoa no Klingo. 2. **Reserva todos os horários.** Se um estiver tomado, solta os outros e mostra a pessoa que perdeu o horário. 3. Marca todos (`id_externo = pagina-<grupo>-<n>`). Se um falhar, **cancela os que já foram marcados**; se não conseguir desfazer, avisa com franqueza ("Marcamos só uma parte… fale com a recepção"). 4. Grava o rastreio e pede a leitura lenta.
 
+## Garantia de que o horário é válido (14/11/2026, para usar com dados reais)
+
+Nada é marcado por uma lista velha. A ordem dos passos de `fam_marcar` é de propósito:
+
+1. **Chave de segurança** `config.familia_marcar_modo`: `desligado` (para tudo), `teste` (**o padrão**: só marcam os CPFs de `config.familia_teste_cpfs`, com ou sem pontos, separados por vírgula; filhos usam o CPF do responsável) ou `ligado`.
+2. **Limites contra abuso** (seção abaixo).
+3. **O horário é conferido ao vivo no Klingo** (sem cache). Se não estiver mais livre, a pessoa é avisada na hora e **já recebe 3 alternativas livres** (o mesmo médico no mesmo dia primeiro). Horário que começa em menos de 30 minutos também sai.
+4. **A pessoa não pode ter outro atendimento ativo no mesmo horário** (menos de 30 min de diferença) **nem o mesmo atendimento duas vezes** (mesmo número de procedimento; para trocar de dia, "Mudar o horário").
+5. **Livro-caixa** (`agenda_segura`, no banco): dois pedidos pelo mesmo horário **no mesmo milissegundo** (pela página ou pelo chat): só um ganha, o outro recebe "ocupado" + alternativas, **sem incomodar o Klingo**. Vale também para o mesmo médico, dia e hora com chave diferente. Todo registro dura poucos minutos (nunca fica preso) e cancelar ou remarcar solta o horário na hora.
+6. **O Klingo reserva e marca** (ele continua sendo o juiz final); se algo falhar no meio, solta e desfaz tudo.
+7. **Conferência depois de marcar**: se o Klingo gravou outro dia ou hora, a marcação é **desfeita na hora**, a pessoa é avisada e a equipe recebe um alerta.
+
+**O chat e a página enxergam um ao outro.** `agenda_reservas_provisorias` (a função do chat que esconde horários que outra conversa está escolhendo) passou a juntar também os horários do livro-caixa; o corpo original ficou em `agenda_reservas_chat`, sem mudar nada. E a busca da página esconde o que o chat está segurando. A volta atrás está no fim de `supabase/familia-agendamento.sql`.
+
+**O que isto NÃO cobre:** a marcação **automática** do chat (`klingo-executar`) não passa pelo livro-caixa; só as reservas provisórias dela são enxergadas. Se as duas tentarem o mesmo horário no mesmo instante, quem decide é o Klingo, e a página trata a recusa com alternativas.
+
+## Fila de espera por pressa
+
+- A pessoa escolhe **hoje**, **esta semana** ou **mais cedo, em qualquer dia**; quem **já tem** horário pode pedir para **adiantar** (o horário de agora continua dela até aceitar outro).
+- Quando um horário abre (cancelou, remarcou, a agenda mudou), a rotina oferece **o mais cedo possível** ao primeiro da fila e o **segura por 15 minutos** (`config.familia_oferta_minutos`). Se a pessoa recusar ou o tempo acabar, passa ao próximo; **o mesmo horário não é oferecido de novo à mesma pessoa**.
+- **Ordem justa:** hoje > esta semana > qualquer dia; quem ainda não tem horário antes de quem só quer adiantar; depois quem espera há mais tempo. Para adiantar, só vale horário **2 horas ou mais antes** do que a pessoa já tem.
+- Cancelar ou remarcar pela página chama a fila **na hora**; fora isso a rotina olha a cada minuto (no máximo 3 leituras do Klingo por vez).
+- **Previsão para a gestão:** `select public.agenda_previsao_espera(7);` devolve, só em números, quanta gente espera por necessidade e urgência, e quantas ofertas foram aceitas, recusadas ou venceram.
+- **Limite honesto:** sem e-mail nem aviso no celular, a oferta só aparece **na página** (início e acompanhar, que se atualizam a cada minuto). Por isso a oferta dura 15 minutos. O aviso por e-mail é o próximo passo.
+
+## Cuidado com abuso (sem acusar ninguém)
+
+A página nunca diz que desconfia. Ela **limita com gentileza** ("a recepção confere junto com você") e **a equipe vê um alerta**:
+
+| Hábito | Limite (em `config`) | Alerta |
+|---|---|---|
+| Muitas pessoas num celular, ou 3 acrescentadas em 24 h | `familia_max_dependentes` = 4 | `muitos_dependentes` |
+| Muitas marcações por vir na família | `familia_max_marcacoes_familia` = 8 | `muitas_marcacoes` |
+| Muitas marcações por vir para uma pessoa | `familia_max_por_pessoa` = 3 | `muitas_marcacoes_pessoa` |
+| Dois atendimentos iguais ou no mesmo horário | sempre recusa | — |
+| Klingo gravou hora diferente da pedida | desfaz | `divergencia_marcacao` |
+
+Ver os alertas (ainda não há tela no painel): `select public.familia_alertas_abertos();` e fechar: `select public.familia_alerta_resolver(<id>, 'recepcao');`. Os números do hábito de um celular (cancelamentos em cima da hora, faltas) saem de `public.familia_risco(<aparelho>)`.
+
+## Primeiro uso com dados reais (passo a passo seguro)
+
+1. Aplicar o SQL e criar os secrets (seção acima). O modo já nasce em **`teste`** e a lista de CPFs está vazia: **ninguém marca** até você liberar.
+2. Em `config`, preencher `familia_teste_cpfs` com **o CPF de um paciente que autorizou** (e o call center avisado). Esse CPF fica em texto na tabela `config` (que só o administrador lê): apague depois do teste.
+3. Entrar na página com esse paciente, **marcar, ver o rastreio e cancelar logo em seguida**. Conferir no Klingo que a marcação e o cancelamento apareceram.
+4. Testar **dois pedidos ao mesmo tempo** pelo mesmo horário (dois celulares, toque junto): só um pode marcar.
+5. Só depois trocar `familia_marcar_modo` para `ligado`. Para pausar tudo na hora: `update public.config set valor = 'desligado' where chave = 'familia_marcar_modo';`
+
 ## O que precisa existir para ligar (passos do dono)
 
 1. **Secrets** da função `klingo-agendamento` (https://supabase.com/dashboard/project/nrvuynjwcgwpjdptkiay/functions): `FAMILIA_CHAVE` (32 bytes aleatórios em base64; **guarde uma cópia fora do Supabase**: sem ela os dados cifrados não abrem) e `FAMILIA_SYNC_CHAVE` (texto longo, mínimo 20 caracteres). A chave pode ser gerada com `openssl rand -base64 32`; ela nunca vai para o repositório. Sem `FAMILIA_CHAVE`, toda ação `fam_*` responde "desligado" e o resto da função segue normal. Para abrir **resultado**, o secret antigo `AGENDAMENTO_RESULTADO=1`.
-2. **Banco:** aplicar `supabase/familia-agendamento.sql` em **partes** (os blocos `PARTE 1` a `PARTE 7`, nesta ordem), medir, depois **refazer o retrato** (`supabase/producao/LEIAME.md`) e rodar `npm run test:retrato`.
+2. **Banco:** aplicar `supabase/familia-agendamento.sql` em **partes** (os blocos `PARTE 1` a `PARTE 11`, nesta ordem), medir, depois **refazer o retrato** (`supabase/producao/LEIAME.md`) e rodar `npm run test:retrato`.
 3. **Rotina de 1 minuto** (depois de aplicar o banco e criar os secrets): `pg_cron` chamando a função com `{"acao":"fam_sincronizar","segredo":"<FAMILIA_SYNC_CHAVE>"}`. O segredo vai no Vault, como as outras rotinas; **não** em arquivo.
 4. **Publicar a função** `klingo-agendamento` (versão 1.2) e a página (junta na `main`).
 5. **Primeiro teste real** (com paciente que autorize): entrar, marcar, ver o rastreio, cancelar, e um **laudo pronto de verdade** (nunca foi testado).
@@ -67,4 +114,4 @@ Versão 1.0 — 13/11/2026 / Mudança: primeira versão. Escrita a partir das de
 
 ## Arquivos
 
-`agendamento/index.html` (página) · `agendamento/completo/index.html` (a página técnica anterior) · `supabase/familia-agendamento.sql` (banco) · `supabase/functions/klingo-agendamento/{familia,ordenar,cripto}.ts` (função) · testes: `npm run test:familia-sql` (28), `npm run test:familia-funcao` (36), `npm run test:agendamento-familia` (20) e `npm run test:agendamento` (a página técnica, 20).
+`agendamento/index.html` (página) · `agendamento/completo/index.html` (a página técnica anterior) · `supabase/familia-agendamento.sql` (banco) · `supabase/functions/klingo-agendamento/{familia,ordenar,cripto}.ts` (função) · testes: `npm run test:familia-sql` (42), `npm run test:familia-funcao` (47), `npm run test:agendamento-familia` (24) e `npm run test:agendamento` (a página técnica, 20).

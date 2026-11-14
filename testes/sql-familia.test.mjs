@@ -221,6 +221,134 @@ await caso('o registro de abertura de laudo guarda só quem, qual e quando, e pa
   return { ok: r.slice(0, 5).every((x) => x.ok) && r[5].ok === false && r[5].motivo === 'devagar' && gravou.length === 5 && !('conteudo' in gravou[0]), detalhe: JSON.stringify(r[5]) };
 });
 
+const noaId = await pessoa('Noa', 90); await vinc(celCarla, noaId, 'responsavel', 'cpf', 1);
+// ---------------------------------------------------------------- PARTE 8: livro-caixa de horários
+const slot = (chave, ini, extra = {}) => ({ chave, inicio: ini, profissional: 'Dra. Ana Pediatra', unidade: 'Desenvoar', minutos: 20, ...extra });
+const segurar = (g, slots, seg = 600, est = 'segurando') => um(`select public.agenda_segurar($1, $2::jsonb, $3, $4) as r`, [g, JSON.stringify(slots), seg, est]).then((x) => x.r);
+const G = (n) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+await caso('livro-caixa: o primeiro que segura ganha; o segundo recebe "em uso" na hora (nome do médico sem acento e em qualquer caixa conta como o mesmo)', async () => {
+  const a = await segurar(G(1), [slot('2026-11-17|63|308|2|09:00', '2026-11-17T09:00', { pessoa: ana })]);
+  const b = await segurar(G(2), [slot('2026-11-17|63|308|2|09:00', '2026-11-17T09:00', { pessoa: joao })]);
+  const c = await segurar(G(3), [slot('outra-chave', '2026-11-17T09:00', { pessoa: joao, profissional: 'DRA ANA PEDIATRA', unidade: 'DESENVOAR' })]);
+  return { ok: a.ok && b.ok === false && b.motivo === 'em_uso' && c.ok === false && c.motivo === 'em_uso', detalhe: JSON.stringify([a, b, c]) };
+});
+await caso('livro-caixa: tudo ou nada (um horário tomado não deixa os outros presos) e quem já segura só renova', async () => {
+  const antes = (await um(`select count(*)::int n from public.agenda_segura`)).n;
+  const r = await segurar(G(4), [slot('livre-1', '2026-11-17T10:00', { pessoa: lia }), slot('2026-11-17|63|308|2|09:00', '2026-11-17T09:00', { pessoa: davi })]);
+  const depois = (await um(`select count(*)::int n from public.agenda_segura`)).n;
+  const renova = await segurar(G(1), [slot('2026-11-17|63|308|2|09:00', '2026-11-17T09:00', { pessoa: ana })], 900);
+  return { ok: r.ok === false && r.indice === 1 && antes === depois && renova.ok === true && (await um(`select count(*)::int n from public.agenda_segura where grupo = $1`, [G(1)])).n === 1, detalhe: JSON.stringify(r) };
+});
+await caso('livro-caixa: a mesma pessoa não segura dois horários que se cruzam (duas abas, dois celulares); pessoas diferentes no mesmo horário com médicos diferentes podem', async () => {
+  const a = await segurar(G(5), [slot('x-1', '2026-11-18T09:00', { pessoa: noaId })]);
+  const b = await segurar(G(6), [slot('x-2', '2026-11-18T09:10', { pessoa: noaId, profissional: 'Dr. Bruno', unidade: 'CSI' })]);   // 09:10 cai dentro dos 20 min de 09:00
+  const c = await segurar(G(7), [slot('x-3', '2026-11-18T09:00', { pessoa: davi, profissional: 'Dr. Bruno', unidade: 'CSI' })]);
+  return { ok: a.ok && b.ok === false && b.motivo === 'pessoa_ocupada' && c.ok === true, detalhe: JSON.stringify([b, c]) };
+});
+await caso('livro-caixa: horário vencido volta a ficar livre sozinho e soltar libera na hora; marcado continua separado por mais alguns minutos', async () => {
+  await db.query(`update public.agenda_segura set expira_em = now() - interval '1 second' where grupo = $1`, [G(1)]);
+  const livre = await segurar(G(8), [slot('2026-11-17|63|308|2|09:00', '2026-11-17T09:00', { pessoa: joao })]);
+  await db.query(`select public.agenda_segura_marcar($1, 600)`, [G(8)]);
+  const estado = (await um(`select estado, expira_em > now() as vivo from public.agenda_segura where grupo = $1`, [G(8)]));
+  await db.query(`select public.agenda_segura_soltar($1)`, [G(8)]);
+  const depois = await segurar(G(9), [slot('2026-11-17|63|308|2|09:00', '2026-11-17T09:00', { pessoa: ana })]);
+  return { ok: livre.ok && estado.estado === 'marcado' && estado.vivo && depois.ok, detalhe: JSON.stringify([livre, estado, depois]) };
+});
+await caso('livro-caixa: dois pedidos AO MESMO TEMPO pelo mesmo horário (disputa de milissegundos) — exatamente um ganha', async () => {
+  const k = slot('corrida', '2026-11-19T08:00', {});
+  const r = await Promise.all([1, 2, 3, 4, 5].map((i) => segurar(G(100 + i), [{ ...k, pessoa: [ana, joao, lia, davi, noaId][i - 1] }])));
+  const ganhou = r.filter((x) => x.ok).length, perdeu = r.filter((x) => x.motivo === 'em_uso').length;
+  return { ok: ganhou === 1 && perdeu === 4 && (await um(`select count(*)::int n from public.agenda_segura where chave_horario = 'corrida'`)).n === 1, detalhe: JSON.stringify(r.map((x) => x.motivo ?? 'ok')) };
+});
+await caso('o chat enxerga o que a página segura (agenda_reservas_provisorias junta as duas fontes) e a página enxerga o que o chat segura (agenda_em_uso)', async () => {
+  const ct = (await um(`insert into public.contatos (nome, telefone) values ('Teste Chat', '71988880001') returning id`)).id;
+  const conv = (await um(`insert into public.conversas (contato_id, status) values ($1, 'em_atendimento') returning id`, [ct])).id;
+  await db.query(`insert into public.pre_agendamentos (conversa_id, tipo, status, escolha_horario) values ($1, 'consulta', 'rascunho', $2::jsonb)`, [conv, JSON.stringify([{ data: '2026-11-20', hora: '14:00', profissional: 'Dr. Carlos Chat', unidade: 'CSI', min: 30 }])]);
+  await segurar(G(200), [slot('pagina-1', '2026-11-21T10:00', { pessoa: ana, profissional: 'Dra. Rosa', unidade: 'CSI' })]);
+  const prov = await q(`select inicio::text, profissional from public.agenda_reservas_provisorias(null) order by 1`);
+  const uso = (await um(`select public.agenda_em_uso($1::jsonb, null) as r`, [JSON.stringify([
+    { chave: 'k1', inicio: '2026-11-20T14:00', profissional: 'DR CARLOS CHAT', unidade: 'csi' }, { chave: 'pagina-1', inicio: '2026-11-21T10:00', profissional: 'x', unidade: 'y' }, { chave: 'livre', inicio: '2026-11-22T10:00', profissional: 'DR NOVO', unidade: 'CSI' }])])).r;
+  const proprio = (await um(`select public.agenda_em_uso($1::jsonb, $2) as r`, [JSON.stringify([{ chave: 'pagina-1', inicio: '2026-11-21T10:00', profissional: 'x', unidade: 'y' }]), G(200)])).r;
+  const chat = await segurar(G(201), [slot('qualquer', '2026-11-20T14:00', { pessoa: lia, profissional: 'Dr. Carlos Chat', unidade: 'CSI' })]);
+  return { ok: prov.some((x) => x.profissional === 'DR CARLOS CHAT' || /carlos/i.test(x.profissional)) && prov.some((x) => /rosa/i.test(x.profissional)) && uso.includes('k1') && uso.includes('pagina-1') && !uso.includes('livre') && proprio.length === 0 && chat.ok === false, detalhe: JSON.stringify({ prov: prov.length, uso, proprio, chat: chat.motivo }) };
+});
+
+// ---------------------------------------------------------------- PARTE 10: fila de espera por pressa
+const entrar = (ap, p, urg, extra = {}) => um(`select public.espera_entrar($1, $2, $3, $4::jsonb, $5, $6, $7, $8) as r`, [ap, p, extra.need ?? 'especialidade=225124&plano=14', JSON.stringify({ especialidade: '225124', plano: '14', nome: 'Pediatria' }), urg, extra.voucher ?? null, extra.data ?? null, extra.hora ?? null]).then((x) => x.r);
+const oferta = (chave, ini) => ({ chave, inicio: ini, profissional: 'Dra. Ana Pediatra', unidade: 'Desenvoar', minutos: 20, procedimento: '1132' });
+await caso('fila de espera: só entra quem o celular acompanha; no máximo 3 por pessoa; entrar de novo só atualiza a pressa', async () => {
+  await db.query(`delete from public.agenda_espera`);
+  const estranho = await entrar(celTio, carla, 'hoje');                      // celTio foi desligado antes: não acompanha ninguém
+  const a = await entrar(celCarla, carla, 'qualquer'), b = await entrar(celCarla, carla, 'hoje');
+  const c1 = await entrar(celCarla, carla, 'semana', { need: 'n2' }), c2 = await entrar(celCarla, carla, 'semana', { need: 'n3' }), c3 = await entrar(celCarla, carla, 'semana', { need: 'n4' });
+  const u = (await um(`select urgencia, limite is not null as tem from public.agenda_espera where pessoa_id = $1 and need_key = 'especialidade=225124&plano=14'`, [carla]));
+  return { ok: estranho.ok === false && a.ok && b.ok && b.ja_estava === true && u.urgencia === 'hoje' && u.tem && c1.ok && c2.ok && c3.ok === false && c3.motivo === 'limite_espera', detalhe: JSON.stringify([estranho.motivo, b, c3]) };
+});
+await caso('fila de espera: pressa primeiro (hoje > esta semana > qualquer), quem ainda não tem horário antes de quem só quer adiantar, depois quem espera há mais tempo', async () => {
+  await db.query(`delete from public.agenda_espera`);
+  const e = []; for (const [p, urg, ex] of [[ana, 'qualquer', {}], [joao, 'semana', { voucher: '999', data: '2026-11-25', hora: '10:00' }], [lia, 'semana', {}], [davi, 'hoje', { voucher: '998', data: '2026-11-30', hora: '08:00' }], [noaId, 'hoje', {}]]) {
+    const ap = p === noaId ? celCarla : celCarla; e.push((await entrar(ap, p, urg, ex)).id); await db.query(`update public.agenda_espera set criado_em = now() - interval '1 hour' * $2 where id = $1`, [e.at(-1), 10 - e.length]); }
+  const c = (await um(`select public.espera_candidatas('especialidade=225124&plano=14') as r`)).r;
+  const ordem = c.map((x) => x.pessoa);
+  return { ok: ordem.join() === [noaId, davi, lia, joao, ana].join(), detalhe: ordem.map((x) => ({ [noaId]: 'noa-hoje', [davi]: 'davi-hoje-adiantar', [lia]: 'lia-semana', [joao]: 'joao-semana-adiantar', [ana]: 'ana-qualquer' }[x])).join(' > ') };
+});
+let esperaId;
+await caso('fila de espera: oferta segura o horário para a pessoa (ninguém mais pega), a lista mostra a oferta com prazo, e recusar passa para o próximo sem repetir o mesmo horário', async () => {
+  const c = (await um(`select public.espera_candidatas('especialidade=225124&plano=14') as r`)).r; esperaId = c[0].id;
+  const o = (await um(`select public.espera_ofertar($1, $2::jsonb, 900) as r`, [esperaId, JSON.stringify(oferta('2026-11-24|63|308|2|08:00', '2026-11-24T08:00'))])).r;
+  const roubo = await segurar(G(300), [slot('2026-11-24|63|308|2|08:00', '2026-11-24T08:00', { pessoa: ana })]);
+  const lista = (await um(`select public.espera_listar($1) as r`, [celCarla])).r.find((x) => x.id === Number(esperaId) || x.id === esperaId);
+  const rec = (await um(`select public.espera_responder($1, $2, false) as r`, [celCarla, esperaId])).r;
+  const volta = (await um(`select estado, recusadas from public.agenda_espera where id = $1`, [esperaId]));
+  const livre = await segurar(G(301), [slot('2026-11-24|63|308|2|08:00', '2026-11-24T08:00', { pessoa: ana })]);
+  const proximos = (await um(`select public.espera_candidatas('especialidade=225124&plano=14') as r`)).r.find((x) => x.id === Number(esperaId));
+  return { ok: o.ok && roubo.ok === false && lista.estado === 'oferecido' && lista.oferta && lista.oferta_ate && rec.ok && rec.aceita === false && volta.estado === 'esperando' && volta.recusadas.includes('2026-11-24|63|308|2|08:00') && livre.ok && proximos.recusadas.includes('2026-11-24|63|308|2|08:00'), detalhe: JSON.stringify({ roubo: roubo.motivo, lista: lista.estado, volta }) };
+});
+await caso('fila de espera: oferta vencida volta para a fila (o horário é solto e não é oferecido de novo à mesma pessoa); aceitar devolve os dados para marcar; concluir fecha a espera', async () => {
+  await db.query(`select public.agenda_segura_soltar($1)`, [G(301)]);
+  const o = (await um(`select public.espera_ofertar($1, $2::jsonb, 900) as r`, [esperaId, JSON.stringify(oferta('2026-11-24|63|308|2|09:00', '2026-11-24T09:00'))])).r;
+  await db.query(`update public.agenda_espera set oferta_ate = now() - interval '1 second' where id = $1`, [esperaId]);
+  const vencida = (await um(`select public.espera_responder($1, $2, true) as r`, [celCarla, esperaId])).r;
+  const ex = (await um(`select public.espera_expirar() as r`)).r;
+  const depois = await um(`select estado, recusadas from public.agenda_espera where id = $1`, [esperaId]);
+  const o2 = (await um(`select public.espera_ofertar($1, $2::jsonb, 900) as r`, [esperaId, JSON.stringify(oferta('2026-11-24|63|308|2|09:20', '2026-11-24T09:20'))])).r;
+  const aceita = (await um(`select public.espera_responder($1, $2, true) as r`, [celCarla, esperaId])).r;
+  await db.query(`select public.espera_concluir($1, '26999')`, [esperaId]);
+  const fim = await um(`select estado from public.agenda_espera where id = $1`, [esperaId]);
+  const prev = (await um(`select public.agenda_previsao_espera(7) as r`)).r;
+  return { ok: o.ok && vencida.motivo === 'oferta_vencida' && ex.ofertas_vencidas === 1 && depois.estado === 'esperando' && depois.recusadas.includes('2026-11-24|63|308|2|09:00') && o2.ok && aceita.aceita === true && aceita.espera.oferta.chave === '2026-11-24|63|308|2|09:20' && fim.estado === 'atendida'
+    && prev.ofertas.ofertadas >= 3 && prev.ofertas.aceitas === 1 && prev.ofertas.vencidas >= 1 && prev.esperando.length >= 1 && !JSON.stringify(prev).includes(ana), detalhe: JSON.stringify(prev.ofertas) };
+});
+await caso('fila de espera: pedido de "hoje" ou "esta semana" vence sozinho depois do prazo; sair da fila solta o horário oferecido', async () => {
+  await db.query(`delete from public.agenda_espera`);
+  const a = await entrar(celCarla, ana, 'hoje', { need: 'v1' });
+  await db.query(`update public.agenda_espera set limite = current_date - 2 where id = $1`, [a.id]);
+  const ex = (await um(`select public.espera_expirar() as r`)).r, est = (await um(`select estado from public.agenda_espera where id = $1`, [a.id])).estado;
+  const b = await entrar(celCarla, joao, 'qualquer', { need: 'v2' });
+  await um(`select public.espera_ofertar($1, $2::jsonb, 900) as r`, [b.id, JSON.stringify(oferta('2026-11-26|63|308|2|08:00', '2026-11-26T08:00'))]);
+  const seg1 = (await um(`select count(*)::int n from public.agenda_segura where chave_horario = '2026-11-26|63|308|2|08:00'`)).n;
+  const s = (await um(`select public.espera_sair($1, $2) as r`, [celCarla, b.id])).r, seg2 = (await um(`select count(*)::int n from public.agenda_segura where chave_horario = '2026-11-26|63|308|2|08:00'`)).n;
+  return { ok: ex.esperas_vencidas === 1 && est === 'expirada' && seg1 === 1 && s.ok && seg2 === 0, detalhe: JSON.stringify([ex, est, seg1, seg2]) };
+});
+
+// ---------------------------------------------------------------- PARTE 11: abuso, alertas e chave de segurança
+await caso('o hábito do celular: quantas pessoas cuida, quantas acrescentou hoje e quantas marcações futuras tem (total e por pessoa)', async () => {
+  const r = (await um(`select public.familia_risco($1) as r`, [celCarla])).r;
+  return { ok: r.dependentes_total >= 3 && r.dependentes_24h >= 3 && typeof r.futuras_total === 'number' && typeof r.futuras_por_pessoa === 'object' && typeof r.faltas_60d === 'number', detalhe: JSON.stringify(r) };
+});
+await caso('alerta de abuso: o mesmo alerta do mesmo celular no mesmo dia soma "repetições" em vez de abrir outro; resolver fecha; o painel vê só primeiro nome', async () => {
+  await db.query(`select public.familia_alertar('muitos_dependentes', $1, $2, '{"total":5}'::jsonb)`, [celCarla, ana]); await db.query(`select public.familia_alertar('muitos_dependentes', $1, $2, '{"total":6}'::jsonb)`, [celCarla, ana]);
+  const l = (await um(`select public.familia_alertas_abertos() as r`)).r.filter((x) => x.tipo === 'muitos_dependentes');
+  await db.query(`select public.familia_alerta_resolver($1, 'recepcao')`, [l[0].id]);
+  const depois = (await um(`select public.familia_alertas_abertos() as r`)).r.filter((x) => x.tipo === 'muitos_dependentes');
+  return { ok: l.length === 1 && l[0].detalhe.repeticoes === 2 && l[0].detalhe.total === 6 && l[0].pessoa === 'Ana' && depois.length === 0 && !JSON.stringify(l).includes('cifrado'), detalhe: JSON.stringify(l[0].detalhe) };
+});
+await caso('a chave de segurança nasce em "teste" (só os CPFs liberados marcam) e lê os limites do banco', async () => {
+  await db.query(`update public.config set valor = '111.444.777-35; 529.982.247-25' where chave = 'familia_teste_cpfs'`);
+  const c = (await um(`select public.familia_config() as r`)).r;
+  return { ok: c.modo === 'teste' && c.cpfs.join() === '11144477735,52998224725' && c.max_dependentes === 4 && c.max_por_pessoa === 3 && c.max_marcacoes_familia === 8 && c.oferta_min === 15, detalhe: JSON.stringify(c) };
+});
+
 // ---------------------------------------------------------------- segurança
 await caso('visitante (anon) e logado do painel não leem as tabelas da família nem executam as funções', async () => {
   const falhou = async (papel, sql) => { await db.exec(`reset role; set role ${papel};`); try { await db.query(sql); return false; } catch { return true; } finally { await db.exec(`reset role;`); } };

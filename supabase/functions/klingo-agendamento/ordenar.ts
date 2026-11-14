@@ -30,7 +30,7 @@ export function mesmoMedico(a: string | null | undefined, b: string | null | und
 }
 const somaPara = (lista: Contagem, nome: string) => lista.reduce((n, x) => n + (mesmoMedico(x.profissional, nome) ? Number(x.total) || 0 : 0), 0);
 
-const leve = (h: Horario): Slot => ({ id: h.id, data: h.data, hora: h.hora, medico: h.profissional?.nome ?? null, unidade: h.unidade?.nome ?? null, unidade_sigla: h.unidade?.sigla ?? null, ordem_chegada: h.ordem_chegada, procedimento: h.procedimento });
+export const slotLeve = (h: Horario): Slot => ({ id: h.id, data: h.data, hora: h.hora, medico: h.profissional?.nome ?? null, unidade: h.unidade?.nome ?? null, unidade_sigla: h.unidade?.sigla ?? null, ordem_chegada: h.ordem_chegada, procedimento: h.procedimento });
 const quando = (s: Slot) => `${s.data} ${s.hora}`;
 
 /** Agrupa os horários por médico (e unidade) e ordena pela regra acima. `todos` guarda tudo (para combinar a família); `proximos` são os 6 primeiros para a tela. */
@@ -38,7 +38,7 @@ export function ordenarMedicos(lista: Horario[], historico: Contagem, procura: C
   const grupos = new Map<string, Slot[]>();
   for (const h of lista) {
     const k = `${h.profissional?.id ?? norm(h.profissional?.nome)}|${h.unidade?.id ?? ""}`;
-    (grupos.get(k) ?? grupos.set(k, []).get(k)!).push(leve(h));
+    (grupos.get(k) ?? grupos.set(k, []).get(k)!).push(slotLeve(h));
   }
   const cartoes: Medico[] = [...grupos].map(([chave, todos]) => {
     todos.sort((a, b) => quando(a).localeCompare(quando(b)));

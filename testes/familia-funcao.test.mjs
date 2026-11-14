@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { criarBancoProducao, ajudantes, REPO } from './banco-producao.mjs';
 import { KlingoApi } from '../supabase/functions/klingo-agendamento/api.ts';
-import { tratarTudo, rodarFila } from '../supabase/functions/klingo-agendamento/familia.ts';
+import { tratarTudo, rodarFila, escolherSlot, alternativas } from '../supabase/functions/klingo-agendamento/familia.ts';
 import { novaChaveBase64, decifrar } from '../supabase/functions/klingo-agendamento/cripto.ts';
 
 const resultados = [];
@@ -19,6 +19,7 @@ const { db, falhas } = await criarBancoProducao();
 const { q, um } = ajudantes(db);
 await db.exec(readFileSync(`${REPO}/supabase/familia-agendamento.sql`, 'utf8'));
 registrar('o retrato monta inteiro e o arquivo da família aplica', falhas.length === 0);
+await db.query(`update public.config set valor = 'ligado' where chave = 'familia_marcar_modo'`);       // os casos abaixo testam a marcação; o modo "teste" e "desligado" têm casos próprios
 const rpc = async (nome, args) => { const ks = Object.keys(args); const sql = `select public.${nome}(${ks.map((k, i) => `$${i + 1}`).join(', ')}) as r`; return (await um(sql, ks.map((k) => args[k]))).r; };
 const familiaDb = {
   aparelhoCriar: (h, a) => um(`select public.familia_aparelho_criar($1, $2) as r`, [h, a ?? null]).then((x) => x.r),
@@ -43,6 +44,25 @@ const familiaDb = {
   pessoasAtivas: (m) => rpc('familia_pessoas_ativas', { p_minutos: m }),
   marcacoesAbertas: (p) => rpc('familia_marcacoes_abertas', { p_pessoa: p }),
   planosEmUso: () => rpc('familia_planos_em_uso', {}),
+  config: () => rpc('familia_config', {}),
+  risco: (a) => rpc('familia_risco', { p_aparelho: a }),
+  alertar: (t, a, p, d) => um(`select public.familia_alertar($1, $2, $3, $4::jsonb) as r`, [t, a, p, JSON.stringify(d ?? {})]),
+  segurar: (g, sl, seg, est) => um(`select public.agenda_segurar($1, $2::jsonb, $3, $4) as r`, [g, JSON.stringify(sl), seg, est ?? 'segurando']).then((x) => x.r),
+  segurarMarcar: (g, seg, v) => um(`select public.agenda_segura_marcar($1, $2, $3::jsonb) as r`, [g, seg, JSON.stringify(v ?? {})]),
+  liberarVoucher: (v) => um(`select public.agenda_segura_liberar($1) as r`, [v]),
+  soltar: (g) => um(`select public.agenda_segura_soltar($1) as r`, [g]),
+  emUso: (sl, ig) => um(`select public.agenda_em_uso($1::jsonb, $2) as r`, [JSON.stringify(sl), ig ?? null]).then((x) => x.r),
+  esperaEntrar: (a, p, k, pr, u, v, d, h) => um(`select public.espera_entrar($1, $2, $3, $4::jsonb, $5, $6, $7, $8) as r`, [a, p, k, JSON.stringify(pr), u, v ?? null, d ?? null, h ?? null]).then((x) => x.r),
+  esperaSair: (a, id) => rpc('espera_sair', { p_aparelho: a, p_id: id }),
+  esperaListar: (a) => rpc('espera_listar', { p_aparelho: a }),
+  esperaNecessidades: (m) => rpc('espera_necessidades', { p_max: m }),
+  esperaLida: (k) => um(`select public.espera_lida($1) as r`, [k]),
+  esperaCandidatas: (k) => rpc('espera_candidatas', { p_need_key: k }),
+  esperaOfertar: (id, sl, seg) => um(`select public.espera_ofertar($1, $2::jsonb, $3) as r`, [id, JSON.stringify(sl), seg]).then((x) => x.r),
+  esperaExpirar: () => rpc('espera_expirar', {}),
+  esperaResponder: (a, id, ac) => um(`select public.espera_responder($1, $2, $3) as r`, [a, id, ac]).then((x) => x.r),
+  esperaConcluir: (id, v) => um(`select public.espera_concluir($1, $2) as r`, [id, v]),
+  esperaFalhou: (id) => um(`select public.espera_falhou($1) as r`, [id]),
   acessoRegistrar: (a, p, v) => rpc('familia_acesso_registrar', { p_aparelho: a, p_pessoa: p, p_voucher: v }),
   cacheLer: (c) => rpc('agenda_cache_ler', { p_chave: c }),
   cacheGravar: (c, d, s) => um(`select public.agenda_cache_gravar($1, $2::jsonb, $3) as r`, [c, JSON.stringify(d), s]),
@@ -53,14 +73,16 @@ const familiaDb = {
 
 // ---------------------------------------------------------------- Klingo de mentira (com estado)
 const CPF_MAE = '11144477735', CPF_PAI = '52998224725', NASC_MAE = '1980-03-25', NASC_PAI = '1978-06-10', CEL_MAE = '71999990001';
-const D1 = '2026-11-17', D2 = '2026-11-18';
+const HOJE = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(new Date());
+const somarDias = (d, n) => new Date(Date.parse(d + 'T12:00:00Z') + n * 86400000).toISOString().slice(0, 10);
+const D1 = somarDias(HOJE, 2), D2 = somarDias(HOJE, 3), NEC = { especialidade: '225124', nome: 'Pediatria' };
 function klingoFalso() {
   const pacientes = new Map();
   const add = (id, nome, nasc, cpf, cel) => pacientes.set(id, { id, nome, nasc, cpf, cel, plano: { id: 14, nome: 'AMIL' } });
   add('P100', 'MARIA TESTE DA SILVA', NASC_MAE, CPF_MAE, CEL_MAE); add('P200', 'PEDRO TESTE DA SILVA', NASC_PAI, CPF_PAI, '71999990002');
   let proximoPre = 7960, proximaReserva = 555, proximoVoucher = 26700;
   const reservas = new Map(), vouchers = new Map(), ocupados = new Set(), chamadas = [];
-  const cfg = { resultado: 'pendente', falharMarcarPara: null, limite429: false, vouchersStatus: null, hojeKlingo: '2026-11-16' };
+  const cfg = { distraido: false, atrasoMs: 0, gravaOutraHora: false, resultado: 'pendente', falharMarcarPara: null, limite429: false, vouchersStatus: null, hojeKlingo: HOJE };
   const chave = (d, m, u, h) => `${d}|${m}|308|${u}|${h}`;
   const dias = [
     { data: D1, med: 63, nome: 'DRA ANA PEDIATRA', uni: { id: 2, nome: 'DESENVOAR', sigla: 'PEDIATRIA' }, horas: ['09:00', '09:20', '09:40', '10:00'] },
@@ -82,15 +104,16 @@ function klingoFalso() {
     if (rota === 'GET /agenda/especialidades') return resp(200, [{ id: 1, cbos: '225124', descr: 'PEDIATRIA' }, { id: 2, cbos: '225112', descr: 'NEUROLOGIA' }]);
     if (rota === 'GET /agenda/horarios') return resp(200, { horarios: dias.map((d, i) => ({ id: `d${i}`, data: d.data, procedimento: 1132, profissional: { id: d.med, nome: d.nome }, unidade: d.uni,
       horarios: Object.fromEntries(d.horas.map((h) => [chave(d.data, d.med, d.uni.id, h), h]).filter(([k]) => !ocupados.has(k))) })) });
-    if (rota === 'POST /agenda/reservar') { const k = corpo.id; if (ocupados.has(k) || [...reservas.values()].includes(k)) return resp(403, { msg: 'Horário já ocupado. [reservado]' }); const id = String(proximaReserva++); reservas.set(id, k); return resp(200, { id }); }
+    if (cfg.atrasoMs && (rota === 'POST /agenda/reservar' || rota === 'POST /agenda/horario')) await new Promise((r) => setTimeout(r, cfg.atrasoMs));
+    if (rota === 'POST /agenda/reservar') { const k = corpo.id; if (!cfg.distraido && (ocupados.has(k) || [...reservas.values()].includes(k))) return resp(403, { msg: 'Horário já ocupado. [reservado]' }); const id = String(proximaReserva++); reservas.set(id, k); return resp(200, { id }); }
     if (rota === 'DELETE /agenda/reservar') { reservas.delete(String(corpo.id)); return resp(200, { status: 'ok' }); }
     if (rota === 'POST /agenda/horario') {
       const p = donoDaSessao(init), k = corpo.id;
       if (cfg.falharMarcarPara && p.id === cfg.falharMarcarPara) return resp(403, { msg: 'Plano AMIL inativado.' });
-      if (ocupados.has(k)) return resp(400, { msg: 'Horário já ocupado. …ID: 1' });
+      if (ocupados.has(k) && !cfg.distraido) return resp(400, { msg: 'Horário já ocupado. …ID: 1' });
       ocupados.add(k); for (const [r, kk] of reservas) if (kk === k) reservas.delete(r);
       const [data, med, , uni, hora] = k.split('|'), d = dias.find((x) => x.data === data && String(x.med) === med);
-      const v = { id: proximoVoucher++, status: 'agendado', data, hora: hora + ':00', procedimento: { id: 1132, descr: 'CONSULTA' }, unidade: { nome: d.uni.nome }, realizador: { nome: d.nome }, id_externo: corpo.id_externo, chave: k };
+      const v = { id: proximoVoucher++, status: 'agendado', data, hora: (cfg.gravaOutraHora ? '23:59' : hora) + ':00', procedimento: { id: 1132, descr: 'CONSULTA' }, unidade: { nome: d.uni.nome }, realizador: { nome: d.nome }, id_externo: corpo.id_externo, chave: k };
       if (corpo.remarcacao) { const l = vouchers.get(p.id) ?? [], velho = l.find((x) => String(x.id) === String(corpo.remarcacao)); if (velho) { ocupados.delete(velho.chave); vouchers.set(p.id, l.filter((x) => x !== velho)); } }
       vouchers.set(p.id, [...(vouchers.get(p.id) ?? []), v]);
       return resp(200, v);
@@ -117,7 +140,7 @@ function montar({ resultado = false, comChave = true, k: kExistente = null } = {
     preDoPar: async () => null,
   };
   const ctx = {
-    api: new KlingoApi('clinicacsi:teste', k.f, { esperar: async () => {} }), db: banco, hoje: () => '2026-11-16', agora: () => Date.now(), uuid: () => crypto.randomUUID(), cache: new Map(), resultado,
+    api: new KlingoApi('clinicacsi:teste', k.f, { esperar: async () => {} }), db: banco, hoje: () => HOJE, agora: () => Date.now(), uuid: () => crypto.randomUUID(), cache: new Map(), resultado,
     fam: { db: comChave ? familiaDb : null, chave: comChave ? CHAVE : null, chaveSync: SYNC },
   };
   const chamar = async (corpo) => { const r = await tratarTudo(ctx, corpo); return { status: r.status, ...r.corpo }; };
@@ -210,21 +233,21 @@ await caso('buscar para dois filhos devolve combinações: dois horários SEGUID
 const buscarCombo = async (medico = 'DRA ANA PEDIATRA') => (await M.chamar({ acao: 'fam_buscar', token: mae.token, pessoas: [mae.ana, mae.joao], especialidade: '225124' })).combinacoes.find((c) => c.itens[0].medico === medico);
 await caso('um horário tomado no meio desfaz tudo: a reserva do primeiro é solta, ninguém fica marcado e a tela recebe a pessoa e o motivo', async () => {
   const c = await buscarCombo(); M.k.ocupados.add(c.itens[1].id);
-  const r = await M.chamar({ acao: 'fam_marcar', token: mae.token, confirmar: true, itens: [{ pessoa: mae.ana, horario: c.itens[0].id, procedimento: '1132' }, { pessoa: mae.joao, horario: c.itens[1].id, procedimento: '1132' }] });
+  const r = await M.chamar({ acao: 'fam_marcar', necessidade: NEC, token: mae.token, confirmar: true, itens: [{ pessoa: mae.ana, horario: c.itens[0].id, procedimento: '1132' }, { pessoa: mae.joao, horario: c.itens[1].id, procedimento: '1132' }] });
   M.k.ocupados.delete(c.itens[1].id);
   return { ok: r.ok === false && r.motivo === 'horario_ocupado' && r.indice === 1 && M.k.reservas.size === 0 && [...M.k.vouchers.values()].flat().length === 0, detalhe: JSON.stringify([r.motivo, r.indice, M.k.reservas.size]) };
 });
 await caso('falha ao marcar o segundo desfaz o primeiro (cancela o voucher) e libera o horário; nada fica gravado no acompanhamento', async () => {
   const c = await buscarCombo(); M.k.cfg.falharMarcarPara = [...M.k.pacientes.values()].find((p) => p.nome === 'João Teste da Silva').id;
-  const r = await M.chamar({ acao: 'fam_marcar', token: mae.token, confirmar: true, itens: [{ pessoa: mae.ana, horario: c.itens[0].id, procedimento: '1132' }, { pessoa: mae.joao, horario: c.itens[1].id, procedimento: '1132' }] });
+  const r = await M.chamar({ acao: 'fam_marcar', necessidade: NEC, token: mae.token, confirmar: true, itens: [{ pessoa: mae.ana, horario: c.itens[0].id, procedimento: '1132' }, { pessoa: mae.joao, horario: c.itens[1].id, procedimento: '1132' }] });
   M.k.cfg.falharMarcarPara = null;
   return { ok: r.ok === false && r.desfeitas?.includes('Ana') && [...M.k.vouchers.values()].flat().length === 0 && !M.k.ocupados.has(c.itens[0].id) && (await um(`select count(*)::int n from public.familia_marcacao`)).n === 0, detalhe: JSON.stringify(r) };
 });
 let grupo;
 await caso('marcar os dois filhos juntos: dois vouchers, mesmo grupo, ids externos do grupo, linha do tempo começando em "agendado", sem confirmar não marca', async () => {
   const c = await buscarCombo(), it = [{ pessoa: mae.ana, horario: c.itens[0].id, procedimento: '1132' }, { pessoa: mae.joao, horario: c.itens[1].id, procedimento: '1132' }];
-  const sem = await M.chamar({ acao: 'fam_marcar', token: mae.token, itens: it });
-  const r = await M.chamar({ acao: 'fam_marcar', token: mae.token, confirmar: true, itens: it });
+  const sem = await M.chamar({ acao: 'fam_marcar', necessidade: NEC, token: mae.token, itens: it });
+  const r = await M.chamar({ acao: 'fam_marcar', necessidade: NEC, token: mae.token, confirmar: true, itens: it });
   grupo = r.grupo;
   const linhas = await q(`select * from public.familia_marcacao order by voucher_id`), vs = [...M.k.vouchers.values()].flat();
   return { ok: sem.motivo === 'sem_confirmacao' && r.ok && r.marcacoes.length === 2 && linhas.length === 2 && linhas.every((l) => l.grupo_id === r.grupo && l.status === 'agendado' && l.profissional === 'DRA ANA PEDIATRA')
@@ -235,9 +258,9 @@ await caso('depois de marcar, a próxima busca da família põe primeiro o médi
   return { ok: r.medicos[0].nome === 'DRA ANA PEDIATRA' && r.medicos[0].motivo === 'ja_foi' && r.medicos[0].vezes === 1, detalhe: r.medicos.map((m) => `${m.nome}:${m.motivo}`).join(', ') };
 });
 await caso('marcar pessoa que não é do celular, horário em formato inválido ou mais de 4 pessoas é recusado', async () => {
-  const a = await M.chamar({ acao: 'fam_marcar', token: pai.token, confirmar: true, itens: [{ pessoa: mae.ana, horario: `${D1}|63|308|2|10:00`, procedimento: '1132' }] });
-  const b = await M.chamar({ acao: 'fam_marcar', token: mae.token, confirmar: true, itens: [{ pessoa: mae.ana, horario: 'qualquer coisa', procedimento: '1132' }] });
-  const c = await M.chamar({ acao: 'fam_marcar', token: mae.token, confirmar: true, itens: Array.from({ length: 5 }, (_, i) => ({ pessoa: `${i}`, horario: 'x', procedimento: '1' })) });
+  const a = await M.chamar({ acao: 'fam_marcar', necessidade: NEC, token: pai.token, confirmar: true, itens: [{ pessoa: mae.ana, horario: `${D1}|63|308|2|10:00`, procedimento: '1132' }] });
+  const b = await M.chamar({ acao: 'fam_marcar', necessidade: NEC, token: mae.token, confirmar: true, itens: [{ pessoa: mae.ana, horario: 'qualquer coisa', procedimento: '1132' }] });
+  const c = await M.chamar({ acao: 'fam_marcar', necessidade: NEC, token: mae.token, confirmar: true, itens: Array.from({ length: 5 }, (_, i) => ({ pessoa: `${i}`, horario: 'x', procedimento: '1' })) });
   return { ok: a.motivo === 'pessoa_nao_encontrada' && b.campo === 'horario' && c.campo === 'itens', detalhe: JSON.stringify([a.motivo, b.campo, c.campo]) };
 });
 
@@ -339,32 +362,140 @@ let pedroV;
 await caso('o pai marca para si, remarca para outro horário (a marcação antiga sai e fica "remarcado") e o horário velho volta a ficar livre', async () => {
   const busca = await M.chamar({ acao: 'fam_buscar', token: pai.token, pessoas: [pai.id], especialidade: '225124' });
   const ana = busca.medicos.find((m) => m.nome === 'DRA ANA PEDIATRA'), carol = busca.medicos.find((m) => m.nome === 'DRA CAROL NOVA');
-  const a = await M.chamar({ acao: 'fam_marcar', token: pai.token, confirmar: true, itens: [{ pessoa: pai.id, horario: carol.proximos[0].id, procedimento: '1132' }] });
+  const a = await M.chamar({ acao: 'fam_marcar', necessidade: NEC, token: pai.token, confirmar: true, itens: [{ pessoa: pai.id, horario: carol.proximos[0].id, procedimento: '1132' }] });
   pedroV = a.marcacoes[0].voucher.id;
-  const r = await M.chamar({ acao: 'fam_marcar', token: pai.token, confirmar: true, itens: [{ pessoa: pai.id, horario: ana.proximos.find((s) => s.hora === '09:40').id, procedimento: '1132', remarcar: pedroV }] });
+  const r = await M.chamar({ acao: 'fam_marcar', necessidade: NEC, token: pai.token, confirmar: true, itens: [{ pessoa: pai.id, horario: ana.proximos.find((s) => s.hora === '09:40').id, procedimento: '1132', remarcar: pedroV }] });
   const antigo = await um(`select status from public.familia_marcacao where voucher_id = $1`, [pedroV]), novo = await um(`select status, hora from public.familia_marcacao where voucher_id = $1`, [r.marcacoes?.[0]?.voucher?.id]);
   pedroV = r.marcacoes[0].voucher.id;
-  const outraPessoa = await M.chamar({ acao: 'fam_marcar', token: pai.token, confirmar: true, itens: [{ pessoa: pai.id, horario: ana.proximos[1].id, procedimento: '1132', remarcar: '99999' }] });
+  const outraPessoa = await M.chamar({ acao: 'fam_marcar', necessidade: NEC, token: pai.token, confirmar: true, itens: [{ pessoa: pai.id, horario: ana.proximos[1].id, procedimento: '1132', remarcar: '99999' }] });
   return { ok: a.ok && r.ok && antigo.status === 'remarcado' && novo.status === 'agendado' && !M.k.ocupados.has(carol.proximos[0].id) && outraPessoa.motivo === 'voucher_nao_encontrado', detalhe: JSON.stringify([antigo, novo, outraPessoa.motivo]) };
 });
 await caso('"Cheguei" só vale no dia (o Klingo diz "outra data"); no dia, a recepção é informada e o rastreio vira "chegou"', async () => {
   const fora = await M.chamar({ acao: 'fam_checkin', token: pai.token, voucher: pedroV, confirmar: true });
-  M.k.cfg.hojeKlingo = '2026-11-17';
+  M.k.cfg.hojeKlingo = D1;
   const dia = await M.chamar({ acao: 'fam_checkin', token: pai.token, voucher: pedroV, confirmar: true });
-  M.k.cfg.hojeKlingo = '2026-11-16';
+  M.k.cfg.hojeKlingo = HOJE;
   const sem = await M.chamar({ acao: 'fam_checkin', token: pai.token, voucher: pedroV });
   return { ok: fora.motivo === 'outra_data' && dia.ok && dia.recepcao === 'Recepção 1' && (await um(`select status from public.familia_marcacao where voucher_id = $1`, [pedroV])).status === 'chegou' && sem.motivo === 'sem_confirmacao', detalhe: JSON.stringify([fora.motivo, dia.recepcao, sem.motivo]) };
 });
 await caso('cancelar: perto da hora (menos de 24 h) a recepção resolve; com antecedência cancela, libera o horário e registra; marcação que não é de ninguém do celular não cancela', async () => {
   const relogioReal = M.ctx.agora;
-  M.ctx.agora = () => Date.parse('2026-11-16T20:00:00-03:00');             // 13 h antes das 09:40 de amanhã
+  M.ctx.agora = () => Date.parse(`${D1}T09:40:00-03:00`) - 13 * 3600e3;     // 13 h antes das 09:40
   const perto = await M.chamar({ acao: 'fam_cancelar', token: pai.token, voucher: pedroV, confirmar: true });
-  M.ctx.agora = () => Date.parse('2026-11-15T09:00:00-03:00');             // 48 h antes
+  M.ctx.agora = () => Date.parse(`${D1}T09:40:00-03:00`) - 48 * 3600e3;     // 48 h antes
   const alheia = await M.chamar({ acao: 'fam_cancelar', token: pai.token, voucher: '99999', confirmar: true });
   const r = await M.chamar({ acao: 'fam_cancelar', token: pai.token, voucher: pedroV, confirmar: true });
   M.ctx.agora = relogioReal;
   const st = (await um(`select status from public.familia_marcacao where voucher_id = $1`, [pedroV])).status;
   return { ok: perto.motivo === 'perto_demais' && /recepção/i.test(perto.mensagem) && alheia.status === 403 && r.ok && st === 'cancelado' && ![...M.k.vouchers.values()].flat().some((v) => String(v.id) === pedroV), detalhe: JSON.stringify([perto.motivo, alheia.motivo, r.ok, st]) };
+});
+
+// ---------------------------------------------------------------- certeza do horário (dados reais exigem isto)
+const achar = async (tok, pessoa, medico, hora) => { const b = await M.chamar({ acao: 'fam_buscar', token: tok, pessoas: [pessoa], especialidade: '225124' }); const m = b.medicos.find((x) => x.nome === medico); return { b, slot: m?.todos?.find?.((s) => s.hora === hora) ?? m?.proximos.find((s) => s.hora === hora) }; };
+const marcarSlot = (tok, pessoa, slot, proc = '1132', extra = {}) => M.chamar({ acao: 'fam_marcar', necessidade: NEC, token: tok, confirmar: true, itens: [{ pessoa, horario: slot.id, procedimento: proc, medico: slot.medico, unidade: slot.unidade, ...extra }] });
+const cancelarComPrazo = async (tok, voucher) => { const real = M.ctx.agora; M.ctx.agora = () => Date.parse(`${D1}T08:00:00-03:00`) - 72 * 3600e3; const r = await M.chamar({ acao: 'fam_cancelar', token: tok, voucher, confirmar: true }); M.ctx.agora = real; return r; };
+await caso('chave de segurança: em "teste" só marca quem tem o CPF liberado (com ou sem pontos); "desligado" pausa tudo; nada chega ao Klingo quando recusa', async () => {
+  const { slot } = await achar(mae.token, mae.id, 'DR BRUNO CLINICO', '09:00'), antes = M.k.contar('POST /agenda/reservar');
+  await db.query(`update public.config set valor = 'teste' where chave = 'familia_marcar_modo'`); await db.query(`update public.config set valor = '529.982.247-25' where chave = 'familia_teste_cpfs'`);
+  const barrada = await marcarSlot(mae.token, mae.id, slot);
+  const liberado = await marcarSlot(pai.token, pai.id, slot);
+  await db.query(`update public.config set valor = 'desligado' where chave = 'familia_marcar_modo'`);
+  const pausa = await marcarSlot(pai.token, pai.id, slot);
+  await db.query(`update public.config set valor = 'ligado' where chave = 'familia_marcar_modo'`);
+  if (liberado.ok) await cancelarComPrazo(pai.token, liberado.marcacoes[0].voucher.id);
+  return { ok: barrada.motivo === 'em_teste' && barrada.status === 403 && liberado.ok === true && pausa.motivo === 'desligado' && M.k.contar('POST /agenda/reservar') === antes + 1, detalhe: JSON.stringify([barrada.motivo, liberado.motivo ?? 'ok', pausa.motivo]) };
+});
+await caso('o horário some do Klingo entre a busca e a confirmação (alguém marcou direto na recepção): a pessoa é avisada na hora, recebe 3 alternativas livres (o mesmo médico no mesmo dia primeiro) e nada foi reservado', async () => {
+  const { slot } = await achar(mae.token, mae.id, 'DRA ANA PEDIATRA', '10:00'); M.k.ocupados.add(slot.id);
+  const r = await marcarSlot(mae.token, mae.id, slot); M.k.ocupados.delete(slot.id);
+  const alt = r.alternativas ?? [];
+  return { ok: r.ok === false && r.motivo === 'horario_ocupado' && r.indice === 0 && alt.length === 3 && !alt.some((a) => a.id === slot.id) && alt[0].medico === 'DRA ANA PEDIATRA' && alt[0].data === D1 && M.k.reservas.size === 0 && /ocupado/.test(r.mensagem), detalhe: JSON.stringify(alt.map((a) => `${a.medico} ${a.data} ${a.hora}`)) };
+});
+await caso('DISPUTA SIMULTÂNEA: duas famílias pedem o MESMO horário no mesmo instante com o Klingo "distraído" (aceitaria as duas): só uma marca, a outra é avisada e recebe alternativas', async () => {
+  const { slot } = await achar(mae.token, mae.id, 'DR BRUNO CLINICO', '09:30');
+  M.k.cfg.distraido = true; M.k.cfg.atrasoMs = 40;
+  const [a, b] = await Promise.all([marcarSlot(mae.token, mae.id, slot), marcarSlot(pai.token, pai.id, slot)]);
+  M.k.cfg.distraido = false; M.k.cfg.atrasoMs = 0;
+  const criadas = [...M.k.vouchers.values()].flat().filter((v) => v.chave === slot.id), perdeu = a.ok ? b : a, ganhou = a.ok ? a : b;
+  const donoToken = a.ok ? mae.token : pai.token;
+  if (ganhou.ok) await cancelarComPrazo(donoToken, ganhou.marcacoes[0].voucher.id);
+  return { ok: [a.ok, b.ok].filter(Boolean).length === 1 && criadas.length === 1 && perdeu.motivo === 'horario_ocupado' && perdeu.alternativas.length >= 1 && !perdeu.alternativas.some((x) => x.id === slot.id), detalhe: JSON.stringify([a.ok, b.ok, criadas.length, perdeu.motivo]) };
+});
+await caso('a mesma pessoa não marca o mesmo atendimento duas vezes, nem dois atendimentos no mesmo horário (nada é reservado)', async () => {
+  const antes = M.k.contar('POST /agenda/reservar');
+  const carol = (await achar(mae.token, mae.joao, 'DRA CAROL NOVA', '14:00')).slot, bruno = (await achar(mae.token, mae.joao, 'DR BRUNO CLINICO', '09:30')).slot;
+  const dup = await marcarSlot(mae.token, mae.joao, carol), cruza = await marcarSlot(mae.token, mae.joao, bruno, '1096');
+  return { ok: dup.motivo === 'ja_tem_marcacao' && dup.existente.data === D1 && /João já tem/.test(dup.mensagem) && cruza.motivo === 'conflito_horario' && cruza.existente.hora === '09:20' && M.k.contar('POST /agenda/reservar') === antes, detalhe: JSON.stringify([dup.motivo, cruza.motivo]) };
+});
+await caso('limites contra abuso: marcações demais por pessoa ou pela família são barradas com gentileza e a equipe recebe um alerta (sem acusar ninguém)', async () => {
+  const carol = (await achar(mae.token, mae.joao, 'DRA CAROL NOVA', '14:00')).slot;
+  await db.query(`update public.config set valor = '1' where chave = 'familia_max_por_pessoa'`);
+  const a = await marcarSlot(mae.token, mae.joao, carol, '1096');
+  await db.query(`update public.config set valor = '3' where chave = 'familia_max_por_pessoa'`); await db.query(`update public.config set valor = '1' where chave = 'familia_max_marcacoes_familia'`);
+  const b = await marcarSlot(mae.token, mae.joao, carol, '1096');
+  await db.query(`update public.config set valor = '8' where chave = 'familia_max_marcacoes_familia'`);
+  const alertas = (await um(`select public.familia_alertas_abertos() as r`)).r.map((x) => x.tipo);
+  return { ok: a.motivo === 'muitas_marcacoes_pessoa' && /recepção/.test(a.mensagem) && b.motivo === 'muitas_marcacoes' && alertas.includes('muitas_marcacoes_pessoa') && alertas.includes('muitas_marcacoes'), detalhe: JSON.stringify([a.motivo, b.motivo, alertas]) };
+});
+await caso('cadastrar pessoas demais (ou várias de uma vez) não é bloqueado em silêncio: a recepção confere junto, a equipe vê o alerta e o Klingo nem é chamado', async () => {
+  await db.query(`update public.config set valor = '2' where chave = 'familia_max_dependentes'`);
+  const antes = M.k.contar('POST /externo/register');
+  const r = await M.chamar({ acao: 'fam_dependente', token: mae.token, nome: 'Terceiro Filho Teste', sexo: 'M', nascimento: '2022-02-02' });
+  await db.query(`update public.config set valor = '4' where chave = 'familia_max_dependentes'`);
+  const alerta = (await um(`select public.familia_alertas_abertos() as r`)).r.find((x) => x.tipo === 'muitos_dependentes');
+  return { ok: r.ok === false && r.motivo === 'limite_pessoas' && /recepção/.test(r.mensagem) && M.k.contar('POST /externo/register') === antes && alerta && alerta.detalhe.limite === 2, detalhe: JSON.stringify([r.motivo, alerta?.detalhe]) };
+});
+await caso('o Klingo grava OUTRA hora (não a pedida): a marcação é desfeita na hora, a pessoa é avisada, o horário volta para quem espera e a equipe recebe um alerta', async () => {
+  const { slot } = await achar(pai.token, pai.id, 'DR BRUNO CLINICO', '09:30'); M.k.cfg.gravaOutraHora = true;
+  const r = await marcarSlot(pai.token, pai.id, slot); M.k.cfg.gravaOutraHora = false;
+  const alerta = (await um(`select public.familia_alertas_abertos() as r`)).r.find((x) => x.tipo === 'divergencia_marcacao'), livre = await db.query(`select count(*)::int n from public.agenda_segura where chave_horario = $1`, [slot.id]);
+  return { ok: r.ok === false && r.motivo === 'divergente' && !M.k.ocupados.has(slot.id) && livre.rows[0].n === 0 && alerta && /23:59/.test(JSON.stringify(alerta.detalhe)), detalhe: JSON.stringify([r.motivo, alerta?.detalhe]) };
+});
+
+// ---------------------------------------------------------------- fila de espera por pressa
+await caso('escolha do horário da fila: dentro do limite pedido, sem repetir recusados e, para quem só quer adiantar, pelo menos 2 horas antes do que já tem', async () => {
+  const H = (d, h, id) => ({ id: id ?? `${d}|1|1|1|${h}`, data: d, hora: h, profissional: { nome: 'X' }, unidade: { nome: 'U' }, ordem_chegada: false, procedimento: 1 });
+  const lista = [H(D1, '09:30'), H(D2, '13:00'), H(somarDias(HOJE, 20), '08:00')];
+  const base = { id: 1, pessoa: 'p', urgencia: 'qualquer', limite: null, voucher_atual: null, data_atual: null, hora_atual: null, recusadas: [] };
+  const a = escolherSlot({ ...base, urgencia: 'hoje', limite: HOJE }, lista, new Set()), b = escolherSlot({ ...base, urgencia: 'semana', limite: somarDias(HOJE, 7) }, lista, new Set());
+  const c = escolherSlot({ ...base, recusadas: [lista[0].id] }, lista, new Set()), d = escolherSlot({ ...base }, lista, new Set([lista[0].id, lista[1].id]));
+  const e1 = escolherSlot({ ...base, voucher_atual: '1', data_atual: D2, hora_atual: '14:00' }, [H(D2, '13:00'), H(D2, '11:30')], new Set()), e2 = escolherSlot({ ...base, voucher_atual: '1', data_atual: D2, hora_atual: '14:00' }, [H(D2, '13:00')], new Set());
+  const alt = alternativas([H(D1, '09:00', 'a'), { ...H(D1, '10:00', 'b'), profissional: { nome: 'Y' } }, { ...H(D2, '09:00', 'c') }, H(D1, '09:40', 'd')], { data: D1, hora: '09:20', medico: 'X' }, new Set(['a']), 3);
+  return { ok: a === null && b.hora === '09:30' && c.id === lista[1].id && d.data === somarDias(HOJE, 20) && e1.hora === '11:30' && e2 === null && alt.map((x) => x.id).join() === 'd,c,b', detalhe: alt.map((x) => x.id).join() };
+});
+let ofertaPedro;
+await caso('FILA DE ESPERA: com a agenda cheia, quem tem pressa entra na fila; quando um horário abre, o mais urgente é chamado primeiro, o horário fica reservado só para ele (ninguém mais vê nem pega) e a pessoa vê o prazo', async () => {
+  for (const [d, m, u, h] of [[D1, 63, 2, '09:40'], [D1, 63, 2, '10:00'], [D1, 70, 1, '09:30'], [D1, 70, 1, '09:00'], [D2, 71, 1, '14:00']]) M.k.ocupados.add(`${d}|${m}|308|${u}|${h}`);
+  const entradaMaria = await M.chamar({ acao: 'fam_espera_entrar', token: mae.token, pessoa: mae.id, necessidade: NEC, urgencia: 'qualquer' });
+  const semVaga = await M.chamar({ acao: 'fam_sincronizar', segredo: SYNC });
+  M.k.ocupados.delete(`${D1}|70|308|1|09:30`);                                          // alguém desmarcou direto no Klingo (recepção)
+  await db.query(`delete from public.agenda_cache`);
+  const entradaPedro = await M.chamar({ acao: 'fam_espera_entrar', token: pai.token, pessoa: pai.id, necessidade: NEC, urgencia: 'semana' });
+  await db.query(`delete from public.agenda_cache`); await db.query(`update public.agenda_fila set proximo_em = now() - interval '1 second'`);
+  const rodou = await M.chamar({ acao: 'fam_sincronizar', segredo: SYNC });
+  const vistaPedro = (await M.chamar({ acao: 'fam_acompanhar', token: pai.token })).espera, vistaMaria = (await M.chamar({ acao: 'fam_acompanhar', token: mae.token })).espera;
+  ofertaPedro = vistaPedro.find((x) => x.estado === 'oferecido');
+  const busca = await M.chamar({ acao: 'fam_buscar', token: mae.token, pessoas: [mae.id], especialidade: '225124' });
+  const roubo = await marcarSlot(mae.token, mae.id, { id: `${D1}|70|308|1|09:30`, medico: 'DR BRUNO CLINICO', unidade: 'CSI' });
+  return { ok: entradaMaria.ok && entradaPedro.ok && semVaga.ofertas === 0 && rodou.ofertas >= 1 && ofertaPedro && ofertaPedro.oferta.hora === '09:30' && /BRUNO/.test(ofertaPedro.oferta.medico) && new Date(ofertaPedro.oferta_ate) > new Date()
+    && vistaMaria.find((x) => x.estado === 'esperando') && !busca.medicos.some((m) => m.proximos.some((s) => s.id === `${D1}|70|308|1|09:30`)) && roubo.ok === false && roubo.motivo === 'horario_ocupado', detalhe: JSON.stringify({ semVaga: semVaga.ofertas, rodou, pedro: vistaPedro.map((x) => x.estado), maria: vistaMaria.map((x) => x.estado), roubo: roubo.motivo }) };
+});
+await caso('FILA DE ESPERA: Pedro recusa, o horário passa para Maria (o próximo da fila); Maria aceita e a marcação sai na hora; Pedro continua na fila e o horário aceito não é oferecido de novo', async () => {
+  const recusa = await M.chamar({ acao: 'fam_espera_responder', token: pai.token, id: ofertaPedro.id, aceita: false });
+  await db.query(`delete from public.agenda_cache`); await db.query(`update public.agenda_fila set proximo_em = now() - interval '1 second'`);
+  const rodou = await M.chamar({ acao: 'fam_sincronizar', segredo: SYNC });
+  const mariaVe = (await M.chamar({ acao: 'fam_eu', token: mae.token })).espera.find((x) => x.estado === 'oferecido');
+  const aceita = await M.chamar({ acao: 'fam_espera_responder', token: mae.token, id: mariaVe.id, aceita: true });
+  const voucher = [...M.k.vouchers.get('P100') ?? []].find((v) => v.chave === `${D1}|70|308|1|09:30`);
+  await db.query(`delete from public.agenda_cache`); await M.chamar({ acao: 'fam_sincronizar', segredo: SYNC });
+  const pedro = (await M.chamar({ acao: 'fam_acompanhar', token: pai.token })).espera, maria = (await M.chamar({ acao: 'fam_acompanhar', token: mae.token })).espera;
+  return { ok: recusa.ok && rodou.ofertas >= 1 && mariaVe && mariaVe.oferta.hora === '09:30' && aceita.ok && aceita.espera_concluida === true && voucher && pedro.length === 1 && pedro[0].estado === 'esperando' && maria.length === 0 && !pedro.some((x) => x.oferta), detalhe: JSON.stringify({ recusa: recusa.ok, aceita: aceita.motivo ?? 'ok', pedro: pedro.map((x) => x.estado), maria: maria.length }) };
+});
+await caso('FILA DE ESPERA: oferta que a pessoa deixa vencer volta para a fila sem repetir o horário; quem sai da fila libera tudo; acompanhar mostra a previsão de procura só em números', async () => {
+  const antes = (await um(`select public.agenda_previsao_espera(7) as r`)).r;
+  const sai = await M.chamar({ acao: 'fam_espera_sair', token: pai.token, id: (await M.chamar({ acao: 'fam_acompanhar', token: pai.token })).espera[0].id });
+  const depois = (await M.chamar({ acao: 'fam_acompanhar', token: pai.token })).espera;
+  return { ok: sai.ok && depois.length === 0 && antes.ofertas.ofertadas >= 2 && antes.ofertas.aceitas === 1 && antes.ofertas.recusadas === 1 && !JSON.stringify(antes).includes(CPF_PAI), detalhe: JSON.stringify(antes.ofertas) };
 });
 
 await caso('desligar este celular: o código deixa de valer na hora, e o dos outros continua', async () => {

@@ -13,6 +13,7 @@
 //   fam_aviso         quem já abre o laudo responde "Liberar" ou "Bloquear".
 //   fam_cancelar / fam_checkin   "Não vou poder ir" (com a regra das 24 horas do chat; perto da hora a recepção resolve) e "Cheguei" (só no dia).
 //   fam_marcar com `remarcar`   troca a marcação de UMA pessoa: a antiga só sai quando a nova está confirmada.
+//   fam_espera_entrar / fam_espera_sair / fam_espera_responder   fila de espera por pressa (hoje, esta semana, qualquer dia mais cedo) e resposta à oferta de um horário que abriu.
 //   fam_desligar      desliga ESTE celular.
 //   fam_laudo         abre o laudo (só celular de nível 2 e só se AGENDAMENTO_RESULTADO=1: o laudo pronto de verdade ainda NÃO foi testado com o Klingo).
 //   fam_sincronizar   (rotina do pg_cron, com FAMILIA_SYNC_CHAVE) lê a fila lenta: no máximo 3 leituras por minuto, só 1 se o Klingo reclamou.
@@ -21,7 +22,7 @@
 // aparelho desligado ou parado há 12 meses não entra; nível 1 marca e acompanha, só nível 2 abre laudo; laudo nunca é guardado nem vai para log; cada abertura é registrada sem conteúdo.
 import { cpfValido, dataIso, type Horario, KlingoErro, resumoVoucher } from "./api.ts";
 import { cifrar, decifrar, novoToken, sha256 } from "./cripto.ts";
-import { combinar, norm, ordenarMedicos, paraTela, primeiroLivre, type Contagem, type Slot } from "./ordenar.ts";
+import { combinar, norm, ordenarMedicos, paraTela, primeiroLivre, slotLeve, type Contagem, type Slot } from "./ordenar.ts";
 import { abrirSessaoCpf, corpoMarcacao, curto, digitos, ehResp, invalido, lerMarca, marcarComSessao, nega, ok, primeiroNome, somarDias, traduzir, tratar, vouchersAtivos, type Ctx, type Marca, type Resp, type Sessao } from "./regras.ts";
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------
@@ -56,6 +57,25 @@ export type FamiliaDb = {
   pessoasAtivas(minutos: number): Promise<string[]>;
   marcacoesAbertas(pessoa: string): Promise<Array<{ voucher: string; status: string; data: string | null }>>;
   planosEmUso(): Promise<number[]>;
+  config(): Promise<ConfigFamilia>;
+  risco(aparelho: string): Promise<Risco>;
+  alertar(tipo: string, aparelho: string | null, pessoa: string | null, detalhe?: Record<string, unknown>): Promise<void>;
+  segurar(grupo: string, slots: SlotLivro[], segundos: number, estado?: string): Promise<{ ok: boolean; motivo?: string; indice?: number }>;
+  segurarMarcar(grupo: string, segundos: number, vouchersPorChave?: Record<string, string>): Promise<void>;
+  liberarVoucher(voucher: string): Promise<void>;
+  soltar(grupo: string): Promise<void>;
+  emUso(slots: SlotLivro[], ignorarGrupo?: string | null): Promise<string[]>;
+  esperaEntrar(aparelho: string, pessoa: string, needKey: string, params: Record<string, unknown>, urgencia: string, voucher?: string | null, data?: string | null, hora?: string | null): Promise<{ ok: boolean; motivo?: string; id?: number; ja_estava?: boolean; limite?: number }>;
+  esperaSair(aparelho: string, id: number): Promise<{ ok: boolean; motivo?: string }>;
+  esperaListar(aparelho: string): Promise<EsperaVista[]>;
+  esperaNecessidades(max: number): Promise<Array<{ need_key: string; params: Record<string, unknown> }>>;
+  esperaLida(needKey: string): Promise<void>;
+  esperaCandidatas(needKey: string): Promise<Candidata[]>;
+  esperaOfertar(id: number, slot: Record<string, unknown>, segundos: number): Promise<{ ok: boolean; motivo?: string; grupo?: string }>;
+  esperaExpirar(): Promise<{ ofertas_vencidas: number; esperas_vencidas: number }>;
+  esperaResponder(aparelho: string, id: number, aceita: boolean): Promise<{ ok: boolean; motivo?: string; aceita?: boolean; espera?: { id: number; pessoa: string; params: Record<string, unknown>; oferta: Record<string, unknown>; grupo: string; voucher_atual: string | null } }>;
+  esperaConcluir(id: number, voucher: string): Promise<void>;
+  esperaFalhou(id: number): Promise<void>;
   acessoRegistrar(aparelho: string, pessoa: string, voucher: string): Promise<{ ok: boolean; motivo?: string }>;
   cacheLer(chave: string): Promise<{ dados: unknown; buscado_em: string; vencido: boolean } | null>;
   cacheGravar(chave: string, dados: unknown, validoSeg: number): Promise<void>;
@@ -63,6 +83,11 @@ export type FamiliaDb = {
   filaPegar(max: number): Promise<Tarefa[]>;
   filaFim(id: number, ok: boolean, erro?: string | null, refazerSeg?: number | null): Promise<void>;
 };
+export type ConfigFamilia = { modo: string; cpfs: string[]; max_dependentes: number; max_marcacoes_familia: number; max_por_pessoa: number; oferta_min: number };
+export type Risco = { dependentes_total: number; dependentes_24h: number; futuras_total: number; futuras_por_pessoa: Record<string, number>; cancelamentos_em_cima_60d: number; faltas_60d: number };
+export type SlotLivro = { chave: string; inicio: string; profissional: string | null; unidade: string | null; minutos: number; pessoa?: string };
+export type Candidata = { id: number; pessoa: string; urgencia: "hoje" | "semana" | "qualquer"; limite: string | null; voucher_atual: string | null; data_atual: string | null; hora_atual: string | null; recusadas: string[] };
+export type EsperaVista = { id: number; pessoa: string; nome: string; necessidade: string | null; urgencia: string; estado: string; posicao: number; voucher_atual: string | null; data_atual: string | null; hora_atual: string | null; oferta: Record<string, unknown> | null; oferta_ate: string | null };
 export type CtxFam = Ctx & { fam: { db: FamiliaDb | null; chave: string | null; chaveSync?: string | null } };
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------
@@ -147,7 +172,7 @@ async function entrar(ctx: CtxFam, c: Record<string, unknown>): Promise<Resp> {
 async function eu(ctx: CtxFam, c: Record<string, unknown>): Promise<Resp> {
   const ap = await aparelhoDe(ctx, c);
   if (ehResposta(ap)) return ap;
-  return ok({ apelido: ap.apelido, pessoas: ap.pessoas, avisos: await ctx.fam.db!.avisos(ap.id) });
+  return ok({ apelido: ap.apelido, pessoas: ap.pessoas, avisos: await ctx.fam.db!.avisos(ap.id), espera: await ctx.fam.db!.esperaListar(ap.id) });
 }
 
 async function celularDaFamilia(ctx: CtxFam, ap: Aparelho): Promise<string | null> {
@@ -175,6 +200,12 @@ async function dependente(ctx: CtxFam, c: Record<string, unknown>): Promise<Resp
     cpfUsado = r.cpf; cpfDe = "responsavel";
   }
   celular = celular ?? await celularDaFamilia(ctx, ap);
+  // cuidado com quem acrescenta pessoas demais (ou depressa demais): não é acusação, a recepção confere junto e a equipe vê um alerta
+  const [cfg, risco] = await Promise.all([ctx.fam.db!.config(), ctx.fam.db!.risco(ap.id)]);
+  if (risco.dependentes_total >= cfg.max_dependentes || risco.dependentes_24h >= 3) {
+    await ctx.fam.db!.alertar("muitos_dependentes", ap.id, null, { total: risco.dependentes_total, em_24h: risco.dependentes_24h, limite: cfg.max_dependentes });
+    return nega("limite_pessoas", { mensagem: "Para cadastrar mais pessoas, a recepção confere junto com você. É só para a segurança de todos." });
+  }
 
   // já existe (outro responsável cadastrou antes)? então só liga este celular
   const par = await ctx.db.hash(`${cpfUsado}|${nascimento}`), existentes = await ctx.fam.db!.pessoasPorPar(par);
@@ -258,11 +289,12 @@ async function buscar(ctx: CtxFam, c: Record<string, unknown>): Promise<Resp> {
   const plano = String(ps[0].planoId ?? 1), planosDiferentes = new Set(ps.map((p) => p.planoId ?? 1)).size > 1;
   const hoje = ctx.hoje(), inicio = hoje;
   let dias = 9, r = await horariosDoCache(ctx, { inicio, fim: somarDias(inicio, dias), plano, ...(especialidade ? { especialidade } : { exame: exame! }) });
-  if (!r.lista.length && !r.motivo) { dias = 30; r = await horariosDoCache(ctx, { inicio, fim: somarDias(inicio, dias), plano, ...(especialidade ? { especialidade } : { exame: exame! }) }); }   // vazio? amplia sozinho
+  let lista = await tirarIndisponiveis(ctx, r.lista, null);                      // fora: o que outra pessoa já segura (página ou chat) e o que começa em menos de 30 minutos
+  if (!lista.length && !r.motivo) { dias = 30; r = await horariosDoCache(ctx, { inicio, fim: somarDias(inicio, dias), plano, ...(especialidade ? { especialidade } : { exame: exame! }) }); lista = await tirarIndisponiveis(ctx, r.lista, null); }   // vazio? amplia sozinho
   const [historico, procura] = await Promise.all([ctx.fam.db!.historico(ps.map((p) => p.id)), popularidade(ctx)]);
-  const medicos = ordenarMedicos(r.lista, historico, procura);
+  const medicos = ordenarMedicos(lista, historico, procura);
   return ok({
-    total: r.lista.length, janela: { inicio, fim: somarDias(inicio, dias) }, atualizado_em: r.atualizadoEm, desatualizado: r.desatualizado, ...(r.motivo ? { motivo: r.motivo } : {}), ...(planosDiferentes ? { aviso: "planos_diferentes" } : {}),
+    total: lista.length, janela: { inicio, fim: somarDias(inicio, dias) }, atualizado_em: r.atualizadoEm, desatualizado: r.desatualizado, ...(r.motivo ? { motivo: r.motivo } : {}), ...(planosDiferentes ? { aviso: "planos_diferentes" } : {}),
     primeiro: primeiroLivre(medicos), medicos: medicos.map(paraTela), combinacoes: combinar(medicos, ps.length), pessoas: ps.map((p) => ({ id: p.id, nome: p.primeiroNome })),
   });
 }
@@ -274,34 +306,121 @@ async function popularidade(ctx: CtxFam): Promise<Contagem> {
   return v;
 }
 
-type Item = { pessoa: Pessoa; sessao: Sessao; marca: Marca; reserva: string | null; idExterno: string; remarcar: string | null; hint: { medico: string | null; unidade: string | null } };
+// ---------------------------------------------------------------------------------------------------------------------------------------------
+// Marcar com CERTEZA: o horário só é marcado se estiver livre NESTE instante
+// ---------------------------------------------------------------------------------------------------------------------------------------------
+// A ordem dos passos é de propósito (cada um protege o paciente de um problema que só aparece depois):
+//   1. chave de segurança (modo "teste" só deixa os CPFs liberados marcarem; "desligado" para tudo) e limites de abuso (celular que junta marcações demais);
+//   2. o horário é conferido AO VIVO no Klingo (a lista da tela pode ter minutos de idade): se não estiver lá, a pessoa escolhe outro, com 3 alternativas já prontas;
+//   3. a pessoa não pode ter outra marcação ativa no mesmo horário nem a mesma consulta/exame duas vezes (quem junta horários atrapalha quem espera);
+//   4. o LIVRO-CAIXA (banco) segura o horário para ela: dois pedidos no mesmo milissegundo, pela página ou pelo chat, e só UM ganha; o outro é avisado na hora;
+//   5. o Klingo reserva e marca (o juiz final); se algo falhar no meio, solta e desfaz tudo (tudo ou nada);
+//   6. depois de marcar, confere que o Klingo gravou o dia e a hora PEDIDOS; se não for igual, desfaz e avisa.
+const ANTECEDENCIA_MIN = 30, SEGURAR_S = 600, MIN_SLOT = 30;
+type Necessidade = { especialidade?: string; exame?: string; nome: string };
+type Item = { pessoa: Pessoa; sessao: Sessao; marca: Marca; reserva: string | null; idExterno: string; remarcar: string | null; slot: Horario; hint: { medico: string | null; unidade: string | null } };
+const minutosDoDia = (hhmm: string) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
+const slotLivro = (h: Horario, pessoa?: string): SlotLivro => ({ chave: h.id, inicio: `${h.data}T${h.hora}`, profissional: h.profissional?.nome ?? null, unidade: h.unidade?.nome ?? null, minutos: MIN_SLOT, ...(pessoa ? { pessoa } : {}) });
+const comecaEm = (h: { data: string; hora: string }) => Date.parse(`${h.data}T${h.hora.slice(0, 5)}:00-03:00`);
 const soltarReserva = async (ctx: CtxFam, it: Item) => { if (it.reserva) await ctx.api.chamar("DELETE", "/agenda/reservar", { sessao: it.sessao.token, corpo: { id: Number(it.reserva) } }).catch(() => {}); };
+const desfazer = async (ctx: CtxFam, feitos: Array<{ it: Item; voucher: { id: string | null } }>) => {
+  const desfeitas: string[] = [], presas: string[] = [];
+  for (const f of feitos) { try { await ctx.api.chamar("DELETE", "/voucher", { sessao: f.it.sessao.token, corpo: { id: f.voucher.id } }); desfeitas.push(f.it.pessoa.primeiroNome); } catch { presas.push(f.it.pessoa.primeiroNome); } }
+  return { desfeitas, presas };
+};
 
-async function marcarJuntos(ctx: CtxFam, c: Record<string, unknown>): Promise<Resp> {
-  const ap = await aparelhoDe(ctx, c);
-  if (ehResposta(ap)) return ap;
-  if (c.confirmar !== true) return nega("sem_confirmacao", { mensagem: "Ação não confirmada." }, 400);
-  const itens = Array.isArray(c.itens) ? c.itens as Array<Record<string, unknown>> : [];
-  if (!itens.length || itens.length > MAX_PESSOAS_POR_VEZ) return invalido("itens");
-  if (new Set(itens.map((i) => String(i.pessoa))).size !== itens.length) return invalido("pessoas");
-  const grupo = ctx.uuid(), prontos: Item[] = [];
-  for (let i = 0; i < itens.length; i++) {
-    const it = itens[i], p = await pessoaPlena(ctx, ap.id, String(it.pessoa ?? ""));
+function lerNecessidade(c: unknown): Necessidade | Resp {
+  const n = (c && typeof c === "object" ? c : {}) as Record<string, unknown>;
+  const especialidade = n.especialidade ? curto(n.especialidade, 20) : null, exame = n.exame ? digitos(n.exame, 1, 9) : null, nome = curto(n.nome, 80) ?? (especialidade ? "Consulta" : "Exame");
+  if (!especialidade && !exame) return invalido("necessidade");
+  return { ...(especialidade ? { especialidade } : { exame: exame! }), nome };
+}
+const chaveNecessidade = (n: Necessidade, plano: number | string) => `${n.especialidade ? "especialidade=" + n.especialidade : "exame=" + n.exame}&plano=${plano}`;
+const consultaDe = (n: Necessidade, plano: number | string, inicio: string, fim: string): Record<string, string> => ({ inicio, fim, plano: String(plano), ...(n.especialidade ? { especialidade: n.especialidade } : { exame: n.exame! }) });
+
+/** Horários livres AGORA (ao vivo, sem cache) a partir de hoje, com os que começam em menos de 30 minutos e os que outra pessoa já segura (livro-caixa ou chat) já tirados. */
+async function listaAoVivo(ctx: CtxFam, n: Necessidade, plano: number | string, ateData: string, ignorarGrupo: string | null): Promise<Horario[]> {
+  const hoje = ctx.hoje(), fim = ateData > somarDias(hoje, 9) ? (ateData > somarDias(hoje, 30) ? somarDias(hoje, 30) : ateData) : somarDias(hoje, 9), q = consultaDe(n, plano, hoje, fim);
+  let lista: Horario[];
+  try { lista = await ctx.api.horarios(q); } catch (e) { if (e instanceof KlingoErro && (e.tipo === "sem_medico" || e.tipo === "plano_inativo" || e.tipo === "plano_desconhecido")) return []; throw e; }
+  await ctx.fam.db!.cacheGravar(chaveHorarios(q), lista, CACHE_FRESCO_S);
+  return await tirarIndisponiveis(ctx, lista, ignorarGrupo);
+}
+async function tirarIndisponiveis(ctx: CtxFam, lista: Horario[], ignorarGrupo: string | null): Promise<Horario[]> {
+  const limite = ctx.agora() + ANTECEDENCIA_MIN * 60_000, futuros = lista.filter((h) => comecaEm(h) >= limite);
+  if (!futuros.length) return [];
+  const usados = new Set(await ctx.fam.db!.emUso(futuros.map((h) => slotLivro(h)), ignorarGrupo));
+  return futuros.filter((h) => !usados.has(h.id));
+}
+/** Até 3 horários livres parecidos com o que a pessoa queria: o mesmo médico no mesmo dia, depois o mesmo médico em outro dia, depois qualquer médico, sempre os mais próximos do pedido. */
+export function alternativas(lista: Horario[], queria: { data: string; hora: string; medico: string | null }, evitar: Set<string>, k = 3): Slot[] {
+  const alvo = comecaEm(queria);
+  const peso = (h: Horario) => { const mesmoMedico = h.profissional?.nome === queria.medico, mesmoDia = h.data === queria.data; return (mesmoMedico && mesmoDia ? 0 : mesmoMedico ? 1 : 2) * 1e13 + Math.abs(comecaEm(h) - alvo); };
+  return lista.filter((h) => !evitar.has(h.id)).sort((a, b) => peso(a) - peso(b)).slice(0, k).map(slotLeve);
+}
+
+async function executarMarcacao(ctx: CtxFam, ap: Aparelho, itens: Array<Record<string, unknown>>, nec: Necessidade, opc: { grupoFixo?: string } = {}): Promise<Resp> {
+  const db = ctx.fam.db!, grupo = opc.grupoFixo ?? ctx.uuid(), hoje = ctx.hoje();
+  const pessoas: Pessoa[] = [];
+  for (const it of itens) {
+    const p = await pessoaPlena(ctx, ap.id, String(it.pessoa ?? ""));
     if (!p) return nega("pessoa_nao_encontrada", { mensagem: "Esta pessoa não está ligada a este celular." }, 403);
     if (!CHAVE_HORARIO.test(String(it.horario ?? ""))) return invalido("horario");
+    pessoas.push(p);
+  }
+  const remarcando = itens.some((i) => i.remarcar !== undefined && i.remarcar !== null && i.remarcar !== "");
+  // 1) chave de segurança e limites de abuso
+  const cfg = await db.config();
+  if (cfg.modo === "desligado") return nega("desligado", { mensagem: "A marcação por aqui está pausada agora. Fale com a recepção." }, 503);
+  if (cfg.modo === "teste" && !pessoas.every((p) => cfg.cpfs.includes(p.cpf))) return nega("em_teste", { mensagem: "A marcação por aqui ainda está em fase de testes. A recepção ou o chat marcam para você agora mesmo." }, 403);
+  if (!remarcando) {
+    const r = await db.risco(ap.id);
+    if (r.futuras_total + itens.length > cfg.max_marcacoes_familia) { await db.alertar("muitas_marcacoes", ap.id, pessoas[0].id, { futuras: r.futuras_total, pedidas: itens.length }); return nega("muitas_marcacoes", { mensagem: "Você já tem muitas marcações por vir. Para marcar mais, fale com a recepção: eles organizam junto com você." }); }
+    for (const p of pessoas) if ((r.futuras_por_pessoa[p.id] ?? 0) >= cfg.max_por_pessoa) { await db.alertar("muitas_marcacoes_pessoa", ap.id, p.id, { futuras: r.futuras_por_pessoa[p.id] }); return nega("muitas_marcacoes_pessoa", { pessoa: p.primeiroNome, mensagem: `${p.primeiroNome} já tem ${r.futuras_por_pessoa[p.id]} marcações por vir. Para marcar outra, fale com a recepção.` }); }
+  }
+  // 2) o horário é conferido AO VIVO (por plano) e fica com os dados do Klingo, nunca com os que a tela mandou
+  const porPlano = new Map<string, Horario[]>(), escolhidos: Horario[] = [];
+  for (let i = 0; i < itens.length; i++) {
+    const it = itens[i], p = pessoas[i], plano = String(it.plano ?? p.planoId ?? 1), ate = String(it.horario).slice(0, 10);
+    if (!porPlano.has(plano)) porPlano.set(plano, await listaAoVivo(ctx, nec, plano, ate, grupo));
+    else if (ate > (porPlano.get(plano)!.at(-1)?.data ?? ate)) porPlano.set(plano, await listaAoVivo(ctx, nec, plano, ate, grupo));
+    const achado = porPlano.get(plano)!.find((h) => h.id === it.horario);
+    if (!achado) {
+      const queria = { data: String(it.horario).slice(0, 10), hora: String(it.horario).slice(-5), medico: curto(it.medico, 80) };
+      const evitar = new Set(itens.map((x) => String(x.horario)));
+      return nega("horario_ocupado", { indice: i, pessoa: p.primeiroNome, mensagem: "Esse horário acabou de ser ocupado. Já separamos outros para você.", alternativas: alternativas(porPlano.get(plano)!, queria, evitar) });
+    }
+    escolhidos.push(achado);
+  }
+  // sessões e conferência das marcações que a pessoa JÁ tem (duplicidade e horário cruzado)
+  const prontos: Item[] = [];
+  for (let i = 0; i < itens.length; i++) {
+    const it = itens[i], p = pessoas[i], slot = escolhidos[i];
     const marca = lerMarca({ horario: it.horario, procedimento: it.procedimento, plano: it.plano ?? p.planoId ?? 1, obs: it.obs });
     if ("status" in marca) return marca as Resp;
     const s = await sessaoDaPessoa(ctx, p);
-    if (ehResp(s)) { for (const x of prontos) await soltarReserva(ctx, x); return s; }
+    if (ehResp(s)) return s;
     let remarcar: string | null = null;
-    if (it.remarcar !== undefined && it.remarcar !== null && it.remarcar !== "") {      // remarcar vale para uma pessoa por vez e só a marcação ativa dela
-      remarcar = digitos(it.remarcar, 1, 12);
-      if (!remarcar || itens.length !== 1) return invalido("remarcar");
-      if (!(await vouchersAtivos(ctx, s)).some((v) => String(v.id) === remarcar)) return nega("voucher_nao_encontrado", { mensagem: "Não achamos esta marcação entre as suas marcações ativas." });
+    if (it.remarcar !== undefined && it.remarcar !== null && it.remarcar !== "") { remarcar = digitos(it.remarcar, 1, 12); if (!remarcar || itens.length !== 1) return invalido("remarcar"); }
+    const ativos = (await vouchersAtivos(ctx, s)).map(resumoVoucher);
+    if (remarcar && !ativos.some((v) => v.id === remarcar)) return nega("voucher_nao_encontrado", { mensagem: "Não achamos esta marcação entre as suas marcações ativas." });
+    for (const v of ativos) {
+      if (v.id === remarcar || !v.data) continue;
+      if (v.procedimento_id === String(marca.procedimento) && v.data >= hoje) return nega("ja_tem_marcacao", { pessoa: p.primeiroNome, existente: { voucher: v.id, data: v.data, hora: v.hora, procedimento: v.procedimento }, mensagem: `${p.primeiroNome} já tem este atendimento marcado. Se precisar de outro dia, use "Mudar o horário".` });
+      if (v.data === slot.data && v.hora && Math.abs(minutosDoDia(v.hora) - minutosDoDia(slot.hora)) < MIN_SLOT) return nega("conflito_horario", { pessoa: p.primeiroNome, existente: { voucher: v.id, data: v.data, hora: v.hora, procedimento: v.procedimento }, mensagem: `${p.primeiroNome} já tem outro atendimento nesse horário. Escolha um horário diferente.` });
     }
-    prontos.push({ pessoa: p, sessao: s, marca, reserva: null, idExterno: `pagina-${grupo}-${i}`, remarcar, hint: { medico: curto(it.medico, 80), unidade: curto(it.unidade, 80) } });
+    prontos.push({ pessoa: p, sessao: s, marca, reserva: null, idExterno: `pagina-${grupo}-${i}`, remarcar, slot, hint: { medico: curto(it.medico, 80), unidade: curto(it.unidade, 80) } });
   }
-  // 1) reservar todos (nenhum é marcado antes de todos estarem seguros)
+  // 4) livro-caixa: um só ganha, no mesmo instante
+  const livro = await db.segurar(grupo, prontos.map((x) => slotLivro(x.slot, x.pessoa.id)), SEGURAR_S);
+  if (!livro.ok) {
+    const i = livro.indice ?? 0, evitar = new Set(prontos.map((x) => x.slot.id));
+    if (livro.motivo === "pessoa_ocupada") return nega("conflito_horario", { indice: i, pessoa: prontos[i].pessoa.primeiroNome, mensagem: `${prontos[i].pessoa.primeiroNome} já está com outro horário em andamento nesse mesmo momento. Termine ou espere alguns minutos.` });
+    const lista = await tirarIndisponiveis(ctx, porPlano.get(String(itens[i].plano ?? pessoas[i].planoId ?? 1)) ?? [], grupo);
+    return nega("horario_ocupado", { indice: i, pessoa: prontos[i].pessoa.primeiroNome, mensagem: "Outra pessoa acabou de escolher esse horário. Já separamos outros para você.", alternativas: alternativas(lista, { data: prontos[i].slot.data, hora: prontos[i].slot.hora, medico: prontos[i].slot.profissional?.nome ?? null }, evitar) });
+  }
+  const falhar = async (r: Resp, extras: Record<string, unknown> = {}): Promise<Resp> => { await db.soltar(grupo); return { status: r.status, corpo: { ...r.corpo, ...extras } }; };
+  // 5) o Klingo reserva e marca; tudo ou nada
   for (let i = 0; i < prontos.length; i++) {
     const it = prontos[i];
     try {
@@ -310,30 +429,142 @@ async function marcarJuntos(ctx: CtxFam, c: Record<string, unknown>): Promise<Re
       it.reserva = rv?.id !== undefined && rv?.id !== null ? String(rv.id) : null;
     } catch (e) {
       for (const x of prontos) await soltarReserva(ctx, x);
-      if (e instanceof KlingoErro && e.tipo === "horario_ocupado") return nega("horario_ocupado", { indice: i, pessoa: it.pessoa.primeiroNome, mensagem: "Um dos horários acabou de ser ocupado. Vamos mostrar outros." });
-      return traduzir(e);
+      if (e instanceof KlingoErro && e.tipo === "horario_ocupado") {
+        const lista = await tirarIndisponiveis(ctx, porPlano.get(String(itens[i].plano ?? pessoas[i].planoId ?? 1)) ?? [], grupo).catch(() => []);
+        return await falhar(nega("horario_ocupado", { indice: i, pessoa: it.pessoa.primeiroNome, mensagem: "Um dos horários acabou de ser ocupado. Já separamos outros para você." }), { alternativas: alternativas(lista, { data: it.slot.data, hora: it.slot.hora, medico: it.slot.profissional?.nome ?? null }, new Set([it.slot.id])) });
+      }
+      return await falhar(traduzir(e));
     }
   }
-  // 2) marcar todos; se um falhar, desfaz os que já foram (tudo ou nada)
   const feitos: Array<{ it: Item; voucher: ReturnType<typeof resumoVoucher> }> = [];
   for (const it of prontos) {
     const r = await marcarComSessao(ctx, it.sessao, it.marca, it.reserva, it.remarcar, it.idExterno);
     const voucher = (r.corpo as { voucher?: ReturnType<typeof resumoVoucher> }).voucher;
-    if (r.corpo.ok === true && voucher?.id) { feitos.push({ it, voucher }); continue; }
-    const desfeitas: string[] = [], presas: string[] = [];
-    for (const f of feitos) {
-      try { await ctx.api.chamar("DELETE", "/voucher", { sessao: f.it.sessao.token, corpo: { id: f.voucher.id } }); desfeitas.push(f.it.pessoa.primeiroNome); } catch { presas.push(f.it.pessoa.primeiroNome); }
+    if (r.corpo.ok === true && voucher?.id) {
+      // 6) o Klingo gravou o que foi pedido? Se a data ou a hora forem outras, desfaz tudo e avisa (nunca deixa uma marcação "quase certa")
+      if (voucher.data !== it.slot.data || (voucher.hora ?? "").slice(0, 5) !== it.slot.hora.slice(0, 5)) {
+        await db.alertar("divergencia_marcacao", ap.id, it.pessoa.id, { pedido: `${it.slot.data} ${it.slot.hora}`, gravado: `${voucher.data} ${voucher.hora}` });
+        const d = await desfazer(ctx, [...feitos, { it, voucher }]);
+        return await falhar(nega("divergente", { pessoa: it.pessoa.primeiroNome, desfeitas: d.desfeitas, mensagem: d.presas.length ? "A marcação saiu diferente do pedido e não conseguimos desfazer sozinhos. Fale com a recepção: eles resolvem rápido." : "A marcação saiu diferente do pedido e foi desfeita. Vamos tentar de novo, sem pressa." }, 502));
+      }
+      feitos.push({ it, voucher }); continue;
     }
+    const d = await desfazer(ctx, feitos);
     for (const x of prontos) if (!feitos.some((f) => f.it === x)) await soltarReserva(ctx, x);
-    if (presas.length) return nega("parcial", { pessoas_marcadas: presas, mensagem: "Marcamos só uma parte e não conseguimos desfazer. Fale com a recepção, por favor: eles resolvem rápido." }, 502);
-    return nega(String(r.corpo.motivo ?? "erro"), { ...(r.corpo.mensagem ? { mensagem: r.corpo.mensagem } : {}), pessoa: it.pessoa.primeiroNome, desfeitas }, r.status);
+    if (d.presas.length) return await falhar(nega("parcial", { pessoas_marcadas: d.presas, mensagem: "Marcamos só uma parte e não conseguimos desfazer. Fale com a recepção, por favor: eles resolvem rápido." }, 502));
+    return await falhar({ status: r.status, corpo: { ok: false, motivo: String(r.corpo.motivo ?? "erro"), ...(r.corpo.mensagem ? { mensagem: r.corpo.mensagem } : {}), pessoa: it.pessoa.primeiroNome, desfeitas: d.desfeitas } });
   }
+  await db.segurarMarcar(grupo, SEGURAR_S, Object.fromEntries(feitos.map((f) => [f.it.slot.id, String(f.voucher.id)])));          // marcado: continua separado alguns minutos, até a lista do Klingo "alcançar"
   for (const { it, voucher } of feitos) {
-    await ctx.fam.db!.marcacaoGravar({ voucher_id: voucher.id, pessoa_id: it.pessoa.id, grupo_id: prontos.length > 1 ? grupo : null, procedimento: voucher.procedimento, profissional: voucher.profissional ?? it.hint.medico, unidade: voucher.unidade ?? it.hint.unidade, data: voucher.data, hora: voucher.hora, status: "agendado" });
-    if (it.remarcar) await ctx.fam.db!.marcacaoGravar({ voucher_id: it.remarcar, pessoa_id: it.pessoa.id, status: "remarcado" });
-    await ctx.fam.db!.filaPedir(`vouchers:${it.pessoa.id}`, { tipo: "vouchers", pessoa: it.pessoa.id }, 2);
+    await db.marcacaoGravar({ voucher_id: voucher.id, pessoa_id: it.pessoa.id, grupo_id: prontos.length > 1 ? grupo : null, procedimento: voucher.procedimento, procedimento_id: voucher.procedimento_id ?? String(it.marca.procedimento), profissional: voucher.profissional ?? it.hint.medico, unidade: voucher.unidade ?? it.hint.unidade, data: voucher.data, hora: voucher.hora, status: "agendado" });
+    if (it.remarcar) { await db.marcacaoGravar({ voucher_id: it.remarcar, pessoa_id: it.pessoa.id, status: "remarcado" }); await db.liberarVoucher(it.remarcar); await db.filaPedir("espera:agora", { tipo: "espera", forcar: true }, 1); }   // o horário antigo ficou livre: a fila de espera olha na hora
+    await db.filaPedir(`vouchers:${it.pessoa.id}`, { tipo: "vouchers", pessoa: it.pessoa.id }, 2);
   }
   return ok({ grupo, marcacoes: feitos.map(({ it, voucher }) => ({ pessoa: it.pessoa.id, nome: it.pessoa.primeiroNome, voucher })) });
+}
+
+async function marcarJuntos(ctx: CtxFam, c: Record<string, unknown>): Promise<Resp> {
+  const ap = await aparelhoDe(ctx, c);
+  if (ehResposta(ap)) return ap;
+  if (c.confirmar !== true) return nega("sem_confirmacao", { mensagem: "Ação não confirmada." }, 400);
+  const itens = Array.isArray(c.itens) ? c.itens as Array<Record<string, unknown>> : [];
+  if (!itens.length || itens.length > MAX_PESSOAS_POR_VEZ) return invalido("itens");
+  if (new Set(itens.map((i) => String(i.pessoa))).size !== itens.length) return invalido("pessoas");
+  const nec = lerNecessidade(c.necessidade);
+  if (ehResposta(nec)) return nec;
+  return await executarMarcacao(ctx, ap, itens, nec);
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------------------------
+// Fila de espera por pressa: "se alguém desmarcar, me chame"
+// ---------------------------------------------------------------------------------------------------------------------------------------------
+// Quem tem pressa (hoje, esta semana) ou só quer adiantar (já tem horário, mas toparia mais cedo) entra na fila da necessidade (a especialidade ou o exame + o plano).
+// Toda vez que um horário abre (alguém desmarcou, remarcou, ou a agenda mudou), a rotina oferece o MAIS CEDO possível para o primeiro da fila, segura o horário para ele por alguns minutos (15)
+// e só passa ao próximo se ele recusar ou o prazo acabar. Ordem justa: hoje > esta semana > qualquer dia; quem ainda não tem horário vem antes de quem só quer adiantar; depois quem espera há mais tempo.
+const URGENCIAS = ["hoje", "semana", "qualquer"];
+async function esperaEntrar(ctx: CtxFam, c: Record<string, unknown>): Promise<Resp> {
+  const ap = await aparelhoDe(ctx, c);
+  if (ehResposta(ap)) return ap;
+  const p = await pessoaPlena(ctx, ap.id, String(c.pessoa ?? ""));
+  if (!p) return nega("pessoa_nao_encontrada", { mensagem: "Esta pessoa não está ligada a este celular." }, 403);
+  const nec = lerNecessidade(c.necessidade);
+  if (ehResposta(nec)) return nec;
+  const urgencia = String(c.urgencia ?? "");
+  if (!URGENCIAS.includes(urgencia)) return invalido("urgencia");
+  let voucher: string | null = null, data: string | null = null, hora: string | null = null;
+  if (c.voucher !== undefined && c.voucher !== null && c.voucher !== "") {            // quer ADIANTAR um horário que já tem
+    voucher = digitos(c.voucher, 1, 12);
+    const m = voucher ? (await ctx.fam.db!.acompanhar(ap.id)).find((x) => x.voucher === voucher && x.pessoa === p.id && ABERTAS.has(x.status)) : null;
+    if (!m) return nega("voucher_nao_encontrado", { mensagem: "Não achamos esta marcação entre as de " + p.primeiroNome + "." });
+    data = m.data; hora = m.hora;
+  }
+  const plano = p.planoId ?? 1, r = await ctx.fam.db!.esperaEntrar(ap.id, p.id, chaveNecessidade(nec, plano), { ...(nec.especialidade ? { especialidade: nec.especialidade } : { exame: nec.exame }), plano: String(plano), nome: nec.nome }, urgencia, voucher, data, hora);
+  if (!r.ok) return nega(r.motivo ?? "erro", { limite: r.limite, mensagem: r.motivo === "limite_espera" ? `${p.primeiroNome} já está em ${r.limite ?? 3} filas de espera. Saia de uma para entrar em outra.` : undefined });
+  await ctx.fam.db!.filaPedir("espera:agora", { tipo: "espera", forcar: true }, 3);     // se já existe horário mais cedo livre, a rotina oferece no próximo minuto
+  return ok({ id: r.id, ja_estava: r.ja_estava === true });
+}
+async function esperaSair(ctx: CtxFam, c: Record<string, unknown>): Promise<Resp> {
+  const ap = await aparelhoDe(ctx, c);
+  if (ehResposta(ap)) return ap;
+  const id = Number(c.id);
+  if (!Number.isInteger(id) || id < 1) return invalido("id");
+  const r = await ctx.fam.db!.esperaSair(ap.id, id);
+  return r.ok ? ok({ saiu: true }) : nega("nao_encontrada", { mensagem: "Esta espera não está mais ativa." });
+}
+async function esperaResponder(ctx: CtxFam, c: Record<string, unknown>): Promise<Resp> {
+  const ap = await aparelhoDe(ctx, c);
+  if (ehResposta(ap)) return ap;
+  const id = Number(c.id);
+  if (!Number.isInteger(id) || id < 1 || typeof c.aceita !== "boolean") return invalido("id");
+  const r = await ctx.fam.db!.esperaResponder(ap.id, id, c.aceita);
+  if (!r.ok) return nega(r.motivo ?? "oferta_invalida", { mensagem: r.motivo === "oferta_vencida" ? "O tempo desta oferta acabou. Você continua na fila e avisamos se abrir outro horário." : "Esta oferta não vale mais." });
+  if (!c.aceita || !r.espera) return ok({ recusou: true });
+  const e = r.espera, o = e.oferta as { chave?: string; procedimento?: string; medico?: string; unidade?: string }, params = e.params as { especialidade?: string; exame?: string; nome?: string; plano?: string };
+  const nec: Necessidade = { ...(params.especialidade ? { especialidade: String(params.especialidade) } : { exame: String(params.exame) }), nome: String(params.nome ?? "Atendimento") };
+  const resp = await executarMarcacao(ctx, ap, [{ pessoa: e.pessoa, horario: o.chave, procedimento: o.procedimento, plano: params.plano, medico: o.medico, unidade: o.unidade, ...(e.voucher_atual ? { remarcar: e.voucher_atual } : {}) }], nec, { grupoFixo: e.grupo });
+  if (resp.corpo.ok === true) { const v = (resp.corpo.marcacoes as Array<{ voucher: { id: string } }>)[0]?.voucher?.id; await ctx.fam.db!.esperaConcluir(e.id, String(v ?? "")); return { status: resp.status, corpo: { ...resp.corpo, espera_concluida: true } }; }
+  if (resp.corpo.motivo === "ja_tem_marcacao") await ctx.fam.db!.esperaSair(ap.id, e.id).catch(() => {});     // já marcou por outro caminho: a espera não faz mais sentido
+  else await ctx.fam.db!.esperaFalhou(e.id);                                                                  // não deu certo: volta para a fila (sem repetir este horário) e solta o horário
+  return resp;
+}
+
+async function horariosFrescos(ctx: CtxFam, q: Record<string, string>, forcar: boolean): Promise<Horario[]> {
+  const chave = chaveHorarios(q), c = await ctx.fam.db!.cacheLer(chave);
+  if (!forcar && c && Array.isArray(c.dados) && !c.vencido) return c.dados as Horario[];
+  try { const lista = await ctx.api.horarios(q); await ctx.fam.db!.cacheGravar(chave, lista, CACHE_FRESCO_S); return lista; }
+  catch (e) { if (e instanceof KlingoErro && (e.tipo === "sem_medico" || e.tipo === "plano_inativo" || e.tipo === "plano_desconhecido")) return []; throw e; }
+}
+/** O horário mais cedo que serve para esta pessoa: dentro do limite que ela pediu, não recusado antes e, para quem só quer adiantar, pelo menos 2 horas antes do que ela já tem. */
+export function escolherSlot(c: Candidata, slots: Horario[], usados: Set<string>): Horario | null {
+  const recusadas = new Set(c.recusadas), atual = c.data_atual && c.hora_atual ? comecaEm({ data: c.data_atual, hora: c.hora_atual }) : null;
+  for (const h of slots) {
+    if (usados.has(h.id) || recusadas.has(h.id)) continue;
+    if (c.limite && h.data > c.limite) continue;
+    if (atual !== null && comecaEm(h) > atual - 2 * 3_600_000) continue;
+    return h;
+  }
+  return null;
+}
+/** Olha as filas, na ordem justa, e oferece os horários que abriram. Poucas leituras por vez (cache de 90 s por necessidade). */
+export async function processarEspera(ctx: CtxFam, o: { max?: number; forcar?: boolean } = {}): Promise<{ ofertas: number; necessidades: number }> {
+  const db = ctx.fam.db!;
+  await db.esperaExpirar();
+  const needs = await db.esperaNecessidades(Math.max(1, o.max ?? TETO_FILA_POR_MINUTO)), cfg = await db.config(), hoje = ctx.hoje();
+  let ofertas = 0;
+  for (const n of needs) {
+    const p = n.params as { especialidade?: string; exame?: string; plano?: string; nome?: string };
+    const nec: Necessidade = { ...(p.especialidade ? { especialidade: String(p.especialidade) } : { exame: String(p.exame) }), nome: String(p.nome ?? "Atendimento") };
+    const lista = await horariosFrescos(ctx, consultaDe(nec, p.plano ?? "1", hoje, somarDias(hoje, 30)), o.forcar === true);
+    const livres = await tirarIndisponiveis(ctx, lista, null), usados = new Set<string>();
+    for (const cand of await db.esperaCandidatas(n.need_key)) {
+      const h = escolherSlot(cand, livres, usados);
+      if (!h) continue;
+      const r = await db.esperaOfertar(cand.id, { ...slotLivro(h), data: h.data, hora: h.hora, medico: h.profissional?.nome ?? null, procedimento: String(h.procedimento ?? ""), ordem_chegada: h.ordem_chegada }, Math.max(5, cfg.oferta_min) * 60);
+      if (r.ok) { usados.add(h.id); ofertas++; }
+    }
+    await db.esperaLida(n.need_key);
+  }
+  return { ofertas, necessidades: needs.length };
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------
@@ -347,7 +578,7 @@ async function acompanhar(ctx: CtxFam, c: Record<string, unknown>): Promise<Resp
   const previsoes: Record<string, unknown> = {};
   for (const proc of new Set(marcacoes.filter((m) => ABERTAS.has(m.status) && m.procedimento).map((m) => m.procedimento!))) previsoes[proc] = await ctx.fam.db!.previsaoLaudo(proc).catch(() => ({ amostra: 0 }));
   for (const pessoa of new Set(marcacoes.filter((m) => ABERTAS.has(m.status)).map((m) => m.pessoa))) await ctx.fam.db!.filaPedir(`vouchers:${pessoa}`, { tipo: "vouchers", pessoa }, 2);
-  return ok({ marcacoes, previsoes, proxima_leitura_s: 60, agora: new Date(ctx.agora()).toISOString() });
+  return ok({ marcacoes, previsoes, espera: await ctx.fam.db!.esperaListar(ap.id), proxima_leitura_s: 60, agora: new Date(ctx.agora()).toISOString() });
 }
 
 const STATUS_DO_KLINGO: Record<string, string> = { agendado: "agendado", checkin: "chegou", atendido: "atendido" };
@@ -376,10 +607,10 @@ export async function atualizarPessoa(ctx: CtxFam, pessoaId: string): Promise<{ 
 }
 
 /** A rotina lenta (pg_cron chama a cada minuto): pega no máximo 3 tarefas; se o Klingo reclamar (429), larga o resto para depois (vai com menos). */
-export async function rodarFila(ctx: CtxFam, max = TETO_FILA_POR_MINUTO): Promise<{ feitas: number; adiadas: number; falhas: number; freio: boolean }> {
+export async function rodarFila(ctx: CtxFam, max = TETO_FILA_POR_MINUTO): Promise<{ feitas: number; adiadas: number; falhas: number; freio: boolean; ofertas: number }> {
   const db = ctx.fam.db!, tarefas = await db.filaPegar(Math.min(max, TETO_FILA_POR_MINUTO));
-  let feitas = 0, adiadas = 0, falhas = 0, freio = false;
-  if (!tarefas.length) { await precarregar(ctx).catch(() => {}); return { feitas, adiadas, falhas, freio }; }
+  let feitas = 0, adiadas = 0, falhas = 0, freio = false, ofertas = 0;
+  if (!tarefas.length) { await precarregar(ctx).catch(() => {}); const e = await processarEspera(ctx).catch(() => ({ ofertas: 0 })); return { feitas, adiadas, falhas, freio, ofertas: e.ofertas }; }
   const ativas = tarefas.some((t) => t.params.tipo === "vouchers") ? new Set(await db.pessoasAtivas(60)) : new Set<string>();
   for (const t of tarefas) {
     if (freio) { await db.filaFim(t.id, true, null, 60); adiadas++; continue; }
@@ -394,6 +625,9 @@ export async function rodarFila(ctx: CtxFam, max = TETO_FILA_POR_MINUTO): Promis
         await atualizarPessoa(ctx, pessoa);
         const seguir = ativas.has(pessoa) && (await db.marcacoesAbertas(pessoa)).length > 0;
         await db.filaFim(t.id, true, null, seguir ? 60 : null);      // continua a cada minuto só enquanto alguém usa o celular e há o que acompanhar
+      } else if (tipo === "espera") {
+        ofertas += (await processarEspera(ctx, { max: 3, forcar: t.params.forcar === true })).ofertas;
+        await db.filaFim(t.id, true, null, null);
       } else await db.filaFim(t.id, true, null, null);
       feitas++;
     } catch (e) {
@@ -402,7 +636,8 @@ export async function rodarFila(ctx: CtxFam, max = TETO_FILA_POR_MINUTO): Promis
       await db.filaFim(t.id, false, e instanceof KlingoErro ? e.tipo : "erro");
     }
   }
-  return { feitas, adiadas, falhas, freio };
+  if (!freio && tarefas.length < TETO_FILA_POR_MINUTO) ofertas += (await processarEspera(ctx, { max: TETO_FILA_POR_MINUTO - tarefas.length }).catch(() => ({ ofertas: 0 }))).ofertas;   // sobrou fôlego no minuto: olha a fila de espera
+  return { feitas, adiadas, falhas, freio, ofertas };
 }
 
 /** Quando a fila está vazia, deixa a agenda pronta para quem chegar: as especialidades × os planos que as famílias usam (mais o particular), uma janela de 10 dias, sem pressa (prioridade 9).
@@ -458,6 +693,8 @@ async function cancelar(ctx: CtxFam, c: Record<string, unknown>): Promise<Resp> 
     } else throw e;
   }
   await ctx.fam.db!.marcacaoGravar({ voucher_id: x.m.voucher, pessoa_id: x.p.id, status: "cancelado" });
+  await ctx.fam.db!.liberarVoucher(x.m.voucher);
+  await ctx.fam.db!.filaPedir("espera:agora", { tipo: "espera", forcar: true }, 1);     // o horário ficou livre: quem está na fila de espera é chamado agora
   return ok({ cancelado: x.m.voucher });
 }
 
@@ -578,7 +815,7 @@ async function laudo(ctx: CtxFam, c: Record<string, unknown>): Promise<Resp> {
 // ---------------------------------------------------------------------------------------------------------------------------------------------
 const ACOES: Record<string, (ctx: CtxFam, c: Record<string, unknown>) => Promise<Resp>> = {
   fam_entrar: entrar, fam_eu: eu, fam_dependente: dependente, fam_buscar: buscar, fam_marcar: marcarJuntos, fam_acompanhar: acompanhar, fam_convidar: convidar, fam_convite_usar: usarConvite,
-  fam_dados: porDados, fam_aviso: responderAviso, fam_desligar: desligar, fam_laudo: laudo, fam_cancelar: cancelar, fam_checkin: checkin,
+  fam_dados: porDados, fam_aviso: responderAviso, fam_desligar: desligar, fam_laudo: laudo, fam_cancelar: cancelar, fam_checkin: checkin, fam_espera_entrar: esperaEntrar, fam_espera_sair: esperaSair, fam_espera_responder: esperaResponder,
 };
 
 export async function tratarFamilia(ctx: Ctx & { fam?: CtxFam["fam"] }, c: Record<string, unknown>): Promise<Resp> {

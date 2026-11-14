@@ -34,7 +34,7 @@ const MEDICOS = [
 
 async function abrir({ comCelular = true, perto = false, ocupado = false, nivel = 2, malicioso = false } = {}) {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 800 }, acceptDownloads: true });
-  const E = { chamadas: [], pessoas: [{ id: 'p-maria', nome: 'Maria', papel: 'proprio', nivel, plano: 'AMIL', plano_id: 14 }], avisos: [], status: 'agendado', marcou: false, exigeCelular: true, ocupado };
+  const E = { espera: [], chamadas: [], pessoas: [{ id: 'p-maria', nome: 'Maria', papel: 'proprio', nivel, plano: 'AMIL', plano_id: 14 }], avisos: [], status: 'agendado', marcou: false, exigeCelular: true, ocupado };
   if (comCelular) await ctx.addInitScript((t) => { try { localStorage.setItem('csi-celular-v1', t); } catch { /* sem armazenamento */ } }, TOKEN);
   await ctx.route('**/functions/v1/klingo-agendamento', async (r) => {
     if (r.request().method() === 'OPTIONS') return r.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*' } });
@@ -43,7 +43,7 @@ async function abrir({ comCelular = true, perto = false, ocupado = false, nivel 
     const j = (corpo, status = 200) => r.fulfill({ status, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(corpo) });
     switch (c.acao) {
       case 'fam_entrar': return c.cpf === CPF_D && c.nascimento === '1980-03-25' ? j({ ok: true, token: TOKEN, pessoas: E.pessoas }) : j({ ok: false, motivo: 'nao_confere', mensagem: 'Não encontramos um cadastro com este CPF e esta data de nascimento.' });
-      case 'fam_eu': return c.token === TOKEN ? j({ ok: true, apelido: null, pessoas: E.pessoas, avisos: E.avisos }) : j({ ok: false, motivo: 'aparelho_desconhecido' }, 401);
+      case 'fam_eu': return c.token === TOKEN ? j({ ok: true, apelido: null, pessoas: E.pessoas, avisos: E.avisos, espera: E.espera }) : j({ ok: false, motivo: 'aparelho_desconhecido' }, 401);
       case 'fam_dependente':
         if (E.exigeCelular && !c.celular) return j({ ok: false, motivo: 'celular_necessario' });
         E.pessoas = [...E.pessoas, { id: 'p-' + c.nome.split(' ')[0].toLowerCase(), nome: c.nome.split(' ')[0], papel: 'responsavel', nivel: 1, plano: 'PARTICULAR', plano_id: 1 }]; E.exigeCelular = false; return j({ ok: true, pessoas: E.pessoas });
@@ -54,15 +54,19 @@ async function abrir({ comCelular = true, perto = false, ocupado = false, nivel 
           combinacoes: dois ? [{ tipo: 'mesmo_medico', data: D1, inicio: '09:00', fim: '09:20', itens: [slot(D1, '09:00'), slot(D1, '09:20')] }, { tipo: 'mesmo_dia', data: D1, inicio: '09:00', fim: '09:30', itens: [slot(D1, '09:00'), { ...slot(D1, '09:30', 'DR BRUNO CLINICO'), unidade: 'CSI' }] }] : [] });
       }
       case 'fam_marcar':
-        if (E.ocupado) { E.ocupado = false; return j({ ok: false, motivo: 'horario_ocupado', indice: 0, mensagem: 'Um dos horários acabou de ser ocupado. Vamos mostrar outros.' }); }
+        if (!c.necessidade || !(c.necessidade.especialidade || c.necessidade.exame)) return j({ ok: false, motivo: 'dados_invalidos', campo: 'necessidade' }, 400);
+        if (E.ocupado) { E.ocupado = false; return j({ ok: false, motivo: 'horario_ocupado', indice: 0, mensagem: 'Esse horário acabou de ser ocupado. Já separamos outros para você.', alternativas: [slot(D1, '09:20'), slot(D1, '09:40'), slot(D2, '10:00')] }); }
         E.marcou = true; return j({ ok: true, grupo: 'g1', marcacoes: c.itens.map((i, k) => ({ pessoa: i.pessoa, nome: i.pessoa === 'p-maria' ? 'Maria' : i.pessoa === 'p-ana' ? 'Ana' : 'João', voucher: { id: String(26700 + k), data: i.horario.split('|')[0], hora: i.horario.split('|')[4], procedimento: 'CONSULTA', profissional: 'DRA ANA PEDIATRA', unidade: 'DESENVOAR' } })) });
-      case 'fam_acompanhar': return j({ ok: true, proxima_leitura_s: 60, previsoes: { 'ULTRASSONOGRAFIA': { amostra: 8, mediana_dias: 2.4, p80_dias: 3 } }, marcacoes: [
+      case 'fam_acompanhar': return j({ ok: true, proxima_leitura_s: 60, espera: E.espera, previsoes: { 'ULTRASSONOGRAFIA': { amostra: 8, mediana_dias: 2.4, p80_dias: 3 } }, marcacoes: [
         { voucher: '26700', pessoa: 'p-ana', nome: 'Ana', grupo: null, procedimento: 'CONSULTA', profissional: 'DRA ANA PEDIATRA', unidade: 'DESENVOAR', data: perto ? hojeSP : D1, hora: '09:00', status: E.status, laudo_pronto_em: null, atualizado_em: new Date().toISOString(), eventos: [{ tipo: 'agendado', em: new Date().toISOString() }, ...(E.status === 'chegou' ? [{ tipo: 'chegou', em: new Date().toISOString() }] : [])] },
         { voucher: '26800', pessoa: 'p-ana', nome: 'Ana', grupo: null, procedimento: 'ULTRASSONOGRAFIA', profissional: 'DRA ROSA', unidade: 'CSI', data: D1, hora: '14:00', status: 'laudo_pronto', laudo_pronto_em: new Date().toISOString(), atualizado_em: new Date().toISOString(), eventos: [{ tipo: 'agendado', em: new Date().toISOString() }, { tipo: 'atendido', em: new Date().toISOString() }, { tipo: 'laudo_pronto', em: new Date().toISOString() }] }] });
       case 'fam_cancelar': return perto ? j({ ok: false, motivo: 'perto_demais', mensagem: 'Falta pouco tempo para o atendimento. Fale com a recepção que a gente resolve junto com você.' }) : j({ ok: true, cancelado: c.voucher });
       case 'fam_laudo': return nivel === 1 ? j({ ok: false, motivo: 'laudo_exige_confianca' }, 403) : j({ ok: true, pronto: true, formato: 'html', resultado: { html: '<p>LAUDO DE TESTE</p><img src=x onerror="parent.__xss2=1">' } });
       case 'fam_convite_usar': return c.codigo === '12345678' ? j({ ok: true, token: TOKEN, ligadas: 1, pessoas: E.pessoas.map((p) => ({ ...p, nivel: 2 })) }) : j({ ok: false, motivo: 'convite_invalido' });
       case 'fam_convidar': return j({ ok: true, codigo: '48291735', expira_em: new Date(Date.now() + 900000).toISOString() });
+      case 'fam_espera_entrar': E.entrouNaFila = c; E.espera = [...E.espera, { id: 7, pessoa: c.pessoa, nome: 'Maria', necessidade: c.necessidade.nome, urgencia: c.urgencia, estado: 'esperando', posicao: 2, voucher_atual: c.voucher || null, data_atual: c.voucher ? D2 : null, hora_atual: c.voucher ? '14:00' : null, oferta: null, oferta_ate: null }]; return j({ ok: true, id: 7 });
+      case 'fam_espera_responder': E.respondeu = c; E.espera = []; return c.aceita ? j({ ok: true, espera_concluida: true, grupo: 'g9', marcacoes: [{ pessoa: 'p-maria', nome: 'Maria', voucher: { id: '26999', data: D1, hora: '09:30', procedimento: 'CONSULTA', profissional: 'DR BRUNO CLINICO', unidade: 'CSI' } }] }) : j({ ok: true, recusou: true });
+      case 'fam_espera_sair': E.saiu = c; E.espera = []; return j({ ok: true, saiu: true });
       case 'fam_desligar': return j({ ok: true, desligado: true });
       default: return j({ ok: false, motivo: 'acao_invalida' }, 400);
     }
@@ -146,13 +150,6 @@ await caso('com dois filhos o celular mostra só combinações para ir juntos (n
   const env = chamou(estado, 'fam_marcar'); await ctx.close();
   return { ok: /Ana: 9h/.test(corpo) && /João: 9h20/.test(corpo) && horasSoltas === 0 && env.length === 1 && env[0].itens.length === 2 && env[0].itens[0].pessoa === 'p-ana' && env[0].itens[1].pessoa === 'p-joao', detalhe: corpo.replace(/\n+/g, ' / ').slice(0, 200) };
 });
-await caso('horário tomado na hora de confirmar: avisa com carinho e já mostra outros horários, sem mandar a pessoa recomeçar', async () => {
-  const { pagina, estado, ctx } = await abrir({ ocupado: true });
-  await pagina.getByText('Oi, Maria!').waitFor(); await clicar(pagina, 'Marcar uma consulta'); await clicar(pagina, 'Pediatria'); await pagina.getByText('O primeiro horário livre').waitFor(); await clicar(pagina, 'Marcar este horário'); await clicar(pagina, 'Confirmar');
-  await pagina.getByText(/acabou de ser ocupado/).waitFor(); await pagina.getByText('O primeiro horário livre').waitFor(); const buscas = chamou(estado, 'fam_buscar').length; await ctx.close();
-  return { ok: buscas === 2, detalhe: `${buscas} buscas` };
-});
-
 // ---------------------------------------------------------------- rastreio, cancelar, resultado
 await caso('rastreio: passo a passo com o passo atual marcado, frases calmas, previsão que aprendeu e atualização sozinha a cada minuto', async () => {
   const { pagina, estado, ctx } = await abrir(); await pagina.clock.install(); await pagina.reload(); await pagina.getByText('Oi, Maria!').waitFor();
@@ -182,6 +179,41 @@ await caso('dar acesso a outra pessoa: mostra um código de 8 números grande, d
   const { pagina, ctx } = await abrir({ nivel: 2 }); await pagina.getByText('Oi, Maria!').waitFor(); await clicar(pagina, 'Dar acesso a outra pessoa'); await clicar(pagina, 'Gerar o código'); await pagina.locator('.codigo').waitFor();
   const cod = await pagina.locator('.codigo').innerText(), texto = await pagina.locator('main').innerText(); const zap = await pagina.getByRole('link', { name: /WhatsApp/ }).getAttribute('href'); await ctx.close();
   return { ok: cod === '4829 1735' && /15 minutos|14 minutos/.test(texto) && decodeURIComponent(zap).includes('4829 1735'), detalhe: cod };
+});
+
+
+// ---------------------------------------------------------------- certeza do horário e pressa
+await caso('horário tomado na hora de confirmar: avisa com carinho, mostra NA HORA 3 horários livres para tocar (sem recomeçar) e a marcação sempre leva o que a pessoa precisa (necessidade)', async () => {
+  const { pagina, estado, ctx } = await abrir({ ocupado: true });
+  await pagina.getByText('Oi, Maria!').waitFor(); await clicar(pagina, 'Marcar uma consulta'); await clicar(pagina, 'Pediatria'); await pagina.getByText('O primeiro horário livre').waitFor(); await clicar(pagina, 'Marcar este horário'); await clicar(pagina, 'Confirmar');
+  await pagina.getByText('Estes estão livres agora').waitFor(); const alvo = pagina.locator('.cartao.destaque', { hasText: 'Estes estão livres agora' }), cartoes = await alvo.locator('button').allInnerTexts();
+  await alvo.locator('button').first().click(); await pagina.getByText('Confira e confirme').first().waitFor(); const resumo = await pagina.locator('main').innerText();
+  await clicar(pagina, 'Confirmar'); await pagina.getByText('Agendamento confirmado').waitFor(); const envios = chamou(estado, 'fam_marcar'); await ctx.close();
+  return { ok: cartoes.length === 3 && /9h20/.test(cartoes[0]) && /9h20/.test(resumo) && envios.length === 2 && envios.every((e) => e.necessidade.especialidade === '225124' && e.necessidade.nome === 'Pediatria') && envios[1].itens[0].horario === chaveSlot(D1, '09:20'), detalhe: cartoes.join(' | ') };
+});
+await caso('PRESSA: na tela de horários a pessoa entra na fila de espera ("hoje", "esta semana" ou "mais cedo"), com a promessa clara de 15 minutos de reserva', async () => {
+  const { pagina, estado, ctx } = await abrir(); await pagina.getByText('Oi, Maria!').waitFor(); await clicar(pagina, 'Marcar uma consulta'); await clicar(pagina, 'Pediatria'); await pagina.getByText('O primeiro horário livre').waitFor();
+  await pagina.getByText(/Com pressa/).waitFor(); await clicar(pagina, 'Quero hoje, se abrir uma vaga'); await pagina.getByText(/entrou na fila de espera \(hoje\)/).waitFor();
+  const msg = await pagina.getByText(/entrou na fila de espera/).innerText(), env = estado.entrouNaFila; await ctx.close();
+  return { ok: /15 minutos/.test(msg) && env.urgencia === 'hoje' && env.pessoa === 'p-maria' && env.necessidade.especialidade === '225124' && !env.voucher, detalhe: msg };
+});
+await caso('PRESSA: depois de marcar, a pessoa pode pedir para ADIANTAR (a fila recebe o número da marcação atual e a mensagem garante que o horário de agora continua dela)', async () => {
+  const { pagina, estado, ctx } = await abrir(); await pagina.getByText('Oi, Maria!').waitFor(); await clicar(pagina, 'Marcar uma consulta'); await clicar(pagina, 'Pediatria'); await pagina.getByText('O primeiro horário livre').waitFor(); await clicar(pagina, 'Marcar este horário'); await clicar(pagina, 'Confirmar');
+  await pagina.getByText('Agendamento confirmado').waitFor(); await pagina.getByText('Quer um horário mais cedo?').waitFor(); await clicar(pagina, 'Me chame se abrir um horário mais cedo'); await pagina.getByText(/continua garantido/).waitFor(); const env = estado.entrouNaFila; await ctx.close();
+  return { ok: env.urgencia === 'qualquer' && env.voucher === '26700', detalhe: JSON.stringify(env) };
+});
+await caso('OFERTA: quando abre um horário, aparece no início com o prazo; "Quero este horário" marca na hora e leva à confirmação; "Não quero" mantém a pessoa na fila', async () => {
+  const oferta = { id: 7, pessoa: 'p-maria', nome: 'Maria', necessidade: 'Pediatria', urgencia: 'semana', estado: 'oferecido', posicao: 1, voucher_atual: '26000', data_atual: D2, hora_atual: '14:00', oferta: { chave: chaveSlot(D1, '09:30'), data: D1, hora: '09:30', medico: 'DR BRUNO CLINICO', unidade: 'CSI', procedimento: '1132' }, oferta_ate: new Date(Date.now() + 14 * 60000).toISOString() };
+  let x = await abrir(); x.estado.espera = [oferta]; await x.pagina.reload(); await x.pagina.getByText('Abriu um horário para Maria!').waitFor();
+  const texto = await x.pagina.locator('.aviso.atencao').first().innerText(); await clicar(x.pagina, 'Quero este horário'); await x.pagina.getByText('Agendamento confirmado').waitFor(); const aceitou = x.estado.respondeu; await x.ctx.close();
+  x = await abrir(); x.estado.espera = [oferta]; await x.pagina.reload(); await x.pagina.getByText('Abriu um horário para Maria!').waitFor(); await clicar(x.pagina, 'Não quero'); await x.pagina.getByText(/continua na fila/).waitFor(); const recusou = x.estado.respondeu; await x.ctx.close();
+  return { ok: /9h30/.test(texto) && /14 minutos|15 minutos/.test(texto) && /trocamos o horário/.test(texto) && aceitou.aceita === true && aceitou.id === 7 && recusou.aceita === false, detalhe: texto.replace(/\n/g, ' ').slice(0, 160) };
+});
+await caso('FILA no acompanhamento: mostra a posição, garante o horário atual e deixa sair da fila', async () => {
+  const { pagina, estado, ctx } = await abrir(); estado.espera = [{ id: 8, pessoa: 'p-maria', nome: 'Maria', necessidade: 'Pediatria', urgencia: 'hoje', estado: 'esperando', posicao: 3, voucher_atual: '26000', data_atual: D2, hora_atual: '14:00', oferta: null, oferta_ate: null }];
+  await pagina.reload(); await pagina.getByText('Oi, Maria!').waitFor(); await clicar(pagina, 'Acompanhar minhas marcações'); await pagina.getByText(/fila de espera/).first().waitFor(); const texto = await pagina.locator('main').innerText();
+  await clicar(pagina, 'Sair da fila'); await pagina.waitForFunction(() => !/Você é o 3º da fila/.test(document.querySelector('main').innerText)); const saiu = estado.saiu; await ctx.close();
+  return { ok: /3º da fila/.test(texto) && /continua garantido/.test(texto) && /hoje/.test(texto) && saiu.id === 8, detalhe: texto.slice(0, 80).replace(/\n/g, ' ') };
 });
 
 // ---------------------------------------------------------------- acessibilidade, aparência e segurança
