@@ -5,6 +5,7 @@
 //
 // Regras que este cliente cumpre (ver docs/klingo-api-externa/GUIA-COMPLETO.md):
 //  - NUNCA devolve nem registra o corpo de um erro (pode ter CPF ou nome). Só status, caminho e um tipo interno (`KlingoErro.tipo`).
+//    Exceção (v1.2, 14/11/2026): em GET /agenda/horarios|consultas|especialidades|exames (sem dado de paciente) guarda `resumo`: a mensagem sem números longos.
 //  - 429 (limite): espera e tenta de novo até 3 vezes, avisando quem chamou (`aoLimite`) para pausar a cota global.
 //  - Resposta HTML no lugar de JSON (403 de laudo, 429) é erro, nunca é lida como JSON.
 //  - Antes de cada chamada, pede uma ficha da cota global (`antes`).
@@ -22,11 +23,14 @@ export class KlingoErro extends Error {
   status: number;
   caminho: string;
   tipo: TipoErro;
-  constructor(status: number, caminho: string, tipo: TipoErro = "outro") {
+  /** v1.2 (14/11/2026): só nas consultas de AGENDA (GET /agenda/...; sem dado de paciente): a mensagem do Klingo sem números longos, para saber POR QUE ele recusou. */
+  resumo?: string;
+  constructor(status: number, caminho: string, tipo: TipoErro = "outro", resumo?: string) {
     super(`Klingo ${status} em ${caminho} (${tipo})`);
     this.status = status;
     this.caminho = caminho;
     this.tipo = tipo;
+    if (resumo) this.resumo = resumo;
   }
   /** Depois de um POST que cria algo, estes erros não dizem se o Klingo criou ou não: o resultado é INCERTO. */
   get incerto() { return this.tipo === "timeout" || this.tipo === "rede" || this.tipo === "servidor" || this.tipo === "html" || this.tipo === "limite"; }
@@ -46,6 +50,11 @@ export function classificar(status: number, texto: string): TipoErro {
   if (status === 401) return "nao_autorizado";
   if (status >= 500) return "servidor";
   return "outro";
+}
+
+/** Mensagem de erro da agenda (sem HTML, sem sequência de 6 ou mais dígitos, no máximo 160 caracteres). Só é usada em GET /agenda/*, que não carrega dado de paciente. */
+export function resumirErro(texto: string): string {
+  return String(texto ?? "").replace(/<[^>]*>/g, " ").replace(/\d{6,}/g, "#").replace(/\s+/g, " ").trim().slice(0, 160);
 }
 
 export type Opcoes = {
@@ -235,7 +244,7 @@ export class KlingoApi {
         if (tentativa < this.o.tentativas429) { await esperar(800 * 2 ** tentativa); continue; }
         throw new KlingoErro(429, caminho, "limite");
       }
-      if (!res.ok) throw new KlingoErro(res.status, caminho, classificar(res.status, t));
+      if (!res.ok) throw new KlingoErro(res.status, caminho, classificar(res.status, t), metodo === "GET" && /^\/agenda\/(horarios|consultas|especialidades|exames)/.test(caminho) ? resumirErro(t) : undefined);
       if (/^\s*</.test(t) && /html/i.test(res.headers.get("content-type") ?? "html")) throw new KlingoErro(res.status, caminho, "html");
       try { return JSON.parse(t) as T; } catch { return t as unknown as T; }
     }

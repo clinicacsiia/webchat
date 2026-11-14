@@ -449,7 +449,7 @@
   @media (prefers-reduced-motion: reduce) { .op, .unidade, .btn-primario { transition: none; } }
   @media (prefers-reduced-motion: no-preference) { .msg { animation: entra .16s ease-out; } @keyframes entra { from { opacity: 0; transform: translateY(4px); } } }
 
-  /* Fase 9: aviso de que é uma IA, previsão de agendamento e humano sempre à mão */
+  /* Fase 9: aviso de que é uma IA, aviso de confirmação pela equipe e humano sempre à mão */
   .aviso-ia { align-self: center; max-width: 94%; margin: 4px 0 12px; padding: 12px 14px; border-radius: 14px; background: #fff; border: 1.5px solid #a9c6ec; box-shadow: 0 1px 2px rgba(15,42,74,.08); font-size: calc(16px * var(--esc)); line-height: 1.45; }
   .aviso-ia b { color: var(--verde); }
   .aviso-ia p { margin: 0 0 6px; }
@@ -597,7 +597,7 @@
         <p class="boas-vindas">💚 Estamos criando uma solução para facilitar o seu dia a dia e levar equidade para todos. A nossa equipe melhora este espaço a cada dia, ouvindo como as pessoas o usam, e queremos você como parte da nossa família, ajudando a construir um lugar melhor.</p>
         <label class="aceite">
           <input type="checkbox" id="fPrevisao">
-          <span>Entendi: os horários só valem depois que uma <b>pessoa da equipe</b> <b>confirma</b>.</span>
+          <span>Entendi: quando o chat não conseguir marcar sozinho, o pedido só vale depois que uma <b>pessoa da equipe</b> <b>confirma</b>.</span>
         </label>
       </div>
       <p class="erro-form" id="erroForm" role="alert"></p>
@@ -660,7 +660,7 @@
   const CHAVE_HIST = 'webchat.historico.v1';   // as últimas conversas deste aparelho (cada uma com o seu token): dá para voltar a elas
   const MAX_HIST = 5;                          // mínimo pedido: 3
   // Muda a cada alteração do chat. Cópia de mensagens guardada por outra versão é descartada (era isso que mostrava conversa velha e travada).
-  const VERSAO_APP = '2026.11.14-2';
+  const VERSAO_APP = '2026.11.14-3';
   // Mesmas regras do banco (fluxo_nome_ok, fluxo_telefone_ok, fluxo_email_ok): o banco confere de novo, aqui é só para avisar logo.
   const LET = 'A-Za-zÀ-ÖØ-öø-ÿ';
   const nomeCompletoOk = (v) => { const t = String(v || '').trim(); return t.length >= 5 && t.length <= 120 && new RegExp(`^[${LET}][${LET}'’.-]*( +[${LET}][${LET}'’.-]*)+$`).test(t) && t.split(/ +/).filter((w) => w.replace(new RegExp(`[^${LET}]`, 'g'), '').length >= 2).length >= 2; };
@@ -1236,7 +1236,7 @@
     if (!telefoneOk(tel)) { el.erroForm.textContent = 'Informe o celular com DDD, por exemplo (71) 91234-5678.'; el.fTel.focus(); return; }
     if (!emailOk(email)) { el.erroForm.textContent = 'Informe um e-mail válido, por exemplo nome@email.com.'; el.fEmail.focus(); return; }
     if (!salvo && !el.fAceite.checked) { el.erroForm.textContent = 'Marque a caixa de concordância para continuar.'; el.fAceite.focus(); return; }
-    if (!el.fPrevisao.checked) { el.erroForm.textContent = 'Marque que você está ciente de que uma pessoa da equipe precisa confirmar os horários.'; el.fPrevisao.focus(); return; }
+    if (!el.fPrevisao.checked) { el.erroForm.textContent = 'Marque que você está ciente de que, quando o chat não marcar sozinho, uma pessoa da equipe precisa confirmar o pedido.'; el.fPrevisao.focus(); return; }
     // Já existe uma conversa ABERTA deste aparelho para o mesmo paciente? Pergunta antes de abrir outra (evita conversa duplicada na equipe).
     if (!reentrada) {
       const nomeAtual = filho ? nomeFilho.trim().toLowerCase() : '';
@@ -1913,7 +1913,7 @@
       filhos.push(h('b', {}, '✓ Agendamento confirmado por um atendente'), ...horarios.map((x) => h('p', {}, x)), h('p', {}, 'Uma pessoa da equipe conferiu e confirmou com você. Qualquer dúvida, é só escrever aqui.'));
     } else if (d.conversa === 'em_atendimento') {
       b.className = 'acomp ok';
-      filhos.push(h('b', {}, `${d.agente || 'Um atendente'} (da nossa equipe) está atendendo você`), h('p', {}, 'Responda aqui mesmo, no campo de mensagem. Sua previsão de agendamento já está com ele.'));
+      filhos.push(h('b', {}, `${d.agente || 'Um atendente'} (da nossa equipe) está atendendo você`), h('p', {}, 'Responda aqui mesmo, no campo de mensagem. O seu pedido de agendamento já está com ele.'));
     } else {
       b.className = 'acomp';
       filhos.push(h('b', {}, d.pedido === 'pronto' ? 'Pedido enviado · aguardando a confirmação do atendente' : 'Aguardando um atendente'),
