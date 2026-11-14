@@ -1,4 +1,6 @@
-# Página de agendamento (`/agendamento/`)
+# Página de agendamento técnica (`/agendamento/completo/`)
+
+> **13/11/2026:** a página `/agendamento/` agora é a **página nova para o paciente e a família** (ver `docs/familia-agendamento.md`). Esta, com todas as abas (catálogos, equipe, API), mudou para `/agendamento/completo/` e continua igual; o link está no rodapé da página nova. O teste desta página (`npm run test:agendamento`) aponta para o novo endereço.
 
 Versão 1.1 — 13/11/2026 / Mudança: acrescenta tudo o que a documentação tinha e a página não usava (verificar horário, resultado de imagem, entrada por telefone, conta do portal, totais do dia, API de telefonia), menos dinheiro. A 1.0 era a primeira versão. Fonte das regras: `docs/klingo-api-externa/GUIA-COMPLETO.md`.
 

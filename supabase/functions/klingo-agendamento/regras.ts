@@ -277,8 +277,8 @@ const corpoMarcacao = (m: Marca, idExterno: string) => ({
 });
 
 /** reservar (opcional) -> marcar. Se o resultado for incerto, reconcilia pelas marcações ativas (id_externo); se não achar, INCERTO. */
-async function marcar(ctx: Ctx, s: Sessao, m: Marca, reservaId: string | null, remarcacao: string | null): Promise<Resp> {
-  const idExterno = "pagina-" + ctx.uuid();
+async function marcar(ctx: Ctx, s: Sessao, m: Marca, reservaId: string | null, remarcacao: string | null, idExternoFixo: string | null = null): Promise<Resp> {
+  const idExterno = idExternoFixo ?? "pagina-" + ctx.uuid();
   const corpo = corpoMarcacao(m, idExterno);
   let reserva: string | null = reservaId;
   if (!reserva) {
@@ -624,3 +624,7 @@ export async function tratar(ctx: Ctx, c: Record<string, unknown>): Promise<Resp
   } catch (e) { return traduzir(e); }
   return nega("acao_invalida", { acoes: ["versao", "horarios", "catalogo", "requisicao", "verificar_horario", "portal_cadastrar", "portal_recuperar", "equipe_atendimentos", "equipe_telefonia", ...ACOES_IDENTIDADE] }, 400);
 }
+
+// Peças reaproveitadas pela família (familia.ts): a mesma conferência de identidade, a mesma marcação com reconciliação e as mesmas respostas.
+export { abrirSessaoCpf, booleano, corpoMarcacao, curto, digitos, diasEntre, ehResp, invalido, lerMarca, marcar as marcarComSessao, nega, ok, primeiroNome, somarDias, travaResp, travado, vouchersAtivos };
+export type { Marca, Sessao };

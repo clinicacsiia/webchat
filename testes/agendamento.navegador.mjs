@@ -69,7 +69,7 @@ async function abrir({ ocupadoNaMarcacao = false, vazio = false, malicioso = fal
   });
   const pagina = await ctx.newPage(); const erros = [];
   pagina.on('pageerror', (e) => erros.push(e.message)); pagina.on('dialog', (d) => d.accept());
-  await pagina.goto(`${base}/agendamento/`);
+  await pagina.goto(`${base}/agendamento/completo/`);
   await pagina.waitForSelector('#estadoApi');
   return { ctx, pagina, estado, erros };
 }

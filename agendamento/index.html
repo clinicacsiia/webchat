@@ -1,620 +1,577 @@
 <!doctype html>
-<html lang="pt-BR">
+<html lang="pt-BR" data-tema="auto" data-fonte="1">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#1e3a5f">
 <meta name="robots" content="noindex">
-<meta name="description" content="Agendamento online da CSI - Clínica de Saúde e Imagem: consultas e exames, horários reais, convênios e suas marcações.">
+<meta name="description" content="Marque consultas e exames na CSI com calma, para você e para a sua família, e acompanhe tudo como uma encomenda.">
 <link rel="icon" href="../icon-192.png">
 <link rel="apple-touch-icon" href="../icon-192.png">
-<title>Agendamento · CSI - Clínica de Saúde e Imagem</title>
+<title>Agendar na CSI · Clínica de Saúde e Imagem</title>
 <!--
-  FLUXOGRAMA: entrada (o paciente escolhe consulta ou exame, convênio e período; ou entra com CPF + nascimento) -> validação (a página confere o formato; QUEM CONFERE DE VERDADE é a função
-    klingo-agendamento, que confirma CPF + nascimento no Klingo antes e depois do login) -> lógica (todas as chamadas vão para a função; a chave do Klingo NUNCA está nesta página)
-    -> saída (horários reais, voucher, marcações, resultados). CPF e nascimento ficam só na memória desta aba (não vão para localStorage, cookie nem URL).
-  Versão 1.0 — 13/11/2026 / Mudança: primeira versão (página de agendamento com tudo o que a API externa do Klingo permite, menos dinheiro). Documentação: docs/agendamento-pagina.md
+  FLUXOGRAMA: entrada (o paciente abre a página; se este celular já foi ligado, entra direto; senão informa CPF + nascimento UMA vez, ou usa um código de convite de 8 números)
+    -> validação (a página só confere o formato; QUEM CONFERE DE VERDADE é a função klingo-agendamento, com o Klingo; CPF e nascimento nunca são guardados aqui: o celular guarda só um código aleatório)
+    -> lógica (uma pergunta por tela: quem vai, o quê, quando, confirmar; os horários vêm ORDENADOS pela função: médico que a família já consultou, depois o mais procurado; unidade nunca é pergunta)
+    -> saída (confirmação com calendário e WhatsApp; acompanhamento tipo "rastreio" que se atualiza a cada 1 minuto; resultado dentro da página nos celulares liberados)
+  Versão 2.0 — 13/11/2026 / Mudança: página nova para o paciente e a família (plano em docs/plano-jornada-familia.md). A página técnica anterior (todas as abas) continua em /agendamento/completo/.
 -->
 <style>
-  :root { --csi-primary:#0088cc; --csi-primary-strong:#006ba1; --csi-primary-soft:#e6f4fb; --csi-sidebar-bg:#1e3a5f; --csi-danger:#e74c3c; --csi-danger-strong:#b3261e; --csi-danger-bg:#fdf2f0;
-    --csi-success-strong:#167a43; --csi-success-soft:#e8f8ef; --csi-warning-strong:#8a5a00; --csi-warning-soft:#fff4dc;
-    --csi-surface:#ffffff; --csi-background:#f8f9fa; --csi-border:#eaedf1; --csi-border-strong:#cfd6df; --csi-text-main:#333333; --csi-text-secondary:#5a6878;
-    --font-family:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif; --radius-md:10px; --radius-lg:16px; --shadow-md:0 4px 12px rgba(0,0,0,.08);
-    --fundo:var(--csi-background); --papel:var(--csi-surface); --texto:var(--csi-text-main); --suave:var(--csi-text-secondary); --linha:var(--csi-border); --linha-forte:var(--csi-border-strong);
-    --azul:var(--csi-primary-strong); --azul-claro:var(--csi-primary-soft); --azul-escuro:var(--csi-sidebar-bg); --erro:var(--csi-danger-strong); --ok:var(--csi-success-strong); }
-  @media (prefers-color-scheme: dark) { :root { --csi-background:#0b1522; --csi-surface:#14233a; --csi-text-main:#e6edf6; --csi-text-secondary:#9fb0c4; --csi-border:#22344d; --csi-border-strong:#3a4f6b;
-    --csi-primary-soft:#12324b; --azul:#5bb8ec; --erro:#ff8a80; --ok:#5fd596; --csi-success-soft:#10331f; --csi-warning-soft:#3a2d0c; --csi-warning-strong:#f1c76a; --csi-danger-bg:#3a1714; } }
+  :root { --csi-primary:#0088cc; --azul:#006ba1; --azul-claro:#e6f4fb; --escuro:#1e3a5f; --fundo:#f6f8fa; --papel:#ffffff; --texto:#1f2933; --suave:#52606d; --linha:#d5dde5; --linha-forte:#9aa7b4;
+    --ok:#12724a; --ok-fundo:#e5f6ee; --aviso:#8a5a00; --aviso-fundo:#fff4dc; --erro:#b3261e; --erro-fundo:#fdeeed; --foco:#0b5fff; --sombra:0 6px 18px rgba(30,58,95,.10); --raio:18px; --btn:56px; }
+  :root[data-tema="escuro"] { color-scheme:dark; --azul:#6cc4f2; --azul-claro:#12324b; --fundo:#0c1622; --papel:#15263b; --texto:#eaf0f6; --suave:#a9b8c8; --linha:#2a3e57; --linha-forte:#5b7391; --ok:#6fdca4; --ok-fundo:#10331f; --aviso:#f2c96c; --aviso-fundo:#3a2d0c; --erro:#ff9a91; --erro-fundo:#3b1a17; --foco:#8cb6ff; --sombra:none; }
+  @media (prefers-color-scheme: dark) { :root[data-tema="auto"] { color-scheme:dark; --azul:#6cc4f2; --azul-claro:#12324b; --fundo:#0c1622; --papel:#15263b; --texto:#eaf0f6; --suave:#a9b8c8; --linha:#2a3e57; --linha-forte:#5b7391; --ok:#6fdca4; --ok-fundo:#10331f; --aviso:#f2c96c; --aviso-fundo:#3a2d0c; --erro:#ff9a91; --erro-fundo:#3b1a17; --foco:#8cb6ff; --sombra:none; } }
+  :root[data-tema="contraste"] { color-scheme:dark; --azul:#ffe600; --azul-claro:#000; --fundo:#000; --papel:#000; --texto:#fff; --suave:#fff; --linha:#fff; --linha-forte:#fff; --ok:#7dff9b; --ok-fundo:#000; --aviso:#ffe600; --aviso-fundo:#000; --erro:#ff8f8f; --erro-fundo:#000; --foco:#00e5ff; --sombra:none; }
+  :root[data-fonte="2"] { font-size:125%; } :root[data-fonte="3"] { font-size:150%; }
   * { box-sizing:border-box; }
+  html { font-size:112.5%; -webkit-text-size-adjust:100%; }
   html, body { margin:0; min-height:100%; }
-  body { font-family:var(--font-family); background:var(--fundo); color:var(--texto); font-size:17px; line-height:1.45; -webkit-text-size-adjust:100%; }
+  body { font-family:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif; background:var(--fundo); color:var(--texto); line-height:1.5; }
   [hidden] { display:none !important; }
-  :focus-visible { outline:3px solid var(--csi-primary); outline-offset:2px; }
-  button, input, select, textarea { font:inherit; color:inherit; }
-  .cabeca { position:sticky; top:0; z-index:5; background:var(--papel); }
-  header.topo { background:var(--papel); border-bottom:3px solid var(--csi-primary); padding:calc(8px + env(safe-area-inset-top)) 16px 8px; display:flex; align-items:center; gap:12px; }
-  header.topo img { height:28px; width:auto; flex:none; }
-  @media (prefers-color-scheme: dark) { header.topo img { background:#fff; border-radius:6px; padding:3px 6px; } }
-  header.topo .tit { flex:1; min-width:0; font-weight:700; line-height:1.15; }
-  header.topo .tit small { display:block; font-weight:400; color:var(--suave); font-size:.82rem; }
-  .quem { display:flex; align-items:center; gap:8px; font-size:.9rem; }
-  .quem button { background:transparent; border:1px solid var(--linha-forte); border-radius:999px; padding:6px 12px; cursor:pointer; min-height:36px; }
-  nav.abas { display:flex; gap:4px; overflow-x:auto; padding:8px 12px 0; background:var(--papel); border-bottom:1px solid var(--linha); scrollbar-width:none; }
-  nav.abas::-webkit-scrollbar { display:none; }
-  nav.abas button { flex:none; background:none; border:0; border-bottom:3px solid transparent; padding:10px 12px; cursor:pointer; color:var(--suave); font-weight:600; min-height:44px; white-space:nowrap; }
-  nav.abas button[aria-selected="true"] { color:var(--azul); border-bottom-color:var(--csi-primary); }
-  main { max-width:760px; margin:0 auto; padding:16px 16px 90px; }
-  h1 { font-size:1.35rem; margin:.2em 0 .5em; } h2 { font-size:1.12rem; margin:0 0 .5em; } h3 { font-size:1rem; margin:.8em 0 .3em; }
-  p { margin:.4em 0; } .suave { color:var(--suave); font-size:.92rem; }
-  .cartao { background:var(--papel); border:1px solid var(--linha); border-radius:var(--radius-lg); padding:16px; margin:0 0 14px; box-shadow:var(--shadow-md); }
-  label { display:block; font-weight:600; margin:12px 0 4px; font-size:.95rem; }
-  input, select, textarea { width:100%; min-height:46px; padding:10px 12px; border:1px solid var(--linha-forte); border-radius:var(--radius-md); background:var(--papel); }
-  input[type=checkbox], input[type=radio] { width:auto; min-height:0; }
-  .linha { display:flex; gap:10px; flex-wrap:wrap; } .linha > * { flex:1 1 150px; min-width:0; }
-  .btn { display:inline-flex; align-items:center; justify-content:center; gap:8px; min-height:46px; padding:10px 18px; border-radius:var(--radius-md); border:1px solid var(--linha-forte); background:var(--papel); cursor:pointer; font-weight:600; }
-  .btn.prim { background:var(--azul); border-color:var(--azul); color:#fff; } @media (prefers-color-scheme: dark) { .btn.prim { color:#06121f; } }
-  .btn.perigo { border-color:var(--erro); color:var(--erro); } .btn.peq { min-height:38px; padding:6px 12px; font-size:.92rem; }
-  .btn:disabled { opacity:.55; cursor:not-allowed; }
-  .acoes { display:flex; gap:10px; flex-wrap:wrap; margin-top:14px; }
-  .aviso { border-radius:var(--radius-md); padding:12px 14px; margin:0 0 12px; border:1px solid var(--linha-forte); background:var(--azul-claro); }
-  .aviso.erro { background:var(--csi-danger-bg); border-color:var(--erro); } .aviso.ok { background:var(--csi-success-soft); border-color:var(--ok); } .aviso.atencao { background:var(--csi-warning-soft); border-color:var(--csi-warning-strong); }
-  .seg { display:flex; border:1px solid var(--linha-forte); border-radius:var(--radius-md); overflow:hidden; } .seg button { flex:1; border:0; background:var(--papel); padding:12px; cursor:pointer; font-weight:600; min-height:46px; }
-  .seg button[aria-pressed="true"] { background:var(--azul); color:#fff; } @media (prefers-color-scheme: dark) { .seg button[aria-pressed="true"] { color:#06121f; } }
-  .passos { display:flex; gap:6px; margin:0 0 14px; padding:0; list-style:none; } .passos li { flex:1; text-align:center; font-size:.78rem; padding:6px 2px; border-bottom:4px solid var(--linha); color:var(--suave); }
-  .passos li.on { border-color:var(--csi-primary); color:var(--azul); font-weight:700; } .passos li.feito { border-color:var(--ok); color:var(--ok); }
-  details.dia { border:1px solid var(--linha); border-radius:var(--radius-md); margin:0 0 8px; background:var(--papel); } details.dia > summary { cursor:pointer; padding:12px 14px; font-weight:700; min-height:46px; }
-  details.dia .conteudo { padding:0 14px 12px; } .medico { margin:8px 0 4px; font-weight:600; } .medico small { color:var(--suave); font-weight:400; }
-  .horas { display:flex; flex-wrap:wrap; gap:8px; } .hora { min-width:68px; min-height:44px; border:1px solid var(--azul); background:var(--papel); color:var(--azul); border-radius:var(--radius-md); font-weight:700; cursor:pointer; }
-  .hora:hover { background:var(--azul-claro); }
-  .item { border:1px solid var(--linha); border-radius:var(--radius-md); padding:12px 14px; margin:0 0 10px; background:var(--papel); } .item h3 { margin:0 0 4px; }
-  .etiqueta { display:inline-block; font-size:.75rem; font-weight:700; padding:2px 8px; border-radius:999px; background:var(--azul-claro); color:var(--azul); margin-right:6px; }
-  .etiqueta.ok { background:var(--csi-success-soft); color:var(--ok); } .etiqueta.nt { background:var(--csi-warning-soft); color:var(--csi-warning-strong); } .etiqueta.no { background:var(--csi-danger-bg); color:var(--erro); }
-  table { width:100%; border-collapse:collapse; font-size:.9rem; } th, td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--linha); vertical-align:top; } th { position:sticky; top:0; background:var(--papel); }
-  .rolagem { overflow:auto; max-height:420px; border:1px solid var(--linha); border-radius:var(--radius-md); }
-  pre { white-space:pre-wrap; word-break:break-word; font-size:.8rem; background:var(--fundo); border:1px solid var(--linha); border-radius:var(--radius-md); padding:10px; max-height:360px; overflow:auto; }
-  .relogio { font-variant-numeric:tabular-nums; font-weight:700; }
-  .carregando::after { content:""; display:inline-block; width:14px; height:14px; margin-left:8px; border:2px solid currentColor; border-right-color:transparent; border-radius:50%; animation:gira .7s linear infinite; vertical-align:-2px; }
-  @keyframes gira { to { transform:rotate(360deg); } } @media (prefers-reduced-motion: reduce) { .carregando::after { animation:none; } }
-  footer { max-width:760px; margin:0 auto; padding:0 16px 30px; font-size:.82rem; color:var(--suave); } footer a { color:var(--azul); }
-  .ponto { display:inline-block; width:9px; height:9px; border-radius:50%; background:#9aa7b6; margin-right:6px; } .ponto.ok { background:#22c55e; } .ponto.no { background:#ef4444; }
-  iframe.laudo { width:100%; height:420px; border:1px solid var(--linha); border-radius:var(--radius-md); background:#fff; }
+  :focus-visible { outline:4px solid var(--foco); outline-offset:3px; border-radius:8px; }
+  button, input, select { font:inherit; color:inherit; }
+  .pular { position:absolute; left:-999px; top:0; background:var(--papel); padding:12px 16px; z-index:20; } .pular:focus { left:8px; top:8px; }
+  header.topo { position:sticky; top:0; z-index:10; background:var(--papel); border-bottom:3px solid var(--csi-primary); padding:calc(8px + env(safe-area-inset-top)) 16px 8px; display:flex; align-items:center; gap:10px; }
+  :root[data-tema="contraste"] header.topo { border-bottom-color:#ffe600; }
+  header.topo img { height:30px; width:auto; flex:none; } :root[data-tema="escuro"] header.topo img, :root[data-tema="contraste"] header.topo img { background:#fff; border-radius:8px; padding:4px 8px; }
+  @media (prefers-color-scheme: dark) { :root[data-tema="auto"] header.topo img { background:#fff; border-radius:8px; padding:4px 8px; } }
+  header.topo .nome { flex:1; font-weight:700; line-height:1.15; min-width:0; } header.topo .nome small { display:block; font-weight:400; color:var(--suave); font-size:.8rem; }
+  .ferr { display:flex; gap:6px; }
+  .ferr button { min-height:44px; min-width:44px; border:2px solid var(--linha-forte); background:var(--papel); border-radius:12px; font-weight:700; cursor:pointer; }
+  details.aparencia { position:relative; } details.aparencia summary { list-style:none; min-height:44px; min-width:44px; display:flex; align-items:center; justify-content:center; border:2px solid var(--linha-forte); border-radius:12px; background:var(--papel); cursor:pointer; font-weight:700; }
+  details.aparencia summary::-webkit-details-marker { display:none; }
+  details.aparencia .painel { position:absolute; right:0; top:52px; width:min(320px, 90vw); background:var(--papel); border:2px solid var(--linha-forte); border-radius:16px; padding:14px; box-shadow:var(--sombra); z-index:30; }
+  details.aparencia fieldset { border:0; padding:0; margin:0 0 10px; } details.aparencia legend { font-weight:700; margin-bottom:6px; }
+  .opcoes { display:flex; flex-wrap:wrap; gap:8px; } .opcoes label { display:flex; align-items:center; gap:8px; min-height:44px; padding:6px 12px; border:2px solid var(--linha-forte); border-radius:12px; cursor:pointer; background:var(--papel); }
+  .opcoes input { width:20px; height:20px; accent-color:var(--azul); }
+  main { max-width:640px; margin:0 auto; padding:18px 16px 140px; outline:none; }
+  h1 { font-size:1.55rem; line-height:1.2; margin:.2em 0 .4em; outline:none; } h2 { font-size:1.2rem; margin:0 0 .4em; } h3 { font-size:1.05rem; margin:0 0 .2em; }
+  p { margin:.5em 0; } .suave { color:var(--suave); } .pequeno { font-size:.9rem; }
+  .cartao { background:var(--papel); border:2px solid var(--linha); border-radius:var(--raio); padding:18px; margin:0 0 16px; box-shadow:var(--sombra); }
+  .cartao.destaque { border-color:var(--azul); }
+  label.campo, .campo > label { display:block; font-weight:700; margin:16px 0 6px; }
+  .dica { color:var(--suave); font-size:.92rem; margin:2px 0 6px; }
+  input[type=text], input[type=search], input[type=tel], input[type=email], input[type=password], input:not([type]) { width:100%; min-height:var(--btn); padding:12px 14px; border:2px solid var(--linha-forte); border-radius:14px; background:var(--papel); }
+  .nasc { display:grid; grid-template-columns:1fr 1fr 1.6fr; gap:10px; } .nasc label { font-weight:600; font-size:.9rem; margin:0 0 4px; display:block; }
+  .btn { display:flex; align-items:center; justify-content:center; gap:10px; width:100%; min-height:var(--btn); padding:12px 20px; border-radius:16px; border:2px solid var(--linha-forte); background:var(--papel); font-weight:700; cursor:pointer; text-align:center; text-decoration:none; color:var(--texto); }
+  .btn.prim { background:var(--azul); border-color:var(--azul); color:#fff; } :root[data-tema="escuro"] .btn.prim { color:#04121f; } :root[data-tema="contraste"] .btn.prim { color:#000; }
+  @media (prefers-color-scheme: dark) { :root[data-tema="auto"] .btn.prim { color:#04121f; } }
+  .btn.ok { background:var(--ok); border-color:var(--ok); color:#fff; } :root[data-tema="escuro"] .btn.ok, :root[data-tema="contraste"] .btn.ok { color:#04121f; } @media (prefers-color-scheme: dark) { :root[data-tema="auto"] .btn.ok { color:#04121f; } }
+  .btn.perigo { border-color:var(--erro); color:var(--erro); } .btn.leve { border-color:transparent; background:transparent; text-decoration:underline; min-height:48px; }
+  .btn:disabled { opacity:.55; cursor:not-allowed; } .btn.com-carga::after { content:""; width:1.1em; height:1.1em; border:3px solid currentColor; border-right-color:transparent; border-radius:50%; animation:gira .8s linear infinite; }
+  @keyframes gira { to { transform:rotate(360deg); } } @media (prefers-reduced-motion: reduce) { .btn.com-carga::after { animation:none; } * { scroll-behavior:auto !important; } }
+  .pilha { display:grid; gap:12px; } .duas { display:grid; grid-template-columns:1fr 1fr; gap:12px; } @media (max-width:420px) { .duas { grid-template-columns:1fr; } }
+  .rodape-acao { position:fixed; left:0; right:0; bottom:0; z-index:9; background:var(--papel); border-top:2px solid var(--linha); padding:12px 16px calc(12px + env(safe-area-inset-bottom)); }
+  .rodape-acao > div { max-width:640px; margin:0 auto; display:grid; gap:10px; }
+  .aviso { border-radius:14px; padding:14px 16px; margin:0 0 14px; border:2px solid var(--linha-forte); background:var(--azul-claro); } .aviso.erro { background:var(--erro-fundo); border-color:var(--erro); } .aviso.ok { background:var(--ok-fundo); border-color:var(--ok); } .aviso.atencao { background:var(--aviso-fundo); border-color:var(--aviso); }
+  .pessoas { display:flex; flex-wrap:wrap; gap:8px; margin:6px 0 14px; } .ficha { display:inline-flex; align-items:center; gap:6px; padding:6px 14px; border-radius:999px; background:var(--azul-claro); border:2px solid var(--linha); font-weight:600; }
+  .escolha { display:flex; align-items:center; gap:14px; width:100%; min-height:var(--btn); padding:14px 16px; border:2px solid var(--linha-forte); border-radius:16px; background:var(--papel); cursor:pointer; text-align:left; }
+  .escolha[aria-pressed="true"], .escolha[aria-checked="true"] { border-color:var(--azul); background:var(--azul-claro); } .escolha .marca { width:28px; height:28px; border-radius:8px; border:3px solid var(--linha-forte); flex:none; display:grid; place-items:center; font-weight:900; } .escolha[aria-checked="true"] .marca { background:var(--azul); border-color:var(--azul); color:#fff; }
+  :root[data-tema="contraste"] .escolha[aria-checked="true"] .marca { color:#000; } .escolha .quem { flex:1; } .escolha .quem small { display:block; color:var(--suave); font-weight:400; }
+  .horario-grande { text-align:left; } .horario-grande .quando { font-size:1.35rem; font-weight:800; } .horario-grande .onde { color:var(--suave); }
+  .horas { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; } .hora { min-width:84px; min-height:52px; border:2px solid var(--azul); background:var(--papel); color:var(--azul); border-radius:14px; font-weight:800; cursor:pointer; padding:6px 10px; }
+  .selo { display:inline-block; font-size:.78rem; font-weight:800; padding:2px 10px; border-radius:999px; background:var(--azul-claro); color:var(--azul); border:1px solid var(--azul); margin-left:6px; vertical-align:middle; } .selo.ok { background:var(--ok-fundo); color:var(--ok); border-color:var(--ok); }
+  ol.trilha { list-style:none; margin:10px 0 4px; padding:0; } ol.trilha li { position:relative; padding:0 0 18px 42px; min-height:44px; color:var(--suave); }
+  ol.trilha li::before { content:""; position:absolute; left:13px; top:28px; bottom:0; width:3px; background:var(--linha); } ol.trilha li:last-child::before { display:none; }
+  ol.trilha .bola { position:absolute; left:0; top:0; width:28px; height:28px; border-radius:50%; border:3px solid var(--linha-forte); background:var(--papel); display:grid; place-items:center; font-size:.8rem; font-weight:900; }
+  ol.trilha li.feito { color:var(--texto); } ol.trilha li.feito .bola { background:var(--ok); border-color:var(--ok); color:#fff; } ol.trilha li.feito::before { background:var(--ok); } :root[data-tema="contraste"] ol.trilha li.feito .bola { color:#000; }
+  ol.trilha li.agora { color:var(--texto); font-weight:700; } ol.trilha li.agora .bola { border-color:var(--azul); box-shadow:0 0 0 5px var(--azul-claro); } ol.trilha time { display:block; font-weight:400; font-size:.88rem; color:var(--suave); }
+  .codigo { font-size:2.2rem; font-weight:900; letter-spacing:.18em; text-align:center; padding:14px; border:3px dashed var(--azul); border-radius:16px; margin:12px 0; font-variant-numeric:tabular-nums; }
+  .ponto { display:inline-block; width:10px; height:10px; border-radius:50%; background:var(--ok); margin-right:8px; } .ponto.velho { background:var(--aviso); }
+  iframe.laudo { width:100%; height:60vh; border:2px solid var(--linha); border-radius:14px; background:#fff; }
+  footer.rodape { max-width:640px; margin:0 auto; padding:0 16px 150px; font-size:.88rem; color:var(--suave); } footer.rodape a { color:var(--azul); }
+  .esconde-visual { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
 </style>
 </head>
 <body>
-<div class="cabeca">
+<a class="pular" href="#app">Pular para o conteúdo</a>
 <header class="topo">
-  <img src="../img/logo-csi.svg" alt="CSI - Clínica de Saúde e Imagem" height="28">
-  <div class="tit">Agendamento<small>CSI · Clínica de Saúde e Imagem</small></div>
-  <div class="quem" id="quem" hidden><span id="quemNome"></span><button type="button" id="sair">Sair</button></div>
+  <img src="../img/logo-csi.svg" alt="CSI - Clínica de Saúde e Imagem" height="30">
+  <div class="nome">Agendar na CSI<small>Clínica de Saúde e Imagem</small></div>
+  <div class="ferr">
+    <details class="aparencia" id="aparencia"><summary aria-label="Letra e cores" title="Letra e cores">Aa</summary>
+      <div class="painel">
+        <fieldset><legend>Tamanho da letra</legend><div class="opcoes" id="opFonte"></div></fieldset>
+        <fieldset><legend>Cores</legend><div class="opcoes" id="opTema"></div></fieldset>
+      </div></details>
+  </div>
 </header>
-<nav class="abas" role="tablist" aria-label="Seções do agendamento" id="abas"></nav>
-</div>
+<div id="avisoVoz" class="esconde-visual" role="status" aria-live="polite"></div>
 <main id="app" tabindex="-1"></main>
-<footer>
-  <p><span class="ponto" id="pontoApi"></span><span id="estadoApi">Verificando o sistema da clínica…</span></p>
-  <p>Usamos o CPF (ou o telefone, ou o e-mail e a senha da conta) e a data de nascimento só para localizar o seu cadastro; não ficam guardados neste aparelho. <a href="../privacidade.html">Privacidade</a> · <a href="../termos.html">Termos</a> · <a href="../">Falar com a equipe pelo chat</a></p>
+<footer class="rodape">
+  <p>Este aparelho guarda só um código que lembra de você. O CPF e a data de nascimento <b>não ficam guardados aqui</b>. <a href="../privacidade.html">Privacidade</a> · <a href="../termos.html">Termos</a> · <a href="./completo/">Página completa (equipe)</a></p>
 </footer>
 
 <script>
 'use strict';
 const FN = 'https://nrvuynjwcgwpjdptkiay.supabase.co/functions/v1/klingo-agendamento';
-const VERSAO_PAGINA = '2026.11.13-2';
+const VERSAO_PAGINA = '2026.11.14-1';
+const CHAT = '../';
+const GUARDA = { celular: 'csi-celular-v1', aparencia: 'csi-aparencia-v1' };
 
 // ---------------------------------------------------------------- utilidades
 const $ = (s, r = document) => r.querySelector(s);
-/** Monta elemento sem innerHTML: TUDO que vem da API entra como texto (nada de HTML da rede é interpretado). */
+/** Monta elemento sem innerHTML: tudo que vem da rede entra como texto. */
 function h(tag, attrs, ...filhos) {
   const e = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs || {})) {
     if (v === null || v === undefined || v === false) continue;
-    if (k === 'class') e.className = v; else if (k.startsWith('on')) e.addEventListener(k.slice(2), v); else if (k === 'dataset') Object.assign(e.dataset, v); else e.setAttribute(k, v === true ? '' : v);
+    if (k === 'class') e.className = v; else if (k.startsWith('on')) e.addEventListener(k.slice(2), v); else if (k === 'value') e.value = v; else e.setAttribute(k, v === true ? '' : v);
   }
   for (const f of filhos.flat(Infinity)) if (f !== null && f !== undefined && f !== false) e.append(f.nodeType ? f : document.createTextNode(String(f)));
   return e;
 }
-const hojeSP = () => new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(new Date());
-const somar = (d, n) => new Date(Date.parse(d + 'T00:00:00Z') + n * 86400000).toISOString().slice(0, 10);
-const DIAS = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
-const fmtData = (d) => { if (!d) return ''; const [a, m, di] = String(d).slice(0, 10).split('-'); const s = DIAS[new Date(Date.parse(d.slice(0, 10) + 'T12:00:00Z')).getUTCDay()]; return `${s}, ${di}/${m}${a !== hojeSP().slice(0, 4) ? '/' + a : ''}`; };
-const fmtNasc = (d) => { const [a, m, di] = String(d || '').split('-'); return a ? `${di}/${m}/${a}` : ''; };
+const guardar = (k, v) => { try { v === null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch { /* navegador sem armazenamento: a página segue sem lembrar */ } };
+const ler = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
 const soDigitos = (v) => String(v || '').replace(/\D/g, '');
-const maskCpf = (v) => { const d = soDigitos(v).slice(0, 11); return d.replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})$/, '$1-$2'); };
+const maskCpf = (v) => soDigitos(v).slice(0, 11).replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+const maskCel = (v) => { const d = soDigitos(v).slice(0, 11); return d.length > 6 ? `(${d.slice(0, 2)}) ${d.slice(2, d.length - 4)}-${d.slice(-4)}` : d.length > 2 ? `(${d.slice(0, 2)}) ${d.slice(2)}` : d; };
 function cpfOk(v) {
   const d = soDigitos(v); if (d.length !== 11 || /^(\d)\1{10}$/.test(d)) return false;
   const dv = (n) => { let s = 0; for (let i = 0; i < n; i++) s += Number(d[i]) * (n + 1 - i); const r = (s * 10) % 11; return r === 10 ? 0 : r; };
   return dv(9) === Number(d[9]) && dv(10) === Number(d[10]);
 }
-const nomeDe = (o) => (o && (o.descr || o.nome || o.descricao || o.name)) || (o && o.id !== undefined ? String(o.id) : '');
+const hojeSP = () => new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(new Date());
+const somar = (d, n) => new Date(Date.parse(d + 'T12:00:00Z') + n * 86400000).toISOString().slice(0, 10);
+const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+const SEMANA = ['domingo', 'segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado'];
+/** "sexta-feira, 14 de novembro" (e "hoje"/"amanhã" quando for). */
+function dataBonita(iso) {
+  if (!iso) return ''; const d = String(iso).slice(0, 10), [a, m, di] = d.split('-').map(Number), dow = new Date(Date.parse(d + 'T12:00:00Z')).getUTCDay();
+  const rel = d === hojeSP() ? 'hoje, ' : d === somar(hojeSP(), 1) ? 'amanhã, ' : '';
+  return `${rel}${SEMANA[dow]}, ${di} de ${MESES[m - 1]}${a !== Number(hojeSP().slice(0, 4)) ? ' de ' + a : ''}`;
+}
+/** "08:00" -> "8h", "08:30" -> "8h30". */
+const horaBonita = (hh) => { if (!hh) return ''; const [a, m] = String(hh).slice(0, 5).split(':'); return `${Number(a)}h${m === '00' ? '' : m}`; };
+const nomeBonito = (s) => String(s || '').toLocaleLowerCase('pt-BR').replace(/(^|\s)(\S)/g, (_, a, b) => a + b.toLocaleUpperCase('pt-BR')).replace(/\b(Da|De|Do|Das|Dos|E)\b/g, (x) => x.toLowerCase());
+const quando = (iso, hora) => `${dataBonita(iso)}, às ${horaBonita(hora)}`;
 const lista = (x) => (Array.isArray(x) ? x : x && Array.isArray(x.dados) ? x.dados : []);
+const nomeDe = (o) => (o && (o.descr || o.nome || o.descricao || o.name)) || (o && o.id !== undefined ? String(o.id) : '');
+const lerLista = (nomes) => nomes.length <= 1 ? nomes.join('') : `${nomes.slice(0, -1).join(', ')} e ${nomes.slice(-1)}`;
+const anunciar = (t) => { const e = $('#avisoVoz'); e.textContent = ''; setTimeout(() => { e.textContent = t; }, 50); };
 
-// ---------------------------------------------------------------- chamada à função (nunca direto ao Klingo)
+// ---------------------------------------------------------------- aparência (letra e cores, lembradas neste aparelho)
+const APARENCIA = { fonte: '1', tema: 'auto' };
+try { Object.assign(APARENCIA, JSON.parse(ler(GUARDA.aparencia) || '{}')); } catch { /* usa o padrão */ }
+function aplicarAparencia() {
+  document.documentElement.dataset.fonte = APARENCIA.fonte; document.documentElement.dataset.tema = APARENCIA.tema; guardar(GUARDA.aparencia, JSON.stringify(APARENCIA));
+  const cor = { claro: '#1e3a5f', escuro: '#0c1622', contraste: '#000000', auto: '#1e3a5f' }[APARENCIA.tema]; $('meta[name=theme-color]').setAttribute('content', cor);
+}
+function montarAparencia() {
+  const grupo = (alvo, nome, itens) => $(alvo).replaceChildren(...itens.map(([v, t]) => h('label', {}, h('input', { type: 'radio', name: nome, value: v, checked: APARENCIA[nome] === v, onchange: () => { APARENCIA[nome] = v; aplicarAparencia(); } }), t)));
+  grupo('#opFonte', 'fonte', [['1', 'Normal'], ['2', 'Grande'], ['3', 'Bem grande']]);
+  grupo('#opTema', 'tema', [['auto', 'Do celular'], ['claro', 'Claro'], ['escuro', 'Escuro'], ['contraste', 'Alto contraste']]);
+}
+aplicarAparencia(); montarAparencia();
+
+// ---------------------------------------------------------------- conversa com a função
 let ocupado = 0;
-async function api(acao, dados = {}, cabecalhos = {}) {
+async function api(acao, dados = {}) {
   ocupado++; document.body.setAttribute('aria-busy', 'true');
   try {
-    const r = await fetch(FN, { method: 'POST', headers: { 'Content-Type': 'application/json', ...cabecalhos }, body: JSON.stringify({ acao, ...dados }) });
+    const r = await fetch(FN, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao, ...(S.token ? { token: S.token } : {}), ...dados }) });
     const j = await r.json().catch(() => null);
     if (!j || typeof j !== 'object') return { ok: false, motivo: 'resposta_invalida' };
+    if (r.status === 401 && /^aparelho_/.test(j.motivo || '')) { esquecerCelular(); return { ...j, ok: false }; }
     return j;
   } catch { return { ok: false, motivo: 'sem_rede' }; }
   finally { if (--ocupado <= 0) document.body.removeAttribute('aria-busy'); }
 }
+/** Mensagens com carinho: sempre dizem o que fazer a seguir e nunca culpam a pessoa. */
 const MSG = {
-  sem_rede: 'Sem conexão com a internet. Confira o sinal e tente de novo.', resposta_invalida: 'O sistema respondeu algo inesperado. Tente de novo em instantes.',
-  nao_confere: 'Não encontramos um cadastro com estes dados. Confira os números (ou o e-mail e a senha) ou faça o cadastro de paciente novo.',
-  tentativas_demais: 'Muitas tentativas. Tente de novo mais tarde ou procure a recepção.', limite: 'O sistema da clínica está muito ocupado. Tente de novo em alguns segundos.',
-  horario_ocupado: 'Este horário acabou de ser ocupado. Escolha outro.', sem_medico: 'Nenhum médico atende com este convênio para esta consulta. Escolha outro plano ou fale com a equipe.',
-  plano_inativo: 'Este plano está inativo no sistema. Escolha outro plano ou fale com a equipe.', plano_desconhecido: 'Este plano não foi reconhecido. Escolha outro.',
-  ja_cancelado: 'Esta marcação já estava cancelada.', outra_data: 'O check-in só vale no dia do atendimento.', voucher_nao_encontrado: 'Não achamos esta marcação entre as suas marcações ativas.',
-  ja_cadastrado: 'Você já tem cadastro. Use “Entrar” com o CPF e a data de nascimento.', nao_foi_possivel: 'Não foi possível concluir por aqui. Procure a recepção da clínica.',
-  incerto: 'Não conseguimos confirmar se deu certo. Veja em “Minhas marcações” antes de tentar de novo.', limite_diario: 'Muitos cadastros hoje. Procure a recepção ou tente amanhã.',
-  sessao_nao_confere: 'Não foi possível confirmar o cadastro. Procure a recepção.', sem_cadastro_definitivo: 'O cadastro precisa ser conferido pela recepção. Procure a clínica.',
-  dados_invalidos: 'Alguns dados não estão no formato certo. Confira e tente de novo.', klingo_recusou: 'O sistema da clínica recusou o pedido. Tente de novo ou fale com a equipe.',
-  desligado: 'Este recurso ainda não foi liberado pela clínica. Peça na recepção ou pelo chat.', nao_autorizado: 'Esta área é só para a equipe da clínica. Confira a chave.',
-  erro: 'Algo deu errado do nosso lado. Tente de novo em instantes.', em_andamento: 'Seu cadastro está sendo conferido. Procure a recepção se não puder continuar.',
+  sem_rede: 'Parece que a internet falhou. Confira o sinal e toque de novo, sem pressa.', resposta_invalida: 'O sistema respondeu algo diferente do esperado. Vamos tentar de novo daqui a pouco?',
+  nao_confere: 'Não encontramos este cadastro. Às vezes é só um número trocado: confira o CPF e a data de nascimento e tente de novo. Se preferir, a recepção ajuda.',
+  tentativas_demais: 'Por segurança, esta tentativa ficou bloqueada por um tempo. Você pode pedir ajuda à recepção agora mesmo.', limite: 'O sistema da clínica está bem ocupado. Espere uns segundos e toque de novo.',
+  horario_ocupado: 'Esse horário acabou de ser ocupado por outra pessoa. Já separamos outros para você.', sem_medico: 'Não encontramos médico com este plano para esse atendimento. A recepção consegue ajudar.',
+  plano_inativo: 'O plano deste cadastro está inativo no sistema. A recepção consegue ajudar.', plano_desconhecido: 'Não reconhecemos o plano deste cadastro. A recepção consegue ajudar.',
+  nao_foi_possivel: 'Não conseguimos concluir por aqui. A recepção resolve rapidinho.', incerto: 'Não deu para confirmar se ficou marcado. Veja em "Acompanhar" antes de tentar de novo, para não marcar duas vezes.',
+  limite_diario: 'Hoje já tivemos muitos cadastros por aqui. Fale com a recepção ou tente amanhã.', sessao_nao_confere: 'Não foi possível confirmar o cadastro. A recepção ajuda.', em_andamento: 'O cadastro está sendo conferido. A recepção ajuda se precisar.',
+  perto_demais: 'Falta pouco tempo para o atendimento. Fale com a recepção que a gente resolve junto com você.', outra_data: 'O "Cheguei" só vale no dia do atendimento.', voucher_nao_encontrado: 'Não achamos esta marcação. Atualize e tente de novo.',
+  desligado: 'Esta parte ainda não foi liberada pela clínica. A recepção ajuda enquanto isso.', limite_aparelhos: 'Este cadastro já está em 3 celulares. Peça a um deles para dar acesso, ou fale com a recepção.', erro: 'Algo deu errado do nosso lado. Tente de novo em instantes.',
+  parcial: 'Marcamos só uma parte e não conseguimos desfazer. Fale com a recepção, por favor: eles resolvem rápido.', celular_necessario: 'Precisamos de um celular com DDD para o cadastro da criança.',
+  ja_tem_marcacao: 'Esta pessoa já tem este atendimento marcado. Use "Mudar o horário" se precisar de outro dia.', conflito_horario: 'Esta pessoa já tem outro atendimento nesse horário. Escolha um horário diferente.',
+  em_teste: 'A marcação por aqui ainda está em fase de testes. A recepção ou o chat marcam para você agora mesmo.', limite_pessoas: 'Para cadastrar mais pessoas, a recepção confere junto com você. É só para a segurança de todos.',
+  muitas_marcacoes: 'Você já tem muitas marcações por vir. Para marcar mais, fale com a recepção.', muitas_marcacoes_pessoa: 'Esta pessoa já tem várias marcações por vir. Para marcar outra, fale com a recepção.',
+  divergente: 'A marcação saiu diferente do pedido e foi desfeita. Vamos tentar de novo, sem pressa.', limite_espera: 'Esta pessoa já está em várias filas de espera. Saia de uma para entrar em outra.', oferta_vencida: 'O tempo desta oferta acabou. Você continua na fila e avisamos se abrir outro horário.', oferta_invalida: 'Esta oferta não vale mais.',
+  devagar: 'Muitas aberturas seguidas. Espere um minuto e tente de novo.', convite_invalido: 'Este código não vale mais. Peça um novo para quem já acompanha.', klingo_recusou: 'O sistema da clínica não aceitou o pedido. Tente de novo ou fale com a recepção.',
 };
 const textoErro = (r) => r.mensagem || MSG[r.motivo] || MSG.erro;
 
 // ---------------------------------------------------------------- estado
 const S = {
-  aba: 'marcar', id: null,                                  // id = { cpf, nasc, nome, pre } só na memória
-  passo: 1, tipo: 'consulta', especialidades: null, convenios: null, consultas: {}, espec: '', exameBusca: '', exames: null, exame: null,
-  plano: { id: 1, nome: 'PARTICULAR' }, ini: hojeSP(), fim: somar(hojeSP(), 9),
-  horarios: null, filtro: { medico: '', unidade: '', turno: '' }, motivoVazio: null, escolhido: null, reserva: null, preco: null, remarcar: null, voucherNovo: null, ident: 'entrar', como: 'cpf', equipeChave: '',
-  marcacoes: null, dados: null, avisos: [], catalogo: { k: 'unidades', resposta: null, valores: {} }, relogio: null,
+  token: ler(GUARDA.celular), tela: 'inicio', pessoas: [], avisos: [], selecionadas: [], tipo: 'consulta', espec: null, exame: null, especialidades: null, exames: null, exameBusca: '',
+  busca: null, escolha: null, marcacoes: null, previsoes: {}, atualizadoEm: 0, remarcar: null, recemMarcadas: null, recado: null, convite: null, mensagem: null, relogio: null, ver: {},
 };
-const ABAS = [['marcar', 'Marcar'], ['marcacoes', 'Minhas marcações'], ['dados', 'Meus dados'], ['consultar', 'Consultar a clínica'], ['equipe', 'Equipe'], ['sobre', 'Sobre a API']];
+const nomesDe = (ids) => ids.map((id) => (S.pessoas.find((p) => p.id === id) || {}).nome).filter(Boolean);
+const algumNivel2 = () => S.pessoas.some((p) => p.nivel === 2);
+function esquecerCelular() { guardar(GUARDA.celular, null); S.token = null; S.pessoas = []; S.marcacoes = null; S.mensagem = { tipo: 'atencao', texto: 'Este celular precisa ser ligado de novo. É só informar o CPF e a data de nascimento uma vez.' }; ir('boasvindas'); }
+function lembrarCelular(token) { if (token) { S.token = token; guardar(GUARDA.celular, token); } }
 
-function aviso(tipo, texto) { S.avisos.push({ tipo, texto }); }
-function trocarAba(a) { if (S.aba === 'marcar' && a !== 'marcar') soltarReserva(); S.aba = a; S.avisos = []; desenhar(); $('#app').focus({ preventScroll: true }); window.scrollTo(0, 0); }
+// ---------------------------------------------------------------- peças de tela
+const botao = (texto, onclick, tipo = 'sec', extra = {}) => { const b = h('button', { type: 'button', class: `btn ${tipo}`, ...extra }, texto); b.addEventListener('click', async () => { if (b.disabled) return; b.disabled = true; b.classList.add('com-carga'); try { await onclick(b); } finally { if (b.isConnected) { b.disabled = false; b.classList.remove('com-carga'); } } }); return b; };
+const caixaErro = () => h('div', { class: 'aviso erro', role: 'alert', hidden: true });
+const mostrar = (caixa, texto, el) => { caixa.textContent = texto; caixa.hidden = false; if (el && el.focus) el.focus(); else caixa.scrollIntoView({ block: 'center' }); };
+const ajuda = () => h('a', { class: 'btn leve', href: CHAT }, 'Falar com uma pessoa');
+const fichas = (nomes) => h('div', { class: 'pessoas', 'aria-label': 'Pessoas' }, nomes.map((n) => h('span', { class: 'ficha' }, n)));
+
+/** Data de nascimento em três caixas (dia, mês, ano): nada de calendário para rolar até 1950. */
+function campoNascimento(prefixo, rotulo) {
+  const d = h('input', { id: prefixo + 'D', inputmode: 'numeric', autocomplete: 'off', maxlength: '2', placeholder: 'DD', 'aria-label': rotulo + ': dia' });
+  const m = h('input', { id: prefixo + 'M', inputmode: 'numeric', autocomplete: 'off', maxlength: '2', placeholder: 'MM', 'aria-label': rotulo + ': mês' });
+  const a = h('input', { id: prefixo + 'A', inputmode: 'numeric', autocomplete: 'off', maxlength: '4', placeholder: 'AAAA', 'aria-label': rotulo + ': ano' });
+  for (const [el, prox, tam] of [[d, m, 2], [m, a, 2], [a, null, 4]]) el.addEventListener('input', () => { el.value = soDigitos(el.value); if (prox && el.value.length === tam) prox.focus(); });
+  const el = h('fieldset', { class: 'campo', style: 'border:0;padding:0;margin:0' }, h('legend', { style: 'font-weight:700;margin:16px 0 6px;padding:0' }, rotulo), h('div', { class: 'nasc' }, h('div', {}, h('label', { for: prefixo + 'D' }, 'Dia'), d), h('div', {}, h('label', { for: prefixo + 'M' }, 'Mês'), m), h('div', {}, h('label', { for: prefixo + 'A' }, 'Ano'), a)));
+  return { el, focar: () => d.focus(), valor() { const di = Number(d.value), me = Number(m.value), an = Number(a.value), iso = `${String(an).padStart(4, '0')}-${String(me).padStart(2, '0')}-${String(di).padStart(2, '0')}`; const t = new Date(iso + 'T12:00:00Z'); return an >= 1900 && me >= 1 && me <= 12 && di >= 1 && !isNaN(t) && t.getUTCDate() === di && iso <= hojeSP() ? iso : null; }, erroEm() { return !d.value || Number(d.value) < 1 || Number(d.value) > 31 ? d : !m.value || Number(m.value) < 1 || Number(m.value) > 12 ? m : a; } };
+}
+const campoTexto = (id, rotulo, attrs = {}, dica) => { const i = h('input', { id, autocomplete: 'off', ...attrs }); return { i, el: h('div', { class: 'campo' }, h('label', { for: id }, rotulo), dica ? h('div', { class: 'dica' }, dica) : null, i) }; };
+function campoCpf(id = 'cpf', rotulo = 'CPF', dica = 'Só os números. Não precisa de pontos.') { const c = campoTexto(id, rotulo, { inputmode: 'numeric', maxlength: '14', placeholder: '000.000.000-00' }, dica); c.i.addEventListener('input', () => { c.i.value = maskCpf(c.i.value); }); return c; }
+function campoCelular(id = 'cel', rotulo = 'Celular com DDD') { const c = campoTexto(id, rotulo, { type: 'tel', inputmode: 'tel', maxlength: '16', placeholder: '(71) 99999-0000' }); c.i.addEventListener('input', () => { c.i.value = maskCel(c.i.value); }); return c; }
+
+// ---------------------------------------------------------------- navegação
+function ir(tela, extra = {}) {
+  pararRelogio(); if (tela !== 'quando') S.avisoBusca = null; S.mensagemViva = null; Object.assign(S, extra); S.tela = tela; desenhar();
+  const app = $('#app'); const t = app.querySelector('h1'); if (t) { t.setAttribute('tabindex', '-1'); t.focus({ preventScroll: true }); } window.scrollTo(0, 0);
+  if (t) anunciar(t.textContent);
+}
 function desenhar() {
-  const nav = $('#abas'); nav.replaceChildren(...ABAS.map(([k, t]) => h('button', { type: 'button', role: 'tab', 'aria-selected': String(S.aba === k), onclick: () => trocarAba(k) }, t)));
-  $('#quem').hidden = !S.id; if (S.id) $('#quemNome').textContent = S.id.nome ? `Olá, ${S.id.nome}` : 'Identificado';
-  const app = $('#app'); const novo = [];
-  for (const a of S.avisos) novo.push(h('div', { class: 'aviso ' + (a.tipo || ''), role: a.tipo === 'erro' ? 'alert' : 'status' }, a.texto));
-  const tela = { marcar: telaMarcar, marcacoes: telaMarcacoes, dados: telaDados, consultar: telaConsultar, equipe: telaEquipe, sobre: telaSobre }[S.aba]();
-  novo.push(tela); app.replaceChildren(...novo);
-}
-async function tarefa(botao, fn) {
-  if (botao) { botao.disabled = true; botao.classList.add('carregando'); }
-  try { await fn(); } finally { if (botao && botao.isConnected) { botao.disabled = false; botao.classList.remove('carregando'); } }
-}
-/** Como o paciente se identifica a cada chamada (só na memória da aba): { cpf, nascimento } | { telefone, nascimento } | { portal_email, portal_senha }. */
-const credenciais = () => S.id.cred;
-function sair() { soltarReserva(); S.id = null; S.marcacoes = null; S.dados = null; S.passo = Math.min(S.passo, 2); S.avisos = []; aviso('ok', 'Você saiu. Seus dados não ficam guardados neste aparelho.'); desenhar(); }
-$('#sair').addEventListener('click', sair);
-
-// ---------------------------------------------------------------- identificação (compartilhada)
-function formIdentidade(aoEntrar, texto) {
-  const como = h('select', { id: 'idComo' }, [['cpf', 'CPF e data de nascimento'], ['telefone', 'Telefone e data de nascimento'], ['portal', 'E-mail e senha do portal']].map(([v, t]) => h('option', { value: v, selected: S.como === v }, t)));
-  como.addEventListener('change', () => { S.como = como.value; desenhar(); });
-  const msg = h('div', { role: 'alert', class: 'aviso erro', hidden: true });
-  const erro = (t, el) => { msg.textContent = t; msg.hidden = false; if (el) el.focus(); };
-  const nasc = h('input', { id: 'idNasc', type: 'date', autocomplete: 'off', max: hojeSP(), min: '1900-01-01' });
-  const cpf = h('input', { id: 'idCpf', inputmode: 'numeric', autocomplete: 'off', placeholder: '000.000.000-00', maxlength: '14' });
-  cpf.addEventListener('input', () => { cpf.value = maskCpf(cpf.value); });
-  const tel = h('input', { id: 'idTel', type: 'tel', inputmode: 'tel', autocomplete: 'off', placeholder: '(71) 99999-0000', maxlength: '16' });
-  const mail = h('input', { id: 'idMail', type: 'email', autocomplete: 'username', maxlength: '120' }), senha = h('input', { id: 'idSenha', type: 'password', autocomplete: 'current-password', maxlength: '60' });
-  const campos = S.como === 'telefone' ? [h('label', { for: 'idTel' }, 'Telefone com DDD'), tel, h('label', { for: 'idNasc' }, 'Data de nascimento'), nasc]
-    : S.como === 'portal' ? [h('label', { for: 'idMail' }, 'E-mail da conta'), mail, h('label', { for: 'idSenha' }, 'Senha'), senha]
-    : [h('label', { for: 'idCpf' }, 'CPF'), cpf, h('label', { for: 'idNasc' }, 'Data de nascimento'), nasc];
-  const entrar = h('button', { type: 'button', class: 'btn prim', onclick: () => tarefa(entrar, async () => {
-    msg.hidden = true; let cred;
-    if (S.como === 'cpf') {
-      if (!cpfOk(cpf.value)) return erro('O CPF não parece certo. Confira os números.', cpf);
-      if (!nasc.value) return erro('Informe a data de nascimento.', nasc);
-      cred = { cpf: soDigitos(cpf.value), nascimento: nasc.value };
-    } else if (S.como === 'telefone') {
-      if (soDigitos(tel.value).length < 10) return erro('Informe o telefone com DDD.', tel);
-      if (!nasc.value) return erro('Informe a data de nascimento.', nasc);
-      cred = { telefone: soDigitos(tel.value), nascimento: nasc.value };
-    } else {
-      if (!/^\S+@\S+\.\S+$/.test(mail.value.trim())) return erro('O e-mail não parece certo.', mail);
-      if (senha.value.length < 4) return erro('Informe a senha.', senha);
-      cred = { portal_email: mail.value.trim().toLowerCase(), portal_senha: senha.value };
-    }
-    const r = await api('identificar', cred);
-    if (!r.ok) return erro(textoErro(r));
-    S.id = { cred, nome: r.primeiro_nome || '', pre: !!r.pre_cadastro };
-    aoEntrar();
-  }) }, 'Entrar');
-  const esqueci = S.como === 'portal' ? h('button', { type: 'button', class: 'btn', onclick: () => tarefa(esqueci, async () => {
-    msg.hidden = true;
-    if (!/^\S+@\S+\.\S+$/.test(mail.value.trim())) return erro('Escreva o e-mail da conta acima para receber as instruções.', mail);
-    const r = await api('portal_recuperar', { email: mail.value.trim().toLowerCase(), confirmar: true });
-    S.avisos = []; aviso(r.ok ? 'ok' : 'erro', r.ok ? r.mensagem : textoErro(r)); desenhar();
-  }) }, 'Esqueci a senha') : null;
-  return h('div', {}, texto ? h('p', { class: 'suave' }, texto) : null,
-    h('label', { for: 'idComo' }, 'Como quer entrar?'), como, campos, msg,
-    h('div', { class: 'acoes' }, entrar, esqueci, h('button', { type: 'button', class: 'btn', onclick: () => { S.ident = 'novo'; desenhar(); } }, 'Sou paciente novo')));
+  const tela = { boasvindas: telaBoasVindas, convite: telaConvite, inicio: telaInicio, quem: telaQuem, adicionar: telaAdicionar, oque: telaOque, quando: telaQuando, confirmar: telaConfirmar, pronto: telaPronto, acompanhar: telaAcompanhar, acesso: telaAcesso, dar_acesso: telaDarAcesso, ver_laudo: telaVerLaudo }[S.tela] || telaInicio;
+  // a mensagem de uma ação ("Liberado!", "Cancelado") continua na tela por 20 s, mesmo que a tela se redesenhe sozinha ao terminar de carregar
+  if (S.mensagem) { S.mensagemViva = { ...S.mensagem, ate: Date.now() + 20000 }; S.mensagem = null; }
+  const mv = S.mensagemViva && S.mensagemViva.ate > Date.now() ? S.mensagemViva : null;
+  const aviso = mv ? h('div', { class: `aviso ${mv.tipo || ''}`, role: mv.tipo === 'erro' ? 'alert' : 'status' }, mv.texto) : null;
+  $('#app').replaceChildren(...[aviso, tela()].filter(Boolean));
+  document.title = ($('#app h1') ? $('#app h1').textContent + ' · ' : '') + 'CSI';
 }
 
-function formCadastro(aoCadastrar) {
-  const c = (id, rotulo, attrs = {}) => [h('label', { for: id }, rotulo), h('input', { id, autocomplete: 'off', ...attrs })];
-  const nome = c('cdNome', 'Nome completo', { maxlength: '100' }), cpf = c('cdCpf', 'CPF', { inputmode: 'numeric', maxlength: '14', placeholder: '000.000.000-00' });
-  cpf[1].addEventListener('input', () => { cpf[1].value = maskCpf(cpf[1].value); });
-  const nasc = c('cdNasc', 'Data de nascimento', { type: 'date', max: hojeSP(), min: '1900-01-01' }), cel = c('cdCel', 'Celular com DDD', { inputmode: 'tel', placeholder: '(71) 99999-0000', maxlength: '16' });
-  const mail = c('cdMail', 'E-mail (opcional)', { type: 'email', maxlength: '120' }), mae = c('cdMae', 'Nome da mãe (opcional)', { maxlength: '100' });
-  const querConta = h('input', { type: 'checkbox', id: 'cdConta' }), senhaNova = h('input', { id: 'cdSenha', type: 'password', autocomplete: 'new-password', maxlength: '60', placeholder: 'Mínimo de 6 caracteres' });
-  const sexo = h('select', { id: 'cdSexo' }, h('option', { value: '' }, 'Escolha'), h('option', { value: 'F' }, 'Feminino'), h('option', { value: 'M' }, 'Masculino'));
-  const msg = h('div', { role: 'alert', class: 'aviso erro', hidden: true });
-  const ok = h('button', { type: 'button', class: 'btn prim', onclick: () => tarefa(ok, async () => {
-    const erro = (t, el) => { msg.textContent = t; msg.hidden = false; el.focus(); };
-    msg.hidden = true;
-    if (nome[1].value.trim().split(/\s+/).length < 2) return erro('Escreva o nome completo.', nome[1]);
-    if (!sexo.value) return erro('Escolha o sexo do cadastro.', sexo);
-    if (!cpfOk(cpf[1].value)) return erro('O CPF não parece certo.', cpf[1]);
-    if (!nasc[1].value) return erro('Informe a data de nascimento.', nasc[1]);
-    if (soDigitos(cel[1].value).length < 10) return erro('Informe o celular com DDD.', cel[1]);
-    const conta = querConta.checked;
-    if (conta && !/^\S+@\S+\.\S+$/.test(mail[1].value.trim())) return erro('Para criar a conta com senha, informe um e-mail válido.', mail[1]);
-    if (conta && senhaNova.value.length < 6) return erro('A senha precisa ter pelo menos 6 caracteres.', senhaNova);
-    const r = await api(conta ? 'portal_cadastrar' : 'cadastrar', { nome: nome[1].value.trim(), sexo: sexo.value, cpf: soDigitos(cpf[1].value), nascimento: nasc[1].value, celular: soDigitos(cel[1].value), email: mail[1].value.trim() || undefined, mae: mae[1].value.trim() || undefined, ...(conta ? { senha: senhaNova.value } : {}), confirmar: true });
-    if (!r.ok) { msg.textContent = textoErro(r); msg.hidden = false; return; }
-    const cred = conta ? { portal_email: mail[1].value.trim().toLowerCase(), portal_senha: senhaNova.value } : { cpf: soDigitos(cpf[1].value), nascimento: nasc[1].value };
-    const e = await api('identificar', cred);
-    if (!e.ok) { S.ident = 'entrar'; S.como = conta ? 'portal' : 'cpf'; aviso('ok', 'Pré-cadastro feito. Agora entre com ' + (conta ? 'o e-mail e a senha.' : 'o CPF e a data de nascimento.')); desenhar(); return; }
-    S.id = { cred, nome: e.primeiro_nome || '', pre: true }; S.ident = 'entrar'; aviso('ok', 'Pré-cadastro feito. A recepção completa os seus dados.'); aoCadastrar();
-  }) }, 'Fazer o cadastro');
-  return h('div', {}, h('p', { class: 'suave' }, 'Cadastro rápido de paciente novo. A recepção completa o restante depois. Se você já foi atendido na CSI, use “Entrar”.'),
-    nome, h('label', { for: 'cdSexo' }, 'Sexo do cadastro'), sexo, cpf, nasc, cel, mail, mae,
-    h('label', {}, querConta, ' Criar também uma conta com e-mail e senha (para entrar sem o CPF)'), h('div', { class: 'suave' }, 'Precisa do e-mail acima. Se a clínica ainda não liberou a conta com senha, o cadastro avisa.'), h('label', { for: 'cdSenha' }, 'Senha da conta (só se marcou a opção acima)'), senhaNova, msg,
-    h('div', { class: 'acoes' }, ok, h('button', { type: 'button', class: 'btn', onclick: () => { S.ident = 'entrar'; desenhar(); } }, 'Já tenho cadastro')));
-}
-const blocoIdentidade = (aoEntrar, texto) => S.ident === 'novo' ? h('div', { class: 'cartao' }, h('h2', {}, 'Paciente novo'), formCadastro(aoEntrar)) : h('div', { class: 'cartao' }, h('h2', {}, 'Quem é você?'), formIdentidade(aoEntrar, texto));
 
-// ---------------------------------------------------------------- aba MARCAR
-const ROTULOS = ['O quê', 'Horário', 'Você', 'Confirmar'];
-function trilha() {
-  return h('ol', { class: 'passos', 'aria-label': 'Etapas' }, ROTULOS.map((t, i) => h('li', { class: i + 1 === S.passo ? 'on' : i + 1 < S.passo ? 'feito' : '', 'aria-current': i + 1 === S.passo ? 'step' : null }, `${i + 1}. ${t}`)));
+// ---------------------------------------------------------------- pressa: fila de espera e oferta de horário que abriu
+const URG = [['hoje', 'Quero hoje, se abrir uma vaga'], ['semana', 'Quero nesta semana, se abrir'], ['qualquer', 'Me chame se abrir um horário mais cedo']];
+const URG_TEXTO = { hoje: 'hoje', semana: 'nesta semana', qualquer: 'qualquer dia mais cedo' };
+/** "Está com pressa?": entra na fila de espera de uma ou mais pessoas. `voucher` = o horário que já tem e quer adiantar. */
+function cartaoPressa({ pessoas, voucherDe, titulo }) {
+  const saida = h('div', { 'aria-live': 'polite' });
+  const entrar = (urg) => botao(urg[1], async () => {
+    saida.replaceChildren(); let falha = null;
+    for (const pid of pessoas) { const r = await api('fam_espera_entrar', { pessoa: pid, necessidade: S.necessidade, urgencia: urg[0], ...(voucherDe && voucherDe[pid] ? { voucher: voucherDe[pid] } : {}) }); if (!r.ok) { falha = r; break; } }
+    if (falha) return void saida.replaceChildren(h('div', { class: 'aviso erro', role: 'alert' }, textoErro(falha)));
+    saida.replaceChildren(h('div', { class: 'aviso ok', role: 'status' }, `Pronto! ${lerLista(nomesDe(pessoas))} entrou na fila de espera (${URG_TEXTO[urg[0]]}). Se alguém desmarcar, o horário fica reservado para você por 15 minutos. Volte aqui ou deixe esta página aberta.${voucherDe ? ' Seu horário de agora continua garantido até você aceitar outro.' : ''}`));
+  });
+  return h('div', { class: 'cartao' }, h('h2', {}, titulo || 'Está com pressa?'), h('p', { class: 'suave' }, 'Entre na fila de espera. Quando um horário mais cedo abrir (alguém desmarcou), a gente separa para você e mostra aqui. Quem tem mais pressa é chamado primeiro.'), h('div', { class: 'pilha' }, URG.map(entrar)), saida);
 }
-function telaMarcar() {
-  if (S.voucherNovo) return telaPronto();
-  const dentro = [trilha()];
-  if (S.remarcar) dentro.push(h('div', { class: 'aviso atencao' }, `Você está remarcando a marcação ${S.remarcar.id} (${fmtData(S.remarcar.data)} ${S.remarcar.hora || ''}). A antiga é cancelada sozinha quando a nova for confirmada. `, h('button', { type: 'button', class: 'btn peq', onclick: () => { S.remarcar = null; desenhar(); } }, 'Desistir de remarcar')));
-  dentro.push([passoServico, passoHorarios, passoIdentidade, passoConfirmar][S.passo - 1]());
-  return h('div', {}, dentro);
+function cartaoOferta(e) {
+  const o = e.oferta, saida = h('div', { 'aria-live': 'polite' }), falta = Math.max(1, Math.round((Date.parse(e.oferta_ate) - Date.now()) / 60000));
+  return h('div', { class: 'aviso atencao', role: 'alert' }, h('h3', {}, `Abriu um horário para ${e.nome}!`), h('div', { style: 'font-size:1.2rem;font-weight:800' }, quando(o.data, o.hora)), h('div', {}, `${o.medico ? nomeBonito(o.medico) : 'Equipe da clínica'}${o.unidade ? ' · ' + o.unidade : ''}`),
+    e.data_atual ? h('p', { class: 'pequeno' }, `Se você aceitar, trocamos o horário de ${dataBonita(e.data_atual)} por este.`) : null, h('p', { class: 'pequeno' }, `Reservado só para você por mais ${falta} minuto${falta === 1 ? '' : 's'}.`),
+    h('div', { class: 'duas' }, botao('Quero este horário', async () => {
+      const r = await api('fam_espera_responder', { id: e.id, aceita: true });
+      if (!r.ok) { saida.replaceChildren(h('div', { class: 'aviso erro', role: 'alert' }, textoErro(r))); S.marcacoes = null; return void setTimeout(() => (S.tela === 'inicio' ? carregarEu().then(desenhar) : carregarRastreio()), 2500); }
+      S.necessidade = { nome: e.necessidade }; S.nomeNeed = e.necessidade; S.recemMarcadas = r.marcacoes.map((m) => ({ ...m, slot: { data: o.data, hora: o.hora, medico: o.medico, unidade: o.unidade }, necessidade: e.necessidade })); S.marcacoes = null; ir('pronto');
+    }, 'ok'), botao('Não quero', async () => { await api('fam_espera_responder', { id: e.id, aceita: false }); S.mensagem = { tipo: 'ok', texto: 'Tudo bem. Você continua na fila e avisamos se abrir outro horário.' }; if (S.tela === 'inicio') { await carregarEu(); desenhar(); } else { S.marcacoes = null; desenhar(); } })), saida);
+}
+function cartaoEspera(e) {
+  const saida = h('div', { 'aria-live': 'polite' });
+  return h('div', { class: 'cartao' }, h('h3', {}, `${e.nome} · fila de espera`), h('div', { class: 'suave' }, `${e.necessidade || 'Atendimento'} · você pediu: ${URG_TEXTO[e.urgencia] || ''}`),
+    e.data_atual ? h('p', { class: 'pequeno' }, `Seu horário atual (${dataBonita(e.data_atual)}, às ${horaBonita(e.hora_atual)}) continua garantido até você aceitar outro.`) : null, h('p', {}, e.posicao > 1 ? `Você é o ${e.posicao}º da fila.` : 'Você é o primeiro da fila: se abrir um horário, ele é seu.'),
+    botao('Sair da fila', async () => { const r = await api('fam_espera_sair', { id: e.id }); if (!r.ok) return void saida.replaceChildren(h('div', { class: 'aviso erro' }, textoErro(r))); S.marcacoes = null; desenhar(); }, 'leve'), saida);
 }
 
-async function carregarCatalogosBase() {
-  if (!S.especialidades) { const r = await api('catalogo', { catalogo: 'especialidades' }); S.especialidades = r.ok ? lista(r.dados) : []; if (!r.ok) aviso('erro', textoErro(r)); }
-  if (!S.convenios) { const r = await api('catalogo', { catalogo: 'convenios' }); S.convenios = r.ok ? lista(r.dados) : []; }
+// ---------------------------------------------------------------- 1) entrar (uma vez só)
+function telaBoasVindas() {
+  const erro = caixaErro(), cpf = campoCpf('cpf', 'Seu CPF'), nasc = campoNascimento('n', 'Sua data de nascimento');
+  const entrar = botao('Continuar', async () => {
+    erro.hidden = true;
+    if (!cpfOk(cpf.i.value)) return mostrar(erro, 'O CPF não parece completo. Confira os números, sem pressa.', cpf.i);
+    const n = nasc.valor(); if (!n) return mostrar(erro, 'Confira a data de nascimento: dia, mês e ano.', nasc.erroEm());
+    const r = await api('fam_entrar', { cpf: soDigitos(cpf.i.value), nascimento: n });
+    if (!r.ok) return mostrar(erro, textoErro(r));
+    lembrarCelular(r.token); S.pessoas = r.pessoas; S.mensagem = { tipo: 'ok', texto: `Pronto, ${r.pessoas[0] ? r.pessoas[0].nome : ''}! Este celular agora lembra de você. Nas próximas vezes não precisa digitar nada.` };
+    ir('inicio');
+  }, 'prim');
+  return h('div', {}, h('h1', {}, 'Oi! Vamos agendar com calma.'),
+    h('p', { class: 'suave' }, 'Leva cerca de 2 minutos. Você informa o CPF e o nascimento só desta vez: depois este celular lembra de você.'),
+    h('div', { class: 'cartao' }, cpf.el, nasc.el, erro, h('div', { class: 'pilha', style: 'margin-top:18px' }, entrar)),
+    h('div', { class: 'pilha' }, botao('Recebi um código de convite', () => ir('convite')), h('a', { class: 'btn', href: './completo/' }, 'É a primeira vez na clínica?'), ajuda()));
 }
-function planosDe(conv) { return Array.isArray(conv.planos) && conv.planos.length ? conv.planos : [{ id: conv.id, nome: nomeDe(conv) }]; }
+function telaConvite() {
+  const erro = caixaErro(), cod = campoTexto('cod', 'Código de 8 números', { inputmode: 'numeric', maxlength: '9', placeholder: '0000 0000' }, 'Quem já acompanha o paciente gera este código no celular dele e passa para você.');
+  cod.i.addEventListener('input', () => { const d = soDigitos(cod.i.value).slice(0, 8); cod.i.value = d.length > 4 ? d.slice(0, 4) + ' ' + d.slice(4) : d; });
+  return h('div', {}, h('h1', {}, 'Entrar com um código'), h('div', { class: 'cartao' }, cod.el, erro, h('div', { class: 'pilha', style: 'margin-top:18px' },
+    botao('Usar este código', async () => {
+      erro.hidden = true; if (soDigitos(cod.i.value).length !== 8) return mostrar(erro, 'O código tem 8 números. Confira com quem passou.', cod.i);
+      const r = await api('fam_convite_usar', { codigo: soDigitos(cod.i.value) }); if (!r.ok) return mostrar(erro, textoErro(r));
+      lembrarCelular(r.token); S.pessoas = r.pessoas; S.mensagem = { tipo: 'ok', texto: 'Pronto! Este celular agora acompanha ' + lerLista(nomesDe(r.pessoas.map((p) => p.id))) + '.' }; ir('inicio');
+    }, 'prim'), botao('Voltar', () => ir(S.token ? 'inicio' : 'boasvindas'))))); }
 
-function passoServico() {
-  const caixa = h('div', { class: 'cartao' });
-  if (!S.especialidades || !S.convenios) { caixa.append(h('p', { class: 'carregando' }, 'Carregando as opções da clínica')); carregarCatalogosBase().then(desenhar); return caixa; }
-  caixa.append(h('h2', {}, 'O que você quer marcar?'),
-    h('div', { class: 'seg', role: 'group', 'aria-label': 'Tipo' }, ['consulta', 'exame'].map((t) => h('button', { type: 'button', 'aria-pressed': String(S.tipo === t), onclick: () => { S.tipo = t; desenhar(); } }, t === 'consulta' ? 'Consulta' : 'Exame'))));
+// ---------------------------------------------------------------- 2) início
+async function carregarEu() {
+  const r = await api('fam_eu'); if (!r.ok) return false;
+  S.pessoas = r.pessoas; S.avisos = r.avisos || []; S.espera = r.espera || []; return true;
+}
+function telaInicio() {
+  if (!S.token) return telaBoasVindas();
+  if (!S.pessoas.length) { carregarEu().then((ok) => { if (ok && S.tela === 'inicio') desenhar(); }); return h('div', {}, h('h1', {}, 'Um instante…'), h('p', { class: 'suave carregando' }, 'Estamos reconhecendo este celular.')); }
+  const meu = S.pessoas.find((p) => p.papel === 'proprio') || S.pessoas[0];
+  const blocoAvisos = S.avisos.map((a) => h('div', { class: 'aviso atencao', role: 'alert' }, h('h3', {}, `Alguém quer acompanhar ${a.pessoa}.`), h('p', {}, 'Foi você que autorizou? Se não conhece, é só bloquear.'),
+    h('div', { class: 'duas' }, botao('Sim, liberar', async () => { await api('fam_aviso', { aviso: a.id, liberar: true }); await carregarEu(); S.mensagem = { tipo: 'ok', texto: 'Liberado.' }; desenhar(); }, 'prim'), botao('Não, bloquear', async () => { await api('fam_aviso', { aviso: a.id, liberar: false }); await carregarEu(); S.mensagem = { tipo: 'ok', texto: 'Bloqueado. Ninguém recebeu acesso.' }; desenhar(); }, 'perigo'))));
+  const ofertas = (S.espera || []).filter((e) => e.estado === 'oferecido' && e.oferta).map(cartaoOferta);
+  if (!S.relogio) iniciarRelogio();
+  return h('div', {}, h('h1', {}, `Oi, ${meu.nome}!`), ofertas, h('p', { class: 'suave' }, 'O que você precisa hoje?'), fichas(S.pessoas.map((p) => p.nome)), blocoAvisos,
+    h('div', { class: 'pilha' },
+      botao('Marcar uma consulta', () => começarMarcar('consulta'), 'prim'), botao('Marcar um exame', () => começarMarcar('exame'), 'prim'),
+      botao('Acompanhar minhas marcações e resultados', () => ir('acompanhar', { marcacoes: null })),
+      botao('Adicionar um filho ou outra pessoa', () => ir('adicionar', { voltarPara: 'inicio' })),
+      algumNivel2() ? botao('Dar acesso a outra pessoa da família', () => ir('dar_acesso', { convite: null })) : null, ajuda(),
+      botao('Desligar este celular', async () => { if (!confirm('Este celular deixa de acompanhar estas pessoas. Quer mesmo desligar?')) return; await api('fam_desligar'); esquecerCelular(); S.mensagem = { tipo: 'ok', texto: 'Celular desligado. Seus dados não ficaram guardados aqui.' }; desenhar(); }, 'leve')));
+}
+
+// ---------------------------------------------------------------- 3) marcar: quem, o quê, quando, confirmar
+function começarMarcar(tipo) { S.tipo = tipo; S.espec = null; S.exame = null; S.busca = null; S.escolha = null; S.remarcar = null; S.selecionadas = S.pessoas.length === 1 ? [S.pessoas[0].id] : S.selecionadas.filter((id) => S.pessoas.some((p) => p.id === id)); ir(S.pessoas.length === 1 ? 'oque' : 'quem'); }
+function telaQuem() {
+  const erro = caixaErro();
+  const lista = h('div', { class: 'pilha', role: 'group', 'aria-label': 'Quem vai ser atendido' }, S.pessoas.map((p) => {
+    const b = h('button', { type: 'button', class: 'escolha', role: 'checkbox', 'aria-checked': String(S.selecionadas.includes(p.id)) }, h('span', { class: 'marca', 'aria-hidden': 'true' }, S.selecionadas.includes(p.id) ? '✓' : ''), h('span', { class: 'quem' }, p.nome, h('small', {}, p.plano ? `Plano: ${nomeBonito(p.plano)}` : 'Particular')));
+    b.addEventListener('click', () => { const i = S.selecionadas.indexOf(p.id); if (i >= 0) S.selecionadas.splice(i, 1); else if (S.selecionadas.length < 4) S.selecionadas.push(p.id); const ativo = S.selecionadas.includes(p.id); b.setAttribute('aria-checked', String(ativo)); b.firstChild.textContent = ativo ? '✓' : ''; });
+    return b;
+  }));
+  return h('div', {}, h('h1', {}, 'Quem vai ser atendido?'), h('p', { class: 'suave' }, 'Pode escolher mais de uma pessoa: a gente procura horários juntos.'), lista, erro,
+    h('div', { class: 'rodape-acao' }, h('div', {}, botao('Continuar', () => { if (!S.selecionadas.length) return mostrar(erro, 'Toque em quem vai ser atendido.'); ir('oque'); }, 'prim'), botao('Adicionar um filho ou outra pessoa', () => ir('adicionar', { voltarPara: 'quem' })))));
+}
+
+function telaAdicionar() {
+  const erro = caixaErro(), nome = campoTexto('dNome', 'Nome completo', { maxlength: '100' }, 'Como está no documento ou na certidão.'), nasc = campoNascimento('dn', 'Data de nascimento');
+  let sexo = null, temCpf = false; const cpf = campoCpf('dCpf', 'CPF da pessoa', 'Se não tiver CPF, deixe como está: usamos o seu.'), cel = campoCelular('dCel', 'Seu celular com DDD'); cel.el.hidden = true; cpf.el.hidden = true;
+  const sx = ['Feminino', 'Masculino'].map((t) => { const b = h('button', { type: 'button', class: 'escolha', role: 'radio', 'aria-checked': 'false' }, h('span', { class: 'quem' }, t)); b.addEventListener('click', () => { sexo = t[0]; sx.forEach((x) => x.setAttribute('aria-checked', String(x === b))); }); return b; });
+  const tem = h('button', { type: 'button', class: 'escolha', role: 'checkbox', 'aria-checked': 'false' }, h('span', { class: 'marca', 'aria-hidden': 'true' }), h('span', { class: 'quem' }, 'Esta pessoa tem CPF próprio')); tem.addEventListener('click', () => { temCpf = !temCpf; tem.setAttribute('aria-checked', String(temCpf)); tem.firstChild.textContent = temCpf ? '✓' : ''; cpf.el.hidden = !temCpf; });
+  const salvar = botao('Salvar e continuar', async () => {
+    erro.hidden = true;
+    if (nome.i.value.trim().split(/\s+/).length < 2) return mostrar(erro, 'Escreva o nome e o sobrenome.', nome.i);
+    if (!sexo) return mostrar(erro, 'Escolha Feminino ou Masculino, como está no cadastro.');
+    const n = nasc.valor(); if (!n) return mostrar(erro, 'Confira a data de nascimento: dia, mês e ano.', nasc.erroEm());
+    if (temCpf && !cpfOk(cpf.i.value)) return mostrar(erro, 'O CPF não parece completo. Confira os números.', cpf.i);
+    if (!cel.el.hidden && soDigitos(cel.i.value).length < 10) return mostrar(erro, 'Informe o celular com DDD.', cel.i);
+    const r = await api('fam_dependente', { nome: nome.i.value.trim(), sexo, nascimento: n, ...(temCpf ? { cpf: soDigitos(cpf.i.value) } : {}), ...(!cel.el.hidden ? { celular: soDigitos(cel.i.value) } : {}) });
+    if (!r.ok && r.motivo === 'celular_necessario') { cel.el.hidden = false; return mostrar(erro, 'Para o cadastro da criança, precisamos do seu celular com DDD. É só desta vez.', cel.i); }
+    if (!r.ok) return mostrar(erro, textoErro(r));
+    const antes = new Set(S.pessoas.map((p) => p.id)); S.pessoas = r.pessoas; const nova = r.pessoas.find((p) => !antes.has(p.id));
+    if (nova) S.selecionadas = [...new Set([...S.selecionadas, nova.id])]; S.mensagem = { tipo: 'ok', texto: r.ja_existia ? 'Esta pessoa já estava cadastrada. Ela agora aparece aqui também.' : `${nova ? nova.nome : 'A pessoa'} foi adicionada.` };
+    ir(S.voltarPara === 'quem' ? 'quem' : 'inicio');
+  }, 'prim');
+  return h('div', {}, h('h1', {}, 'Adicionar uma pessoa'), h('p', { class: 'suave' }, 'Pode ser filho, pai, mãe ou quem você cuida. Só precisa fazer isto uma vez.'),
+    h('div', { class: 'cartao' }, nome.el, h('div', { class: 'campo' }, h('label', {}, 'Sexo no cadastro'), h('div', { class: 'duas', role: 'radiogroup' }, sx)), nasc.el, h('div', { style: 'margin-top:14px' }, tem), cpf.el, cel.el, erro),
+    h('div', { class: 'rodape-acao' }, h('div', {}, salvar, botao('Voltar', () => ir(S.voltarPara || 'inicio')))));
+}
+
+const CHIPS_EXAME = ['Ultrassom', 'Mamografia', 'Raio-X', 'Ressonância', 'Eletrocardiograma', 'Ecocardiograma'];
+async function carregarEspecialidades() { const r = await api('catalogo', { catalogo: 'especialidades' }); S.especialidades = r.ok ? lista(r.dados) : []; }
+function telaOque() {
+  const nomes = nomesDe(S.selecionadas), erro = caixaErro();
+  const cab = [h('h1', {}, S.tipo === 'consulta' ? 'Qual consulta?' : 'Qual exame?'), fichas(nomes), S.remarcar ? h('div', { class: 'aviso atencao' }, `Você está remarcando ${S.remarcar.nome}. A marcação antiga só sai quando a nova estiver confirmada.`) : null];
+  const trocar = h('div', { class: 'duas', role: 'group', 'aria-label': 'Consulta ou exame' }, ['consulta', 'exame'].map((t) => h('button', { type: 'button', class: 'escolha', 'aria-pressed': String(S.tipo === t), onclick: () => { S.tipo = t; S.espec = null; S.exame = null; desenhar(); } }, h('span', { class: 'quem' }, t === 'consulta' ? 'Consulta' : 'Exame'))));
   if (S.tipo === 'consulta') {
-    const sel = h('select', { id: 'selEsp', onchange: (e) => { S.espec = e.target.value; } }, h('option', { value: '' }, 'Escolha a especialidade'),
-      S.especialidades.map((e) => h('option', { value: e.cbos || e.id, selected: String(e.cbos || e.id) === S.espec }, nomeDe(e))));
-    caixa.append(h('label', { for: 'selEsp' }, 'Especialidade'), sel);
-  } else {
-    const busca = h('input', { id: 'busExame', value: S.exameBusca, placeholder: 'Ex.: ultrassom, mamografia, ressonância', onkeydown: (e) => { if (e.key === 'Enter') buscarBtn.click(); } });
-    const buscarBtn = h('button', { type: 'button', class: 'btn', onclick: () => tarefa(buscarBtn, async () => {
-      S.exameBusca = busca.value.trim(); if (S.exameBusca.length < 3) { aviso('atencao', 'Digite pelo menos 3 letras do nome do exame.'); desenhar(); return; }
-      const r = await api('catalogo', { catalogo: 'exames', busca: S.exameBusca }); S.exames = r.ok ? lista(r.dados) : []; S.exame = null; if (!r.ok) aviso('erro', textoErro(r)); else if (!S.exames.length) aviso('atencao', 'Nenhum exame com esse nome. Tente outra palavra.'); desenhar();
-    }) }, 'Buscar');
-    caixa.append(h('label', { for: 'busExame' }, 'Nome do exame'), h('div', { class: 'linha' }, busca, buscarBtn));
-    if (S.exames && S.exames.length) caixa.append(h('div', { role: 'radiogroup', 'aria-label': 'Exames encontrados', style: 'margin-top:10px' }, S.exames.slice(0, 40).map((x) => h('label', { style: 'display:flex;gap:10px;align-items:flex-start;font-weight:400;margin:6px 0' },
-      h('input', { type: 'radio', name: 'exame', value: x.id, checked: S.exame && String(S.exame.id) === String(x.id), onchange: () => { S.exame = { id: x.id, nome: nomeDe(x) }; } }), nomeDe(x)))),
-      S.exames.length > 40 ? h('p', { class: 'suave' }, `Mostrando 40 de ${S.exames.length}. Digite mais letras para afinar.`) : null);
+    if (!S.especialidades) { carregarEspecialidades().then(() => { if (S.tela === 'oque') desenhar(); }); return h('div', {}, cab, trocar, h('p', { class: 'suave' }, 'Carregando as opções…')); }
+    return h('div', {}, cab, trocar, S.especialidades.length ? h('div', { class: 'pilha', style: 'margin-top:14px' }, S.especialidades.map((e) => botao(nomeBonito(nomeDe(e)), () => { S.espec = String(e.cbos || e.id); S.nomeNeed = nomeBonito(nomeDe(e)); return procurar(); }, 'prim'))) : h('div', { class: 'aviso atencao' }, 'Não conseguimos carregar as especialidades agora. Tente de novo ou fale com a recepção.'), erro, ajuda());
   }
-  // convênio e plano
-  const convs = S.convenios; const iConv = Math.max(0, convs.findIndex((c) => planosDe(c).some((p) => String(p.id) === String(S.plano.id)))); const atualConv = convs[iConv];
-  const selConv = h('select', { id: 'selConv', onchange: (e) => { const c = convs[Number(e.target.value)]; const p = c ? planosDe(c)[0] : null; if (p) S.plano = { id: p.id, nome: nomeDe(p) }; desenhar(); } },
-    convs.map((c, i) => h('option', { value: i, selected: i === iConv }, nomeDe(c))));
-  const selPlano = h('select', { id: 'selPlano', onchange: (e) => { const p = planosDe(atualConv || convs[0]).find((x) => String(x.id) === e.target.value); if (p) S.plano = { id: p.id, nome: nomeDe(p) }; } },
-    planosDe(atualConv || convs[0] || { id: 1, nome: 'PARTICULAR' }).map((p) => h('option', { value: p.id, selected: String(p.id) === String(S.plano.id) }, nomeDe(p))));
-  caixa.append(h('div', { class: 'linha' }, h('div', {}, h('label', { for: 'selConv' }, 'Convênio'), convs.length ? selConv : h('input', { value: 'PARTICULAR', disabled: true })), h('div', {}, h('label', { for: 'selPlano' }, 'Plano'), selPlano)),
-    h('p', { class: 'suave' }, 'O convênio muda quais médicos atendem. Sem convênio, escolha Particular.'));
-  const ini = h('input', { id: 'perIni', type: 'date', value: S.ini, min: hojeSP(), onchange: (e) => { S.ini = e.target.value; } }), fim = h('input', { id: 'perFim', type: 'date', value: S.fim, min: hojeSP(), onchange: (e) => { S.fim = e.target.value; } });
-  caixa.append(h('div', { class: 'linha' }, h('div', {}, h('label', { for: 'perIni' }, 'A partir de'), ini), h('div', {}, h('label', { for: 'perFim' }, 'Até (máx. 31 dias)'), fim)));
-  const ver = h('button', { type: 'button', class: 'btn prim', onclick: () => tarefa(ver, buscarHorarios) }, 'Ver horários');
-  caixa.append(h('div', { class: 'acoes' }, ver)); return caixa;
+  const busca = h('input', { id: 'bus', type: 'search', value: S.exameBusca, placeholder: 'Ex.: ultrassom, mamografia', autocomplete: 'off', enterkeyhint: 'search' });
+  const buscar = async (texto) => { S.exameBusca = (texto ?? busca.value).trim(); if (S.exameBusca.length < 3) return mostrar(erro, 'Digite pelo menos 3 letras do nome do exame.', busca); erro.hidden = true; const r = await api('catalogo', { catalogo: 'exames', busca: S.exameBusca }); S.exames = r.ok ? lista(r.dados) : []; if (!r.ok) return mostrar(erro, textoErro(r)); if (!S.exames.length) mostrar(erro, 'Não achamos exame com esse nome. Tente outra palavra, ou fale com a recepção.'); else desenhar(); };
+  busca.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); buscar(); } });
+  return h('div', {}, cab, trocar, h('div', { class: 'campo' }, h('label', { for: 'bus' }, 'Nome do exame'), busca), h('div', { class: 'pilha' }, botao('Procurar', () => buscar(), 'prim')),
+    h('div', { class: 'opcoes', style: 'margin:14px 0' }, CHIPS_EXAME.map((c) => h('button', { type: 'button', class: 'btn', style: 'width:auto;min-height:48px', onclick: () => { busca.value = c; buscar(c); } }, c))), erro,
+    S.exames && S.exames.length ? h('div', { class: 'pilha' }, h('h2', {}, 'Escolha o exame'), S.exames.slice(0, 40).map((x) => botao(nomeBonito(nomeDe(x)), () => { S.exame = { id: x.id, nome: nomeBonito(nomeDe(x)) }; S.nomeNeed = S.exame.nome; return procurar(); }))) : null, ajuda());
 }
 
-async function buscarHorarios(manterAvisos = false) {
-  if (!manterAvisos) S.avisos = [];
-  if (S.tipo === 'consulta' && !S.espec) { aviso('atencao', 'Escolha a especialidade.'); return desenhar(); }
-  if (S.tipo === 'exame' && !S.exame) { aviso('atencao', 'Busque o exame e escolha um da lista.'); return desenhar(); }
-  if (!S.ini || !S.fim || S.fim < S.ini) { aviso('atencao', 'Confira as datas do período.'); return desenhar(); }
-  if (Date.parse(S.fim) - Date.parse(S.ini) > 31 * 86400000) { aviso('atencao', 'O período pode ter no máximo 31 dias.'); return desenhar(); }
-  const r = await api('horarios', { ...(S.tipo === 'consulta' ? { especialidade: S.espec } : { exame: S.exame.id }), plano: S.plano.id, inicio: S.ini, fim: S.fim });
-  if (!r.ok) { aviso('erro', textoErro(r)); return desenhar(); }
-  S.horarios = r.horarios || []; S.motivoVazio = r.motivo || null; S.filtro = { medico: '', unidade: '', turno: '' }; S.passo = 2; desenhar(); window.scrollTo(0, 0);
+async function procurar() {
+  S.busca = null; S.necessidade = S.tipo === 'consulta' ? { especialidade: S.espec, nome: S.nomeNeed } : { exame: String(S.exame.id), nome: S.nomeNeed }; ir('quando'); const r = await api('fam_buscar', { pessoas: S.selecionadas, ...(S.tipo === 'consulta' ? { especialidade: S.espec } : { exame: String(S.exame.id) }) });
+  if (S.tela !== 'quando') return;
+  if (!r.ok) { S.busca = { erro: textoErro(r), motivo: r.motivo }; } else S.busca = r; desenhar();
 }
-
-function passoHorarios() {
-  const todos = S.horarios || [];
-  const caixa = h('div', { class: 'cartao' }, h('h2', {}, 'Escolha o dia e a hora'),
-    h('p', { class: 'suave' }, `${S.tipo === 'consulta' ? nomeDe((S.especialidades || []).find((e) => String(e.cbos || e.id) === S.espec)) || 'Consulta' : (S.exame && S.exame.nome) || 'Exame'} · plano ${S.plano.nome} · ${fmtData(S.ini)} a ${fmtData(S.fim)}`));
-  if (!todos.length) {
-    caixa.append(h('div', { class: 'aviso atencao' }, S.motivoVazio ? MSG[S.motivoVazio] || MSG.sem_medico : 'Não há horários livres neste período. Tente um período maior ou fale com a equipe pelo chat.'));
-    caixa.append(h('div', { class: 'acoes' }, h('button', { type: 'button', class: 'btn', onclick: () => { S.passo = 1; desenhar(); } }, 'Mudar a busca'))); return caixa;
+function cartaoHorario(titulo, linhas, acao, texto = 'Quero este') {
+  return h('div', { class: 'cartao horario-grande destaque' }, titulo ? h('div', { class: 'suave pequeno' }, titulo) : null, linhas, h('div', { style: 'margin-top:12px' }, botao(texto, acao, 'prim')));
+}
+function telaQuando() {
+  const b = S.busca, nomes = nomesDe(S.selecionadas);
+  const avisoBusca = S.avisoBusca ? h('div', { class: `aviso ${S.avisoBusca.tipo || ''}`, role: 'status' }, S.avisoBusca.texto) : null;
+  if (!b) return h('div', {}, avisoBusca, h('h1', {}, 'Procurando os melhores horários…'), fichas(nomes), h('p', { class: 'suave' }, 'Só um instante. Estamos olhando a agenda de verdade da clínica.'), h('div', { class: 'cartao carregando', 'aria-busy': 'true' }, 'Isso costuma levar poucos segundos.'));
+  if (b.erro) return h('div', {}, avisoBusca, h('h1', {}, 'Não deu para ver os horários'), h('div', { class: 'aviso erro', role: 'alert' }, b.erro), h('div', { class: 'pilha' }, botao('Tentar de novo', () => procurar(), 'prim'), botao('Escolher outra coisa', () => ir('oque')), ajuda()));
+  if (!b.total) return h('div', {}, avisoBusca, h('h1', {}, 'Sem horários livres por enquanto'), h('div', { class: 'aviso atencao' }, b.motivo ? (MSG[b.motivo] || MSG.sem_medico) : 'Procuramos nos próximos 30 dias e não há horário livre agora. Mas pode abrir uma vaga se alguém desmarcar.'),
+    b.motivo ? null : cartaoPressa({ pessoas: S.selecionadas, titulo: 'Entre na fila de espera' }), h('div', { class: 'pilha' }, botao('Escolher outra coisa', () => ir('oque'), 'prim'), ajuda()));
+  const nome = S.nomeNeed || (S.tipo === 'consulta' ? 'Consulta' : 'Exame');
+  const escolher = (itens) => { S.alternativas = []; S.escolha = itens; ir('confirmar'); };
+  const proc = (s) => String(s.procedimento || (S.exame && S.exame.id) || '');
+  const slotLinha = (s) => [h('div', { class: 'quando' }, quando(s.data, s.hora)), h('div', { class: 'onde' }, `${s.medico ? nomeBonito(s.medico) : 'Equipe da clínica'}${s.unidade ? ' · ' + s.unidade : ''}${s.ordem_chegada ? ' · por ordem de chegada' : ''}`)];
+  const alt = (S.alternativas || []).slice(0, 3);
+  const partes = [avisoBusca, alt.length ? h('div', { class: 'cartao destaque' }, h('h2', {}, 'Estes estão livres agora'), h('div', { class: 'pilha' }, alt.map((a) => botao(`${quando(a.data, a.hora)} · ${a.medico ? nomeBonito(a.medico) : 'Equipe'}`, () => { S.alternativas = []; S.escolha = [{ pessoa: S.selecionadas[0], slot: a, procedimento: String(a.procedimento || (S.exame && S.exame.id) || '') }]; ir('confirmar'); })))) : null, h('h1', {}, nomes.length > 1 ? 'Horários para ' + lerLista(nomes) : `Horários para ${nome}`), fichas(nomes)];
+  if (b.desatualizado) partes.push(h('div', { class: 'aviso atencao' }, 'Estes horários podem ter mudado há poucos minutos. Se algum já tiver sido ocupado, avisamos e mostramos outro.'));
+  if (b.aviso === 'planos_diferentes') partes.push(h('div', { class: 'aviso atencao' }, 'Estas pessoas têm planos diferentes. Mostramos os horários do plano da primeira. A recepção confere os outros.'));
+  if (S.selecionadas.length > 1) {
+    partes.push(h('p', { class: 'suave' }, 'Estas são as melhores opções para ir todo mundo junto, sem ficar esperando muito.'));
+    if (!b.combinacoes.length) partes.push(h('div', { class: 'aviso atencao' }, 'Não achamos horários próximos para todos no mesmo dia. Você pode marcar um de cada vez, ou falar com a recepção.'), botao('Marcar um de cada vez', () => { S.selecionadas = S.selecionadas.slice(0, 1); procurar(); }));
+    b.combinacoes.forEach((c, i) => partes.push(cartaoHorario(i === 0 ? 'Melhor opção' : `Opção ${i + 1}`, [h('div', { class: 'quando' }, dataBonita(c.data)), c.itens.map((s, j) => h('div', { class: 'onde' }, `${nomesDe([S.selecionadas[j]])[0]}: ${horaBonita(s.hora)} · ${s.medico ? nomeBonito(s.medico) : 'Equipe'}${s.unidade ? ' · ' + s.unidade : ''}`))],
+      () => escolher(c.itens.map((s, j) => ({ pessoa: S.selecionadas[j], slot: s, procedimento: proc(s) }))), 'Marcar estes horários')));
+    partes.push(cartaoPressa({ pessoas: S.selecionadas, titulo: 'Com pressa? Quer mais cedo?' }));
+    return h('div', {}, partes, ajuda());
   }
-  const medicos = [...new Set(todos.map((x) => x.profissional && x.profissional.nome).filter(Boolean))].sort(), unidades = [...new Set(todos.map((x) => x.unidade && x.unidade.nome).filter(Boolean))].sort();
-  const filtro = (id, rotulo, opcoes, chave) => h('div', {}, h('label', { for: id }, rotulo), h('select', { id, onchange: (e) => { S.filtro[chave] = e.target.value; desenhar(); } }, h('option', { value: '' }, 'Todos'), opcoes.map((o) => h('option', { value: o[0], selected: S.filtro[chave] === o[0] }, o[1]))));
-  caixa.append(h('div', { class: 'linha' }, filtro('fMed', 'Médico', medicos.map((m) => [m, m]), 'medico'), filtro('fUni', 'Unidade', unidades.map((m) => [m, m]), 'unidade'), filtro('fTur', 'Turno', [['manha', 'Manhã'], ['tarde', 'Tarde']], 'turno')));
-  const visiveis = todos.filter((x) => (!S.filtro.medico || (x.profissional && x.profissional.nome) === S.filtro.medico) && (!S.filtro.unidade || (x.unidade && x.unidade.nome) === S.filtro.unidade)
-    && (!S.filtro.turno || (S.filtro.turno === 'manha' ? x.hora < '12:00' : x.hora >= '12:00')));
-  caixa.append(h('p', { class: 'suave', role: 'status' }, `${visiveis.length} horário(s) livre(s).`));
-  const porDia = new Map(); for (const x of visiveis) { if (!porDia.has(x.data)) porDia.set(x.data, []); porDia.get(x.data).push(x); }
-  let primeiro = true;
-  for (const [dia, itens] of porDia) {
-    const grupos = new Map(); for (const x of itens) { const k = `${(x.profissional && x.profissional.nome) || 'Equipe'}|${(x.unidade && (x.unidade.nome || x.unidade.sigla)) || ''}`; if (!grupos.has(k)) grupos.set(k, []); grupos.get(k).push(x); }
-    caixa.append(h('details', { class: 'dia', open: primeiro }, h('summary', {}, `${fmtData(dia)} · ${itens.length} horário(s)`), h('div', { class: 'conteudo' },
-      [...grupos].map(([k, hs]) => { const [med, uni] = k.split('|'); return h('div', {}, h('div', { class: 'medico' }, med, uni ? h('small', {}, ` · ${uni}`) : null, hs[0].ordem_chegada ? h('small', {}, ' · por ordem de chegada') : null),
-        h('div', { class: 'horas' }, hs.map((x) => h('button', { type: 'button', class: 'hora', 'aria-label': `${fmtData(dia)} às ${x.hora}, ${med}`, onclick: () => escolher(x) }, x.hora)))); }))));
-    primeiro = false;
-  }
-  caixa.append(h('div', { class: 'acoes' }, h('button', { type: 'button', class: 'btn', onclick: () => { S.passo = 1; desenhar(); } }, 'Mudar a busca'))); return caixa;
+  const p0 = S.selecionadas[0];
+  if (b.primeiro) partes.push(cartaoHorario('O primeiro horário livre', slotLinha(b.primeiro), () => escolher([{ pessoa: p0, slot: b.primeiro, procedimento: proc(b.primeiro) }]), 'Marcar este horário'));
+  partes.push(cartaoPressa({ pessoas: S.selecionadas, titulo: 'Com pressa? Quer mais cedo?' }));
+  partes.push(h('h2', { style: 'margin-top:22px' }, 'Ou escolha o médico'), h('p', { class: 'suave pequeno' }, 'Quem você já consultou vem primeiro; depois, os mais procurados.'));
+  for (const m of b.medicos) partes.push(h('div', { class: 'cartao' }, h('h3', {}, nomeBonito(m.nome), m.motivo === 'ja_foi' ? h('span', { class: 'selo ok' }, 'Você já foi') : m.motivo === 'mais_procurado' ? h('span', { class: 'selo' }, 'Mais procurado') : null),
+    h('div', { class: 'suave pequeno' }, `${m.unidade ? 'Onde: ' + m.unidade + ' · ' : ''}${m.total} horário${m.total > 1 ? 's' : ''} livre${m.total > 1 ? 's' : ''}`),
+    h('div', { class: 'horas' }, m.proximos.map((s) => h('button', { type: 'button', class: 'hora', 'aria-label': `${quando(s.data, s.hora)} com ${nomeBonito(m.nome)}`, onclick: () => escolher([{ pessoa: p0, slot: s, procedimento: proc(s) }]) }, h('div', { class: 'pequeno', style: 'font-weight:600' }, dataCurta(s.data)), horaBonita(s.hora))))));
+  partes.push(ajuda());
+  return h('div', {}, partes);
 }
-function escolher(x) { S.escolhido = x; S.reserva = null; S.semReserva = false; S.preco = null; S.passo = S.id ? 4 : 3; desenhar(); window.scrollTo(0, 0); }
+const dataCurta = (iso) => { const [, m, d] = String(iso).split('-'); return d === hojeSP().slice(8) && m === hojeSP().slice(5, 7) ? 'hoje' : `${SEMANA[new Date(Date.parse(iso + 'T12:00:00Z')).getUTCDay()].slice(0, 3)} ${Number(d)}/${Number(m)}`; };
 
-function passoIdentidade() {
-  const voltar = h('div', { class: 'acoes' }, h('button', { type: 'button', class: 'btn', onclick: () => { S.passo = 2; desenhar(); } }, 'Voltar aos horários'));
-  return h('div', {}, resumoEscolha(), blocoIdentidade(() => { S.passo = 4; desenhar(); window.scrollTo(0, 0); }, 'Precisamos do CPF e da data de nascimento para localizar o seu cadastro e marcar em seu nome.'), voltar);
-}
-function resumoEscolha() {
-  const x = S.escolhido; if (!x) return h('div');
-  return h('div', { class: 'item' }, h('h3', {}, `${fmtData(x.data)} às ${x.hora}`), h('div', {}, (x.profissional && x.profissional.nome) || 'Equipe da clínica', x.unidade ? ` · ${x.unidade.nome || x.unidade.sigla}` : ''),
-    h('div', { class: 'suave' }, `${S.tipo === 'consulta' ? 'Consulta' : (S.exame && S.exame.nome) || 'Exame'} · plano ${S.plano.nome}`));
+function telaConfirmar() {
+  const it = S.escolha; if (!it) return telaInicio();
+  const erro = caixaErro(), nome = S.nomeNeed || 'Atendimento';
+  const frases = it.map((x) => { const p = S.pessoas.find((q) => q.id === x.pessoa); return h('div', { class: 'cartao destaque' }, h('h3', {}, p ? p.nome : ''), h('div', { class: 'quando', style: 'font-size:1.2rem;font-weight:800' }, quando(x.slot.data, x.slot.hora)),
+    h('div', {}, `${nome} · ${x.slot.medico ? nomeBonito(x.slot.medico) : 'Equipe da clínica'}`), h('div', { class: 'suave' }, `Onde: ${x.slot.unidade || 'CSI'}${x.slot.ordem_chegada ? ' · por ordem de chegada' : ''}`), p && p.plano ? h('div', { class: 'suave pequeno' }, `Plano: ${nomeBonito(p.plano)}`) : null); });
+  const confirmar = botao(S.remarcar ? 'Confirmar a remarcação' : it.length > 1 ? 'Confirmar todos' : 'Confirmar', async () => {
+    erro.hidden = true;
+    const r = await api('fam_marcar', { confirmar: true, necessidade: S.necessidade, itens: it.map((x) => ({ pessoa: x.pessoa, horario: x.slot.id, procedimento: x.procedimento, medico: x.slot.medico, unidade: x.slot.unidade, ...(S.remarcar ? { remarcar: S.remarcar.voucher } : {}) })) });
+    if (r.ok) { S.recemMarcadas = r.marcacoes.map((m, i) => ({ ...m, slot: it[i].slot, necessidade: nome })); S.remarcar = null; S.marcacoes = null; return ir('pronto'); }
+    if (r.motivo === 'horario_ocupado') { S.avisoBusca = { tipo: 'atencao', texto: r.mensagem || MSG.horario_ocupado }; S.alternativas = r.alternativas || []; return procurar(); }
+    if (r.motivo === 'incerto') { S.mensagem = { tipo: 'atencao', texto: MSG.incerto }; return ir('acompanhar', { marcacoes: null }); }
+    mostrar(erro, textoErro(r));
+    if (r.motivo === 'ja_tem_marcacao') erro.append(' ', h('button', { type: 'button', class: 'btn leve', style: 'min-height:44px;display:inline-flex;width:auto', onclick: () => ir('acompanhar', { marcacoes: null }) }, 'Ver essa marcação'));
+  }, 'ok');
+  return h('div', {}, h('h1', {}, it.length > 1 ? 'Confira e confirme' : 'Confira e confirme'), h('p', { class: 'suave' }, 'Está tudo certo? Se algo estiver errado, volte e escolha de novo. Nada é marcado antes de você tocar em confirmar.'), frases, erro,
+    h('div', { class: 'rodape-acao' }, h('div', {}, confirmar, botao('Escolher outro horário', () => ir('quando')))));
 }
 
-async function segurarHorario() {
-  const x = S.escolhido; if (!x || S.reserva || !S.id) return;
-  const r = await api('reservar', { ...credenciais(), horario: x.id, procedimento: String(x.procedimento || (S.exame && S.exame.id) || ''), plano: String(S.plano.id) });
-  if (r.ok) { S.reserva = { id: r.reserva.id, fim: Date.now() + 10 * 60000, instrucao: r.reserva.instrucao }; iniciarRelogio(); }
-  else if (r.motivo === 'horario_ocupado') { aviso('erro', MSG.horario_ocupado); S.passo = 2; S.escolhido = null; await buscarHorarios(true).catch(() => {}); return; }
-  else { S.semReserva = true; aviso('atencao', 'Não foi possível segurar o horário agora; ele será reservado na hora de confirmar.'); }
-  if (S.preco === null) { const p = await api('catalogo', { catalogo: 'preco', id_procedimento: String(x.procedimento || (S.exame && S.exame.id) || ''), id_plano: String(S.plano.id) }); S.preco = p.ok ? (p.dados && (p.dados.valor !== undefined ? p.dados.valor : p.dados)) : false; }
-  desenhar();
+// ---------------------------------------------------------------- 4) pronto: calendário e WhatsApp
+const pad = (n) => String(n).padStart(2, '0');
+function arquivoIcs(itens) {
+  const agora = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+/, ''), quebra = '\r\n', esc = (t) => String(t || '').replace(/[\\;,]/g, (c) => '\\' + c).replace(/\n/g, '\\n');
+  const ev = itens.map((x) => { const [a, m, d] = x.data.split('-'), [hh, mm] = x.hora.split(':'), fim = new Date(Date.UTC(+a, +m - 1, +d, +hh + 1, +mm)); return ['BEGIN:VEVENT', `UID:${x.id}@csi-agendamento`, `DTSTAMP:${agora}`, `DTSTART:${a}${m}${d}T${hh}${mm}00`, `DTEND:${fim.getUTCFullYear()}${pad(fim.getUTCMonth() + 1)}${pad(fim.getUTCDate())}T${pad(fim.getUTCHours())}${pad(fim.getUTCMinutes())}00`,
+    `SUMMARY:${esc(x.titulo)}`, `LOCATION:${esc(x.local)}`, `DESCRIPTION:${esc('Chegue 15 minutos antes e leve um documento com foto' + (x.plano ? ' e a carteirinha do plano.' : '.'))}`, 'BEGIN:VALARM', 'TRIGGER:-PT2H', 'ACTION:DISPLAY', 'DESCRIPTION:Atendimento na CSI', 'END:VALARM', 'END:VEVENT'].join(quebra); });
+  return ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//CSI//Agendamento//PT', 'CALSCALE:GREGORIAN', ...ev, 'END:VCALENDAR'].join(quebra) + quebra;
 }
-function soltarReserva() { if (S.reserva && S.id) { api('soltar', { ...credenciais(), reserva: S.reserva.id }); } S.reserva = null; pararRelogio(); }
-function iniciarRelogio() { pararRelogio(); S.relogio = setInterval(() => { const e = $('#relogio'); if (!S.reserva) return pararRelogio(); const s = Math.max(0, Math.round((S.reserva.fim - Date.now()) / 1000)); if (e) e.textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; if (s === 0) { S.reserva = null; pararRelogio(); aviso('atencao', 'O tempo de reserva acabou. Ao confirmar, tentaremos reservar de novo.'); desenhar(); } }, 1000); }
-function pararRelogio() { if (S.relogio) clearInterval(S.relogio); S.relogio = null; }
-
-function passoConfirmar() {
-  const x = S.escolhido; if (!x) { S.passo = 1; return passoServico(); }
-  if (!S.reserva && !S.reservando && !S.semReserva) { S.reservando = true; segurarHorario().finally(() => { S.reservando = false; }); }
-  const email = h('input', { type: 'checkbox', id: 'cfEmail' }), obs = h('textarea', { id: 'cfObs', rows: '2', maxlength: '160', placeholder: 'Ex.: preciso de acesso para cadeira de rodas' });
-  const procId = String(x.procedimento || (S.exame && S.exame.id) || '');
-  const confirmar = h('button', { type: 'button', class: 'btn prim', onclick: () => tarefa(confirmar, async () => {
-    const base = { ...credenciais(), horario: x.id, procedimento: procId, plano: String(S.plano.id), enviar_email: email.checked, obs: obs.value.trim() || undefined, reserva: S.reserva ? S.reserva.id : undefined, confirmar: true };
-    const r = S.remarcar ? await api('remarcar', { ...base, voucher: S.remarcar.id }) : await api('marcar', base);
-    S.avisos = [];
-    if (r.ok) { S.reserva = null; pararRelogio(); S.voucherNovo = r.voucher; S.remarcar = null; S.marcacoes = null; desenhar(); window.scrollTo(0, 0); return; }
-    if (r.motivo === 'horario_ocupado') { S.reserva = null; pararRelogio(); S.escolhido = null; aviso('erro', MSG.horario_ocupado); S.passo = 2; await buscarHorarios(true).catch(() => {}); return; }
-    if (r.motivo === 'incerto') { S.reserva = null; pararRelogio(); S.marcacoes = null; aviso('atencao', MSG.incerto); S.aba = 'marcacoes'; desenhar(); return; }
-    aviso('erro', textoErro(r)); desenhar();
-  }) }, S.remarcar ? 'Confirmar remarcação' : 'Confirmar agendamento');
-  const preco = S.preco === false || S.preco === null ? null : (typeof S.preco === 'number' || /^[\d.,]+$/.test(String(S.preco)) ? `R$ ${Number(String(S.preco).replace(',', '.')).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : null);
-  return h('div', {}, resumoEscolha(), h('div', { class: 'cartao' }, h('h2', {}, 'Confira e confirme'),
-    h('p', {}, `Paciente: ${S.id.nome || 'identificado'}${S.id.pre ? ' (pré-cadastro)' : ''}`), preco ? h('p', {}, `Valor de tabela neste plano: ${preco}`) : null,
-    S.reserva ? h('div', { class: 'aviso ok', role: 'status' }, 'Horário reservado para você por ', h('span', { class: 'relogio', id: 'relogio' }, '10:00'), ' minutos.') : (S.semReserva ? null : h('p', { class: 'carregando suave' }, 'Segurando o horário')),
-    S.reserva && S.reserva.instrucao && (S.reserva.instrucao.procedimento || S.reserva.instrucao.profissional) ? h('div', { class: 'aviso atencao' }, h('b', {}, 'Orientações: '), [S.reserva.instrucao.procedimento, S.reserva.instrucao.profissional].filter(Boolean).join(' · ')) : null,
-    h('label', { for: 'cfObs' }, 'Recado para a clínica (opcional)'), obs,
-    h('label', { style: 'display:flex;gap:10px;align-items:center;font-weight:400' }, email, 'Quero receber o e-mail de confirmação do Klingo ', h('span', { class: 'etiqueta nt', title: 'Ainda não testado em produção (os pacientes de teste não têm e-mail)' }, 'não testado')),
-    h('div', { class: 'acoes' }, confirmar, h('button', { type: 'button', class: 'btn', onclick: () => { soltarReserva(); S.passo = 2; desenhar(); } }, 'Escolher outro horário'))));
-}
+function baixar(nome, texto, tipo) { const url = URL.createObjectURL(new Blob([texto], { type: tipo })); const a = h('a', { href: url, download: nome }); document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 5000); }
 function telaPronto() {
-  const v = S.voucherNovo;
-  return h('div', { class: 'cartao' }, h('div', { class: 'aviso ok', role: 'status' }, h('b', {}, 'Agendado! ')), h('h2', {}, `${fmtData(v.data)} às ${v.hora || ''}`),
-    h('p', {}, [v.procedimento, v.profissional, v.unidade].filter(Boolean).join(' · ')), h('p', { class: 'suave' }, `Número da marcação: ${v.id}. Chegue com 15 minutos de antecedência e leve um documento com foto${S.plano.id !== 1 ? ' e a carteirinha do convênio' : ''}.`),
-    h('div', { class: 'acoes' }, h('button', { type: 'button', class: 'btn prim', onclick: () => { S.voucherNovo = null; S.marcacoes = null; trocarAba('marcacoes'); } }, 'Ver minhas marcações'),
-      h('button', { type: 'button', class: 'btn', onclick: () => { S.voucherNovo = null; S.passo = 1; S.escolhido = null; S.horarios = null; desenhar(); } }, 'Fazer outra marcação')));
+  const lista = S.recemMarcadas || []; if (!lista.length) return telaInicio();
+  const itens = lista.map((m) => { const v = m.voucher || {}, s = m.slot || {}, d = v.data || s.data, hr = (v.hora || s.hora || '00:00').slice(0, 5); return { id: v.id || m.voucher, data: d, hora: hr, nome: m.nome, titulo: `${m.necessidade || 'Atendimento'} · ${m.nome}`, local: [v.unidade || s.unidade, 'CSI'].filter(Boolean)[0], medico: v.profissional || s.medico, plano: (S.pessoas.find((p) => p.id === m.pessoa) || {}).plano }; });
+  const texto = 'Marcado na CSI:\n' + itens.map((x) => `• ${x.nome}: ${dataBonita(x.data)}, às ${horaBonita(x.hora)}${x.medico ? ' com ' + nomeBonito(x.medico) : ''} (${x.local})`).join('\n') + '\nChegue 15 minutos antes e leve um documento com foto.';
+  return h('div', {}, h('div', { class: 'aviso ok', role: 'status' }, h('b', {}, itens.length > 1 ? 'Tudo marcado! ' : 'Marcado! '), 'Pode ficar tranquilo(a): está reservado.'), h('h1', {}, 'Agendamento confirmado'),
+    itens.map((x) => h('div', { class: 'cartao destaque' }, h('h3', {}, x.nome), h('div', { style: 'font-size:1.2rem;font-weight:800' }, `${dataBonita(x.data)}, às ${horaBonita(x.hora)}`), h('div', {}, `${x.medico ? nomeBonito(x.medico) : 'Equipe da clínica'} · ${x.local}`))),
+    h('div', { class: 'cartao' }, h('h2', {}, 'No dia, leve'), h('ul', { style: 'margin:.3em 0 0 1.1em;padding:0' }, h('li', {}, 'Um documento com foto (e o da criança, se for o caso)'), h('li', {}, 'A carteirinha do plano de saúde, se tiver'), h('li', {}, 'O pedido do médico e exames antigos, se tiver'), h('li', {}, 'Chegue 15 minutos antes'))),
+    cartaoPressa({ pessoas: lista.map((m) => m.pessoa), voucherDe: Object.fromEntries(lista.map((m) => [m.pessoa, (m.voucher || {}).id])), titulo: 'Quer um horário mais cedo?' }),
+    h('div', { class: 'pilha' }, botao('Salvar no calendário do celular', () => baixar('agendamento-csi.ics', arquivoIcs(itens), 'text/calendar'), 'prim'), h('a', { class: 'btn', href: 'https://wa.me/?text=' + encodeURIComponent(texto), target: '_blank', rel: 'noopener' }, 'Mandar para a família no WhatsApp'),
+      botao('Acompanhar a marcação', () => ir('acompanhar', { marcacoes: null })), botao('Fazer outra marcação', () => ir('inicio'), 'leve')));
 }
 
-// ---------------------------------------------------------------- aba MINHAS MARCAÇÕES
-function telaMarcacoes() {
-  if (!S.id) return blocoIdentidade(() => desenhar(), 'Entre para ver, remarcar ou cancelar as suas marcações.');
-  const caixa = h('div', {}, h('h1', {}, 'Minhas marcações'));
-  if (!S.marcacoes) { caixa.append(h('p', { class: 'carregando' }, 'Buscando as suas marcações')); api('minhas_marcacoes', credenciais()).then((r) => { if (!r.ok) { aviso('erro', textoErro(r)); S.marcacoes = []; } else S.marcacoes = r.marcacoes || []; if (S.aba === 'marcacoes') desenhar(); }); return caixa; }
-  if (!S.marcacoes.length) caixa.append(h('div', { class: 'cartao' }, h('p', {}, 'Você não tem marcações ativas.'), h('button', { type: 'button', class: 'btn prim', onclick: () => trocarAba('marcar') }, 'Marcar agora')));
-  for (const v of S.marcacoes) caixa.append(cartaoMarcacao(v));
-  caixa.append(h('div', { class: 'acoes' }, h('button', { type: 'button', class: 'btn', onclick: () => { S.marcacoes = null; desenhar(); } }, 'Atualizar a lista'), h('button', { type: 'button', class: 'btn', onclick: () => trocarAba('marcar') }, 'Nova marcação')));
-  caixa.append(formResultadoImagem());
-  return caixa;
+// ---------------------------------------------------------------- 5) acompanhar (o "rastreio")
+const ETAPAS = [['agendado', 'Marcado'], ['confirmado', 'Confirmado'], ['chegou', 'Você chegou'], ['atendido', 'Atendimento feito'], ['laudo_pronto', 'Resultado pronto']];
+const posicao = (st) => ({ agendado: 0, confirmado: 1, chegou: 2, atendido: 3, laudo_pronto: 4 }[st] ?? 0);
+const ehConsulta = (m) => /CONSULTA/i.test(m.procedimento || '');
+function dataHoraCurta(iso) { if (!iso) return ''; const d = new Date(iso); return isNaN(d) ? '' : new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' }).format(d).replace(',', ' às'); }
+function frase(m, prev) {
+  const consulta = ehConsulta(m);
+  if (m.status === 'agendado') return 'Tudo certo! O seu horário está reservado. Perto do dia a clínica confirma com você.';
+  if (m.status === 'confirmado') return 'Confirmado! É só chegar com 15 minutos de antecedência.';
+  if (m.status === 'chegou') return 'Você já chegou. Em breve chamam você.';
+  if (m.status === 'atendido') return consulta ? 'Atendimento concluído. Obrigado por confiar na CSI.' : `Já foi feito. O médico está preparando o resultado. ${prev && prev.amostra >= 5 && prev.mediana_dias !== undefined ? `Resultados deste tipo costumam ficar prontos em ${prev.mediana_dias < 1 ? 'menos de um dia' : `cerca de ${Math.round(prev.mediana_dias)} dia${Math.round(prev.mediana_dias) > 1 ? 's' : ''}`}.` : 'Assim que ficar pronto, o aviso aparece aqui.'}`;
+  if (m.status === 'laudo_pronto') return 'O resultado está pronto.';
+  if (m.status === 'cancelado') return 'Esta marcação foi cancelada.'; if (m.status === 'remarcado') return 'Esta marcação foi trocada por outra. Veja a nova abaixo.'; if (m.status === 'faltou') return 'Não conseguimos atender nesse dia. Quer escolher outro horário?';
+  return '';
 }
-function cartaoMarcacao(v) {
-  const hoje = v.data === hojeSP(), saida = h('div', { 'aria-live': 'polite' });
-  const acao = (rotulo, fn, cls = '', nt = false) => { const b = h('button', { type: 'button', class: `btn peq ${cls}`, onclick: () => tarefa(b, () => fn(saida)) }, rotulo); return nt ? h('span', {}, b, h('span', { class: 'etiqueta nt', title: 'Ainda não testado em produção' }, 'não testado')) : b; };
-  const recarregar = () => { S.marcacoes = null; desenhar(); };
-  const botoes = [
-    acao('Cancelar', async () => { if (!confirm('Cancelar esta marcação? O horário volta para outras pessoas.')) return; const r = await api('cancelar', { ...credenciais(), voucher: v.id, confirmar: true }); S.avisos = []; aviso(r.ok ? 'ok' : 'erro', r.ok ? 'Marcação cancelada.' : textoErro(r)); recarregar(); }, 'perigo'),
-    acao('Remarcar', async () => { S.remarcar = v; S.passo = 1; S.escolhido = null; S.horarios = null; S.avisos = []; S.aba = 'marcar'; desenhar(); window.scrollTo(0, 0); }),
-    acao('Trocar procedimento', async (s) => trocarProcedimento(v, s)),
-    hoje ? acao('Fazer check-in', async () => { const r = await api('checkin', { ...credenciais(), voucher: v.id, confirmar: true }); S.avisos = []; aviso(r.ok ? 'ok' : 'erro', r.ok ? `Check-in feito${r.checkin && r.checkin.recepcao ? ` na ${r.checkin.recepcao}` : ''}.` : textoErro(r)); desenhar(); }, '', true) : null,
-    hoje ? acao('Desfazer check-in', async () => { const r = await api('cancelar_checkin', { ...credenciais(), voucher: v.id, confirmar: true }); S.avisos = []; aviso(r.ok ? 'ok' : 'erro', r.ok ? 'Check-in desfeito.' : textoErro(r)); desenhar(); }, '', true) : null,
-    acao('Ver resultado', async (s) => verResultado(v, s), '', true),
-  ];
-  return h('div', { class: 'item' }, h('h3', {}, `${fmtData(v.data)} às ${v.hora || ''}`), h('div', {}, [v.procedimento, v.profissional, v.unidade].filter(Boolean).join(' · ')),
-    h('div', { class: 'suave' }, `Marcação ${v.id} · ${v.status || ''}`), h('div', { class: 'acoes' }, botoes.filter(Boolean)), saida);
-}
-async function trocarProcedimento(v, saida) {
-  saida.replaceChildren(h('p', { class: 'carregando suave' }, 'Buscando os procedimentos'));
-  if (!S.especialidades) await carregarCatalogosBase();
-  const opcoes = [];
-  for (const e of (S.especialidades || []).slice(0, 12)) { const cbos = String(e.cbos || e.id); if (!S.consultas[cbos]) { const r = await api('catalogo', { catalogo: 'consultas', cbos }); S.consultas[cbos] = r.ok ? lista(r.dados) : []; } for (const c of S.consultas[cbos]) opcoes.push([c.id, `${nomeDe(e)} · ${nomeDe(c)}`]); }
-  const sel = h('select', { 'aria-label': 'Novo procedimento' }, opcoes.map(([id, t]) => h('option', { value: id }, t)));
-  const ok = h('button', { type: 'button', class: 'btn prim peq', onclick: () => tarefa(ok, async () => { const r = await api('trocar_procedimento', { ...credenciais(), voucher: v.id, procedimento: String(sel.value), confirmar: true }); S.avisos = []; aviso(r.ok ? 'ok' : 'erro', r.ok ? 'Procedimento trocado.' : textoErro(r)); S.marcacoes = null; desenhar(); }) }, 'Trocar');
-  saida.replaceChildren(opcoes.length ? h('div', { class: 'linha', style: 'margin-top:10px' }, sel, ok) : h('p', { class: 'suave' }, 'Não encontramos procedimentos para trocar.'));
-}
-const ehBase64Pdf = (s) => typeof s === 'string' && s.length > 100 && /^JVBERi0/.test(s.trim());
-function acharConteudo(o, achados = { pdf: null, html: null }, prof = 0) {
-  if (!o || prof > 4) return achados;
-  if (typeof o === 'string') { if (ehBase64Pdf(o) && !achados.pdf) achados.pdf = o.trim(); else if (/<\s*(html|body|div|p|table)\b/i.test(o) && !achados.html) achados.html = o; return achados; }
-  if (typeof o === 'object') for (const x of Object.values(o)) acharConteudo(x, achados, prof + 1);
-  return achados;
-}
-async function verResultado(v, saida) {
-  saida.replaceChildren(h('p', { class: 'carregando suave' }, 'Consultando o resultado'));
-  let r = await api('resultado', { ...credenciais(), voucher: v.id });
-  if (!r.ok) { saida.replaceChildren(h('div', { class: 'aviso erro' }, textoErro(r))); return; }
-  if (!r.pronto) { saida.replaceChildren(h('div', { class: 'aviso atencao' }, 'O resultado desta marcação ainda não está pronto.')); return; }
-  let c = acharConteudo(r.resultado); if (!c.pdf && !c.html) { const p = await api('resultado', { ...credenciais(), voucher: v.id, formato: 'pdf' }); if (p.ok && p.pronto) c = acharConteudo(p.resultado); }
-  const partes = [];
-  if (c.pdf) { const bin = atob(c.pdf); const bytes = Uint8Array.from(bin, (ch) => ch.charCodeAt(0)); const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' })); partes.push(h('a', { class: 'btn prim peq', href: url, target: '_blank', rel: 'noopener', download: `resultado-${v.id}.pdf` }, 'Abrir o resultado em PDF')); }
-  if (c.html) partes.push(h('iframe', { class: 'laudo', sandbox: '', title: 'Resultado do exame', srcdoc: c.html }));
-  saida.replaceChildren(partes.length ? h('div', { style: 'margin-top:10px' }, partes) : h('div', { class: 'aviso atencao' }, 'O resultado está pronto, mas não veio em um formato que a página consegue mostrar. Peça a retirada na recepção.'));
-}
-
-/** Resultado de exame de imagem pelo número de acesso (GET /resultado/pdf/an/{número}). Só se a clínica liberar a entrega de resultados. */
-function formResultadoImagem() {
-  const num = h('input', { id: 'anNum', autocomplete: 'off', maxlength: '40', placeholder: 'Número de acesso do exame' }), saida = h('div', { 'aria-live': 'polite' });
-  const b = h('button', { type: 'button', class: 'btn peq', onclick: () => tarefa(b, async () => {
-    const an = num.value.trim();
-    if (!/^[A-Za-z0-9._-]{3,40}$/.test(an)) { saida.replaceChildren(h('div', { class: 'aviso erro' }, 'Informe o número de acesso do exame (letras, números, ponto, traço).')); return; }
-    saida.replaceChildren(h('p', { class: 'carregando suave' }, 'Consultando o resultado'));
-    const r = await api('resultado_imagem', { ...credenciais(), accession: an });
-    if (!r.ok) { saida.replaceChildren(h('div', { class: 'aviso erro' }, textoErro(r))); return; }
-    if (!r.pronto) { saida.replaceChildren(h('div', { class: 'aviso atencao' }, 'Não encontramos um resultado pronto para este número. Confira o número ou procure a recepção.')); return; }
-    const c = acharConteudo(r.resultado);
-    if (!c.pdf) { saida.replaceChildren(h('div', { class: 'aviso atencao' }, 'O resultado está pronto, mas não veio em um formato que a página consegue mostrar. Peça a retirada na recepção.')); return; }
-    const bytes = Uint8Array.from(atob(c.pdf), (ch) => ch.charCodeAt(0)); const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
-    saida.replaceChildren(h('a', { class: 'btn prim peq', href: url, target: '_blank', rel: 'noopener', download: 'resultado-imagem.pdf' }, 'Abrir o resultado em PDF'));
-  }) }, 'Ver o resultado');
-  return h('div', { class: 'cartao' }, h('h2', {}, 'Resultado de exame de imagem ', h('span', { class: 'etiqueta nt', title: 'Ainda não testado em produção' }, 'não testado')),
-    h('p', { class: 'suave' }, 'Digite o número de acesso que veio no seu protocolo. O Klingo confere se o exame é do cadastro com que você entrou.'), h('label', { for: 'anNum' }, 'Número de acesso'), num, h('div', { class: 'acoes' }, b), saida);
-}
-
-// ---------------------------------------------------------------- aba MEUS DADOS
-function telaDados() {
-  if (!S.id) return blocoIdentidade(() => desenhar(), 'Entre para ver e atualizar os seus dados de contato.');
-  const caixa = h('div', {}, h('h1', {}, 'Meus dados'));
-  if (!S.dados) { caixa.append(h('p', { class: 'carregando' }, 'Buscando o seu cadastro')); api('meus_dados', credenciais()).then((r) => { if (!r.ok) aviso('erro', textoErro(r)); S.dados = r.ok ? r : { vazio: true }; if (S.aba === 'dados') desenhar(); }); return caixa; }
-  const d = S.dados.dados || {};
-  caixa.append(h('div', { class: 'cartao' }, h('h2', {}, d.nome || 'Cadastro'), S.dados.pre_cadastro ? h('div', { class: 'aviso atencao' }, 'Você tem um pré-cadastro. A recepção completa os seus dados no primeiro atendimento.') : null,
-    h('table', {}, h('tbody', {}, [['Nascimento', fmtNasc(d.nascimento)], ['Celular', d.celular], ['Telefone', d.telefone], ['E-mail', d.email], ['Convênio', d.convenio], ['Plano', d.plano]].filter(([, v]) => v).map(([k, v]) => h('tr', {}, h('th', {}, k), h('td', {}, v))))),
-    h('p', { class: 'suave' }, 'Por segurança, o contato aparece parcialmente escondido.')));
-  if (!S.dados.pre_cadastro) {
-    const cel = h('input', { id: 'upCel', inputmode: 'tel', placeholder: '(71) 99999-0000', maxlength: '16' }), tel = h('input', { id: 'upTel', inputmode: 'tel', maxlength: '16' }), mail = h('input', { id: 'upMail', type: 'email', maxlength: '120' });
-    const salvar = h('button', { type: 'button', class: 'btn prim', onclick: () => tarefa(salvar, async () => {
-      const corpo = { ...credenciais(), confirmar: true }; if (cel.value.trim()) corpo.celular = soDigitos(cel.value); if (tel.value.trim()) corpo.telefone = soDigitos(tel.value); if (mail.value.trim()) corpo.email = mail.value.trim();
-      S.avisos = []; if (!corpo.celular && !corpo.telefone && !corpo.email) { aviso('atencao', 'Preencha o que quer mudar.'); return desenhar(); }
-      const r = await api('atualizar_contato', corpo); aviso(r.ok ? 'ok' : 'erro', r.ok ? 'Contato atualizado.' : textoErro(r)); if (r.ok) S.dados = null; desenhar();
-    }) }, 'Salvar contato');
-    caixa.append(h('div', { class: 'cartao' }, h('h2', {}, 'Atualizar contato ', h('span', { class: 'etiqueta nt', title: 'O formato exato do envio ao Klingo ainda não foi conferido em produção' }, 'não testado')), h('p', { class: 'suave' }, 'Preencha só o que quer mudar.'),
-      h('label', { for: 'upCel' }, 'Novo celular'), cel, h('label', { for: 'upTel' }, 'Novo telefone fixo'), tel, h('label', { for: 'upMail' }, 'Novo e-mail'), mail, h('div', { class: 'acoes' }, salvar)));
+function cartaoRastreio(m) {
+  const consulta = ehConsulta(m), ativa = !['cancelado', 'remarcado', 'faltou'].includes(m.status), etapas = consulta ? ETAPAS.slice(0, 4) : ETAPAS, pos = Math.min(posicao(m.status), etapas.length - 1), prev = S.previsoes[m.procedimento];
+  const em = (tipo) => (m.eventos.find((e) => e.tipo === tipo) || {}).em;
+  const bloco = h('div', { class: 'cartao' + (ativa ? '' : '') }, h('h3', {}, `${m.nome} · ${m.procedimento ? nomeBonito(m.procedimento) : 'Atendimento'}`),
+    h('div', { class: 'suave' }, `${dataBonita(m.data)}, às ${horaBonita(m.hora)}${m.profissional ? ' · ' + nomeBonito(m.profissional) : ''}${m.unidade ? ' · ' + m.unidade : ''}`));
+  if (ativa) bloco.append(h('ol', { class: 'trilha', 'aria-label': 'Passo a passo da marcação' }, etapas.map(([k, t], i) => h('li', { class: i < pos || (i === pos && m.status === 'laudo_pronto') ? 'feito' : i === pos ? 'agora' : '', 'aria-current': i === pos ? 'step' : null }, h('span', { class: 'bola', 'aria-hidden': 'true' }, i < pos || (i === pos && m.status === 'laudo_pronto') ? '✓' : i + 1), t, em(k) ? h('time', { datetime: em(k) }, dataHoraCurta(em(k))) : null))));
+  bloco.append(h('p', { style: 'font-weight:600' }, frase(m, prev)));
+  const saida = h('div', { 'aria-live': 'polite' }), acoes = h('div', { class: 'pilha' });
+  const hoje = m.data === hojeSP();
+  if (m.status === 'laudo_pronto') acoes.append(botao('Ver o resultado', () => { S.ver = { m }; ir('ver_laudo'); }, 'prim'));
+  if (ativa && ['agendado', 'confirmado'].includes(m.status)) {
+    if (hoje) acoes.append(botao('Cheguei', async () => { const r = await api('fam_checkin', { voucher: m.voucher, confirmar: true }); if (!r.ok) return void saida.replaceChildren(h('div', { class: 'aviso erro', role: 'alert' }, textoErro(r))); S.mensagem = { tipo: 'ok', texto: `Que bom que chegou!${r.recepcao ? ' Vá até ' + r.recepcao + '.' : ''}` }; S.marcacoes = null; desenhar(); }, 'prim'));
+    acoes.append(botao('Mudar o horário', () => { S.remarcar = { voucher: m.voucher, nome: m.nome }; S.selecionadas = [m.pessoa]; S.tipo = ehConsulta(m) ? 'consulta' : 'exame'; ir('oque'); }),
+      botao('Não vou poder ir', () => { saida.replaceChildren(h('div', { class: 'aviso atencao', role: 'alert' }, h('p', {}, 'Quer mesmo cancelar? O horário volta para outras pessoas.'), h('div', { class: 'duas' }, botao('Não, manter', () => saida.replaceChildren(), 'prim'),
+        botao('Sim, cancelar', async () => { const r = await api('fam_cancelar', { voucher: m.voucher, confirmar: true }); if (!r.ok) { saida.replaceChildren(h('div', { class: 'aviso erro', role: 'alert' }, textoErro(r), ' ', h('a', { href: CHAT }, 'Falar com a recepção'))); return; } S.mensagem = { tipo: 'ok', texto: 'Tudo bem, cancelado. Quando quiser marcar de novo, estamos aqui.' }; S.marcacoes = null; desenhar(); }, 'perigo')))); }, 'perigo'));
   }
-  const saida = h('div'); const aut = h('button', { type: 'button', class: 'btn', onclick: () => tarefa(aut, async () => { const r = await api('autorizacoes', credenciais()); saida.replaceChildren(r.ok ? (lista(r.autorizacoes).length ? resultadoTabela(r.autorizacoes) : h('p', { class: 'suave' }, 'Nenhuma autorização registrada.')) : h('div', { class: 'aviso erro' }, textoErro(r))); }) }, 'Ver minhas autorizações de convênio');
-  caixa.append(h('div', { class: 'cartao' }, h('h2', {}, 'Autorizações'), aut, saida), h('div', { class: 'acoes' }, h('button', { type: 'button', class: 'btn', onclick: sair }, 'Sair')));
-  return caixa;
+  if (m.status === 'cancelado' || m.status === 'faltou') acoes.append(botao('Marcar de novo', () => { S.selecionadas = [m.pessoa]; S.tipo = ehConsulta(m) ? 'consulta' : 'exame'; ir('oque'); }, 'prim'));
+  bloco.append(acoes, saida); return bloco;
+}
+async function carregarRastreio(silencioso = false) {
+  const r = await api('fam_acompanhar'); if (!r.ok) { if (!silencioso) { S.marcacoes = []; S.mensagem = { tipo: 'erro', texto: textoErro(r) }; } return; }
+  S.marcacoes = r.marcacoes; S.previsoes = r.previsoes || {}; S.espera = r.espera || []; S.atualizadoEm = Date.now(); if (S.tela === 'acompanhar') desenhar();
+}
+function pararRelogio() { if (S.relogio) { clearInterval(S.relogio.a); clearInterval(S.relogio.b); document.removeEventListener('visibilitychange', S.relogio.v); } S.relogio = null; }
+function iniciarRelogio() {
+  pararRelogio();
+  const atualiza = () => { if (document.hidden) return; if (S.tela === 'acompanhar') carregarRastreio(true); else if (S.tela === 'inicio') carregarEu().then((ok) => { if (ok && S.tela === 'inicio') desenhar(); }); };
+  const v = () => { if (!document.hidden && Date.now() - S.atualizadoEm > 55000) atualiza(); };
+  document.addEventListener('visibilitychange', v);
+  S.relogio = { a: setInterval(atualiza, 60000), b: setInterval(() => { const e = $('#idade'); if (e) e.textContent = textoIdade(); }, 15000), v };
+}
+const textoIdade = () => { const s = Math.round((Date.now() - S.atualizadoEm) / 1000); return s < 20 ? 'agora há pouco' : s < 90 ? 'há cerca de 1 minuto' : `há ${Math.round(s / 60)} minutos`; };
+function telaAcompanhar() {
+  if (!S.token) return telaBoasVindas();
+  const topo = h('h1', {}, 'Acompanhar');
+  if (!S.marcacoes) { carregarRastreio().then(() => { if (S.tela === 'acompanhar') { desenhar(); iniciarRelogio(); } }); return h('div', {}, topo, h('p', { class: 'suave' }, 'Buscando as suas marcações…')); }
+  if (!S.relogio) iniciarRelogio();
+  const ativas = S.marcacoes.filter((m) => !['cancelado', 'remarcado'].includes(m.status)), antigas = S.marcacoes.filter((m) => ['cancelado', 'remarcado'].includes(m.status));
+  return h('div', {}, topo, h('p', { class: 'suave' }, h('span', { class: 'ponto', 'aria-hidden': 'true' }), 'Atualizando sozinho a cada minuto. Última vez: ', h('span', { id: 'idade' }, textoIdade()), '.'),
+    (S.espera || []).filter((e) => e.estado === 'oferecido' && e.oferta).map(cartaoOferta), ativas.length ? ativas.map(cartaoRastreio) : h('div', { class: 'cartao' }, h('p', {}, 'Você ainda não tem marcações por aqui.'), botao('Marcar agora', () => ir('inicio'), 'prim')),
+    (S.espera || []).filter((e) => e.estado === 'esperando').map(cartaoEspera), antigas.length ? h('details', { class: 'cartao' }, h('summary', { style: 'cursor:pointer;font-weight:700;min-height:44px' }, `Canceladas ou trocadas (${antigas.length})`), antigas.map(cartaoRastreio)) : null,
+    h('div', { class: 'pilha' }, botao('Atualizar agora', () => carregarRastreio()), botao('Voltar ao início', () => ir('inicio')), ajuda()));
 }
 
-// ---------------------------------------------------------------- aba CONSULTAR A CLÍNICA (catálogos)
-const CAT = [
-  { k: 'unidades', t: 'Unidades', campos: [] },
-  { k: 'especialidades', t: 'Especialidades', campos: [['id_plano', 'Número do plano (opcional)']] },
-  { k: 'consultas', t: 'Consultas de uma especialidade', campos: [['cbos', 'CBOS da especialidade (ex.: 225112)']] },
-  { k: 'exames', t: 'Exames', campos: [['busca', 'Parte do nome (ex.: ultra)']] },
-  { k: 'convenios', t: 'Convênios e planos', campos: [] },
-  { k: 'convenio_cnpj', t: 'Convênio pelo CNPJ', campos: [['cnpj', 'CNPJ (14 números)', 1]] },
-  { k: 'profissionais', t: 'Médicos', campos: [['especialidade', 'CBOS (opcional)']] },
-  { k: 'profissional', t: 'Dados de um médico', campos: [['id_medico', 'Número do médico', 1]] },
-  { k: 'profissionais_procedimento', t: 'Médicos que fazem um procedimento', campos: [['id_procedimento', 'Número do procedimento', 1], ['id_plano', 'Número do plano', 1]] },
-  { k: 'preco', t: 'Preço de um procedimento', campos: [['id_procedimento', 'Número do procedimento', 1], ['id_plano', 'Número do plano', 1], ['id_medico', 'Número do médico (opcional)'], ['id_unidade', 'Número da unidade (opcional)']] },
-  { k: 'precos', t: 'Tabela de preços de um plano', campos: [['id_plano', 'Número do plano', 1], ['page', 'Página (opcional)']] },
-  { k: 'recepcoes', t: 'Recepções', campos: [['cnes', 'Unidade (na CSI use 1)', 1]] },
-  { k: 'regioes_cd', t: 'Regiões de coleta domiciliar', campos: [['cnes', 'Unidade (na CSI use 1)', 1]] },
-  { k: 'verificar_horario', acao: 'verificar_horario', t: 'Convênios e procedimentos de um horário (verificar horário)', campos: [['horario', 'Chave do horário (data|médico|agenda|unidade|hora)', 1]] },
-  { k: 'horario_procedimentos', t: 'Procedimentos aceitos por um horário', campos: [['horario', 'Chave do horário (data|médico|agenda|unidade|hora)', 1]] },
-  { k: 'requisicao', acao: 'requisicao', t: 'Requisição de exames do pedido médico', campos: [['id', 'Número da requisição', 1], ['origem', 'Origem', 1], ['token', 'Código da requisição', 1]] },
-];
-function resultadoTabela(dados) {
-  const arr = Array.isArray(dados) ? dados : null;
-  const bruto = h('details', {}, h('summary', {}, 'Ver dados brutos (JSON)'), h('pre', {}, JSON.stringify(dados, null, 2)));
-  if (!arr || !arr.length || typeof arr[0] !== 'object') return h('div', {}, h('pre', {}, JSON.stringify(dados, null, 2)));
-  const colunas = [...new Set(arr.slice(0, 30).flatMap((o) => Object.keys(o).filter((k) => ['string', 'number', 'boolean'].includes(typeof o[k]))))].slice(0, 7);
-  const cab = h('thead', {}, h('tr', {}, colunas.map((c) => h('th', {}, c))));
-  const corpo = h('tbody', {}, arr.slice(0, 100).map((o) => h('tr', {}, colunas.map((c) => h('td', {}, o[c] === undefined || o[c] === null ? '' : String(o[c]))))));
-  return h('div', {}, h('p', { class: 'suave' }, `${arr.length} resultado(s)${arr.length > 100 ? ' (mostrando 100)' : ''}.`), h('div', { class: 'rolagem' }, h('table', {}, cab, corpo)), bruto);
+// ---------------------------------------------------------------- 6) resultado, acesso e convite
+const ehPdf = (s) => typeof s === 'string' && s.length > 100 && /^JVBERi0/.test(s.trim());
+function achar(o, r = { pdf: null, html: null }, prof = 0) { if (!o || prof > 4) return r; if (typeof o === 'string') { if (ehPdf(o) && !r.pdf) r.pdf = o.trim(); else if (/<\s*(html|body|div|p|table)\b/i.test(o) && !r.html) r.html = o; return r; } if (typeof o === 'object') for (const x of Object.values(o)) achar(x, r, prof + 1); return r; }
+function telaVerLaudo() {
+  const m = S.ver.m; if (!m) return telaInicio();
+  const saida = h('div', { 'aria-live': 'polite' }, h('p', { class: 'suave' }, 'Abrindo o resultado…'));
+  (async () => {
+    const r = await api('fam_laudo', { voucher: m.voucher });
+    if (S.tela !== 'ver_laudo') return;
+    if (r.motivo === 'laudo_exige_confianca') { S.acessoPara = m; return ir('acesso'); }
+    if (!r.ok) return saida.replaceChildren(h('div', { class: 'aviso erro', role: 'alert' }, textoErro(r)), ajuda());
+    if (!r.pronto) return saida.replaceChildren(h('div', { class: 'aviso atencao' }, 'O resultado ainda não está pronto. Assim que ficar, o aviso aparece aqui.'));
+    const c = achar(r.resultado), partes = [];
+    if (c.pdf) { const bytes = Uint8Array.from(atob(c.pdf), (ch) => ch.charCodeAt(0)), arq = new File([bytes], `resultado-${m.nome}.pdf`, { type: 'application/pdf' }), url = URL.createObjectURL(arq);
+      partes.push(h('a', { class: 'btn prim', href: url, target: '_blank', rel: 'noopener' }, 'Abrir o resultado em PDF'), h('a', { class: 'btn', href: url, download: arq.name }, 'Salvar no celular'));
+      if (navigator.canShare && navigator.canShare({ files: [arq] })) partes.push(botao('Enviar para o meu médico', () => navigator.share({ files: [arq], title: 'Resultado de exame' }).catch(() => {}))); }
+    if (c.html) partes.push(h('iframe', { class: 'laudo', sandbox: '', title: 'Resultado', srcdoc: c.html }));
+    saida.replaceChildren(partes.length ? h('div', { class: 'pilha' }, partes) : h('div', { class: 'aviso atencao' }, 'O resultado está pronto, mas não veio em um formato que a página mostra. Fale com a recepção e eles entregam.'), ajuda());
+  })();
+  return h('div', {}, h('h1', {}, `Resultado de ${m.nome}`), h('p', { class: 'suave' }, `${m.procedimento ? nomeBonito(m.procedimento) : 'Exame'} · ${dataBonita(m.data)}`), saida, h('div', { class: 'pilha', style: 'margin-top:14px' }, botao('Voltar', () => ir('acompanhar'))));
 }
-function telaConsultar() {
-  const def = CAT.find((c) => c.k === S.catalogo.k) || CAT[0];
-  const sel = h('select', { id: 'catSel', onchange: (e) => { S.catalogo = { k: e.target.value, resposta: null, valores: {} }; desenhar(); } }, CAT.map((c) => h('option', { value: c.k, selected: c.k === def.k }, c.t)));
-  const campos = def.campos.map(([n, rot, req]) => [h('label', { for: 'cat_' + n }, rot + (req ? '' : '')), h('input', { id: 'cat_' + n, value: S.catalogo.valores[n] || '', autocomplete: 'off', oninput: (e) => { S.catalogo.valores[n] = e.target.value; } })]);
-  const saida = h('div', { 'aria-live': 'polite' }); if (S.catalogo.resposta) saida.append(S.catalogo.resposta.ok ? resultadoTabela(S.catalogo.resposta.dados !== undefined ? S.catalogo.resposta.dados : S.catalogo.resposta.requisicao) : h('div', { class: 'aviso erro' }, textoErro(S.catalogo.resposta)));
-  const ir = h('button', { type: 'button', class: 'btn prim', onclick: () => tarefa(ir, async () => {
-    const v = {}; for (const [n, , req] of def.campos) { const x = (S.catalogo.valores[n] || '').trim(); if (req && !x) { S.catalogo.resposta = { ok: false, mensagem: 'Preencha os campos obrigatórios.' }; return desenhar(); } if (x) v[n] = x; }
-    S.catalogo.resposta = await api(def.acao || 'catalogo', def.acao ? v : { catalogo: def.k, ...v }); desenhar();
-  }) }, 'Consultar');
-  return h('div', {}, h('h1', {}, 'Consultar a clínica'), h('p', { class: 'suave' }, 'Informações abertas do sistema da clínica: unidades, médicos, convênios, procedimentos e preços. Não mostram dados de pacientes.'),
-    h('div', { class: 'cartao' }, h('label', { for: 'catSel' }, 'O que consultar'), sel, campos, h('div', { class: 'acoes' }, ir), saida));
+function telaAcesso() {
+  const m = S.acessoPara || {}, erro1 = caixaErro(), erro2 = caixaErro();
+  const cod = campoTexto('cod2', 'Código de 8 números', { inputmode: 'numeric', maxlength: '9', placeholder: '0000 0000' }); cod.i.addEventListener('input', () => { const d = soDigitos(cod.i.value).slice(0, 8); cod.i.value = d.length > 4 ? d.slice(0, 4) + ' ' + d.slice(4) : d; });
+  const cpf = campoCpf('aCpf', 'CPF do cadastro'), nasc = campoNascimento('an', 'Nascimento de quem fez o exame'), nome = campoTexto('aNome', 'Nome completo de quem fez o exame', { maxlength: '100' }), cel = campoCelular('aCel', 'Celular que está no cadastro');
+  return h('div', {}, h('h1', {}, 'Liberar este celular'), h('p', { class: 'suave' }, `Para proteger os dados de saúde${m.nome ? ' de ' + m.nome : ''}, os resultados só abrem em celulares liberados. Escolha o jeito mais fácil para você:`),
+    h('div', { class: 'cartao' }, h('h2', {}, 'Alguém da família já acompanha?'), h('p', { class: 'suave' }, 'Peça a essa pessoa para tocar em "Dar acesso a outra pessoa" no celular dela e digite aqui o código.'), cod.el, erro1,
+      h('div', { class: 'pilha', style: 'margin-top:12px' }, botao('Usar o código', async () => { erro1.hidden = true; if (soDigitos(cod.i.value).length !== 8) return mostrar(erro1, 'O código tem 8 números.', cod.i); const r = await api('fam_convite_usar', { codigo: soDigitos(cod.i.value) }); if (!r.ok) return mostrar(erro1, textoErro(r)); lembrarCelular(r.token); S.pessoas = r.pessoas; S.mensagem = { tipo: 'ok', texto: 'Liberado! Já pode abrir o resultado.' }; ir('acompanhar', { marcacoes: null }); }, 'prim'))),
+    h('div', { class: 'cartao' }, h('h2', {}, 'Eu sei todos os dados'), h('p', { class: 'suave' }, 'Informe os dados exatamente como estão no cadastro da clínica. Se outro celular já abre este resultado, ele recebe um aviso e a liberação pode levar até 24 horas.'),
+      cpf.el, nasc.el, nome.el, cel.el, erro2, h('div', { class: 'pilha', style: 'margin-top:12px' }, botao('Pedir liberação', async () => {
+        erro2.hidden = true; if (!cpfOk(cpf.i.value)) return mostrar(erro2, 'O CPF não parece completo.', cpf.i); const n = nasc.valor(); if (!n) return mostrar(erro2, 'Confira a data de nascimento.', nasc.erroEm());
+        if (nome.i.value.trim().length < 3) return mostrar(erro2, 'Escreva o nome completo.', nome.i); if (soDigitos(cel.i.value).length < 10) return mostrar(erro2, 'Informe o celular com DDD.', cel.i);
+        const r = await api('fam_dados', { cpf: soDigitos(cpf.i.value), nascimento: n, nome: nome.i.value.trim(), celular: soDigitos(cel.i.value) }); if (!r.ok) return mostrar(erro2, textoErro(r));
+        lembrarCelular(r.token); S.pessoas = r.pessoas; S.mensagem = r.imediato ? { tipo: 'ok', texto: 'Liberado! Já pode abrir o resultado.' } : { tipo: 'atencao', texto: 'Pedido feito. Avisamos quem já acompanha. A liberação acontece quando essa pessoa aprovar ou em até 24 horas.' }; ir('acompanhar', { marcacoes: null });
+      }, 'prim'))), h('div', { class: 'pilha' }, botao('Voltar', () => ir('acompanhar')), ajuda()));
 }
-
-// ---------------------------------------------------------------- aba SOBRE A API
-const MAPA = [
-  ['ok', 'Horários livres (GET /agenda/horarios)', 'Marcar'], ['ok', 'Reservar e soltar a reserva por 10 min (POST e DELETE /agenda/reservar)', 'Marcar > Confirmar'],
-  ['ok', 'Marcar e remarcar (POST /agenda/horario)', 'Marcar'], ['ok', 'Procedimentos aceitos por um horário (GET /agenda/horario_procedimentos)', 'Consultar'], ['ok', 'Trocar o procedimento (PUT /agenda/procedimento)', 'Minhas marcações'],
-  ['ok', 'Especialidades, consultas, exames e médicos por procedimento (GET /agenda/especialidades, /consultas, /exames, /profissionais)', 'Marcar e Consultar'],
-  ['ok', 'Unidades, convênios, convênio por CNPJ, médicos, preço, tabela de preços, recepções e coleta domiciliar (GET /unidades, /convenios, /convenio/{cnpj}, /profissionais, /profissional, /preco, /precos, /recepcoes, /regiao_cd)', 'Consultar'],
-  ['ok', 'Achar o paciente pelo CPF e entrar (GET /paciente/cpf, POST /externo/login)', 'Entrar'], ['ok', 'Cadastrar paciente novo (POST /externo/register), uma vez por CPF', 'Paciente novo'],
-  ['ok', 'Ver o cadastro (GET /paciente) e as autorizações (GET /autorizacoes)', 'Meus dados'], ['nt', 'Atualizar o contato (PUT /paciente, só celular, telefone e e-mail)', 'Meus dados'],
-  ['ok', 'Ver e cancelar marcações (GET /vouchers, DELETE /voucher)', 'Minhas marcações'], ['nt', 'Check-in e desfazer check-in (POST e DELETE /checkin)', 'Minhas marcações'],
-  ['nt', 'Resultado de exame (GET /resultado/{id} e /resultado/pdf/{id}): só se o Klingo disser que está pronto. A função vem com a entrega DESLIGADA até a clínica liberar', 'Minhas marcações'], ['nt', 'Requisição de exames (GET /requisicao)', 'Consultar'], ['ok', 'Ver se a API está no ar (GET /live)', 'Rodapé'],
-  ['no', 'Adiantamento, pagamento, registrar atendimento e formas de pagamento (/adiantamento(s), /pagamento(s), /registrar_atendimento, /formas_de_pagamento)', 'Mexem em dinheiro: o guia manda validar com o suporte do Klingo antes'],
-  ['nt', 'Totais dos atendimentos do dia (GET /atendimentos): só números por médico, plano e procedimento, nunca dados de paciente, e só com a chave da equipe', 'Equipe'],
-  ['nt', 'Entrar pelo telefone + nascimento (POST /paciente/identificar). Vem DESLIGADO até a clínica liberar (AGENDAMENTO_TELEFONE=1); cinco erros travam o telefone por 1 hora', 'Entrar'],
-  ['nt', 'Conta do portal: cadastrar com e-mail e senha, entrar e recuperar a senha (POST /externo/portal/register, /login, /recuperar). Vem DESLIGADO até a clínica liberar (AGENDAMENTO_PORTAL=1)', 'Paciente novo e Entrar'],
-  ['nt', 'Convênios e procedimentos de um horário (GET /agenda/verificar_horario): a documentação pede um corpo num GET; a página manda o dado na consulta', 'Consultar'],
-  ['nt', 'Resultado de imagem pelo número de acesso (GET /resultado/pdf/an/{número}); junto do interruptor do resultado, que vem DESLIGADO', 'Minhas marcações'],
-  ['nt', 'API de Confirmação / telefonia (GET /telefonia/live, /lista, /{id}, /bloqueios; POST /confirmar, /nps): em 12/11/2026 respondeu “não encontrado”, provavelmente não habilitada. Ficou de fora só a lista por CPF e a entrada de chamada', 'Equipe'],
-  ['no', 'Aviso automático de mudança (POST /webhook-configurado)', 'É o Klingo que chama a clínica. O receptor já existe (função klingo-webhook); falta o Klingo cadastrar o endereço'],
-];
-// ---------------------------------------------------------------- aba EQUIPE (só com a chave da equipe; nada de dado de paciente)
-function telaEquipe() {
-  const chave = h('input', { id: 'eqChave', type: 'password', autocomplete: 'off', value: S.equipeChave, maxlength: '120' });
-  chave.addEventListener('input', () => { S.equipeChave = chave.value; });
-  const cab = () => ({ 'x-equipe-chave': S.equipeChave });
-  const saidaAt = h('div', { 'aria-live': 'polite' }), saidaTel = h('div', { 'aria-live': 'polite' });
-  const data = h('input', { id: 'eqData', type: 'date', value: hojeSP() });
-  const tabela = (r) => h('div', {}, h('p', {}, h('b', {}, `${r.total} atendimento(s) em ${fmtData(r.data)}`)),
-    [['Por médico', r.por_medico], ['Por plano', r.por_plano], ['Por procedimento', r.por_procedimento]].map(([t, l]) => h('details', { class: 'dia', open: true }, h('summary', {}, t), h('div', { class: 'conteudo' }, resultadoTabela(l)))));
-  const bAt = h('button', { type: 'button', class: 'btn prim', onclick: () => tarefa(bAt, async () => {
-    if (!S.equipeChave) { saidaAt.replaceChildren(h('div', { class: 'aviso erro' }, 'Digite a chave da equipe.')); return; }
-    const r = await api('equipe_atendimentos', { data: data.value || hojeSP() }, cab());
-    saidaAt.replaceChildren(r.ok ? tabela(r) : h('div', { class: 'aviso erro' }, textoErro(r)));
-  }) }, 'Ver os totais do dia');
-  const campo = (id, rot, attrs = {}) => [h('label', { for: id }, rot), h('input', { id, autocomplete: 'off', ...attrs })];
-  const rota = h('select', { id: 'eqRota' }, [['live', 'Está no ar?'], ['lista', 'Marcações de um dia (sem dados do paciente)'], ['marcacao', 'Uma marcação'], ['bloqueios', 'Bloqueios de agenda'], ['confirmar', 'Registrar confirmação da marcação'], ['nps', 'Registrar nota NPS']].map(([v, t]) => h('option', { value: v }, t)));
-  const tData = campo('eqTData', 'Data (opcional)', { type: 'date' }), tAte = campo('eqTAte', 'Até (opcional; na lista, no máximo 7 dias)', { type: 'date' });
-  const tId = campo('eqTId', 'Número da marcação', { inputmode: 'numeric', maxlength: '12' }), tMed = campo('eqTMed', 'Número do médico (bloqueios, opcional)', { inputmode: 'numeric', maxlength: '9' });
-  const tStatus = h('select', { id: 'eqTStatus' }, [['C', 'C – Confirmado'], ['S', 'S – Sem resposta'], ['N', 'N – Não confirmado (CANCELA a marcação)']].map(([v, t]) => h('option', { value: v }, t)));
-  const tNota = campo('eqTNota', 'Nota NPS (0 a 10)', { type: 'number', min: '0', max: '10' }), tObs = campo('eqTObs', 'Observação (opcional)', { maxlength: '200' });
-  const bTel = h('button', { type: 'button', class: 'btn prim', onclick: () => tarefa(bTel, async () => {
-    if (!S.equipeChave) { saidaTel.replaceChildren(h('div', { class: 'aviso erro' }, 'Digite a chave da equipe.')); return; }
-    const r0 = rota.value, d = { rota: r0 }, v = (el) => el.value.trim();
-    if (r0 === 'lista') { if (v(tData[1])) d.data = v(tData[1]); if (v(tAte[1])) d.ate = v(tAte[1]); }
-    if (r0 === 'bloqueios') { if (v(tData[1])) d.de = v(tData[1]); if (v(tAte[1])) d.ate = v(tAte[1]); if (v(tMed[1])) d.id_medico = v(tMed[1]); }
-    if (r0 === 'marcacao') d.id = v(tId[1]);
-    if (r0 === 'confirmar') { Object.assign(d, { id_marcacao: v(tId[1]), status: tStatus.value, obs: v(tObs[1]) || undefined, confirmar: true }); if (tStatus.value === 'N') { if (!confirm('O status N CANCELA a marcação no Klingo. Continuar?')) return; d.cancelar_marcacao = true; } }
-    if (r0 === 'nps') Object.assign(d, { id_marcacao: v(tId[1]), nota: Number(v(tNota[1])), obs: v(tObs[1]) || undefined, confirmar: true });
-    const r = await api('equipe_telefonia', d, cab());
-    saidaTel.replaceChildren(r.ok ? h('div', {}, r.marcacoes ? resultadoTabela(r.marcacoes) : h('pre', {}, JSON.stringify(r, null, 2))) : h('div', { class: 'aviso erro' }, textoErro(r)));
-  }) }, 'Enviar');
-  return h('div', {}, h('h1', {}, 'Equipe'),
-    h('div', { class: 'aviso atencao' }, 'Área só para a equipe da clínica. A chave fica só na memória desta aba. Aqui saem apenas totais e dados da agenda: nunca nome, CPF, telefone ou endereço de paciente.'),
-    h('div', { class: 'cartao' }, h('label', { for: 'eqChave' }, 'Chave da equipe'), chave),
-    h('div', { class: 'cartao' }, h('h2', {}, 'Atendimentos do dia ', h('span', { class: 'etiqueta nt' }, 'não testado')), h('p', { class: 'suave' }, 'Mostra quantos atendimentos houve, por médico, plano e procedimento.'), h('label', { for: 'eqData' }, 'Dia'), data, h('div', { class: 'acoes' }, bAt), saidaAt),
-    h('div', { class: 'cartao' }, h('h2', {}, 'API de Confirmação (telefonia) ', h('span', { class: 'etiqueta nt' }, 'não testado')), h('p', { class: 'suave' }, 'Em 12/11/2026 o Klingo respondeu “não encontrado” para esta API: ela provavelmente não está habilitada para a CSI. Peça a habilitação ao suporte do Klingo.'),
-      h('label', { for: 'eqRota' }, 'O que fazer'), rota, tData, tAte, tId, tMed, h('label', { for: 'eqTStatus' }, 'Status (só para confirmação)'), tStatus, tNota, tObs, h('div', { class: 'acoes' }, bTel), saidaTel));
-}
-
-function telaSobre() {
-  const et = { ok: ['ok', 'Na página'], nt: ['nt', 'Não testado'], no: ['no', 'Fora de propósito'] };
-  return h('div', {}, h('h1', {}, 'O que a API do Klingo faz e o que esta página usa'), h('p', { class: 'suave' }, 'Versão da página ' + VERSAO_PAGINA + '. Fonte: documentação oficial guardada pela clínica (API Externa 1.0.0) e testes reais de 12/11/2026.'),
-    h('div', { class: 'aviso' }, h('b', {}, 'Como funciona: '), 'a página nunca fala direto com o Klingo. Ela chama uma função da clínica, que guarda a chave, confere CPF + nascimento antes de qualquer ação sobre um paciente e limita as tentativas. ', h('b', {}, 'Não testado '), 'significa que a rota existe na documentação, mas ainda não foi exercitada de verdade na clínica.'),
-    MAPA.map(([t, o, onde]) => h('div', { class: 'item' }, h('span', { class: 'etiqueta ' + et[t][0] }, et[t][1]), o, h('div', { class: 'suave' }, t === 'no' ? `Por quê: ${onde}` : `Onde: ${onde}`))));
+function telaDarAcesso() {
+  const erro = caixaErro();
+  const gerar = async () => { const r = await api('fam_convidar'); if (!r.ok) return mostrar(erro, textoErro(r)); S.convite = { codigo: r.codigo, ate: Date.parse(r.expira_em) || Date.now() + 15 * 60000 }; desenhar(); };
+  if (!S.convite) return h('div', {}, h('h1', {}, 'Dar acesso a outra pessoa'), h('p', { class: 'suave' }, 'A outra pessoa poderá marcar, acompanhar e abrir os resultados de quem você acompanha. Você gera um código que vale 15 minutos e passa para ela.'), erro,
+    h('div', { class: 'pilha' }, botao('Gerar o código', gerar, 'prim'), botao('Voltar', () => ir('inicio'))));
+  const c = S.convite.codigo, falta = Math.max(0, Math.round((S.convite.ate - Date.now()) / 60000));
+  return h('div', {}, h('h1', {}, 'Passe este código'), h('div', { class: 'codigo', 'aria-label': 'Código: ' + c.split('').join(' ') }, c.slice(0, 4) + ' ' + c.slice(4)),
+    h('p', {}, `Vale por mais ${falta} minuto${falta === 1 ? '' : 's'} e só uma vez. A pessoa abre esta página, toca em "Recebi um código de convite" e digita os 8 números. Ela vai aparecer na lista de quem acompanha.`),
+    h('div', { class: 'pilha' }, h('a', { class: 'btn', href: 'https://wa.me/?text=' + encodeURIComponent(`Código para acompanhar os atendimentos na CSI: ${c.slice(0, 4)} ${c.slice(4)}. Abra ${location.origin}${location.pathname} e toque em "Recebi um código de convite". Vale por 15 minutos.`), target: '_blank', rel: 'noopener' }, 'Mandar por WhatsApp'), botao('Gerar outro código', gerar), botao('Pronto', () => ir('inicio'), 'prim')));
 }
 
 // ---------------------------------------------------------------- partida
-(async function iniciar() {
-  desenhar();
-  const r = await api('versao'); const ok = r.ok;
-  $('#pontoApi').className = 'ponto ' + (ok ? 'ok' : 'no'); $('#estadoApi').textContent = ok ? 'Sistema da clínica no ar.' : 'O sistema da clínica não respondeu agora. Tente de novo em instantes.';
+(function iniciar() {
+  S.tela = S.token ? 'inicio' : 'boasvindas'; desenhar();
+  const t = $('#app h1'); if (t) t.setAttribute('tabindex', '-1');
+  window.__CSI_AGENDAMENTO__ = { versao: VERSAO_PAGINA };
 })();
 </script>
 </body>
