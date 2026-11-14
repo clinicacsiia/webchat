@@ -1,5 +1,5 @@
 // FLUXOGRAMA: entrada (linhas do relatório de marcações do Klingo, #13825 ou o duplicado por data do exame) -> validação (id da marcação, data do exame e uma forma de identificar o paciente: prontuário, ou nome + telefone; textos cortados) -> lógica (janela de leitura por modo e filtro; telefone vira marca/hash; sem valor em R$) -> saída (linhas enxutas {m,a,p,n,f,x,o,u,e,d,s,t,r,c} em lotes para jornada_klingo_lote)
-// Versão 1.0 — 01/11/2026 / Mudança: Implementação inicial
+// Versão 1.2 — 14/11/2026 / Mudança: colunas por relatório (layout); janela do #14359 sempre de hoje até 1 ano à frente
 //
 // Tudo aqui é função pura (sem rede, sem banco), para testar sem Klingo. As linhas trazem nome e telefone de pacientes: ficam só na memória da Edge Function;
 // o telefone nunca sai daqui, vira só uma marca (SHA-256 dos 8 últimos dígitos + o segredo da clínica) que o banco usa para achar a conversa do chat.
@@ -13,9 +13,15 @@ export type LinhaLote = { m: string; a: string; p: string; n: string; f: string;
 export type Modo = "rapido" | "completo";
 export type Filtro = "criacao" | "exame";
 
+// Em que coluna (colN) está cada campo, por relatório. "criacao" = #13825; "exame" = #14359, refeito em 14/11/2026 (nome e responsável vieram para o começo).
+export type Layout = { m: string; a: string; pront: string; nome: string; resp: string; em: string; d: string; proc: string; oper: string; unid: string; conf: string; motivo: string; status: string; atend: string; cel: string; tel: string };
+export const LAYOUT_CRIACAO: Layout = { m: "col0", a: "col1", pront: "col2", em: "col3", d: "col4", proc: "col5", oper: "col6", unid: "col14", conf: "col10", motivo: "col11", status: "col12", atend: "col13", nome: "col15", cel: "col16", tel: "col17", resp: "col7" };
+export const LAYOUT_EXAME: Layout = { m: "col0", a: "col1", nome: "col2", resp: "col3", pront: "col4", em: "col5", d: "col6", proc: "col7", oper: "col8", unid: "col9", conf: "col12", motivo: "col13", tel: "col14", status: "col15", atend: "col16", cel: "col17" };
+export const layoutDe = (f: Filtro): Layout => (f === "exame" ? LAYOUT_EXAME : LAYOUT_CRIACAO);
+
 // Quantos dias para trás e para a frente da data de hoje a Jornada mostra (tem que bater com jornada_klingo_fechar).
 export const CARTOES_ATRAS = 2;
-export const CARTOES_FRENTE = 30;
+export const CARTOES_FRENTE = 365;
 
 const ISO = /^\d{4}-\d{2}-\d{2}/;
 const txt = (v: unknown, max: number): string => String(v ?? "").trim().slice(0, max);
@@ -41,28 +47,28 @@ export const normNome = (v: unknown): string =>
 
 // Marcação SEM prontuário no Klingo (cerca de 1 em cada 5): a chave do paciente passa a ser "n:" + hash(nome + últimos 8 dígitos do telefone + segredo).
 // Com o segredo no hash, a chave não dá para refazer a partir de um nome conhecido. Sem prontuário e sem nome, não há como identificar: a linha é descartada.
-export async function chavePaciente(r: Row, segredo: string): Promise<string> {
-  const prontuario = txt(r.col2, 40);
+export async function chavePaciente(r: Row, segredo: string, L: Layout = LAYOUT_CRIACAO): Promise<string> {
+  const prontuario = txt(r[L.pront], 40);
   if (prontuario) return prontuario;
-  const nome = normNome(r.col15);
+  const nome = normNome(r[L.nome]);
   if (!nome) return "";
-  const fone = String(r.col16 ?? "").replace(/\D/g, "").slice(-8) || String(r.col17 ?? "").replace(/\D/g, "").slice(-8);
+  const fone = String(r[L.cel] ?? "").replace(/\D/g, "").slice(-8) || String(r[L.tel] ?? "").replace(/\D/g, "").slice(-8);
   return "n:" + (await sha256Hex(`${nome}|${fone}|${segredo}`)).slice(0, 24);
 }
 
 // Uma linha do relatório -> uma linha enxuta para o banco. null = linha sem id, sem como identificar o paciente ou sem data do exame (não serve).
-export async function mapearLinha(r: Row, segredo: string): Promise<LinhaLote | null> {
-  const m = txt(r.col0, 40), d = txt(r.col4, 30);
+export async function mapearLinha(r: Row, segredo: string, L: Layout = LAYOUT_CRIACAO): Promise<LinhaLote | null> {
+  const m = txt(r[L.m], 40), d = txt(r[L.d], 30);
   if (!m || !ISO.test(d)) return null;
-  const p = await chavePaciente(r, segredo);
+  const p = await chavePaciente(r, segredo, L);
   if (!p) return null;
-  const e = txt(r.col3, 30);
+  const e = txt(r[L.em], 30);
   return {
-    m, a: txt(r.col1, 40), p, n: txt(r.col15, 120),
-    f: (await chaveFone(r.col16, segredo)) || (await chaveFone(r.col17, segredo)),
-    x: txt(r.col5, 200), o: txt(r.col6, 80), u: txt(r.col14, 120),
+    m, a: txt(r[L.a], 40), p, n: txt(r[L.nome], 120),
+    f: (await chaveFone(r[L.cel], segredo)) || (await chaveFone(r[L.tel], segredo)),
+    x: txt(r[L.proc], 200), o: txt(r[L.oper], 80), u: txt(r[L.unid], 120),
     e: ISO.test(e) ? e : "", d,
-    s: txt(r.col12, 20), t: txt(r.col13, 3), r: txt(r.col11, 120), c: txt(r.col10, 40),
+    s: txt(r[L.status], 20), t: txt(r[L.atend], 3), r: txt(r[L.motivo], 120), c: txt(r[L.conf], 40),
   };
 }
 
@@ -71,11 +77,11 @@ export async function mapearLinha(r: Row, segredo: string): Promise<LinhaLote | 
 //  - filtro "criacao" (#13825, que só filtra pela data em que a marcação foi FEITA): rápido = marcações de ontem e de hoje (pega as novas);
 //    completo = as feitas nos últimos 45 dias (pega confirmação, cancelamento e atendimento de marcações mais antigas).
 export function janelaLeitura(modo: Modo, filtro: Filtro, hoje: string): { de: string; ate: string } {
-  if (filtro === "exame") return modo === "rapido" ? { de: somaDias(hoje, -CARTOES_ATRAS), ate: somaDias(hoje, 1) } : { de: somaDias(hoje, -CARTOES_ATRAS), ate: somaDias(hoje, CARTOES_FRENTE) };
+  if (filtro === "exame") return modo === "rapido" ? { de: hoje, ate: somaDias(hoje, 7) } : { de: hoje, ate: somaDias(hoje, CARTOES_FRENTE) };
   return modo === "rapido" ? { de: somaDias(hoje, -1), ate: hoje } : { de: somaDias(hoje, -45), ate: hoje };
 }
 
-// Só entra na Jornada o exame que cai na janela dos cartões (anteontem até daqui a 30 dias).
+// Só entra na Jornada o exame que cai na janela dos cartões (anteontem até daqui a 1 ano).
 export const dentroDosCartoes = (dataExame: string, hoje: string): boolean => {
   const dia = dataExame.slice(0, 10);
   return dia >= somaDias(hoje, -CARTOES_ATRAS) && dia <= somaDias(hoje, CARTOES_FRENTE);
@@ -83,23 +89,23 @@ export const dentroDosCartoes = (dataExame: string, hoje: string): boolean => {
 
 // Por que uma linha não serve (só o motivo, nunca o conteúdo): ajuda a ver, sem expor paciente, o que o relatório traz de estranho.
 export type Descartes = { sem_id: number; sem_data: number; sem_identificacao: number };
-export function motivoDescarte(r: Row): keyof Descartes | null {
-  if (!txt(r.col0, 40)) return "sem_id";
-  if (!ISO.test(txt(r.col4, 30))) return "sem_data";
-  if (!txt(r.col2, 40) && !normNome(r.col15)) return "sem_identificacao";
+export function motivoDescarte(r: Row, L: Layout = LAYOUT_CRIACAO): keyof Descartes | null {
+  if (!txt(r[L.m], 40)) return "sem_id";
+  if (!ISO.test(txt(r[L.d], 30))) return "sem_data";
+  if (!txt(r[L.pront], 40) && !normNome(r[L.nome])) return "sem_identificacao";
   return null;
 }
 
 // Mapeia, descarta o que não serve, tira repetidas (a mesma marcação duas vezes: vale a última) e mantém só a janela dos cartões.
 // "semProntuario" conta as linhas que ficaram com a chave por nome (n:...), só para o resumo.
-export async function prepararLinhas(linhas: Row[], segredo: string, hoje: string): Promise<{ linhas: LinhaLote[]; descartadas: number; descartes: Descartes; fora: number; semProntuario: number }> {
+export async function prepararLinhas(linhas: Row[], segredo: string, hoje: string, L: Layout = LAYOUT_CRIACAO): Promise<{ linhas: LinhaLote[]; descartadas: number; descartes: Descartes; fora: number; semProntuario: number }> {
   const porId = new Map<string, LinhaLote>();
   const descartes: Descartes = { sem_id: 0, sem_data: 0, sem_identificacao: 0 };
   let descartadas = 0, fora = 0, semProntuario = 0;
   for (const r of linhas) {
-    const motivo = motivoDescarte(r);
+    const motivo = motivoDescarte(r, L);
     if (motivo) { descartes[motivo]++; descartadas++; continue; }
-    const l = (await mapearLinha(r, segredo))!;
+    const l = (await mapearLinha(r, segredo, L))!;
     if (!dentroDosCartoes(l.d, hoje)) { fora++; continue; }
     if (l.p.startsWith("n:")) semProntuario++;
     porId.set(l.m, l);

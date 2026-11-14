@@ -95,3 +95,8 @@ Criado pelo dono ("Marcações pela data em que foram marcadas", filtros `period
 ## Relatório por data do exame (#14359, 09/11/2026)
 Criado no Klingo ("Agendamentos - Visão Consolidada por Marcação Data Agendado"): é cópia do #13825 com o filtro de período trocado para **Data Agendado Para**. Conferido pela função (só estrutura e contagem, sem dado de paciente): mesmas 18 colunas (col0 a col17) na mesma ordem. **Atenção:** o id do filtro de período é **`periodo1`** (no #13825 é `periodo0`) e o filtro de unidade passou de `parm1` para `parm0`. A Edge Function `sync-jornada-klingo` (versão 5) usa `periodo1` quando `config.jornada_relatorio_filtro = 'exame'`.
 Em uso desde 09/11/2026: `config.jornada_relatorio_id = 14359` e `jornada_relatorio_filtro = exame`. Para voltar ao antigo: `13825` e `criacao`.
+
+
+## #14359 refeito (14/11/2026)
+Filtros: `periodo0` = Data Agendado Para (livre) e `parm1` = Unidade. Colunas: 0 Id Marcação, 1 Id Atendimento, 2 Nome, 3 Responsável, 4 Prontuário, 5 Agendado Em, 6 Agendado Para, 7 Procedimento, 8 Operadora, 9 Unidade, 10 Valor (nunca lido), 11 Observação, 12 Confirm Status, 13 Cancelamento-Motivo, 14 Telefone, 15 Status, 16 Atendido, 17 Celular.
+`sync-jornada-klingo` v1.2: filtro sempre `periodo0`, colunas por layout (`mapa.ts`), janela sempre a partir de hoje: rápido = 7 dias (a cada 30 s), completo = 1 ano. O `klingo-conferir-olho` (cron 38) roda a cada 30 s.
