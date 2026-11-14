@@ -1,6 +1,6 @@
 # Página de agendamento técnica (`/agendamento/completo/`)
 
-> **13/11/2026:** a página `/agendamento/` agora é a **página nova para o paciente e a família** (ver `docs/familia-agendamento.md`). Esta, com todas as abas (catálogos, equipe, API), mudou para `/agendamento/completo/` e continua igual; o link está no rodapé da página nova. O teste desta página (`npm run test:agendamento`) aponta para o novo endereço.
+> **14/11/2026:** a página nova para o paciente e a família (que ficaria em `/agendamento/`) foi **abandonada pelo dono** e removida do repositório: o HTML, o arquivo `supabase/familia-agendamento.sql` e os testes dela. **Nada dela chegou à produção** (conferido em 14/11/2026: não existe tabela nem função `familia_*` no banco). Esta página técnica continua em `/agendamento/completo/`; o endereço `/agendamento/` ficou sem página. O código antigo continua no histórico do git (commits `8890756` e `d389d3c`). O trecho `familia.ts` da função `klingo-agendamento` ficou no código, desligado (só liga com o secret `FAMILIA_CHAVE`, que não existe).
 
 Versão 1.1 — 13/11/2026 / Mudança: acrescenta tudo o que a documentação tinha e a página não usava (verificar horário, resultado de imagem, entrada por telefone, conta do portal, totais do dia, API de telefonia), menos dinheiro. A 1.0 era a primeira versão. Fonte das regras: `docs/klingo-api-externa/GUIA-COMPLETO.md`.
 
