@@ -1823,29 +1823,40 @@
     const t2 = setInterval(() => { if (!dlg.open || dlg.dataset.equipe !== '1') { clearInterval(t2); return; } carregarMarcouHoje(); }, 60000);
     dlg.addEventListener('close', () => { delete dlg.dataset.equipe; clearInterval(t); clearInterval(t2); }, { once: true });
   }
-  /* ---------- Lista de previsão (13/11/2026) ---------- */
-  // Pacientes que não tinham data disponível e aceitaram esperar uma vaga. NÃO é agendamento. Quando o sistema acha uma vaga dentro do pedido do paciente,
-  // a linha fica em destaque ("Vaga aberta") e a atendente oferece. Só leitura: a lista vem de painel_previsao_lista (admin e atendente).
-  const PREV_TURNO = { manha: 'Manhã', tarde: 'Tarde', qualquer: 'Tanto faz' };
-  const PREV_ANTEC = { imediato: 'Até 24 h', '1_dia': '1 dia', '1_semana': '1 semana', '1_mes': '1 mês' };
+  /* ---------- Disponibilidade futura (14/11/2026; antiga "Lista de previsão") ---------- */
+  // Pedidos de pacientes que não achavam horário e pediram aviso quando surgir vaga compatível. NÃO é agendamento nem reserva. O sistema procura sozinho na API do Klingo;
+  // a equipe só age nas exceções ("Precisa de pessoa"). Uma lista só, com filtros por situação (nada de quadros repetidos). Dados: painel_disponibilidade_lista (admin e atendente).
+  const DISP_ESTADO = { ativa: 'Procurando vaga', oportunidade_identificada: 'Vaga encontrada', notificada: 'Paciente avisado', aguardando_resposta: 'Aguardando o paciente', convertida_em_agendamento: 'Virou agendamento', expirada: 'Expirada', cancelada: 'Cancelada' };
+  const DISP_NOTIF = { pendente: 'Aviso na fila (envio desligado ou aguardando)', entregue_ao_chat: 'Aviso entregue no chat', bloqueada_sem_autorizacao: 'Sem autorização para avisar', bloqueada_limite: 'Limite de avisos atingido', falhou: 'Aviso falhou' };
+  const DISP_TURNO = { manha: 'Manhã', tarde: 'Tarde', noite: 'Noite', qualquer: 'Qualquer horário' };
+  const DISP_DIAS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+  const DISP_FILTROS = [['', 'Todas'], ['ativa', 'Procurando'], ['oportunidade_identificada', 'Vaga encontrada'], ['notificada', 'Avisados'], ['aguardando_resposta', 'Aguardando paciente'], ['convertida_em_agendamento', 'Viraram agendamento'], ['expirada', 'Expiradas'], ['cancelada', 'Canceladas'], ['humano', 'Precisam de pessoa']];
   const dataPrev = (iso) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || '')); return m ? `${m[3]}/${m[2]}/${m[1]}` : '—'; };
   const vagaTxt = (v) => (v && v.data ? `${dataPrev(v.data)} às ${String(v.hora || '').slice(0, 5)}` : null);
-  function renderPrevisao(linhas, erro) {
+  const dispQuando = (iso) => { if (!iso) return 'ainda não'; const d = new Date(iso); return isNaN(d) ? '—' : d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); };
+  let dispFiltro = '';
+  function renderPrevisao(res, erro) {
     if (!dlg.open || dlg.dataset.previsao !== '1') return;
-    const cab = ['Paciente', 'Pedido', 'Turno', 'Período pedido', 'Pode ser chamado com', 'Situação', ''];
-    const tr = (l) => h('tr', { class: l.status === 'vaga_encontrada' ? 'eq-livre' : '' },
-      h('th', { scope: 'row' }, l.paciente || 'Paciente'),
-      h('td', {}, [l.pedido, l.plano].filter(Boolean).join(' · ') || '—'),
-      h('td', {}, PREV_TURNO[l.turno] || '—'),
-      h('td', {}, `${dataPrev(l.de)} a ${dataPrev(l.ate)}`),
-      h('td', {}, PREV_ANTEC[l.antecedencia] || '—'),
-      h('td', {}, l.status === 'vaga_encontrada' ? h('b', {}, 'Vaga aberta: ' + (vagaTxt(l.vaga) || '—')) : 'Aguardando vaga'),
-      h('td', {}, h('button', { class: 'btn', type: 'button', onclick: () => { dlg.close(); abrirConversaDoAviso(l.conversa_id); } }, 'Abrir conversa')));
-    dlg.replaceChildren(h('h3', {}, 'Lista de previsão'),
-      h('p', { class: 'dica', style: 'margin:-8px 0 10px' }, 'Pacientes sem data disponível que aceitaram esperar uma vaga. Isto NÃO é agendamento: quando abrir uma vaga dentro do que o paciente pediu, a linha fica em destaque e a atendente oferece.'),
+    const todas = (res && res.itens) || [], cont = (res && res.contagem) || {};
+    const linhas = todas.filter((l) => dispFiltro === '' ? true : dispFiltro === 'humano' ? l.precisa_humano : l.estado === dispFiltro);
+    const cab = ['Paciente', 'Atendimento', 'Quando pode ir', 'Situação', 'Última busca', 'Vaga / aviso', ''];
+    const tr = (l) => h('tr', { class: ['oportunidade_identificada', 'notificada', 'aguardando_resposta'].includes(l.estado) || l.precisa_humano ? 'eq-livre' : '' },
+      h('th', { scope: 'row' }, l.paciente || 'Paciente', l.paciente_tipo === 'filho' ? h('span', { class: 'dica' }, ' (filho/a)') : null),
+      h('td', {}, [l.procedimento, l.plano].filter(Boolean).join(' · ') || '—'),
+      h('td', {}, `${dataPrev(l.data_ini)} a ${dataPrev(l.data_fim)} · ${DISP_TURNO[l.turno] || '—'} · ${(l.dias_semana || []).map((d) => DISP_DIAS[d]).join(' ')}`),
+      h('td', {}, h('b', {}, DISP_ESTADO[l.estado] || l.estado), l.precisa_humano ? h('div', { class: 'dica' }, 'Precisa de pessoa: ' + (DISP_NOTIF[l.notificacao] || 'aviso não saiu')) : null),
+      h('td', {}, dispQuando(l.ultima_verificacao_em), l.ultima_verificacao_resultado ? h('div', { class: 'dica' }, l.ultima_verificacao_resultado.replace(/_/g, ' ')) : null),
+      h('td', {}, vagaTxt(l.ultima_oportunidade) ? `Vaga: ${vagaTxt(l.ultima_oportunidade)}` : '—', l.notificacao ? h('div', { class: 'dica' }, DISP_NOTIF[l.notificacao] || l.notificacao) : null),
+      h('td', {}, h('button', { class: 'btn', type: 'button', onclick: () => { dlg.close(); abrirConversaDoAviso(l.conversa_id); } }, 'Abrir conversa'),
+        ['ativa', 'oportunidade_identificada', 'notificada', 'aguardando_resposta'].includes(l.estado) ? h('button', { class: 'btn sec', type: 'button', title: 'Cancela a procura a pedido do paciente', onclick: async (ev) => { ev.currentTarget.disabled = true; try { const r = await db.rpc('painel_disponibilidade_cancelar', { p_id: l.id, p_motivo: 'cancelada pela equipe' }); if (r.error) throw r.error; abrirPrevisao(); } catch { ev.currentTarget.disabled = false; } } }, 'Cancelar procura') : null,
+        h('details', {}, h('summary', {}, 'Histórico'), h('ul', { style: 'margin:4px 0 0;padding-left:18px' }, (l.historico || []).map((e) => h('li', {}, `${dispQuando(e.em)} · ${String(e.tipo).replace('estado:', '→ ').replace(/_/g, ' ')} (${e.origem})`))))));
+    dlg.replaceChildren(h('h3', {}, 'Disponibilidade futura'),
+      h('p', { class: 'dica', style: 'margin:-8px 0 10px' }, 'Pacientes que não acharam horário e pediram aviso quando surgir uma vaga compatível. Isto NÃO é agendamento nem reserva: o sistema procura sozinho na agenda do Klingo e avisa o paciente pelo chat (se ele autorizou e o envio estiver ligado). A equipe só age nas linhas marcadas "Precisa de pessoa".'),
+      h('div', { class: 'chips', role: 'group', 'aria-label': 'Filtrar por situação' }, DISP_FILTROS.map(([v, t]) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(dispFiltro === v),
+        onclick: () => { dispFiltro = v; renderPrevisao(res, erro); } }, t + (v && v !== 'humano' ? ` (${cont[v] || 0})` : v === 'humano' ? ` (${todas.filter((x) => x.precisa_humano).length})` : ` (${todas.length})`)))),
       erro ? h('p', { class: 'dica', role: 'alert' }, erro)
-        : linhas === null ? h('p', { class: 'dica' }, 'Carregando…')
-        : linhas.length === 0 ? h('p', { class: 'dica' }, 'Ninguém na lista de previsão agora.')
+        : res === null ? h('p', { class: 'dica' }, 'Carregando…')
+        : linhas.length === 0 ? h('p', { class: 'dica' }, 'Nenhuma solicitação nesta situação.')
         : h('div', { class: 'eq-rolagem' }, h('table', { class: 'tab eq-tab', id: 'tabPrevisao' },
             h('thead', {}, h('tr', {}, cab.map((t) => h('th', { scope: 'col' }, t)))),
             h('tbody', {}, linhas.map(tr)))),
@@ -1854,12 +1865,12 @@
   async function abrirPrevisao() {
     if (!podeAtender()) return;
     dlg.className = 'equipe'; dlg.dataset.previsao = '1';
-    renderPrevisao(null, null); dlg.showModal();
+    renderPrevisao(null, null); if (!dlg.open) dlg.showModal();
     const carregar = async () => {
       try {
-        const { data, error } = await db.rpc('painel_previsao_lista');
-        renderPrevisao(error ? [] : (data || []), error ? 'Não foi possível carregar a lista agora. Tente de novo em instantes.' : null);
-      } catch { renderPrevisao([], 'Não foi possível carregar a lista agora. Tente de novo em instantes.'); }
+        const { data, error } = await db.rpc('painel_disponibilidade_lista');
+        renderPrevisao(error ? { itens: [], contagem: {} } : (data || { itens: [], contagem: {} }), error ? 'Não foi possível carregar a lista agora. Tente de novo em instantes.' : null);
+      } catch { renderPrevisao({ itens: [], contagem: {} }, 'Não foi possível carregar a lista agora. Tente de novo em instantes.'); }
     };
     await carregar();
     const t = setInterval(() => { if (!dlg.open || dlg.dataset.previsao !== '1') { clearInterval(t); return; } carregar(); }, 60000);
@@ -2262,7 +2273,7 @@
       h('div', { class: 'cab-linha' },
         h('div', {}, h('h2', {}, icone('fone'), 'Painel de Atendimento'), h('p', { class: 'sub' }, 'Acompanhe as conversas do dia, o que está em espera e os alertas.')),
         h('div', { class: 'cab-acoes' },
-          podeAtender() ? h('button', { class: 'btn', type: 'button', id: 'btnPrevisao', title: 'Pacientes sem data disponível que aceitaram esperar uma vaga (não é agendamento)', onclick: abrirPrevisao }, icone('calendario'), 'Lista de previsão') : null,
+          podeAtender() ? h('button', { class: 'btn', type: 'button', id: 'btnPrevisao', title: 'Pacientes que pediram aviso quando surgir vaga compatível (não é agendamento nem reserva)', onclick: abrirPrevisao }, icone('calendario'), 'Disponibilidade futura') : null,
           ehChefia() ? h('button', { class: 'btn', type: 'button', id: 'btnEquipe', title: 'Quanto cada atendente está atendendo agora (só TI, gerência e supervisão)', onclick: abrirEquipe }, icone('pessoas'), 'Equipe agora') : null,
           h('div', { class: 'data-hoje' }, icone('calendario'), 'Hoje, ' + new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'short', year: 'numeric' })))),
       h('div', { class: 'kpis', id: 'kpis', 'aria-label': 'Indicadores do dia' }));
