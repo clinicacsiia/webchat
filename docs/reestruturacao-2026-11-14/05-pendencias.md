@@ -47,6 +47,7 @@ Relatórios do Klingo a criar/editar para esta tarefa: **nenhum** (regra do `CLA
 | I10 | Notificação por WhatsApp/SMS/e-mail (item E9). |
 | I11 | A `chat-agenda-ao-vivo` (leitura de ocupação por relatório) **não é mais chamada pelo chat**; fica publicada sem uso. Pode ser apagada depois da publicação. |
 | I12 | (resolvido em 14/11: o texto do painel sobre o interruptor geral foi reescrito). |
+| I13 | Teste de navegador intermitente `chat-equipe-assume.navegador.mjs`, cenário "corrida" (clique com tempo esgotado): 1 falha em 14 execuções isoladas e 1 na corrida final; 0 de 12 na versão base. Investigar o `abrir()` do teste (espera a lista de opções antes de clicar). Não foi alterado. |
 
 ### Melhorias futuras
 

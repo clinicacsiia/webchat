@@ -23,7 +23,7 @@ Versão 1.0 — 14/11/2026 / Mudança: primeira versão. Implementado em `supaba
 | `klingo_api_cancelar` | `nao` · `teste` · `sim` | **novo**, copia `klingo_api_pos` | `teste` | Cancelamento. |
 | `klingo_api_remarcar` | `nao` · `teste` · `sim` | **novo**, copia `klingo_api_pos` | `teste` | Remarcação. |
 | `klingo_api_consultar` | `nao` · `teste` · `sim` | **novo**, copia `klingo_api_pos` | — | Ver minhas marcações (consulta o Klingo pela sessão do próprio paciente). |
-| `klingo_api_pos` | `nao` · `teste` · `sim` | (legado) | `teste` | Mantida só como herança enquanto as três acima não existirem. |
+| `klingo_api_pos` | `nao` · `teste` · `sim` | (legado) | `teste` | Só herança de valor para as três acima na migração. **Depois da parte 5 nada mais lê esta chave**: o menu "Cancelar / Remarcar" que aparece logo depois de marcar pelo chat passa a valer por `klingo_api_cancelar` e `klingo_api_remarcar` (testado). |
 | `klingo_api_resultado` | `nao` · `sombra` · `teste` · `sim` | **novo**, `nao` | — | Resultado de exame: com a chave ligada, **só confere no Klingo se o laudo está liberado** (`GET /resultado/{id}`, nunca o conteúdo); a entrega do link/senha continua com a equipe. Desligada, só a orientação da clínica. **Laudo liberado nunca foi testado com paciente real.** |
 | `previsao_modo` | `nao` · `teste` · `sim` | **novo**, `teste` | — | Registrar solicitação de disponibilidade. |
 | `previsao_monitor_modo` | `nao` · `sombra` · `teste` · `sim` | **novo**, `nao` | — | Motor que procura vagas na API (consome cota). |

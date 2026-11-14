@@ -34,7 +34,7 @@ O chat passou a mostrar **somente horários que a API do Klingo devolveu** (cale
 | Resultado de exame até o limite da integração | ✅ experiência completa e configurável; com a chave ligada **só confere se o laudo está liberado** (nunca o conteúdo). **Laudo liberado nunca foi testado de verdade (E2); entrega de link/senha continua com a equipe.** |
 | Painel coerente com o chat | ✅ chaves por capacidade, disponibilidade futura, números do pós-agendamento (5/5 no navegador). |
 | Testes Python executados | ✅ 27 de 27 (`pytest` instalado **só no ambiente**; nenhum arquivo de dependência foi alterado). |
-| Todos os testes aplicáveis passaram | ✅ **87 de 87 scripts** da corrente `npm test`; **285 de 285** verificações das suítes desta reestruturação. `04` |
+| Todos os testes aplicáveis passaram | ⚠️ **Quase:** **288 de 288** verificações das suítes desta reestruturação; da corrente `npm test`, **86 de 87 scripts** na corrida final. O que falhou foi `test:equipe-assume` (cenário "corrida", teste de navegador **intermitente**: 1 falha em 14 repetições isoladas, 0 em 12 na versão base); repetido, passa. Não alterei o teste. `04` |
 | Dependências do suporte Klingo documentadas | ✅ `05` seção A (E1 a E9). |
 | Plano de publicação e reversão validado | ⚠️ Plano e reversão escritos; a **reversão foi testada no banco clonado** (`rollback`, idempotência e preservação de dados). A publicação em si só se valida na produção. |
 | Nenhuma alteração nova publicada na produção | ✅ Confirmado: nenhuma migração, função, configuração ou merge. A única chamada à produção foi `acao: "inexistente"` na `klingo-agendamento` (sem efeito) e leituras de estrutura. |

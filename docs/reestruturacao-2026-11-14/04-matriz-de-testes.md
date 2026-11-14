@@ -1,6 +1,6 @@
 # 04 — Matriz de testes
 
-Versão 2.0 — 14/11/2026 / Mudança: regenerada da execução real em 14/11/2026 (depois das decisões do dono): **285 de 285 verificações das suítes desta reestruturação passaram** e a corrente completa `npm test` passou **87 de 87 scripts** (inclui `test:python`: 27 testes com `pytest` instalado só no ambiente de teste, e `test:voltar-sql`, 9 de 9). Não foi modificado nenhum teste para fazê-lo passar: os testes antigos que descreviam comportamento que mudou de propósito foram **atualizados com o motivo no próprio arquivo** (ex.: o executor agora aceita `ler_vouchers`; o `previsao.navegador` e o `agenda-ao-vivo.navegador` deixaram de conferir a grade) ou **retirados com registro** (testes da `klingo-agendamento` v1.1 de 13/11 que descreviam código nunca publicado; `sql-klingo-auto.test.mjs`, ver `05-pendencias.md` I7).
+Versão 2.0 — 14/11/2026 / Mudança: regenerada da execução real em 14/11/2026 (depois das decisões do dono): **288 de 288 verificações das suítes desta reestruturação passaram** e a corrente completa `npm test` passou **86 de 87 scripts** (inclui `test:python`: 27 testes com `pytest` instalado só no ambiente de teste, e `test:voltar-sql`, 9 de 9). Não foi modificado nenhum teste para fazê-lo passar: os testes antigos que descreviam comportamento que mudou de propósito foram **atualizados com o motivo no próprio arquivo** (ex.: o executor agora aceita `ler_vouchers`; o `previsao.navegador` e o `agenda-ao-vivo.navegador` deixaram de conferir a grade) ou **retirados com registro** (testes da `klingo-agendamento` v1.1 de 13/11 que descreviam código nunca publicado; `sql-klingo-auto.test.mjs`, ver `05-pendencias.md` I7).
 
 **O que estes testes provam e o que NÃO provam.** Rodam num Postgres embutido com a estrutura REAL da produção (retrato de 14/11/2026), num navegador real (Chromium) com o Supabase simulado e em Node/Deno com o Klingo **simulado**. **Nenhum fala com o Klingo real, nenhum cria ou cancela marcação real e nenhum toca a produção.** O comportamento real do Klingo (formato de `GET /vouchers` para marcações do balcão, laudo liberado, remarcação com falha parcial, respostas perdidas) **continua sem prova** e está listado em `05-pendencias.md` (E2, E3, E4, E8). O piloto de `06-plano-de-publicacao.md` seção 3 é o teste real.
 
@@ -26,18 +26,14 @@ Grupos do prompt mestre: **A** disponibilidade · **B** agendamento · **C** sol
 | Pipeline de marcação (Klingo simulado) | 15 de 15 | ✅ |
 | Solicitação de disponibilidade futura | 24 de 24 | ✅ |
 | Pós-agendamento (Klingo simulado) | 39 de 39 | ✅ |
-| Configuração pública (público geral) | 10 de 10 | ✅ |
+| Configuração pública (público geral) | 11 de 11 | ✅ |
 | Migração, preservação de dados, idempotência e rollback | 7 de 7 | ✅ |
 | Segurança da klingo-agendamento (banco) | 12 de 12 | ✅ |
-| Navegador: calendário e disponibilidade (paciente) | 11 de 11 | ✅ |
+| Navegador: calendário e disponibilidade (paciente) | 13 de 13 | ✅ |
 | Navegador: lista de médicos (paciente) | 4 de 4 | ✅ |
 | Navegador: pós-agendamento (paciente) | 4 de 4 | ✅ |
 | Navegador: painel da equipe | 5 de 5 | ✅ |
 | Navegador: previsão antiga → disponibilidade | 6 de 6 | ✅ |
-| Edge: diagnóstico por etapa (chat-agenda-api) | 0 de 0 | ✅ |
-| Edge: motor de vagas (disponibilidade-vigia) | 0 de 0 | ✅ |
-| Edge: executor (marcar, cancelar, remarcar, ver, resultado; Klingo simulado) | 0 de 0 | ✅ |
-| Edge: klingo-agendamento (chamada direta, trava, terceiros) | 0 de 0 | ✅ |
 | Edge: diagnóstico por etapa (chat-agenda-api) | 11 de 11 | ✅ |
 | Edge: motor de vagas (disponibilidade-vigia) | 4 de 4 | ✅ |
 | Edge: executor (marcar, cancelar, remarcar, ver, resultado; Klingo simulado) | 46 de 46 | ✅ |
@@ -186,6 +182,7 @@ Grupos do prompt mestre: **A** disponibilidade · **B** agendamento · **C** sol
 | E | Configuração pública (público geral) | PÚBLICO: a marcação automática segue o pipeline protegido (operação pendente sem dado pessoal; "agendado" só com o voucher do Klingo) | marcar/pendente; pedido=rascunho | `sql-webchat-v2-publico.test.mjs` | ✅ passou |
 | E | Configuração pública (público geral) | PÚBLICO: o calendário do paciente comum mostra EXATAMENTE as ofertas da API (a grade não é vaga) | estado=com_horarios; slots=2026-11-18 10:30 | `sql-webchat-v2-publico.test.mjs` | ✅ passou |
 | E | Configuração pública (público geral) | PÚBLICO: sem consulta à API não há calendário nem vaga inventada (estado "sem_consulta") | estado=sem_consulta | `sql-webchat-v2-publico.test.mjs` | ✅ passou |
+| E | Configuração pública (público geral) | PÚBLICO: depois de marcar pelo chat, o menu oferece "Cancelar" e "Remarcar" pelas chaves próprias (klingo_api_pos antigo em "teste" não esconde nada); cada botão some se a sua chave for desligada | ligadas=ver,remarcar,cancelar,equipe,fim; desligadas=ver,equipe,fim | `sql-webchat-v2-publico.test.mjs` | ✅ passou |
 | E | Migração, preservação de dados, idempotência e rollback | ANTES da migração o defeito existe (retrato da produção): mestre "sim" + marcar "teste" libera o paciente comum | klingo_ativo(comum, marcar) = true | `sql-webchat-v2-rollback.test.mjs` | ✅ passou |
 | E | Migração, preservação de dados, idempotência e rollback | as 6 migrações, na ordem do plano de publicação, aplicam sem erro sobre um banco que já tem dados | — | `sql-webchat-v2-rollback.test.mjs` | ✅ passou |
 | E | Migração, preservação de dados, idempotência e rollback | reaplicar as 6 migrações uma segunda vez também funciona (idempotentes) | — | `sql-webchat-v2-rollback.test.mjs` | ✅ passou |
@@ -208,6 +205,8 @@ Grupos do prompt mestre: **A** disponibilidade · **B** agendamento · **C** sol
 | A/C | Navegador: calendário e disponibilidade (paciente) | COM HORÁRIOS: mostra só os horários que vieram da API, diz que só ficam marcados depois da confirmação e oferece "Procurar mais datas" | slots=08:00,08:30,09:00; ordem=fn:chat-agenda-api>chat_horarios | `calendario-api.navegador.mjs` | ✅ passou |
 | A/C | Navegador: calendário e disponibilidade (paciente) | SEM HORÁRIOS (a API respondeu e não há vaga): mensagem pedida e três saídas; NENHUM horário aparece | botões=Registrar minha disponibilidade para uma vaga futura \| Consultar de novo \| Falar com a equipe | `calendario-api.navegador.mjs` | ✅ passou |
 | A/C | Navegador: calendário e disponibilidade (paciente) | FALHA TÉCNICA (API fora do ar) NÃO é "sem vaga": avisa que não foi possível consultar e oferece "Tentar de novo" (que consulta a API de novo, sem usar a lista guardada) | botões=Tentar de novo \| Registrar minha disponibilidade para uma vaga futura \| Falar com a equipe; última chamada={"janela":0,"fresco":true} | `calendario-api.navegador.mjs` | ✅ passou |
+| A/C | Navegador: calendário e disponibilidade (paciente) | API LENTA (responde em 2,5 s): a tela mostra que está conferindo e depois os horários da API, sem travar nem mostrar horário antes da resposta | conferindo=true; horário antes da resposta=false | `calendario-api.navegador.mjs` | ✅ passou |
+| A/C | Navegador: calendário e disponibilidade (paciente) | API LENTA DEMAIS (passa do limite de 14 s): a tela NÃO fica esperando para sempre nem inventa horário: mostra "não foi possível consultar" com "Tentar de novo" | horários na tela=0 | `calendario-api.navegador.mjs` | ✅ passou |
 | A/C | Navegador: calendário e disponibilidade (paciente) | SERVIÇO SEM INTEGRAÇÃO: diz que é agendado pela equipe, NÃO oferece registrar disponibilidade (não seria procurado) e "Enviar meu pedido para a equipe" responde "sem_horario" ao assistente | botões=Enviar meu pedido para a equipe \| Falar com a equipe; resposta="sem_horario" | `calendario-api.navegador.mjs` | ✅ passou |
 | A/C | Navegador: calendário e disponibilidade (paciente) | REGISTRAR DISPONIBILIDADE: formulário com período, dias, turno, aviso desmarcado por padrão e texto "não é um agendamento"; envia os dados certos | {"data_ini":"2026-11-15","data_fim":"2026-12-29","dias_semana":[1,2,3,4,5],"turno":"manha","aceita_outras_unidades":true,"aceita_outros_profissionais":true,"ace | `calendario-api.navegador.mjs` | ✅ passou |
 | A/C | Navegador: calendário e disponibilidade (paciente) | REGISTRAR sem autorizar aviso: canais vazios (não há consentimento presumido); datas invertidas e nenhum dia são recusados na tela, sem chamar o servidor | Escolha as datas: a final precisa ser depois da inicial. | `calendario-api.navegador.mjs` | ✅ passou |
@@ -335,4 +334,4 @@ Grupos do prompt mestre: **A** disponibilidade · **B** agendamento · **C** sol
 
 ## Corrente completa `npm test`
 
-87 de 87 scripts passaram (lista com tempos em `regressao.json`, nesta pasta; os nomes são os scripts de `testes/package.json`). Observações: `test:python` roda com `pytest` instalado só no ambiente (`python3 -m pip install pytest`); os testes de navegador precisam de `CHROMIUM_PATH` definido **no mesmo comando**.
+**86 de 87 scripts passaram** na corrida final (tempos em `regressao.json`, nesta pasta). **Um falhou: `test:equipe-assume`** (cenário "corrida": `page.click` com tempo esgotado de 30 s). É um teste de navegador **intermitente**: repetido isolado, falhou 1 de 14 vezes na versão atual e **0 de 12** na versão base (`e6c2d15`); as demais passaram 9/9. Não foi alterado para passar; fica registrado como intermitência a investigar (`05-pendencias.md` I13). Observações: `test:python` roda com `pytest` instalado só no ambiente (`python3 -m pip install pytest`); os testes de navegador precisam de `CHROMIUM_PATH` definido **no mesmo comando**.
