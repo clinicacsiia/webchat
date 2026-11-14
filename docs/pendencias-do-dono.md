@@ -107,7 +107,8 @@ Resumo e plano completo: [`reestruturacao-2026-11-14/00-leia-primeiro.md`](reest
 3. **Decidir a política de encerramento** de conversa quando o paciente registra disponibilidade futura (chave `disponibilidade_encerra_conversa`, hoje `nao`) e a inatividade de 24 h.
 4. **Suporte do Klingo**: webhook, endpoints de resultado de exame, remarcação atômica, `/vouchers` com `id_externo`, limite por minuto, catálogo (lista em [`05-pendencias.md`](reestruturacao-2026-11-14/05-pendencias.md), seção A).
 5. **Jurídico**: `privacidade.html` precisa citar a solicitação de disponibilidade, o aviso no chat, a retenção e o opt-out (item 2.5).
-6. Apagar também as funções temporárias `klingo-comparar-chat`, `klingo-comparar-14554`, `klingo-teste-api` e `klingo-inspecionar-chat` (lista em 4).
+6. **Decidir sobre um erro meu**: um telefone de teste real (o da lista `klingo_api_telefones_teste`) ficou nos commits antigos da branch `ccr-462c5406-8n7vre` (já removido da versão atual). Me autorize a **reescrever o histórico dessa branch** (ninguém mais depende dela) ou apague a branch no GitHub e eu a recrio limpa: https://github.com/clinicacsiia/webchat/branches . **Não faça merge antes disso.**
+7. Apagar também as funções temporárias `klingo-comparar-chat`, `klingo-comparar-14554`, `klingo-teste-api` e `klingo-inspecionar-chat` (lista em 4).
 
 ## 3. Contas e segurança
 

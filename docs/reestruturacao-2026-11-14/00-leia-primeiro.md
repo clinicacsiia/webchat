@@ -50,10 +50,10 @@ Apagar `klingo-agendamento` (função pública que escreve no Klingo, fora das c
 | 4 | Solicitação futura não cria agendamento | Atendido (0 operações, pedido não vira `agendado`). |
 | 5 | Motor identifica oportunidades compatíveis | Atendido em SQL com ofertas inventadas; a Edge Function **não** foi executada contra a API real. |
 | 6 | Notificação não afirma agendamento | Atendido (texto testado). |
-| 7 | Idempotência e concorrência da marcação | **Já existia** (`UNIQUE chave_idem`, `on conflict`); não alterada, **sem teste novo**. |
-| 8 | Sem agendamento duplicado por repetição local | Idem (7). |
-| 9 | Operações incertas reconciliadas | Parcial: marcadas `incerto` e levadas à equipe (existente); conciliação ativa depende do Klingo (E4). |
-| 10 | Sem "agendado" sem confirmação válida | Existente (`klingo_operacao_concluir`); não alterado. |
+| 7 | Idempotência e concorrência da marcação | **Já existia** (`UNIQUE chave_idem`, `on conflict`); não alterada. **Agora com teste** (`sql-webchat-v2-agendamento`): duplo clique, 2 chamadas simultâneas, inserção direta duplicada recusada (23505). Klingo simulado. |
+| 8 | Sem agendamento duplicado por repetição local | Idem (7), mais retentativa do job e reabertura: sempre a mesma operação. |
+| 9 | Operações incertas reconciliadas | Parcial: `incerto` não vira agendado, chama a equipe com "conferir ANTES de marcar de novo" e **não cria 2ª operação** (testado); conciliação ativa depende do Klingo (E4). |
+| 10 | Sem "agendado" sem confirmação válida | Existente; **testado**: só `sucesso` com voucher agenda; incerto, falha e horário tomado nunca agendam. |
 | 11 | Serviços não somem | Atendido. |
 | 12 | Estados independentes | **Parcial** (I2). |
 | 13 | Remarcação respeita a segurança | **Não atendido nesta rodada** (B3, E3). |
@@ -63,8 +63,8 @@ Apagar `klingo-agendamento` (função pública que escreve no Klingo, fora das c
 | 17 | Autogestão não promove | Atendido (testes de recuo/recomendação/recusa). |
 | 18 | Funções expostas com autenticação | **Parcial**: auditadas; apagar as temporárias depende do dono (B0). |
 | 19 | Migrações preservam dados | Atendido (teste de rollback e preservação). |
-| 20 | Fluxos não relacionados continuam | Regressão: ver `04-matriz-de-testes.md`. |
-| 21 | Testes obrigatórios com evidência | **Parcial**: grupos A, C, E cobertos; **B (agendamento) e D (pós-agendamento) não receberam testes novos**. |
+| 20 | Fluxos não relacionados continuam | Regressão: **77 de 79 scripts passaram** na corrente; as 2 falhas eram `test:python` (falta `pytest` no ambiente) e `test:voltar-sql` (já corrigido, 9/9). Ver `04-matriz-de-testes.md`. |
+| 21 | Testes obrigatórios com evidência | **Parcial**: A, B (sobre o pipeline existente, Klingo simulado), C e E cobertos; **D (pós-agendamento) não coberto**. Detalhe e lacunas em `04-matriz-de-testes.md`. |
 | 22 | Documentação = comportamento | Atendido para o que foi implementado; limites em `05-pendencias.md`. |
 
 ## 4. Onde ler o resto

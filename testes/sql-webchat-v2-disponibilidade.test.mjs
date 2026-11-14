@@ -31,7 +31,7 @@ await db.exec(`
 const cfg = (chave, valor) => db.query(`insert into public.config (chave, valor) values ($1, $2) on conflict (chave) do update set valor = excluded.valor`, [chave, valor]);
 const dia = (n) => new Date(Date.now() + n * 864e5).toLocaleString('sv-SE', { timeZone: 'America/Bahia' }).slice(0, 10);
 const dow = (iso) => new Date(`${iso}T12:00:00Z`).getUTCDay();
-const TESTE = '71988880077';
+const TESTE = '71900000001';
 const CAMPO = (c) => (c.tipo === 'sexo' ? 'F' : c.tipo === 'data' ? '25/03/1980' : c.tipo === 'cpf' ? '111.444.777-35' : c.tipo === 'tel' ? '(71) 99999-0001' : c.tipo === 'email' ? 'maria@exemplo.invalid'
   : c.tipo === 'cep' ? '40000-000' : c.tipo === 'uf' ? 'BA' : c.nome === 'nome' ? 'Maria Teste da Silva' : c.nome === 'mae' ? 'Ana Teste da Silva' : c.nome === 'numero' ? '10' : 'Texto de teste');
 let nTel = 0;
@@ -115,7 +115,7 @@ await caso('EDITAR e CONSULTAR: o paciente altera preferências e vê a solicita
   const e = await comoPaciente(() => rpc('chat_disponibilidade_alterar', { p_conversa: A.c, p_token: A.t, p_id: sol.id, p_dados: base({ turno: 'manha', dias_semana: [2, 4] }) }));
   const v = await comoPaciente(() => rpc('chat_disponibilidade_ver', { p_conversa: A.c, p_token: A.t }));
   const txt = JSON.stringify(v);
-  return { ok: e.ok && v.solicitacoes.length === 1 && v.solicitacoes[0].turno === 'manha' && JSON.stringify(v.solicitacoes[0].dias_semana) === '[2,4]' && !/111\.?444|Maria|1980|71988880077/.test(txt), detalhe: `turno=${v.solicitacoes[0].turno}; dias=${JSON.stringify(v.solicitacoes[0].dias_semana)}` };
+  return { ok: e.ok && v.solicitacoes.length === 1 && v.solicitacoes[0].turno === 'manha' && JSON.stringify(v.solicitacoes[0].dias_semana) === '[2,4]' && !/111\.?444|Maria|1980|71900000001/.test(txt), detalhe: `turno=${v.solicitacoes[0].turno}; dias=${JSON.stringify(v.solicitacoes[0].dias_semana)}` };
 });
 
 await caso('SEM BUSCA AUTOMÁTICA: vários exames ou serviço sem integração NÃO viram solicitação (seguem para a equipe); nada é prometido que não será procurado', async () => {

@@ -103,25 +103,26 @@ const pedidoDe = async (c) => { await como(''); return um(`select status, tipo, 
 const erroDe = async (fn) => { try { await fn(); return null; } catch (e) { return { code: e.code, msg: String(e.message).split('\n')[0] }; } };
 const flux = async (c) => { await como(''); return um(`select passo, dados from public.conversa_fluxo where conversa_id = $1`, [c]); };
 
-await caso('voltar do CPF E NASCIMENTO: refaz a escolha do exame (com o exame antigo trocado) e o resto do caminho continua até o fim', async () => {
+// Versão 2.0 — 14/11/2026: a produção pergunta CPF e nascimento ANTES do motivo (cpf_nasc > motivo > exame > plano ...); os 3 casos abaixo foram ajustados a essa ordem.
+await caso('voltar do PLANO: refaz a escolha do exame (com o exame antigo trocado) e o resto do caminho continua até o fim', async () => {
   const p = await iniciar('Voltar Plano Teste');
-  await responder(p, { motivo: 'exame' }); await responder(p, {});            // motivo, exame
+  await responder(p, { motivo: 'exame' }); await responder(p, { motivo: 'exame' }); await responder(p, {});   // cpf_nasc, motivo, exame
   const antes = p.passos.join(' > ');
   const r = await voltar(p);
   const pa = await pedidoDe(p.c);
   const refeito = await responder(p, {});                                        // escolhe o exame de novo
   const fim = await ateOFim(p, { plano: 'Particular', confirmar: 'ok' });
   const f = await pedidoDe(p.c);
-  return { ok: antes === 'motivo > exame > cpf_nasc' && r.passo === 'exame' && p.passos[3] === 'exame' && /Tudo bem, vamos corrigir/.test(r.respostas.at(-1).texto) && refeito && fim.passos.at(-1) === 'acompanhar' && f.status === 'pronto',
+  return { ok: antes === 'cpf_nasc > motivo > exame > plano' && r.passo === 'exame' && p.passos[4] === 'exame' && /Tudo bem, vamos corrigir/.test(r.respostas.at(-1).texto) && refeito && fim.passos.at(-1) === 'acompanhar' && f.status === 'pronto',
     detalhe: fim.passos.join(' > ') };
 });
 await caso('voltar do EXAME leva ao MOTIVO e dá para trocar de exame para consulta', async () => {
   const p = await iniciar('Voltar Motivo Teste');
-  await responder(p, { motivo: 'exame' });
+  await responder(p, {}); await responder(p, { motivo: 'exame' });   // cpf_nasc, motivo
   const r = await voltar(p);
   await escolher(p, 'motivo', 'consulta');
   const f = await flux(p.c);
-  return { ok: r.passo === 'motivo' && p.passos.join(' > ') === 'motivo > exame > motivo > consulta' && f.dados.motivo === 'consulta', detalhe: p.passos.join(' > ') };
+  return { ok: r.passo === 'motivo' && p.passos.join(' > ') === 'cpf_nasc > motivo > exame > motivo > consulta' && f.dados.motivo === 'consulta', detalhe: p.passos.join(' > ') };
 });
 await caso('voltar do HORÁRIO leva ao PLANO e o plano antigo é apagado', async () => {
   const p = await iniciar('Voltar Horario Teste');
@@ -144,12 +145,12 @@ await caso('voltar da CONFIRMAÇÃO leva ao último grupo de dados; voltar de no
   const a = await voltar(p), b = await voltar(p), c = await voltar(p), d = await voltar(p);
   return { ok: a.passo === 'dados_contato' && b.passo === 'dados_ident' && c.passo === 'horario' && d.passo === 'plano', detalhe: [a, b, c, d].map((x) => x.passo).join(' < ') };
 });
-await caso('CONSULTA: voltar do CPF e nascimento leva à escolha do médico; do médico, à consulta', async () => {
+await caso('CONSULTA: voltar do PLANO leva à escolha do médico; do médico, à consulta', async () => {
   const p = await iniciar('Voltar Consulta Teste');
-  await responder(p, { motivo: 'consulta' }); await responder(p, {}); await responder(p, { medico: 'DRA EXEMPLO DOIS' });
+  await responder(p, {}); await responder(p, { motivo: 'consulta' }); await responder(p, {}); await responder(p, { medico: 'DRA EXEMPLO DOIS' });   // cpf_nasc, motivo, consulta, médico
   const a = await voltar(p), f = await flux(p.c);
   const b = await voltar(p);
-  return { ok: p.passos.slice(0, 4).join(' > ') === 'motivo > consulta > medico > cpf_nasc' && a.passo === 'medico' && b.passo === 'consulta', detalhe: `${a.passo} / ${b.passo}` };
+  return { ok: p.passos.slice(0, 5).join(' > ') === 'cpf_nasc > motivo > consulta > medico > plano' && a.passo === 'medico' && b.passo === 'consulta', detalhe: `${a.passo} / ${b.passo}` };
 });
 await caso('primeira pergunta: não há o que corrigir antes dela (recusa clara)', async () => {
   const p = await iniciar('Voltar Primeira Teste');

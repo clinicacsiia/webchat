@@ -24,10 +24,10 @@ const novaConversa = async (tel) => {
   const c = (await q(`insert into public.contatos (nome, telefone) values ('Paciente Teste', $1) returning id`, [tel]))[0].id;
   return (await q(`insert into public.conversas (contato_id) values ($1) returning id`, [c]))[0].id;
 };
-const FORA = await novaConversa('71988880001'), LISTA = await novaConversa('71988880077');
+const FORA = await novaConversa('71988880001'), LISTA = await novaConversa('71900000001');
 const modo = async (conv, chave) => (await um(`select public.klingo_modo($1, $2) m, public.klingo_ativo($1, $2) a, public.klingo_sombra($1, $2) s`, [conv, chave]));
 const cenario = async (mestre, chaves, pct = '100') => {
-  await cfg('klingo_auto', mestre); await cfg('klingo_api_telefones_teste', '71988880077'); await cfg('klingo_api_percentual', pct);
+  await cfg('klingo_auto', mestre); await cfg('klingo_api_telefones_teste', '71900000001'); await cfg('klingo_api_percentual', pct);
   for (const [k, v] of Object.entries(chaves)) await cfg(k, v);
 };
 

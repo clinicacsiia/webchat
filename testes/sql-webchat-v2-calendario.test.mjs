@@ -68,7 +68,7 @@ async function ateOCalendario(tel = telefone()) {
 const horarios = async (p, extra = {}) => { await anonimo(); try { return await rpc('chat_horarios', { p_conversa: p.c, p_token: p.t, p_grupo: 1, p_de: dia(0), p_ate: dia(40), ...extra }); } finally { await como(''); } };
 const escolher = async (p, data, hora, unidade = null) => { await anonimo(); try { return await rpc('chat_horario_escolher', { p_conversa: p.c, p_token: p.t, p_grupo: 1, p_data: data, p_hora: hora, p_unidade: unidade }); } finally { await como(''); } };
 const erroDe = async (fn) => { try { await fn(); return null; } catch (e) { return { code: e.code, msg: String(e.message).split('\n')[0] }; } };
-const TESTE = '71988880077';
+const TESTE = '71900000001';
 const ofertar = async (c, itens, sombra = false) => {
   const l = itens.map(([d, h, prof, un]) => ({ chave: `${d}|63|308|2|${h}`, data: d, hora: h, profissional: prof ?? 'DRA EXEMPLO IMAGEM', unidade: un ?? UNIDADE }));
   return (await um(`select public.klingo_oferta_gravar_v2($1, 201, 1, $2::jsonb, $3, true) n`, [c, JSON.stringify(l), sombra])).n;

@@ -13,9 +13,9 @@ await db.exec(`insert into vault.secrets_tbl (name, secret) values ('klingo_hash
 // dados que já existem na produção antes da migração (inventados)
 await db.exec(`
   insert into public.config (chave, valor) values ('klingo_auto', 'sim'), ('klingo_api_horarios', 'sombra'), ('klingo_api_marcar', 'teste'), ('klingo_api_pos', 'teste'), ('klingo_api_pre_cadastro', 'teste'),
-    ('klingo_so_liberados', 'sim'), ('klingo_api_telefones_teste', '71988880077'), ('klingo_api_percentual', '100'), ('klingo_webhook', 'nao'), ('pedido_horario_modo', 'teste'), ('klingo_autogestao', 'sim')
+    ('klingo_so_liberados', 'sim'), ('klingo_api_telefones_teste', '71900000001'), ('klingo_api_percentual', '100'), ('klingo_webhook', 'nao'), ('pedido_horario_modo', 'teste'), ('klingo_autogestao', 'sim')
     on conflict (chave) do update set valor = excluded.valor;
-  insert into public.contatos (nome, telefone) values ('Paciente Comum', '71988880001'), ('Paciente Teste', '71988880077');
+  insert into public.contatos (nome, telefone) values ('Paciente Comum', '71988880001'), ('Paciente Teste', '71900000001');
   insert into public.conversas (contato_id) select id from public.contatos;
 `);
 const comum = (await um(`select c.id from public.conversas c join public.contatos t on t.id = c.contato_id where t.telefone = '71988880001'`)).id;

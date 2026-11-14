@@ -15,7 +15,7 @@ let sqlErro = null;
 for (const f of ['webchat-v2-parte1-modos', 'webchat-v2-parte2-calendario-api']) { try { await db.exec(readFileSync(`${REPO}/supabase/${f}.sql`, 'utf8')); } catch (e) { sqlErro = `${f}: ${String(e.message).split('\n')[0]}`; } }
 registrar('o retrato da produção monta inteiro e as partes 1 e 2 aplicam sem erro', falhas.length === 0 && !sqlErro, sqlErro ?? '');
 
-const UNIDADE = 'CLÍNICA DE SAÚDE E IMAGEM - CSI', TESTE = '71988880077';
+const UNIDADE = 'CLÍNICA DE SAÚDE E IMAGEM - CSI', TESTE = '71900000001';
 await db.exec(`
   insert into public.config (chave, valor) values ('ia_segredo', 'segredo-de-teste'), ('motor', 'fluxo'), ('nome_empresa', 'Clínica de Teste'), ('boas_vindas', 'Olá!'), ('reabrir_dias', '2'),
     ('klingo_auto', 'sim'), ('klingo_api_horarios', 'teste'), ('klingo_api_marcar', 'teste'), ('klingo_api_pre_cadastro', 'teste'), ('klingo_api_telefones_teste', '${TESTE}'), ('klingo_api_percentual', '100'),

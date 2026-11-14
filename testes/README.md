@@ -91,3 +91,20 @@ Leia isto antes de tratar "tudo verde" como "pronto para produção".
 | `navegador.smoke.mjs` | Servidor local + Playwright + Supabase simulado. `CHROMIUM_PATH` aponta para um Chromium já instalado. |
 
 Os testes do Python ficam em `biometria/test_avaliar_assinatura.py` e os da Edge Function em `supabase/functions/sync-catalogo-klingo/*.test.ts`, junto do código que testam.
+
+## WebChat v2 (14/11/2026)
+
+| Arquivo | O que prova |
+|---|---|
+| `sql-webchat-v2-modos.test.mjs` | Matriz mestre × chave × telefone (`klingo_modo`): o mestre só limita, sombra só mede, auditoria de config, recuo/recomendação/promoção, catálogo, `klingo_consulta`. |
+| `sql-webchat-v2-calendario.test.mjs` | O calendário só mostra ofertas da API; sem oferta não vira vaga da grade; escolha só de oferta válida. |
+| `sql-webchat-v2-disponibilidade.test.mjs` | Solicitação de disponibilidade futura: criar, editar, cancelar, expirar, vaga compatível/incompatível, aviso sem duplicar, sem autorização, filhos diferentes, acesso cruzado, motor em sombra. |
+| `sql-webchat-v2-agendamento.test.mjs` | Pipeline de marcação **existente** (`klingo_operacao`): duplo clique, duas chamadas, incerto, retentativa, horário tomado, divergência, vários exames. Klingo **simulado**. |
+| `sql-webchat-v2-rollback.test.mjs` | A migração preserva dados e o rollback (reaplicar as funções do retrato) devolve o comportamento anterior. |
+| `calendario-api.navegador.mjs` | Tela do paciente: os 4 estados, 3 saídas, formulário de disponibilidade, "Minha disponibilidade", aviso de vaga. |
+| `previsao.navegador.mjs` | Painel "Disponibilidade futura" (filtros por situação). |
+| `../supabase/functions/chat-agenda-api/diagnostico.test.ts`, `../supabase/functions/disponibilidade-vigia/vigia.test.ts` | Diagnóstico por etapa da resposta da API (vazio × estrutura inválida × tudo filtrado × expirado) e janelas de 15 dias. |
+
+**Retirado da corrente de `npm test` (14/11/2026):** `sql-klingo-auto.test.mjs` (script `test:klingo-auto-sql-legado`). Ele reaplicava as 15 partes `klingo-auto-*` sobre o retrato; como o retrato agora **é** a produção (que já contém essas partes) e o fluxo mudou (CPF primeiro), 21 das 73 verificações falham por motivo do teste, não do código. Reescrevê-lo contra o fluxo atual está em `docs/reestruturacao-2026-11-14/05-pendencias.md` (limitação 1).
+
+**Ambiente:** `test:python` precisa de `pytest` (não instalado nesta sessão); os demais rodam com `CHROMIUM_PATH=/opt/pw-browsers/chromium`.
