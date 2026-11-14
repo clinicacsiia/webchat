@@ -1019,7 +1019,7 @@
 
   /* ---------- aba Fila: quem chegou e quem é o próximo ---------- */
   // O banco calcula a posição e gera os avisos (chegou, perto, sua vez) para o celular do paciente; aqui a equipe só registra, chama e conclui.
-  const F = { itens: [], tRecarga: null, acesso: null, ident: {}, un: {} };
+  const F = { itens: [], tRecarga: null, acesso: null, ident: {}, un: {}, olho: {} };
   const hojeFila = () => new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(new Date());
   async function carregarFila() {
     const { data, error } = await db.from('fila_chegada').select('id,nome,senha,status,origem,conta_id,chegou_em,chamado_em,email,telefone,pede_senha').in('status', ['aguardando', 'chamado']).order('chegou_em').order('id');
@@ -1029,6 +1029,9 @@
     // Identificação automática (paciente novo ou já cadastrado, conversas, exames em aberto, exames de hoje no Klingo). Sem o SQL novo, a fila segue sem ela.
     F.ident = {};
     try { const { data: ids, error: eId } = await db.rpc('fila_identificar_todos'); if (!eId && Array.isArray(ids)) for (const i of ids) F.ident[i.id] = i; } catch { /* sem identificação */ }
+    // O "olho": status AO VIVO no Klingo (relatório lido a cada 2 min) das marcações de quem está na fila. Sem a função nova, a fila segue sem ela.
+    F.olho = {};
+    try { const { data: ol, error: eO } = await db.rpc('fila_olho_hoje'); if (!eO && Array.isArray(ol)) for (const o of ol) F.olho[o.id] = o.marcacoes || []; } catch { /* sem o olho */ }
     // Unidade provável de cada pessoa (exame de hoje no Klingo > pedido do chat > unidade do formulário). Sem resposta = aparece em todas.
     F.un = {};
     try { const { data: us, error: eU } = await db.rpc('fila_unidades_hoje'); if (!eU && Array.isArray(us)) for (const u of us) F.un[u.id] = u; } catch { /* sem unidade: aparece em todas */ }
@@ -1059,6 +1062,12 @@
     } catch (e) { toast(msgErro(e)); }
   }
   const ST_KLINGO = { agendado: 'agendado', confirmado: 'confirmado', atendido: 'atendido', cancelado: 'cancelado', remarcado: 'remarcado', faltou: 'faltou', pedido: 'pedido' };
+  const ST_AGORA = { Aberta: 'marcada', Cancelada: 'cancelada', Bloqueada: 'bloqueada' };
+  // Onde cada marcação está no Klingo agora (só para quem está na fila). Não mostra "N de M": só a situação de cada exame.
+  function olhoNos(x) {
+    const o = F.olho[x.id]; if (!o || !o.length) return null;
+    return h('div', { class: 'sub' }, h('b', {}, 'No Klingo agora: '), o.map((e) => String(e.exame || 'exame').toLowerCase() + ' (' + (ST_AGORA[e.status] || e.status || 'sem status') + (e.atendimento ? ', atendimento aberto' : '') + ')').join(', '));
+  }
   function identificacaoNos(x) {
     const i = F.ident[x.id]; if (!i) return null;
     const nos = [];
@@ -1091,6 +1100,7 @@
         x.pede_senha ? h('div', { class: 'selo erro', style: 'display:inline-block;margin-top:4px' }, 'Esqueceu a senha') : null,
         x.telefone || x.email ? h('div', { class: 'sub' }, [x.telefone, x.email].filter(Boolean).join(' · ')) : null,
         (() => { const u = F.un[x.id]; return u && (u.unidades || []).length ? h('div', { class: 'sub' }, 'Unidade provável: ' + u.unidades.map((k) => (UNIDADES_PAINEL.find((z) => z[0] === k) || [k, k])[1]).join(' e ') + ' (' + (ROT_FONTE_UN[u.fonte] || u.fonte) + ')') : null; })(),
+        olhoNos(x),
         identificacaoNos(x)),
       h('td', {},
         !x.conta_id && x.email && x.telefone ? h('button', { class: 'btn', type: 'button', onclick: () => acessoFila(x, 'criar') }, 'Criar conta') : null,
