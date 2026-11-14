@@ -29,6 +29,8 @@ export type Resultado = {
   voucher?: ReturnType<typeof resumoVoucher>;
   /** v1.1: só em "ler_vouchers" (marcações ativas do próprio paciente). */
   marcacoes?: Array<ReturnType<typeof resumoVoucher>>;
+  /** v1.1: só em "ler_vouchers" com detalhe.resultado: exames já realizados e se o laudo está liberado (nunca o conteúdo). */
+  resultados?: Array<{ id: string | null; procedimento: string | null; data: string | null; pronto: boolean | null }>;
   /** v1.1: só em "remarcar": situação do voucher ANTIGO depois da marcação nova. */
   antigo?: "ativo" | "cancelado" | "desconhecido";
 };
@@ -151,7 +153,19 @@ export async function executarConsulta(api: KlingoApi, rpc: Rpc, p: Pegar): Prom
     const s = await abrirSessao(api, rpc, p, { liberarNovo: false });
     if (ehResultado(s)) return s;
     const lista = await api.vouchers(s.token);
-    const marcacoes = (Array.isArray(lista) ? lista : []).map((v) => resumoVoucher(v)).filter((v) => v.id && /^\d+$/.test(v.id) && !/cancel/i.test(v.status ?? "")).slice(0, 20);
+    const todos = (Array.isArray(lista) ? lista : []).map((v) => resumoVoucher(v)).filter((v) => v.id && /^\d+$/.test(v.id));
+    if (p.operacao.detalhe?.resultado === true) {
+      // resultado de exame: só diz se o laudo está liberado (o conteúdo nunca passa por aqui); erro numa consulta = "não consegui conferir" (pronto: null), nunca "pronto" por suposição
+      const feitos = todos.filter((v) => /atendid|realizad/i.test(v.status ?? "")).slice(0, 5);
+      const resultados: NonNullable<Resultado["resultados"]> = [];
+      for (const v of feitos) {
+        let pronto: boolean | null = null;
+        try { pronto = (await api.resultadoPronto(v.id!)).pronto; } catch { pronto = null; }
+        resultados.push({ id: v.id, procedimento: v.procedimento, data: v.data, pronto });
+      }
+      return { estado: "sucesso", codigo: resultados.length ? "ok_com_resultados" : "sem_exames_realizados", http_status: 200, caminho: "/resultado", resultados };
+    }
+    const marcacoes = todos.filter((v) => !/cancel|atendid/i.test(v.status ?? "")).slice(0, 20);
     return { estado: "sucesso", codigo: marcacoes.length ? "ok_com_marcacoes" : "sem_marcacoes", http_status: 200, caminho: "/vouchers", marcacoes };
   } catch (e) {
     return falha(e instanceof KlingoErro ? e.tipo : "erro_interno", e);

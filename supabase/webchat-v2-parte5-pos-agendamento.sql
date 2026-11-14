@@ -54,7 +54,8 @@ insert into public.fluxo_texto (chave, texto, descricao) values
   ('marc_pos',           'Posso ajudar em mais alguma coisa com as suas marcações?', 'Pós-agendamento: depois de uma ação'),
   ('marc_desatualizada', 'Essa marcação mudou desde a última consulta. Vou consultar de novo.', 'Pós-agendamento: lista antiga'),
   ('resultado_situacao', 'Sobre o resultado do exame, o que você precisa?', 'Resultado de exame: pergunta inicial'),
-  ('resultado_orientacao_pronto',   'O prazo de entrega do resultado é informado no dia do exame. Para saber se o seu já está pronto, a nossa equipe confere no sistema com você. Posso chamar uma pessoa agora.', 'Resultado: está pronto? (editável)'),
+  ('resultado_consultando', 'Estou conferindo no sistema da clínica se o seu resultado já foi liberado. Leva só alguns segundos.', 'Resultado: aguardando a consulta ao Klingo'),
+  ('resultado_orientacao_pronto',   'O prazo de entrega do resultado é informado no dia do exame. O acesso (link e senha) é enviado pela clínica quando o laudo é liberado; se o seu já estiver liberado e você não recebeu, a nossa equipe reenvia. Posso chamar uma pessoa agora.', 'Resultado: está pronto? (editável)'),
   ('resultado_orientacao_acesso',   'O link e a senha de acesso ao resultado são enviados pela clínica depois que o laudo é liberado. Se você ainda não recebeu, a nossa equipe confere e reenvia. Posso chamar uma pessoa agora.', 'Resultado: link e senha (editável)'),
   ('resultado_orientacao_problema', 'Sinto muito pelo transtorno. Vou passar para a nossa equipe, que olha o seu caso com prioridade.', 'Resultado: problema com o resultado (editável)')
 on conflict (chave) do nothing;
@@ -109,6 +110,7 @@ declare
   op public.klingo_operacao; v_cod text := left(p_r ->> 'codigo', 60); v_n integer := 0; v_fut integer := 0; v_hoje date := (now() at time zone 'America/Bahia')::date; ctx jsonb; v_txt text; v_pos text;
 begin
   select * into op from public.klingo_operacao where id = p_op;
+  if coalesce((op.detalhe ->> 'resultado')::boolean, false) then return public.klingo_resultados_aplicar(p_op, p_estado, p_r); end if;   -- consulta de resultado de exame
   ctx := public.fluxo_ctx(op.conversa_id);
   select passo into v_pos from public.conversa_fluxo where conversa_id = op.conversa_id;
   if p_estado = 'sucesso' and jsonb_typeof(p_r -> 'marcacoes') = 'array' then
@@ -156,6 +158,59 @@ begin
   end if;
   return jsonb_build_object('ok', true, 'estado', p_estado);
 end $f$;
+
+-- Resultado de exame: só pergunta ao Klingo se o laudo está LIBERADO (nunca guarda nem mostra o conteúdo). Fica desligado enquanto klingo_api_resultado = nao (padrão) ou sombra.
+-- Limite honesto: a API entrega o laudo como arquivo (não existe link nem senha); o acesso continua sendo passado pela equipe, como decidido em 03/11/2026. Laudo liberado nunca foi testado com paciente real.
+create or replace function public.klingo_resultados_pedir(p_conversa uuid) returns uuid
+  language plpgsql security definer set search_path to ''
+as $f$
+declare d jsonb; v_op uuid;
+begin
+  if not public.klingo_ativo(p_conversa, 'klingo_api_resultado') then return null; end if;
+  d := public.klingo_dados_conversa(p_conversa);
+  if d ->> 'cpf' is null or d ->> 'nascimento' is null then return null; end if;
+  select id into v_op from public.klingo_operacao where conversa_id = p_conversa and tipo = 'ler_vouchers' and estado in ('pendente', 'executando') and criado_em > now() - interval '3 minutes' and coalesce((detalhe ->> 'resultado')::boolean, false) order by criado_em desc limit 1;
+  if v_op is null then
+    insert into public.klingo_operacao (conversa_id, pre_agendamento_id, tipo, chave_idem, detalhe)
+    values (p_conversa, (d ->> 'pre_agendamento_id')::uuid, 'ler_vouchers', 'ler:' || p_conversa::text || ':' || gen_random_uuid()::text, '{"resultado": true}'::jsonb) returning id into v_op;
+    perform public.klingo_operacao_disparar(v_op);
+    perform public.klingo_medir('op_criada');
+  end if;
+  perform public.fluxo_set(p_conversa, jsonb_build_object('resultado_estado', 'consultando', 'resultado_op', v_op));
+  return v_op;
+end $f$;
+
+create or replace function public.klingo_resultados_aplicar(p_op uuid, p_estado text, p_r jsonb) returns jsonb
+  language plpgsql security definer set search_path to ''
+as $f$
+declare op public.klingo_operacao; v_cod text := left(p_r ->> 'codigo', 60); v_pos text; v_txt text; v_lista text; ctx jsonb;
+begin
+  select * into op from public.klingo_operacao where id = p_op;
+  ctx := public.fluxo_ctx(op.conversa_id);
+  select passo into v_pos from public.conversa_fluxo where conversa_id = op.conversa_id;
+  if v_pos is distinct from 'marc_consultando' then return jsonb_build_object('ok', true, 'estado', p_estado); end if;
+  if p_estado = 'sucesso' and jsonb_typeof(p_r -> 'resultados') = 'array' then
+    select string_agg('• ' || coalesce(nullif(x.procedimento, ''), 'Exame') || coalesce(' de ' || to_char(case when x.data ~ '^\d{4}-\d{2}-\d{2}' then substr(x.data, 1, 10)::date end, 'DD/MM'), '') || ': '
+                      || case when x.pronto is true then 'resultado liberado' when x.pronto is false then 'ainda não liberado' else 'não consegui conferir' end, E'\n')
+      into v_lista from jsonb_to_recordset(p_r -> 'resultados') as x(procedimento text, data text, pronto boolean);
+    v_txt := case when v_lista is null then 'Não encontrei exame realizado recentemente no cadastro' || (ctx ->> 'de_quem') || '.' else 'Conferi no sistema da clínica:' || E'\n' || v_lista end;
+    perform public.fluxo_set(op.conversa_id, jsonb_build_object('resultado_estado', 'mostrado'));
+    perform public.fluxo_perguntar(op.conversa_id, 'resultado_orientacao', v_txt);
+    return jsonb_build_object('ok', true, 'estado', 'sucesso');
+  end if;
+  if v_cod in ('nascimento_divergente', 'sessao_nao_confere', 'dados_incompletos', 'sem_id_definitivo', 'cadastro_nao_encontrado') or v_cod like 'divergencia_%' then
+    perform public.fluxo_dizer(op.conversa_id, public.fluxo_t('marc_identidade', ctx));
+    perform public.fluxo_transferir(op.conversa_id, 'Paciente quis saber do resultado de exame e a identidade não foi confirmada no Klingo (' || coalesce(v_cod, 'falha') || ').', 'baixa', true);
+    return jsonb_build_object('ok', true, 'estado', p_estado);
+  end if;
+  perform public.fluxo_set(op.conversa_id, jsonb_build_object('resultado_estado', 'falha'));
+  perform public.fluxo_nota(op.conversa_id, 'Consulta de resultado ao Klingo não concluída (' || coalesce(v_cod, 'falha') || ').');
+  perform public.fluxo_perguntar(op.conversa_id, 'resultado_orientacao', 'Não consegui conferir o sistema da clínica agora, então não sei dizer se o seu resultado já foi liberado.');
+  return jsonb_build_object('ok', true, 'estado', p_estado);
+end $f$;
+
+revoke all on function public.klingo_resultados_pedir(uuid), public.klingo_resultados_aplicar(uuid, text, jsonb) from public, anon, authenticated;
+grant execute on function public.klingo_resultados_pedir(uuid), public.klingo_resultados_aplicar(uuid, text, jsonb) to service_role;
 
 -- Cancelamento pedido pela lista: "cancelado" só depois do OK do Klingo; o registro local acompanha, nunca antecipa
 create or replace function public.klingo_cancelamento_aplicar(p_op uuid, p_estado text, p_cod text) returns jsonb
@@ -343,7 +398,9 @@ begin
   if d ->> 'assunto' is null then return 'assunto'; end if;
   if coalesce((d ->> 'assunto_resolvido')::boolean, false) then return 'assunto_fim'; end if;
   if d ->> 'assunto' = 'Resultado de exame' and not coalesce((d ->> 'resultado_feito')::boolean, false) then
-    return case when d ->> 'resultado_situacao' is null then 'resultado_situacao' else 'resultado_orientacao' end;
+    if d ->> 'resultado_situacao' is null then return 'resultado_situacao'; end if;
+    if d ->> 'resultado_estado' = 'consultando' then return 'marc_consultando'; end if;
+    return 'resultado_orientacao';
   end if;
   if public.fluxo_marc_ativo(p_conversa, d) then return public.fluxo_marc_proximo(p_conversa, d); end if;
   return 'assunto_texto';
@@ -354,7 +411,7 @@ create or replace function public.fluxo_marc_iniciar(p_conversa uuid, p_assunto 
 as $f$
 declare v_op uuid;
 begin
-  perform public.fluxo_set(p_conversa, '{"marc_estado": null, "marc_op": null, "marc_voucher": null, "marc_acao": null, "resultado_situacao": null, "resultado_feito": null, "assunto_resolvido": null}'::jsonb);
+  perform public.fluxo_set(p_conversa, '{"marc_estado": null, "marc_op": null, "marc_voucher": null, "marc_acao": null, "resultado_situacao": null, "resultado_feito": null, "resultado_estado": null, "resultado_op": null, "assunto_resolvido": null}'::jsonb);
   if p_assunto in ('Remarcar', 'Cancelar', 'Minhas marcações') then
     v_op := public.klingo_marcacoes_pedir(p_conversa);
     if v_op is null then perform public.fluxo_set(p_conversa, '{"marc_estado": "local"}'::jsonb); end if;   -- chave desligada ou sem CPF/nascimento: segue o caminho antigo (texto para a equipe)
@@ -370,6 +427,9 @@ begin
   select coalesce(dados, '{}'::jsonb) into d from public.conversa_fluxo where conversa_id = p_conversa;
   case p_passo
   when 'marc_consultando' then
+    if d ->> 'resultado_estado' = 'consultando' then
+      return jsonb_build_object('texto', public.fluxo_t('resultado_consultando', ctx), 'op', jsonb_build_object('tipo', 'marcando', 'operacao', d ->> 'resultado_op', 'titulo', 'Conferindo o seu resultado…'));
+    end if;
     return jsonb_build_object('texto', public.fluxo_t(case when d ->> 'marc_acao' = 'cancelando' then 'marc_cancelando' else 'marc_consultando' end, ctx),
       'op', jsonb_build_object('tipo', 'marcando', 'operacao', d ->> 'marc_op', 'titulo', case when d ->> 'marc_acao' = 'cancelando' then 'Cancelando…' else 'Consultando as suas marcações…' end));
   when 'marc_lista' then
@@ -531,6 +591,7 @@ begin
     end if;
     if v not in ('pronto', 'acesso', 'problema') then return '{"ok": false}'::jsonb; end if;
     perform public.fluxo_set(p_conversa, jsonb_build_object('resultado_situacao', v));
+    if v = 'pronto' then perform public.klingo_resultados_pedir(p_conversa); end if;   -- só se klingo_api_resultado estiver ligada; senão segue só a orientação
     return '{"ok": true}'::jsonb;
 
   when 'resultado_orientacao' then

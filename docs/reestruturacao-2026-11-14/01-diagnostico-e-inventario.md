@@ -2,6 +2,8 @@
 
 Versão 1.0 — 14/11/2026 / Mudança: primeira versão (Etapa 0 do prompt mestre). Tudo aqui foi **lido** da produção (estrutura, contagens, tempos, definições de função). Nenhuma linha de paciente foi lida e **nada foi alterado na produção**.
 
+> **Atualização de 14/11/2026 (versão 2.0, depois das decisões do dono):** **R1** — a `klingo-agendamento` **é mantida** (não apagar, não desativar); a segurança foi corrigida mantendo o contrato: ver `07-auditoria-klingo-agendamento.md` (a coluna "Contenção" abaixo, que sugeria apagar, **não vale mais**). **R2** — o dono decidiu que o agendamento automático fica **disponível para todos** e assume a responsabilidade; a configuração produtiva **não** foi tocada, e a nova versão atende o público por chaves separadas (`03-matriz-de-configuracao.md`, seção "Configuração para o público"). R3 e R4 seguem corrigidos na parte 1.
+
 ## 1. Riscos ativos encontrados (contenção recomendada)
 
 | # | Risco | Evidência | Contenção (30 s) | Reversão |
@@ -15,7 +17,7 @@ Versão 1.0 — 14/11/2026 / Mudança: primeira versão (Etapa 0 do prompt mestr
 
 | Função | `verify_jwt` | Autenticação própria | O que devolve / faz | Uso real | Decisão |
 |---|---|---|---|---|---|
-| `klingo-agendamento` | **false** | **Nenhuma** além de CPF + nascimento | Escrita real no Klingo (ver R1) | Nenhum (página removida) | **Apagar já** (R1). |
+| `klingo-agendamento` | **false** | CPF + nascimento conferidos no Klingo (sem login do Supabase) | Escrita real no Klingo (ver R1) | **Mantida por decisão do dono** (usada em outro contexto) | **Preservar e proteger** no servidor (v1.1, `07-auditoria-klingo-agendamento.md`). |
 | `klingo-inspecionar-chat` | false | `x-sync-key` = `config.ia_segredo` (comparação simples) | Só estrutura e contagem de relatórios (lista fixa de 8 relatórios) | Diagnóstico manual | Autenticação comprovada. Pode ser apagada (pendência antiga). |
 | `klingo-comparar-chat` | false | `x-sync-key` = `config.ia_segredo` (comparação simples) | Lê o relatório #14554 **na memória** e devolve só contagens e ids de marcação | Auditoria de 13/11 | Autenticação comprovada. **Apagar** (finalidade cumprida). |
 | `klingo-comparar-14554` | true | JWT do Supabase | (função de comparação; não relida em detalhe) | Auditoria de 13/11 | **Apagar** (já está nas pendências do dono). |

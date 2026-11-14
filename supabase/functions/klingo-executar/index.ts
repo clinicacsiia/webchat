@@ -34,7 +34,7 @@ Deno.serve(async (req: Request) => {
     const api = new KlingoApi(tokenKlingo, (u, i) => fetch(u, i), { antes: cotaGlobal(rpc, { maxTentativas: 10, maxEsperaMs: 3000 }), aoLimite: async () => { await supabase.rpc("klingo_cota_429"); }, tentativas429: 2 });
     const { data: esps } = await supabase.from("klingo_especialidade").select("cbos, procedimentos");
     const r = await executar(api, rpc, pegar as unknown as Pegar, (esps ?? []) as Esp[]);
-    await concluir(r.estado, { voucher: r.voucher ?? null, codigo: r.codigo ?? null, http_status: r.http_status ?? null, caminho: r.caminho ?? null, marcacoes: r.marcacoes ?? null, antigo: r.antigo ?? null });   // v1.1: lista de marcações (ler_vouchers) e situação do voucher antigo (remarcar)
+    await concluir(r.estado, { voucher: r.voucher ?? null, codigo: r.codigo ?? null, http_status: r.http_status ?? null, caminho: r.caminho ?? null, marcacoes: r.marcacoes ?? null, resultados: r.resultados ?? null, antigo: r.antigo ?? null });   // v1.1: lista de marcações (ler_vouchers) e situação do voucher antigo (remarcar)
     return json({ ok: true, estado: r.estado });
   } catch {
     await concluir("incerto", { codigo: "erro_no_executor" });   // se algo escapou, o seguro é a equipe conferir antes de marcar de novo

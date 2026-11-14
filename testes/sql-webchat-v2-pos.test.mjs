@@ -337,7 +337,7 @@ await caso('RESULTADO: a clínica pode trocar a orientação pelo texto (resulta
   const Q = await novo(); await ateAssunto(Q); await clicar(Q, 'Resultado de exame'); const m = await clicar(Q, 'pronto'); const f = await clicar(Q, 'resolvido'); const n = await nota(Q.c);
   return { ok: /5 dias úteis/.test(m.texto) && f.opcoes?.tipo === 'nova' && n.ia_ativa === true, detalhe: `${f.opcoes?.tipo}` };
 });
-await caso('RESULTADO: nenhuma operação no Klingo é criada (a integração de resultado NÃO existe e não é simulada)', async () => {
+await caso('RESULTADO: só existem os 4 tipos de operação conhecidos (nenhuma operação de "entrega de resultado" foi inventada) e a chave padrão é "nao"', async () => {
   const x = await um(`select count(*)::int n from public.klingo_operacao where tipo not in ('marcar','cancelar','remarcar','ler_vouchers')`);
   const y = await um(`select valor from public.config where chave = 'klingo_api_resultado'`);
   return { ok: x.n === 0 && y.valor === 'nao', detalhe: `klingo_api_resultado=${y.valor}` };
@@ -368,6 +368,30 @@ await caso('EMERGÊNCIA escrita no meio de qualquer pergunta: orienta e chama a 
 await caso('PAINEL: o resumo do painel passa a contar cancelar/remarcar/ver marcações (só números)', async () => {
   const d = (await um(`select pg_get_functiondef('public.painel_automacao_resumo(date, date)'::regprocedure) f`)).f;
   return { ok: /'pos'/.test(d) && /ler_vouchers/.test(d) };
+});
+
+await caso('RESULTADO COM A INTEGRAÇÃO LIGADA (klingo_api_resultado = teste, Klingo SIMULADO): confere no Klingo se o laudo está liberado, mostra só "liberado / ainda não liberado" por exame e nunca o conteúdo', async () => {
+  await cfg('klingo_api_resultado', 'teste');
+  const Q = await novo(); await ateAssunto(Q); await clicar(Q, 'Resultado de exame'); const esp = await clicar(Q, 'pronto');
+  const ops = await q(`select id, detalhe from public.klingo_operacao where conversa_id = $1 and tipo = 'ler_vouchers'`, [Q.c]);
+  await executor(ops[0].id, 'sucesso', JSON.stringify({ codigo: 'ok_com_resultados', resultados: [{ id: '41001', procedimento: 'RM JOELHO', data: dia(-5), pronto: true }, { id: '41002', procedimento: 'US ABDOME', data: dia(-9), pronto: false }, { id: '41003', procedimento: 'RX TORAX', data: dia(-12), pronto: null }] }));
+  const m = await ultima(Q);
+  return { ok: ops.length === 1 && ops[0].detalhe.resultado === true && esp.opcoes?.tipo === 'marcando' && /RM JOELHO.*resultado liberado/.test(m.texto) && /US ABDOME.*ainda não liberado/.test(m.texto) && /RX TORAX.*não consegui conferir/.test(m.texto) && m.opcoes?.passo === 'resultado_orientacao' && !/laudo|pdf|senha:|http/i.test(m.texto.split('\n').slice(0, 4).join(' ')), detalhe: m.texto.split('\n').slice(0, 4).join(' / ').slice(0, 150) };
+});
+await caso('RESULTADO: Klingo fora do ar não vira "pronto": diz que não conseguiu conferir e mantém a orientação; identidade que não confere chama a equipe sem mostrar nada', async () => {
+  const Q = await novo(); await ateAssunto(Q); await clicar(Q, 'Resultado de exame'); await clicar(Q, 'pronto');
+  await executor((await q(`select id from public.klingo_operacao where conversa_id = $1 and tipo = 'ler_vouchers'`, [Q.c]))[0].id, 'falha', JSON.stringify({ codigo: 'erro_api' }));
+  const m = await ultima(Q);
+  const R = await novo(); await ateAssunto(R); await clicar(R, 'Resultado de exame'); await clicar(R, 'pronto');
+  await executor((await q(`select id from public.klingo_operacao where conversa_id = $1 and tipo = 'ler_vouchers'`, [R.c]))[0].id, 'falha', JSON.stringify({ codigo: 'nascimento_divergente' }));
+  const n = await nota(R.c), cont = await um(`select count(*)::int n from public.mensagens where conversa_id = $1 and texto ilike '%resultado liberado%'`, [R.c]);
+  return { ok: /não sei dizer se o seu resultado já foi liberado/.test(m.texto) && m.opcoes?.passo === 'resultado_orientacao' && n.ia_ativa === false && cont.n === 0, detalhe: m.texto.slice(0, 80) };
+});
+await caso('RESULTADO com a chave desligada (padrão): nenhuma consulta ao Klingo; só a orientação da clínica', async () => {
+  await cfg('klingo_api_resultado', 'nao');
+  const Q = await novo(); await ateAssunto(Q); await clicar(Q, 'Resultado de exame'); const m = await clicar(Q, 'pronto');
+  const ops = await q(`select count(*)::int n from public.klingo_operacao where conversa_id = $1`, [Q.c]);
+  return { ok: ops[0].n === 0 && m.opcoes?.passo === 'resultado_orientacao', detalhe: `ops=${ops[0].n}` };
 });
 
 // ---------------------------------------------------------------------------------------------- 7.3 Aviso do Klingo (webhook; continua DESLIGADO na produção — aqui só a regra do banco)

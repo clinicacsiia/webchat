@@ -21,6 +21,7 @@ type Cena = {
   reservar?: "ok" | "ocupado";
   marcar?: "ok" | "ocupado" | "timeout" | "html500" | "plano_inativo" | "sem_voucher";
   vouchers?: Array<Record<string, unknown>>;
+  resultados?: Record<string, "pronto" | "sem" | "queda">;      // GET /resultado/{id}: laudo liberado, sem laudo (403 em HTML) ou queda de rede
   vouchersDepoisDeCancelar?: Array<Record<string, unknown>>;   // o que a lista mostra depois do DELETE /voucher
   cancelar?: "ok" | "timeout" | "ja_cancelado";
   register?: "ok" | "timeout";
@@ -53,6 +54,12 @@ function klingo(c: Cena) {
       cancelou = true;
       if (c.cancelar === "timeout") { const e = new Error("t"); e.name = "TimeoutError"; throw e; }
       return c.cancelar === "ja_cancelado" ? resp(403, { msg: "Agendamento já cancelado." }) : resp(200, { status: "ok" });
+    }
+    if (rota.startsWith("GET /resultado/")) {
+      const k = c.resultados?.[rota.split("/").pop()!] ?? "sem";
+      if (k === "pronto") return resp(200, { pronto: true, status: "F", laudo: "CONTEUDO SIGILOSO DO LAUDO", pdf: "JVBERi0=" });
+      if (k === "queda") { const e = new Error("t"); e.name = "TimeoutError"; throw e; }
+      return resp(403, "<html>sem laudo</html>", "text/html");
     }
     if (rota === "GET /vouchers") return resp(200, cancelou && c.vouchersDepoisDeCancelar ? c.vouchersDepoisDeCancelar : (c.vouchers ?? []));
     return resp(404, "nao");
@@ -410,4 +417,28 @@ test("MARCAR comum não mexe no campo antigo", async () => {
   const { api } = apiDe({ paciente: PAC });
   const r = await executar(api, rpcDe().rpc, opDe("marcar", { chave: CHAVE }), ESPS);
   assert.equal(r.estado, "sucesso"); assert.equal(r.antigo, undefined);
+});
+
+test("RESULTADO: só diz se o laudo está liberado (nunca o conteúdo); sem laudo (403 HTML) = ainda não; queda = 'não consegui conferir', não 'pronto'", async () => {
+  const feito = (id: number, status = "atendido") => ({ id, status, data: "2026-11-10", hora: "09:00:00", procedimento: { id: 201, descr: "RM JOELHO" }, unidade: { nome: "CSI" } });
+  const { api, k } = apiDe({ paciente: PAC, vouchers: [feito(41001), feito(41002), feito(41003), V26700], resultados: { "41001": "pronto", "41002": "sem", "41003": "queda" } });
+  const r = await executar(api, rpcDe().rpc, opDe("ler_vouchers", { resultado: true }), ESPS);
+  assert.equal(r.estado, "sucesso"); assert.equal(r.codigo, "ok_com_resultados");
+  assert.deepEqual(r.resultados!.map((x) => [x.id, x.pronto]), [["41001", true], ["41002", false], ["41003", null]]);
+  assert.ok(!JSON.stringify(r).includes("SIGILOSO") && !JSON.stringify(r).includes("JVBERi"), "nenhum conteúdo de laudo sai do executor");
+  assert.ok(!k.chamadas.includes("GET /resultado/26700"), "marcação futura (agendado) não tem resultado para consultar");
+  assert.equal(r.marcacoes, undefined);
+});
+test("RESULTADO: sem exame realizado é sucesso com lista vazia; identidade que não confere não consulta resultado nenhum", async () => {
+  let a = apiDe({ paciente: PAC, vouchers: [V26700] });
+  let r = await executar(a.api, rpcDe().rpc, opDe("ler_vouchers", { resultado: true }), ESPS);
+  assert.equal(r.codigo, "sem_exames_realizados"); assert.deepEqual(r.resultados, []);
+  a = apiDe({ paciente: { ...PAC, dt_nasc: "1999-01-01" }, vouchers: [] });
+  r = await executar(a.api, rpcDe().rpc, opDe("ler_vouchers", { resultado: true }), ESPS);
+  assert.equal(r.codigo, "nascimento_divergente"); assert.ok(!a.k.chamadas.some((c) => c.startsWith("GET /resultado")));
+});
+test("VER MARCAÇÕES não lista exame já realizado (atendido) como se pudesse cancelar", async () => {
+  const { api } = apiDe({ paciente: PAC, vouchers: [V26700, { ...V26700, id: 41009, status: "atendido" }] });
+  const r = await executar(api, rpcDe().rpc, opDe("ler_vouchers", {}), ESPS);
+  assert.deepEqual(r.marcacoes!.map((m) => m.id), ["26700"]);
 });
