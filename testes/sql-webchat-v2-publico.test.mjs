@@ -135,6 +135,18 @@ await caso('PÚBLICO: sem consulta à API não há calendário nem vaga inventad
   return { ok: r.estado === 'sem_consulta' && (r.dias || []).length === 0, detalhe: `estado=${r.estado}` };
 });
 
+await caso('PÚBLICO: depois de marcar pelo chat, o menu oferece "Cancelar" e "Remarcar" pelas chaves próprias (klingo_api_pos antigo em "teste" não esconde nada); cada botão some se a sua chave for desligada', async () => {
+  const marcar = async () => { const P = await comum(); await andar(P, () => false, P.nasc); await como(''); const [o] = await q(`select id from public.klingo_operacao where conversa_id = $1 and tipo = 'marcar'`, [P.c]);
+    await um(`select public.klingo_operacao_pegar($1)`, [o.id]); await db.query(`select public.klingo_operacao_concluir($1, 'sucesso', $2::jsonb)`, [o.id, sucessoApi(P.c, { id: String(28000 + (++nTel)) })]);
+    return um(`select opcoes from public.mensagens where conversa_id = $1 and opcoes ->> 'passo' = 'pos_menu' order by id desc limit 1`, [P.c]); };
+  await cfg('klingo_api_pos', 'teste');
+  const a = (await marcar()).opcoes.itens.map((i) => i.valor);
+  await cfg('klingo_api_cancelar', 'nao'); await cfg('klingo_api_remarcar', 'nao');
+  const b = (await marcar()).opcoes.itens.map((i) => i.valor);
+  await cfg('klingo_api_cancelar', 'sim'); await cfg('klingo_api_remarcar', 'sim');
+  return { ok: a.includes('cancelar') && a.includes('remarcar') && !b.includes('cancelar') && !b.includes('remarcar') && b.includes('equipe'), detalhe: `ligadas=${a}; desligadas=${b}` };
+});
+
 const ok = resultados.filter(Boolean).length;
 console.log(`\n${ok} de ${resultados.length} verificações passaram.`);
 process.exit(ok === resultados.length ? 0 : 1);

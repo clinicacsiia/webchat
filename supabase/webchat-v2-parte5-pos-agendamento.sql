@@ -679,3 +679,13 @@ select pg_temp.encaixar('public.fluxo_avancar(uuid, jsonb)',
 select pg_temp.encaixar('public.klingo_evento_aplicar(jsonb)',
   E'  select * into pa from public.pre_agendamentos where klingo_marcacoes @> array[v_id] limit 1;',
   E'  if v_nova ~ \'^[0-9]+$\' then update public.klingo_marcacao set situacao = \'remarcada\' where voucher = v_id and situacao = \'ativa\';   -- v2.1\n  elsif v_st = \'C\' then update public.klingo_marcacao set situacao = \'cancelada\' where voucher = v_id and situacao = \'ativa\'; end if;\n  select * into pa from public.pre_agendamentos where klingo_marcacoes @> array[v_id] limit 1;');
+-- (k) menu depois de marcar pelo chat: cancelar e remarcar passam a valer pelas chaves PRÓPRIAS (klingo_api_cancelar / klingo_api_remarcar), não mais pela herdada klingo_api_pos
+select pg_temp.encaixar('public.fluxo_pos_menu(uuid, text)',
+  E'if public.klingo_ativo(p_conversa, \'klingo_api_pos\')',
+  E'if (public.klingo_ativo(p_conversa, \'klingo_api_cancelar\') or public.klingo_ativo(p_conversa, \'klingo_api_remarcar\'))');
+select pg_temp.encaixar('public.fluxo_pos_responder(uuid, text)',
+  E'if not (public.klingo_ativo(p_conversa, \'klingo_api_pos\') and pa.agendado_origem = \'chat_api\' and pa.status = \'agendado\' and v_vou ~ \'^[0-9]+$\' and v_quando is not null) then',
+  E'if not (public.klingo_ativo(p_conversa, case when p_valor = \'cancelar\' then \'klingo_api_cancelar\' else \'klingo_api_remarcar\' end) and pa.agendado_origem = \'chat_api\' and pa.status = \'agendado\' and v_vou ~ \'^[0-9]+$\' and v_quando is not null) then');
+select pg_temp.encaixar('public.fluxo_pos_responder(uuid, text)',
+  E'if not (public.klingo_ativo(p_conversa, \'klingo_api_pos\') and pa.agendado_origem = \'chat_api\' and pa.status = \'agendado\' and v_vou ~ \'^[0-9]+$\') then',
+  E'if not (public.klingo_ativo(p_conversa, \'klingo_api_cancelar\') and pa.agendado_origem = \'chat_api\' and pa.status = \'agendado\' and v_vou ~ \'^[0-9]+$\') then');
