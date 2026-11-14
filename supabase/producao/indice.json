@@ -1,5 +1,5 @@
 {
- "gerado_em": "2026-11-14T16:28:10.423154+00:00",
+ "gerado_em": "2026-11-14T19:27:05.948845+00:00",
  "postgres": "17.11",
  "tabelas": [
   {
@@ -425,6 +425,22 @@
    ],
    "rls": true,
    "politicas": 2
+  },
+  {
+   "nome": "config_auditoria",
+   "colunas": [
+    "id",
+    "em",
+    "chave",
+    "valor_antes",
+    "valor_depois",
+    "operacao",
+    "origem",
+    "justificativa",
+    "versao"
+   ],
+   "rls": true,
+   "politicas": 1
   },
   {
    "nome": "consulta_config",
@@ -1145,6 +1161,28 @@
    "politicas": 0
   },
   {
+   "nome": "klingo_consulta",
+   "colunas": [
+    "id",
+    "em",
+    "conversa_id",
+    "modo",
+    "tipo",
+    "procedimento",
+    "plano",
+    "resultado",
+    "http_status",
+    "n_recebidos",
+    "n_validos",
+    "n_filtrados",
+    "n_gravados",
+    "ms",
+    "detalhe"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
    "nome": "klingo_convenio",
    "colunas": [
     "plano_id",
@@ -1291,7 +1329,8 @@
     "unidade_id",
     "ordem_chegada",
     "criado_em",
-    "expira_em"
+    "expira_em",
+    "sombra"
    ],
    "rls": true,
    "politicas": 0
@@ -2101,6 +2140,7 @@
   "CREATE TRIGGER atendimentos_transicao BEFORE UPDATE ON public.atendimentos FOR EACH ROW EXECUTE FUNCTION atendimentos_transicao_trg()",
   "CREATE TRIGGER catalogo_agenda_hash BEFORE INSERT ON public.catalogo_agenda FOR EACH ROW EXECUTE FUNCTION catalogo_agenda_hash_trg()",
   "CREATE TRIGGER catalogo_preco_confianca BEFORE INSERT OR UPDATE ON public.catalogo_preco FOR EACH ROW EXECUTE FUNCTION catalogo_preco_confianca_trg()",
+  "CREATE TRIGGER config_auditar_trg AFTER INSERT OR DELETE OR UPDATE ON public.config FOR EACH ROW EXECUTE FUNCTION config_auditar()",
   "CREATE TRIGGER config_catalogo_aplicar BEFORE INSERT OR UPDATE OF valor ON public.config FOR EACH ROW WHEN ((new.chave ~~ 'catalogo\\_%'::text)) EXECUTE FUNCTION catalogo_config_aplicar()",
   "CREATE TRIGGER convenio_evento_catalogo AFTER INSERT ON public.catalogo_mudanca FOR EACH ROW EXECUTE FUNCTION convenio_evento_catalogo_trg()",
   "CREATE TRIGGER conversa_exame_aberto BEFORE UPDATE OF status ON public.conversas FOR EACH ROW EXECUTE FUNCTION conversa_exame_aberto_trg()",
@@ -2200,11 +2240,15 @@
   "jornada_identidade_klingo",
   "jornada_relatorio_filtro",
   "jornada_relatorio_id",
+  "klingo_api_cancelar",
+  "klingo_api_consultar",
   "klingo_api_horarios",
   "klingo_api_marcar",
   "klingo_api_percentual",
   "klingo_api_pos",
   "klingo_api_pre_cadastro",
+  "klingo_api_remarcar",
+  "klingo_api_resultado",
   "klingo_api_telefones_teste",
   "klingo_auto",
   "klingo_autogestao",
@@ -2218,6 +2262,7 @@
   "motor",
   "motor_telefones_teste",
   "nome_empresa",
+  "notificacao_modo",
   "pedido_escolha_texto",
   "pedido_horario_modo",
   "pedido_oferta2_texto",
@@ -2226,6 +2271,8 @@
   "permissao_modo",
   "previsao_decide_texto",
   "previsao_final_texto",
+  "previsao_modo",
+  "previsao_monitor_modo",
   "previsao_oferta_texto",
   "previsao_texto",
   "reabrir_dias",
@@ -4490,6 +4537,16 @@
    "authenticated": true,
    "publico": false,
    "md5": "a594426758e705c5f7e0a58c0552f439"
+  },
+  {
+   "nome": "config_auditar",
+   "args": [],
+   "definer": true,
+   "gatilho": true,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "571e9e3105aa7f1b67a92d748a876c75"
   },
   {
    "nome": "consulta_config_salvar",
@@ -7736,6 +7793,21 @@
    "md5": "711d97373f983d80ce8a197b8b324249"
   },
   {
+   "nome": "klingo_aceita_sombra",
+   "args": [
+    {
+     "nome": "p_chave",
+     "padrao": false
+    }
+   ],
+   "definer": false,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "cb678be7530b4317561bd9f3638d6924"
+  },
+  {
    "nome": "klingo_ativo",
    "args": [
     {
@@ -7752,7 +7824,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "c9c2219f66d90e3ae84f2263ba522039"
+   "md5": "23cabbcae479720447d5753e495151de"
   },
   {
    "nome": "klingo_autogestao",
@@ -7762,7 +7834,26 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "49861cf1452a0ab82af1407211868190"
+   "md5": "2bd042efc61a29a6fafe3a54a4bbe39d"
+  },
+  {
+   "nome": "klingo_automatizavel",
+   "args": [
+    {
+     "nome": "p_proc",
+     "padrao": false
+    },
+    {
+     "nome": "p_tipo",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "21cf750a607a489630f6c072d5b112ec"
   },
   {
    "nome": "klingo_avisar_gestao",
@@ -7866,6 +7957,21 @@
    "md5": "60fc6a6e676e6a41dd5fc756178aa755"
   },
   {
+   "nome": "klingo_chave_de_modo",
+   "args": [
+    {
+     "nome": "p_chave",
+     "padrao": false
+    }
+   ],
+   "definer": false,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "be84986cb6b31dcbdf341a508d1f4e79"
+  },
+  {
    "nome": "klingo_conferencia_agendar",
    "args": [
     {
@@ -7936,6 +8042,69 @@
    "md5": "27bcd8991a5822d372e340c3b3d6d1a3"
   },
   {
+   "nome": "klingo_consulta_registrar",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_modo",
+     "padrao": false
+    },
+    {
+     "nome": "p_tipo",
+     "padrao": false
+    },
+    {
+     "nome": "p_procedimento",
+     "padrao": false
+    },
+    {
+     "nome": "p_plano",
+     "padrao": false
+    },
+    {
+     "nome": "p_resultado",
+     "padrao": false
+    },
+    {
+     "nome": "p_http",
+     "padrao": true
+    },
+    {
+     "nome": "p_recebidos",
+     "padrao": true
+    },
+    {
+     "nome": "p_validos",
+     "padrao": true
+    },
+    {
+     "nome": "p_filtrados",
+     "padrao": true
+    },
+    {
+     "nome": "p_gravados",
+     "padrao": true
+    },
+    {
+     "nome": "p_ms",
+     "padrao": true
+    },
+    {
+     "nome": "p_detalhe",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "b20c52ff998fe3d45641a05b12e67530"
+  },
+  {
    "nome": "klingo_cota_429",
    "args": [],
    "definer": true,
@@ -8000,7 +8169,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "a3edab85f19801044f599aba50d1e05f"
+   "md5": "84cce9e93c0da39b75631fda0976cd1a"
   },
   {
    "nome": "klingo_evento_aplicar",
@@ -8148,7 +8317,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "7149dc3339f798c66070fac98a152240"
+   "md5": "c3217d3441e0a7e5de42e3955cd32e94"
   },
   {
    "nome": "klingo_limpar",
@@ -8158,7 +8327,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "2aaa238e18863f8341e2cc5a4d82f232"
+   "md5": "f88b217518b0f7903ad1c37aaaf940ba"
   },
   {
    "nome": "klingo_medida_soma",
@@ -8211,6 +8380,55 @@
    "authenticated": false,
    "publico": false,
    "md5": "95a213e4d5ead8b9d2a98851c59bb107"
+  },
+  {
+   "nome": "klingo_modo",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_chave",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "ab6046046c6425e6d6a08d3a93723fed"
+  },
+  {
+   "nome": "klingo_modo_chave",
+   "args": [
+    {
+     "nome": "p_chave",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "ad29fa10abb2e229f1cb72da278dd980"
+  },
+  {
+   "nome": "klingo_modo_nivel",
+   "args": [
+    {
+     "nome": "p_valor",
+     "padrao": false
+    }
+   ],
+   "definer": false,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "45da2a4ccb52e386a79a9d36f2334cb5"
   },
   {
    "nome": "klingo_motivo_texto",
@@ -8268,6 +8486,41 @@
    "authenticated": false,
    "publico": false,
    "md5": "5920b2c6d26cf20b6e77e2c93ba1227d"
+  },
+  {
+   "nome": "klingo_oferta_gravar_v2",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_procedimento",
+     "padrao": false
+    },
+    {
+     "nome": "p_plano",
+     "padrao": false
+    },
+    {
+     "nome": "p_ofertas",
+     "padrao": false
+    },
+    {
+     "nome": "p_sombra",
+     "padrao": true
+    },
+    {
+     "nome": "p_substituir",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "6009cc0a535070cafa6f6ef729c38308"
   },
   {
    "nome": "klingo_operacao_concluir",
@@ -8389,7 +8642,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "a1ddcaa3cec04f080d7339b1d13fdf6f"
+   "md5": "93208341090534066bcad1089007b55d"
   },
   {
    "nome": "klingo_pre_gravar",
@@ -8459,6 +8712,56 @@
    "authenticated": false,
    "publico": false,
    "md5": "3bdeaa11f89cc805f88037cb8591a525"
+  },
+  {
+   "nome": "klingo_promover",
+   "args": [
+    {
+     "nome": "p_chave",
+     "padrao": false
+    },
+    {
+     "nome": "p_para",
+     "padrao": false
+    },
+    {
+     "nome": "p_justificativa",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "3dfb8285fb72b726deefd3428c4f349a"
+  },
+  {
+   "nome": "klingo_recomendar",
+   "args": [
+    {
+     "nome": "p_chave",
+     "padrao": false
+    },
+    {
+     "nome": "p_para",
+     "padrao": false
+    },
+    {
+     "nome": "p_motivo",
+     "padrao": false
+    },
+    {
+     "nome": "p_aviso",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "823a65d4caf7e724362a0b62b5c49eba"
   },
   {
    "nome": "klingo_revisao_disparar",
@@ -8556,6 +8859,25 @@
    "authenticated": false,
    "publico": false,
    "md5": "d7f2dd7b515b39849f909dc8107beb63"
+  },
+  {
+   "nome": "klingo_sombra",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_chave",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "dff6d0ce634d8ec88699c31f52e0c39d"
   },
   {
    "nome": "klingo_sombra_medir",
