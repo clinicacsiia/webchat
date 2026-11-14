@@ -529,6 +529,7 @@
     <button type="button" id="btnAtendente" hidden>Falar com um atendente</button>
     <button type="button" id="btnSino" hidden></button>
     <button type="button" id="btnOutroFilho" hidden>Agendar para outro filho(a)</button>
+    <button type="button" id="btnDisponibilidade">Minha disponibilidade</button>
     <button type="button" id="btnLetra">Letra maior</button>
     <button type="button" id="btnLetraMenor" hidden>Letra menor</button>
     <button type="button" id="btnSuporte">Código de suporte</button>
@@ -659,7 +660,7 @@
   const CHAVE_HIST = 'webchat.historico.v1';   // as últimas conversas deste aparelho (cada uma com o seu token): dá para voltar a elas
   const MAX_HIST = 5;                          // mínimo pedido: 3
   // Muda a cada alteração do chat. Cópia de mensagens guardada por outra versão é descartada (era isso que mostrava conversa velha e travada).
-  const VERSAO_APP = '2026.11.13-7';
+  const VERSAO_APP = '2026.11.14-2';
   // Mesmas regras do banco (fluxo_nome_ok, fluxo_telefone_ok, fluxo_email_ok): o banco confere de novo, aqui é só para avisar logo.
   const LET = 'A-Za-zÀ-ÖØ-öø-ÿ';
   const nomeCompletoOk = (v) => { const t = String(v || '').trim(); return t.length >= 5 && t.length <= 120 && new RegExp(`^[${LET}][${LET}'’.-]*( +[${LET}][${LET}'’.-]*)+$`).test(t) && t.split(/ +/).filter((w) => w.replace(new RegExp(`[^${LET}]`, 'g'), '').length >= 2).length >= 2; };
@@ -1606,8 +1607,10 @@
     if (o.tipo === 'lista') widgetLista(w, o);
     else if (o.tipo === 'escolha') widgetEscolha(w, o);
     else if (o.tipo === 'campos') widgetCampos(w, o);
+    else if (o.tipo === 'disponibilidade_registrada') w.append(h('button', { class: 'btn-w sec', type: 'button', onclick: abrirMinhaDisponibilidade }, 'Ver ou alterar minha disponibilidade'));
+    else if (o.tipo === 'disponibilidade_oportunidade') { w.append(h('p', { class: 'w-nota' }, 'O horário ainda não está reservado: ao tocar abaixo conferimos a agenda de agora.')); w.append(opcoesOportunidade({ id: o.solicitacao })); }
     else if (o.tipo === 'acompanhar') widgetAcompanhar(w);
-    else if (o.tipo === 'marcando') widgetMarcando(w);
+    else if (o.tipo === 'marcando') widgetMarcando(w, o);
     else if (o.tipo === 'marcado') widgetMarcado(w, o);
     else if (o.tipo === 'texto') w.append(h('p', { class: 'w-nota' }, 'Escreva no campo aqui embaixo e toque na setinha para enviar.'));
     else if (o.tipo === 'nova') w.append(h('button', { class: 'btn-w', type: 'button', onclick: () => novaConversa(true) }, 'Fazer um novo pedido'));
@@ -1851,8 +1854,8 @@
   /* acompanhamento: se já foi confirmado, quem atende e se estamos em horário de trabalho (sem relógio de espera) */
   let acompBox = null, acompDados = null, acompP = null;
   /* Autoatendimento (Klingo): "reservando…" enquanto a marcação roda e o cartão do agendamento confirmado. */
-  function widgetMarcando(w) {
-    w.append(h('div', { class: 'acomp marcando', role: 'status', 'aria-live': 'polite' }, h('b', {}, 'Reservando o seu horário…'),
+  function widgetMarcando(w, o = {}) {   // v2.1: o título pode vir do banco (ex.: "Consultando as suas marcações…", "Cancelando…")
+    w.append(h('div', { class: 'acomp marcando', role: 'status', 'aria-live': 'polite' }, h('b', {}, String(o.titulo || 'Reservando o seu horário…').slice(0, 80)),
       h('p', {}, 'Leva só alguns segundos. Você não precisa fechar esta tela: o resultado aparece aqui.')));
   }
   const ics = (v) => {
@@ -2689,7 +2692,7 @@
     const convId = conv.id, hoje = new Date();
     const nota = (b, texto, sem) => { const velho = b.querySelector('.disp'); if (velho) velho.remove(); b.append(h('span', { class: 'disp' + (sem ? ' sem' : '') }, texto)); };
     botoes.forEach((b) => { if (b.dataset.valor) nota(b, 'conferindo a agenda…'); });
-    await conferirAgenda(ymd(hoje), ymd(somaDias(hoje, 13)));
+    await chamarAgendaApi(0, false);   // v2.1: pede as ofertas à API do Klingo (a grade não é fonte); sem resposta da API a lista volta vazia e nada é escrito ao lado do médico
     if (!conv || conv.id !== convId) return;
     try {
       const { data, error } = await db.rpc('chat_medicos_disponiveis', { p_conversa: conv.id, p_token: conv.token });
@@ -2700,7 +2703,7 @@
         const x = por.get(b.dataset.valor);
         if (!x) { const velho = b.querySelector('.disp'); if (velho) velho.remove(); return; }
         if (x.proximo) nota(b, `Próximo horário: ${fmtProximo(x.proximo)}`, false);
-        else nota(b, 'Sem horário livre nos próximos dias', true);
+        else nota(b, 'Sem horário disponível nos próximos 15 dias', true);
       });
     } catch { botoes.forEach((b) => { const velho = b.querySelector('.disp'); if (velho) velho.remove(); }); }
   }
@@ -2718,41 +2721,17 @@
   /* Agenda AO VIVO (10/11/2026): dia, horário e médico que a paciente vê são conferidos no Klingo AGORA, quando ela chega ao passo.
      A função chat-agenda-ao-vivo lê o Klingo e atualiza a ocupação no banco; só depois o chat pede a lista (chat_horarios), que já enxerga a agenda de agora.
      Nunca trava o chat: se o Klingo não responder, mostra o que o banco já tem, com aviso e botão para conferir de novo. */
-  // Estado da conferência com o Klingo (vale para o calendário e para a lista de médicos): quando cada dia foi conferido, o que falhou, se está desligado.
-  const V = { ts: new Map(), falhas: new Set(), ultimo: null, desligado: false };
-  const VIVO_FRESCO_MS = (window.__WEBCHAT_TESTE__ && window.__WEBCHAT_TESTE__.vivoFrescoMs) || 20000;
-  const VIVO_CONFIRMA_MS = (window.__WEBCHAT_TESTE__ && window.__WEBCHAT_TESTE__.vivoConfirmaMs) || 8000;
   const somaDias = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
-  const diasYmd = (de, ate) => { const out = []; for (let d = dataLocal(de), f = dataLocal(ate); d <= f; d = somaDias(d, 1)) out.push(ymd(d)); return out; };
-  // Devolve true quando TODOS os dias pedidos estão conferidos agora (ou foram há menos de "idadeMs").
-  async function conferirAgenda(de, ate, idadeMs = VIVO_FRESCO_MS) {
-    if (!conv || V.desligado) return false;
-    const convId = conv.id;
-    const lista = diasYmd(de, ate).filter((d) => !(V.ts.get(d) > Date.now() - idadeMs));
-    if (!lista.length) return true;
+  // v2.1 (14/11/2026): a antiga conferência da grade ("chat-agenda-ao-vivo") saiu do chat: nenhuma tela lê ocupação nem grade como vaga.
+  /* Horários REAIS (API do Klingo): a única fonte de horário reservável. Sem oferta da API o chat NÃO mostra horário da grade (v2.0, 14/11/2026).
+     A função devolve {estado: com_horarios | sem_horarios | indisponivel | nao_integrado}; o banco monta o calendário só com as ofertas guardadas.
+     janela = 0, 1 ou 2 (cada uma soma mais ~15 dias); fresco = ignora a lista guardada há menos de 45 s (usado logo antes de confirmar). */
+  async function chamarAgendaApi(janela = 0, fresco = false) {
+    if (!conv) return null;
     try {
-      const { data, error } = await comLimite(db.functions.invoke('chat-agenda-ao-vivo', { body: { conversa: conv.id, token: conv.token, de: lista[0], ate: lista[lista.length - 1] } }), 24000);
-      if (error || !data) throw error || new Error('sem resposta');
-      if (data.motivo === 'desligado') { V.desligado = true; return false; }
-      if (data.motivo) throw new Error(data.motivo);
-      const falhas = new Set(data.falhas || []), agora = Date.now();
-      for (const d of lista) { if (falhas.has(d)) V.falhas.add(d); else { V.ts.set(d, agora); V.falhas.delete(d); } }
-      if (falhas.size < lista.length) V.ultimo = agora;
-      return falhas.size === 0;
-    } catch {
-      if (conv && conv.id === convId) for (const d of lista) V.falhas.add(d);
-      return false;
-    }
-  }
-  /* Autoatendimento (Klingo): pede à API os horários REAIS desta conversa. Nunca trava o chat: se falhar ou estiver desligada, vale a grade de sempre.
-     Em modo "sombra" a função responde na hora e só mede em segundo plano. */
-  let apiHorariosOff = false;
-  async function chamarAgendaApi() {
-    if (!conv || apiHorariosOff) return;
-    try {
-      const { data } = await comLimite(db.functions.invoke('chat-agenda-api', { body: { conversa: conv.id, token: conv.token } }), 7000);
-      if (data && data.motivo === 'desligado') apiHorariosOff = true;
-    } catch { /* usa a grade */ }
+      const { data } = await comLimite(db.functions.invoke('chat-agenda-api', { body: { conversa: conv.id, token: conv.token, janela, fresco } }), 14000);
+      return data || null;
+    } catch { return null; }
   }
   async function buscarHorarios() {
     const hoje = new Date();
@@ -2764,11 +2743,9 @@
   async function carregarHorarios(primeira, forcar) {
     if (!C) return;
     const meu = C, hoje = new Date();
-    if (forcar) V.ts.clear();
-    // 1) Confere o Klingo agora (primeiros 14 dias; o resto vem em segundo plano depois de a lista aparecer).
-    await Promise.all([conferirAgenda(ymd(hoje), ymd(somaDias(hoje, 13))), chamarAgendaApi()]);
-    if (C !== meu) return;
-    // 2) Pede a lista ao banco, que já enxerga a agenda de agora.
+    // 1) Pergunta à API do Klingo (primeiros ~15 dias; "Procurar mais datas" soma as próximas janelas).
+    if (primeira || forcar) { meu.janela = 0; await chamarAgendaApi(0, !!forcar); if (C !== meu) return; }
+    // 2) Pede a lista ao banco, que só monta o calendário com as ofertas da API (e diz o estado: com horários, sem horários, fora do ar, sem integração).
     try {
       const data = await buscarHorarios();
       if (C !== meu) return;
@@ -2783,7 +2760,6 @@
       }
     } catch (e) { $('#folhaCorpo').replaceChildren(h('p', { class: 'erro-form' }, mensagemErro(e))); return; }
     desenharCalendario();
-    if (primeira || forcar) conferirRestoEmSegundoPlano();
   }
   // Recarrega a lista sem mexer na escolha da paciente; se o horário que ela marcou sumiu, avisa e desmarca.
   async function recarregarSilencioso() {
@@ -2800,29 +2776,15 @@
     } catch { /* mantém o que já está na tela */ }
     desenharCalendario();
   }
-  // Depois da primeira tela, confere os dias seguintes (até 45) e atualiza a lista a cada janela conferida.
-  async function conferirRestoEmSegundoPlano() {
-    const meu = C; if (!meu || V.desligado || meu.segundoPlano) return;
-    meu.segundoPlano = true; desenharCalendario();
-    const hoje = new Date();
-    for (const [a, b] of [[14, 27], [28, 41], [42, 45]]) {
-      if (C !== meu) return;
-      const ok = await conferirAgenda(ymd(somaDias(hoje, a)), ymd(somaDias(hoje, b)));
-      if (C !== meu) return;
-      if (ok || V.falhas.size) await recarregarSilencioso();
-    }
-    if (C === meu) { meu.segundoPlano = false; desenharCalendario(); }
-  }
-  // A paciente tocou num dia: confere aquele dia no Klingo antes de mostrar os horários dele.
-  async function selecionarDia(s) {
+  // A paciente tocou num dia: os horários dele já vieram da API (guardados no banco); não há mais conferência de grade.
+  function selecionarDia(s) { const meu = C; if (!meu) return; meu.dia = s; meu.slot = null; desenharCalendario(); }
+  // Soma mais uma janela de datas (a API só devolve ~15 dias por vez).
+  async function maisDatas() {
     const meu = C; if (!meu) return;
-    meu.dia = s; meu.slot = null;
-    const fresco = V.ts.get(s) > Date.now() - VIVO_FRESCO_MS;
-    if (V.desligado || fresco) { desenharCalendario(); return; }
-    meu.conferindo = s; desenharCalendario();
-    await conferirAgenda(s, s);
+    meu.janela = (meu.janela || 0) + 1; meu.buscandoMais = true; desenharCalendario();
+    await chamarAgendaApi(meu.janela);
     if (C !== meu) return;
-    meu.conferindo = null;
+    meu.buscandoMais = false;
     await recarregarSilencioso();
   }
   function desenharCalendario() {
@@ -2838,15 +2800,8 @@
       return;
     }
     if (g && g.nomes) corpo.append(h('p', { class: 'p-dica' }, 'Neste horário: ' + g.nomes.join(' + ')));
-    const v = V, semConferir = v.desligado || v.falhas.size > 0;
-    const limitePerto = ymd(somaDias(new Date(), 13)), pertoFalhou = [...v.falhas].some((d) => d <= limitePerto || d === C.dia);
-    if (r.klingo_api) corpo.append(h('p', { class: 'p-dica ao-vivo', role: 'status' }, '✔ Horários livres conferidos agora na agenda da clínica.'));
-    else corpo.append(h('p', { class: 'aviso-cal' }, 'Estes horários são uma previsão: ainda não foi possível conferir tudo na agenda da clínica. Um atendente confere e confirma o dia e o horário.' + (r.aviso && semConferir ? ' ' + r.aviso : '')));
-    if (!v.desligado) {
-      if (v.falhas.size) corpo.append(h('p', { class: 'aviso-cal', role: 'status' }, (pertoFalhou ? 'Não consegui conferir a agenda da clínica agora; os horários abaixo podem estar desatualizados. ' : 'Não consegui conferir algumas datas mais adiante; os horários delas podem estar desatualizados. '),
-        h('button', { class: 'chip', type: 'button', onclick: () => carregarHorarios(false, true) }, 'Conferir de novo')));
-      else if (v.ultimo) corpo.append(h('p', { class: 'p-dica ao-vivo', role: 'status' }, `✔ Agenda conferida agora (${new Date(v.ultimo).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })})` + (C.segundoPlano ? ' · conferindo mais datas…' : '')));
-    }
+    if (r.estado && r.estado !== 'com_horarios') { desenharSemHorarios(r); return; }
+    corpo.append(h('p', { class: 'p-dica ao-vivo', role: 'status' }, '✔ Horários livres conferidos agora na agenda da clínica. Só ficam marcados depois da sua confirmação.'));
     if (r.sugerido && C.slot && C.slot.hora === r.sugerido.hora && C.dia === r.sugerido.data) {
       corpo.append(h('p', { class: 'p-dica' }, `Já deixei marcado o horário logo depois de ${primeiroNome(r.sugerido.apos)}, no mesmo dia. Se preferir, escolha outro.`));
     }
@@ -2884,6 +2839,7 @@
     corpo.append(grade);
     corpo.append(h('div', { class: 'legenda' }, h('span', {}, h('i', { style: 'background:var(--verde)' }), 'Com horário livre'), h('span', {}, h('i', { style: 'background:#c2cad6' }), 'Lotado ou sem atendimento')));
 
+    if ((C.janela || 0) < 2) corpo.append(h('p', { class: 'p-dica' }, `Mostrando os horários dos próximos ${15 * ((C.janela || 0) + 1)} dias. `, h('button', { class: 'chip', type: 'button', disabled: !!C.buscandoMais, onclick: maisDatas }, C.buscandoMais ? 'Procurando…' : 'Procurar mais datas')));
     if (C.dia) {
       const dt = dataLocal(C.dia), slots = dias.get(C.dia) || [];
       corpo.append(h('h3', { style: 'margin:14px 0 4px;font-size:15px' }, `${DIAS_SEMANA[dt.getDay()]}, ${dt.getDate()} de ${MESES[dt.getMonth()]}`));
@@ -2910,13 +2866,112 @@
         onclick: () => { C.slot = x; desenharCalendario(); } }, `Ordem de chegada, a partir das ${x.hora}`)));
       corpo.append(grid, h('div', { class: 'legenda' }, h('span', {}, h('i', { style: 'background:var(--verde)' }), 'Livre'), h('span', {}, h('i', { style: 'background:#dfe4ea' }), 'Ocupado ou indisponível')));
     } else if (![...dias.values()].some((x) => x.length)) {
-      corpo.append(h('p', { class: 'p-dica', style: 'margin-top:12px' }, 'Não há horários livres nos próximos dias com esses filtros. Tente outro período ou unidade, ou envie sua preferência por mensagem que o atendente procura para você.'));
+      corpo.append(h('p', { class: 'p-dica', style: 'margin-top:12px' }, 'Não há horários livres com esses filtros. Tente outro período ou unidade, ou procure mais datas.'));
     }
     const dt = C.dia ? dataLocal(C.dia) : null;
     rodape.append(h('button', { class: 'btn-w', type: 'button', disabled: !C.slot, onclick: confirmarHorario },
       C.slot ? `Escolher ${DIAS_SEMANA[dt.getDay()]}, ${dt.getDate()}/${String(dt.getMonth() + 1).padStart(2, '0')} às ${C.slot.hora}` : 'Escolha um horário'));
     corpo.scrollTop = rolagem;
   }
+  /* ---------- Sem horário da API: três saídas claras (v2.0, 14/11/2026) ----------
+     Quatro estados vêm do banco (chat_horarios.estado): sem_horarios (a API respondeu e não há vaga), indisponivel (a consulta falhou: NÃO é falta de vaga),
+     nao_integrado (o atendimento é da equipe: sem horário automático), sem_consulta (ainda não consultou). A grade nunca vira horário na tela. */
+  function desenharSemHorarios(r) {
+    const corpo = $('#folhaCorpo'), rodape = $('#folhaRodape'), est = r.estado;
+    corpo.replaceChildren(); rodape.replaceChildren();
+    const falhou = est === 'indisponivel' || est === 'sem_consulta';
+    corpo.append(h('p', { class: 'aviso-cal', role: 'status' }, est === 'sem_horarios' ? 'Não encontramos horários disponíveis para esse atendimento no momento.'
+        : falhou ? 'Não foi possível consultar os horários agora.' : 'Este atendimento é agendado pela nossa equipe.'),
+      h('p', { class: 'p-dica' }, est === 'sem_horarios' ? 'Você pode registrar os dias em que consegue ir e avisamos quando surgir uma vaga compatível. Isso não é um agendamento.'
+        : falhou ? 'Isso não quer dizer que não há vagas: a consulta não foi concluída. Tente de novo em instantes.'
+        : 'Não há horário automático para este pedido. Envie o pedido à equipe, que confirma o dia e o horário com você.'));
+    const filtros = !!(C && (C.unidade || C.periodo));
+    const lista = [];
+    if (falhou) lista.push(h('button', { class: 'btn-w', type: 'button', onclick: async (e) => { e.currentTarget.disabled = true; e.currentTarget.textContent = 'Consultando…'; await carregarHorarios(true, true); } }, 'Tentar de novo'));
+    if (est === 'sem_horarios' || falhou) lista.push(h('button', { class: falhou ? 'btn-w sec' : 'btn-w', type: 'button', onclick: () => abrirDisponibilidade(r) }, 'Registrar minha disponibilidade para uma vaga futura'));
+    if (est === 'sem_horarios') lista.push(h('button', { class: 'btn-w sec', type: 'button', onclick: async (e) => { e.currentTarget.disabled = true; if (C) { C.unidade = ''; C.periodo = ''; } await carregarHorarios(true, true); } }, filtros ? 'Tirar os filtros e consultar de novo' : 'Consultar de novo'));
+    if (est === 'nao_integrado') lista.push(h('button', { class: 'btn-w', type: 'button', onclick: async () => { fecharFolha(); await responder('horario', 'sem_horario', 'Enviar o meu pedido para a equipe'); } }, 'Enviar meu pedido para a equipe'));
+    lista.push(h('button', { class: 'btn-w sec', type: 'button', onclick: () => { fecharFolha(); pedirAtendente(); } }, 'Falar com a equipe'));
+    rodape.append(...lista);
+  }
+
+  /* ---------- Solicitação de disponibilidade futura (substitui a antiga "previsão") ---------- */
+  const DIAS_CURTOS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+  function abrirDisponibilidade(r, existente) {
+    const corpo = $('#folhaCorpo'), rodape = $('#folhaRodape'); corpo.replaceChildren(); rodape.replaceChildren();
+    $('#folhaTitulo').textContent = existente ? 'Alterar minha disponibilidade' : 'Minha disponibilidade';
+    const hoje = new Date(), e = existente || {};
+    const F = { ini: e.data_ini || ymd(somaDias(hoje, 1)), fim: e.data_fim || ymd(somaDias(hoje, 45)), dias: new Set((e.dias_semana && e.dias_semana.length ? e.dias_semana : [0, 1, 2, 3, 4, 5, 6])), turno: e.turno || 'qualquer',
+      outras: e.aceita_outras_unidades !== false, outros: e.aceita_outros_profissionais !== false, avisar: !!e.aceita_notificacao };
+    const erro = h('p', { class: 'erro-form', role: 'alert', hidden: true });
+    const dIni = h('input', { type: 'date', id: 'dispIni', value: F.ini, min: ymd(somaDias(hoje, 0)), 'aria-label': 'A partir de' }), dFim = h('input', { type: 'date', id: 'dispFim', value: F.fim, min: ymd(somaDias(hoje, 0)), max: ymd(somaDias(hoje, 365)), 'aria-label': 'Até' });
+    const chipsDias = h('div', { class: 'chips', role: 'group', 'aria-label': 'Dias da semana em que posso ir' });
+    const chipsTurno = h('div', { class: 'chips', role: 'group', 'aria-label': 'Período do dia' });
+    const desenharChips = () => {
+      chipsDias.replaceChildren(...DIAS_CURTOS.map((t, i) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(F.dias.has(i)), onclick: () => { if (F.dias.has(i)) F.dias.delete(i); else F.dias.add(i); desenharChips(); } }, t)));
+      chipsTurno.replaceChildren(...[['manha', 'Manhã'], ['tarde', 'Tarde'], ['noite', 'Noite'], ['qualquer', 'Qualquer horário']].map(([v, t]) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(F.turno === v), onclick: () => { F.turno = v; desenharChips(); } }, t)));
+    };
+    desenharChips();
+    const cbOutras = h('input', { type: 'checkbox', id: 'dispOutras', checked: F.outras }), cbOutros = h('input', { type: 'checkbox', id: 'dispOutros', checked: F.outros }), cbAvisar = h('input', { type: 'checkbox', id: 'dispAvisar', checked: F.avisar });
+    corpo.append(
+      h('p', { class: 'p-dica' }, 'Diga quando você consegue ir. Se surgir uma vaga compatível (um cancelamento, uma agenda nova), avisamos. ', h('strong', {}, 'Isso não é um agendamento e não reserva horário.')),
+      h('div', { class: 'campo' }, h('label', { for: 'dispIni' }, 'A partir de'), dIni), h('div', { class: 'campo' }, h('label', { for: 'dispFim' }, 'Até'), dFim),
+      h('div', { class: 'campo' }, h('label', {}, 'Dias da semana em que posso ir'), chipsDias), h('div', { class: 'campo' }, h('label', {}, 'Período do dia'), chipsTurno),
+      h('div', { class: 'campo' }, h('label', { for: 'dispOutras' }, cbOutras, ' Aceito outra unidade da clínica')), h('div', { class: 'campo' }, h('label', { for: 'dispOutros' }, cbOutros, ' Aceito outro profissional')),
+      h('div', { class: 'campo' }, h('label', { for: 'dispAvisar' }, cbAvisar, ' Quero ser avisado(a) aqui no chat quando surgir uma vaga compatível'),
+        h('p', { class: 'w-nota' }, 'Só usamos isso para avisar sobre esta solicitação. Você pode cancelar ou tirar o aviso quando quiser, em "Minha disponibilidade" no menu.')), erro);
+    const salvar = h('button', { class: 'btn-w', type: 'button' }, existente ? 'Salvar alterações' : 'Registrar minha disponibilidade');
+    salvar.addEventListener('click', async () => {
+      erro.hidden = true;
+      if (!dIni.value || !dFim.value || dFim.value < dIni.value) { erro.textContent = 'Escolha as datas: a final precisa ser depois da inicial.'; erro.hidden = false; return; }
+      if (!F.dias.size) { erro.textContent = 'Escolha pelo menos um dia da semana.'; erro.hidden = false; return; }
+      salvar.disabled = true; salvar.textContent = 'Registrando…';
+      const dados = { data_ini: dIni.value, data_fim: dFim.value, dias_semana: [...F.dias].sort(), turno: F.turno, aceita_outras_unidades: cbOutras.checked, aceita_outros_profissionais: cbOutros.checked, aceita_notificacao: cbAvisar.checked, canais: cbAvisar.checked ? ['chat'] : [] };
+      try {
+        const { error } = existente ? await db.rpc('chat_disponibilidade_alterar', { p_conversa: conv.id, p_token: conv.token, p_id: existente.id, p_dados: dados })
+                                    : await db.rpc('chat_disponibilidade_registrar', { p_conversa: conv.id, p_token: conv.token, p_dados: dados });
+        if (error) throw error;
+        fecharFolha(); toast(existente ? 'Alterações salvas.' : 'Disponibilidade registrada.'); carregar();
+      } catch (er) { salvar.disabled = false; salvar.textContent = existente ? 'Salvar alterações' : 'Registrar minha disponibilidade'; erro.textContent = mensagemErro(er); erro.hidden = false; }
+    });
+    rodape.append(salvar, h('button', { class: 'btn-w sec', type: 'button', onclick: () => { if (C && C.res) desenharCalendario(); else fecharFolha(); } }, 'Voltar'));
+  }
+  const ESTADO_DISP = { ativa: 'Procurando vaga para você', oportunidade_identificada: 'Possível vaga encontrada', notificada: 'Você foi avisado(a) de uma possível vaga', aguardando_resposta: 'Aguardando você ver os horários',
+    convertida_em_agendamento: 'Virou agendamento', expirada: 'Terminou o período', cancelada: 'Cancelada' };
+  async function abrirMinhaDisponibilidade() {
+    if (!conv) return;
+    fecharMenu(); abrirFolha('Minha disponibilidade');
+    const corpo = $('#folhaCorpo'); corpo.replaceChildren(h('p', { class: 'carregando', role: 'status' }, 'Buscando…'));
+    try {
+      const { data, error } = await db.rpc('chat_disponibilidade_ver', { p_conversa: conv.id, p_token: conv.token });
+      if (error) throw error;
+      const l = (data && data.solicitacoes) || [];
+      corpo.replaceChildren(h('p', { class: 'p-dica' }, 'Solicitações de disponibilidade não são agendamentos: só avisamos quando surgir uma vaga compatível.'));
+      if (!l.length) corpo.append(h('p', { class: 'p-dica' }, 'Você ainda não registrou nenhuma. Quando um atendimento não tiver horário, você poderá registrar aqui.'));
+      for (const s of l) {
+        const aberta = !['expirada', 'cancelada', 'convertida_em_agendamento'].includes(s.estado);
+        corpo.append(h('div', { class: 'campo' }, h('strong', {}, s.procedimento || 'Atendimento'), h('p', { class: 'w-nota' }, `${ESTADO_DISP[s.estado] || s.estado} · de ${s.data_ini.split('-').reverse().slice(0, 2).join('/')} a ${s.data_fim.split('-').reverse().slice(0, 2).join('/')}${s.aceita_notificacao ? ' · com aviso no chat' : ' · sem aviso'}`),
+          aberta ? h('div', { class: 'chips' },
+            h('button', { class: 'chip', type: 'button', onclick: () => abrirDisponibilidade(null, s) }, 'Alterar'),
+            h('button', { class: 'chip', type: 'button', onclick: async (ev) => { ev.currentTarget.disabled = true; try { const r = await db.rpc('chat_disponibilidade_cancelar', { p_conversa: conv.id, p_token: conv.token, p_id: s.id }); if (r.error) throw r.error; toast('Solicitação cancelada.'); abrirMinhaDisponibilidade(); } catch (er) { toast(mensagemErro(er)); } } }, 'Cancelar')) : null,
+          s.oportunidade ? opcoesOportunidade(s) : null));
+      }
+    } catch (er) { corpo.replaceChildren(h('p', { class: 'erro-form' }, mensagemErro(er))); }
+  }
+  // Aviso de possível vaga: aceitar = voltar ao calendário normal (consulta nova à API); nada está reservado até a confirmação.
+  function opcoesOportunidade(s) {
+    return h('div', { class: 'chips' },
+      h('button', { class: 'chip', type: 'button', onclick: async () => {
+        try {
+          const { data, error } = await db.rpc('chat_disponibilidade_responder', { p_conversa: conv.id, p_token: conv.token, p_id: s.id, p_aceita: true });
+          if (error) throw error;
+          if (!data.ok) { toast(data.mensagem || 'Esse horário não está mais disponível. Continuamos procurando para você.'); return; }
+          fecharFolha(); await carregar(); abrirCalendario(1);
+        } catch (er) { toast(mensagemErro(er)); }
+      } }, 'Ver horários agora'),
+      h('button', { class: 'chip', type: 'button', onclick: async (ev) => { ev.currentTarget.disabled = true; try { await db.rpc('chat_disponibilidade_responder', { p_conversa: conv.id, p_token: conv.token, p_id: s.id, p_aceita: false }); toast('Tudo bem, continuamos procurando.'); } catch (er) { toast(mensagemErro(er)); } } }, 'Agora não'));
+  }
+
   async function trocarMedico() {
     try {
       const { error } = await db.rpc('chat_medico_limpar', { p_conversa: conv.id, p_token: conv.token });
@@ -2930,7 +2985,8 @@
     botao.disabled = true;
     try {
       // Última conferência no Klingo, logo antes de gravar a escolha (o banco ainda confere de novo ao gravar).
-      if (!V.desligado) { botao.textContent = 'Conferindo o horário…'; await conferirAgenda(meu.dia, meu.dia, VIVO_CONFIRMA_MS); if (C !== meu) return; }
+      botao.textContent = 'Conferindo o horário…';
+      for (let j = 0; j <= (meu.janela || 0); j++) { await chamarAgendaApi(j, true); if (C !== meu) return; }
       const { data, error } = await db.rpc('chat_horario_escolher', { p_conversa: conv.id, p_token: conv.token, p_grupo: C.grupo, p_data: C.dia, p_hora: C.slot.hora, p_unidade: C.slot.unidade || null });
       if (error) throw error;
       if (data && data.restantes > 0) { C.grupo += 1; C.mes = null; C.dia = null; toast('Horário guardado. Agora escolha o próximo.'); await carregarHorarios(true); }
@@ -2957,6 +3013,7 @@
     clearTimeout(tGuardar); fecharMenu();
     apagarLocal(CHAVE_CONVERSA); apagarLocal(CHAVE_MSGS); conv = null; mostrarForm();
   });
+  $('#btnDisponibilidade').addEventListener('click', abrirMinhaDisponibilidade);
   el.btnMenu.addEventListener('click', () => {
     if (el.menu.hidden) atualizarAcessoHistorico();
     el.menu.hidden = !el.menu.hidden; el.btnMenu.setAttribute('aria-expanded', String(!el.menu.hidden));

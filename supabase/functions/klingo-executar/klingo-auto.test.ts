@@ -4,7 +4,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { classificar, cotaGlobal, KlingoApi, KlingoErro, resumoPaciente } from "./klingo-api.ts";
-import { acharVoucher, executar, executarCancelamento, executarMarcacao, type Pegar, type Rpc } from "./executor.ts";
+import { acharVoucher, executar, executarCancelamento, executarConsulta, executarMarcacao, type Pegar, type Rpc } from "./executor.ts";
 import { identificar } from "../klingo-identificar/identificar.ts";
 import { KlingoApi as KlingoApiIdent } from "../klingo-identificar/klingo-api.ts";   // cada função usa a própria cópia (classe de erro própria)
 import { montarOfertas, pedidoDaApi } from "../chat-agenda-api/oferta.ts";
@@ -21,6 +21,7 @@ type Cena = {
   reservar?: "ok" | "ocupado";
   marcar?: "ok" | "ocupado" | "timeout" | "html500" | "plano_inativo" | "sem_voucher";
   vouchers?: Array<Record<string, unknown>>;
+  resultados?: Record<string, "pronto" | "sem" | "queda">;      // GET /resultado/{id}: laudo liberado, sem laudo (403 em HTML) ou queda de rede
   vouchersDepoisDeCancelar?: Array<Record<string, unknown>>;   // o que a lista mostra depois do DELETE /voucher
   cancelar?: "ok" | "timeout" | "ja_cancelado";
   register?: "ok" | "timeout";
@@ -53,6 +54,12 @@ function klingo(c: Cena) {
       cancelou = true;
       if (c.cancelar === "timeout") { const e = new Error("t"); e.name = "TimeoutError"; throw e; }
       return c.cancelar === "ja_cancelado" ? resp(403, { msg: "Agendamento já cancelado." }) : resp(200, { status: "ok" });
+    }
+    if (rota.startsWith("GET /resultado/")) {
+      const k = c.resultados?.[rota.split("/").pop()!] ?? "sem";
+      if (k === "pronto") return resp(200, { pronto: true, status: "F", laudo: "CONTEUDO SIGILOSO DO LAUDO", pdf: "JVBERi0=" });
+      if (k === "queda") { const e = new Error("t"); e.name = "TimeoutError"; throw e; }
+      return resp(403, "<html>sem laudo</html>", "text/html");
     }
     if (rota === "GET /vouchers") return resp(200, cancelou && c.vouchersDepoisDeCancelar ? c.vouchersDepoisDeCancelar : (c.vouchers ?? []));
     return resp(404, "nao");
@@ -118,9 +125,10 @@ test("resumo do cadastro: só id, nascimento, o que falta e o plano (nenhum nome
   assert.deepEqual(resumoPaciente({ id: "P9", convenio: { plano: { id: 28 } } }).planoId, 28);
   assert.deepEqual(resumoPaciente(null), { id: null, nascimento: null, faltando: ["email", "celular", "telefone"], planoId: null });
 });
-test("as 4 cópias do klingo-api.ts são idênticas (cada Edge Function publica a pasta isolada)", () => {
+test("as 5 cópias do klingo-api.ts (e as 2 do oferta.ts) são idênticas (cada Edge Function publica a pasta isolada)", () => {
   const base = readFileSync(new URL("./klingo-api.ts", import.meta.url), "utf8");
-  for (const f of ["klingo-identificar", "chat-agenda-api", "klingo-sincronizar"]) assert.equal(readFileSync(new URL(`../${f}/klingo-api.ts`, import.meta.url), "utf8"), base, f);
+  for (const f of ["klingo-identificar", "chat-agenda-api", "klingo-sincronizar", "disponibilidade-vigia"]) assert.equal(readFileSync(new URL(`../${f}/klingo-api.ts`, import.meta.url), "utf8"), base, f);
+  assert.equal(readFileSync(new URL("../chat-agenda-api/oferta.ts", import.meta.url), "utf8"), readFileSync(new URL("../disponibilidade-vigia/oferta.ts", import.meta.url), "utf8"));
   assert.equal(readFileSync(new URL("../chat-agenda-api/identificar.ts", import.meta.url), "utf8"), readFileSync(new URL("../klingo-identificar/identificar.ts", import.meta.url), "utf8"));
 });
 
@@ -294,7 +302,7 @@ test("REMARCAR: confere que o voucher antigo é desta sessão, reserva sem 'rema
   const { api, k } = apiDe({ paciente: PAC, vouchers: [V26700] });
   const r = await executar(api, rpcDe().rpc, opDe("remarcar", { chave: CHAVE, remarcacao: "26700" }), ESPS);
   assert.equal(r.estado, "sucesso"); assert.equal(r.voucher?.id, "26700".replace("26700", "26700"));
-  assert.deepEqual(k.chamadas, ["GET /paciente/cpf", "POST /externo/login", "GET /vouchers", "GET /agenda/horarios", "POST /agenda/reservar", "POST /agenda/horario"]);
+  assert.deepEqual(k.chamadas, ["GET /paciente/cpf", "POST /externo/login", "GET /vouchers", "GET /agenda/horarios", "POST /agenda/reservar", "POST /agenda/horario", "GET /vouchers"]);   // v1.1: o último GET confere o voucher antigo
   assert.equal(k.corpos.find((c) => c.rota === "POST /agenda/reservar")!.corpo.remarcacao, undefined);
   assert.equal(k.corpos.find((c) => c.rota === "POST /agenda/horario")!.corpo.remarcacao, 26700);
 });
@@ -310,7 +318,7 @@ test("REMARCAR: voucher antigo que não é desta sessão não reserva nem marca;
 });
 test("tipo de operação desconhecido não faz nada", async () => {
   const a = apiDe({ paciente: PAC });
-  assert.equal((await executar(a.api, rpcDe().rpc, opDe("ler_vouchers", {}), ESPS)).codigo, "tipo_nao_suportado");
+  assert.equal((await executar(a.api, rpcDe().rpc, opDe("apagar_tudo", {}), ESPS)).codigo, "tipo_nao_suportado");   // v1.1: "ler_vouchers" agora existe; a regra segue valendo para o que não existe
   assert.equal(a.k.chamadas.length, 0);
 });
 
@@ -343,4 +351,94 @@ test("DIVERGÊNCIA também vale para cancelar: dois campos diferentes não cance
   const r = await executar(api, rpcDe().rpc, opDe("cancelar", { voucher: "26700" }), ESPS);
   assert.equal(r.estado, "falha"); assert.match(String(r.codigo), /^divergencia_2:/);
   assert.ok(!k.chamadas.includes("DELETE /voucher"));
+});
+
+
+// ------------------------------------------------------------------ v1.1 (14/11/2026): ver minhas marcações e conferência do voucher antigo (Klingo SIMULADO; dados inventados)
+const V2 = { id: 26701, status: "agendado", data: "2026-11-25", hora: "10:00:00", procedimento: { id: 201, descr: "RM JOELHO" }, unidade: { nome: "CSI" }, realizador: { nome: "DRA EXEMPLO" } };
+test("VER MARCAÇÕES: lista as ativas do próprio paciente (id, data, hora, procedimento, unidade, profissional), sem cancelar, sem escrever nada", async () => {
+  const { api, k } = apiDe({ paciente: PAC, vouchers: [V26700, V2, { ...V2, id: 99, status: "cancelado" }] });
+  const r = await executar(api, rpcDe().rpc, opDe("ler_vouchers", {}), ESPS);
+  assert.equal(r.estado, "sucesso"); assert.equal(r.codigo, "ok_com_marcacoes");
+  assert.deepEqual(r.marcacoes!.map((m) => m.id), ["26700", "26701"]);
+  assert.equal(r.marcacoes![1].procedimentoId, "201"); assert.equal(r.marcacoes![1].hora, "10:00");
+  assert.deepEqual(k.chamadas, ["GET /paciente/cpf", "POST /externo/login", "GET /vouchers"], "só leitura: nenhuma reserva, marcação ou cancelamento");
+});
+test("VER MARCAÇÕES: sem marcações ativas é sucesso com lista vazia (não é erro)", async () => {
+  const { api } = apiDe({ paciente: PAC, vouchers: [] });
+  const r = await executarConsulta(api, rpcDe().rpc, opDe("ler_vouchers", {}));
+  assert.equal(r.estado, "sucesso"); assert.equal(r.codigo, "sem_marcacoes"); assert.deepEqual(r.marcacoes, []);
+});
+test("VER MARCAÇÕES: nascimento diferente, cadastro inexistente e sessão de outra pessoa NÃO listam nada (nunca marcação de terceiro)", async () => {
+  let a = apiDe({ paciente: { ...PAC, dt_nasc: "1999-01-01" }, vouchers: [V26700] });
+  let r = await executarConsulta(a.api, rpcDe().rpc, opDe("ler_vouchers", {}));
+  assert.equal(r.codigo, "nascimento_divergente"); assert.equal(r.marcacoes, undefined); assert.ok(!a.k.chamadas.includes("GET /vouchers"));
+  a = apiDe({ paciente: null, vouchers: [V26700] });
+  r = await executarConsulta(a.api, rpcDe({ preCadastro: true }).rpc, opDe("ler_vouchers", {}));
+  assert.equal(r.codigo, "cadastro_nao_encontrado"); assert.ok(!a.k.chamadas.includes("GET /vouchers"));
+  a = apiDe({ paciente: PAC, vouchers: [V26700], loginUser: { id: "P999", nome: "Outra Pessoa", nascimento: NASC, id_paciente: "1" } });
+  r = await executarConsulta(a.api, rpcDe().rpc, opDe("ler_vouchers", {}));
+  assert.equal(r.codigo, "sessao_nao_confere"); assert.ok(!a.k.chamadas.includes("GET /vouchers"));
+});
+test("VER MARCAÇÕES: sem CPF ou nascimento não chama o Klingo; dois campos de cadastro diferentes não listam", async () => {
+  let a = apiDe({ paciente: PAC, vouchers: [V26700] });
+  const op = opDe("ler_vouchers", {}); op.dados.cpf = null;
+  assert.equal((await executarConsulta(a.api, rpcDe().rpc, op)).codigo, "dados_incompletos"); assert.equal(a.k.chamadas.length, 0);
+  a = apiDe({ paciente: { ...PAC, nome: "JOSEFA ALMEIDA", sexo: "M" }, vouchers: [V26700] });
+  const r = await executarConsulta(a.api, rpcDe().rpc, opDe("ler_vouchers", {}));
+  assert.match(String(r.codigo), /^divergencia_2:/); assert.ok(!a.k.chamadas.includes("GET /vouchers"));
+});
+test("VER MARCAÇÕES: erro do Klingo vira falha com código (nunca lista inventada)", async () => {
+  const k = klingo({ paciente: PAC }); const f = async (u: string, i?: RequestInit) => (String(u).includes("/vouchers") ? new Response("<html>x</html>", { status: 502, headers: { "content-type": "text/html" } }) : k.f(u, i));
+  const r = await executarConsulta(new KlingoApi("clinicacsi:s", f as any, semEspera), rpcDe().rpc, opDe("ler_vouchers", {}));
+  assert.equal(r.estado, "falha"); assert.equal(r.marcacoes, undefined);
+});
+test("REMARCAR: depois da nova, confere o antigo — ainda ativo (duplicidade), cancelado (ok) ou não deu para ver", async () => {
+  let a = apiDe({ paciente: PAC, vouchers: [V26700] });                                   // o antigo continua na lista = DUAS marcações ativas
+  let r = await executar(a.api, rpcDe().rpc, opDe("remarcar", { chave: CHAVE, remarcacao: "26700" }), ESPS);
+  assert.equal(r.estado, "sucesso"); assert.equal(r.antigo, "ativo");
+  const k = klingo({ paciente: PAC, vouchers: [V26700] }); let n = 0;                   // a 2ª leitura (depois de marcar) já não traz o antigo
+  const f1 = async (u: string, i?: RequestInit) => { if (String(u).includes("/vouchers") && ++n === 2) return new Response("[]", { status: 200, headers: { "content-type": "application/json" } }); return k.f(u, i); };
+  r = await executar(new KlingoApi("clinicacsi:s", f1 as any, semEspera), rpcDe().rpc, opDe("remarcar", { chave: CHAVE, remarcacao: "26700" }), ESPS);
+  assert.equal(r.estado, "sucesso"); assert.equal(r.antigo, "cancelado");
+  const k2 = klingo({ paciente: PAC, vouchers: [V26700] }); let m = 0;                  // a leitura final falha
+  const f2 = async (u: string, i?: RequestInit) => { if (String(u).includes("/vouchers") && ++m === 2) return new Response("<html>x</html>", { status: 502, headers: { "content-type": "text/html" } }); return k2.f(u, i); };
+  r = await executar(new KlingoApi("clinicacsi:s", f2 as any, semEspera), rpcDe().rpc, opDe("remarcar", { chave: CHAVE, remarcacao: "26700" }), ESPS);
+  assert.equal(r.estado, "sucesso"); assert.equal(r.antigo, "desconhecido");
+});
+test("REMARCAR incerto: informa também a situação do antigo (se o antigo já sumiu e o novo não aparece, a equipe precisa agir já)", async () => {
+  const k = klingo({ paciente: PAC, vouchers: [V26700], marcar: "timeout" }); let n = 0;
+  const f = async (u: string, i?: RequestInit) => { if (String(u).includes("/vouchers") && ++n >= 2) return new Response("[]", { status: 200, headers: { "content-type": "application/json" } }); return k.f(u, i); };
+  const r = await executar(new KlingoApi("clinicacsi:s", f as any, semEspera), rpcDe().rpc, opDe("remarcar", { chave: CHAVE, remarcacao: "26700" }), ESPS);
+  assert.equal(r.estado, "incerto"); assert.equal(r.antigo, "cancelado");
+  assert.equal(k.chamadas.filter((c) => c === "POST /agenda/horario").length, 1, "nunca marca de novo sozinho");
+});
+test("MARCAR comum não mexe no campo antigo", async () => {
+  const { api } = apiDe({ paciente: PAC });
+  const r = await executar(api, rpcDe().rpc, opDe("marcar", { chave: CHAVE }), ESPS);
+  assert.equal(r.estado, "sucesso"); assert.equal(r.antigo, undefined);
+});
+
+test("RESULTADO: só diz se o laudo está liberado (nunca o conteúdo); sem laudo (403 HTML) = ainda não; queda = 'não consegui conferir', não 'pronto'", async () => {
+  const feito = (id: number, status = "atendido") => ({ id, status, data: "2026-11-10", hora: "09:00:00", procedimento: { id: 201, descr: "RM JOELHO" }, unidade: { nome: "CSI" } });
+  const { api, k } = apiDe({ paciente: PAC, vouchers: [feito(41001), feito(41002), feito(41003), V26700], resultados: { "41001": "pronto", "41002": "sem", "41003": "queda" } });
+  const r = await executar(api, rpcDe().rpc, opDe("ler_vouchers", { resultado: true }), ESPS);
+  assert.equal(r.estado, "sucesso"); assert.equal(r.codigo, "ok_com_resultados");
+  assert.deepEqual(r.resultados!.map((x) => [x.id, x.pronto]), [["41001", true], ["41002", false], ["41003", null]]);
+  assert.ok(!JSON.stringify(r).includes("SIGILOSO") && !JSON.stringify(r).includes("JVBERi"), "nenhum conteúdo de laudo sai do executor");
+  assert.ok(!k.chamadas.includes("GET /resultado/26700"), "marcação futura (agendado) não tem resultado para consultar");
+  assert.equal(r.marcacoes, undefined);
+});
+test("RESULTADO: sem exame realizado é sucesso com lista vazia; identidade que não confere não consulta resultado nenhum", async () => {
+  let a = apiDe({ paciente: PAC, vouchers: [V26700] });
+  let r = await executar(a.api, rpcDe().rpc, opDe("ler_vouchers", { resultado: true }), ESPS);
+  assert.equal(r.codigo, "sem_exames_realizados"); assert.deepEqual(r.resultados, []);
+  a = apiDe({ paciente: { ...PAC, dt_nasc: "1999-01-01" }, vouchers: [] });
+  r = await executar(a.api, rpcDe().rpc, opDe("ler_vouchers", { resultado: true }), ESPS);
+  assert.equal(r.codigo, "nascimento_divergente"); assert.ok(!a.k.chamadas.some((c) => c.startsWith("GET /resultado")));
+});
+test("VER MARCAÇÕES não lista exame já realizado (atendido) como se pudesse cancelar", async () => {
+  const { api } = apiDe({ paciente: PAC, vouchers: [V26700, { ...V26700, id: 41009, status: "atendido" }] });
+  const r = await executar(api, rpcDe().rpc, opDe("ler_vouchers", {}), ESPS);
+  assert.deepEqual(r.marcacoes!.map((m) => m.id), ["26700"]);
 });

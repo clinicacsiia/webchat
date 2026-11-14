@@ -1,0 +1,524 @@
+[
+ {
+  "script": "test:retrato",
+  "codigo": 0,
+  "seg": 0,
+  "fim": "PASS  o service worker do chat guarda os arquivos que o chat carrega; as versões do chat e dos service workers foram trocadas juntas  -- chat 2026.11.14-2; webchat-cliente-v40 | 10 de 10 verificações passaram."
+ },
+ {
+  "script": "test:edge",
+  "codigo": 0,
+  "seg": 1,
+  "fim": "# todo 0 | # duration_ms 871.744092"
+ },
+ {
+  "script": "test:python",
+  "codigo": 0,
+  "seg": 0,
+  "fim": "...........................                                              [100%] | 27 passed in 0.09s"
+ },
+ {
+  "script": "test:sql",
+  "codigo": 0,
+  "seg": 2,
+  "fim": "PASS  funções do n8n e do paciente: anon executa; funções da recepção e internas não  -- true,true,true|false,false,false,false,false,false,false | 46/46 verificações passaram"
+ },
+ {
+  "script": "test:delta",
+  "codigo": 0,
+  "seg": 2,
+  "fim": "PASS  o delta é idempotente (segunda aplicação sem erro) | 5/5 verificações passaram"
+ },
+ {
+  "script": "test:saida-n8n-fila",
+  "codigo": 0,
+  "seg": 1,
+  "fim": "PASS  a função nova não é executável pelo navegador (anon e authenticated)  -- permission denied for function fila_avisar_link | permission denied for function fila_avisar_link | 8/8 verificações passaram"
+ },
+ {
+  "script": "test:saida-n8n",
+  "codigo": 0,
+  "seg": 1,
+  "fim": "PASS  formato desconhecido: a migração para com erro claro e a função fica intacta  -- chat_iniciar: não consegui remover o bloco do n8n; nada foi alterado | 7/7 verificações passaram"
+ },
+ {
+  "script": "test:sw",
+  "codigo": 0,
+  "seg": 0,
+  "fim": "PASS  nenhuma URL da fila foi gravada no cache  -- https://clinicacsiia.github.io/webchat/ | https://clinicacsiia.github.io/webchat/ | 16/16 verificações passaram"
+ },
+ {
+  "script": "test:sentinela",
+  "codigo": 0,
+  "seg": 0,
+  "fim": "PASS  privacidade: texto, valor, nome e telefone nunca entram; números longos e e-mails são mascarados  -- {\"passo\":\"plano\",\"ms\":12,\"erro\":\"falha para # em @\",\"ok\":true} | 14/14 verificações passaram"
+ },
+ {
+  "script": "test:paciente-status",
+  "codigo": 0,
+  "seg": 0,
+  "fim": "PASS  resumo de lista vazia ou inválida não quebra | 20/20 verificações passaram"
+ },
+ {
+  "script": "test:nomes",
+  "codigo": 0,
+  "seg": 0,
+  "fim": "PASS  lista vazia ou sem nome não quebra | 28/28 verificações passaram"
+ },
+ {
+  "script": "test:sql9",
+  "codigo": 0,
+  "seg": 1,
+  "fim": "PASS  textos: as variáveis {nome}, {resumo} e {paciente} continuam presentes e a aplicação repetida não altera de novo  -- Confira se está tudo certo: / {resumo} /  / Ao confirmar, você envia uma PREVISÃO de agendamento. Quem confirm | 14/14 verificações passaram"
+ },
+ {
+  "script": "test:espera",
+  "codigo": 0,
+  "seg": 1,
+  "fim": "PASS  texto editado pela equipe não é sobrescrito pela migração | 18/18 verificações passaram"
+ },
+ {
+  "script": "test:cronometro-grupo",
+  "codigo": 0,
+  "seg": 1,
+  "fim": "PASS  Parte 2: conserta o relógio que ficou para trás (resposta de pessoa posterior em outra conversa da pessoa) | 8 de 8"
+ },
+ {
+  "script": "test:convenio",
+  "codigo": 0,
+  "seg": 1,
+  "fim": "PASS  trocar a CONSULTA também refaz o horário (antes só o exame refazia)  -- condição \"só exame\" removida | 20 de 20 verificações passaram."
+ },
+ {
+  "script": "test:assuntos",
+  "codigo": 0,
+  "seg": 1,
+  "fim": "PASS  depois de \"Resolveu\", escrever de novo reabre para a equipe (como o pedido pronto) | 21 de 21 verificações passaram."
+ },
+ {
+  "script": "test:contas",
+  "codigo": 0,
+  "seg": 1,
+  "fim": "PASS  anon não lê contas nem convites; ninguém além do administrador lê convites  -- 4 leituras recusadas (convites só pelas funções) | 15 de 15 casos passaram."
+ },
+ {
+  "script": "test:protecao",
+  "codigo": 0,
+  "seg": 1,
+  "fim": "PASS  sem validado em nenhum dos dois, o mais recente continua desempatando (comportamento anterior) | 11 de 11 casos passaram."
+ },
+ {
+  "script": "test:login-sql",
+  "codigo": 0,
+  "seg": 3,
+  "fim": "PASS  supabase/aplicar-login-paciente.sql é exatamente os três arquivos em ordem e aplica do zero  -- 4 de 4 funções criadas, aplicado 2 vezes | 20 de 20 casos passaram."
+ },
+ {
+  "script": "test:meus-dados",
+  "codigo": 0,
+  "seg": 1,
+  "fim": "PASS  depois de apagada, a sessão antiga não enxerga mais nada (cópia e exclusão recusadas)  -- Entre na sua conta para ver os seus dados. | 15 de 15 verificações passaram."
+ },
+ {
+  "script": "test:navegador",
+  "codigo": 0,
+  "seg": 5,
+  "fim": "PASS  painel (admin logado): cada aba abre sem exceção de JS  -- sem exceções | 4/4 verificações passaram"
+ },
+ {
+  "script": "test:convenios-painel",
+  "codigo": 0,
+  "seg": 10,
+  "fim": "PASS  conversa com foto: tag na lista, aviso de anexo, botão abre as fotos e a pendência do Klingo se confere  -- Anexo: 2 fotos do pedido médico / Pendência do Klingo (2 fotos sem conferir): veja se o paciente está cadastrado, se o convênio e a carteiri | imgs=2 | {\"rpc\":\"conferido\",\"p_conversa\":\"c"
+ },
+ {
+  "script": "test:catalogo-painel",
+  "codigo": 0,
+  "seg": 7,
+  "fim": "PASS  atendente não vê a aba Catálogo  -- 0 | OK: 8 testes"
+ },
+ {
+  "script": "test:foto-pedido",
+  "codigo": 0,
+  "seg": 6,
+  "fim": "PASS  sem pedido: monta por tipo/parte/lado, pode juntar uma foto depois e envia uma vez só  -- itensTela=2 | envios=1 | [{\"modalidade\":\"MAMO\",\"regiao\":\"mama\",\"lado\":\"A\",\"procedimento_id\":5001},{\"texto\":\"Exame do pedido médico enviado em foto\"}] |  | 3/3 verificações passaram"
+ },
+ {
+  "script": "test:corrida",
+  "codigo": 0,
+  "seg": 8,
+  "fim": "PASS  abrir com cópia guardada de outra versão do chat: ignora a cópia e busca a conversa do servidor  -- cópia velha descartada | 4/4 verificações passaram"
+ },
+ {
+  "script": "test:historico",
+  "codigo": 0,
+  "seg": 27,
+  "fim": "PASS  seta \"Voltar ao início\": só aparece no chat, leva ao início e a conversa continua no histórico  -- chat=true, início=false, atalho=true | 8/8 verificações passaram"
+ },
+ {
+  "script": "test:sentinela-navegador",
+  "codigo": 0,
+  "seg": 40,
+  "fim": "PASS  lado: parte do corpo SEM lado (tórax) não oferece o exame \"unilateral\" de articulação, que o banco não saberia de que lado é  -- opções=Tórax / Mama bilateral; seletor de lado=0 | 20/20 verificações passaram"
+ },
+ {
+  "script": "test:login",
+  "codigo": 0,
+  "seg": 35,
+  "fim": "PASS  nenhuma exceção de JavaScript em toda a tela de login (ligada e desligada)  -- sem exceções | 23 de 23 casos passaram."
+ },
+ {
+  "script": "test:quadro",
+  "codigo": 0,
+  "seg": 7,
+  "fim": "PASS  Banco sem a visão do quadro: avisa em português e a lista continua funcionando  -- ok | 9/9 verificações passaram"
+ },
+ {
+  "script": "test:lista-agrupada",
+  "codigo": 0,
+  "seg": 4,
+  "fim": "PASS  Clicar no título do grupo recolhe e expande as conversas dele  -- 8/7/8 | 5/5 verificações passaram"
+ },
+ {
+  "script": "test:indicadores",
+  "codigo": 0,
+  "seg": 20,
+  "fim": "PASS  Avisos: conflito, dado faltando (adulto) e dado faltando de FILHO chegam como cartões na aba Avisos; no filho, o CPF do responsável não vai para a criança  -- Conflito entre o chat e o Klingo Maria de Teste (marcação 900001): CPF diferente entre o que foi informado no chat e o cadastro do Klin"
+ },
+ {
+  "script": "test:jornada",
+  "codigo": 0,
+  "seg": 17,
+  "fim": "PASS  banco fora do ar: avisa em português, com \"Tentar de novo\", sem quebrar  -- ok | 18/18 verificações passaram"
+ },
+ {
+  "script": "test:pessoa-sql",
+  "codigo": 0,
+  "seg": 3,
+  "fim": "PASS  tempo real: mudar o status do exame ou a etapa da visita avisa os portais (\"jornada_mudou\", sem dado pessoal)  -- 4 6 {\"evento\": \"jornada_mudou\"} | 54 de 54 verificações passaram."
+ },
+ {
+  "script": "test:pessoa",
+  "codigo": 0,
+  "seg": 34,
+  "fim": "PASS  Jornada SEM o SQL novo: um cartão por paciente do jeito antigo, sem o alternador e sem erro  -- 7 cartões | 24/24 verificações passaram"
+ },
+ {
+  "script": "test:chegada-sql",
+  "codigo": 0,
+  "seg": 1,
+  "fim": "PASS  autochegada desligada: paciente não entra  -- Avise a recepção que você chegou. | Todos os 17 casos passaram."
+ },
+ {
+  "script": "test:checkin-sql",
+  "codigo": 0,
+  "seg": 1,
+  "fim": "PASS  teto diário de check-ins sem conta  -- Muitos check-ins agora. Avise a recepção. | 14 de 14"
+ },
+ {
+  "script": "test:jornada-paciente",
+  "codigo": 0,
+  "seg": 1,
+  "fim": "PASS  chegou: exames marcados passam para o passo 4 sem \"em atendimento\" | 8 de 8"
+ },
+ {
+  "script": "test:identificar",
+  "codigo": 0,
+  "seg": 2,
+  "fim": "PASS  quem já saiu da fila (atendido) deixa de ser identificado | 8 de 8"
+ },
+ {
+  "script": "test:minha-vez",
+  "codigo": 0,
+  "seg": 11,
+  "fim": "PASS  Sair volta ao início | Todos os 13 casos passaram."
+ },
+ {
+  "script": "test:medicos-sql",
+  "codigo": 0,
+  "seg": 2,
+  "fim": "PASS  mapa: atendente não vê | Tudo certo (80)"
+ },
+ {
+  "script": "test:medicos",
+  "codigo": 0,
+  "seg": 11,
+  "fim": "PASS  bloquear no chat pede confirmação e chama profissional_bloquear  -- Bloquear Daniela Ladeia no chat? Ele some da lista e dos horários; quem já tinha escolhido recebe aviso. | {\"rpc\":\"bloquear\",\"p_nome\":\"DANIELA LADEIA\",\"p_motivo\":null} | Tudo certo (11)"
+ },
+ {
+  "script": "test:encerramento-sql",
+  "codigo": 0,
+  "seg": 1,
+  "fim": "PASS  como atendente de verdade (papel authenticated, sem ler config): sem motivo é recusado, com motivo fecha, e outras colunas seguem bloqueadas  -- MOTIVO_OBRIGATORIO: escolha o  |  | permission denied for table co | 14 de 14 verificações passaram."
+ },
+ {
+  "script": "test:agendado-sql",
+  "codigo": 0,
+  "seg": 2,
+  "fim": "PASS  a rotina nunca derruba o encerramento: mesmo sem a tabela de conferência o fechamento passa | 24 de 24 verificações passaram."
+ },
+ {
+  "script": "test:encerramento",
+  "codigo": 0,
+  "seg": 19,
+  "fim": "PASS  \"Chamei, o paciente desistiu\": anota o contato e encerra com o motivo Paciente desistiu  -- [{\"status\":\"encerrada\",\"motivo_encerramento\":\"desistiu\"}] | 13/13 verificações passaram"
+ },
+ {
+  "script": "test:despedida-sql",
+  "codigo": 0,
+  "seg": 1,
+  "fim": "PASS  RLS: quem usa a API não lê nem altera as versões direto | 14 de 14 verificações passaram."
+ },
+ {
+  "script": "test:despedida",
+  "codigo": 0,
+  "seg": 7,
+  "fim": "PASS  mensagens de sistema antigas (sem opcoes) continuam iguais | 4/4 verificações passaram"
+ },
+ {
+  "script": "test:autoencerrar-sql",
+  "codigo": 0,
+  "seg": 2,
+  "fim": "PASS  resumo para o administrador: só administrador lê  -- {\"modo\":\"ligado\",\"elegiveis\":0} | 18 de 18 verificações passaram."
+ },
+ {
+  "script": "test:avaliacao-sql",
+  "codigo": 0,
+  "seg": 1,
+  "fim": "PASS  resumo agregado só para administrador; a tabela não é lida direto por quem usa a API  -- {\"dias\":30,\"total\":5,\"por_canal\":{\"Google\":2,\"WhatsApp\":2,\"Instagram\":1},\"media_site\":7.4,\"media_atendimento\":5} | 11 de 11 verificações passaram."
+ },
+ {
+  "script": "test:avaliacao",
+  "codigo": 0,
+  "seg": 19,
+  "fim": "PASS  celular pequeno com letra grande: nada sai da tela e todos os controles ficam alcançáveis  -- {\"rolagemLateral\":false,\"formLargura\":305,\"janela\":390,\"menor\":44} | 9/9 verificações passaram"
+ },
+ {
+  "script": "test:cabecalho",
+  "codigo": 0,
+  "seg": 9,
+  "fim": "PASS  celular: o contato fica em 2 linhas e tocar no nome mostra tudo; o telefone continua sendo link  -- 78px -> 147px -> 78px | 7/7 verificações passaram"
+ },
+ {
+  "script": "test:voltar-sql",
+  "codigo": 0,
+  "seg": 4,
+  "fim": "PASS  a função auxiliar não pode ser chamada pelo paciente (só pelo banco)  -- permission denied for function fluxo_voltar_passo | 9/9 passaram"
+ },
+ {
+  "script": "test:voltar",
+  "codigo": 0,
+  "seg": 4,
+  "fim": "PASS  com uma pessoa da equipe atendendo, o botão não aparece | 2/2 passaram"
+ },
+ {
+  "script": "test:reconhecer-sql",
+  "codigo": 0,
+  "seg": 1,
+  "fim": "PASS  rotina (disparar): só chama a Edge Function com a chave ligada e pedido esperando | 16 de 16 verificações passaram."
+ },
+ {
+  "script": "test:ao-vivo-sql",
+  "codigo": 0,
+  "seg": 1,
+  "fim": "PASS  privilégios: só service_role executa; anon e authenticated não | 18 de 18 passaram"
+ },
+ {
+  "script": "test:ao-vivo",
+  "codigo": 0,
+  "seg": 7,
+  "fim": "PASS  o token e a conversa vão no corpo da consulta à API de horários; nenhum dado de paciente é enviado à função  -- conversa,token,janela,fresco | 4 de 4 passaram"
+ },
+ {
+  "script": "test:etapa0-sql",
+  "codigo": 0,
+  "seg": 1,
+  "fim": "PASS  privilégios: a equipe só LÊ os eventos; escrever direto é recusado; as funções internas não são públicas | 17 de 17 passaram"
+ },
+ {
+  "script": "test:indicadores-sql",
+  "codigo": 0,
+  "seg": 2,
+  "fim": "PASS  permissão: atendente vê; quem não é da equipe é recusado (42501); anônimo não executa | 20 de 20 passaram"
+ },
+ {
+  "script": "test:autoria-sql",
+  "codigo": 0,
+  "seg": 1,
+  "fim": "PASS  gatilho com defeito não atrapalha a gravação (a função de papel some e o status muda mesmo assim) | 5 de 5 passaram"
+ },
+ {
+  "script": "test:c1-sql",
+  "codigo": 0,
+  "seg": 1,
+  "fim": "PASS  simulação/desligado: a rotina não fecha nem avisa | 17/17 verificações passaram"
+ },
+ {
+  "script": "test:c1",
+  "codigo": 0,
+  "seg": 16,
+  "fim": "PASS  servidor sem a função nova (cache antigo): cai no jeito de antes, sem tela e sem erro | 8/8 verificações passaram"
+ },
+ {
+  "script": "test:estrutura-sql",
+  "codigo": 0,
+  "seg": 1,
+  "fim": "PASS  a estrutura inicial usa nomes provisórios: 4 equipes, \"Atendente 1..4\" em cada, nenhum papel de conta mudou | 13/13 verificações passaram"
+ },
+ {
+  "script": "test:transferir-sql",
+  "codigo": 0,
+  "seg": 1,
+  "fim": "PASS  sino do paciente: silenciar e reativar; o gatilho de push respeita o silêncio | 9/9 verificações passaram"
+ },
+ {
+  "script": "test:convenio-suspenso-sql",
+  "codigo": 0,
+  "seg": 1,
+  "fim": "PASS  renovar dá mais 1 mês e rearma o aviso; reativar libera o convênio e grava no log  -- convenio_suspenso,convenio_suspensao_renovada,convenio_reativado | 8/8 verificações passaram"
+ },
+ {
+  "script": "test:vinculo-sql",
+  "codigo": 0,
+  "seg": 1,
+  "fim": "PASS  prontuário inexistente e conversa inexistente são recusados | 8/8 verificações passaram"
+ },
+ {
+  "script": "test:sino",
+  "codigo": 0,
+  "seg": 5,
+  "fim": "PASS  permissão ainda não pedida: o item oferece \"Ativar avisos no celular\" | 3/3 verificações passaram"
+ },
+ {
+  "script": "test:autoencerrar-zap-sql",
+  "codigo": 0,
+  "seg": 2,
+  "fim": "PASS  resumo do administrador traz quantas estão marcadas  -- {\"modo\":\"ligado\",\"horas\":24,\"ultimas\":[{\"em\":\"2026-11-14T18:12:37.104+00:00\",\"modo\":\"ligado\",\"marcadas\":1,\"elegiveis\":1},{\"em\":\"2026-11-14T18:12:37.093+00:00\",\"modo\":\"ligado\",\"marcadas\":1,\"elegiveis\":1},{\"em\":\"2026-11-14T18:12:37.085+00:0"
+ },
+ {
+  "script": "test:producao-sql",
+  "codigo": 0,
+  "seg": 4,
+  "fim": "PASS  seguranca-ajustes.sql aplica duas vezes e não sobra função de gatilho executável sem login  -- 0 gatilhos abertos | 29 de 29 verificações passaram."
+ },
+ {
+  "script": "test:ponta-a-ponta",
+  "codigo": 0,
+  "seg": 3,
+  "fim": "PASS  rotinas do sistema (código da produção) rodam sobre essas conversas sem erro: espera, encerramento automático, agrupamento, indicadores  -- {\"espera_vigiar\":\"ok\",\"autoencerrar_vigiar\":\"ok\",\"pessoa_agrupar_pendentes\":\"ok\",\"agendado_vigiar\":\"ok\",\"ind_fechar_pendentes\":\"ok\",\"convenios_revisar\":\"o"
+ },
+ {
+  "script": "test:v2-modos",
+  "codigo": 0,
+  "seg": 3,
+  "fim": "PASS  permissões: as funções novas não são chamáveis por anon; klingo_promover só por logado  -- nenhuma exposta | 24 de 24 verificações passaram."
+ },
+ {
+  "script": "test:v2-calendario",
+  "codigo": 0,
+  "seg": 3,
+  "fim": "PASS  pedido_horario_vigiar NÃO oferece mais horário da grade: pedido com data que passou vira alerta para a equipe, sem \"oferta pendente\"  -- ofertas=0; avisos à equipe=1; alerta=\"Pedido sem horário: a data escolhida (02\" | 17 de 17 verificações passaram."
+ },
+ {
+  "script": "test:v2-disponibilidade",
+  "codigo": 0,
+  "seg": 4,
+  "fim": "PASS  POLÍTICA DE ENCERRAMENTO é configurável e vem DESLIGADA: por padrão a conversa não é encerrada; ligada, encerra só sem humano nem operação pendente  -- padrão=aguardando; ligado=encerrada/outro/sistema | 24 de 24 verificações passaram."
+ },
+ {
+  "script": "test:v2-agendamento",
+  "codigo": 0,
+  "seg": 4,
+  "fim": "PASS  TRANSFERÊNCIA HUMANA COM OPERAÇÃO EM ANDAMENTO / DEPOIS DE AGENDAR: a rotina NÃO encerra sozinha uma conversa que já teve atendente  -- status=aguardando | 15 de 15 verificações passaram."
+ },
+ {
+  "script": "test:v2-rollback",
+  "codigo": 0,
+  "seg": 3,
+  "fim": "PASS  ROLLBACK devolve o comportamento anterior (inclusive o defeito, que é o que \"voltar atrás\" significa) e as tabelas novas ficam sem uso nem dano  -- klingo_ativo(comum, marcar)=true (comportamento antigo); tabelas novas preservadas: auditoria=17 | 7 de 7 verificações passaram."
+ },
+ {
+  "script": "test:calendario-api",
+  "codigo": 0,
+  "seg": 19,
+  "fim": "PASS  MENU \"Minha disponibilidade\": lista as solicitações, deixa alterar e cancelar, e explica que não é agendamento  -- cancelados=sol-1 | 11/11 verificações passaram"
+ },
+ {
+  "script": "test:marcado",
+  "codigo": 0,
+  "seg": 7,
+  "fim": "PASS  cartão sem data ou hora (voucher incompleto): mostra o que tem e não oferece o botão da agenda, sem erro na tela  -- {\"cartao\":true,\"botao\":0,\"texto\":\"✓\\nAgendamento confirmado\\n\\nProtocolo\\n26701\"} | 4 de 4 verificações passaram."
+ },
+ {
+  "script": "test:equipe-assume",
+  "codigo": 0,
+  "seg": 18,
+  "fim": "PASS  rede: falha numa AÇÃO do paciente (tocar numa opção) continua avisando na hora, com código  -- nível=apoio erro; botões religados=2 | 9 de 9 verificações passaram."
+ },
+ {
+  "script": "test:painel-recarga",
+  "codigo": 0,
+  "seg": 21,
+  "fim": "PASS  servidor lento + rajada de 12 eventos: nunca há duas releituras ao mesmo tempo, e no fim a lista fica atualizada  -- releituras=4 para 12 eventos; ao mesmo tempo no máximo 1 | 4 de 4 verificações passaram."
+ },
+ {
+  "script": "test:equipe-agora",
+  "codigo": 0,
+  "seg": 4,
+  "fim": "PASS  \"Marcou hoje\" pede só o dia de hoje, sem conversas de teste  -- {\"p_de\":\"2026-11-14\",\"p_ate\":\"2026-11-14\",\"p_unidade\":null,\"p_incluir_teste\":false} | 5/5 verificações passaram"
+ },
+ {
+  "script": "test:agendou-credito",
+  "codigo": 0,
+  "seg": 3,
+  "fim": "PASS  período sem agendamento continua zerado e sem erro  -- [0,0] | 6 de 6 verificações passaram."
+ },
+ {
+  "script": "test:conferencia-sql",
+  "codigo": 0,
+  "seg": 3,
+  "fim": "PASS  só administrador e atendente leem o indicador; anônimo não executa o lote nem os avisos  -- lote negado=true indicador negado=true | 19 de 19 verificações passaram."
+ },
+ {
+  "script": "test:carga",
+  "codigo": 0,
+  "seg": 25,
+  "fim": "p95 geral: 9ms | limite 1500ms | RESULTADO: PASSOU"
+ },
+ {
+  "script": "test:agendamento-seguranca",
+  "codigo": 0,
+  "seg": 2,
+  "fim": "PASS  permissões: anon e usuário logado NÃO chamam a trava nem leem a tabela; service_role chama  -- anon=negado auth=negado tabela(anon,auth)=negado,negado service=liberado | 12 de 12 verificações passaram."
+ },
+ {
+  "script": "test:v2-medicos",
+  "codigo": 0,
+  "seg": 3,
+  "fim": "PASS  I13: se a API ainda oferece aquele horário, a escolha é gravada COM a chave da oferta (o pipeline de marcação a exige)  -- [{\"min\":30,\"data\":\"2026-11-17\",\"hora\":\"08:00\",\"grupo\":1,\"local\":null,\"origem\":\"klingo_api\",\"chegada\":false,\"unidade\":\"CSI\",\"klingo_chave\":\"2026-11-17|63|308|2|0 | 10 de 10"
+ },
+ {
+  "script": "test:v2-pos",
+  "codigo": 0,
+  "seg": 7,
+  "fim": "PASS  AUDITORIA DE COERÊNCIA depois de todos os cenários: nenhum pedido \"agendado\" com marcação cancelada; nenhum voucher valendo em dois pedidos; todo agendado do chat tem operação com sucesso e voucher  -- agendado+cancelada=0; voucher duplicado=0; sucesso sem voucher=0; agendado sem operação=0; c"
+ },
+ {
+  "script": "test:v2-publico",
+  "codigo": 0,
+  "seg": 3,
+  "fim": "PASS  PÚBLICO: sem consulta à API não há calendário nem vaga inventada (estado \"sem_consulta\")  -- estado=sem_consulta | 10 de 10 verificações passaram."
+ },
+ {
+  "script": "test:pos",
+  "codigo": 0,
+  "seg": 6,
+  "fim": "PASS  confirmação de cancelamento: dois botões (\"Sim, cancelar\" / \"Não, manter a marcação\") e o passo certo  -- Sim, cancelar | Não, manter a marcação | 4 de 4 passaram"
+ },
+ {
+  "script": "test:painel-v2",
+  "codigo": 0,
+  "seg": 5,
+  "fim": "PASS  INDICADORES: mostra as consultas de marcações, os cancelamentos e as remarcações confirmados pelo Klingo e o que foi para a equipe  -- Autoatendimento (marcação automática pelo Klingo)Interruptor geral (teto, em Configurações > Autoatendimento com o Klingo): LIGADO para todos. Horários reais d"
+ }
+]

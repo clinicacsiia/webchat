@@ -9,7 +9,6 @@ AS $function$
 declare v_cpf text := regexp_replace(coalesce(p_cpf, ''), '\D', '', 'g');
 begin
   if p_klingo_id !~ '^[0-9]+$' then raise exception 'id de pré-cadastro inválido' using errcode = '22023'; end if;
-  -- o id fica na operação ANTES de tudo: se a gravação abaixo falhar, o pré-cadastro criado não se perde
   update public.klingo_operacao set detalhe = detalhe || jsonb_build_object('registro_id', p_klingo_id) where id = p_op;
   begin
     insert into public.klingo_identidade (chave, cpf_hash, tipo, klingo_id, situacao, criado_pela_operacao)

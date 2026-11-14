@@ -253,6 +253,12 @@ export class KlingoApi {
     return normalizarHorarios(r);
   }
 
+  /** Igual a horarios(), mas devolve a resposta CRUA da API (v2.0, 14/11/2026): é com ela que o chat-agenda-api diferencia "sem horários", "estrutura inesperada" e "tudo filtrado". */
+  async horariosBruto(p: PedidoHorarios, sessao?: string): Promise<unknown> {
+    if (!p.especialidade && !p.exame) throw new Error("informe especialidade (consulta) ou exame");
+    return await this.chamar("GET", "/agenda/horarios", { sessao, query: { ...p, revisao: p.revisao === undefined ? undefined : p.revisao ? 1 : 0 } });
+  }
+
   /** GET /paciente/cpf — cadastro pelo CPF (11 dígitos). Não acha quem só tem pré-cadastro. */
   pacientePorCpf(cpf: string) { return this.chamar<Record<string, unknown>>("GET", "/paciente/cpf", { query: { cpf } }); }
 
@@ -285,6 +291,17 @@ export class KlingoApi {
   vouchers(sessao: string) { return this.chamar<Array<Record<string, unknown>>>("GET", "/vouchers", { sessao }); }
   /** DELETE /voucher — cancela. O horário volta à lista na hora. */
   cancelarVoucher(sessao: string, id: number | string) { return this.chamar("DELETE", "/voucher", { sessao, corpo: { id: String(id) } }); }
+  /** v1.1 (14/11/2026): só pergunta se o laudo desta marcação está pronto (GET /resultado/{id}, chave da clínica). NUNCA devolve o conteúdo do laudo. 403 ou página HTML = ainda sem laudo (provado em 13/11). */
+  async resultadoPronto(id: number | string): Promise<{ pronto: boolean; status: string | null }> {
+    try {
+      const r = await this.chamar<unknown>("GET", `/resultado/${encodeURIComponent(String(id))}`);
+      const o = (typeof r === "object" && r ? r : {}) as Record<string, unknown>;
+      return { pronto: o.pronto === true || o.pronto === 1 || o.pronto === "S", status: o.status == null ? null : String(o.status).slice(0, 20) };
+    } catch (e) {
+      if (e instanceof KlingoErro && (e.tipo === "html" || e.status === 403)) return { pronto: false, status: null };
+      throw e;
+    }
+  }
 }
 
 function paraApi(m: Marcacao) {
@@ -301,6 +318,8 @@ export function resumoVoucher(v: Record<string, unknown> | null | undefined) {
   return {
     id: v?.id === undefined || v?.id === null ? null : String(v.id), status: texto(v?.status), data: texto(v?.data), hora: texto(v?.hora)?.slice(0, 5) ?? null,
     procedimento: typeof proc === "object" ? texto(proc?.descr) : texto(proc), unidade: texto(uni?.nome), profissional: texto(rea?.nome), idExterno: texto(v?.id_externo),
+    // v1.1 (14/11/2026): id do procedimento (para saber se a marcação pode ser remarcada pelo chat); campo novo, quem já usa o resumo não é afetado
+    procedimentoId: typeof proc === "object" && proc?.id !== undefined && proc?.id !== null ? String(proc.id) : null,
   };
 }
 

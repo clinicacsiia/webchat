@@ -10,6 +10,6 @@ begin
   perform public.chat_valida(p_conversa, p_token);
   if p_modalidade not in ('RM','TC','US','RX','MAMO','DENSITO') then raise exception 'Modalidade inválida.' using errcode = '22023'; end if;
   return coalesce((select jsonb_agg(jsonb_build_object('id', e.id, 'nome', e.nome, 'unilateral', e.unilateral, 'bilateral', e.bilateral))
-                   from public.catalogo_exames_regiao(p_modalidade, coalesce(nullif(p_regiao, ''), 'todos')) e), '[]'::jsonb);
+                   from public.catalogo_exames_regiao(p_modalidade, coalesce(nullif(p_regiao, ''), 'todos')) e where public.klingo_liberado(p_conversa, e.id, 'exame')), '[]'::jsonb);
 end $function$;
 

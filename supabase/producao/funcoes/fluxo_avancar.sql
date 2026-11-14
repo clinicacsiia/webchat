@@ -110,6 +110,9 @@ begin
   end if;
 
   if v_prox is null then v_prox := public.fluxo_proximo(p_conversa); end if;
+  if v_tipo = 'inicio' and v_prox = 'cpf_nasc' then   -- cpf-primeiro: a 1ª mensagem já pede CPF e nascimento
+    v_prefixo := public.fluxo_t(case when (ctx ->> 'filho')::boolean then 'ola_cpf_filho' else 'ola_cpf_proprio' end, ctx);
+  end if;
   if v_prox = 'pronto' then
     perform public.fluxo_finalizar(p_conversa);
   elsif v_prox = 'horario' and v_tipo = 'componente' and v_passo = 'horario' then

@@ -51,9 +51,6 @@ begin
   on conflict (telefone) do update set ultimo_contato_em = now(), email = coalesce(public.contatos.email, excluded.email),
     aceitou_lgpd_em = coalesce(public.contatos.aceitou_lgpd_em, now())
   returning id into v_contato;
-  -- Sem duplicata: a mesma pessoa (telefone) e o mesmo paciente (para mim / mesma criança), com conversa ainda SEM atendente,
-  -- fica com uma só. A antiga é encerrada como 'nova_conversa' (igual ao botão "Abrir uma nova conversa"). Nunca mexe em conversa
-  -- que a equipe já assumiu ou que tem exame em aberto; o histórico não é apagado.
   for v_ant in
     select c.id from public.conversas c
      where c.contato_id = v_contato and c.teste = false and c.status = 'aguardando' and c.agente_id is null and c.primeiro_humano_em is null

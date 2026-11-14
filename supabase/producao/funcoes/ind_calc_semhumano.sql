@@ -1,5 +1,5 @@
 -- public.ind_calc_semhumano(p_de date, p_ate date)
--- Pode executar: ninguém pela API (só o dono/gatilhos/rotinas)
+-- Pode executar: service_role
 CREATE OR REPLACE FUNCTION public.ind_calc_semhumano(p_de date, p_ate date)
  RETURNS TABLE(dia date, pessoa text, teste boolean, unidades text[])
  LANGUAGE sql

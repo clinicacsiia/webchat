@@ -1,4 +1,7 @@
 // O coração da marcação automática (sem Deno, para testar com um Klingo de mentira). Versão 1.0 — 12/11/2026.
+// Versão 1.1 — 14/11/2026 / Mudança: (a) tipo "ler_vouchers" (ver minhas marcações: lista as marcações ATIVAS do próprio paciente, só leitura); (b) remarcação confere, depois da marcação nova, se o voucher
+//   antigo ainda está ativo (campo "antigo": ativo | cancelado | desconhecido) para o banco avisar a equipe se ficaram dois agendamentos ou nenhum.
+//   Fluxo: Entrada (operação aprovada pelo banco) → Validação (identidade + sessão conferida) → Processamento (lista / marca / cancela) → Persistência (klingo_operacao_concluir) → Saída (Resultado).
 //
 // Recebe SÓ o que o banco entregou ao executor (a operação, os dados já validados da conversa e a oferta que o Klingo fez a ela) e devolve o resultado.
 // Ordem, sem pular nada (cada passo que falha para tudo e devolve um código interno; nunca o corpo da resposta do Klingo):
@@ -24,6 +27,12 @@ export type Resultado = {
   estado: "sucesso" | "falha" | "incerto" | "horario_tomado";
   codigo?: string; http_status?: number; caminho?: string;
   voucher?: ReturnType<typeof resumoVoucher>;
+  /** v1.1: só em "ler_vouchers" (marcações ativas do próprio paciente). */
+  marcacoes?: Array<ReturnType<typeof resumoVoucher>>;
+  /** v1.1: só em "ler_vouchers" com detalhe.resultado: exames já realizados e se o laudo está liberado (nunca o conteúdo). */
+  resultados?: Array<{ id: string | null; procedimento: string | null; data: string | null; pronto: boolean | null }>;
+  /** v1.1: só em "remarcar": situação do voucher ANTIGO depois da marcação nova. */
+  antigo?: "ativo" | "cancelado" | "desconhecido";
 };
 
 const falha = (codigo: string, e?: unknown): Resultado => ({ estado: "falha", codigo, ...(e instanceof KlingoErro ? { http_status: e.status, caminho: e.caminho } : {}) });
@@ -136,8 +145,36 @@ export async function executarCancelamento(api: KlingoApi, rpc: Rpc, p: Pegar): 
   }
 }
 
+/** Ver minhas marcações (v1.1): só leitura. Lista as marcações ATIVAS da sessão conferida do próprio paciente; nunca lista de outra pessoa. */
+export async function executarConsulta(api: KlingoApi, rpc: Rpc, p: Pegar): Promise<Resultado> {
+  const d = p.dados;
+  if (!d.cpf || !d.nascimento) return falha("dados_incompletos");
+  try {
+    const s = await abrirSessao(api, rpc, p, { liberarNovo: false });
+    if (ehResultado(s)) return s;
+    const lista = await api.vouchers(s.token);
+    const todos = (Array.isArray(lista) ? lista : []).map((v) => resumoVoucher(v)).filter((v) => v.id && /^\d+$/.test(v.id));
+    if (p.operacao.detalhe?.resultado === true) {
+      // resultado de exame: só diz se o laudo está liberado (o conteúdo nunca passa por aqui); erro numa consulta = "não consegui conferir" (pronto: null), nunca "pronto" por suposição
+      const feitos = todos.filter((v) => /atendid|realizad/i.test(v.status ?? "")).slice(0, 5);
+      const resultados: NonNullable<Resultado["resultados"]> = [];
+      for (const v of feitos) {
+        let pronto: boolean | null = null;
+        try { pronto = (await api.resultadoPronto(v.id!)).pronto; } catch { pronto = null; }
+        resultados.push({ id: v.id, procedimento: v.procedimento, data: v.data, pronto });
+      }
+      return { estado: "sucesso", codigo: resultados.length ? "ok_com_resultados" : "sem_exames_realizados", http_status: 200, caminho: "/resultado", resultados };
+    }
+    const marcacoes = todos.filter((v) => !/cancel|atendid/i.test(v.status ?? "")).slice(0, 20);
+    return { estado: "sucesso", codigo: marcacoes.length ? "ok_com_marcacoes" : "sem_marcacoes", http_status: 200, caminho: "/vouchers", marcacoes };
+  } catch (e) {
+    return falha(e instanceof KlingoErro ? e.tipo : "erro_interno", e);
+  }
+}
+
 /** Ponto único de entrada do executor: cada tipo de operação tem o seu caminho. */
 export async function executar(api: KlingoApi, rpc: Rpc, p: Pegar, esps: Esp[]): Promise<Resultado> {
+  if (p.operacao.tipo === "ler_vouchers") return await executarConsulta(api, rpc, p);
   if (p.operacao.tipo === "cancelar") return await executarCancelamento(api, rpc, p);
   if (p.operacao.tipo === "marcar" || p.operacao.tipo === "remarcar") return await executarMarcacao(api, rpc, p, esps);
   return falha("tipo_nao_suportado");
@@ -180,6 +217,11 @@ export async function executarMarcacao(api: KlingoApi, rpc: Rpc, p: Pegar, esps:
     }
     const soltar = async () => { if (reserva?.id !== undefined) await api.cancelarReserva(token, reserva.id).catch(() => {}); };
     tentouMarcar = true;
+    // v1.1: depois da marcação (ou da dúvida), olha o voucher ANTIGO (só na remarcação): ficou ativo, foi cancelado ou não deu para ver
+    const olharAntigo = async (): Promise<"ativo" | "cancelado" | "desconhecido" | undefined> => {
+      if (!remarcacao) return undefined;
+      try { const l = await api.vouchers(token); return (Array.isArray(l) ? l : []).some((x) => String(x.id) === remarcacao) ? "ativo" : "cancelado"; } catch { return "desconhecido"; }
+    };
     let v: Record<string, unknown> | null = null;
     try { v = await api.marcar(token, remarcacao ? { ...m, remarcacao } : m); } catch (e) {
       if (e instanceof KlingoErro && e.tipo === "horario_ocupado") { await soltar(); return { estado: "horario_tomado", codigo: "horario_ocupado", http_status: e.status, caminho: e.caminho }; }
@@ -187,16 +229,16 @@ export async function executarMarcacao(api: KlingoApi, rpc: Rpc, p: Pegar, esps:
       // INCERTO: o Klingo pode ter criado a marcação. Reconcilia pelas marcações ativas da sessão.
       try {
         const achado = acharVoucher(await api.vouchers(token), op.id, o.data, o.hora, o.procedimento);
-        if (achado?.id) return { estado: "sucesso", voucher: achado, codigo: "reconciliado" };
+        if (achado?.id) return { estado: "sucesso", voucher: achado, codigo: "reconciliado", antigo: await olharAntigo() };
       } catch { /* não deu para conferir: continua incerto */ }
-      return { estado: "incerto", codigo: e instanceof KlingoErro ? e.tipo : "erro", ...(e instanceof KlingoErro ? { http_status: e.status, caminho: e.caminho } : {}) };
+      return { estado: "incerto", codigo: e instanceof KlingoErro ? e.tipo : "erro", antigo: await olharAntigo(), ...(e instanceof KlingoErro ? { http_status: e.status, caminho: e.caminho } : {}) };
     }
     const voucher = resumoVoucher(v);
     if (!voucher.id) {
-      try { const achado = acharVoucher(await api.vouchers(token), op.id, o.data, o.hora, o.procedimento); if (achado?.id) return { estado: "sucesso", voucher: achado, codigo: "reconciliado" }; } catch { /* segue incerto */ }
-      return { estado: "incerto", codigo: "resposta_sem_voucher" };
+      try { const achado = acharVoucher(await api.vouchers(token), op.id, o.data, o.hora, o.procedimento); if (achado?.id) return { estado: "sucesso", voucher: achado, codigo: "reconciliado", antigo: await olharAntigo() }; } catch { /* segue incerto */ }
+      return { estado: "incerto", codigo: "resposta_sem_voucher", antigo: await olharAntigo() };
     }
-    return { estado: "sucesso", voucher: { ...voucher, data: voucher.data ?? o.data, hora: voucher.hora ?? o.hora }, http_status: 200, caminho: "/agenda/horario" };
+    return { estado: "sucesso", voucher: { ...voucher, data: voucher.data ?? o.data, hora: voucher.hora ?? o.hora }, http_status: 200, caminho: "/agenda/horario", antigo: await olharAntigo() };
   } catch (e) {
     if (tentouMarcar) return { estado: "incerto", codigo: e instanceof KlingoErro ? e.tipo : "erro_depois_de_marcar" };
     if (e instanceof KlingoErro && e.tipo === "limite") return falha("limite", e);

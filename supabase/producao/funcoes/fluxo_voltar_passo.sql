@@ -1,5 +1,5 @@
 -- public.fluxo_voltar_passo(p_conversa uuid, p_op integer)
--- Pode executar: ninguém pela API (só o dono/gatilhos/rotinas)
+-- Pode executar: service_role
 CREATE OR REPLACE FUNCTION public.fluxo_voltar_passo(p_conversa uuid, p_op integer)
  RETURNS void
  LANGUAGE plpgsql

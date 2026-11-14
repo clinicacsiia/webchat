@@ -26,5 +26,5 @@ begin
   else v_txt := 'Como podemos continuar?'; v_itens := '[]'::jsonb;
   end case;
   return jsonb_build_object('texto', v_txt, 'opcoes', public.fluxo_escolha(p_passo, v_itens));
-end $function$
-;
+end $function$;
+

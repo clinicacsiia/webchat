@@ -1,5 +1,5 @@
 -- public.chat_voltar(p_conversa uuid, p_token text)
--- Pode executar: anon, authenticated
+-- Pode executar: anon, authenticated, service_role
 CREATE OR REPLACE FUNCTION public.chat_voltar(p_conversa uuid, p_token text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -14,12 +14,15 @@ begin
   if c.motor <> 'fluxo' or not (c.ia_ativa and c.status = 'aguardando') or v_passo is null then
     raise exception 'Não dá para voltar agora. Veja a última mensagem.' using errcode = '22023';
   end if;
-  if v_passo in ('identidade', 'atalho', 'motivo', 'pronto', 'humano', 'assunto_fim') then
+  if v_passo in ('marcando', 'marcado', 'pos_menu', 'pos_cancelar', 'cancelado') or exists (select 1 from public.klingo_operacao o where o.conversa_id = p_conversa and o.estado in ('pendente', 'executando')) then
+    raise exception 'Depois de confirmar não dá para voltar por aqui. Use as opções da mensagem.' using errcode = '22023';   -- klingo-auto: voltar durante ou depois da marcação poderia gerar uma 2ª reserva
+  end if;
+  if v_passo in ('cpf_nasc', 'identidade', 'atalho', 'motivo', 'pronto', 'humano', 'assunto_fim') then
     raise exception 'Esta é a primeira pergunta: não há o que corrigir antes dela.' using errcode = '22023';
   end if;
   select coalesce(max(id), 0) into v_antes from public.mensagens where conversa_id = p_conversa;
   -- cada tentativa é ensaiada e desfeita (o erro de propósito desfaz só o que foi mexido no bloco); a primeira que muda a pergunta vale
-  foreach i in array array[1, 2, 3, 4, 5, 6, 11, 7, 8, 9, 10] loop   -- klingo-auto: a 11 (CPF e nascimento) vem logo antes do médico/exame
+  foreach i in array array[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] loop   -- cpf-primeiro: a 11 (CPF e nascimento) agora é a PRIMEIRA etapa, a última a ser tentada ao voltar
     begin
       perform public.fluxo_voltar_passo(p_conversa, i);
       v_p := public.fluxo_proximo(p_conversa);

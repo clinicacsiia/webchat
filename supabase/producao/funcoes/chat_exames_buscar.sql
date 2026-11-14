@@ -37,7 +37,7 @@ begin
     ), um as (
       select distinct on (c.id) c.* from cand c order by c.id, c.fonte
     ), lim as (
-      select u.*, row_number() over (order by u.fonte, u.demanda desc, u.nome) as ord from um u
+      select u.*, row_number() over (order by u.fonte, u.demanda desc, u.nome) as ord from um u where public.klingo_liberado(p_conversa, u.id, 'exame')
     )
     select coalesce(jsonb_agg(jsonb_build_object('id', x.id, 'nome', x.nome, 'modalidade', x.modalidade, 'regiao', reg.codigo, 'regiao_nome', reg.nome,
              'tem_lado', coalesce(reg.tem_lado, false), 'bilateral', x.nome ~* 'BILATERAL', 'lado', v_lado, 'linha', case when p_ocr then left(l, 120) end,

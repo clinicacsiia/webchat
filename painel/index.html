@@ -1823,29 +1823,40 @@
     const t2 = setInterval(() => { if (!dlg.open || dlg.dataset.equipe !== '1') { clearInterval(t2); return; } carregarMarcouHoje(); }, 60000);
     dlg.addEventListener('close', () => { delete dlg.dataset.equipe; clearInterval(t); clearInterval(t2); }, { once: true });
   }
-  /* ---------- Lista de previsão (13/11/2026) ---------- */
-  // Pacientes que não tinham data disponível e aceitaram esperar uma vaga. NÃO é agendamento. Quando o sistema acha uma vaga dentro do pedido do paciente,
-  // a linha fica em destaque ("Vaga aberta") e a atendente oferece. Só leitura: a lista vem de painel_previsao_lista (admin e atendente).
-  const PREV_TURNO = { manha: 'Manhã', tarde: 'Tarde', qualquer: 'Tanto faz' };
-  const PREV_ANTEC = { imediato: 'Até 24 h', '1_dia': '1 dia', '1_semana': '1 semana', '1_mes': '1 mês' };
+  /* ---------- Disponibilidade futura (14/11/2026; antiga "Lista de previsão") ---------- */
+  // Pedidos de pacientes que não achavam horário e pediram aviso quando surgir vaga compatível. NÃO é agendamento nem reserva. O sistema procura sozinho na API do Klingo;
+  // a equipe só age nas exceções ("Precisa de pessoa"). Uma lista só, com filtros por situação (nada de quadros repetidos). Dados: painel_disponibilidade_lista (admin e atendente).
+  const DISP_ESTADO = { ativa: 'Procurando vaga', oportunidade_identificada: 'Vaga encontrada', notificada: 'Paciente avisado', aguardando_resposta: 'Aguardando o paciente', convertida_em_agendamento: 'Virou agendamento', expirada: 'Expirada', cancelada: 'Cancelada' };
+  const DISP_NOTIF = { pendente: 'Aviso na fila (envio desligado ou aguardando)', entregue_ao_chat: 'Aviso entregue no chat', bloqueada_sem_autorizacao: 'Sem autorização para avisar', bloqueada_limite: 'Limite de avisos atingido', falhou: 'Aviso falhou' };
+  const DISP_TURNO = { manha: 'Manhã', tarde: 'Tarde', noite: 'Noite', qualquer: 'Qualquer horário' };
+  const DISP_DIAS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+  const DISP_FILTROS = [['', 'Todas'], ['ativa', 'Procurando'], ['oportunidade_identificada', 'Vaga encontrada'], ['notificada', 'Avisados'], ['aguardando_resposta', 'Aguardando paciente'], ['convertida_em_agendamento', 'Viraram agendamento'], ['expirada', 'Expiradas'], ['cancelada', 'Canceladas'], ['humano', 'Precisam de pessoa']];
   const dataPrev = (iso) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || '')); return m ? `${m[3]}/${m[2]}/${m[1]}` : '—'; };
   const vagaTxt = (v) => (v && v.data ? `${dataPrev(v.data)} às ${String(v.hora || '').slice(0, 5)}` : null);
-  function renderPrevisao(linhas, erro) {
+  const dispQuando = (iso) => { if (!iso) return 'ainda não'; const d = new Date(iso); return isNaN(d) ? '—' : d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); };
+  let dispFiltro = '';
+  function renderPrevisao(res, erro) {
     if (!dlg.open || dlg.dataset.previsao !== '1') return;
-    const cab = ['Paciente', 'Pedido', 'Turno', 'Período pedido', 'Pode ser chamado com', 'Situação', ''];
-    const tr = (l) => h('tr', { class: l.status === 'vaga_encontrada' ? 'eq-livre' : '' },
-      h('th', { scope: 'row' }, l.paciente || 'Paciente'),
-      h('td', {}, [l.pedido, l.plano].filter(Boolean).join(' · ') || '—'),
-      h('td', {}, PREV_TURNO[l.turno] || '—'),
-      h('td', {}, `${dataPrev(l.de)} a ${dataPrev(l.ate)}`),
-      h('td', {}, PREV_ANTEC[l.antecedencia] || '—'),
-      h('td', {}, l.status === 'vaga_encontrada' ? h('b', {}, 'Vaga aberta: ' + (vagaTxt(l.vaga) || '—')) : 'Aguardando vaga'),
-      h('td', {}, h('button', { class: 'btn', type: 'button', onclick: () => { dlg.close(); abrirConversaDoAviso(l.conversa_id); } }, 'Abrir conversa')));
-    dlg.replaceChildren(h('h3', {}, 'Lista de previsão'),
-      h('p', { class: 'dica', style: 'margin:-8px 0 10px' }, 'Pacientes sem data disponível que aceitaram esperar uma vaga. Isto NÃO é agendamento: quando abrir uma vaga dentro do que o paciente pediu, a linha fica em destaque e a atendente oferece.'),
+    const todas = (res && res.itens) || [], cont = (res && res.contagem) || {};
+    const linhas = todas.filter((l) => dispFiltro === '' ? true : dispFiltro === 'humano' ? l.precisa_humano : l.estado === dispFiltro);
+    const cab = ['Paciente', 'Atendimento', 'Quando pode ir', 'Situação', 'Última busca', 'Vaga / aviso', ''];
+    const tr = (l) => h('tr', { class: ['oportunidade_identificada', 'notificada', 'aguardando_resposta'].includes(l.estado) || l.precisa_humano ? 'eq-livre' : '' },
+      h('th', { scope: 'row' }, l.paciente || 'Paciente', l.paciente_tipo === 'filho' ? h('span', { class: 'dica' }, ' (filho/a)') : null),
+      h('td', {}, [l.procedimento, l.plano].filter(Boolean).join(' · ') || '—'),
+      h('td', {}, `${dataPrev(l.data_ini)} a ${dataPrev(l.data_fim)} · ${DISP_TURNO[l.turno] || '—'} · ${(l.dias_semana || []).map((d) => DISP_DIAS[d]).join(' ')}`),
+      h('td', {}, h('b', {}, DISP_ESTADO[l.estado] || l.estado), l.precisa_humano ? h('div', { class: 'dica' }, 'Precisa de pessoa: ' + (DISP_NOTIF[l.notificacao] || 'aviso não saiu')) : null),
+      h('td', {}, dispQuando(l.ultima_verificacao_em), l.ultima_verificacao_resultado ? h('div', { class: 'dica' }, l.ultima_verificacao_resultado.replace(/_/g, ' ')) : null),
+      h('td', {}, vagaTxt(l.ultima_oportunidade) ? `Vaga: ${vagaTxt(l.ultima_oportunidade)}` : '—', l.notificacao ? h('div', { class: 'dica' }, DISP_NOTIF[l.notificacao] || l.notificacao) : null),
+      h('td', {}, h('button', { class: 'btn', type: 'button', onclick: () => { dlg.close(); abrirConversaDoAviso(l.conversa_id); } }, 'Abrir conversa'),
+        ['ativa', 'oportunidade_identificada', 'notificada', 'aguardando_resposta'].includes(l.estado) ? h('button', { class: 'btn sec', type: 'button', title: 'Cancela a procura a pedido do paciente', onclick: async (ev) => { ev.currentTarget.disabled = true; try { const r = await db.rpc('painel_disponibilidade_cancelar', { p_id: l.id, p_motivo: 'cancelada pela equipe' }); if (r.error) throw r.error; abrirPrevisao(); } catch { ev.currentTarget.disabled = false; } } }, 'Cancelar procura') : null,
+        h('details', {}, h('summary', {}, 'Histórico'), h('ul', { style: 'margin:4px 0 0;padding-left:18px' }, (l.historico || []).map((e) => h('li', {}, `${dispQuando(e.em)} · ${String(e.tipo).replace('estado:', '→ ').replace(/_/g, ' ')} (${e.origem})`))))));
+    dlg.replaceChildren(h('h3', {}, 'Disponibilidade futura'),
+      h('p', { class: 'dica', style: 'margin:-8px 0 10px' }, 'Pacientes que não acharam horário e pediram aviso quando surgir uma vaga compatível. Isto NÃO é agendamento nem reserva: o sistema procura sozinho na agenda do Klingo e avisa o paciente pelo chat (se ele autorizou e o envio estiver ligado). A equipe só age nas linhas marcadas "Precisa de pessoa".'),
+      h('div', { class: 'chips', role: 'group', 'aria-label': 'Filtrar por situação' }, DISP_FILTROS.map(([v, t]) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(dispFiltro === v),
+        onclick: () => { dispFiltro = v; renderPrevisao(res, erro); } }, t + (v && v !== 'humano' ? ` (${cont[v] || 0})` : v === 'humano' ? ` (${todas.filter((x) => x.precisa_humano).length})` : ` (${todas.length})`)))),
       erro ? h('p', { class: 'dica', role: 'alert' }, erro)
-        : linhas === null ? h('p', { class: 'dica' }, 'Carregando…')
-        : linhas.length === 0 ? h('p', { class: 'dica' }, 'Ninguém na lista de previsão agora.')
+        : res === null ? h('p', { class: 'dica' }, 'Carregando…')
+        : linhas.length === 0 ? h('p', { class: 'dica' }, 'Nenhuma solicitação nesta situação.')
         : h('div', { class: 'eq-rolagem' }, h('table', { class: 'tab eq-tab', id: 'tabPrevisao' },
             h('thead', {}, h('tr', {}, cab.map((t) => h('th', { scope: 'col' }, t)))),
             h('tbody', {}, linhas.map(tr)))),
@@ -1854,12 +1865,12 @@
   async function abrirPrevisao() {
     if (!podeAtender()) return;
     dlg.className = 'equipe'; dlg.dataset.previsao = '1';
-    renderPrevisao(null, null); dlg.showModal();
+    renderPrevisao(null, null); if (!dlg.open) dlg.showModal();
     const carregar = async () => {
       try {
-        const { data, error } = await db.rpc('painel_previsao_lista');
-        renderPrevisao(error ? [] : (data || []), error ? 'Não foi possível carregar a lista agora. Tente de novo em instantes.' : null);
-      } catch { renderPrevisao([], 'Não foi possível carregar a lista agora. Tente de novo em instantes.'); }
+        const { data, error } = await db.rpc('painel_disponibilidade_lista');
+        renderPrevisao(error ? { itens: [], contagem: {} } : (data || { itens: [], contagem: {} }), error ? 'Não foi possível carregar a lista agora. Tente de novo em instantes.' : null);
+      } catch { renderPrevisao({ itens: [], contagem: {} }, 'Não foi possível carregar a lista agora. Tente de novo em instantes.'); }
     };
     await carregar();
     const t = setInterval(() => { if (!dlg.open || dlg.dataset.previsao !== '1') { clearInterval(t); return; } carregar(); }, 60000);
@@ -2262,7 +2273,7 @@
       h('div', { class: 'cab-linha' },
         h('div', {}, h('h2', {}, icone('fone'), 'Painel de Atendimento'), h('p', { class: 'sub' }, 'Acompanhe as conversas do dia, o que está em espera e os alertas.')),
         h('div', { class: 'cab-acoes' },
-          podeAtender() ? h('button', { class: 'btn', type: 'button', id: 'btnPrevisao', title: 'Pacientes sem data disponível que aceitaram esperar uma vaga (não é agendamento)', onclick: abrirPrevisao }, icone('calendario'), 'Lista de previsão') : null,
+          podeAtender() ? h('button', { class: 'btn', type: 'button', id: 'btnPrevisao', title: 'Pacientes que pediram aviso quando surgir vaga compatível (não é agendamento nem reserva)', onclick: abrirPrevisao }, icone('calendario'), 'Disponibilidade futura') : null,
           ehChefia() ? h('button', { class: 'btn', type: 'button', id: 'btnEquipe', title: 'Quanto cada atendente está atendendo agora (só TI, gerência e supervisão)', onclick: abrirEquipe }, icone('pessoas'), 'Equipe agora') : null,
           h('div', { class: 'data-hoje' }, icone('calendario'), 'Hoje, ' + new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'short', year: 'numeric' })))),
       h('div', { class: 'kpis', id: 'kpis', 'aria-label': 'Indicadores do dia' }));
@@ -3366,8 +3377,18 @@
       { k: 'catalogo_csi', tipo: 'sim', rot: 'CSI (exames e consultas)', dica: 'Desligado: a CSI some da escolha de unidade no começo do chat.' },
       { k: 'catalogo_rmtc', tipo: 'sim', rot: 'CSI RM/TC (ressonância e tomografia)', dica: 'Desligado: a CSI RM/TC some da escolha de unidade no começo do chat.' },
     ] },
-    { id: 'klingoauto', icone: 'pin', titulo: 'Autoatendimento com o Klingo', desc: 'Um único botão liga tudo que a API do Klingo faz pelo chat: horários reais da agenda, conferência de CPF, cadastro de paciente novo, marcar, cancelar e remarcar. Vale para os próximos atendimentos; o que já foi marcado não muda. Qualquer problema: volte para “Desligado” e o chat volta ao jeito antigo na hora, com a equipe marcando.', campos: [
-      { k: 'klingo_auto', tipo: 'escolha', rot: 'Autoatendimento com o Klingo', opcoes: [['nao', 'Desligado (o chat funciona como antes)'], ['teste', 'Teste: só os telefones da lista abaixo'], ['sim', 'Ligado para todos os pacientes']], dica: 'Comece em “Teste”. Em “Ligado para todos” qualquer paciente marca horário real na agenda. Se aparecerem marcações incertas ou falhas, o sistema volta sozinho para “Teste” e avisa a gestão.' },
+    { id: 'klingoauto', icone: 'pin', titulo: 'Autoatendimento com o Klingo', desc: 'O botão geral é o TETO: “Desligado” desliga tudo na hora (o chat volta ao jeito antigo, com a equipe marcando); “Teste” deixa só os telefones da lista; “Ligado” deixa cada parte funcionar no modo que você escolher logo abaixo. O botão geral NUNCA liga sozinho uma parte que esteja em “Teste” ou “Só medir”. Cada parte abaixo é independente. O que já foi marcado não muda.', campos: [
+      { k: 'klingo_auto', tipo: 'escolha', rot: 'Autoatendimento com o Klingo', opcoes: [['nao', 'Desligado (o chat funciona como antes)'], ['teste', 'Teste (teto): só os telefones da lista'], ['sim', 'Ligado (cada parte vale pelo modo dela)']], dica: 'Desligado desliga TUDO. Teste limita tudo à lista de telefones. Ligado só libera as partes que estiverem em “Ligado para todos”. Se aparecerem marcações incertas ou falhas, o sistema só RECUA uma parte e avisa a gestão; subir de “Teste” para “Ligado” é sempre decisão sua.' },
+      { k: 'klingo_api_horarios', tipo: 'escolha', rot: 'Horários reais da agenda (API do Klingo)', opcoes: [['nao', 'Desligado'], ['sombra', 'Só medir (o paciente não vê)'], ['teste', 'Teste: só os telefones da lista'], ['sim', 'Ligado para todos']], dica: 'Só mostra horários que o Klingo devolveu. “Só medir” consulta e registra sem mostrar ao paciente.' },
+      { k: 'klingo_api_marcar', tipo: 'escolha', rot: 'Marcar sozinho', opcoes: [['nao', 'Desligado'], ['teste', 'Teste: só os telefones da lista'], ['sim', 'Ligado para todos']], dica: 'Marcação automática com confirmação do paciente e comprovante só depois do OK do Klingo.' },
+      { k: 'klingo_api_pre_cadastro', tipo: 'escolha', rot: 'Cadastrar paciente novo (pré-cadastro)', opcoes: [['nao', 'Desligado'], ['teste', 'Teste: só os telefones da lista'], ['sim', 'Ligado para todos']], dica: 'Cria o pré-cadastro no Klingo para quem ainda não tem cadastro.' },
+      { k: 'klingo_api_consultar', tipo: 'escolha', rot: 'Ver minhas marcações', opcoes: [['nao', 'Desligado'], ['teste', 'Teste: só os telefones da lista'], ['sim', 'Ligado para todos']], dica: 'O paciente vê as marcações ativas dele no Klingo (inclusive as feitas fora do chat).' },
+      { k: 'klingo_api_cancelar', tipo: 'escolha', rot: 'Cancelar sozinho', opcoes: [['nao', 'Desligado'], ['teste', 'Teste: só os telefones da lista'], ['sim', 'Ligado para todos']], dica: 'Cancelamento com confirmação, regra de 24 horas e conferência no Klingo.' },
+      { k: 'klingo_api_remarcar', tipo: 'escolha', rot: 'Remarcar sozinho', opcoes: [['nao', 'Desligado'], ['teste', 'Teste: só os telefones da lista'], ['sim', 'Ligado para todos']], dica: 'Marca o novo horário e o Klingo cancela o antigo; se algo ficar duplicado ou incerto, a equipe é chamada.' },
+      { k: 'previsao_modo', tipo: 'escolha', rot: 'Pedir aviso de vaga futura (disponibilidade)', opcoes: [['nao', 'Desligado'], ['teste', 'Teste: só os telefones da lista'], ['sim', 'Ligado para todos']], dica: 'O paciente registra o interesse; isso NÃO marca nem reserva.' },
+      { k: 'previsao_monitor_modo', tipo: 'escolha', rot: 'Procurar vagas para quem pediu aviso', opcoes: [['nao', 'Desligado'], ['sombra', 'Só medir (o paciente não vê)'], ['teste', 'Teste: só os telefones da lista'], ['sim', 'Ligado para todos']], dica: 'O sistema consulta o Klingo a cada 10 minutos e consome a cota de chamadas.' },
+      { k: 'notificacao_modo', tipo: 'escolha', rot: 'Avisar o paciente quando surgir vaga (chat)', opcoes: [['nao', 'Desligado'], ['teste', 'Teste: só os telefones da lista'], ['sim', 'Ligado para todos']], dica: 'O aviso só vai para quem autorizou e nunca diz que o horário foi reservado.' },
+      { k: 'klingo_api_percentual', tipo: 'texto', rot: 'Porcentagem das conversas (só vale em “Ligado”)', max: 3, dica: '100 = todos os pacientes. Número de 0 a 100.' },
       { k: 'klingo_api_telefones_teste', tipo: 'texto', rot: 'Telefones de teste', max: 300, dica: 'Só números com DDD, vários separados por vírgula (ex.: 71999990000, 71988880000). Em “Teste”, só quem usar um desses celulares no chat passa pelo autoatendimento; todos os outros seguem como antes. A marcação de teste é real: avise o call center para cancelar depois.' },
     ] },
     { id: 'atualizacao', icone: 'livro', titulo: 'Encerramento e avaliação', desc: 'Chaves da Atualização do WebChat. Ligue uma por vez e confira o dia seguinte; desligar volta ao comportamento anterior na hora.', custom: 'autoencerrar', campos: [
@@ -4363,8 +4384,8 @@ h1.longo { font-size: 14mm; }
   /* Autoatendimento com a API do Klingo (planejamento de 12/11/2026): só números, nenhum dado de paciente. */
   function blocoAutoatendimento(d) {
     if (!d || !d.modos) return null;
-    const m = d.modos, op = d.operacoes || {}, cad = d.cadastros || {}, ha = d.horarios_api || {};
-    const modoHor = { nao: 'desligados', sombra: 'só medindo (a tela do paciente não muda)', sim: 'ligados' }[m.horarios] || m.horarios;
+    const m = d.modos, op = d.operacoes || {}, cad = d.cadastros || {}, ha = d.horarios_api || {}, pos = d.pos || {};   // v2.1: pos = cancelar/remarcar/ver marcações ("tipo:estado" → quantidade)
+    const modoHor = { nao: 'desligados', sombra: 'só medindo (a tela do paciente não muda)', teste: 'só nos telefones de teste', sim: 'ligados' }[m.horarios] || m.horarios;
     const geral = { nao: 'DESLIGADO (o chat funciona como antes)', teste: 'em TESTE (só os telefones da lista)', sim: 'LIGADO para todos', legado: 'regras antigas por chave' }[m.mestre] || 'DESLIGADO (o chat funciona como antes)';
     const modoMar = m.marcar === 'sim' ? `ligada para ${m.percentual}% das conversas` : m.marcar === 'teste' ? 'só nos telefones de teste' : 'desligada';
     const mini2 = (n, rot) => h('div', { class: 'ind-mini' }, h('b', {}, String(n ?? 0)), h('span', {}, rot));
@@ -4372,9 +4393,11 @@ h1.longo { font-size: 14mm; }
     const nomeChave = { klingo_api_horarios: 'Horários reais', klingo_api_marcar: 'Marcação automática', klingo_api_percentual: 'Parte das conversas' };
     return h('div', { class: 'ind-auto' },
       h('h3', { class: 'ind-sec' }, 'Autoatendimento (marcação automática pelo Klingo)'),
-      h('p', { class: 'dica' }, `Interruptor geral (Configurações > Autoatendimento com o Klingo): ${geral}. ` + (m.mestre === 'legado' ? `Horários reais do Klingo: ${modoHor}. Marcação automática: ${modoMar}. O sistema avança e recua sozinho conforme os números; você só é avisado quando ele recua.` : 'Ligado para todos, o sistema só vigia e volta sozinho para Teste se aparecerem marcações incertas ou falhas; ele não liga nada por conta própria.')),
+      h('p', { class: 'dica' }, `Interruptor geral (teto, em Configurações > Autoatendimento com o Klingo): ${geral}. Horários reais do Klingo: ${modoHor}. Marcação automática: ${modoMar}. Cada parte tem a sua própria chave nas Configurações. O sistema só RECUA sozinho quando aparecem falhas (e avisa a gestão); subir de Teste para Ligado é sempre decisão de uma pessoa.`),
       h('div', { class: 'ind-minis' }, mini2(d.agendadas_sozinhas, 'agendadas sozinhas'), mini2(d.resolvidas_sem_humano, 'resolvidas sem atendente'), mini2(op.sucesso, 'marcações certas'),
         mini2((op.incerto || 0) + (op.falha || 0), 'foram para a equipe'), mini2(op.horario_tomado, 'horário já ocupado'), mini2(d.tempo_medio_s != null ? d.tempo_medio_s + ' s' : '–', 'tempo médio para marcar')),
+      h('div', { class: 'ind-minis' }, mini2(pos['ler_vouchers:sucesso'], 'consultas de marcações'), mini2(pos['cancelar:sucesso'], 'cancelamentos confirmados pelo Klingo'), mini2(pos['remarcar:sucesso'], 'remarcações confirmadas'),
+        mini2((pos['cancelar:incerto'] || 0) + (pos['cancelar:falha'] || 0) + (pos['remarcar:incerto'] || 0) + (pos['remarcar:falha'] || 0), 'cancelar/remarcar que foram para a equipe')),
       h('p', { class: 'dica' }, `Cadastros conferidos no Klingo: ${cad.confere || 0} encontrados · ${cad.nao_encontrado || 0} pacientes novos · ${cad.divergente || 0} com nascimento diferente (a equipe confere). Convênios traduzidos: ${(d.convenios || {}).traduzidos || 0} · sem tradução: ${(d.convenios || {}).sem_traducao || 0}. Consultas à agenda do Klingo no período: ${ha.ok || 0} certas, ${(ha.erro || 0) + (ha.limite || 0)} com problema.`),
       (d.motivos_falha || []).length ? h('p', { class: 'dica' }, 'O que mandou para a equipe: ' + d.motivos_falha.map((x) => `${x.codigo} (${x.n})`).join(', ') + '.') : null,
       decisoes.length ? h('p', { class: 'dica' }, 'Últimas decisões automáticas: ' + decisoes.map((x) => `${fmtDataHora(x.em)} · ${nomeChave[x.chave] || x.chave}: ${x.de || '–'} → ${x.para}`).join(' | ')) : null);

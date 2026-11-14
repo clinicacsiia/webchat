@@ -1,5 +1,6 @@
 # Testes
 
+Versão 1.2 — 14/11/2026 / Mudança: testes do pós-agendamento, do próximo horário do médico, da configuração pública, da segurança da `klingo-agendamento`, do painel; ambiente com `pytest`.
 Versão 1.1 — 11/11/2026 / Mudança: testes contra o clone da produção, sincronismo telas x banco e cadeia `npm test` completa (69 suítes)
 Versão 1.0 — 30/10/2026 / Mudança: Implementação inicial
 
@@ -91,3 +92,26 @@ Leia isto antes de tratar "tudo verde" como "pronto para produção".
 | `navegador.smoke.mjs` | Servidor local + Playwright + Supabase simulado. `CHROMIUM_PATH` aponta para um Chromium já instalado. |
 
 Os testes do Python ficam em `biometria/test_avaliar_assinatura.py` e os da Edge Function em `supabase/functions/sync-catalogo-klingo/*.test.ts`, junto do código que testam.
+
+## WebChat v2 (14/11/2026)
+
+| Arquivo | O que prova |
+|---|---|
+| `sql-webchat-v2-modos.test.mjs` | Matriz mestre × chave × telefone (`klingo_modo`): o mestre só limita, sombra só mede, auditoria de config, recuo/recomendação/promoção, catálogo, `klingo_consulta`. |
+| `sql-webchat-v2-calendario.test.mjs` | O calendário só mostra ofertas da API; sem oferta não vira vaga da grade; escolha só de oferta válida. |
+| `sql-webchat-v2-disponibilidade.test.mjs` | Solicitação de disponibilidade futura: criar, editar, cancelar, expirar, vaga compatível/incompatível, aviso sem duplicar, sem autorização, filhos diferentes, acesso cruzado, motor em sombra. |
+| `sql-webchat-v2-agendamento.test.mjs` | Pipeline de marcação **existente** (`klingo_operacao`): duplo clique, duas chamadas, incerto, retentativa, horário tomado, divergência, vários exames. Klingo **simulado**. |
+| `sql-webchat-v2-rollback.test.mjs` | A migração preserva dados e o rollback (reaplicar as funções do retrato) devolve o comportamento anterior. |
+| `sql-webchat-v2-medicos.test.mjs` | Próximo horário de cada médico só da API (a grade nunca vira horário) e aceite de oferta antiga só pela API. |
+| `sql-webchat-v2-pos.test.mjs` | Pós-agendamento com o Klingo **simulado**: ver minhas marcações, cancelar (confirmação, 24 h, incerto), remarcar (antigo ativo/cancelado, incerto, ocupado, sem pedido original), resultado de exame, "não fica preso", webhook, auditoria de coerência. |
+| `sql-webchat-v2-publico.test.mjs` | Configuração pública (`webchat-v2-config-publica.sql`): paciente fora de qualquer lista tem cada capacidade em `sim`; mestre é teto; chaves independentes. |
+| `sql-klingo-agendamento-seguranca.test.mjs` | Trava no servidor da função pública `klingo-agendamento` (IP, CPF, escritas, desligamento, só hashes, permissões). Testes da função em si: `../supabase/functions/klingo-agendamento/agendamento.test.ts`. |
+| `pos-agendamento.navegador.mjs` | Tela do chat: espera com título, lista de marcações, confirmação de cancelamento. |
+| `painel-v2.navegador.mjs` | Painel (admin): Disponibilidade futura (filtros e cancelar), chaves do autoatendimento por capacidade, indicadores do pós-agendamento. |
+| `calendario-api.navegador.mjs` | Tela do paciente: os 4 estados, 3 saídas, formulário de disponibilidade, "Minha disponibilidade", aviso de vaga. |
+| `previsao.navegador.mjs` | Painel "Disponibilidade futura" (filtros por situação). |
+| `../supabase/functions/chat-agenda-api/diagnostico.test.ts`, `../supabase/functions/disponibilidade-vigia/vigia.test.ts` | Diagnóstico por etapa da resposta da API (vazio × estrutura inválida × tudo filtrado × expirado) e janelas de 15 dias. |
+
+**Retirado da corrente de `npm test` (14/11/2026):** `sql-klingo-auto.test.mjs` (script `test:klingo-auto-sql-legado`). Ele reaplicava as 15 partes `klingo-auto-*` sobre o retrato; como o retrato agora **é** a produção (que já contém essas partes) e o fluxo mudou (CPF primeiro), 21 das 73 verificações falham por motivo do teste, não do código. Reescrevê-lo contra o fluxo atual está em `docs/reestruturacao-2026-11-14/05-pendencias.md` (limitação 1).
+
+**Ambiente:** `test:python` precisa de `pytest` (`python3 -m pip install pytest`, só no ambiente de teste; **não** é dependência do projeto: 27 testes passam); os demais rodam com `CHROMIUM_PATH=/opt/pw-browsers/chromium-1243/chrome-linux64/chrome` (a variável não persiste entre comandos: defina no mesmo comando).

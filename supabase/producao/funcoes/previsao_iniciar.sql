@@ -14,5 +14,5 @@ begin
   update public.pre_agendamentos set escolha_horario = null, data_desejada = null, hora_desejada = null, etapa = 'data_hora' where conversa_id = p_conversa;
   perform public.fluxo_nota(p_conversa, case when p_decidir then 'Paciente recusou os horários oferecidos dentro do filtro dele: perguntou-se se quer ficar na lista de previsão.' else 'Nenhum horário serviu ao paciente: o assistente pergunta turno e período para procurar.' end);
   return jsonb_build_object('ok', true, 'aviso', p_aviso);
-end $function$
-;
+end $function$;
+
