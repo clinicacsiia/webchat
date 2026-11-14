@@ -24,6 +24,7 @@ Três telas, um banco:
 | Chat | Paciente | `https://clinicacsiia.github.io/webchat/` | `index.html` |
 | Painel | Equipe (atendentes, supervisão, TI, marketing) | `https://clinicacsiia.github.io/webchat/painel/` | `painel/index.html` |
 | Minha vez | Paciente na recepção (fila de chegada) | `https://clinicacsiia.github.io/webchat/minha-vez/` | `minha-vez/index.html` |
+| Acesso rápido | Paciente (celular + PIN; filhos, números de confiança, solicitações de marcação). Nasce desligado | `https://clinicacsiia.github.io/webchat/acesso/` | `acesso/index.html` · detalhes em [`acesso-rapido-paciente.md`](acesso-rapido-paciente.md) |
 
 Não há servidor próprio. As páginas são arquivos parados no GitHub Pages; toda a regra de negócio mora no **Supabase** (projeto `nrvuynjwcgwpjdptkiay`, região de São Paulo): banco Postgres, login, tempo real e funções na nuvem.
 

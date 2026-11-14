@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<!--
+FLUXOGRAMA: entrada (celular + PIN de 4 dígitos; no primeiro acesso, cadastro único em 5 passos) -> validação (a página confere o formato; quem decide é o servidor: funções app_* do Supabase, supabase/acesso-rapido-paciente.sql) -> lógica (o aparelho guarda só um código de acesso e o primeiro nome; PIN, filhos, números de confiança e marcações ficam no banco; o PIN é pedido de novo depois de 5 minutos em segundo plano) -> saída (tela inicial com Eu / cada filho / Todos juntos; solicitações de marcação; quem confia em você)
+Versão 2.0 — 14/11/2026 / Mudança: ligado ao Supabase (versão 1 guardava tudo só no celular)
+-->
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#0f766e">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; connect-src https://nrvuynjwcgwpjdptkiay.supabase.co; base-uri 'none'; form-action 'none'">
+<link rel="icon" href="../icon-192.png">
+<title>CSI • Acesso rápido do paciente</title>
+<style>
+:root{--pri:#0f766e;--pri2:#115e59;--bg:#f2f6f6;--card:#fff;--tx:#12302e;--mut:#5b7270;--bd:#d8e3e2;--err:#b42318;--ok:#067647}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+#app{max-width:480px;margin:0 auto;min-height:100vh;padding:max(16px,env(safe-area-inset-top)) 16px max(24px,env(safe-area-inset-bottom))}
+h1{font-size:1.5rem;margin:.2rem 0 .3rem}
+h2{font-size:1.05rem;margin:1.2rem 0 .5rem}
+p{margin:.2rem 0}
+.sub{color:var(--mut)}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:16px;padding:16px;margin:12px 0}
+label{display:block;font-weight:600;font-size:.9rem;margin:12px 0 4px}
+input,select,textarea{width:100%;padding:13px 12px;font:inherit;border:1.5px solid var(--bd);border-radius:12px;background:#fff;color:var(--tx)}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--pri);border-color:var(--pri)}
+button{font:inherit;cursor:pointer}
+.btn{display:block;width:100%;padding:14px;border:0;border-radius:12px;background:var(--pri);color:#fff;font-weight:700;margin-top:16px}
+.btn:active{background:var(--pri2)}
+.btn.sec{background:#e3efee;color:var(--pri2)}
+.btn.danger{background:#fde8e6;color:var(--err)}
+.link{background:none;border:0;color:var(--pri2);font-weight:600;padding:10px 4px;text-decoration:underline}
+.err{color:var(--err);font-size:.9rem;min-height:1.2em;margin-top:8px}
+.prog{display:flex;gap:6px;margin:4px 0 14px}
+.prog i{flex:1;height:5px;border-radius:3px;background:var(--bd)}
+.prog i.on{background:var(--pri)}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+.chip{padding:10px 16px;border-radius:999px;border:1.5px solid var(--bd);background:#fff;font-weight:600;color:var(--tx)}
+.chip.on{background:var(--pri);border-color:var(--pri);color:#fff}
+.item{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--bd)}
+.item:last-child{border-bottom:0}
+.item small{color:var(--mut);display:block}
+.x{background:none;border:0;color:var(--err);font-size:1.3rem;padding:6px 10px}
+.pinwrap{text-align:center;padding-top:6vh}
+.dots{display:flex;justify-content:center;gap:16px;margin:26px 0 6px}
+.dots i{width:16px;height:16px;border-radius:50%;border:2px solid var(--pri)}
+.dots i.on{background:var(--pri)}
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;max-width:300px;margin:18px auto}
+.pad button{height:64px;border-radius:50%;border:0;background:#fff;border:1px solid var(--bd);font-size:1.5rem;font-weight:600;color:var(--tx)}
+.pad button:active{background:#e3efee}
+.pad .ghost{background:none;border:0;font-size:.9rem;color:var(--pri2)}
+.tag{display:inline-block;font-size:.75rem;padding:3px 8px;border-radius:999px;background:#e3efee;color:var(--pri2);font-weight:700}
+.tag.w{background:#fff4d6;color:#8a5a00}
+.tag.ok{background:#dcfae6;color:var(--ok)}
+.top{display:flex;justify-content:space-between;align-items:center}
+.sheet{position:fixed;inset:0;background:rgba(10,30,28,.5);display:flex;align-items:flex-end;justify-content:center;z-index:9}
+.sheet>div{background:#fff;width:100%;max-width:480px;border-radius:20px 20px 0 0;padding:18px 16px max(20px,env(safe-area-inset-bottom));max-height:90vh;overflow:auto}
+.toast{position:fixed;left:50%;bottom:max(24px,env(safe-area-inset-bottom));transform:translateX(-50%);background:#12302e;color:#fff;padding:12px 18px;border-radius:12px;z-index:20;font-size:.95rem;max-width:90vw;text-align:center}
+.codigo{font-size:1.6rem;letter-spacing:.25em;font-weight:800;color:var(--pri2);margin:6px 0}
+.busy{cursor:progress}.busy button{opacity:.6;pointer-events:none}
+pre{white-space:pre-wrap;background:#f2f6f6;border-radius:12px;padding:12px;font:inherit;font-size:.92rem}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+'use strict';
+/* ===== Servidor (Supabase) =====
+   A chave abaixo é a PÚBLICA do projeto (a mesma do chat e do Minha vez). Quem protege os dados são as funções app_* do banco:
+   as tabelas são fechadas e o PIN é conferido lá, nunca aqui. */
+const SUPABASE_URL='https://nrvuynjwcgwpjdptkiay.supabase.co';
+const SUPABASE_KEY='sb_publishable_e2GK1YGEj06STa_ESCevow_nvtATB-y';
+async function rpc(nome,args){
+  const ctl=new AbortController(),t=setTimeout(()=>ctl.abort(),20000);
+  try{
+    const r=await fetch(`${SUPABASE_URL}/rest/v1/rpc/${nome}`,{method:'POST',headers:{'Content-Type':'application/json',apikey:SUPABASE_KEY},body:JSON.stringify(args||{}),signal:ctl.signal});
+    if(!r.ok)return{ok:false,erro:'rede',mensagem:'Não foi possível falar com a clínica agora. Tente de novo em instantes.'};
+    return await r.json();
+  }catch(e){return{ok:false,erro:'rede',mensagem:'Sem conexão. Confira a internet e tente de novo.'}}
+  finally{clearTimeout(t)}
+}
+
+/* ===== Utilidades ===== */
+const $=(s,r=document)=>r.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const digits=s=>String(s||'').replace(/\D/g,'');
+const fmtTel=d=>{d=digits(d).slice(0,11);if(d.length<=2)return d?'('+d:'';if(d.length<=7)return`(${d.slice(0,2)}) ${d.slice(2)}`;return`(${d.slice(0,2)}) ${d.slice(2,7)}-${d.slice(7)}`};
+const telOk=d=>/^[1-9]{2}9\d{8}$/.test(digits(d));
+const nomeOk=n=>{const t=String(n).trim();return t.length>=5&&/^[A-Za-zÀ-ÿ'.\- ]+$/.test(t)&&t.split(/\s+/).filter(x=>x.length>=2).length>=2};
+const hoje=()=>new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10);
+const dataOk=v=>{if(!/^\d{4}-\d{2}-\d{2}$/.test(v))return false;const d=new Date(v+'T00:00:00');return !isNaN(d)&&v<=hoje()&&d.getFullYear()>=1900};
+const idade=v=>{const d=new Date(v+'T00:00:00'),n=new Date();let a=n.getFullYear()-d.getFullYear();if(n<new Date(n.getFullYear(),d.getMonth(),d.getDate()))a--;return a};
+const fmtIdade=v=>{const a=idade(v);return a<1?'menos de 1 ano':a+(a===1?' ano':' anos')};
+const fmtData=v=>v?String(v).slice(0,10).split('-').reverse().join('/'):'';
+const primeiro=n=>String(n||'').trim().split(/\s+/)[0];
+const STATUS={solicitada:['Aguardando confirmação','w'],confirmada:['Confirmada pela clínica','ok'],concluida:['Concluída','']};
+
+/* ===== O que fica no celular: só o código do aparelho e o primeiro nome (para o "Olá"). Nada de dado de saúde. ===== */
+const KEY='csi_acesso_v2';let mem=null;
+const store={
+  get(){try{const v=localStorage.getItem(KEY);return v?JSON.parse(v):mem}catch(e){return mem}},
+  set(v){mem=v;try{localStorage.setItem(KEY,JSON.stringify(v))}catch(e){}},
+  clear(){mem=null;try{localStorage.removeItem(KEY)}catch(e){}}
+};
+const aparelho=()=>(navigator.userAgentData&&navigator.userAgentData.platform)||(/iPhone|iPad/.test(navigator.userAgent)?'iPhone/iPad':/Android/.test(navigator.userAgent)?'Android':'Navegador');
+
+/* ===== Estado ===== */
+const S={dev:null,perfil:null,view:'',d:{filhos:[],confiavel:null},buf:'',mode:'unlock',tmp:'',old:'',after:null,who:['eu'],unlocked:false,sheet:null,temFilhos:null,hiddenAt:0,busy:false,volta:'home',esq:null,tel:'',resumo:'',confirma:null};
+const app=$('#app');
+function toast(t){const e=document.createElement('div');e.className='toast';e.textContent=t;document.body.appendChild(e);setTimeout(()=>e.remove(),2600)}
+function erro(m){const e=$('#err');if(e)e.textContent=m||''}
+function go(v){S.view=v;S.sheet=null;render();window.scrollTo(0,0)}
+function ocupado(b){S.busy=b;document.body.classList.toggle('busy',b)}
+/* Chama o servidor com o código do aparelho e trata os avisos que valem para qualquer tela. Devolve a resposta, ou null se a tela já mudou. */
+async function chamar(nome,args){
+  if(S.busy)return null;
+  ocupado(true);
+  const r=await rpc(nome,Object.assign({p_token:S.dev},args||{}));
+  ocupado(false);
+  if(r.erro==='bloqueado'&&!r.segundos){S.unlocked=false;S.perfil=null;S.mode='unlock';S.buf='';go('pin');erro('Digite seu PIN para continuar.');return null}
+  if(r.erro==='sessao'){store.clear();S.dev=null;S.perfil=null;S.unlocked=false;go('entrar');setTimeout(()=>erro(r.mensagem),0);return null}
+  if(r.erro==='indisponivel'){S.perfil=null;go('indisp');return null}
+  if(r.ok&&r.perfil)S.perfil=r.perfil;
+  return r;
+}
+/* Recarrega os dados do servidor sem travar a tela (quem acompanha, status confirmado pela clínica, filho cadastrado em outro aparelho). */
+async function atualizar(){
+  if(!S.dev||S.busy||!S.perfil)return;
+  const r=await rpc('app_perfil',{p_token:S.dev});
+  if(r.ok){S.perfil=r.perfil;if(['home','dados'].includes(S.view)&&!S.sheet&&!S.busy)render();return}
+  if(r.erro==='bloqueado'&&!r.segundos){S.unlocked=false;S.perfil=null;S.mode='unlock';S.buf='';go('pin');return}
+  if(r.erro==='sessao'){store.clear();S.dev=null;S.perfil=null;S.unlocked=false;go('entrar');setTimeout(()=>erro(r.mensagem),0)}
+}
+function entrou(r){   // resposta de cadastro / login / esqueci: guarda o código do aparelho e abre a tela inicial
+  S.dev=r.token;S.perfil=r.perfil;S.unlocked=true;S.who=S.perfil.selecao||['eu'];
+  store.set({dev:r.token,nome1:primeiro(r.perfil.nome)});
+}
+
+/* ===== Pessoas ===== */
+function pessoas(){const p=S.perfil;return[{id:'eu',nome:p.nome,nasc:p.nascimento},...p.filhos.map(f=>({id:f.id,nome:f.nome,nasc:f.nascimento}))]}
+function quemSel(){const ids=pessoas().map(p=>p.id);S.who=S.who.filter(i=>ids.includes(i));if(!S.who.length)S.who=['eu'];return pessoas().filter(p=>S.who.includes(p.id))}
+function chips(){
+  const ps=pessoas();if(ps.length<2)return'';
+  const all=S.who.length===ps.length;
+  return`<div class="chips">${ps.map(p=>`<button class="chip ${S.who.includes(p.id)?'on':''}" data-act="who" data-id="${esc(p.id)}">${p.id==='eu'?'Eu':esc(primeiro(p.nome))}</button>`).join('')}<button class="chip ${all?'on':''}" data-act="whoall">Todos juntos</button></div>`;
+}
+function agrupar(ms,so){const g={};ms.filter(m=>!so||so.includes(m.status)).forEach(m=>{(g[m.grupo]=g[m.grupo]||[]).push(m)});return Object.values(g)}
+function solicHtml(g,cancelavel){
+  const m=g[0],st=STATUS[m.status]||[m.status,''];
+  return`<div class="item"><div><b>${esc(g.map(x=>primeiro(x.pessoa_nome)).join(' + '))}</b><small>${esc(m.exame)} · ${fmtData(m.data)} · ${esc(m.turno)}</small><span class="tag ${st[1]}">${st[0]}</span></div>${cancelavel&&m.status==='solicitada'?`<button class="x" data-act="canc" data-g="${esc(m.grupo)}" aria-label="Cancelar solicitação">×</button>`:''}</div>`;
+}
+
+/* ===== PIN pad ===== */
+function padView(titulo,sub,extra){
+  return`<div class="pinwrap"><h1>${titulo}</h1><p class="sub">${sub}</p>
+  <div class="dots" id="dots">${[0,1,2,3].map(i=>`<i class="${i<S.buf.length?'on':''}"></i>`).join('')}</div>
+  <div class="err" id="err" role="alert"></div>
+  <div class="pad">${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-k="${n}">${n}</button>`).join('')}
+  <button class="ghost" ${extra?`data-act="${extra.act}"`:'disabled'}>${extra?extra.txt:''}</button>
+  <button data-k="0">0</button><button class="ghost" data-k="del" aria-label="Apagar">⌫</button></div>
+  ${S.mode==='unlock'?'<button class="link" data-act="outro">Não sou eu / usar outro celular</button>':''}${S.mode==='login'?'<button class="link" data-act="go" data-v="entrar">← Trocar o celular</button>':''}</div>`;
+}
+function dotsUpdate(){document.querySelectorAll('#dots i').forEach((d,i)=>d.classList.toggle('on',i<S.buf.length))}
+function pinView(){
+  const m=S.mode,st=store.get();
+  if(m==='unlock')return padView(`Olá${st&&st.nome1?', '+esc(st.nome1):''}`,'Digite seu PIN de 4 dígitos',{act:'esqueci',txt:'Esqueci'});
+  if(m==='login')return padView('Seu PIN','Digite o PIN de 4 dígitos desse cadastro',{act:'esqueci',txt:'Esqueci'});
+  if(m==='old')return padView('PIN atual','Digite o PIN que você usa hoje');
+  if(m==='new1')return padView('Crie seu PIN','Escolha 4 dígitos que só você sabe');
+  return padView('Confirme o PIN','Digite os mesmos 4 dígitos de novo');
+}
+async function onPin(pin){
+  if(S.busy)return;
+  const m=S.mode;
+  if(m==='unlock'){
+    ocupado(true);const r=await rpc('app_desbloquear',{p_token:S.dev,p_pin:pin});ocupado(false);
+    if(r.ok){S.perfil=r.perfil;S.unlocked=true;S.who=S.perfil.selecao||['eu'];go('home');return}
+    if(r.erro==='sessao'){store.clear();S.dev=null;go('entrar');setTimeout(()=>erro(r.mensagem),0);return}
+    if(r.erro==='indisponivel'){go('indisp');return}
+    erro(r.mensagem);return;
+  }
+  if(m==='login'){
+    ocupado(true);const r=await rpc('app_login',{p_telefone:S.tel,p_pin:pin,p_aparelho:aparelho()});ocupado(false);
+    if(r.ok){entrou(r);toast('Que bom ter você de volta');go('home');return}
+    if(r.erro==='indisponivel'){go('indisp');return}
+    erro(r.mensagem);return;
+  }
+  if(m==='old'){S.old=pin;S.mode='new1';render();return}
+  if(m==='new1'){S.tmp=pin;S.mode='new2';render();return}
+  if(m==='new2'){
+    if(pin!==S.tmp){S.mode='new1';S.tmp='';render();erro('Os PINs não conferem. Tente de novo.');return}
+    await S.after(pin);
+  }
+}
+
+/* ===== Layout ===== */
+const prog=n=>`<div class="prog">${[1,2,3,4,5].map(i=>`<i class="${i<=n?'on':''}"></i>`).join('')}</div>`;
+const voltar=v=>`<button class="link" data-act="go" data-v="${v}">← Voltar</button>`;
+function contatoForm(){
+  return`<label for="ctnome">Nome</label><input id="ctnome" placeholder="Ex.: Maria" autocomplete="off">
+  <label for="cttel">Celular com DDD</label><input id="cttel" inputmode="numeric" placeholder="(71) 99999-9999" autocomplete="off">
+  <label for="ctrel">Relação</label><select id="ctrel">${['Cônjuge','Pai/Mãe','Avó/Avô','Irmão(ã)','Outro'].map(x=>`<option>${x}</option>`).join('')}</select>`;
+}
+const pinSub=()=>S.mode==='new2'?'Digite os mesmos 4 dígitos de novo':'Você vai usar para abrir o app';
+
+/* ===== Telas ===== */
+const V={
+  indisp:()=>`<h1>Ainda não disponível</h1><p class="sub">O acesso rápido ainda não foi aberto ao público. Fale com a clínica para marcar seu atendimento.</p>`,
+  pin:pinView,
+  c1:()=>`${prog(1)}<h1>Vamos começar</h1><p class="sub">Só na primeira vez. Seu celular será seu login.</p>
+    <div class="card"><label for="tel">Seu celular com DDD</label>
+    <input id="tel" inputmode="numeric" autocomplete="tel-national" placeholder="(71) 99999-9999" value="${fmtTel(S.d.telefone)}">
+    <div class="err" id="err" role="alert"></div></div>
+    <button class="btn" data-act="c1">Continuar</button>
+    <button class="link" data-act="go" data-v="entrar" style="display:block;margin:12px auto 0">Já tenho cadastro</button>`,
+  entrar:()=>`${voltar('c1')}<h1>Entrar</h1><p class="sub">Use o celular do seu cadastro. Em seguida, o seu PIN.</p>
+    <div class="card"><label for="tel">Seu celular com DDD</label>
+    <input id="tel" inputmode="numeric" autocomplete="tel-national" placeholder="(71) 99999-9999" value="${fmtTel(S.tel)}">
+    <div class="err" id="err" role="alert"></div></div>
+    <button class="btn" data-act="entrar">Continuar</button>`,
+  c2:()=>`${prog(2)}${voltar('c1')}<h1>Confirme quem é você</h1><p class="sub">Usamos esses dados para encontrar seu cadastro na clínica.</p>
+    <div class="card"><label for="nome">Nome completo</label><input id="nome" autocomplete="name" placeholder="Como no documento" value="${esc(S.d.nome||'')}">
+    <label for="nasc">Data de nascimento</label><input id="nasc" type="date" max="${hoje()}" value="${esc(S.d.nascimento||'')}">
+    <div class="err" id="err" role="alert"></div></div>
+    <button class="btn" data-act="c2">Continuar</button>`,
+  c3:()=>{
+    const f=S.d.filhos;
+    return`${prog(3)}${voltar('c2')}<h1>Você tem filhos?</h1><p class="sub">Cadastrando agora, nas próximas consultas é só escolher. Dá para adicionar mais depois.</p>
+    <div class="chips"><button class="chip ${S.temFilhos===true?'on':''}" data-act="tf" data-v="1">Sim</button><button class="chip ${S.temFilhos===false?'on':''}" data-act="tf" data-v="0">Não</button></div>
+    ${S.temFilhos?`<div class="card">${f.map((x,i)=>`<div class="item"><div><b>${esc(x.nome)}</b><small>${fmtData(x.nascimento)} · ${fmtIdade(x.nascimento)}</small></div><button class="x" data-act="rmf" data-i="${i}" aria-label="Remover">×</button></div>`).join('')}
+      <label for="fnome">Nome completo do filho(a)</label><input id="fnome" placeholder="Nome completo" autocomplete="off">
+      <label for="fnasc">Data de nascimento</label><input id="fnasc" type="date" max="${hoje()}">
+      <button class="btn sec" data-act="addf">+ Adicionar ${f.length?'outro filho':'filho'}</button></div>`:''}
+    <div class="err" id="err" role="alert"></div>
+    <button class="btn" data-act="c3">Continuar</button>`;
+  },
+  c4:()=>`${prog(4)}${voltar('c3')}<h1>Número de confiança</h1><p class="sub">Opcional. Essa pessoa poderá ver seus filhos e as marcações, depois de digitar um código que você vai passar a ela. Dá para adicionar depois.</p>
+    <div class="card">${contatoForm()}<div class="err" id="err" role="alert"></div></div>
+    <button class="btn" data-act="c4">Continuar</button>
+    <button class="btn sec" data-act="c4skip">Pular por enquanto</button>`,
+  c5:()=>`${prog(5)}${voltar('c4')}${padView(S.mode==='new2'?'Confirme o PIN':'Crie seu PIN',pinSub())}`,
+  esqueci:()=>`${voltar(S.dev?'pin':'entrar')}<h1>Esqueci o PIN</h1><p class="sub">Confirme seus dados para criar um novo PIN.</p>
+    <div class="card"><label for="tel">Seu celular com DDD</label><input id="tel" inputmode="numeric" autocomplete="tel-national" placeholder="(71) 99999-9999" value="${fmtTel((S.esq&&S.esq.tel)||(S.dev?'':S.tel))}">
+    <label for="nome">Nome completo</label><input id="nome" autocomplete="name" value="${esc(S.esq?S.esq.nome:'')}">
+    <label for="nasc">Data de nascimento</label><input id="nasc" type="date" max="${hoje()}" value="${esc(S.esq?S.esq.nasc:'')}">
+    <div class="err" id="err" role="alert"></div></div>
+    <button class="btn" data-act="esqueci2">Continuar</button>`,
+  pinnovo:()=>`${voltar(S.volta)}${pinView()}`,
+  home:()=>{
+    const p=S.perfil,q=quemSel(),lista=agrupar(p.marcacoes,['solicitada','confirmada']).sort((a,b)=>a[0].data.localeCompare(b[0].data));
+    const confiam=p.confiam_em_mim||[];
+    return`<div class="top"><div><p class="sub">Clínica CSI</p><h1>Olá, ${esc(primeiro(p.nome))}</h1></div><button class="link" data-act="go" data-v="dados">Meus dados</button></div>
+    <div class="card"><h2 style="margin-top:0">Quem vai ser atendido?</h2>
+    ${pessoas().length>1?chips():`<p class="sub">Só você por enquanto. Adicione filhos em <b>Meus dados</b>.</p>`}
+    <p class="sub">${q.map(x=>esc(primeiro(x.nome))).join(' + ')}</p>
+    <button class="btn" data-act="go" data-v="nova">Nova marcação</button></div>
+    <h2>Suas solicitações</h2>
+    ${lista.length?`<div class="card">${lista.map(g=>solicHtml(g,true)).join('')}</div>`:`<p class="sub">Nenhuma solicitação ainda.</p>`}
+    ${confiam.map(c=>{const sol=agrupar(c.marcacoes,['solicitada','confirmada']);return`<h2>Você acompanha: ${esc(c.titular_nome)}</h2><div class="card">
+      <p class="sub">Só leitura. ${c.filhos.length?'Filhos: '+c.filhos.map(f=>esc(primeiro(f.nome))+' ('+fmtIdade(f.nascimento)+')').join(', ')+'.':'Sem filhos cadastrados.'}</p>
+      ${sol.length?sol.map(g=>solicHtml(g,false)).join(''):'<p class="sub">Nenhuma solicitação.</p>'}</div>`}).join('')}`;
+  },
+  nova:()=>{
+    const q=quemSel();
+    return`${voltar('home')}<h1>Nova marcação</h1>
+    ${pessoas().length>1?`<p class="sub">Para quem?</p>${chips()}`:''}
+    <div class="card"><p class="sub">Para: <b>${q.map(x=>esc(primeiro(x.nome))).join(' + ')}</b></p>
+    <label for="exame">Exame ou consulta</label><select id="exame">${['Ressonância magnética','Tomografia computadorizada','Ultrassom','Raio-X','Consulta','Outro'].map(x=>`<option>${x}</option>`).join('')}</select>
+    <label for="dtm">Data preferida</label><input id="dtm" type="date" min="${hoje()}">
+    <label for="turno">Turno</label><select id="turno"><option>Qualquer horário</option><option>Manhã</option><option>Tarde</option></select>
+    <label for="obs">Observação (opcional)</label><textarea id="obs" rows="2" maxlength="500" placeholder="Pedido médico, convênio, dúvidas..."></textarea>
+    <div class="err" id="err" role="alert"></div></div>
+    <button class="btn" data-act="nova">Enviar solicitação</button>`;
+  },
+  ok:()=>`<h1>Solicitação registrada ✔</h1><p class="sub">A clínica confirma o horário. Para agilizar, envie este resumo ao atendimento.</p>
+    <pre id="resumo">${esc(S.resumo)}</pre>
+    <button class="btn" data-act="copiar">Copiar resumo</button>
+    <button class="btn sec" data-act="go" data-v="home">Voltar ao início</button>`,
+  dados:()=>{
+    const p=S.perfil;
+    return`${voltar('home')}<h1>Meus dados</h1>
+    <div class="card"><div class="item"><div><b>${esc(p.nome)}</b><small>${fmtData(p.nascimento)} · login: ${fmtTel(p.telefone)}</small></div></div></div>
+    <h2>Filhos</h2><div class="card">${p.filhos.length?p.filhos.map(f=>`<div class="item"><div><b>${esc(f.nome)}</b><small>${fmtData(f.nascimento)} · ${fmtIdade(f.nascimento)}</small></div><button class="x" data-act="delf" data-id="${esc(f.id)}" aria-label="Remover">×</button></div>`).join(''):'<p class="sub">Nenhum filho cadastrado.</p>'}
+    <button class="btn sec" data-act="sheet" data-t="filho">+ Adicionar filho</button></div>
+    <h2>Números de confiança</h2><div class="card">${p.confiaveis.length?p.confiaveis.map(c=>`<div class="item"><div><b>${esc(c.nome)}</b><small>${fmtTel(c.telefone)} · ${esc(c.relacao)}</small>
+      ${c.vinculado?'<span class="tag ok">Já acompanha</span>':c.codigo_invalido?'<span class="tag w">Código vencido</span> <button class="link" data-act="novocod" data-id="'+esc(c.id)+'">Gerar outro</button>'
+        :'<small>Passe este código para '+esc(primeiro(c.nome))+' (WhatsApp ou ligação):</small><div class="codigo">'+esc(c.codigo)+'</div><button class="link" data-act="novocod" data-id="'+esc(c.id)+'">Gerar outro código</button>'}</div>
+      <button class="x" data-act="delc" data-id="${esc(c.id)}" aria-label="Remover">×</button></div>`).join(''):'<p class="sub">Ninguém ainda. Essa pessoa verá seus filhos e as marcações depois de digitar um código.</p>'}
+    <button class="btn sec" data-act="sheet" data-t="conf">+ Adicionar número de confiança</button></div>
+    <h2>Acompanhar outra pessoa</h2><div class="card"><p class="sub">Alguém cadastrou o seu número como de confiança e te passou um código?</p>
+    <button class="btn sec" data-act="sheet" data-t="codigo">Tenho um código</button></div>
+    <h2>Segurança</h2><button class="btn sec" data-act="trocapin" style="margin-top:0">Trocar PIN</button>
+    <button class="btn danger" data-act="sheet" data-t="sair">Sair deste aparelho</button>
+    <p class="sub" style="margin-top:16px;font-size:.85rem">Seus dados ficam guardados com a clínica. Este celular guarda só um código de acesso, e o PIN é pedido para abrir.</p>`;
+  }
+};
+function sheetHtml(){
+  const s=S.sheet;if(!s)return'';
+  let c='';
+  if(s.t==='filho')c=`<h2 style="margin-top:0">Adicionar filho(a)</h2><label for="fnome">Nome completo</label><input id="fnome" autocomplete="off"><label for="fnasc">Data de nascimento</label><input id="fnasc" type="date" max="${hoje()}"><div class="err" id="err" role="alert"></div><button class="btn" data-act="sf">Salvar</button>`;
+  if(s.t==='conf')c=`<h2 style="margin-top:0">Número de confiança</h2><p class="sub">Essa pessoa poderá ver seus filhos e as marcações, depois de digitar o código que você vai passar.</p>${contatoForm()}<div class="err" id="err" role="alert"></div><button class="btn" data-act="sc">Salvar</button>`;
+  if(s.t==='codigo')c=`<h2 style="margin-top:0">Tenho um código</h2><p class="sub">Digite os 6 números que a pessoa te passou. Vale só para o celular que ela cadastrou.</p><label for="cod">Código</label><input id="cod" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="000000"><div class="err" id="err" role="alert"></div><button class="btn" data-act="scod">Confirmar</button>`;
+  if(s.t==='sair')c=`<h2 style="margin-top:0">Sair deste aparelho?</h2><p class="sub">Você poderá entrar de novo com seu celular e PIN. Seus dados continuam guardados com a clínica.</p><button class="btn danger" data-act="sair">Sair</button>`;
+  if(s.t==='confirma')c=`<h2 style="margin-top:0">${esc(s.titulo)}</h2><p class="sub">${esc(s.msg)}</p><button class="btn danger" data-act="confirmar">${esc(s.botao)}</button>`;
+  return`<div class="sheet" role="dialog" aria-modal="true"><div>${c}<button class="btn sec" data-act="closesheet">Cancelar</button></div></div>`;
+}
+function render(){
+  if(!S.dev&&!['c1','c2','c3','c4','c5','entrar','esqueci','pinnovo','indisp'].includes(S.view)&&!(S.view==='pin'&&['login','new1','new2'].includes(S.mode)))S.view='c1';
+  if(['home','nova','ok','dados'].includes(S.view)&&!S.perfil){S.view=S.dev?'pin':'c1';S.mode='unlock'}
+  app.innerHTML=(V[S.view]?V[S.view]():'')+sheetHtml();
+  const t=$('#tel');if(t)t.addEventListener('input',()=>{t.value=fmtTel(t.value)});
+  const c=$('#cttel');if(c)c.addEventListener('input',()=>{c.value=fmtTel(c.value)});
+}
+
+/* ===== Validações reutilizáveis ===== */
+function lerContato(){
+  const nome=$('#ctnome').value.trim(),tel=digits($('#cttel').value),rel=$('#ctrel').value;
+  if(nome.length<2)return{e:'Informe o nome do contato.'};
+  if(!telOk(tel))return{e:'Celular inválido. Use DDD + 9 dígitos.'};
+  if(tel===digits(S.d.telefone)||(S.perfil&&tel===S.perfil.telefone))return{e:'Use um número diferente do seu.'};
+  return{c:{nome,telefone:tel,relacao:rel}};
+}
+function lerFilho(){
+  const nome=$('#fnome').value.trim(),n=$('#fnasc').value;
+  if(!nome&&!n)return{vazio:true};
+  if(!nomeOk(nome))return{e:'Informe nome e sobrenome do filho(a).'};
+  if(!dataOk(n))return{e:'Data de nascimento inválida.'};
+  return{f:{nome,nascimento:n}};
+}
+function pedirConfirmacao(titulo,msg,botao,fn){S.confirma=fn;S.sheet={t:'confirma',titulo,msg,botao};render()}
+const aviso=r=>erro(r.mensagem||'Não foi possível concluir.');
+
+/* ===== Ações ===== */
+const A={
+  go:el=>{const v=el.dataset.v;if(v==='pin'){S.mode='unlock';S.buf=''}go(v);if(v==='home'||v==='dados')atualizar()},
+  c1:()=>{const d=digits($('#tel').value);if(!telOk(d))return erro('Celular inválido. Use DDD + 9 dígitos.');S.d.telefone=d;go('c2')},
+  entrar:()=>{const d=digits($('#tel').value);if(!telOk(d))return erro('Celular inválido. Use DDD + 9 dígitos.');S.tel=d;S.mode='login';S.buf='';go('pin')},
+  c2:()=>{
+    const nome=$('#nome').value.trim(),n=$('#nasc').value;
+    if(!nomeOk(nome))return erro('Digite nome e sobrenome completos.');
+    if(!dataOk(n))return erro('Data de nascimento inválida.');
+    if(idade(n)<18)return erro('O cadastro principal precisa ser de um maior de 18 anos.');
+    S.d.nome=nome;S.d.nascimento=n;go('c3');
+  },
+  tf:el=>{S.temFilhos=el.dataset.v==='1';render()},
+  addf:()=>{const r=lerFilho();if(r.vazio)return erro('Preencha nome e nascimento.');if(r.e)return erro(r.e);S.d.filhos.push(r.f);render()},
+  rmf:el=>{S.d.filhos.splice(Number(el.dataset.i),1);render()},
+  c3:()=>{
+    if(S.temFilhos===null)return erro('Escolha Sim ou Não.');
+    if(S.temFilhos){
+      const r=lerFilho();
+      if(r.e)return erro(r.e);
+      if(r.f)S.d.filhos.push(r.f);
+      if(!S.d.filhos.length)return erro('Adicione ao menos um filho ou escolha Não.');
+    }else S.d.filhos=[];
+    go('c4');
+  },
+  c4:()=>{const r=lerContato();if(r.e)return erro(r.e);S.d.confiavel=r.c;iniciaPin()},
+  c4skip:()=>{S.d.confiavel=null;iniciaPin()},
+  esqueci:()=>{S.esq=null;go('esqueci')},
+  esqueci2:()=>{
+    const tel=digits($('#tel').value),nome=$('#nome').value.trim(),nasc=$('#nasc').value;
+    if(!telOk(tel))return erro('Celular inválido. Use DDD + 9 dígitos.');
+    if(!nome||!dataOk(nasc))return erro('Digite o nome completo e a data de nascimento do cadastro.');
+    S.esq={tel,nome,nasc};S.volta='esqueci';S.mode='new1';S.buf='';S.tmp='';
+    S.after=async pin=>{
+      ocupado(true);const r=await rpc('app_pin_esqueci',{p_telefone:S.esq.tel,p_nome:S.esq.nome,p_nascimento:S.esq.nasc,p_pin_novo:pin,p_aparelho:aparelho()});ocupado(false);
+      if(r.ok){S.esq=null;entrou(r);toast('Novo PIN criado');go('home');return}
+      if(r.erro==='indisponivel')return go('indisp');
+      go('esqueci');setTimeout(()=>erro(r.mensagem||'Os dados não conferem com o cadastro.'),0);
+    };
+    go('pinnovo');
+  },
+  trocapin:()=>{
+    S.volta='dados';S.mode='old';S.buf='';
+    S.after=async pin=>{
+      const r=await chamar('app_pin_trocar',{p_atual:S.old,p_novo:pin});S.old='';
+      if(!r)return;
+      if(r.ok){toast('PIN alterado');go('dados');return}
+      S.mode='old';S.buf='';render();erro(r.mensagem);
+    };
+    go('pinnovo');
+  },
+  outro:()=>{if(S.dev)rpc('app_sair',{p_token:S.dev});store.clear();S.dev=null;S.perfil=null;S.unlocked=false;go('c1')},
+  who:el=>{const id=el.dataset.id;if(S.who.includes(id)){if(S.who.length>1)S.who=S.who.filter(x=>x!==id)}else S.who.push(id);rpc('app_selecao_salvar',{p_token:S.dev,p_selecao:S.who});render()},
+  whoall:()=>{S.who=pessoas().map(p=>p.id);rpc('app_selecao_salvar',{p_token:S.dev,p_selecao:S.who});render()},
+  nova:async()=>{
+    const dt=$('#dtm').value;
+    if(!dt||dt<hoje())return erro('Escolha uma data a partir de hoje.');
+    const q=quemSel(),exame=$('#exame').value,turno=$('#turno').value,obs=$('#obs').value.trim();
+    const r=await chamar('app_marcar',{p_pessoas:q.map(x=>x.id),p_exame:exame,p_data:dt,p_turno:turno,p_obs:obs||null});
+    if(!r)return;
+    if(!r.ok)return aviso(r);
+    S.resumo=`Solicitação de marcação - Clínica CSI\nResponsável: ${S.perfil.nome} (${fmtTel(S.perfil.telefone)})\nPaciente(s): ${q.map(x=>x.nome+' ('+fmtData(x.nasc)+')').join('; ')}\nExame: ${exame}\nData preferida: ${fmtData(dt)}\nTurno: ${turno}${obs?'\nObs: '+obs:''}`;
+    go('ok');
+  },
+  copiar:async()=>{try{await navigator.clipboard.writeText(S.resumo);toast('Resumo copiado')}catch(e){const r=document.createRange();r.selectNodeContents($('#resumo'));getSelection().removeAllRanges();getSelection().addRange(r);toast('Selecione e copie o texto')}},
+  canc:el=>pedirConfirmacao('Cancelar a solicitação?','A clínica não vai mais receber este pedido.','Cancelar solicitação',async()=>{
+    const r=await chamar('app_marcacao_cancelar',{p_grupo:el.dataset.g});S.sheet=null;if(r&&!r.ok)toast(r.mensagem);render()}),
+  sheet:el=>{S.sheet={t:el.dataset.t};render()},
+  closesheet:()=>{S.sheet=null;render()},
+  confirmar:async()=>{const f=S.confirma;S.confirma=null;if(f)await f()},
+  sf:async()=>{const r=lerFilho();if(r.vazio)return erro('Preencha nome e nascimento.');if(r.e)return erro(r.e);
+    const x=await chamar('app_filho_salvar',{p_nome:r.f.nome,p_nascimento:r.f.nascimento});if(!x)return;if(!x.ok)return aviso(x);S.sheet=null;toast('Filho adicionado');render()},
+  delf:el=>pedirConfirmacao('Remover este filho(a)?','As solicitações dele(a) que ainda aguardam confirmação serão canceladas. Você pode cadastrar de novo quando quiser.','Remover',async()=>{
+    const r=await chamar('app_filho_remover',{p_id:el.dataset.id});S.sheet=null;if(r&&!r.ok)toast(r.mensagem);render()}),
+  sc:async()=>{const r=lerContato();if(r.e)return erro(r.e);
+    const x=await chamar('app_confianca_salvar',{p_nome:r.c.nome,p_telefone:r.c.telefone,p_relacao:r.c.relacao});if(!x)return;if(!x.ok)return aviso(x);S.sheet=null;toast('Contato adicionado. Passe o código a ele(a).');render()},
+  delc:el=>pedirConfirmacao('Remover este número de confiança?','Essa pessoa deixa de ver seus filhos e as marcações na hora.','Remover',async()=>{
+    const r=await chamar('app_confianca_remover',{p_id:el.dataset.id});S.sheet=null;if(r&&!r.ok)toast(r.mensagem);render()}),
+  novocod:async el=>{const r=await chamar('app_confianca_novo_codigo',{p_id:el.dataset.id});if(r&&r.ok){toast('Código novo gerado');render()}},
+  scod:async()=>{const c=digits($('#cod').value);if(c.length!==6)return erro('O código tem 6 números.');
+    const x=await chamar('app_confianca_aceitar',{p_codigo:c});if(!x)return;if(!x.ok)return aviso(x);S.sheet=null;toast('Pronto! Você já acompanha essa pessoa.');go('home')},
+  sair:async()=>{ocupado(false);await rpc('app_sair',{p_token:S.dev});store.clear();S.dev=null;S.perfil=null;S.unlocked=false;S.d={filhos:[],confiavel:null};S.temFilhos=null;S.who=['eu'];go('c1')}
+};
+function iniciaPin(){
+  S.mode='new1';S.buf='';S.tmp='';
+  S.after=async pin=>{
+    const d=S.d;
+    const args={p_telefone:d.telefone,p_nome:d.nome,p_nascimento:d.nascimento,p_pin:pin,p_filhos:d.filhos,p_aparelho:aparelho()};
+    if(d.confiavel)args.p_confianca=d.confiavel;
+    ocupado(true);const r=await rpc('app_cadastrar',args);ocupado(false);
+    if(r.ok){entrou(r);S.d={filhos:[],confiavel:null};toast('Cadastro concluído');go('home');return}
+    if(r.erro==='indisponivel')return go('indisp');
+    // volta para a etapa que tem o problema, com a explicação do servidor
+    const etapa={celular:'c1',telefone_cadastrado:'c1',nome:'c2',nascimento:'c2',menor:'c2',filho:'c3',confianca:'c4'}[r.erro]||'c4';
+    S.mode='new1';S.buf='';S.tmp='';go(etapa);setTimeout(()=>erro(r.mensagem),0);
+    if(r.erro==='telefone_cadastrado')S.tel=d.telefone;
+  };
+  go('c5');
+}
+
+/* ===== Eventos ===== */
+document.addEventListener('click',e=>{
+  const k=e.target.closest('[data-k]');
+  if(k){
+    if(S.busy)return;
+    const v=k.dataset.k;
+    if(v==='del')S.buf=S.buf.slice(0,-1);
+    else if(S.buf.length<4)S.buf+=v;
+    dotsUpdate();erro('');
+    if(S.buf.length===4){const pin=S.buf;S.buf='';setTimeout(()=>{dotsUpdate();if(S.view==='c5'||S.view==='pin'||S.view==='pinnovo')onPin(pin)},120)}
+    return;
+  }
+  if(e.target.classList&&e.target.classList.contains('sheet')){A.closesheet();return}   // toque no fundo escuro fecha o painel
+  const b=e.target.closest('[data-act]');
+  if(b&&A[b.dataset.act]&&!S.busy)A[b.dataset.act](b);
+});
+/* Pede o PIN de novo se o app ficar mais de 5 minutos em segundo plano. O servidor também exige o PIN depois de 30 minutos sem uso. */
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden){S.hiddenAt=Date.now();return}
+  if(S.dev&&S.unlocked&&S.hiddenAt&&Date.now()-S.hiddenAt>300000){S.unlocked=false;S.perfil=null;S.sheet=null;S.mode='unlock';S.buf='';go('pin');return}
+  if(S.dev&&S.unlocked)atualizar();
+});
+
+/* ===== Início: se este aparelho já tem cadastro, abre direto no PIN ===== */
+const salvo=store.get();
+if(salvo&&salvo.dev){S.dev=salvo.dev;S.mode='unlock';S.view='pin'}else S.view='c1';
+render();
+</script>
+</body>
+</html>
