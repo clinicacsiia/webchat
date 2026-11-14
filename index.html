@@ -660,7 +660,7 @@
   const CHAVE_HIST = 'webchat.historico.v1';   // as últimas conversas deste aparelho (cada uma com o seu token): dá para voltar a elas
   const MAX_HIST = 5;                          // mínimo pedido: 3
   // Muda a cada alteração do chat. Cópia de mensagens guardada por outra versão é descartada (era isso que mostrava conversa velha e travada).
-  const VERSAO_APP = '2026.11.14-1';
+  const VERSAO_APP = '2026.11.14-2';
   // Mesmas regras do banco (fluxo_nome_ok, fluxo_telefone_ok, fluxo_email_ok): o banco confere de novo, aqui é só para avisar logo.
   const LET = 'A-Za-zÀ-ÖØ-öø-ÿ';
   const nomeCompletoOk = (v) => { const t = String(v || '').trim(); return t.length >= 5 && t.length <= 120 && new RegExp(`^[${LET}][${LET}'’.-]*( +[${LET}][${LET}'’.-]*)+$`).test(t) && t.split(/ +/).filter((w) => w.replace(new RegExp(`[^${LET}]`, 'g'), '').length >= 2).length >= 2; };
@@ -1610,7 +1610,7 @@
     else if (o.tipo === 'disponibilidade_registrada') w.append(h('button', { class: 'btn-w sec', type: 'button', onclick: abrirMinhaDisponibilidade }, 'Ver ou alterar minha disponibilidade'));
     else if (o.tipo === 'disponibilidade_oportunidade') { w.append(h('p', { class: 'w-nota' }, 'O horário ainda não está reservado: ao tocar abaixo conferimos a agenda de agora.')); w.append(opcoesOportunidade({ id: o.solicitacao })); }
     else if (o.tipo === 'acompanhar') widgetAcompanhar(w);
-    else if (o.tipo === 'marcando') widgetMarcando(w);
+    else if (o.tipo === 'marcando') widgetMarcando(w, o);
     else if (o.tipo === 'marcado') widgetMarcado(w, o);
     else if (o.tipo === 'texto') w.append(h('p', { class: 'w-nota' }, 'Escreva no campo aqui embaixo e toque na setinha para enviar.'));
     else if (o.tipo === 'nova') w.append(h('button', { class: 'btn-w', type: 'button', onclick: () => novaConversa(true) }, 'Fazer um novo pedido'));
@@ -1854,8 +1854,8 @@
   /* acompanhamento: se já foi confirmado, quem atende e se estamos em horário de trabalho (sem relógio de espera) */
   let acompBox = null, acompDados = null, acompP = null;
   /* Autoatendimento (Klingo): "reservando…" enquanto a marcação roda e o cartão do agendamento confirmado. */
-  function widgetMarcando(w) {
-    w.append(h('div', { class: 'acomp marcando', role: 'status', 'aria-live': 'polite' }, h('b', {}, 'Reservando o seu horário…'),
+  function widgetMarcando(w, o = {}) {   // v2.1: o título pode vir do banco (ex.: "Consultando as suas marcações…", "Cancelando…")
+    w.append(h('div', { class: 'acomp marcando', role: 'status', 'aria-live': 'polite' }, h('b', {}, String(o.titulo || 'Reservando o seu horário…').slice(0, 80)),
       h('p', {}, 'Leva só alguns segundos. Você não precisa fechar esta tela: o resultado aparece aqui.')));
   }
   const ics = (v) => {

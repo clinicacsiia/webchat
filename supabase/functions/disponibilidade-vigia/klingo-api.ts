@@ -307,6 +307,8 @@ export function resumoVoucher(v: Record<string, unknown> | null | undefined) {
   return {
     id: v?.id === undefined || v?.id === null ? null : String(v.id), status: texto(v?.status), data: texto(v?.data), hora: texto(v?.hora)?.slice(0, 5) ?? null,
     procedimento: typeof proc === "object" ? texto(proc?.descr) : texto(proc), unidade: texto(uni?.nome), profissional: texto(rea?.nome), idExterno: texto(v?.id_externo),
+    // v1.1 (14/11/2026): id do procedimento (para saber se a marcação pode ser remarcada pelo chat); campo novo, quem já usa o resumo não é afetado
+    procedimentoId: typeof proc === "object" && proc?.id !== undefined && proc?.id !== null ? String(proc.id) : null,
   };
 }
 

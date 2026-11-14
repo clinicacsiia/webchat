@@ -6,6 +6,7 @@
 // REGRA CENTRAL: esta função NÃO recebe CPF, nascimento, horário, procedimento nem plano de ninguém de fora. Recebe só o id de uma operação já aprovada
 // pelo banco (klingo_pode_marcar) e lê o resto de lá. Não há modo diagnóstico e o segredo NÃO é o x-sync-key (é um segredo próprio do cofre).
 // Nunca registra nome, CPF, telefone nem o corpo de erro do Klingo. Secret: KLINGO_APP_TOKEN.
+// Versão 1.1 — 14/11/2026 / Mudança: operação "ler_vouchers" (ver minhas marcações) e conferência do voucher antigo na remarcação; o resultado leva marcacoes e antigo ao banco.
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { cotaGlobal, KlingoApi } from "./klingo-api.ts";
 import { executar, type Esp, type Pegar } from "./executor.ts";
@@ -33,7 +34,7 @@ Deno.serve(async (req: Request) => {
     const api = new KlingoApi(tokenKlingo, (u, i) => fetch(u, i), { antes: cotaGlobal(rpc, { maxTentativas: 10, maxEsperaMs: 3000 }), aoLimite: async () => { await supabase.rpc("klingo_cota_429"); }, tentativas429: 2 });
     const { data: esps } = await supabase.from("klingo_especialidade").select("cbos, procedimentos");
     const r = await executar(api, rpc, pegar as unknown as Pegar, (esps ?? []) as Esp[]);
-    await concluir(r.estado, { voucher: r.voucher ?? null, codigo: r.codigo ?? null, http_status: r.http_status ?? null, caminho: r.caminho ?? null });
+    await concluir(r.estado, { voucher: r.voucher ?? null, codigo: r.codigo ?? null, http_status: r.http_status ?? null, caminho: r.caminho ?? null, marcacoes: r.marcacoes ?? null, antigo: r.antigo ?? null });   // v1.1: lista de marcações (ler_vouchers) e situação do voucher antigo (remarcar)
     return json({ ok: true, estado: r.estado });
   } catch {
     await concluir("incerto", { codigo: "erro_no_executor" });   // se algo escapou, o seguro é a equipe conferir antes de marcar de novo

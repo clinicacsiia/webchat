@@ -67,13 +67,13 @@ end $t$;
 -- ---------------------------------------------------------------------------------------------------------------------------------------------
 -- 2. Modos por capacidade
 -- ---------------------------------------------------------------------------------------------------------------------------------------------
--- Valor normalizado da chave (nao|teste|sombra|sim). Cancelar/remarcar herdam klingo_api_pos enquanto não têm chave própria (compatibilidade).
+-- Valor normalizado da chave (nao|teste|sombra|sim). Cancelar/remarcar/consultar herdam klingo_api_pos enquanto não têm chave própria (compatibilidade).
 create or replace function public.klingo_modo_chave(p_chave text) returns text
   language sql stable security definer set search_path to ''
 as $function$
   select case when v in ('nao', 'teste', 'sombra', 'sim') then v else 'nao' end
     from (select lower(btrim(coalesce((select valor from public.config where chave = p_chave),
-                                      case when p_chave in ('klingo_api_cancelar', 'klingo_api_remarcar') then (select valor from public.config where chave = 'klingo_api_pos') end,
+                                      case when p_chave in ('klingo_api_cancelar', 'klingo_api_remarcar', 'klingo_api_consultar') then (select valor from public.config where chave = 'klingo_api_pos') end,
                                       'nao'))) as v) x
 $function$;
 
@@ -128,7 +128,7 @@ grant execute on function public.klingo_modo_chave(text), public.klingo_aceita_s
 -- ---------------------------------------------------------------------------------------------------------------------------------------------
 create or replace function public.klingo_chave_de_modo(p_chave text) returns boolean
   language sql immutable set search_path to ''
-as $function$ select p_chave in ('klingo_auto', 'klingo_api_horarios', 'klingo_api_marcar', 'klingo_api_pre_cadastro', 'klingo_api_pos', 'klingo_api_cancelar', 'klingo_api_remarcar',
+as $function$ select p_chave in ('klingo_auto', 'klingo_api_horarios', 'klingo_api_marcar', 'klingo_api_pre_cadastro', 'klingo_api_pos', 'klingo_api_cancelar', 'klingo_api_remarcar', 'klingo_api_consultar',
                                   'klingo_api_resultado', 'klingo_webhook', 'previsao_modo', 'previsao_monitor_modo', 'notificacao_modo', 'pedido_horario_modo') $function$;
 
 create or replace function public.klingo_modo_nivel(p_valor text) returns integer
@@ -369,6 +369,7 @@ insert into public.config (chave, valor)
 select k, v from (values
   ('klingo_api_cancelar',   coalesce((select valor from public.config where chave = 'klingo_api_pos' and valor in ('nao', 'teste')), 'nao')),
   ('klingo_api_remarcar',   coalesce((select valor from public.config where chave = 'klingo_api_pos' and valor in ('nao', 'teste')), 'nao')),
+  ('klingo_api_consultar',  coalesce((select valor from public.config where chave = 'klingo_api_pos' and valor in ('nao', 'teste')), 'nao')),
   ('klingo_api_resultado',  'nao'),
   ('previsao_modo',         'teste'),
   ('previsao_monitor_modo', 'nao'),
