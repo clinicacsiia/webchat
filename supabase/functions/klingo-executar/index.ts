@@ -7,6 +7,7 @@
 // pelo banco (klingo_pode_marcar) e lê o resto de lá. Não há modo diagnóstico e o segredo NÃO é o x-sync-key (é um segredo próprio do cofre).
 // Nunca registra nome, CPF, telefone nem o corpo de erro do Klingo. Secret: KLINGO_APP_TOKEN.
 // Versão 1.1 — 14/11/2026 / Mudança: operação "ler_vouchers" (ver minhas marcações) e conferência do voucher antigo na remarcação; o resultado leva marcacoes e antigo ao banco.
+// Versões 1.2 a 1.4 — 14/11/2026 / Mudança: cancelar, remarcar e ver marcações para quem tem só PRÉ-CADASTRO (ver executor.ts).
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { cotaGlobal, KlingoApi } from "./klingo-api.ts";
 import { executar, type Esp, type Pegar } from "./executor.ts";
@@ -30,7 +31,16 @@ Deno.serve(async (req: Request) => {
   const tokenKlingo = Deno.env.get("KLINGO_APP_TOKEN");
   if (!tokenKlingo) { await concluir("falha", { codigo: "sem_chave" }); return json({ ok: false, motivo: "sem_chave" }, 500); }
   try {
-    const rpc = (n: string, a: Record<string, unknown>) => supabase.rpc(n, a);
+    // v1.2: "klingo_pre_do_par" NÃO é uma função do banco: é uma LEITURA (só leitura, sem criar nada) do pré-cadastro guardado para CPF + nascimento.
+    const rpc = async (n: string, a: Record<string, unknown>) => {
+      if (n === "klingo_pre_do_par") {
+        const { data: chave, error: eh } = await supabase.rpc("klingo_hash", { p_texto: `${a.p_cpf}|${a.p_nasc}` });
+        if (eh || typeof chave !== "string") return { data: { klingo_id: null } };
+        const { data } = await supabase.from("klingo_identidade").select("klingo_id").eq("chave", chave).eq("tipo", "pre").maybeSingle();
+        return { data: { klingo_id: (data as { klingo_id: string | null } | null)?.klingo_id ?? null } };
+      }
+      return await supabase.rpc(n, a);
+    };
     const api = new KlingoApi(tokenKlingo, (u, i) => fetch(u, i), { antes: cotaGlobal(rpc, { maxTentativas: 10, maxEsperaMs: 3000 }), aoLimite: async () => { await supabase.rpc("klingo_cota_429"); }, tentativas429: 2 });
     const { data: esps } = await supabase.from("klingo_especialidade").select("cbos, procedimentos");
     const r = await executar(api, rpc, pegar as unknown as Pegar, (esps ?? []) as Esp[]);
