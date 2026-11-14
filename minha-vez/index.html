@@ -297,7 +297,7 @@
     } else if (f.situacao === 'aguardando') {
       const perto = f.a_frente <= AVISAR_PERTO;
       nos.push(h('div', { class: 'cartao posicao' + (perto ? ' perto' : ''), role: 'status', 'aria-live': 'polite' },
-        h('div', { class: 'rot' }, 'Você é o(a)'), h('div', { class: 'num' }, f.posicao + 'º'), h('div', { class: 'rot' }, 'da fila'),
+        h('div', { class: 'rot' }, 'Você está na fila'), h('div', { class: 'num' }, f.posicao + 'º'), h('div', { class: 'rot' }, 'lugar'),
         h('p', { style: 'margin-top:14px' }, f.a_frente === 0 ? 'Você é o próximo! Fique por perto.' : f.a_frente === 1 ? 'Falta 1 pessoa à sua frente.' : 'Faltam ' + f.a_frente + ' pessoas à sua frente.'),
         h('span', { class: 'selo ' + (perto ? 'mau' : '') }, 'Senha ' + f.senha),
         perto ? h('p', { style: 'margin-top:12px' }, 'Está chegando a sua vez.') : null));
@@ -308,7 +308,7 @@
         f.pode_chegar === false ? h('p', {}, 'Avise a recepção que você chegou. Ela vai colocar você na fila e o portal mostrará a sua posição.')
           : [h('p', {}, 'Toque no botão para avisar a recepção. Você entra na fila e acompanha a sua posição aqui.'),
              h('button', { class: 'principal', type: 'button', onclick: (e) => cheguei(e.currentTarget) }, 'Cheguei')],
-        h('p', { class: 'suave', style: 'margin-top:12px' }, f.total ? f.total + (f.total === 1 ? ' pessoa aguarda' : ' pessoas aguardam') + ' agora.' : 'Ninguém aguardando agora.')));
+        ));
     }
     if (modo === 'conta') nos.push(...jornadaNos());
     nos.push(...cartaoAvisos());
