@@ -253,6 +253,12 @@ export class KlingoApi {
     return normalizarHorarios(r);
   }
 
+  /** Igual a horarios(), mas devolve a resposta CRUA da API (v2.0, 14/11/2026): é com ela que o chat-agenda-api diferencia "sem horários", "estrutura inesperada" e "tudo filtrado". */
+  async horariosBruto(p: PedidoHorarios, sessao?: string): Promise<unknown> {
+    if (!p.especialidade && !p.exame) throw new Error("informe especialidade (consulta) ou exame");
+    return await this.chamar("GET", "/agenda/horarios", { sessao, query: { ...p, revisao: p.revisao === undefined ? undefined : p.revisao ? 1 : 0 } });
+  }
+
   /** GET /paciente/cpf — cadastro pelo CPF (11 dígitos). Não acha quem só tem pré-cadastro. */
   pacientePorCpf(cpf: string) { return this.chamar<Record<string, unknown>>("GET", "/paciente/cpf", { query: { cpf } }); }
 
