@@ -2,6 +2,7 @@
 //   -> processamento (cota global; GET /agenda/horarios por 14 dias com sexo e nascimento; diagnosticar(): estrutura x quantidade x filtros; no modo sombra só mede) -> persistência (klingo_consulta guarda o resultado de CADA etapa; klingo_oferta só no modo teste/sim)
 //   -> saída ({ok, modo, estado, ofertas}; nunca dado de paciente; sombra responde na hora e não devolve horário)
 // Versão 1.0 — 12/11/2026 / Mudança: primeira versão (autoatendimento Klingo, etapa 1: horários reais). Só LEITURA: não reserva nem marca nada.
+// Versão 2.1 — 14/11/2026 / Mudança: guarda a mensagem do Klingo nos 403 da agenda (klingo-api v1.2) e trata 403 de idade/sexo como regra de negócio.
 // Versão 2.0 — 14/11/2026 / Mudança: (1) o modo vem de klingo_modo (o mestre klingo_auto NÃO transforma "sombra" em "sim": sombra só mede, não grava oferta visível e não responde horário); (2) HTTP 200 não é "ok":
 //   resposta vazia, estrutura inesperada e "tudo filtrado" viram resultados distintos em klingo_consulta; (3) janela 0/1/2 soma mais 14 dias sem apagar o que já veio; (4) a mesma conversa não consulta duas vezes ao mesmo tempo.
 //
@@ -121,6 +122,11 @@ Deno.serve(async (req: Request) => {
       if (e instanceof KlingoErro && (e.tipo === "sem_medico" || e.tipo === "plano_inativo" || e.tipo === "plano_desconhecido")) {
         await supabase.rpc("klingo_medir", { p_tipo: "horarios_api_regra", p_n: 1, p_ms: null }).then(() => {}, () => {});
         return await recusar(e.tipo, e.resumo);
+      }
+      // v2.1 (14/11/2026): 403 por idade/sexo do paciente (regra do procedimento no Klingo) também é regra de negócio, não falha técnica.
+      if (e instanceof KlingoErro && e.status === 403 && /idade|sexo|dispon[ií]vel apenas/i.test(e.resumo ?? "")) {
+        await supabase.rpc("klingo_medir", { p_tipo: "horarios_api_regra", p_n: 1, p_ms: null }).then(() => {}, () => {});
+        return await recusar("regra_paciente", e.resumo);
       }
       await registrar(tipo === "limite" ? "limite" : "erro_api", { http: e instanceof KlingoErro ? e.status : undefined, detalhe });
       await motivar(tipo === "limite" ? "limite" : "indisponivel", detalhe);

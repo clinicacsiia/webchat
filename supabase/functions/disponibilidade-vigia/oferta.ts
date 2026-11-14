@@ -80,6 +80,7 @@ export function resultadoDoMotivo(m: string): string {
   if (m === "limite") return "limite";
   if (m === "indisponivel" || m === "sem_chave") return "erro_api";
   if (m === "fora_do_escopo" || m === "dados_incompletos" || m === "sem_pedido") return m;
+  if (m === "regra_paciente") return "fora_do_escopo";   // v2.1: idade/sexo do paciente não vale para o procedimento
   return "sem_traducao_plano";   // sem_traducao, plano_inativo, plano_desconhecido, sem_medico, plano_do_cadastro_necessario...
 }
 
