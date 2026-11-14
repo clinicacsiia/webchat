@@ -10,6 +10,7 @@
 //   3) login com o id EXATO do Klingo e conferência da sessão (id, nascimento e, no pré-cadastro, o nome)
 //   4) o horário ainda existe? (GET /agenda/horarios do dia com a sessão); se não, "horário tomado"
 //   5) reservar -> marcar (id_externo = id da operação); se o resultado for incerto, reconcilia por GET /vouchers; se não achar, INCERTO (a equipe confere ANTES de marcar de novo)
+// Versões 1.2 a 1.4 — 14/11/2026: pré-cadastro guardado para cancelar/remarcar/ver marcações; nome só conferido se informado; consulta de horário refeita sem sessão no 403.
 // Cancelar e remarcar (etapa 4): mesma identidade e mesma sessão conferida; só mexem em voucher que está entre as marcações ATIVAS da sessão do próprio paciente.
 import { cadastroParaComparar, camposDivergentes, type Horario, type KlingoApi, KlingoErro, resumoPaciente, resumoVoucher, semAcento, dataIso } from "./klingo-api.ts";
 
@@ -69,22 +70,37 @@ async function abrirSessao(api: KlingoApi, rpc: Rpc, p: Pegar, o: { planoDaOfert
   try { pac = await api.pacientePorCpf(d.cpf!) as Record<string, unknown> | null; } catch (e) {
     if (!(e instanceof KlingoErro && e.tipo === "paciente_nao_identificado")) throw e;
   }
+  // v1.2: pré-cadastro guardado para CPF + nascimento (só leitura; só vale com id numérico puro)
+  const preGuardado = async (): Promise<string | null> => {
+    const r = dado<{ klingo_id?: string | null } | null>(await rpc("klingo_pre_do_par", { p_cpf: d.cpf, p_nasc: d.nascimento }));
+    const id = r?.klingo_id ?? null;
+    return id && /^\d+$/.test(id) ? id : null;
+  };
   const s = pac ? resumoPaciente(pac) : null;
   if (s?.id) {
     if (s.nascimento !== d.nascimento) {
       await rpc("klingo_identidade_registrar", { p_cpf: d.cpf, p_nasc: d.nascimento, p_r: { situacao: "divergente" }, p_conversa: null });
       return falha("nascimento_divergente");
     }
-    if (!/^P\d+$/.test(s.id)) return falha("sem_id_definitivo");
+    if (!/^P\d+$/.test(s.id)) {
+      // v1.2: id fora do formato definitivo = só tem pré-cadastro; usa o guardado para este CPF + nascimento
+      const pre = await preGuardado();
+      if (!pre) return falha("sem_id_definitivo");
+      idLogin = pre; tipoId = "pre";
+    } else {
     // nome, mãe, sexo, telefone e e-mail digitados x cadastro do Klingo (o Klingo manda): 1 divergente = a equipe valida; 2 ou mais = o paciente vai à clínica
     const dif = camposDivergentes(cadastroParaComparar(pac), d);
     if (dif.length >= 2) { await rpc("klingo_identidade_registrar", { p_cpf: d.cpf, p_nasc: d.nascimento, p_r: { situacao: "divergente" }, p_conversa: null }); return falha("divergencia_2:" + dif.join(",")); }
     if (dif.length === 1) return falha("divergencia_1:" + dif[0]);
     idLogin = s.id; tipoId = "definitivo"; planoCadastro = s.planoId;
     await rpc("klingo_identidade_registrar", { p_cpf: d.cpf, p_nasc: d.nascimento, p_r: { situacao: "confere", klingo_id: s.id, faltando: s.faltando, plano_id: s.planoId }, p_conversa: null });
+    }
   } else {
-    // paciente novo (só cria marcação; cancelar/remarcar de quem nem cadastro tem não faz sentido)
-    if (o.liberarNovo === false) return falha("cadastro_nao_encontrado");
+    // sem cadastro definitivo: cancelar/remarcar/ver marcações usam o pré-cadastro guardado (v1.2); só marcar cria paciente novo
+    const preExistente = o.liberarNovo === false ? await preGuardado() : null;
+    if (o.liberarNovo === false && !preExistente) return falha("cadastro_nao_encontrado");
+    if (preExistente) { idLogin = preExistente; tipoId = "pre"; }
+    else {
     const liberado = dado<boolean>(await rpc("klingo_ativo", { p_conversa: op.conversa_id, p_chave: "klingo_api_pre_cadastro" }));
     if (!liberado) return falha("paciente_novo_nao_liberado");
     if (!d.nome || !d.sexo) return falha("dados_incompletos");
@@ -102,6 +118,7 @@ async function abrirSessao(api: KlingoApi, rpc: Rpc, p: Pegar, o: { planoDaOfert
       await rpc("klingo_pre_gravar", { p_op: op.id, p_cpf: d.cpf, p_nasc: d.nascimento, p_klingo_id: novo.id });
       idLogin = novo.id; tipoId = "pre";
     } else return { estado: "incerto", codigo: "registro_em_andamento_ou_incerto" };
+    }
   }
   if (o.planoDaOferta !== undefined) {
     const pl = dado<{ plano_id?: number | null; motivo?: string }>(await rpc("klingo_plano_resolver", { p_operadora: d.plano, p_plano_cadastro: planoCadastro }));
@@ -110,7 +127,8 @@ async function abrirSessao(api: KlingoApi, rpc: Rpc, p: Pegar, o: { planoDaOfert
     if (plano !== o.planoDaOferta) return falha("plano_mudou_depois_da_oferta");
   }
   const { token, user } = await api.login(idLogin);
-  const mesmoNome = tipoId === "definitivo" || semAcento(user.nome) === semAcento(d.nome);
+  // v1.3: o nome só é conferido quando foi informado na conversa
+  const mesmoNome = tipoId === "definitivo" || !d.nome || semAcento(user.nome) === semAcento(d.nome);
   if (String(user.id ?? "") !== idLogin || dataIso(user.nascimento) !== d.nascimento || !mesmoNome) return falha("sessao_nao_confere");
   if (tipoId === "pre" && user.id_paciente) return falha("pre_cadastro_ja_definitivo");
   return { token, idLogin, tipoId, planoCadastro };
@@ -201,7 +219,15 @@ export async function executarMarcacao(api: KlingoApi, rpc: Rpc, p: Pegar, esps:
     // 4) o horário ainda existe?
     const ped = pedidoDeHorarios(d.tipo, d.procedimento, esps);
     if (!ped) return falha("fora_do_escopo");
-    const dia: Horario[] = await api.horarios({ ...ped, plano, inicio: o.data, fim: o.data }, token).catch((e) => {
+    const pedH = { ...ped, plano, inicio: o.data, fim: o.data };
+    // v1.4: o Klingo pode recusar (403) esta consulta com a sessão do pré-cadastro; refaz SEM sessão, com nascimento (e sexo, se houver)
+    const buscarDia = async (): Promise<Horario[]> => {
+      try { return await api.horarios(pedH, token); } catch (e) {
+        if (e instanceof KlingoErro && e.status === 403 && e.tipo === "outro") return await api.horarios({ ...pedH, ...(d.sexo ? { sexo: d.sexo } : {}), nascimento: d.nascimento! });
+        throw e;
+      }
+    };
+    const dia: Horario[] = await buscarDia().catch((e) => {
       if (e instanceof KlingoErro && (e.tipo === "sem_medico" || e.tipo === "plano_inativo" || e.tipo === "plano_desconhecido")) return [] as Horario[];
       throw e;
     });
