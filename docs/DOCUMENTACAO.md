@@ -230,7 +230,7 @@ Liga/desliga e textos. Só o administrador lê e altera (aba Configurações ou 
 | `agendamento_reconhecer` | `sim` | Reconhecer agendamento no Klingo |
 | `vinculo_manual_quem` | `equipe` | Quem liga paciente a prontuário |
 | `jornada_relatorio_id` / `_filtro` | `14359` / `exame` | Relatório do Klingo usado na Jornada |
-| `klingo_api_horarios` | `sombra` | Horários reais da API: `nao` / `sombra` (só mede; não expõe) / `teste` / `sim` |
+| `klingo_api_horarios` | (sem efeito desde 14/11/2026) | Era o modo dos horários reais da API. O autoatendimento do Klingo é SEMPRE LIGADO (`webchat-v2-sempre-ligado.sql`); as chaves `klingo_auto`, `klingo_api_*`, `previsao_*`, `notificacao_modo`, `klingo_api_telefones_teste`, `klingo_api_percentual` e `klingo_autogestao` ficaram sem efeito e podem ser apagadas. Só `klingo_api_resultado` (laudo, sem integração) ainda segue a configuração. |
 | `klingo_api_marcar`, `klingo_api_pre_cadastro`, `klingo_api_pos` (v2.0: `klingo_api_cancelar`, `klingo_api_remarcar`, `klingo_api_resultado`, `previsao_modo`, `previsao_monitor_modo`, `notificacao_modo`) | `teste` | Uma chave por capacidade: `nao` / `teste` (só os telefones da lista) / `sim`. O mestre `klingo_auto` só **limita**, nunca promove (ver `reestruturacao-2026-11-14/03-matriz-de-configuracao.md`) |
 | `klingo_api_telefones_teste` | vazio | Celulares (só números, vírgula) que sempre usam a automação nos modos `teste` |
 | `klingo_api_percentual` | `100` | No modo `sim`, que parte das conversas usa a automação (a autogestão sobe 10 → 50 → 100) |

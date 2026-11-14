@@ -1,6 +1,6 @@
 -- public.disponibilidade_compativel(r disponibilidade_pedido, p_data date, p_hora text, p_unidade text, p_prof text)
 -- Pode executar: service_role
-CREATE OR REPLACE FUNCTION public.disponibilidade_compativel(r disponibilidade_pedido, p_data date, p_hora text, p_unidade text, p_prof text)
+CREATE OR REPLACE FUNCTION public.disponibilidade_compativel(r public.disponibilidade_pedido, p_data date, p_hora text, p_unidade text, p_prof text)
  RETURNS boolean
  LANGUAGE sql
  STABLE
