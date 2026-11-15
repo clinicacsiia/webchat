@@ -112,7 +112,7 @@ await caso('PIN vencido (30 min): o chat mostra "Digitar PIN"; PIN errado avisa;
   await aguardaTexto(page, /PIN incorreto/);
   for (const d of '1357') await tecla(d);
   await page.waitForSelector('#acessoSair', { timeout: 8000 });
-  await aguardaTexto(page, /Acesso rápido: Ana/);
+  await aguardaTexto(page, /Olá, Ana!/);
   const cartoes = await page.$$eval('#fQuem .unidade strong', (n) => n.map((x) => x.textContent));
   await ctx.close();
   return { ok: /Digite seu PIN/.test(antes) && cartoes.join('|') === 'Para mim|Para Leo|Para Lia|Todos os filhos', detalhe: cartoes.join('|') };
@@ -120,7 +120,7 @@ await caso('PIN vencido (30 min): o chat mostra "Digitar PIN"; PIN errado avisa;
 
 await caso('cadastro com informação pendente: a faixa NÃO mostra aviso nem cartão pedindo informação (só o link "Meus dados")', async () => {
   const { page, ctx } = await abrir();
-  await aguardaTexto(page, /Acesso rápido: Ana/);
+  await aguardaTexto(page, /Olá, Ana!/);
   const txt = await texto(page), link = await page.$eval('#acessoMeusDados', (e) => e.textContent + '|' + e.getAttribute('href')), pend = await page.locator('#acessoPend').count();
   await ctx.close();
   return { ok: !/Falta(m)? \d+ informaç/.test(txt) && !pend && link === 'Meus dados|acesso/?ir=dados', detalhe: link };
@@ -128,7 +128,7 @@ await caso('cadastro com informação pendente: a faixa NÃO mostra aviso nem ca
 
 await caso('faixa do acesso rápido (fora da clínica): não escreve a palavra "null" na tela', async () => {
   const { page, ctx } = await abrir();
-  await aguardaTexto(page, /Acesso rápido: Ana/);
+  await aguardaTexto(page, /Olá, Ana!/);
   const faixa = await page.$eval('#blocoAcesso', (e) => e.textContent);
   await ctx.close();
   return { ok: !/null|undefined/.test(faixa), detalhe: faixa.replace(/\s+/g, ' ').trim() };
@@ -139,7 +139,7 @@ let sessaoAna;
 await caso('1ª conversa "Para mim": nome e celular vêm do cadastro (travados); o chat pergunta CPF e nascimento (ainda não há CPF salvo)', async () => {
   sessaoAna = await abrir();
   const { page } = sessaoAna;
-  await aguardaTexto(page, /Acesso rápido: Ana/);
+  await aguardaTexto(page, /Olá, Ana!/);
   await page.click('#fQuem .unidade >> text=Para mim');
   const nomeTravado = await page.evaluate(() => { const n = document.getElementById('fNome'), t = document.getElementById('fTel'); return n.readOnly && t.readOnly && n.value === 'Ana Souza Teste' && /99123-0001/.test(t.value); });
   const email = await page.isVisible('#fEmail');
@@ -170,7 +170,7 @@ await sessaoAna.ctx.close();
 await caso('2ª conversa "Para mim" (aparelho que já conhece o e-mail): sem pergunta de CPF/nascimento; vai direto para "o que você precisa"', async () => {
   const s = await abrir();
   const { page } = s;
-  await aguardaTexto(page, /Acesso rápido: Ana/);
+  await aguardaTexto(page, /Olá, Ana!/);
   await page.click('#fQuem .unidade >> text=Para mim');
   await aceites(page);
   const antes = mundo.chamadas.length;
@@ -195,7 +195,7 @@ let sessaoLeo;
 await caso('conversa "Para Leo": o chat pergunta o CPF dele uma vez (o da mãe não é usado) e o cadastro aprende separado', async () => {
   sessaoLeo = await abrir();
   const { page } = sessaoLeo;
-  await aguardaTexto(page, /Acesso rápido: Ana/);
+  await aguardaTexto(page, /Olá, Ana!/);
   await page.click('#fQuem .unidade >> text=Para Leo');
   await aceites(page);
   await page.click('#btnIniciar');
@@ -213,7 +213,7 @@ await caso('conversa "Para Leo": o chat pergunta o CPF dele uma vez (o da mãe n
 });
 await caso('Leo de novo: não pergunta mais; Lia (sem CPF salvo) ainda pergunta', async () => {
   const s = await abrir(); const { page } = s;
-  await aguardaTexto(page, /Acesso rápido: Ana/);
+  await aguardaTexto(page, /Olá, Ana!/);
   await page.click('#fQuem .unidade >> text=Para Leo');
   await aceites(page);
   await page.click('#btnIniciar');
@@ -226,7 +226,7 @@ await caso('Leo de novo: não pergunta mais; Lia (sem CPF salvo) ainda pergunta'
   await page.click('#btnVoltarInicio').catch(() => {});
   await s.ctx.close();
   const s2 = await abrir(); const p2 = s2.page;
-  await aguardaTexto(p2, /Acesso rápido: Ana/);
+  await aguardaTexto(p2, /Olá, Ana!/);
   await p2.click('#fQuem .unidade >> text=Para Lia');
   await aceites(p2);
   await p2.click('#btnIniciar');
@@ -239,7 +239,7 @@ await caso('Leo de novo: não pergunta mais; Lia (sem CPF salvo) ainda pergunta'
 // ================================================================= Todos os filhos
 await caso('"Todos os filhos" usa os irmãos do chat: Leo primeiro, Lia na fila, com a escolha "mesmo pedido / um de cada vez"', async () => {
   const s = await abrir(); const { page } = s;
-  await aguardaTexto(page, /Acesso rápido: Ana/);
+  await aguardaTexto(page, /Olá, Ana!/);
   await page.click('#fQuem .unidade >> text=Todos os filhos');
   const modos = await page.$$eval('#fModoIrmaos .unidade strong', (n) => n.map((x) => x.textContent));
   const nomesDigitaveis = await page.isVisible('#fFilho');
@@ -252,6 +252,32 @@ await caso('"Todos os filhos" usa os irmãos do chat: Leo primeiro, Lia na fila,
   const conv = (await q(`select paciente_nome, irmaos, irmaos_modo from public.conversas order by criado_em desc limit 1`))[0];
   await s.ctx.close();
   return { ok: modos.length === 2 && !nomesDigitaveis && /Lia/.test(prox) && conv.paciente_nome === 'Leo Souza Teste' && conv.irmaos_modo === 'juntos', detalhe: `${modos.join('|')} / ${prox.trim()}` };
+});
+
+await caso('tela inicial do acesso rápido: logo à vista no topo, "Olá, nome!" com Meus dados e Sair na mesma linha, sem repetir nome e telefone, e "Começar" antes de "Acompanhe seus pedidos"', async () => {
+  const { page, ctx } = await abrir();
+  await aguardaTexto(page, /Olá, Ana!/);
+  const d = await page.evaluate(() => {
+    const vis = (e) => { if (!e) return false; const b = e.getBoundingClientRect(), c = getComputedStyle(e); return b.width > 20 && b.height > 10 && c.display !== 'none' && c.visibility !== 'hidden'; };
+    const topo = (s) => { const e = document.querySelector(s); return e ? e.getBoundingClientRect().top : -1; };
+    const sa = document.querySelector('.saudacao'), links = sa ? [...sa.querySelectorAll('#acoesSaudacao a, #acoesSaudacao button')].map((x) => x.textContent.trim()) : [];
+    return { logo: vis(document.querySelector('.topo-logo')), capa: !!document.querySelector('.capa'), links, voltaOculta: document.querySelector('#blocoVolta').hidden, blocoAcessoOculto: document.querySelector('#blocoAcesso').hidden,
+      comecar: topo('#btnIniciar'), acompanhar: topo('#linkAcompanhar'), textoTela: document.querySelector('#telaInicio').innerText };
+  });
+  await page.evaluate(() => document.querySelector('#telaInicio').scrollTo(0, 400));   // mesmo rolando a tela, a logo continua no topo
+  const logoRolando = await page.evaluate(() => { const b = document.querySelector('.topo-logo').getBoundingClientRect(); return b.top >= 0 && b.bottom <= 80; });
+  await ctx.close();
+  const repete = (d.textoTela.match(/Ana/g) || []).length;
+  return { ok: d.logo && logoRolando && !d.capa && d.links.join('|') === 'Meus dados|Sair' && d.voltaOculta && d.blocoAcessoOculto && !/Acesso rápido:/.test(d.textoTela) && !/99123|\(71\)/.test(d.textoTela) && repete === 1 && d.comecar > 0 && d.acompanhar > d.comecar,
+    detalhe: JSON.stringify({ logo: d.logo, logoRolando, links: d.links, repete, comecar: d.comecar, acompanhar: d.acompanhar }) };
+});
+
+await caso('tela inicial: o aviso é curto (equidade, família e "pessoa da equipe confirmar") e a tela do acesso rápido cabe sem rolar num celular de 390x780', async () => {
+  const { page, ctx } = await abrir();
+  await aguardaTexto(page, /Olá, Ana!/);
+  const d = await page.evaluate(() => { const t = document.querySelector('#telaInicio'), a = document.querySelector('#avisoForm').innerText; return { cabe: t.scrollHeight <= t.clientHeight + 2, aviso: a, tam: a.length }; });
+  await ctx.close();
+  return { ok: d.cabe && /equidade/.test(d.aviso) && /família/.test(d.aviso) && /pessoa da equipe confirmar/.test(d.aviso) && d.tam < 260, detalhe: `cabe=${d.cabe} tam=${d.tam}` };
 });
 
 await caso('PIN de outro aparelho/código inválido: o chat apaga o código local e volta ao convite', async () => {
