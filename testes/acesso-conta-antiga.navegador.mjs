@@ -16,6 +16,7 @@ await db.exec(readFileSync(`${REPO}/supabase/acesso-rapido-chat.sql`, 'utf8'));
 await db.exec(readFileSync(`${REPO}/supabase/acesso-rapido-conta-antiga.sql`, 'utf8'));
 await db.exec(readFileSync(`${REPO}/supabase/acesso-rapido-pendencias.sql`, 'utf8'));
 await db.exec(readFileSync(`${REPO}/supabase/acesso-rapido-filhos.sql`, 'utf8'));
+await db.exec(readFileSync(`${REPO}/supabase/acesso-rapido-pin-obrigatorio.sql`, 'utf8'));   // app_pre_cadastro (a página pergunta se o celular já tem PIN)
 await db.exec(`update public.config set valor = 'sim' where chave = 'app_acesso_modo'`);
 
 const HTML = readFileSync(`${REPO}/acesso/index.html`, 'utf8');
@@ -218,6 +219,36 @@ await caso('homônimo de criança (Dani, nascimento de menor): já vem como "É 
   await pin(dn.page, '1357'); await pin(dn.page, '1357'); await esperaTexto(dn.page, /Olá, Dani/);
   const f = await q(`select f.nome, f.nascimento::text n from public.app_filho f join public.app_paciente p on p.id = f.responsavel_id where p.conta_antiga_id = '${ids.dani}'`);
   return { ok: /Quem é\?/.test(antes) && v === '2013-03-03' && f.length === 1 && f[0].nome === 'Dani Teste Costa' && f[0].n === '2013-03-03', detalhe: JSON.stringify(f) };
+});
+
+// ================================================================= Conta de e-mail + celular que JÁ tem PIN (cadastro separado, sem ligação com a conta)
+// Foi o caso do dono em 15/11/2026: abria pelo chat e caía em "Confira os seus dados" mesmo com o PIN criado.
+for (const [k, email, nomeC, tel] of [['eva', 'eva@exemplo.invalid', 'Eva Pin Teste', '71991230011'], ['fabi', 'fabi@exemplo.invalid', 'Fabi Pin Teste', '71991230013']]) {
+  ids[k] = (await q(`insert into auth.users (id, email) values (gen_random_uuid(), '${email}') returning id`))[0].id;
+  await db.exec(`insert into public.contas_paciente (id, email, nome, telefone) values ('${ids[k]}', '${email}', '${nomeC}', '${tel}')`);
+}
+await db.exec(`insert into public.app_paciente (telefone, nome, nascimento, pin_hash) values ('71991230011', 'Eva Pin Teste', '1990-01-01', extensions.crypt('2468', extensions.gen_salt('bf', 8)))`);
+const antesEva = await n(`select count(*)::int n from public.app_paciente`);
+const sessaoEva = JSON.stringify({ access_token: tokenDe(ids.eva), expires_at: Math.floor(Date.now() / 1000) + 3600, user: { id: ids.eva } });
+const ev = await novaPagina('/?voltar=chat&antiga=1', ['csi-paciente-auth', sessaoEva]);
+await caso('vindo do chat com a conta logada e o celular dela JÁ com PIN: vai direto para digitar o PIN (não mostra "Confira os seus dados")', async () => {
+  await esperaTexto(ev.page, /Você já tem PIN/);
+  const t = await texto(ev.page);
+  return { ok: !/Confira os seus dados/.test(t) && (await ev.page.locator('.pad button[data-k="1"]').count()) === 1, detalhe: t.slice(0, 120).replace(/\n/g, ' | ') };
+});
+await caso('a sessão da conta de e-mail sai do aparelho e o PIN certo abre o acesso rápido; nada é criado a mais', async () => {
+  await pin(ev.page, '2468');
+  await esperaTexto(ev.page, /Olá, Eva/);
+  const st = await ev.page.evaluate(() => ({ antiga: localStorage.getItem('csi-paciente-auth') }));
+  return { ok: st.antiga === null && (await n(`select count(*)::int n from public.app_paciente`)) === antesEva, detalhe: JSON.stringify(st) };
+});
+const fb = await novaPagina(); await fb.page.click('[data-act="go"][data-v="antiga"]'); await entrarComEmail(fb.page, 'fabi@exemplo.invalid', SENHA);
+await esperaTexto(fb.page, /Confira os seus dados/);
+await caso('conta sem PIN que digita um celular que já tem PIN: ao Continuar vai para o PIN em vez de tentar cadastrar de novo', async () => {
+  await fb.page.fill('#tel', '71991230011'); await fb.page.fill('#nome', 'Fabi Pin Teste'); await fb.page.fill('#nasc', '1991-02-02');
+  await fb.page.click('[data-act="antiga2"]');
+  await esperaTexto(fb.page, /Este celular já tem PIN/);
+  return { ok: (await fb.page.locator('.pad button[data-k="1"]').count()) === 1 && (await n(`select count(*)::int n from public.app_paciente`)) === antesEva };
 });
 
 // ================================================================= Quem já migrou e tenta de novo
