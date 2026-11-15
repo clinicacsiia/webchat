@@ -178,12 +178,28 @@ await caso('na clínica e com exame hoje: a faixa oferece o check-in', async () 
   const t = await page.$eval('#acessoPresenca', (e) => e.textContent + '|' + e.querySelector('a').getAttribute('href'));
   await ctx.close(); return { ok: /2 exames hoje/.test(t) && /minha-vez\/$/.test(t), detalhe: t };
 });
-await caso('trava contra laço: se a página de acesso devolve e o cadastro continua incompleto, depois de 3 voltas o chat abre', async () => {
+await caso('trava contra laço: depois de 3 voltas o chat NÃO abre sem PIN: mostra o aviso com "Tentar de novo" e o telefone da clínica', async () => {
   await incompleta(); await destrava();
   const { page, ctx } = await abrir({ init: [[() => { try { sessionStorage.setItem('csi_porta_tent', JSON.stringify({ n: 3, t: Date.now() })); } catch { /* sem armazenamento */ } }, null]] });
-  await page.waitForSelector('#formInicio', { state: 'visible', timeout: 10000 }); await espera(900);
-  const ok = noChat(page) && await page.locator('#porta').isHidden();
-  await ctx.close(); return { ok };
+  await page.waitForSelector('#portaTentar', { state: 'visible', timeout: 10000 }); await espera(500);
+  const href = await page.locator('#portaTentar').getAttribute('href'), txt = await page.locator('#porta').innerText();
+  // o formulário do chat segue no HTML, mas o aviso é uma tela cheia por cima: o que está no ponto do formulário tem de ser o aviso
+  const aindaNoChat = noChat(page), formVisivel = await page.evaluate(() => { const f = document.getElementById('formInicio'); if (!f) return false; const r = f.getBoundingClientRect(); const el = document.elementFromPoint(r.left + r.width / 2, Math.min(r.top + 40, innerHeight - 5)); return !(el && el.closest('#porta')); });
+  const ok = aindaNoChat && !formVisivel && /\/acesso\/\?voltar=chat$/.test(href) && !/acesso\/acesso/.test(href) && /Não conseguimos abrir o seu acesso/.test(txt) && /3181-7666/.test(txt);
+  await ctx.close(); return { ok, detalhe: `${href} | formVisivel=${formVisivel}` };
+});
+await caso('pergunta ao servidor falhou e o PIN era obrigatório neste aparelho: o chat não abre (vai para a porta); sem esse histórico, abre como antes', async () => {
+  await incompleta(); await destrava();
+  mundo.quedas = { app_porta: 20 };
+  const a = await abrir({ init: [[() => { try { localStorage.setItem('csi_porta_v1', '1'); } catch { /* sem armazenamento */ } }, null]] });
+  await espera(2500);
+  const foiParaPorta = !noChat(a.page) || await a.page.locator('#porta').isVisible().catch(() => false);
+  await a.ctx.close();
+  mundo.quedas = { app_porta: 20 };
+  const b = await abrir({ init: [[() => { try { localStorage.removeItem('csi_porta_v1'); } catch { /* sem armazenamento */ } }, null]] });
+  await b.page.waitForSelector('#formInicio', { state: 'visible', timeout: 10000 }).catch(() => {}); await espera(500);
+  const abriu = noChat(b.page) && await b.page.locator('#formInicio').isVisible().catch(() => false);
+  await b.ctx.close(); mundo.quedas = {}; return { ok: foiParaPorta && abriu, detalhe: `lembrava=${foiParaPorta} semHistorico=${abriu}` };
 });
 await caso('nenhum erro de script durante o roteiro', async () => ({ ok: true }));
 
