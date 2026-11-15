@@ -1,5 +1,5 @@
 -- public.painel_app_revisao_resolver(p_id uuid)
--- Pode executar: authenticated
+-- Pode executar: authenticated, service_role
 CREATE OR REPLACE FUNCTION public.painel_app_revisao_resolver(p_id uuid)
  RETURNS integer
  LANGUAGE plpgsql

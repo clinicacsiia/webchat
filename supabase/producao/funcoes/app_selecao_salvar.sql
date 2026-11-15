@@ -1,5 +1,5 @@
 -- public.app_selecao_salvar(p_token text, p_selecao jsonb)
--- Pode executar: service_role
+-- Pode executar: anon, authenticated, service_role
 CREATE OR REPLACE FUNCTION public.app_selecao_salvar(p_token text, p_selecao jsonb)
  RETURNS jsonb
  LANGUAGE plpgsql

@@ -1,5 +1,5 @@
 -- public.app_login(p_telefone text, p_pin text, p_aparelho text)
--- Pode executar: service_role
+-- Pode executar: anon, authenticated, service_role
 CREATE OR REPLACE FUNCTION public.app_login(p_telefone text, p_pin text, p_aparelho text DEFAULT NULL::text)
  RETURNS jsonb
  LANGUAGE plpgsql

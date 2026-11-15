@@ -1,5 +1,5 @@
 -- public.app_marcar(p_token text, p_pessoas jsonb, p_exame text, p_data text, p_turno text, p_obs text)
--- Pode executar: service_role
+-- Pode executar: anon, authenticated, service_role
 CREATE OR REPLACE FUNCTION public.app_marcar(p_token text, p_pessoas jsonb, p_exame text, p_data text, p_turno text, p_obs text DEFAULT NULL::text)
  RETURNS jsonb
  LANGUAGE plpgsql

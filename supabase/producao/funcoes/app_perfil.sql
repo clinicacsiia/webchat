@@ -1,5 +1,5 @@
 -- public.app_perfil(p_token text)
--- Pode executar: service_role
+-- Pode executar: anon, authenticated, service_role
 CREATE OR REPLACE FUNCTION public.app_perfil(p_token text)
  RETURNS jsonb
  LANGUAGE plpgsql

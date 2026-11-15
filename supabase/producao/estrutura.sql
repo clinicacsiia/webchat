@@ -1,5 +1,5 @@
 -- RETRATO DA ESTRUTURA DO BANCO DE PRODUÇÃO (projeto webchat-atendimento). GERADO: não editar à mão.
--- Atualização parcial em 2026-11-15T02:10:00+00:00 (funções app_* e painel_app_*, tabelas app_*). Retrato inteiro tirado em 2026-11-14T20:32:54.165875+00:00 · Postgres 17.11. Só estrutura: nenhuma linha de tabela, nenhum valor de configuração.
+-- Atualização parcial em 2026-11-15T02:45:00+00:00 (funções app_* e painel_app_*, tabelas app_*). Retrato inteiro tirado em 2026-11-14T20:32:54.165875+00:00 · Postgres 17.11. Só estrutura: nenhuma linha de tabela, nenhum valor de configuração.
 -- Serve de referência e para os testes. NÃO rodar inteiro sobre a produção. Como refazer: supabase/producao/LEIAME.md.
 
 -- ===== Extensões =====
@@ -2555,6 +2555,8 @@ CREATE INDEX app_paciente_sugerido ON public.app_paciente USING btree (paciente_
 alter table public.app_paciente enable row level security;
 
 
+
+
 -- ===== Chaves estrangeiras (depois de todas as tabelas) =====
 alter table public.agendamento_fechamento add constraint agendamento_fechamento_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE CASCADE;
 alter table public.agendamento_fechamento add constraint agendamento_fechamento_por_fkey FOREIGN KEY (por) REFERENCES agentes(id) ON DELETE SET NULL;
@@ -2803,6 +2805,53 @@ create view public.v_remarcacao_pendente with (security_invoker=on) as
   WHERE (desfecho = ANY (ARRAY['faltou'::text, 'remarcou'::text])) AND (remarcacao = ANY (ARRAY['pendente'::text, 'pedida'::text, 'aceita'::text]));
 -- concessão a anon: DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
 -- concessão a authenticated: DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+
+create view public.v_olho_fila with (security_invoker=true) as
+ SELECT f.id AS fila_id,
+    f.senha,
+    f.status AS fila_status,
+        CASE
+            WHEN f.status = 'aguardando'::text THEN fila_posicao(f.id)
+            ELSE NULL::integer
+        END AS posicao,
+    ( SELECT count(*)::integer AS count
+           FROM fila_chegada t
+          WHERE t.status = 'aguardando'::text AND fila_dia(t.chegou_em) = fila_dia(f.chegou_em)) AS total_na_fila,
+    f.chegou_em,
+    f.chamado_em,
+    f.concluido_em,
+    o.marcacao_id,
+    o.atendimento_id,
+    o.status_agora,
+    o.situacao_jornada,
+    o.procedimento,
+    o.unidade
+   FROM fila_chegada f
+     LEFT JOIN contas_paciente cp ON cp.id = f.conta_id
+     LEFT JOIN jornada_paciente jp ON jp.fone_chave = encode(sha256(convert_to("right"(regexp_replace(COALESCE(f.telefone, cp.telefone, ''::text), '\D'::text, ''::text, 'g'::text), 8) || COALESCE(( SELECT config.valor
+           FROM config
+          WHERE config.chave = 'ia_segredo'::text), ''::text), 'UTF8'::name)), 'hex'::text) AND nome_confere(jp.nome, COALESCE(cp.nome, f.nome))
+     LEFT JOIN jornada_card c ON c.paciente_chave = jp.prontuario AND c.arquivado_em IS NULL AND c.data_ref = fila_dia(f.chegou_em) AND c.paciente_chave !~~ 'conv:%'::text AND c.paciente_chave !~~ 'manual:%'::text
+     LEFT JOIN jornada_exame e ON e.card_id = c.id
+     LEFT JOIN v_olho_marcacao o ON o.marcacao_id = e.marcacao_id;
+
+create view public.v_olho_marcacao with (security_invoker=true) as
+ SELECT c.m AS marcacao_id,
+    e.atendimento_id,
+    c.status_klingo AS status_agora,
+    c.lido_em AS status_lido_em,
+    e.status AS situacao_jornada,
+    e.confirm_status,
+    e.cancelamento_motivo,
+    c.marcado_em,
+    c.exame_em,
+    c.origem,
+    c.unidade,
+    c.plano,
+    COALESCE(e.procedimento, ''::text) AS procedimento,
+    e.atualizado_em AS jornada_atualizado_em
+   FROM klingo_conferencia c
+     LEFT JOIN jornada_exame e ON e.marcacao_id = c.m;
 
 -- ===== Gatilhos (as funções estão em funcoes/) =====
 CREATE TRIGGER assinatura_tentativas_imutavel BEFORE DELETE OR UPDATE ON public.assinatura_tentativas FOR EACH ROW EXECUTE FUNCTION registro_imutavel_trg();

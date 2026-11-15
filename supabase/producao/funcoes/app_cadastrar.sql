@@ -1,5 +1,5 @@
 -- public.app_cadastrar(p_telefone text, p_nome text, p_nascimento text, p_pin text, p_filhos jsonb, p_confianca jsonb, p_aparelho text)
--- Pode executar: anon, authenticated
+-- Pode executar: anon, authenticated, service_role
 CREATE OR REPLACE FUNCTION public.app_cadastrar(p_telefone text, p_nome text, p_nascimento text, p_pin text, p_filhos jsonb DEFAULT '[]'::jsonb, p_confianca jsonb DEFAULT NULL::jsonb, p_aparelho text DEFAULT NULL::text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -25,7 +25,7 @@ begin
     v_fd := public.app_data(v_f ->> 'nascimento');
     if jsonb_typeof(v_f) <> 'object' or not public.app_nome_ok(v_f ->> 'nome') then return jsonb_build_object('ok', false, 'erro', 'filho', 'mensagem', 'Informe nome e sobrenome do filho(a).'); end if;
     if v_fd is null or v_fd > public.app_hoje() or v_fd < date '1900-01-01' then return jsonb_build_object('ok', false, 'erro', 'filho', 'mensagem', 'Data de nascimento do filho(a) inválida.'); end if;
-    v_c := public.app_filho_conflito(v_nome, v_nasc, v_f ->> 'nome', v_fd, coalesce(v_f ->> 'mesmo_nome_confirmado', '') = 'true');   -- filho com o nome do titular: é ela mesma ou precisa de confirmação
+    v_c := public.app_filho_conflito(v_nome, v_nasc, v_f ->> 'nome', v_fd, coalesce(v_f ->> 'mesmo_nome_confirmado', '') = 'true');
     if v_c is not null then return v_c; end if;
   end loop;
   if p_confianca is not null and p_confianca <> 'null'::jsonb then
@@ -56,9 +56,9 @@ begin
   end;
   for v_f in select * from jsonb_array_elements(v_filhos) loop
     v_chave := public.app_norm(v_f ->> 'nome') || '|' || (v_f ->> 'nascimento');
-    continue when v_chave = any(v_vistos);   -- o mesmo filho digitado duas vezes vale uma vez só
+    continue when v_chave = any(v_vistos);
     v_vistos := v_vistos || v_chave;
-    insert into public.app_filho (responsavel_id, nome, nascimento, criado_em)   -- clock_timestamp: a ordem digitada é a ordem mostrada
+    insert into public.app_filho (responsavel_id, nome, nascimento, criado_em)
     values (v_id, btrim(regexp_replace(v_f ->> 'nome', '\s+', ' ', 'g')), public.app_data(v_f ->> 'nascimento'), clock_timestamp());
   end loop;
   if v_ctel is not null then

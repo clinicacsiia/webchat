@@ -1,5 +1,5 @@
 -- public.app_conta_antiga_filhos()
--- Pode executar: authenticated
+-- Pode executar: authenticated, service_role
 CREATE OR REPLACE FUNCTION public.app_conta_antiga_filhos()
  RETURNS jsonb
  LANGUAGE plpgsql

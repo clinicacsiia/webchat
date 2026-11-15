@@ -1,5 +1,5 @@
 -- public.app_filho_salvar(p_token text, p_nome text, p_nascimento text)
--- Pode executar: anon, authenticated
+-- Pode executar: anon, authenticated, service_role
 CREATE OR REPLACE FUNCTION public.app_filho_salvar(p_token text, p_nome text, p_nascimento text)
  RETURNS jsonb
  LANGUAGE sql

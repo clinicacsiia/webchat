@@ -1,5 +1,5 @@
 -- public.painel_app_solicitacoes(p_status text)
--- Pode executar: service_role
+-- Pode executar: authenticated, service_role
 CREATE OR REPLACE FUNCTION public.painel_app_solicitacoes(p_status text DEFAULT 'solicitada'::text)
  RETURNS jsonb
  LANGUAGE plpgsql

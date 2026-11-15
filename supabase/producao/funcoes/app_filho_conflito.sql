@@ -1,5 +1,5 @@
 -- public.app_filho_conflito(p_titular_nome text, p_titular_nasc date, p_nome text, p_nasc date, p_confirmado boolean)
--- Pode executar: ninguém pela API (só o dono/gatilhos/rotinas)
+-- Pode executar: service_role
 CREATE OR REPLACE FUNCTION public.app_filho_conflito(p_titular_nome text, p_titular_nasc date, p_nome text, p_nasc date, p_confirmado boolean)
  RETURNS jsonb
  LANGUAGE sql

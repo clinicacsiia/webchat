@@ -1,5 +1,5 @@
 -- public.app_marcacao_cancelar(p_token text, p_grupo uuid)
--- Pode executar: service_role
+-- Pode executar: anon, authenticated, service_role
 CREATE OR REPLACE FUNCTION public.app_marcacao_cancelar(p_token text, p_grupo uuid)
  RETURNS jsonb
  LANGUAGE plpgsql

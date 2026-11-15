@@ -1,5 +1,5 @@
 -- public.app_conferir_cadastro(p_pac uuid)
--- Pode executar: ninguém pela API (só o dono/gatilhos/rotinas)
+-- Pode executar: service_role
 CREATE OR REPLACE FUNCTION public.app_conferir_cadastro(p_pac uuid)
  RETURNS void
  LANGUAGE plpgsql

@@ -1,5 +1,5 @@
 -- public.app_pin_trocar(p_token text, p_atual text, p_novo text)
--- Pode executar: service_role
+-- Pode executar: anon, authenticated, service_role
 CREATE OR REPLACE FUNCTION public.app_pin_trocar(p_token text, p_atual text, p_novo text)
  RETURNS jsonb
  LANGUAGE plpgsql

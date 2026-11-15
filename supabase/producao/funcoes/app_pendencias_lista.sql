@@ -1,5 +1,5 @@
 -- public.app_pendencias_lista(p_pac uuid)
--- Pode executar: ninguém pela API (só o dono/gatilhos/rotinas)
+-- Pode executar: service_role
 CREATE OR REPLACE FUNCTION public.app_pendencias_lista(p_pac uuid)
  RETURNS jsonb
  LANGUAGE sql
