@@ -390,6 +390,9 @@
   .volta .link-add { flex: none; font-size: calc(14.5px * var(--esc)); }
   .volta .link-add { margin: 0; padding: 4px 0; }
   .unidades.dois .unidade { min-height: 66px; }
+  /* porta do PIN obrigatório: cobre o chat enquanto o servidor confere o PIN e o cadastro */
+  #porta { position: fixed; inset: 0; z-index: 9999; background: var(--papel, #fff); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; font-weight: 700; }
+  #porta[hidden] { display: none; }
   /* acesso rápido (celular + PIN) */
   #blocoAcesso { flex-wrap: wrap; }
   #blocoAcesso .acoes-acesso { display: flex; gap: 14px; flex-wrap: wrap; }
@@ -537,6 +540,8 @@
 </style>
 </head>
 <body>
+<div id="porta" hidden role="status" aria-live="polite"><img src="img/logo-csi-simbolo.svg" alt="" width="89" height="30"><p>Abrindo com segurança…</p></div>
+<script>try { if (localStorage.getItem('csi_porta_v1') === '1') document.getElementById('porta').hidden = false; } catch (e) {}</script>
 <div class="app" id="app">
   <header class="topo">
     <button class="btn-menu btn-voltar" id="btnVoltarInicio" type="button" aria-label="Voltar ao início" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M12 5l-7 7 7 7"/></svg></button>
@@ -684,7 +689,7 @@
   const CHAVE_HIST = 'webchat.historico.v1';   // as últimas conversas deste aparelho (cada uma com o seu token): dá para voltar a elas
   const MAX_HIST = 5;                          // mínimo pedido: 3
   // Muda a cada alteração do chat. Cópia de mensagens guardada por outra versão é descartada (era isso que mostrava conversa velha e travada).
-  const VERSAO_APP = '2026.11.15-4';
+  const VERSAO_APP = '2026.11.15-5';
   // Mesmas regras do banco (fluxo_nome_ok, fluxo_telefone_ok, fluxo_email_ok): o banco confere de novo, aqui é só para avisar logo.
   const LET = 'A-Za-zÀ-ÖØ-öø-ÿ';
   const nomeCompletoOk = (v) => { const t = String(v || '').trim(); return t.length >= 5 && t.length <= 120 && new RegExp(`^[${LET}][${LET}'’.-]*( +[${LET}][${LET}'’.-]*)+$`).test(t) && t.split(/ +/).filter((w) => w.replace(new RegExp(`[^${LET}]`, 'g'), '').length >= 2).length >= 2; };
@@ -3174,7 +3179,7 @@
   const PAGINA_URL = location.origin + location.pathname;
   const TURNSTILE_SITEKEY = '';   // CAPTCHA (Cloudflare Turnstile, grátis). Se ligar "CAPTCHA protection" no Supabase, cole aqui a chave do site.
   let homonimoConfirmado = '';   // nome da criança (sem acento) que a pessoa já confirmou ser igual ao dela
-  let acessoAtivo = false, acessoPerfil = null, acessoTrava = false, acessoPend = 0;   // acesso rápido (celular + PIN): ver mais abaixo
+  let acessoAtivo = false, acessoPerfil = null, acessoTrava = false, acessoPend = 0, acessoRede = false, acessoPorta = null;   // acesso rápido (celular + PIN): ver mais abaixo
   let loginAtivo = false, conta = null;   // conta = resumo devolvido por conta_paciente_resumo (conta:true, email, nome, telefone) ou null
   const senhaValida = (s) => s.length >= 8 && /[A-Za-z]/.test(s) && /\d/.test(s);
   const SENHA_REGRA = 'A senha precisa ter pelo menos 8 caracteres, com letras e números.';
@@ -3276,17 +3281,23 @@
   const acessoTentou = new Set();
   const acessoDev = () => { const st = lerLocal(ACESSO_CHAVE); return st && typeof st.dev === 'string' && st.dev ? st.dev : ''; };
   async function acessoCarregar() {
-    acessoPerfil = null; acessoTrava = false; acessoPend = 0;
+    acessoPerfil = null; acessoTrava = false; acessoPend = 0; acessoRede = false;
     const dev = acessoDev();
     if (!acessoAtivo || !dev) return;
     const { data, error } = await db.rpc('app_perfil', { p_token: dev });
-    if (error || !data) return;
+    if (error || !data) { acessoRede = true; return; }
     if (data.ok) {
       acessoPerfil = data.perfil;
       try { const p = await db.rpc('app_pendencias', { p_token: dev }); acessoPend = p.data && p.data.ok ? (p.data.pendencias || []).filter((x) => !x.opcional).length : 0; } catch { acessoPend = 0; }   // quantas informações obrigatórias ainda faltam
     }
     else if (data.erro === 'bloqueado') acessoTrava = true;      // falta digitar o PIN
     else if (data.erro === 'sessao') apagarLocal(ACESSO_CHAVE);   // aparelho desconhecido pelo servidor
+  }
+  // Na clínica e com exame hoje (o servidor confere a posição enviada ao entrar): oferece o check-in.
+  function acessoPresenca() {
+    let p = null; try { p = JSON.parse(sessionStorage.getItem('csi_presenca') || 'null'); } catch { p = null; }
+    if (!p || p.na !== true || !(p.ex > 0) || Date.now() - p.t > 6 * 3600000) return null;
+    return h('p', { class: 'volta-dados', id: 'acessoPresenca' }, `📍 Você está na clínica e tem ${p.ex > 1 ? p.ex + ' exames' : 'um exame'} hoje. `, h('a', { class: 'link-add', href: 'minha-vez/' }, 'Fazer check-in'));
   }
   function atualizarAcessoUI(semForm) {
     let b = $('#blocoAcesso');
@@ -3299,6 +3310,7 @@
           h('span', { class: 'acoes-acesso' }, h('a', { class: 'link-add', id: 'acessoHerdar', href: 'acesso/?voltar=chat&antiga=1' }, 'Criar meu PIN')));
       } else if (acessoPerfil) {
         b.replaceChildren(h('p', { class: 'volta-dados' }, `⚡ Acesso rápido: ${primeiroNome(acessoPerfil.nome)}`),
+          acessoPresenca(),
           acessoPend > 0 ? h('p', { class: 'volta-dados', id: 'acessoPend' }, `${acessoPend > 1 ? 'Faltam' : 'Falta'} ${acessoPend} informaç${acessoPend > 1 ? 'ões' : 'ão'} no seu cadastro.`) : null,
           h('span', { class: 'acoes-acesso' }, h('a', { class: 'link-add', id: 'acessoMeusDados', href: 'acesso/' }, acessoPend > 0 ? 'Completar' : 'Meus dados'), h('button', { type: 'button', class: 'link-add', id: 'acessoSair', onclick: acessoSair }, 'Sair')));
       } else if (acessoDev() && acessoTrava) {
@@ -3354,9 +3366,54 @@
     tContar = setInterval(() => { if (!document.hidden) acessoContar(); }, 60000);   // não estende o PIN: só quem usa a tela mantém o acesso
     if (!acessoContarSempre.vis) { acessoContarSempre.vis = true; document.addEventListener('visibilitychange', () => { if (!document.hidden) acessoContar(); }); }
   }
+  /* PIN OBRIGATÓRIO (config.app_pin_obrigatorio): o chat só abre para quem tem cadastro completo e PIN digitado nos últimos 30 minutos.
+     Qualquer outra situação leva à página /acesso/, que pede o PIN, completa o cadastro (CPF) ou cria o PIN, e devolve para cá.
+     Sem rede, sem resposta ou com a função ainda não aplicada, o chat abre como antes (a porta nunca tranca o paciente por falha técnica). */
+  const CHAVE_PORTA = 'csi_porta_v1';
+  let atividadeEm = Date.now(), renovouEm = 0;
+  function portaMostrar(on) { const p = $('#porta'); if (p) p.hidden = !on; }
+  function irParaPorta() {
+    let t = null; try { t = JSON.parse(sessionStorage.getItem('csi_porta_tent') || 'null'); } catch { t = null; }
+    t = t && Date.now() - t.t < 60000 ? { n: t.n + 1, t: t.t } : { n: 1, t: Date.now() };
+    try { sessionStorage.setItem('csi_porta_tent', JSON.stringify(t)); } catch { /* sem armazenamento: segue */ }
+    if (t.n > 3) { portaMostrar(false); return false; }   // trava contra laço (a página de acesso devolveu e o cadastro continua incompleto): abre o chat
+    portaMostrar(true);
+    location.replace('acesso/?voltar=chat');
+    return true;
+  }
+  async function renovarPin() {   // renova os 30 minutos no servidor enquanto a pessoa usa; se o PIN já venceu, volta para a porta
+    const dev = acessoDev(); if (!dev || !acessoPorta || !acessoPorta.obrigatorio) return;
+    renovouEm = Date.now();
+    try { const { data } = await db.rpc('app_perfil', { p_token: dev }); if (data && (data.erro === 'bloqueado' || data.erro === 'sessao')) irParaPorta(); } catch { /* sem rede: tenta depois */ }
+  }
+  function portaVigiar() {
+    if (portaVigiar.ligado) return; portaVigiar.ligado = true;
+    const marca = () => { atividadeEm = Date.now(); if (Date.now() - renovouEm > 240000) renovarPin(); };
+    ['pointerdown', 'keydown', 'touchstart', 'scroll'].forEach((ev) => addEventListener(ev, marca, { passive: true, capture: true }));
+    const vencido = () => acessoPorta && acessoPorta.obrigatorio && Date.now() - atividadeEm > 30 * 60000;
+    setInterval(() => { if (vencido()) irParaPorta(); }, 30000);
+    document.addEventListener('visibilitychange', () => { if (document.hidden) return; if (vencido()) irParaPorta(); else renovarPin(); });   // voltou depois de 30 minutos: pede o PIN de novo
+  }
+  function portaBarrar() {   // true = mandou a pessoa para a porta (a página vai trocar)
+    try { localStorage.setItem(CHAVE_PORTA, acessoPorta && acessoPorta.obrigatorio ? '1' : '0'); } catch { /* ignora */ }
+    if (!acessoPorta || !acessoPorta.obrigatorio) { portaMostrar(false); return false; }
+    const dev = acessoDev();
+    if (dev && acessoRede) { portaMostrar(false); portaVigiar(); return false; }   // sem rede para conferir: não tranca
+    const ok = !!(dev && acessoPerfil && !acessoTrava && acessoPend === 0);
+    if (ok) { portaMostrar(false); portaVigiar(); return false; }
+    return irParaPorta();
+  }
   async function acessoIniciar() {
-    try { const { data, error } = await db.rpc('app_ativo'); acessoAtivo = !error && data === true; } catch { acessoAtivo = false; }
-    if (acessoAtivo) { try { await acessoCarregar(); await acessoVincular(); await acessoContar(); acessoContarSempre(); } catch { /* sem rede: segue como convidado */ } }
+    try {
+      const { data, error } = await db.rpc('app_porta');
+      if (!error && data && data.ativo !== undefined) { acessoPorta = data; acessoAtivo = data.ativo === true; }
+      else { const r = await db.rpc('app_ativo'); acessoAtivo = !r.error && r.data === true; }
+    } catch { acessoAtivo = false; }
+    if (acessoAtivo) {
+      try { await acessoCarregar(); } catch { acessoRede = true; }
+      if (portaBarrar()) return;
+      try { await acessoVincular(); await acessoContar(); acessoContarSempre(); } catch { /* sem rede: segue como convidado */ }
+    } else portaMostrar(false);
     atualizarContaUI(true);   // com o acesso rápido ligado a faixa de e-mail e senha some para quem não tem conta antiga
     atualizarAcessoUI();
   }
@@ -3364,6 +3421,7 @@
     const dev = acessoDev();
     if (dev) { try { await db.rpc('app_sair', { p_token: dev }); } catch { /* sai deste aparelho mesmo assim */ } }
     apagarLocal(ACESSO_CHAVE); acessoPerfil = null; acessoTrava = false; acessoSel = null; escolha = null;
+    if (acessoPorta && acessoPorta.obrigatorio) { try { sessionStorage.removeItem('csi_porta_tent'); } catch { /* ignora */ } irParaPorta(); return; }
     atualizarAcessoUI();
   }
   // Teclado do PIN dentro do chat (a mesma regra da página /acesso/: o servidor confere, bloqueia depois de 5 erros).

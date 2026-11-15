@@ -1,6 +1,6 @@
 # Acesso rápido do paciente (celular + PIN de 4 dígitos)
 
-Versão 1.5 — 15/11/2026 / Mudança: **LIGADO em produção** (`app_acesso_modo = 'sim'`, depois da "última parte" aplicada pelo dono). Versão 1.4 — 15/11/2026 / Mudança: filhos dos contatos antigos; nada de SMS. Versão 1.3 — 15/11/2026 / Mudança: pendências para TODO paciente (CPF, e-mail) e dúvidas para a equipe. Versão 1.2 — 15/11/2026 / Mudança: contas antigas (e-mail e senha) viram acesso rápido, uma forma de login só. Versão 1.1 — 15/11/2026 / Mudança: acesso rápido dentro do chat real (CPF e nascimento perguntados uma vez só). Versão 1.0 — 14/11/2026 / Mudança: Implementação inicial (primeira versão guardava tudo só no celular; esta liga ao Supabase)
+Versão 1.6 — 15/11/2026 / Mudança: **PIN obrigatório na porta do chat** (interruptor `app_pin_obrigatorio`, nasce desligado), CPF obrigatório antes do PIN, pré-preenchimento pelo histórico, registro de acessos e posição opcional. Versão 1.5 — 15/11/2026 / Mudança: **LIGADO em produção** (`app_acesso_modo = 'sim'`, depois da "última parte" aplicada pelo dono). Versão 1.4 — 15/11/2026 / Mudança: filhos dos contatos antigos; nada de SMS. Versão 1.3 — 15/11/2026 / Mudança: pendências para TODO paciente (CPF, e-mail) e dúvidas para a equipe. Versão 1.2 — 15/11/2026 / Mudança: contas antigas (e-mail e senha) viram acesso rápido, uma forma de login só. Versão 1.1 — 15/11/2026 / Mudança: acesso rápido dentro do chat real (CPF e nascimento perguntados uma vez só). Versão 1.0 — 14/11/2026 / Mudança: Implementação inicial (primeira versão guardava tudo só no celular; esta liga ao Supabase)
 
 **Página:** `acesso/index.html` (`https://clinicacsiia.github.io/webchat/acesso/`, ainda sem link em nenhuma outra tela). **Banco:** `supabase/acesso-rapido-paciente.sql`. **Testes:** `npm run test:acesso-sql` (57), `npm run test:acesso` (36, a página `/acesso/` num Chromium falando com o banco de teste), `npm run test:acesso-chat-sql` (20, motor real do chat) e `npm run test:acesso-chat` (12, o `index.html` real do chat num Chromium falando com o motor real).
 
@@ -98,6 +98,41 @@ Feita **só dentro do banco**, só como **sugestão**: se existir um único paci
 
 **Conta antiga (e-mail e senha): os filhos vêm do histórico, mas só da PRÓPRIA conta.** Depois de entrar, a página lista os filhos dos atendimentos ligados àquela conta (`conversas.conta_id`, que só existe quando a conversa foi feita logado ou adotada com o token dela). A pessoa confere, corrige ou preenche o nascimento e desmarca quem não é filho. Quem tem o mesmo nome dela vê "Quem é? Sou eu / É outra pessoa". O CPF do filho vem do histórico **só** se o nome bate e o nascimento não contradiz; o que faltar cai no cartão "Falta pouco". Hoje, 4 das 5 contas com histórico têm filhos.
 **Contatos que só têm celular (sem conta) NÃO têm filhos trazidos do histórico:** sem confirmar o celular, isso mostraria nomes e dados de crianças a quem só digitou um número. Eles digitam os filhos e o CPF uma vez, com as regras acima. No chat sem acesso rápido, nome da criança igual ao do responsável avisa antes de iniciar (tocar de novo confirma).
+
+## PIN obrigatório na porta do chat (15/11/2026) — **pronto no repositório, interruptor DESLIGADO**
+**Banco:** `supabase/acesso-rapido-pin-obrigatorio.sql` (`npm run test:acesso-pin-sql`, 26 casos). **Telas:** `acesso/index.html` (`npm run test:acesso-pin`, 17 casos) e `index.html` (`npm run test:acesso-porta`, 12 casos). Com o interruptor desligado, tudo se comporta como antes (os testes antigos continuam passando).
+
+**Ligar:** `update public.config set valor = 'sim' where chave = 'app_pin_obrigatorio';` — **Desligar na hora:** `... valor = 'nao' ...` (o chat volta a abrir sem PIN).
+
+### O que a pessoa vê (com o interruptor ligado)
+1. **Abre o chat.** O chat pergunta à porta (`app_porta`) e, enquanto confere, mostra uma capa "Abrindo com segurança…".
+2. **Aparelho conhecido, PIN dos últimos 30 minutos e cadastro completo** (CPF dela e de cada filho): o chat abre direto.
+3. **Qualquer outra situação leva à página `/acesso/`** e, depois de resolvida, **volta ao chat** sozinha:
+   - aparelho sem cadastro: celular → nome e nascimento → filhos → **CPF (só de quem o servidor ainda não conhece)** → número de confiança (opcional) → **criar o PIN**;
+   - celular que já tem PIN: vai direto ao teclado do PIN;
+   - PIN vencido (30 minutos): teclado do PIN;
+   - cadastro incompleto (CPF dela ou de filho em branco): depois do PIN aparece **"Falta pouco"**, sem "Agora não", e só sai preenchendo (o e-mail continua opcional);
+   - conta antiga (e-mail e senha): segue o caminho "Tenho conta com e-mail" já existente (traz os dados, completa o que falta, cria o PIN).
+4. **Quem já usou o chat neste aparelho** (cache `webchat.perfil.v1`) já começa com celular, nome e e-mail preenchidos. **Quem a clínica ou as conversas antigas já conhecem** (mesmo celular + nome + nascimento) **não digita o CPF**: só cria o PIN. Quem tem tudo salvo nem preenche nada: só o PIN.
+5. **30 minutos sem usar** (sem toque, ou aba escondida por 30 minutos), ou o servidor vencendo o PIN: a tela volta ao teclado do PIN. Usar o chat (toques) renova os 30 minutos no servidor a cada 4 minutos.
+6. **Sair** no chat leva à porta.
+7. Entrar de novo depois de **adicionar um filho** também exige o CPF dele na hora.
+
+### Como o pré-preenchimento respeita a privacidade
+O celular **não é confirmado** (decisão do dono: nada de SMS). Por isso `app_pre_cadastro` só aproveita o histórico quando **celular + nome completo + nascimento** batem juntos com a clínica (`public.pacientes`) ou com conversas antigas do mesmo celular, **e nunca devolve o que achou**: responde só "falta o CPF de X" ou "não falta nada". O CPF achado é gravado **dentro do banco**, no momento do cadastro (`app_pin_criar`). Filhos do histórico **não são listados**: só se completa o CPF de quem a pessoa digitou. O cadastro com PIN é **tudo ou nada** (se o CPF não vem ou é inválido, nenhum cadastro nasce).
+
+### Registro de acessos e posição (`app_acesso_log`, `app_acesso_registrar`)
+A cada entrada (cadastro, login, PIN depois de 30 minutos, esqueci o PIN, conta antiga) grava: horário, **IP** (do servidor), aparelho, idioma, fuso, tamanho da tela. **Posição só com `app_local_ativo = 'sim'` e com a permissão do aparelho**: guarda a posição arredondada (cerca de 100 m), a precisão, a **distância até a clínica** e "na clínica sim/não" (precisa de `clinica_lat`, `clinica_lng` e `clinica_raio_m` em `config`; sem coordenadas não há "na clínica"). Recusa da permissão também fica registrada e **não impede a entrada**.
+**Confronto com o status:** o servidor conta os exames da pessoa **de hoje** (Jornada: de "agendado" a "chegou") e devolve "na clínica" + "exames hoje". Se os dois forem verdadeiros, a faixa do chat oferece **"Fazer check-in"** (`minha-vez/`). A equipe lê `select public.painel_app_acessos(null, 50);` (admin e atendente): a coluna `divergente` marca "tem exame hoje e não estava na clínica". Registros com mais de 180 dias são apagados. **Ainda não há botão no painel** para isso.
+
+### Limites conhecidos (leia antes de ligar)
+- **A porta é da tela, não do servidor.** Quem chamar as funções `chat_*` direto (sem a página) continua conseguindo abrir conversa, como antes. Trancar no servidor exigiria mexer no motor do chat; ficou de fora de propósito (risco para o atendimento).
+- **Falha técnica não tranca o paciente:** sem rede, sem resposta da porta, ou função ainda não aplicada → o chat abre como antes. Trava contra laço: depois de 3 idas à porta em 1 minuto o chat abre.
+- **Paciente novo passa a precisar de CPF e PIN antes do primeiro atendimento.** É a decisão do dono; vale medir o efeito nos pedidos nos primeiros dias (compare `select count(*) from conversas` por dia antes e depois).
+- O IP e a posição são dados pessoais: **entrar na política de privacidade** (finalidade: segurança e conferir presença; prazo: 180 dias; base legal). Ver `pendencias-do-dono.md`, item 2.16.
+- O banco de teste não prova o desempenho em produção: `app_pre_cadastro` olha conversas antigas pelo celular; **medir o tempo na produção** depois de aplicar (limite de 3 s do paciente).
+
+**Voltar atrás:** comandos no cabeçalho do SQL (não altera nenhuma função existente).
 
 ## Equipe
 **Painel (15/11/2026):** botão **Atendimento > Pendências** (admin e atendente), com contador e 3 abas: Solicitações (Confirmar, Concluir, Cancelar), Cadastros para conferir (Marcar como conferido) e Contas antigas sem PIN (WhatsApp). Banco: `supabase/acesso-rapido-painel.sql` (`npm run test:acesso-painel-sql`, 10 casos); tela: `npm run test:painel-pendencias` (9 casos). As funções abaixo continuam valendo para quem prefere SQL.
