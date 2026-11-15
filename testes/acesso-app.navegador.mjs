@@ -205,6 +205,30 @@ await caso('passados 30 min o servidor também exige o PIN: ao enviar, a tela vo
   await pin(ana.page, '1357'); await esperaTexto(ana.page, /Marcar pelo chat/);
   return { ok: /Digite seu PIN/.test(t) && !/erro|Erro/.test(t) };
 });
+await caso('"Meus dados" do chat (?ir=dados) com o PIN ainda válido abre direto em Meus dados, sem pedir o PIN de novo', async () => {
+  await ana.page.goto(`${ORIGEM}/?ir=dados`);
+  await esperaTexto(ana.page, /Meus dados/);
+  const t = await texto(ana.page);
+  return { ok: /Nascimento/.test(t) && /Filhos/.test(t) && (await ana.page.locator('.pad').count()) === 0, detalhe: t.slice(0, 60).replace(/\n/g, ' ') };
+});
+await caso('"Meus dados" do chat com o PIN vencido (30 min) pede o PIN, como antes', async () => {
+  await q(`update public.app_aparelho set desbloqueada_ate = now() - interval '1 minute'`);
+  await ana.page.goto(`${ORIGEM}/?ir=dados`);
+  await esperaTexto(ana.page, /Digite seu PIN/);
+  const pad = await ana.page.locator('.pad').count();
+  await pin(ana.page, '1357'); await esperaTexto(ana.page, /Marcar pelo chat/);
+  return { ok: pad === 1 };
+});
+await caso('o site não muda de cor com o tema escuro do celular (segue o chat, sempre claro)', async () => {
+  const ctx = await browser.newContext({ colorScheme: 'dark', viewport: { width: 390, height: 800 } });
+  const pg = await ctx.newPage();
+  await ctx.route(`${ORIGEM}/**`, (r) => r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: HTML }));
+  await ctx.route(`${API}/**`, (r) => r.fulfill({ status: 200, headers: { 'access-control-allow-origin': '*', 'content-type': 'application/json' }, body: 'null' }));
+  await pg.goto(`${ORIGEM}/`); await espera(500);
+  const cor = await pg.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  await ctx.close();
+  return { ok: cor === 'rgb(248, 249, 250)', detalhe: cor };
+});
 await caso('trocar o PIN: PIN atual → novo → confirma; o antigo deixa de valer', async () => {
   await ana.page.click('[data-act="go"][data-v="dados"]'); await ana.page.click('[data-act="trocapin"]');
   await pin(ana.page, '1357'); await pin(ana.page, '2468'); await pin(ana.page, '2468');
