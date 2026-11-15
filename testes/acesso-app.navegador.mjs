@@ -84,7 +84,7 @@ let ana = await novaPagina();
 await caso('aparelho sem cadastro abre no passo 1 (celular)', async () => ({ ok: /Vamos começar/.test(await texto(ana.page)) && /Já tenho cadastro/.test(await texto(ana.page)) }));
 await caso('passo 1 recusa celular inválido, sem chamar o servidor', async () => {
   await ana.page.fill('#tel', '(71) 3333-0000'); await ana.page.click('[data-act="c1"]');
-  return { ok: /Celular inválido/.test(await texto(ana.page)) && chamadasRede.length === 0 };
+  return { ok: /Celular inválido/.test(await texto(ana.page)) && chamadasRede.filter((c) => c.nome !== 'app_porta').length === 0 };   // a página só pergunta a porta (app_porta) ao abrir
 });
 await caso('cadastro único: celular → nome/nascimento → filho → número de confiança → PIN', async () => {
   await ana.page.fill('#tel', '71991230001'); await ana.page.click('[data-act="c1"]');
