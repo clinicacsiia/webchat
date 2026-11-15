@@ -213,8 +213,8 @@ begin
     if p_passo = 'dados_ident' then
       if v_pac ->> 'nome' is null and not ('o nome completo' = any(v_err)) then v_err := array_append(v_err, 'o nome completo'::text); end if;
       if v_pac ->> 'sexo' is null and not ('o sexo' = any(v_err)) then v_err := array_append(v_err, 'o sexo'::text); end if;
-      if v_pac ->> 'dt_nasc' is null and not ('a data de nascimento' = any(v_err)) then v_err := array_append(v_err, 'a data de nascimento'::text); end if;
-      if v_pac ->> 'cpf' is null and not ('o CPF (os números não conferem)' = any(v_err)) then v_err := array_append(v_err, 'o CPF'::text); end if;
+      if v_pac ->> 'dt_nasc' is null and public.fluxo_ler_data(pa.paciente ->> 'dt_nasc') is null and not ('a data de nascimento' = any(v_err)) then v_err := array_append(v_err, 'a data de nascimento'::text); end if;   -- sem-repetir: já veio do cpf_nasc
+      if v_pac ->> 'cpf' is null and not public.fluxo_cpf_ok(pa.paciente ->> 'cpf') and not ('o CPF (os números não conferem)' = any(v_err)) then v_err := array_append(v_err, 'o CPF'::text); end if;   -- sem-repetir: já veio do cpf_nasc
     elsif p_passo = 'dados_contato' and v_pac ->> 'celular' is null and not ('o celular (DDD + número)' = any(v_err)) then
       v_err := array_append(v_err, 'o celular (DDD + número)'::text);
     end if;
