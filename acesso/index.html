@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!--
 FLUXOGRAMA: entrada (celular + PIN de 4 dígitos; no primeiro acesso, cadastro único em 5 passos) -> validação (a página confere o formato; quem decide é o servidor: funções app_* do Supabase, supabase/acesso-rapido-paciente.sql) -> lógica (o aparelho guarda só um código de acesso e o primeiro nome; PIN, filhos, números de confiança e marcações ficam no banco; o PIN é pedido de novo depois de 5 minutos em segundo plano) -> saída (tela inicial com Eu / cada filho / Todos juntos; solicitações de marcação; quem confia em você)
-Versão 2.1 — 15/11/2026 / Mudança: quem tem conta antiga (e-mail e senha) entra uma última vez, confere os dados que já temos e cria o PIN (supabase/acesso-rapido-conta-antiga.sql); "Meus dados" mais claro. Versão 2.0 — 14/11/2026 / Mudança: ligado ao Supabase (versão 1 guardava tudo só no celular)
+Versão 2.2 — 15/11/2026 / Mudança: cartão "Falta pouco" (CPF dela e dos filhos, e-mail) para TODO paciente (supabase/acesso-rapido-pendencias.sql). Versão 2.1 — 15/11/2026 / Mudança: quem tem conta antiga (e-mail e senha) entra uma última vez, confere os dados que já temos e cria o PIN (supabase/acesso-rapido-conta-antiga.sql); "Meus dados" mais claro. Versão 2.0 — 14/11/2026 / Mudança: ligado ao Supabase (versão 1 guardava tudo só no celular)
 -->
 <html lang="pt-BR">
 <head>
@@ -110,11 +110,11 @@ function aposEntrar(){if(VOLTAR_CHAT){location.replace('../');return}go('home')}
 const aparelho=()=>(navigator.userAgentData&&navigator.userAgentData.platform)||(/iPhone|iPad/.test(navigator.userAgent)?'iPhone/iPad':/Android/.test(navigator.userAgent)?'Android':'Navegador');
 
 /* ===== Estado ===== */
-const S={dev:null,perfil:null,view:'',d:{filhos:[],confiavel:null},buf:'',mode:'unlock',tmp:'',old:'',after:null,who:['eu'],unlocked:false,sheet:null,temFilhos:null,hiddenAt:0,busy:false,volta:'home',esq:null,tel:'',resumo:'',confirma:null,conta:null,aem:''};
+const S={dev:null,perfil:null,view:'',d:{filhos:[],confiavel:null},buf:'',mode:'unlock',tmp:'',old:'',after:null,who:['eu'],unlocked:false,sheet:null,temFilhos:null,hiddenAt:0,busy:false,volta:'home',esq:null,tel:'',resumo:'',confirma:null,conta:null,aem:'',pend:null,pendOculta:false};
 const app=$('#app');
 function toast(t){const e=document.createElement('div');e.className='toast';e.textContent=t;document.body.appendChild(e);setTimeout(()=>e.remove(),2600)}
 function erro(m){const e=$('#err');if(e)e.textContent=m||''}
-function go(v){S.view=v;S.sheet=null;render();window.scrollTo(0,0)}
+function go(v){S.view=v;S.sheet=null;render();window.scrollTo(0,0);if(['home','dados'].includes(v)&&S.perfil&&S.pend===null)carregarPend()}
 function ocupado(b){S.busy=b;document.body.classList.toggle('busy',b)}
 /* Chama o servidor com o código do aparelho e trata os avisos que valem para qualquer tela. Devolve a resposta, ou null se a tela já mudou. */
 async function chamar(nome,args){
@@ -128,6 +128,22 @@ async function chamar(nome,args){
   if(r.ok&&r.perfil)S.perfil=r.perfil;
   return r;
 }
+/* Pendências: o que falta no cadastro (CPF dela e dos filhos, e-mail). O servidor só lista o que falta: nunca devolve o que a clínica tem guardado. */
+async function carregarPend(){
+  if(!S.dev||!S.perfil)return;
+  S.pend=[];   // evita chamar duas vezes enquanto espera
+  const r=await rpc('app_pendencias',{p_token:S.dev});
+  if(r&&r.ok){S.pend=r.pendencias||[];if(['home','dados'].includes(S.view)&&!S.sheet&&!S.busy)render()}
+  else S.pend=null;
+}
+function pendHtml(){
+  const l=S.pend;if(!l||!l.length||S.pendOculta)return'';
+  return`<div class="card" id="pend"><h2 style="margin-top:0">Falta pouco</h2><p class="sub">Complete uma vez e o chat não pergunta de novo.</p>
+  ${l.map((x,i)=>`<label for="pd${i}">${esc(x.pergunta)}</label><input id="pd${i}" data-pp="${esc(x.pessoa)}" data-pc="${esc(x.campo)}" ${x.campo==='cpf'?'inputmode="numeric" placeholder="000.000.000-00" autocomplete="off"':'type="email" inputmode="email" autocapitalize="off" placeholder="nome@exemplo.com"'}>`).join('')}
+  <div class="err" id="err" role="alert"></div>
+  <button class="btn" data-act="pendsalvar">Salvar</button>
+  <button class="link" data-act="pendmais" style="display:block;margin:8px auto 0">Agora não</button></div>`;
+}
 /* Recarrega os dados do servidor sem travar a tela (quem acompanha, status confirmado pela clínica, filho cadastrado em outro aparelho). */
 async function atualizar(){
   if(!S.dev||S.busy||!S.perfil)return;
@@ -137,7 +153,7 @@ async function atualizar(){
   if(r.erro==='sessao'){store.clear();S.dev=null;S.perfil=null;S.unlocked=false;go('entrar');setTimeout(()=>erro(r.mensagem),0)}
 }
 function entrou(r){   // resposta de cadastro / login / esqueci: guarda o código do aparelho e abre a tela inicial
-  S.dev=r.token;S.perfil=r.perfil;S.unlocked=true;S.who=S.perfil.selecao||['eu'];
+  S.dev=r.token;S.perfil=r.perfil;S.unlocked=true;S.who=S.perfil.selecao||['eu'];S.pend=null;S.pendOculta=false;
   store.set({dev:r.token,nome1:primeiro(r.perfil.nome)});
 }
 
@@ -277,6 +293,7 @@ const V={
     const p=S.perfil,q=quemSel(),lista=agrupar(p.marcacoes,['solicitada','confirmada']).sort((a,b)=>a[0].data.localeCompare(b[0].data));
     const confiam=p.confiam_em_mim||[];
     return`<div class="top"><div><p class="sub">Clínica CSI</p><h1>Olá, ${esc(primeiro(p.nome))}</h1></div><button class="link" data-act="go" data-v="dados">Meus dados</button></div>
+    ${pendHtml()}
     <div class="card"><h2 style="margin-top:0">Quem vai ser atendido?</h2>
     ${pessoas().length>1?chips():`<p class="sub">Só você por enquanto. Adicione filhos em <b>Meus dados</b>.</p>`}
     <p class="sub">${q.map(x=>esc(primeiro(x.nome))).join(' + ')}</p>
@@ -306,7 +323,7 @@ const V={
     <button class="btn sec" data-act="go" data-v="home">Voltar ao início</button>`,
   dados:()=>{
     const p=S.perfil;
-    return`${voltar('home')}<h1>Meus dados</h1>
+    return`${voltar('home')}<h1>Meus dados</h1>${pendHtml()}
     <div class="card"><div class="item"><div><small>Nome</small><b>${esc(p.nome)}</b></div></div>
     <div class="item"><div><small>Nascimento</small><b>${fmtData(p.nascimento)} · ${fmtIdade(p.nascimento)}</b></div></div>
     <div class="item"><div><small>Celular (seu login)</small><b>${fmtTel(p.telefone)}</b></div></div>
@@ -343,6 +360,7 @@ function render(){
   app.innerHTML=(V[S.view]?V[S.view]():'')+sheetHtml();
   const t=$('#tel');if(t)t.addEventListener('input',()=>{t.value=fmtTel(t.value)});
   const c=$('#cttel');if(c)c.addEventListener('input',()=>{c.value=fmtTel(c.value)});
+  document.querySelectorAll('#pend input[data-pc="cpf"]').forEach(i=>i.addEventListener('input',()=>{const d=digits(i.value).slice(0,11);i.value=d.replace(/(\d{3})(\d{1,3})?(\d{1,3})?(\d{1,2})?/,(m,a,b,c2,e)=>a+(b?'.'+b:'')+(c2?'.'+c2:'')+(e?'-'+e:''))}));
   const cp=$('#cpfn');if(cp)cp.addEventListener('input',()=>{const d=digits(cp.value).slice(0,11);cp.value=d.replace(/(\d{3})(\d{1,3})?(\d{1,3})?(\d{1,2})?/,(m,a,b,c2,e)=>a+(b?'.'+b:'')+(c2?'.'+c2:'')+(e?'-'+e:''))});
 }
 
@@ -392,6 +410,22 @@ const A={
   c4:()=>{const r=lerContato();if(r.e)return erro(r.e);S.d.confiavel=r.c;iniciaPin()},
   c4skip:()=>{S.d.confiavel=null;iniciaPin()},
   esqueci:()=>{S.esq=null;go('esqueci')},
+  pendsalvar:async()=>{
+    const campos=[...document.querySelectorAll('#pend input')].filter(i=>i.value.trim());
+    if(!campos.length)return erro('Preencha pelo menos um campo ou toque em "Agora não".');
+    for(const i of campos){
+      if(i.dataset.pc==='cpf'&&digits(i.value).length!==11)return erro('O CPF tem 11 números.');
+      if(i.dataset.pc==='email'&&!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(i.value.trim()))return erro('Esse e-mail não parece certo.');
+    }
+    for(const i of campos){
+      const r=await chamar('app_pendencia_responder',{p_pessoa:i.dataset.pp,p_campo:i.dataset.pc,p_valor:i.value.trim()});
+      if(!r)return;
+      if(!r.ok)return erro(r.mensagem||'Não foi possível salvar.');
+      S.pend=r.pendencias||[];
+    }
+    toast('Salvo. Obrigado!');render();
+  },
+  pendmais:()=>{S.pendOculta=true;render()},
   antiga:async()=>{
     const em=$('#aem').value.trim(),se=$('#asen').value;S.aem=em;
     if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em))return erro('Digite o e-mail da sua conta.');

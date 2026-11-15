@@ -1,6 +1,6 @@
 # Acesso rápido do paciente (celular + PIN de 4 dígitos)
 
-Versão 1.2 — 15/11/2026 / Mudança: contas antigas (e-mail e senha) viram acesso rápido, uma forma de login só. Versão 1.1 — 15/11/2026 / Mudança: acesso rápido dentro do chat real (CPF e nascimento perguntados uma vez só). Versão 1.0 — 14/11/2026 / Mudança: Implementação inicial (primeira versão guardava tudo só no celular; esta liga ao Supabase)
+Versão 1.3 — 15/11/2026 / Mudança: pendências para TODO paciente (CPF, e-mail) e dúvidas para a equipe. Versão 1.2 — 15/11/2026 / Mudança: contas antigas (e-mail e senha) viram acesso rápido, uma forma de login só. Versão 1.1 — 15/11/2026 / Mudança: acesso rápido dentro do chat real (CPF e nascimento perguntados uma vez só). Versão 1.0 — 14/11/2026 / Mudança: Implementação inicial (primeira versão guardava tudo só no celular; esta liga ao Supabase)
 
 **Página:** `acesso/index.html` (`https://clinicacsiia.github.io/webchat/acesso/`, ainda sem link em nenhuma outra tela). **Banco:** `supabase/acesso-rapido-paciente.sql`. **Testes:** `npm run test:acesso-sql` (57), `npm run test:acesso` (36, a página `/acesso/` num Chromium falando com o banco de teste), `npm run test:acesso-chat-sql` (20, motor real do chat) e `npm run test:acesso-chat` (12, o `index.html` real do chat num Chromium falando com o motor real).
 
@@ -65,6 +65,23 @@ Feita **só dentro do banco**, só como **sugestão**: se existir um único paci
 **Com o acesso rápido ligado**, a faixa "Entrar / Criar conta" de e-mail some do chat para quem não tem conta antiga (e quem se cadastrar passa a ser só celular + PIN).
 **Voltar atrás:** comandos no cabeçalho do SQL (apagam as 3 funções e a coluna `conta_antiga_id`; as contas antigas continuam funcionando).
 **Ainda não existe:** filhos nas contas antigas (as contas antigas nunca tiveram filhos); código por SMS para provar o celular.
+
+## Pendências para todo paciente: o sistema pergunta o que falta (15/11/2026)
+**Banco:** `supabase/acesso-rapido-pendencias.sql` (`npm run test:acesso-pendencias-sql`, 21 casos). **Telas:** cartão "Falta pouco" em `/acesso/` (início e Meus dados) e aviso "Faltam N informações" na faixa do chat (`npm run test:acesso-pendencias`, 10 casos; o teste do chat ganhou 1 caso).
+
+**O que é perguntado, a qualquer paciente que entra por celular + PIN (não só contas antigas):** o CPF dele, o CPF de cada filho e o e-mail (opcional). Cada resposta é gravada uma vez e o chat deixa de perguntar. Quem já respondeu no chat não é perguntado de novo. "Agora não" esconde o cartão naquela visita.
+
+**Dúvida com a base da clínica vai para a EQUIPE, não para o paciente.** Como o celular não é confirmado por SMS, nada que a clínica tem guardado é copiado ou mostrado a quem só digitou o celular (senão bastaria saber o celular, o nome e o nascimento de alguém para ver ou usar o CPF dessa pessoa). Quando o paciente informa o CPF, o banco compara em silêncio e **nunca devolve o resultado** (senão seria um jeito de testar CPFs):
+| Situação | O que acontece |
+|---|---|
+| CPF bate com 1 cadastro da clínica **do mesmo celular** | grava só a *sugestão* (`paciente_sugerido_id`), sem marca |
+| CPF bate com 1 cadastro, mas de **outro celular** | marca `cpf_com_outro_celular` |
+| CPF aparece em **mais de um** cadastro da clínica | marca `cpf_repetido_na_clinica` |
+| CPF não existe na clínica, mas o **celular existe** lá | marca `cpf_nao_bate_com_o_celular` |
+| Nada na clínica (paciente novo) | sem marca |
+
+**Equipe:** `select public.painel_app_revisoes();` lista os cadastros com dúvida e também os que têm celular já existente na clínica **sem vínculo** (admin e atendente; CPF só mascarado). `select public.painel_app_revisao_resolver('<id>');` dá a dúvida por resolvida. **Ainda não há botão no painel.**
+**Voltar atrás:** comandos no cabeçalho do SQL. **Ainda não existe:** avisar o paciente por mensagem (WhatsApp/SMS) para completar; código por SMS para confirmar o celular (aí daria para trazer da clínica com segurança).
 
 ## Equipe
 - `select public.painel_app_solicitacoes('solicitada');` lista as solicitações (responsável, celular, pessoas com nascimento, exame, data, turno, observação). Só administrador e atendente.

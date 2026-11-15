@@ -673,7 +673,7 @@
   const CHAVE_HIST = 'webchat.historico.v1';   // as últimas conversas deste aparelho (cada uma com o seu token): dá para voltar a elas
   const MAX_HIST = 5;                          // mínimo pedido: 3
   // Muda a cada alteração do chat. Cópia de mensagens guardada por outra versão é descartada (era isso que mostrava conversa velha e travada).
-  const VERSAO_APP = '2026.11.15-1';
+  const VERSAO_APP = '2026.11.15-2';
   // Mesmas regras do banco (fluxo_nome_ok, fluxo_telefone_ok, fluxo_email_ok): o banco confere de novo, aqui é só para avisar logo.
   const LET = 'A-Za-zÀ-ÖØ-öø-ÿ';
   const nomeCompletoOk = (v) => { const t = String(v || '').trim(); return t.length >= 5 && t.length <= 120 && new RegExp(`^[${LET}][${LET}'’.-]*( +[${LET}][${LET}'’.-]*)+$`).test(t) && t.split(/ +/).filter((w) => w.replace(new RegExp(`[^${LET}]`, 'g'), '').length >= 2).length >= 2; };
@@ -3151,7 +3151,7 @@
   // Só aparece quando o banco liga o interruptor (login_paciente_ativo). O e-mail serve só para confirmar a conta e redefinir a senha.
   const PAGINA_URL = location.origin + location.pathname;
   const TURNSTILE_SITEKEY = '';   // CAPTCHA (Cloudflare Turnstile, grátis). Se ligar "CAPTCHA protection" no Supabase, cole aqui a chave do site.
-  let acessoAtivo = false, acessoPerfil = null, acessoTrava = false;   // acesso rápido (celular + PIN): ver mais abaixo
+  let acessoAtivo = false, acessoPerfil = null, acessoTrava = false, acessoPend = 0;   // acesso rápido (celular + PIN): ver mais abaixo
   let loginAtivo = false, conta = null;   // conta = resumo devolvido por conta_paciente_resumo (conta:true, email, nome, telefone) ou null
   const senhaValida = (s) => s.length >= 8 && /[A-Za-z]/.test(s) && /\d/.test(s);
   const SENHA_REGRA = 'A senha precisa ter pelo menos 8 caracteres, com letras e números.';
@@ -3253,12 +3253,15 @@
   const acessoTentou = new Set();
   const acessoDev = () => { const st = lerLocal(ACESSO_CHAVE); return st && typeof st.dev === 'string' && st.dev ? st.dev : ''; };
   async function acessoCarregar() {
-    acessoPerfil = null; acessoTrava = false;
+    acessoPerfil = null; acessoTrava = false; acessoPend = 0;
     const dev = acessoDev();
     if (!acessoAtivo || !dev) return;
     const { data, error } = await db.rpc('app_perfil', { p_token: dev });
     if (error || !data) return;
-    if (data.ok) acessoPerfil = data.perfil;
+    if (data.ok) {
+      acessoPerfil = data.perfil;
+      try { const p = await db.rpc('app_pendencias', { p_token: dev }); acessoPend = p.data && p.data.ok ? (p.data.pendencias || []).filter((x) => !x.opcional).length : 0; } catch { acessoPend = 0; }   // quantas informações obrigatórias ainda faltam
+    }
     else if (data.erro === 'bloqueado') acessoTrava = true;      // falta digitar o PIN
     else if (data.erro === 'sessao') apagarLocal(ACESSO_CHAVE);   // aparelho desconhecido pelo servidor
   }
@@ -3273,7 +3276,8 @@
           h('span', { class: 'acoes-acesso' }, h('a', { class: 'link-add', id: 'acessoHerdar', href: 'acesso/?voltar=chat&antiga=1' }, 'Criar meu PIN')));
       } else if (acessoPerfil) {
         b.replaceChildren(h('p', { class: 'volta-dados' }, `⚡ Acesso rápido: ${primeiroNome(acessoPerfil.nome)}`),
-          h('span', { class: 'acoes-acesso' }, h('a', { class: 'link-add', id: 'acessoMeusDados', href: 'acesso/' }, 'Meus dados'), h('button', { type: 'button', class: 'link-add', id: 'acessoSair', onclick: acessoSair }, 'Sair')));
+          acessoPend > 0 ? h('p', { class: 'volta-dados', id: 'acessoPend' }, `${acessoPend > 1 ? 'Faltam' : 'Falta'} ${acessoPend} informaç${acessoPend > 1 ? 'ões' : 'ão'} no seu cadastro.`) : null,
+          h('span', { class: 'acoes-acesso' }, h('a', { class: 'link-add', id: 'acessoMeusDados', href: 'acesso/' }, acessoPend > 0 ? 'Completar' : 'Meus dados'), h('button', { type: 'button', class: 'link-add', id: 'acessoSair', onclick: acessoSair }, 'Sair')));
       } else if (acessoDev() && acessoTrava) {
         b.replaceChildren(h('p', { class: 'volta-dados' }, `⚡ Olá${st.nome1 ? ', ' + st.nome1 : ''}! Digite seu PIN para usar seus dados salvos.`),
           h('span', { class: 'acoes-acesso' }, h('button', { type: 'button', class: 'link-add', id: 'acessoPin', onclick: acessoPedirPin }, 'Digitar PIN'), h('button', { type: 'button', class: 'link-add', id: 'acessoSair', onclick: acessoSair }, 'Não sou eu')));

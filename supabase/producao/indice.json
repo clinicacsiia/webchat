@@ -2138,7 +2138,10 @@
     "ultimo_acesso_em",
     "cpf",
     "email",
-    "conta_antiga_id"
+    "conta_antiga_id",
+    "revisar_motivo",
+    "revisao_resolvida_em",
+    "cadastro_conferido_em"
    ],
    "rls": true,
    "politicas": 0
@@ -3292,6 +3295,21 @@
    "md5": "57c269411a837c4a670a10983ab77b32"
   },
   {
+   "nome": "app_conferir_cadastro",
+   "args": [
+    {
+     "nome": "p_pac",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "974b4f0a29faa9bcbfd92ade96063c81"
+  },
+  {
    "nome": "app_confianca_aceitar",
    "args": [
     {
@@ -3722,6 +3740,63 @@
    "authenticated": false,
    "publico": false,
    "md5": "efbceda882057967818eb7b2e09677ab"
+  },
+  {
+   "nome": "app_pendencia_responder",
+   "args": [
+    {
+     "nome": "p_token",
+     "padrao": false
+    },
+    {
+     "nome": "p_pessoa",
+     "padrao": false
+    },
+    {
+     "nome": "p_campo",
+     "padrao": false
+    },
+    {
+     "nome": "p_valor",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "5ff2f752ea2180697e6645f524df414b"
+  },
+  {
+   "nome": "app_pendencias",
+   "args": [
+    {
+     "nome": "p_token",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "d7700babd38e5cdc071466623acfdf27"
+  },
+  {
+   "nome": "app_pendencias_lista",
+   "args": [
+    {
+     "nome": "p_pac",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "f89cb2902b69f860006e1a984d10cf51"
   },
   {
    "nome": "app_perfil",
@@ -11505,6 +11580,31 @@
    "authenticated": true,
    "publico": false,
    "md5": "30b5dc91f4dc8ccdf0573505c6af7508"
+  },
+  {
+   "nome": "painel_app_revisao_resolver",
+   "args": [
+    {
+     "nome": "p_id",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "17387809c37a720a176c77929aea2220"
+  },
+  {
+   "nome": "painel_app_revisoes",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "65f71dd9e9836a83a1e07e8fd767cc65"
   },
   {
    "nome": "painel_app_solicitacao_status",

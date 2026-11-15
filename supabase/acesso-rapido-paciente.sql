@@ -627,3 +627,11 @@ do $$ begin
     grant execute on function public.app_conta_antiga_resumo(), public.app_conta_antiga_herdar(text, text, text, text, text) to authenticated;
   end if;
 end $$;
+
+-- As funções de pendências (supabase/acesso-rapido-pendencias.sql) também perdem a permissão no bloco acima; devolve se já existirem.
+do $$ begin
+  if to_regprocedure('public.app_pendencias(text)') is not null then
+    grant execute on function public.app_pendencias(text), public.app_pendencia_responder(text, text, text, text) to anon, authenticated;
+    grant execute on function public.painel_app_revisoes(), public.painel_app_revisao_resolver(uuid) to authenticated;
+  end if;
+end $$;
