@@ -6,10 +6,18 @@ CREATE OR REPLACE FUNCTION public.klingo_exames_sondar(p_n integer DEFAULT 15)
  STABLE SECURITY DEFINER
  SET search_path TO ''
 AS $function$
-  select p.id from public.catalogo_procedimento p
-   where p.ativo and p.modalidade in ('RM', 'TC', 'US', 'RX', 'MAMO', 'DENSITO')
-     and exists (select 1 from public.catalogo_agenda a where a.procedimento_id = p.id and a.vig_fim >= current_date and a.profissional !~* 'teste')
-     and coalesce((select greatest(x.com_horario_em, x.vazio_em) from public.klingo_proc_api x where x.procedimento_id = p.id), 'epoch'::timestamptz) < now() - interval '3 days'
-   order by coalesce(p.demanda_90d, 0) desc, p.id limit greatest(1, least(coalesce(p_n, 15), 40))
+  with cfg as (select greatest(5, coalesce(nullif(public.klingo_cfg('klingo_exames_vazio_min', '60'), '')::int, 60)) as vazio,
+                      greatest(5, coalesce(nullif(public.klingo_cfg('klingo_exames_tem_min', '120'), '')::int, 120)) as tem)
+  select f.id
+    from public.fluxo_exames f
+    join public.klingo_exame_api k on k.id = f.id
+    left join public.klingo_proc_api x on x.procedimento_id = f.id
+    cross join cfg
+   where x.procedimento_id is null
+      or greatest(x.com_horario_em, x.vazio_em) is null
+      or greatest(x.com_horario_em, x.vazio_em) < now() - make_interval(mins =>
+           case when x.com_horario_em is null or (x.vazio_em is not null and x.vazio_em > x.com_horario_em) then cfg.vazio else cfg.tem end)
+   order by (x.procedimento_id is null) desc, greatest(x.com_horario_em, x.vazio_em) nulls first, f.demanda desc, f.id
+   limit greatest(1, least(coalesce(p_n, 15), 40))
 $function$;
 

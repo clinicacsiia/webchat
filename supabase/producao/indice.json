@@ -1459,16 +1459,6 @@
    "politicas": 0
   },
   {
-   "nome": "klingo_proc_api",
-   "colunas": [
-    "procedimento_id",
-    "com_horario_em",
-    "vazio_em"
-   ],
-   "rls": true,
-   "politicas": 0
-  },
-  {
    "nome": "klingo_profissional",
    "colunas": [
     "id",
@@ -2217,6 +2207,17 @@
    ],
    "rls": true,
    "politicas": 0
+  },
+  {
+   "nome": "klingo_proc_api",
+   "colunas": [
+    "procedimento_id",
+    "com_horario_em",
+    "vazio_em",
+    "primeiro_dia"
+   ],
+   "rls": true,
+   "politicas": 0
   }
  ],
  "visoes": [
@@ -2399,7 +2400,7 @@
   },
   {
    "nome": "klingo-sondar-exames",
-   "quando": "*/10 * * * *",
+   "quando": "*/5 * * * *",
    "ativa": true,
    "comando": "select public.klingo_sondar_disparar()"
   },
@@ -2583,6 +2584,10 @@
   "klingo_auto",
   "klingo_autogestao",
   "klingo_conferir_ativo",
+  "klingo_exames_so_api",
+  "klingo_exames_tem_min",
+  "klingo_exames_vazio_min",
+  "klingo_exames_vencimento_h",
   "klingo_funcoes_base",
   "klingo_paciente_url",
   "klingo_reconfirmar_dias",
@@ -10192,7 +10197,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "21cf750a607a489630f6c072d5b112ec"
+   "md5": "c38f1d83d9ff59789a72d59d0711cd82"
   },
   {
    "nome": "klingo_avisar_gestao",
@@ -10561,7 +10566,32 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "87d55b99f5cf47db33350a5a66173cf9"
+   "md5": "7d8b4350544e355e4d1b5c62cfca602a"
+  },
+  {
+   "nome": "klingo_exame_oferecido",
+   "args": [
+    {
+     "nome": "p_proc",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "3d21bb7d607b281d6b236c7298c30f9a"
+  },
+  {
+   "nome": "klingo_exames_cobertura",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "40eb086347b47c1a8a8bb04c6d9d90bb"
   },
   {
    "nome": "klingo_hash",
@@ -10614,7 +10644,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "f57e4b680050bd556275d231441a1704"
+   "md5": "db1f422d9f4712fffa253cb69ed2b3bc"
   },
   {
    "nome": "klingo_identidade_registrar",
@@ -11406,7 +11436,30 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "c1b3f3966a16a21a6a1b222fb0a93f07"
+   "md5": "d2ee52dd197dd37b45fa8e02e4124ac0"
+  },
+  {
+   "nome": "klingo_sondagem_registrar",
+   "args": [
+    {
+     "nome": "p_proc",
+     "padrao": false
+    },
+    {
+     "nome": "p_tem",
+     "padrao": false
+    },
+    {
+     "nome": "p_primeiro",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "731de838dd844f58c942089684d08fb6"
   },
   {
    "nome": "klingo_sondar_disparar",
