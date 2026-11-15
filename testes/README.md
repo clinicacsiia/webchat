@@ -27,6 +27,20 @@ Depois de mudar o banco, refaça o retrato (`supabase/producao/LEIAME.md`), sen�
 
 Para simular outra hora do dia (um teste já falhou só das 21h às 00h20): `RELOGIO_UTC=01:10 node --import ./relogio-falso.mjs sql-pessoa.test.mjs`.
 
+## Auditoria de layout/CSS (15/11/2026)
+
+Varredura que roda **em cima dos testes de navegador que já existem**: injeta um verificador em toda página aberta e aponta texto vazando da caixa (o bug dos botões de lado espremidos), página rolando de lado, elementos sobrepostos de verdade, alvos de toque menores que 32px, letra menor que 12px e contraste fraco. Não precisa de teste novo.
+
+```
+# celular (360x740), letra normal
+AUD_SAIDA=/tmp/aud/chat-corrida.jsonl AUD_LARG=360 AUD_ALT=740 CHROMIUM_PATH=... node -r ./auditoria-layout.cjs chat-corrida.navegador.mjs
+# letra "muito grande" do chat (AUD_ESC=1.36) e tela baixa (teclado aberto: 360x480)
+AUD_SAIDA=/tmp/aud/x.jsonl AUD_LARG=360 AUD_ALT=480 AUD_ESC=1.36 CHROMIUM_PATH=... node -r ./auditoria-layout.cjs foto-pedido.navegador.mjs
+node auditoria-layout-resumo.mjs /tmp/aud                      # resume por tipo e elemento
+```
+
+Os testes do painel são feitos para computador: rode sem `AUD_LARG`. Falsos positivos conhecidos: o link "Pular para o conteúdo" (escondido de propósito), a faixa rolante da jornada e as animações de entrada (~14px na tela inicial). Arquivos: `auditoria-layout.cjs`, `auditoria-layout-pagina.js`, `auditoria-layout-resumo.mjs`.
+
 ## Como rodar
 
 Requisitos: Node 22 ou mais novo, Python 3.10 ou mais novo com `pytest`, e um Chromium.
