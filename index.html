@@ -102,48 +102,21 @@
   .hero { text-align: center; padding: 6px 0 14px; }
   .hero-logo { width: min(250px, 68%); height: auto; display: inline-block; }
   .hero-nome { margin: 4px 0 0; font-size: calc(15px * var(--esc)); font-weight: 650; letter-spacing: .02em; color: var(--csi-sidebar-bg); }
-  /* Capa da tela inicial: logo com brilho sobre degradê azul e ondas (sem o logo pequeno do topo nesta tela) */
-  .app:has(#telaInicio:not([hidden])) .topo-logo { display: none; }
-  .capa { position: relative; overflow: hidden; margin: -18px -16px 4px; height: 220px; display: grid; place-items: start center; padding-top: 34px;
-    background: radial-gradient(ellipse 85% 70% at 50% 36%, #fff 0%, rgba(255,255,255,.7) 50%, rgba(255,255,255,0) 100%), radial-gradient(circle at 96% 6%, rgba(160,220,250,.55), transparent 50%), linear-gradient(180deg, #d9eefa 0%, #ecf6fc 55%, var(--fundo) 100%);
-    -webkit-mask-image: linear-gradient(#000 78%, transparent 100%); mask-image: linear-gradient(#000 78%, transparent 100%); }
-  .capa .marca { position: relative; width: min(215px, 60%); z-index: 2; animation: capa-flut 5s ease-in-out infinite; }
-  .capa img.anel { position: absolute; inset: 0; transform-origin: 85.2% 20.9%; animation: capa-gira 18s linear infinite; }
-  .capa img { display: block; width: 100%; height: auto; filter: drop-shadow(0 2px 0 rgba(255,255,255,.9)) drop-shadow(0 10px 8px rgba(0,70,130,.35)) saturate(1.15) contrast(1.05); }
-  .capa .brilho { position: absolute; inset: 0; -webkit-mask: url(img/logo-csi-sem-anel.svg) center/contain no-repeat; mask: url(img/logo-csi-sem-anel.svg) center/contain no-repeat; background: linear-gradient(105deg, transparent 35%, rgba(255,255,255,.95) 50%, transparent 65%) -150% 0/60% 100% no-repeat; animation: capa-varre 4.5s ease-in-out infinite; }
-  .capa .ondas { position: absolute; left: -10%; bottom: 0; width: 120%; height: 80px; z-index: 1; }
-  @media (max-height: 760px) { .capa { height: 170px; padding-top: 22px; } .capa .ondas { height: 60px; } }
-  .capa .w1 { animation: capa-onda 7s ease-in-out infinite alternate; } .capa .w2 { animation: capa-onda 9s ease-in-out infinite alternate-reverse; }
-  .capa .luz { position: absolute; border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,.9), rgba(255,255,255,0) 70%); animation: capa-flut 6s ease-in-out infinite; }
-  .capa .l1 { width: 120px; height: 120px; left: -30px; top: 30px; } .capa .l2 { width: 80px; height: 80px; right: 10px; top: 10px; animation-delay: -2s; } .capa .l3 { width: 50px; height: 50px; left: 30%; top: 150px; animation-delay: -4s; }
-  @keyframes capa-flut { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
-  @keyframes capa-varre { 0%, 25% { background-position: -150% 0; } 70%, 100% { background-position: 250% 0; } }
-  @keyframes capa-onda { from { transform: translateX(-8px); } to { transform: translateX(8px); } }
-  @media (prefers-reduced-motion: reduce) { .capa * { animation: none !important; } }
+  /* Tela inicial: a logo fica sempre no topo (não some ao rolar) e um degradê azul bem leve dá o clima da clínica */
+  .inicio { background: linear-gradient(180deg, #e3f3fc 0, rgba(227,243,252,0) 150px) no-repeat; }
   /* Animações da tela inicial (todas desligam com "reduzir movimento") */
-  .capa .bol { position: absolute; bottom: 40px; width: 8px; height: 8px; border-radius: 50%; background: rgba(0,136,204,.35); animation: capa-sobe 7s ease-in infinite; z-index: 1; }
-  .capa .b1 { left: 14%; animation-delay: 0s; } .capa .b2 { left: 30%; width: 5px; height: 5px; animation-delay: -2s; } .capa .b3 { left: 52%; animation-delay: -4s; width: 6px; height: 6px; } .capa .b4 { left: 72%; animation-delay: -1s; } .capa .b5 { left: 86%; width: 5px; height: 5px; animation-delay: -5s; }
-  @keyframes capa-sobe { 0% { transform: translateY(0) scale(.6); opacity: 0; } 15% { opacity: .9; } 100% { transform: translateY(-170px) scale(1.2); opacity: 0; } }
-  .capa .marca { animation: capa-flut 5s ease-in-out infinite, capa-entra 1s cubic-bezier(.2,.8,.2,1) both; }
-  @keyframes capa-entra { from { opacity: 0; transform: translateY(14px) scale(.94); } to { opacity: 1; } }
-  .inicio > h1, .inicio .conta-faixa, .inicio #formInicio > *, .inicio > .link-add, .inicio .inst-clinica { animation: sobe .55s cubic-bezier(.2,.8,.2,1) both; }
-  .inicio > h1 { animation-delay: .15s; } .inicio .conta-faixa { animation-delay: .25s; }
+  .inicio .saudacao, .inicio .conta-faixa, .inicio #formInicio > *, .inicio > .acompanhar-grande, .inicio > .link-add, .inicio .inst-clinica { animation: sobe .55s cubic-bezier(.2,.8,.2,1) both; }
+  .inicio .saudacao { animation-delay: .1s; } .inicio .conta-faixa { animation-delay: .2s; }
   .inicio #formInicio > :nth-child(1) { animation-delay: .3s; } .inicio #formInicio > :nth-child(2) { animation-delay: .4s; } .inicio #formInicio > :nth-child(3) { animation-delay: .5s; } .inicio #formInicio > :nth-child(n+4) { animation-delay: .6s; }
-  .inicio > .link-add, .inicio .inst-clinica { animation-delay: .75s; }
+  .inicio > .acompanhar-grande { animation-delay: .6s; } .inicio > .link-add, .inicio .inst-clinica { animation-delay: .7s; }
   @keyframes sobe { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
   .inicio .unidade[aria-checked="true"] { animation: escolhe .35s cubic-bezier(.3,1.6,.5,1); }
   @keyframes escolhe { 0% { transform: scale(.94); } 100% { transform: scale(1); } }
   .inicio .btn-primario { position: relative; overflow: hidden; }
   .inicio .btn-primario::after { content: ""; position: absolute; top: 0; bottom: 0; left: -40%; width: 30%; background: linear-gradient(100deg, transparent, rgba(255,255,255,.35), transparent); transform: skewX(-20deg); animation: brilha 3.6s ease-in-out 1.5s infinite; }
   @keyframes brilha { 0%, 60% { left: -40%; } 100% { left: 130%; } }
-  /* Mais movimento no logo, entrada marcante e reação ao toque */
-  @keyframes capa-gira { to { transform: rotate(360deg); } }
-  .capa .marca { animation: capa-flut 5s ease-in-out 1.2s infinite, capa-entra2 1.1s cubic-bezier(.2,1.3,.4,1) both; }
-  @keyframes capa-entra2 { 0% { opacity: 0; transform: scale(.55) translateY(20px); filter: blur(6px); } 60% { opacity: 1; filter: blur(0); } 100% { opacity: 1; transform: none; filter: blur(0); } }
-  .capa .brilho { animation-duration: 3.2s; }
-  .capa .ondas { animation: capa-sobe-onda 1.2s cubic-bezier(.2,.8,.2,1) both; }
-  @keyframes capa-sobe-onda { from { transform: translateY(60px); opacity: 0; } to { transform: none; opacity: 1; } }
-  .inicio > h1 { animation-name: entra-esq; }
+  /* Entrada e reação ao toque */
+  .inicio .saudacao { animation-name: entra-esq; }
   @keyframes entra-esq { from { opacity: 0; transform: translateX(-24px); } to { opacity: 1; transform: none; } }
   .inicio .unidade { transition: transform .12s ease, box-shadow .2s ease; }
   .inicio .unidade:active { transform: scale(.95); }
@@ -151,7 +124,7 @@
   @keyframes ondinha { from { box-shadow: 0 0 0 0 rgba(0,136,204,.45); } to { box-shadow: 0 0 0 14px rgba(0,136,204,0); } }
   #formInicio:has(.unidade[aria-checked="true"]) .btn-primario { animation: sobe .55s both, chama 1.8s ease-in-out .6s infinite; }
   @keyframes chama { 0%, 100% { box-shadow: 0 6px 16px rgba(0,107,161,.28); } 50% { box-shadow: 0 8px 26px rgba(0,136,204,.55); } }
-  @media (prefers-reduced-motion: reduce) { .capa *, .inicio *, .inicio *::after { animation: none !important; } }
+  @media (prefers-reduced-motion: reduce) { .inicio *, .inicio *::after { animation: none !important; } }
   /* Entrar / Criar conta no cabeçalho, do lado oposto ao "Online" (só na tela inicial) */
   .inicio .conta-faixa { position: absolute; top: calc(8px + env(safe-area-inset-top)); right: 12px; z-index: 6; margin: 0; height: 36px; align-items: center; justify-content: flex-end; gap: 0; }
   .inicio .conta-faixa .txt { display: none; }
@@ -159,9 +132,17 @@
   .inicio .conta-faixa .link-add { padding: 6px 0; }
   .app:has(#telaInicio:not([hidden]) #faixaConta:not([hidden])) .topo { padding-right: 160px; }
   .app:has(#telaInicio:not([hidden]) #btnContaDados:not([hidden])) .topo { padding-right: 210px; }
-  .inicio h1 { font-size: calc(26px * var(--esc)); line-height: 1.2; margin: 0 0 4px; text-align: left; }
-  .inicio p.sub { margin: 0 0 8px; color: var(--texto-suave); text-align: left; }
-  .inicio > form { margin-bottom: 24px; }
+  @media (max-width: 380px) { .app:has(#telaInicio:not([hidden]) #btnContaDados:not([hidden])) .topo-logo { display: none; } }
+  .inicio h1 { font-size: calc(26px * var(--esc)); line-height: 1.2; margin: 0; text-align: left; min-width: 0; overflow-wrap: anywhere; }
+  /* Saudação numa linha só: "Olá, Ana!" à esquerda, "Meus dados" e "Sair" à direita (nome e telefone não se repetem) */
+  .saudacao { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 12px; }
+  .saudacao[hidden] { display: none; }
+  .acoes-saudacao { display: flex; align-items: center; gap: 16px; flex: none; }
+  .acoes-saudacao[hidden] { display: none; }
+  .acoes-saudacao .link-add { margin: 0; padding: 10px 0; min-height: 44px; font-size: calc(15.5px * var(--esc)); text-decoration: none; display: inline-flex; align-items: center; }
+  .acoes-saudacao #acessoSair { color: var(--texto-suave); font-weight: 600; }
+  .inicio p.sub { margin: -6px 0 10px; color: var(--texto-suave); text-align: left; }
+  .inicio > form { margin-bottom: 14px; }
   .inicio > .link-add { align-self: flex-start; margin-bottom: 16px; }
   /* Dados da clínica (somente leitura) */
   .inst-clinica { margin-top: auto; background: var(--csi-surface); border: 1px solid var(--csi-border); border-top: 4px solid var(--csi-primary); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); padding: 12px 16px; font-size: calc(15px * var(--esc)); line-height: 1.5; }
@@ -286,8 +267,9 @@
   .widget .w-outro:focus { border-color: var(--verde); outline: none; }
   .btn-w { background: var(--verde); color: #fff; border: 0; border-radius: 10px; padding: 11px 16px; font-weight: 650; cursor: pointer; }
   .btn-w.sec { background: #fff; color: var(--verde); border: 1.5px solid var(--verde); }
-  .aviso-form { margin: 4px 0 12px; padding: 10px 12px; border-radius: 12px; background: #fff7e5; border: 1px solid #f0dfb8; color: var(--aviso); font-size: calc(15.5px * var(--esc)); }
+  .aviso-form { margin: 8px 0 12px; padding: 10px 12px; border-radius: 12px; background: #fff7e5; border: 1px solid #f0dfb8; color: var(--aviso); font-size: calc(15.5px * var(--esc)); }
   .aviso-form p { margin: 0 0 8px; }
+  .aviso-form .boas-vindas { align-self: auto; max-width: none; text-align: left; font-size: calc(14.5px * var(--esc)); line-height: 1.4; margin: 0 0 10px; }
   .aviso-form .aceite { margin: 0; }
   .escolha-txt { margin: 0 0 12px; font-size: calc(16.5px * var(--esc)); line-height: 1.45; }
   .escolha-txt.aviso { padding: 10px 12px; border-radius: 12px; background: #fff7e5; border: 1px solid #f0dfb8; color: var(--aviso); }
@@ -403,12 +385,15 @@
   #blocoAcesso .acoes-acesso { display: flex; gap: 14px; flex-wrap: wrap; }
   #blocoAcesso a.link-add { text-decoration: none; }
   /* Acompanhe seus pedidos: o botão grande da tela principal (só com acesso rápido) e o balão de novidades */
-  .acompanhar-grande { display: flex; align-items: center; justify-content: center; gap: 12px; position: relative; margin: 0 0 14px; padding: 20px 16px; border-radius: var(--radius-lg); background: linear-gradient(135deg, var(--verde), #0b5f8f); color: #fff; text-decoration: none; font-weight: 800; font-size: calc(20px * var(--esc)); text-align: center; box-shadow: 0 6px 16px rgba(0,100,160,.28); }
+  .acompanhar-grande { display: flex; align-items: center; gap: 12px; position: relative; margin: 0 0 14px; padding: 12px 16px; min-height: 64px; border-radius: var(--radius-lg); background: var(--csi-surface); border: 2px solid var(--csi-primary); color: var(--csi-primary-strong); text-decoration: none; font-weight: 800; font-size: calc(17px * var(--esc)); text-align: left; box-shadow: var(--shadow-sm); }
   .acompanhar-grande[hidden] { display: none; }
-  .acompanhar-grande:active { transform: translateY(1px); }
-  .acompanhar-grande small { display: block; font-weight: 600; font-size: calc(14px * var(--esc)); opacity: .92; }
+  .acompanhar-grande:active { background: var(--verde-claro); transform: translateY(1px); }
+  .acompanhar-grande .ac-icone { font-size: calc(26px * var(--esc)); line-height: 1; flex: none; }
+  .acompanhar-grande .ac-txt { flex: 1; min-width: 0; }
+  .acompanhar-grande .ac-seta { font-size: calc(30px * var(--esc)); line-height: 1; flex: none; font-weight: 400; }
+  .acompanhar-grande small { display: block; font-weight: 600; font-size: calc(14px * var(--esc)); color: var(--texto-suave); margin-top: 1px; }
   .balao { display: inline-flex; align-items: center; justify-content: center; min-width: 26px; height: 26px; padding: 0 7px; border-radius: 999px; background: #e5484d; color: #fff; font-size: 15px; font-weight: 800; line-height: 1; box-shadow: 0 0 0 3px rgba(255,255,255,.9); }
-  .acompanhar-grande .balao { position: absolute; top: -9px; right: 10px; }
+  .acompanhar-grande .balao { position: absolute; top: -10px; right: 12px; }
   .balao[hidden] { display: none; }
   #btnAcompanhar .balao { margin-left: 8px; height: 22px; min-width: 22px; font-size: 13px; box-shadow: none; }
   #formInicio.com-acesso #btnAddIrmao, #formInicio.com-acesso #listaIrmaos, #formInicio.com-acesso #fFilho, #formInicio.com-acesso label[for="fFilho"] { display: none; }   /* os nomes vêm do cadastro */
@@ -574,11 +559,7 @@
 
   <!-- Tela 1: dados iniciais -->
   <section class="inicio" id="telaInicio" hidden>
-    <div class="capa" aria-hidden="false"><span class="luz l1"></span><span class="luz l2"></span><span class="luz l3"></span><span class="bol b1"></span><span class="bol b2"></span><span class="bol b3"></span><span class="bol b4"></span><span class="bol b5"></span>
-      <div class="marca"><img class="base" src="img/logo-csi-sem-anel.svg" alt="CSI · Clínica de Saúde e Imagem" width="270" height="114"><img class="anel" src="img/logo-csi-anel.svg" alt="" width="270" height="114" aria-hidden="true"><span class="brilho" aria-hidden="true"></span></div>
-      <svg class="ondas" viewBox="0 0 360 80" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="capaO1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#cfeafa"/><stop offset="1" stop-color="#a6d8f3"/></linearGradient></defs><path class="w2" d="M0 40 C70 8 140 60 220 34 S330 14 360 30 V80 H0Z" fill="#d4eefb" opacity=".8"/><path class="w1" d="M0 52 C80 22 150 70 230 46 S330 30 360 44 V80 H0Z" fill="url(#capaO1)"/></svg>
-    </div>
-    <h1 id="tituloInicio">Vamos agendar?</h1>
+    <div class="saudacao"><h1 id="tituloInicio">Vamos agendar?</h1><span class="acoes-saudacao" id="acoesSaudacao" hidden></span></div>
     <p class="sub" id="boasVindasForm">Responda rapidinho, é só tocar nas opções.</p>
     <div class="conta-faixa" id="faixaConta" hidden>
       <span class="txt" id="faixaContaTxt"></span>
@@ -589,7 +570,6 @@
         <button type="button" class="link-add" id="btnContaSair" hidden>Sair da conta</button>
       </span>
     </div>
-    <a class="acompanhar-grande" id="linkAcompanhar" href="minha-vez/?acompanhar=1" hidden><span>📋 Acompanhe seus pedidos<small>Status, remarcar, cancelar e resultados</small></span><span class="balao" id="balaoAcompanhar" hidden role="status"></span></a>
     <form id="formInicio" novalidate>
       <div class="volta" id="blocoVolta" hidden>
         <p class="volta-dados" id="voltaDados"></p>
@@ -628,15 +608,16 @@
         </label>
       </div>
       <div class="aviso-form" id="avisoForm">
-        <p class="boas-vindas">💚 Estamos criando uma solução para facilitar o seu dia a dia e levar equidade para todos. A nossa equipe melhora este espaço a cada dia, ouvindo como as pessoas o usam, e queremos você como parte da nossa família, ajudando a construir um lugar melhor.</p>
+        <p class="boas-vindas">💚 Criamos esta solução para facilitar o seu dia a dia e levar equidade para todos. Você é da nossa família: sua opinião nos ajuda a melhorar.</p>
         <label class="aceite">
           <input type="checkbox" id="fPrevisao">
-          <span>Entendi: quando o chat não conseguir marcar sozinho, o pedido só vale depois que uma <b>pessoa da equipe</b> <b>confirma</b>.</span>
+          <span>Entendi: se o chat não conseguir marcar sozinho, o pedido só vale quando uma <b>pessoa da equipe confirmar</b>.</span>
         </label>
       </div>
       <p class="erro-form" id="erroForm" role="alert"></p>
       <button class="btn-primario" id="btnIniciar" type="submit">Começar</button>
     </form>
+    <a class="acompanhar-grande" id="linkAcompanhar" href="minha-vez/?acompanhar=1" hidden><span class="ac-icone" aria-hidden="true">📋</span><span class="ac-txt">Acompanhe seus pedidos<small>Status, remarcar, cancelar e resultados</small></span><span class="ac-seta" aria-hidden="true">›</span><span class="balao" id="balaoAcompanhar" hidden role="status"></span></a>
     <button type="button" class="link-add" id="btnHistoricoForm" hidden>Ver conversas anteriores</button>
     <details class="inst-clinica">
       <summary id="instNome">Sobre a clínica · endereço e horários</summary>
@@ -694,7 +675,7 @@
   const CHAVE_HIST = 'webchat.historico.v1';   // as últimas conversas deste aparelho (cada uma com o seu token): dá para voltar a elas
   const MAX_HIST = 5;                          // mínimo pedido: 3
   // Muda a cada alteração do chat. Cópia de mensagens guardada por outra versão é descartada (era isso que mostrava conversa velha e travada).
-  const VERSAO_APP = '2026.11.15-11';
+  const VERSAO_APP = '2026.11.15-12';
   // Mesmas regras do banco (fluxo_nome_ok, fluxo_telefone_ok, fluxo_email_ok): o banco confere de novo, aqui é só para avisar logo.
   const LET = 'A-Za-zÀ-ÖØ-öø-ÿ';
   const nomeCompletoOk = (v) => { const t = String(v || '').trim(); return t.length >= 5 && t.length <= 120 && new RegExp(`^[${LET}][${LET}'’.-]*( +[${LET}][${LET}'’.-]*)+$`).test(t) && t.split(/ +/).filter((w) => w.replace(new RegExp(`[^${LET}]`, 'g'), '').length >= 2).length >= 2; };
@@ -723,7 +704,7 @@
     empresa: $('#empresa'), ponto: $('#ponto'), status: $('#status'),
     btnMenu: $('#btnMenu'), btnVoltarInicio: $('#btnVoltarInicio'), menu: $('#menu'), btnNova: $('#btnNova'), btnHistorico: $('#btnHistorico'), btnHistoricoForm: $('#btnHistoricoForm'), btnAtendente: $('#btnAtendente'), btnSair: $('#btnSair'),
     btnLetra: $('#btnLetra'), btnLetraMenor: $('#btnLetraMenor'), btnSuporte: $('#btnSuporte'), btnPrivacidade: $('#btnPrivacidade'), apoio: $('#apoio'), barraHumano: $('#barraHumano'), btnHumano: $('#btnHumano'), btnCorrigir: $('#btnCorrigir'),
-    telaInicio: $('#telaInicio'), telaChat: $('#telaChat'), boasForm: $('#boasVindasForm'), tituloInicio: $('#tituloInicio'),
+    telaInicio: $('#telaInicio'), telaChat: $('#telaChat'), boasForm: $('#boasVindasForm'), tituloInicio: $('#tituloInicio'), acoesSaudacao: $('#acoesSaudacao'),
     faixaConta: $('#faixaConta'), faixaContaTxt: $('#faixaContaTxt'), btnContaEntrar: $('#btnContaEntrar'), btnContaCriar: $('#btnContaCriar'), btnContaDados: $('#btnContaDados'), btnContaSair: $('#btnContaSair'),
     form: $('#formInicio'), fNome: $('#fNome'), fTel: $('#fTel'), fEmail: $('#fEmail'),
     fAceite: $('#fAceite'), fPrevisao: $('#fPrevisao'), erroForm: $('#erroForm'), btnIniciar: $('#btnIniciar'),
@@ -845,16 +826,19 @@
     const p = lerLocal(CHAVE_PERFIL) || {}, salvo = perfilSalvo();
     el.fNome.value = p.nome || ''; el.fTel.value = p.telefone || ''; el.fEmail.value = p.email || '';
     el.fAceite.checked = !!salvo; el.fPrevisao.checked = false; el.erroForm.textContent = ''; el.fFilho.value = '';
-    el.blocoVolta.hidden = !salvo; el.blocoNome.hidden = !!salvo; el.blocoContato.hidden = !!salvo;
+    const pedePin = !!(acessoAtivo && !acessoPerfil && !conta && acessoDev() && acessoTrava);   // aparelho conhecido, falta o PIN: a caixa do PIN já tem "Não sou eu"
+    el.blocoVolta.hidden = !salvo || !!acessoPerfil || pedePin;   // o nome já está em "Olá, nome!": não repete nome e telefone
+    el.blocoNome.hidden = !!salvo; el.blocoContato.hidden = !!salvo;
     el.btnNaoSouEu.hidden = !!(salvo && salvo.conta);   // conta logada: quem sai é a conta ("Sair da conta")
     el.fEmail.readOnly = !!(conta && !salvo);           // conta logada sem perfil salvo: o e-mail é o da conta
     if (conta && !salvo) el.fEmail.value = conta.email;
     const travaAcesso = !!(acessoPerfil && !salvo && !conta);   // acesso rápido sem e-mail ainda: nome e celular são os do cadastro (o servidor confere o celular)
     el.fNome.readOnly = el.fTel.readOnly = travaAcesso;
     if (travaAcesso) { el.fNome.value = acessoPerfil.nome; el.fTel.value = mascaraTel(acessoPerfil.telefone); }
-    el.tituloInicio.textContent = salvo ? `Olá, ${primeiroNome(salvo.nome)}!` : 'Vamos agendar?';
+    const nomeSaudacao = acessoPerfil ? acessoPerfil.nome : salvo ? salvo.nome : '';
+    el.tituloInicio.textContent = nomeSaudacao ? `Olá, ${primeiroNome(nomeSaudacao)}!` : 'Vamos agendar?';
     if (salvo) el.voltaDados.textContent = `${salvo.nome} · ${salvo.telefone}`;
-    el.boasForm.hidden = !!salvo;   // quem volta já sabe o que fazer: vai direto à pergunta
+    el.boasForm.hidden = !!(salvo || acessoPerfil);   // quem volta já sabe o que fazer: vai direto à pergunta
     atualizarAcessoHistorico();
     if (!manterEscolha) escolha = null;
     irmaosForm = []; modoIrmaos = 'um_de_cada_vez';
@@ -967,7 +951,7 @@
     el.fQuem.replaceChildren(
       cartao('Para mim', '', acessoSel === 'eu', pick('eu')),
       ...kids.map((k) => cartao('Para ' + primeiroNome(k.nome), '', acessoSel === k.id, pick(k.id))),
-      ...(kids.length > 1 ? [cartao('Todos os filhos', 'Mesmo pedido ou um de cada vez', acessoSel === 'filhos', pick('filhos'))] : []));
+      ...(kids.length > 1 ? [cartao('Todos os filhos', 'Juntos ou separados', acessoSel === 'filhos', pick('filhos'))] : []));
     const filho = !!escolha && escolha.tipo === 'filho';
     el.lNome.textContent = filho ? 'Seu nome (responsável)' : 'Seu nome completo';
     const at = $('#aceiteTxt'); if (at) at.replaceChildren(...textoAceite(filho));
@@ -3331,19 +3315,19 @@
   function atualizarAcessoUI(semForm) {
     let b = $('#blocoAcesso');
     if (!b) { b = h('div', { id: 'blocoAcesso', class: 'volta' }); $('#formInicio').prepend(b); }
-    b.hidden = !acessoAtivo;
+    b.hidden = !acessoAtivo; el.acoesSaudacao.hidden = true;   // os links da saudação só existem com o acesso rápido já aberto
     if (!b.hidden) {
-      const st = lerLocal(ACESSO_CHAVE) || {};
       if (conta) {   // conta antiga (e-mail e senha): convida a criar o PIN, trazendo os dados que já temos
         b.replaceChildren(h('p', { class: 'volta-dados' }, '⚡ Crie seu PIN: seus dados já estão salvos e, daqui para a frente, você entra só com o celular e o PIN.'),
           h('span', { class: 'acoes-acesso' }, h('a', { class: 'link-add', id: 'acessoHerdar', href: 'acesso/?voltar=chat&antiga=1' }, 'Criar meu PIN')));
       } else if (acessoPerfil) {
-        // replaceChildren (nativo) escreve "null" na tela se receber null: só entra o aviso de presença quando ele existe.
-        b.replaceChildren(...[h('p', { class: 'volta-dados' }, `⚡ Acesso rápido: ${primeiroNome(acessoPerfil.nome)}`),
-          acessoPresenca(),
-          h('span', { class: 'acoes-acesso' }, h('a', { class: 'link-add', id: 'acessoMeusDados', href: 'acesso/?ir=dados' }, 'Meus dados'), h('button', { type: 'button', class: 'link-add', id: 'acessoSair', onclick: acessoSair }, 'Sair'))].filter(Boolean));
+        // Já logado: "Meus dados" e "Sair" ficam na linha do "Olá, nome!"; a caixa só aparece se há aviso de presença na clínica.
+        const pres = acessoPresenca();
+        b.replaceChildren(...(pres ? [pres] : [])); b.hidden = !pres;
+        el.acoesSaudacao.replaceChildren(h('a', { class: 'link-add', id: 'acessoMeusDados', href: 'acesso/?ir=dados' }, 'Meus dados'), h('button', { type: 'button', class: 'link-add', id: 'acessoSair', onclick: acessoSair }, 'Sair'));
+        el.acoesSaudacao.hidden = false;
       } else if (acessoDev() && acessoTrava) {
-        b.replaceChildren(h('p', { class: 'volta-dados' }, `⚡ Olá${st.nome1 ? ', ' + st.nome1 : ''}! Digite seu PIN para usar seus dados salvos.`),
+        b.replaceChildren(h('p', { class: 'volta-dados' }, '⚡ Digite seu PIN para usar seus dados salvos.'),
           h('span', { class: 'acoes-acesso' }, h('button', { type: 'button', class: 'link-add', id: 'acessoPin', onclick: acessoPedirPin }, 'Digitar PIN'), h('button', { type: 'button', class: 'link-add', id: 'acessoSair', onclick: acessoSair }, 'Não sou eu')));
       } else {
         b.replaceChildren(h('p', { class: 'volta-dados' }, '⚡ Acesso rápido: com celular e PIN você não digita seus dados toda vez.'),
