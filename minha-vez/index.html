@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#1e3a5f">
+<meta name="theme-color" content="#ffffff">
+<meta name="color-scheme" content="light">
 <meta name="robots" content="noindex">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
@@ -17,13 +18,11 @@
     --font-family:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif; --radius-md:10px; --radius-lg:16px; --shadow-md:0 4px 12px rgba(0,0,0,.08); --csi-focus:0 0 0 3px rgba(0,136,204,.28);
     --azul-escuro:var(--csi-sidebar-bg); --azul:var(--csi-primary-strong); --azul-claro:var(--csi-primary-soft); --fundo:var(--csi-background); --papel:var(--csi-surface); --texto:var(--csi-text-main);
     --suave:var(--csi-text-secondary); --linha:var(--csi-border); --erro:var(--csi-danger-strong); --ok:var(--csi-success-strong); --ok-claro:var(--csi-success-soft); --aviso:var(--csi-warning-strong); --aviso-claro:var(--csi-warning-soft); }
-  @media (prefers-color-scheme: dark) { :root { --csi-background:#0b1522; --csi-surface:#14233a; --csi-text-main:#e6edf6; --csi-text-secondary:#9fb0c4; --csi-border:#2a3d57; --csi-border-strong:#3a5072; --csi-primary-soft:#1a3558; --csi-success-soft:#12331f; --csi-warning-soft:#3a2c0b; --csi-primary-strong:#4aa8dd; --csi-success-strong:#4cc582; --csi-danger-strong:#ff8a80; --csi-warning-strong:#f0b955; } }
   * { box-sizing:border-box; }
   html,body { margin:0; min-height:100%; }
   body { font-family:var(--font-family); background:var(--fundo); color:var(--texto); font-size:18px; line-height:1.45; }
   header { background:var(--csi-surface); color:var(--csi-sidebar-bg); padding:10px 16px; display:flex; align-items:center; justify-content:space-between; gap:12px; border-bottom:3px solid var(--csi-primary); }
   .marca-cab { display:flex; align-items:center; gap:10px; min-width:0; } .marca-cab img { height:25px; width:auto; flex:none; }
-  @media (prefers-color-scheme: dark) { header { background:var(--azul-escuro); color:#fff; } .marca-cab img { background:#fff; border-radius:6px; padding:3px 6px; height:31px; } }
   header b { font-size:1.05rem; }
   header button { background:transparent; color:inherit; border:1px solid currentColor; border-radius:10px; padding:8px 12px; font-size:.9rem; }
   main { max-width:520px; margin:0 auto; padding:16px; }

@@ -694,7 +694,7 @@
   const CHAVE_HIST = 'webchat.historico.v1';   // as últimas conversas deste aparelho (cada uma com o seu token): dá para voltar a elas
   const MAX_HIST = 5;                          // mínimo pedido: 3
   // Muda a cada alteração do chat. Cópia de mensagens guardada por outra versão é descartada (era isso que mostrava conversa velha e travada).
-  const VERSAO_APP = '2026.11.15-9';
+  const VERSAO_APP = '2026.11.15-10';
   // Mesmas regras do banco (fluxo_nome_ok, fluxo_telefone_ok, fluxo_email_ok): o banco confere de novo, aqui é só para avisar logo.
   const LET = 'A-Za-zÀ-ÖØ-öø-ÿ';
   const nomeCompletoOk = (v) => { const t = String(v || '').trim(); return t.length >= 5 && t.length <= 120 && new RegExp(`^[${LET}][${LET}'’.-]*( +[${LET}][${LET}'’.-]*)+$`).test(t) && t.split(/ +/).filter((w) => w.replace(new RegExp(`[^${LET}]`, 'g'), '').length >= 2).length >= 2; };
@@ -3341,7 +3341,7 @@
         // replaceChildren (nativo) escreve "null" na tela se receber null: só entra o aviso de presença quando ele existe.
         b.replaceChildren(...[h('p', { class: 'volta-dados' }, `⚡ Acesso rápido: ${primeiroNome(acessoPerfil.nome)}`),
           acessoPresenca(),
-          h('span', { class: 'acoes-acesso' }, h('a', { class: 'link-add', id: 'acessoMeusDados', href: 'acesso/' }, 'Meus dados'), h('button', { type: 'button', class: 'link-add', id: 'acessoSair', onclick: acessoSair }, 'Sair'))].filter(Boolean));
+          h('span', { class: 'acoes-acesso' }, h('a', { class: 'link-add', id: 'acessoMeusDados', href: 'acesso/?ir=dados' }, 'Meus dados'), h('button', { type: 'button', class: 'link-add', id: 'acessoSair', onclick: acessoSair }, 'Sair'))].filter(Boolean));
       } else if (acessoDev() && acessoTrava) {
         b.replaceChildren(h('p', { class: 'volta-dados' }, `⚡ Olá${st.nome1 ? ', ' + st.nome1 : ''}! Digite seu PIN para usar seus dados salvos.`),
           h('span', { class: 'acoes-acesso' }, h('button', { type: 'button', class: 'link-add', id: 'acessoPin', onclick: acessoPedirPin }, 'Digitar PIN'), h('button', { type: 'button', class: 'link-add', id: 'acessoSair', onclick: acessoSair }, 'Não sou eu')));

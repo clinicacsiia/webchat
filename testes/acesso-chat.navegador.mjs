@@ -123,7 +123,7 @@ await caso('cadastro com informação pendente: a faixa NÃO mostra aviso nem ca
   await aguardaTexto(page, /Acesso rápido: Ana/);
   const txt = await texto(page), link = await page.$eval('#acessoMeusDados', (e) => e.textContent + '|' + e.getAttribute('href')), pend = await page.locator('#acessoPend').count();
   await ctx.close();
-  return { ok: !/Falta(m)? \d+ informaç/.test(txt) && !pend && link === 'Meus dados|acesso/', detalhe: link };
+  return { ok: !/Falta(m)? \d+ informaç/.test(txt) && !pend && link === 'Meus dados|acesso/?ir=dados', detalhe: link };
 });
 
 await caso('faixa do acesso rápido (fora da clínica): não escreve a palavra "null" na tela', async () => {
