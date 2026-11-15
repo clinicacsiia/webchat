@@ -57,6 +57,12 @@ const casos = [
   ['arquivos de /fila/ (js e css) NÃO passam pelo cache', { method: 'GET', url: `${ESCOPO}fila/fila.js`, mode: 'cors' }, false],
   ['/agendamento/ (página de agendamento) NÃO passa pelo cache do chat', { method: 'GET', url: `${ESCOPO}agendamento/`, mode: 'navigate' }, false],
   ['/painel/ NÃO passa pelo cache', { method: 'GET', url: `${ESCOPO}painel/`, mode: 'navigate' }, false],
+  ['/acesso/ (PIN) NÃO passa pelo cache: antes recebia a cópia do chat e o PIN não aparecia', { method: 'GET', url: `${ESCOPO}acesso/?voltar=chat`, mode: 'navigate' }, false],
+  ['/acesso/acesso/ (caminho torto) também NÃO passa pelo cache', { method: 'GET', url: `${ESCOPO}acesso/acesso/?voltar=chat`, mode: 'navigate' }, false],
+  ['arquivos de /acesso/ NÃO passam pelo cache', { method: 'GET', url: `${ESCOPO}acesso/app.js`, mode: 'cors' }, false],
+  ['navegação para um caminho desconhecido vai direto para a rede (não recebe o chat)', { method: 'GET', url: `${ESCOPO}qualquer-coisa/`, mode: 'navigate' }, false],
+  ['index.html (navegação) é atendido pelo cache', { method: 'GET', url: `${ESCOPO}index.html`, mode: 'navigate' }, true],
+  ['privacidade.html (navegação) é atendida pelo cache', { method: 'GET', url: `${ESCOPO}privacidade.html`, mode: 'navigate' }, true],
   ['POST NÃO passa pelo cache', { method: 'POST', url: `${ESCOPO}`, mode: 'cors' }, false],
   ['outra origem NÃO passa pelo cache', { method: 'GET', url: 'https://nrvuynjwcgwpjdptkiay.supabase.co/rest/v1/rpc/chat_config', mode: 'cors' }, false],
 ];
@@ -89,9 +95,27 @@ registrar('cópia diferente da rede (ETag): avisa a página que há versão nova
 registrar('primeira visita (sem cópia): não avisa', primeira.length === 0, JSON.stringify(primeira));
 registrar('o cache da versão nova inclui o sentinela.js', /BASE = \[[^\]]*'sentinela\.js'/.test(codigo));
 
+// Cada página guardada usa a sua própria cópia: privacidade.html e termos.html não podem receber a cópia do chat ('./').
+async function chaveDe(url) {
+  const usadas = [], ouvintes = {};
+  const cache = { match: async (k) => { usadas.push(typeof k === 'string' ? k : k.url); return undefined; }, put: async () => {}, addAll: async () => {} };
+  const ctx = { URL, Request, Promise, console, location: { origin: BASE },
+    self: { registration: { scope: ESCOPO }, skipWaiting: () => {}, addEventListener: (t, fn) => { ouvintes[t] = fn; }, clients: { claim: async () => {} } },
+    caches: { open: async () => cache, keys: async () => [], delete: async () => true, match: async () => undefined }, fetch: async () => ({ ok: true, clone() { return this; } }) };
+  vm.runInNewContext(codigo, ctx);
+  let resposta = null; ouvintes.fetch({ request: { method: 'GET', url, mode: 'navigate' }, respondWith: (p) => { resposta = p; }, waitUntil: () => {} });
+  await resposta; return usadas[0];
+}
+const kChat = await chaveDe(`${ESCOPO}`), kPriv = await chaveDe(`${ESCOPO}privacidade.html`), kTermos = await chaveDe(`${ESCOPO}termos.html`), kIdx = await chaveDe(`${ESCOPO}index.html`);
+registrar('a página do chat e o index.html usam a mesma cópia (./)', kChat === ESCOPO && kIdx === ESCOPO, `${kChat} | ${kIdx}`);
+registrar('privacidade.html e termos.html usam a cópia delas, nunca a do chat', kPriv === `${ESCOPO}privacidade.html` && kTermos === `${ESCOPO}termos.html`, `${kPriv} | ${kTermos}`);
+registrar('a instalação busca os arquivos na rede de verdade (cache: reload), não no cache do navegador', /cache: 'reload'/.test(codigo));
+
 // Nada da fila pode ter sido gravado no cache, nem a URL com o token.
 await new Promise((ok) => setTimeout(ok, 50));
 registrar('nenhuma URL da fila foi gravada no cache', !gravados.some((u) => u.includes('/fila/') || u.includes('token=')), gravados.join(' | '));
+// A cópia do chat ('./') nunca pode ser sobrescrita por outra página (/acesso/, painel, caminho desconhecido): foi isso que fez a política de privacidade e o chat mostrarem a tela do PIN.
+registrar('nenhuma página fora da lista (/acesso/, /painel/, desconhecida) foi gravada no cache', !gravados.some((u) => /\/(acesso|painel|qualquer-coisa)\//.test(u)), gravados.join(' | '));
 
 const falhas = resultados.filter((r) => !r).length;
 console.log(`\n${resultados.length - falhas}/${resultados.length} verificações passaram`);

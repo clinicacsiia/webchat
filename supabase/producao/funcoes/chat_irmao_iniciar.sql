@@ -10,6 +10,7 @@ declare
   o public.conversas; src public.pre_agendamentos; v_prox text; v_resto jsonb; v_recentes int; v_conv uuid; v_token text;
   v_copia boolean := false; v_msg text;
 begin
+  perform public.app_pin_exigir();   -- PIN obrigatório também no servidor (nasce desligado: config.app_pin_servidor)
   perform public.chat_valida(p_origem, p_token);
   select * into o from public.conversas where id = p_origem;
   if o.paciente_tipo <> 'filho' or jsonb_array_length(o.irmaos) = 0 then
