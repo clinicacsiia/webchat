@@ -8,6 +8,7 @@ CREATE OR REPLACE FUNCTION public.chat_foto_enviar(p_conversa uuid, p_token text
 AS $function$
 declare v_bin bytea; v_id bigint; v_msg bigint;
 begin
+  perform public.app_pin_exigir_leitura();   -- PIN também no servidor (config.app_pin_servidor)
   perform public.chat_valida(p_conversa, p_token);
   if p_mime not in ('image/jpeg', 'image/png', 'image/webp') then raise exception 'Envie uma foto (JPG ou PNG).' using errcode = '22023'; end if;
   if length(coalesce(p_base64, '')) > 2000000 then raise exception 'A foto é grande demais. Tente de novo.' using errcode = '22023'; end if;

@@ -8,6 +8,7 @@ CREATE OR REPLACE FUNCTION public.chat_avaliar(p_conversa uuid, p_token text, p_
 AS $function$
 declare c record; n integer;
 begin
+  perform public.app_pin_exigir_leitura();   -- PIN também no servidor (config.app_pin_servidor)
   perform public.chat_valida(p_conversa, p_token);
   if coalesce((select valor from public.config where chave = 'avaliacao_ativa'), 'nao') <> 'sim' then raise exception 'A avaliação não está disponível no momento.' using errcode = '22023'; end if;
   if p_nota_atendimento is null or p_nota_site is null or p_nota_atendimento <> trunc(p_nota_atendimento) or p_nota_site <> trunc(p_nota_site)

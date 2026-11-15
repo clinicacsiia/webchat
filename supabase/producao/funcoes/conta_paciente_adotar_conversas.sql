@@ -8,6 +8,7 @@ CREATE OR REPLACE FUNCTION public.conta_paciente_adotar_conversas(p_itens jsonb)
 AS $function$
 declare v_uid uuid := (select auth.uid()); v_cp record; v_email text; v_tel text; v_n int := 0; it jsonb; v_id uuid;
 begin
+  perform public.app_pin_exigir_leitura();   -- PIN também no servidor (config.app_pin_servidor)
   select * into v_cp from public.contas_paciente where id = v_uid;
   if v_uid is null or not found then raise exception 'Entre na sua conta para guardar as conversas.' using errcode = '42501'; end if;
   if p_itens is null or jsonb_typeof(p_itens) <> 'array' then return 0; end if;

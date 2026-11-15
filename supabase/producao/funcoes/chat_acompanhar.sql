@@ -8,6 +8,7 @@ CREATE OR REPLACE FUNCTION public.chat_acompanhar(p_conversa uuid, p_token text)
 AS $function$
 declare r jsonb;
 begin
+  perform public.app_pin_exigir_leitura();   -- PIN também no servidor (config.app_pin_servidor)
   perform public.chat_valida(p_conversa, p_token);
   select jsonb_build_object('conversa', c.status, 'agente', a.nome, 'em_horario', public.horario_trabalho_agora(), 'equipe_online', public.horario_trabalho_agora(),
     'pedido', pa.status, 'tipo', pa.tipo, 'conferencia', pa.conferencia_status,

@@ -10,6 +10,7 @@ declare v_tel text := regexp_replace(coalesce(p_telefone, ''), '\D', '', 'g'); a
 begin
   if not public.app_modo() then return public.app_erro_json('indisponivel'); end if;
   if coalesce(p_pin_novo, '') !~ '^[0-9]{4}$' then return jsonb_build_object('ok', false, 'erro', 'pin', 'mensagem', 'O PIN precisa ter 4 números.'); end if;
+  if public.app_pin_fraco(p_pin_novo) then return jsonb_build_object('ok', false, 'erro', 'pin_fraco', 'mensagem', 'Escolha um PIN menos óbvio: não use números repetidos (1111), em sequência (1234) nem pares repetidos (1212).'); end if;
   select * into a from public.app_paciente where telefone = v_tel for update;
   if not found then return jsonb_build_object('ok', false, 'erro', 'dados', 'mensagem', 'Os dados não conferem com o cadastro.'); end if;
   v_seg := public.app_trava(a.id);

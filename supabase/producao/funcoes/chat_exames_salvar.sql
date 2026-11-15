@@ -8,6 +8,7 @@ CREATE OR REPLACE FUNCTION public.chat_exames_salvar(p_conversa uuid, p_token te
 AS $function$
 declare it jsonb; p record; reg record; v_lado text; v_qtd int; v_linhas text[] := '{}'; v_nomes text[] := '{}'; v_n int := 0; v_msg bigint; v_txt text; v_livre text;
 begin
+  perform public.app_pin_exigir_leitura();   -- PIN também no servidor (config.app_pin_servidor)
   perform public.chat_valida(p_conversa, p_token);
   if p_itens is null or jsonb_typeof(p_itens) <> 'array' or jsonb_array_length(p_itens) = 0 or jsonb_array_length(p_itens) > 12 then
     raise exception 'Pedido inválido.' using errcode = '22023';

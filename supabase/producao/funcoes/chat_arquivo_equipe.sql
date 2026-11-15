@@ -8,6 +8,7 @@ CREATE OR REPLACE FUNCTION public.chat_arquivo_equipe(p_conversa uuid, p_token t
 AS $function$
 declare r record;
 begin
+  perform public.app_pin_exigir_leitura();   -- PIN também no servidor (config.app_pin_servidor)
   perform public.chat_valida(p_conversa, p_token);
   if not exists (select 1 from public.mensagens m where m.conversa_id = p_conversa and (m.opcoes ->> 'tipo') = 'arquivo' and (m.opcoes ->> 'id') = p_id::text) then return null; end if;
   select mime, dados, nome into r from public.conversa_anexo where id = p_id and conversa_id = p_conversa and tipo = 'equipe_arquivo';

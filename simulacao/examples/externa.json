@@ -1,0 +1,13 @@
+{"gerado_em":"2026-11-15T12:00:00Z","hoje":"2026-11-15",
+ "base":{"de":"2026-10-18","ate":"2026-11-14","dias_com_dado":15,"atendidos":2400,"media_dia":160,"por_unidade":[{"unidade":"csi1","atendidos":1500,"media_dia":100},{"unidade":"csi2","atendidos":550,"media_dia":37},{"unidade":"ped","atendidos":350,"media_dia":23}]},
+ "chat":{"esperando":6,"mais_antiga_min":150,"abertas":24,"conversas_dia":40},
+ "pedidos":{"prontos":40,"mais_antigo_h":60,"rascunhos":120,"agendados":80},
+ "confirmacao":[
+  {"ordem":2,"horizonte":"Amanhã","unidade":"csi1","confirmado":120,"a_confirmar":25,"sem_resposta":18,"total":163},
+  {"ordem":2,"horizonte":"Amanhã","unidade":"csi2","confirmado":38,"a_confirmar":2,"sem_resposta":5,"total":45},
+  {"ordem":2,"horizonte":"Amanhã","unidade":"ped","confirmado":55,"a_confirmar":2,"sem_resposta":13,"total":70},
+  {"ordem":3,"horizonte":"Em 2 a 3 dias","unidade":"csi1","confirmado":100,"a_confirmar":78,"sem_resposta":29,"total":207},
+  {"ordem":3,"horizonte":"Em 2 a 3 dias","unidade":"csi2","confirmado":48,"a_confirmar":44,"sem_resposta":3,"total":95},
+  {"ordem":5,"horizonte":"Em 8 a 15 dias","unidade":"csi1","confirmado":0,"a_confirmar":430,"sem_resposta":0,"total":430}],
+ "dia_de_hoje":{"previstos":0,"atendidos":0,"faltaram":0,"a_caminho":0,"atrasados":0,"por_unidade":[]},
+ "resultado":{"atendidos_14d":2100,"faixas":[{"faixa":"0 a 2 dias","n":260},{"faixa":"3 a 7 dias","n":990},{"faixa":"8 a 14 dias","n":850}],"entregues_registrados":0,"concluidos_jornada":2}}

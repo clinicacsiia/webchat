@@ -11,6 +11,7 @@ begin
   select * into s from public.app_aparelho_validar(p_token);
   if s.o_erro is not null then return public.app_erro_json(s.o_erro); end if;
   if coalesce(p_novo, '') !~ '^[0-9]{4}$' then return jsonb_build_object('ok', false, 'erro', 'pin', 'mensagem', 'O PIN precisa ter 4 números.'); end if;
+  if public.app_pin_fraco(p_novo) then return jsonb_build_object('ok', false, 'erro', 'pin_fraco', 'mensagem', 'Escolha um PIN menos óbvio: não use números repetidos (1111), em sequência (1234) nem pares repetidos (1212).'); end if;
   select * into a from public.app_paciente where id = s.o_pac for update;
   v_seg := public.app_trava(a.id);
   if v_seg > 0 then return public.app_bloqueado_json(v_seg); end if;

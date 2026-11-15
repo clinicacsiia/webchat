@@ -8,6 +8,7 @@ CREATE OR REPLACE FUNCTION public.chat_disponibilidade_cancelar(p_conversa uuid,
 AS $function$
 declare r public.disponibilidade_pedido;
 begin
+  perform public.app_pin_exigir_leitura();   -- PIN também no servidor (config.app_pin_servidor)
   perform public.chat_valida(p_conversa, p_token);
   r := public.disponibilidade_do_paciente(p_conversa, p_id);
   if r.estado in ('expirada', 'cancelada', 'convertida_em_agendamento') then return jsonb_build_object('ok', true, 'estado', r.estado, 'ja_terminada', true); end if;

@@ -10,6 +10,7 @@ AS $function$
                     v_uid uuid := (select auth.uid()); v_cp public.contas_paciente;
                       v_cadastro jsonb; v_hist jsonb; v_pedidos jsonb; v_msgs jsonb; v_fotos int; v_conv int;
                       begin
+  perform public.app_pin_exigir_leitura();   -- PIN também no servidor (config.app_pin_servidor)
                         select * into v_cp from public.contas_paciente where id = v_uid;
                           if v_uid is null or not found then raise exception 'Entre na sua conta para ver os seus dados.' using errcode = '42501'; end if;
 

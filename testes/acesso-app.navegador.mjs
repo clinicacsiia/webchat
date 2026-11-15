@@ -289,14 +289,14 @@ await caso('"Esqueci o PIN" (aparelho sem cadastro): pelo "Já tenho cadastro", 
   await novo.page.click('[data-act="esqueci"]');
   const tel = await novo.page.inputValue('#tel');
   await novo.page.fill('#nome', 'Ana Outra Teste'); await novo.page.fill('#nasc', NASC_ANA); await novo.page.click('[data-act="esqueci2"]');
-  await pin(novo.page, '1111'); await pin(novo.page, '1111');
+  await pin(novo.page, '7391'); await pin(novo.page, '7391');
   await esperaTexto(novo.page, /não conferem/);
   const manteve = (await novo.page.inputValue('#nasc')) === NASC_ANA && (await novo.page.inputValue('#nome')) === 'Ana Outra Teste';
   await novo.page.fill('#nome', 'ana  SOUZA teste'); await novo.page.click('[data-act="esqueci2"]');
-  await pin(novo.page, '1111'); await pin(novo.page, '1111');
+  await pin(novo.page, '7391'); await pin(novo.page, '7391');
   await esperaTexto(novo.page, /Olá, Ana/);
   const ev = await n(`select count(*)::int n from public.app_evento where tipo = 'pin_redefinido'`);
-  const antigo = await ana.page.evaluate(async () => (await rpc('app_desbloquear', { p_token: S.dev, p_pin: '1111' })).erro);
+  const antigo = await ana.page.evaluate(async () => (await rpc('app_desbloquear', { p_token: S.dev, p_pin: '7391' })).erro);
   const login = await q(`select (select count(*) from public.app_aparelho a join public.app_paciente p on p.id = a.paciente_id where p.telefone = '71991230001')::int n`);
   return { ok: manteve && tel === '(71) 99123-0001' && ev === 1 && antigo === 'sessao' && login[0].n === 1, detalhe: `outros aparelhos derrubados: ${antigo}` };
 });
@@ -306,7 +306,7 @@ await caso('desligar o interruptor mostra "ainda não disponível" em vez de err
   await off.page.fill('#tel', '71991230009'); await off.page.click('[data-act="c1"]');
   await off.page.fill('#nome', 'Caio Teste Silva'); await off.page.fill('#nasc', '1980-01-01'); await off.page.click('[data-act="c2"]');
   await off.page.click('[data-act="tf"][data-v="0"]'); await off.page.click('[data-act="c3"]'); await off.page.click('[data-act="c4skip"]');
-  await pin(off.page, '1234'); await pin(off.page, '1234');
+  await pin(off.page, '7392'); await pin(off.page, '7392');
   await esperaTexto(off.page, /Ainda não disponível/);
   await db.exec(`update public.config set valor = 'sim' where chave = 'app_acesso_modo'`);
   return { ok: (await n(`select count(*)::int n from public.app_paciente where telefone = '71991230009'`)) === 0 };
@@ -316,16 +316,27 @@ await caso('cadastro com celular que já existe volta ao passo 1 com a explicaç
   await dup.page.fill('#tel', '71991230001'); await dup.page.click('[data-act="c1"]');
   await dup.page.fill('#nome', 'Outra Pessoa Teste'); await dup.page.fill('#nasc', '1980-01-01'); await dup.page.click('[data-act="c2"]');
   await dup.page.click('[data-act="tf"][data-v="0"]'); await dup.page.click('[data-act="c3"]'); await dup.page.click('[data-act="c4skip"]');
-  await pin(dup.page, '5555'); await pin(dup.page, '5555');
+  await pin(dup.page, '8264'); await pin(dup.page, '8264');
   await esperaTexto(dup.page, /já tem cadastro/);
   return { ok: /Vamos começar/.test(await texto(dup.page)) && /Já tenho cadastro/.test(await texto(dup.page)) };
+});
+await caso('PIN óbvio (0000, 1234, 1111, 1212...) é recusado na hora, com a explicação, e a pessoa continua na etapa de criar o PIN; um PIN bom segue', async () => {
+  const p = await novaPagina();
+  await p.page.fill('#tel', '71990000099'); await p.page.click('[data-act="c1"]');
+  await p.page.fill('#nome', 'Pessoa Nova Teste'); await p.page.fill('#nasc', '1985-05-05'); await p.page.click('[data-act="c2"]');
+  await p.page.click('[data-act="tf"][data-v="0"]'); await p.page.click('[data-act="c3"]'); await p.page.click('[data-act="c4skip"]');
+  const msgs = [];
+  for (const fraco of ['0000', '1234', '4321', '1212']) { await pin(p.page, fraco); msgs.push(/menos óbvio/.test(await texto(p.page)) && /Crie seu PIN/.test(await texto(p.page))); }
+  await pin(p.page, '8264');
+  const segue = /Confirme o PIN/.test(await texto(p.page));
+  return { ok: msgs.every(Boolean) && segue, detalhe: `recusou=${msgs.join(',')} segue=${segue}` };
 });
 // ================================================================= integração com o chat
 await caso('tela inicial: "Marcar pelo chat da clínica" leva ao chat (a marcação de verdade); a solicitação sem chat continua como opção', async () => {
   const p = await novaPagina();
   await p.page.click('[data-act="go"][data-v="entrar"]');
   await p.page.fill('#tel', '71991230001'); await p.page.click('[data-act="entrar"]');
-  await pin(p.page, '1111'); await esperaTexto(p.page, /Marcar pelo chat/);
+  await pin(p.page, '7391'); await esperaTexto(p.page, /Marcar pelo chat/);
   const href = await p.page.getAttribute('a.btn[href]', 'href');
   const sec = /Deixar uma solicitação/.test(await texto(p.page));
   ana = p;
@@ -353,7 +364,7 @@ await caso('veio do chat (?voltar=chat): depois do PIN a página devolve para o 
   const p = await novaPagina('/?voltar=chat');
   await p.page.click('[data-act="go"][data-v="entrar"]');
   await p.page.fill('#tel', '71991230001'); await p.page.click('[data-act="entrar"]');
-  await pin(p.page, '1111');
+  await pin(p.page, '7391');
   await p.page.waitForURL((u) => !String(u).includes('voltar'), { timeout: 5000 });
   return { ok: !p.page.url().includes('voltar'), detalhe: p.page.url() };
 });

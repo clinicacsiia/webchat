@@ -22,6 +22,7 @@ const TELAS = [
   { arquivo: 'index.html', nome: 'chat' },
   { arquivo: 'painel/index.html', nome: 'painel' },
   { arquivo: 'minha-vez/index.html', nome: 'minha-vez' },
+  { arquivo: 'simulacao/integration.mjs', nome: 'painel' },   // simulação da clínica (15/11/2026): só a equipe logada; chama painel_simulacao_dia e painel_simulacao_indicadores
   { arquivo: 'acesso/index.html', nome: 'acesso' },   // acesso rápido do paciente (celular + PIN): só chama funções app_*
 ];
 // Chamadas feitas com o nome numa variável (não aparecem como texto ao lado de "rpc("): declaradas aqui para não ficarem sem conferência.
