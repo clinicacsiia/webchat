@@ -12891,6 +12891,21 @@
    "md5": "60cd04765914d32daa548cb4a3253546"
   },
   {
+   "nome": "painel_simulacao_externa",
+   "args": [
+    {
+     "nome": "p_dias",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "40e5e74501a805cc1b2cc514a2a24185"
+  },
+  {
    "nome": "painel_simulacao_indicadores",
    "args": [
     {

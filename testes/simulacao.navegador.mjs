@@ -20,6 +20,10 @@ const jwt = () => `${b64({ alg: 'HS256', typ: 'JWT' })}.${b64({ sub: USER.id, ro
 const sessao = () => ({ access_token: jwt(), refresh_token: 'r', token_type: 'bearer', expires_in: 86400, expires_at: Math.floor(Date.now() / 1000) + 86400, user: USER });
 const Q = [-40, -30, -20, -14, -10, -6, -3, 0, 6, 15, 25];
 
+const THREE_DIR = resolve(import.meta.dirname, 'node_modules/three');
+const EXTERNA = JSON.parse(require('node:fs').readFileSync(resolve(RAIZ, 'simulacao/examples/externa.json'), 'utf8'));
+const DECISAO = JSON.parse(require('node:fs').readFileSync(resolve(RAIZ, 'simulacao/examples/decisao.json'), 'utf8'));
+const ARGS_GL = ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'];
 const resultados = [];
 const registrar = (nome, ok, detalhe = '') => { resultados.push(ok); console.log(`${ok ? 'PASS' : 'FAIL'}  ${nome}${detalhe ? '  -- ' + detalhe : ''}`); };
 const caso = async (nome, fn) => { try { const r = await fn(); registrar(nome, r.ok, r.detalhe); } catch (e) { registrar(nome, false, `exceção: ${String(e.message).split('\n')[0]}`); } };
@@ -86,6 +90,11 @@ async function pagina(browser, { logado }, viewport = { width: 1280, height: 900
   p.on('pageerror', (e) => erros.push(e.message));
   p.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) erros.push(m.text()); });
   await p.route('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2', (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: require('node:fs').readFileSync(UMD, 'utf8') }));
+  await p.route('https://cdn.jsdelivr.net/npm/three@0.160.0/**', (r) => {
+    const rel = new URL(r.request().url()).pathname.replace('/npm/three@0.160.0/', '');
+    const arq = join(THREE_DIR, rel);
+    return existsSync(arq) ? r.fulfill({ status: 200, contentType: 'text/javascript', body: require('node:fs').readFileSync(arq, 'utf8') }) : r.fulfill({ status: 404, body: 'x' });
+  });
   await p.route(`https://${HOST}/**`, async (r) => {
     const req = r.request(), u = new URL(req.url());
     if (req.method() === 'OPTIONS') return r.fulfill({ status: 204, headers: CORS });
@@ -97,17 +106,20 @@ async function pagina(browser, { logado }, viewport = { width: 1280, height: 900
     chamadas.push({ fn, corpo });
     if (fn === 'painel_simulacao_dia') return json(dia(corpo.p_dia));
     if (fn === 'painel_simulacao_indicadores') return json(INDICADORES);
+    if (fn === 'painel_simulacao_externa') return json({ ...EXTERNA, gerado_em: new Date().toISOString() });
+    if (fn === 'painel_indicadores_decisao') return json(DECISAO);
     return json({ message: 'não esperado: ' + fn }, 404);
   });
   if (logado) await p.addInitScript((s) => { localStorage.setItem('sb-nrvuynjwcgwpjdptkiay-auth-token', JSON.stringify(s)); }, sessao());
   return { p, ctx, chamadas, erros };
 }
 const texto = (p, sel) => p.locator(sel).first().innerText();
+const texto_ = texto;
 const espera = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const srv = await servidor();
 const URL_BASE = `http://127.0.0.1:${srv.address().port}/simulacao/`;
-const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH, args: ['--no-sandbox'] } : {});
+const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH, args: ARGS_GL } : {});
 
 // 1. Sem login, a demonstração funciona e não chama o banco
 await caso('sem login: abre a demonstração, mostra métricas e não chama nenhuma função', async () => {
@@ -148,15 +160,43 @@ await caso('com sessão: carrega hoje sozinho, mostra origem do dado, chegadas r
   const modo = await P.inputValue('#dataMode');
   return { ok: modo === 'forecast' && /chegada\(s\) real/.test(s) && /falta\(s\) registrada/.test(s) && /dia\(s\) de histórico/.test(s) && /cancelada\(s\)\/remarcada\(s\)/.test(s), detalhe: s.slice(0, 260) };
 });
-await caso('chama só as duas funções de leitura, só com data e dias (nenhum dado pessoal sai)', async () => {
+await caso('chama só as funções de leitura previstas, só com datas, dias e filtros fixos (nenhum dado pessoal sai)', async () => {
   const fns = [...new Set(logada.chamadas.map((c) => c.fn))].sort();
   const chaves = [...new Set(logada.chamadas.flatMap((c) => Object.keys(c.corpo)))].sort();
-  return { ok: fns.join() === 'painel_simulacao_dia,painel_simulacao_indicadores' && chaves.join() === 'p_dia,p_dias', detalhe: fns.join() + ' / ' + chaves.join() };
+  return { ok: fns.join() === 'painel_indicadores_decisao,painel_simulacao_dia,painel_simulacao_externa,painel_simulacao_indicadores' && chaves.join() === 'p_ate,p_de,p_dia,p_dias,p_incluir_teste,p_unidade', detalhe: fns.join() + ' / ' + chaves.join() };
 });
 await caso('hoje: segue a hora atual e a linha do tempo tem dados', async () => {
   const pressed = await P.getAttribute('#live', 'aria-pressed');
   const occ = await texto(P, '#occupancy');
   return { ok: pressed === 'true' && occ.length > 0, detalhe: `live ${pressed}; ${occ}` };
+});
+await caso('indicadores primeiro: 4 cartões do painel e pontos de atenção ordenados do mais grave ao menos grave', async () => {
+  const tiles = await P.locator('#kpis .kpi').count();
+  const niveis = await P.locator('#attention li').evaluateAll((els) => els.map((e) => e.dataset.level));
+  const rank = { critical: 0, serious: 1, warning: 2 };
+  const ordenado = niveis.every((n, i) => i === 0 || rank[niveis[i - 1]] <= rank[n]);
+  const texto = await texto_(P, '#attention');
+  return { ok: tiles === 4 && niveis.length >= 3 && ordenado && /Fonte: /.test(texto), detalhe: `${tiles} cartões; níveis ${niveis.join(',')}` };
+});
+await caso('área externa: espaços do chat ao resultado, com dias de atendimento como régua e símbolo + palavra de nível', async () => {
+  const nomes = await P.locator('#strip .space-name').allInnerTexts();
+  const t = await texto_(P, '#strip');
+  return { ok: nomes.length >= 6 && /Esperando resposta no chat/.test(t) && /Exame feito, resultado/.test(t) && /dia\(s\) de atendimento/.test(t) && /(Crítico|Alto|Atenção)/i.test(t), detalhe: nomes.join(' | ') };
+});
+await caso('3D: cena aberta, pontos de atenção em destaque e o resto como contorno', async () => {
+  await P.waitForFunction(() => window.__simulacao.estado3d() === 'ready', null, { timeout: 30000 });
+  await espera(600);
+  const c = await P.evaluate(() => window.__simulacao.cena());
+  const a = await P.evaluate(() => window.__simulacao.analise().pontos.length);
+  const status = await texto_(P, '#d3Status');
+  const canvasPx = await P.evaluate(() => document.querySelector('#scene3d canvas').toDataURL('image/png').length);
+  return { ok: c.attention.length >= 1 && c.ghost.length >= 1 && c.people >= 3 && canvasPx > 4000 && /em destaque/.test(status) && a >= 3, detalhe: JSON.stringify({ att: c.attention, ghost: c.ghost, gente: c.people, canvasPx, status }) };
+});
+await caso('clicar num ponto de atenção marca o item e leva ao 3D', async () => {
+  await P.locator('#attention [data-point]').first().click();
+  await espera(500);
+  const marcado = await P.locator('#attention li[aria-current="true"]').count();
+  return { ok: marcado === 1, detalhe: `${marcado} item marcado` };
 });
 await caso('recomendações trazem título, texto e número; indicadores reais aparecem no painel Resumo', async () => {
   const recs = await P.locator('#recommendations li').count();
@@ -228,6 +268,17 @@ await caso('trocar de dia: ontem é "dia fechado" e amanhã é "dia futuro", amb
 await caso('sem erro de JavaScript durante todo o uso', async () => ({ ok: logada.erros.length === 0, detalhe: logada.erros.join(' | ') }));
 await logada.ctx.close();
 
+await caso('sem WebGL: a página avisa, mantém a lista de pontos de atenção e não dá erro', async () => {
+  const semGl = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH, args: ['--no-sandbox', '--disable-3d-apis', '--disable-gpu', '--disable-webgl', '--disable-webgl2'] } : {});
+  const { p, ctx, erros } = await pagina(semGl, { logado: true });
+  await p.goto(URL_BASE);
+  await p.waitForFunction(() => ['off', 'ready'].includes(window.__simulacao.estado3d()), null, { timeout: 30000 });
+  const estado = await p.evaluate(() => window.__simulacao.estado3d());
+  const msg = estado === 'off' ? await p.locator('#scene3dMsg').innerText() : '';
+  const itens = await p.locator('#attention li').count();
+  await ctx.close(); await semGl.close();
+  return { ok: estado === 'off' && /WebGL/.test(msg) && itens >= 3 && !erros.length, detalhe: `estado ${estado}; ${itens} pontos; erros ${erros.join('|')}` };
+});
 await caso('celular (390 px): sem rolagem lateral e decisão visível', async () => {
   const { p, ctx } = await pagina(browser, { logado: true }, { width: 390, height: 800 });
   await p.goto(URL_BASE);

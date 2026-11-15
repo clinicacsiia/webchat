@@ -164,7 +164,9 @@ Abrir: https://clinicacsiia.github.io/webchat/simulacao/ (entre com a conta do p
 2. **Tempos de guichê, preparo e exame:** se alguém da equipe medir com cronômetro por alguns dias, ponha em **Premissas** (hoje são hipóteses: guichê 3 a 6 min, preparo 4 a 8 min, exame pelo padrão de cada modalidade).
 3. **"Confirmado" na recepção:** confirme com a equipe se a recepção marca "Confirmado" quando o paciente chega. Se marcar, a taxa de falta dos confirmados (≈ 11%) fica otimista.
 4. **Suporte do Klingo (pergunta 4 de `klingo-relatorios-pendentes.md`):** hora real de início e de fim do atendimento. É o que troca hipótese por medida.
-5. **Check-in pelo "Minha vez":** só 5 pacientes usaram até 15/11/2026. É a única espera de verdade; incentivar na recepção melhora a simulação.
+5. **Entrega do resultado:** o sistema não registra quando o paciente busca o resultado (a Jornada tem 2 "concluídos" e `app_resultado` está vazia). Por isso a etapa "Exame feito, resultado" da área externa aparece como ponto cego. Decidir como registrar (equipe marca na conversa? Klingo informa?).
+6. **Limites de atenção da área externa** (chat 15/60/240 min, pedido 8/24/72 h, confirmação 10/20/30%): são palpites meus; diga se a clínica usa outros.
+7. **Check-in pelo "Minha vez":** só 5 pacientes usaram até 15/11/2026. É a única espera de verdade; incentivar na recepção melhora a simulação.
 
 ## 3. Contas e segurança
 

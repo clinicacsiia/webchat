@@ -355,3 +355,34 @@ export function utilization(summary,plan){
  const span=CLOSE-OPEN;
  return Object.fromEntries(Object.entries(plan).map(([pool,count])=>[pool,Math.min(1.5,(summary.work[pool]??0)/(count*span))]));
 }
+
+// Pessoas presentes e esperando, por unidade e por minuto (para o gráfico da linha do tempo). Esperando = da chegada até entrar na sala.
+export function presenceSeries(jobs,end,from=OPEN){
+ const length=Math.max(1,end-from+1);
+ const present={},waiting={};
+ for(const unit of Object.keys(units)){present[unit]=new Int16Array(length);waiting[unit]=new Int16Array(length);}
+ for(const job of jobs){
+  if(job.absent||!Number.isFinite(job.arrive))continue;
+  const first=Math.max(from,job.arrive),last=Math.min(end+1,job.end??end+1);
+  for(let minute=first;minute<last;minute++)present[job.unit][minute-from]++;
+  const stop=Math.min(end+1,job.start??end+1);
+  for(let minute=first;minute<stop;minute++)waiting[job.unit][minute-from]++;
+ }
+ const total=Array.from({length},(_,i)=>0),totalWaiting=total.slice();
+ for(const unit of Object.keys(units))for(let i=0;i<length;i++){total[i]+=present[unit][i];totalWaiting[i]+=waiting[unit][i];}
+ return {present,waiting,total,totalWaiting,from,length};
+}
+// P90 da espera (da chegada ao início do exame) por hora de chegada.
+export function waitByHour(jobs){
+ const buckets=new Map();
+ for(const job of jobs){
+  if(job.absent||job.start===null||!Number.isFinite(job.arrive))continue;
+  const hour=Math.floor(Math.max(OPEN,job.arrive)/60);
+  if(!buckets.has(hour))buckets.set(hour,[]);
+  buckets.get(hour).push(job.start-job.arrive);
+ }
+ return [...buckets].sort((a,b)=>a[0]-b[0]).map(([hour,list])=>{
+  list.sort((a,b)=>a-b);
+  return {hour,n:list.length,p90:list[Math.ceil(list.length*.9)-1],max:list.at(-1)};
+ });
+}

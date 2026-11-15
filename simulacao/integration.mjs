@@ -208,6 +208,20 @@ export async function fetchIndicators(client,days=28){
  return data;
 }
 
+// Área externa (etapas fora da clínica, com a régua dos atendimentos antigos) e os indicadores que o painel já calcula.
+export async function fetchExterna(client,days=28){
+ const {data,error}=await client.rpc('painel_simulacao_externa',{p_dias:days});
+ if(error)throw Error(error.message);
+ return data;
+}
+export async function fetchDecisao(client,days=28){
+ const today=localClock(new Date()).date;
+ const from=new Date(today+'T12:00:00Z');from.setUTCDate(from.getUTCDate()-(days-1));
+ const {data,error}=await client.rpc('painel_indicadores_decisao',{p_de:from.toISOString().slice(0,10),p_ate:today,p_unidade:null,p_incluir_teste:false});
+ if(error)throw Error(error.message);
+ return data;
+}
+
 export function openSnapshotStore(namespace){
  return new Promise((resolve,reject)=>{
   const request=indexedDB.open(namespace,2);

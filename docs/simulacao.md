@@ -1,8 +1,42 @@
 # Simulação da clínica (15/11/2026)
 
-Versão 1.0 — 15/11/2026 / Mudança: criação. A simulação "Clínica CSI portátil 2.0" (pacote enviado pelo dono) foi trazida para `simulacao/`, ligada ao banco do webchat e ao relatório #14359 do Klingo, e ganhou o painel **Decisão**.
+Versão 1.1 — 15/11/2026 / Mudança: **indicadores primeiro**, **área externa** (do pedido ao resultado, com os atendimentos antigos como régua), **3D só com os pontos de atenção**, gráficos refeitos e visual novo; função `painel_simulacao_externa`. Versão 1.0 — 15/11/2026 / Mudança: criação. A simulação "Clínica CSI portátil 2.0" (pacote enviado pelo dono) foi trazida para `simulacao/`, ligada ao banco do webchat e ao relatório #14359 do Klingo, e ganhou o painel **Decisão**.
 
 **Endereço:** https://clinicacsiia.github.io/webchat/simulacao/ (também pelo botão **Simulação** no alto do painel de atendimento). Só funciona com login do painel (administrador ou atendente). Sem login, abre a **Demonstração** com dados fictícios.
+
+## Ordem da página (indicadores primeiro)
+
+1. **Indicadores:** os 4 cartões do painel (procuraram o chat, agendaram, marcações novas, faltas, com a variação contra o período anterior) e a lista de **pontos de atenção**, do mais grave ao menos grave. Cada ponto traz o número, a fonte (indicadores do painel, área externa ou simulação) e leva ao 3D.
+2. **Área externa:** o caminho antes e depois da clínica (ver abaixo).
+3. **Pontos de atenção em 3D.**
+4. **Clínica por dentro:** a simulação (linha do tempo por unidade, espera por hora, miniatura, ronda).
+5. **Decisão:** recomendações, uso das estações, encaixes e indicadores em abas.
+
+O programa roda a análise **antes** de desenhar: lê `painel_indicadores_decisao` (a mesma função que alimenta a aba Indicadores do painel, últimos 28 dias contra os 28 anteriores, com as mesmas regras de frases), `painel_simulacao_externa` e o resultado da simulação do dia, e só então monta a lista, o desenho da área externa e o 3D.
+
+## Área externa (do pedido ao resultado)
+
+Os "espaços" são as etapas fora da clínica. **A régua é o total de atendimentos antigos**: média de atendidos por dia nos dias fechados dos últimos 28 dias (15/11/2026: 161 por dia, 2.420 atendimentos em 15 dias). Cada etapa mostra pessoas e **dias de atendimento** = pessoas ÷ média por dia; a largura do espaço cresce com a raiz desse número.
+
+| Espaço | O que conta | Nível de atenção |
+|---|---|---|
+| Esperando resposta no chat | Conversas abertas (fora as de teste) esperando a equipe | Mais antiga há 15 min: atenção; 60 min: alto; 4 h: crítico. Também se esperam 20% ou mais das conversas abertas por dia |
+| Pedido pronto, falta marcar | `pre_agendamentos` em `pronto` | Parado há 8 h: atenção; 24 h: alto; 72 h: crítico |
+| Sem confirmação (hoje e amanhã) | Exames de hoje e amanhã "A confirmar" ou "Sem resposta" | 10% dos exames: atenção; 20%: alto; 30%: crítico (mostra a pior unidade) |
+| Agenda dos próximos dias | Exames marcados nos próximos 15 dias, em dias de atendimento | Só informação |
+| A caminho da clínica hoje | Marcados para hoje que ainda não chegaram, e atrasados (30 min ou mais) | Atrasados: 8%: atenção; 15%: alto; 25%: crítico |
+| Na clínica (simulação) | Fila simulada e espera P90 do dia | P90 de 30 min: atenção; 45: alto; 60: crítico |
+| Exame feito, resultado | Atendidos nos últimos 14 dias | **Ponto cego:** o Klingo/Jornada não registra a entrega do resultado (`app_resultado` vazia; 2 "concluídos" na Jornada). Sem nenhuma entrega registrada: alto |
+
+Os limites são decisões de partida e ficam em `simulacao/analise.mjs` (uma linha por regra). Dizer ao Claude se algum precisa mudar.
+
+## 3D: só os pontos de atenção
+
+Cena com three.js 0.160 (carregada de `cdn.jsdelivr.net` pelo `importmap`; se a CDN falhar ou o navegador não tiver WebGL, a página avisa e a lista de pontos continua inteira). O caminho vai da esquerda (chat) para a direita (clínica e resultado). **Só os pontos de atenção ganham corpo:** disco e anel na cor do nível, figuras de pessoas (proporcionais ao número real, no máximo 90 por espaço), coluna de luz pulsando e rótulo com símbolo, nome e número (o texto completo aparece ao passar o mouse). O que está em ordem fica como contorno fantasma com a etiqueta "em ordem". As três unidades da clínica ficam como prédios; só as que têm alerta de simulação acendem. Arrastar gira, rolar aproxima, tocar num ponto da lista ou num espaço da área externa leva a câmera até ele. A cena só desenha quando está visível na tela.
+
+## Gráficos
+
+Refeitos em SVG puro (`simulacao/grafico.mjs`), seguindo o método de visualização do projeto: **linha do tempo** com áreas empilhadas por unidade (CSI 1 azul, CSI 2 laranja, Pediatria verde-água; paleta validada no fundo escuro, diferença para daltonismo ≥ 9), linha tracejada de quem espera, marcações das ocorrências da ronda, pico anotado, melhor janela sombreada, dica ao passar o mouse e **tabela equivalente**; **espera por hora** (P90 da chegada ao exame) com a meta de 30 min e cor por nível, sempre com símbolo e valor; cartões com variação. Os níveis usam a paleta de estado reservada, **sempre com símbolo e palavra** (▲ Crítico, ◆ Alto, ● Atenção), nunca só cor.
 
 ## O que ela faz
 
@@ -72,6 +106,7 @@ Arquivo `supabase/simulacao-dados.sql` (fluxograma, versão e rollback no cabeç
 | `sim_unidade(texto)`, `sim_modalidade(texto)` | qualquer um (puras) | Traduz "CSI 1" → `csi1` e o nome do procedimento → `consulta`, `us`, `rm`, `tc`, `eco`, `rx`, `dmo`, `mamo`, `histero` (fora disso: nulo, contado em `fora_do_modelo`) |
 | `painel_simulacao_dia(date)` | `authenticated` com papel admin ou atendente | Um dia no formato da simulação (`visits`, `history`, `calibragem`, `meta`) |
 | `painel_simulacao_indicadores(integer)` | idem | Indicadores de decisão dos últimos 7 a 90 dias e dos próximos 15 |
+| `painel_simulacao_externa(integer)` | idem | Base de atendimentos antigos e etapas fora da clínica (chat, pedidos, confirmação por horizonte e unidade, hoje, resultado). Só números. Arquivo `supabase/simulacao-externa.sql`, aplicada como `simulacao_externa_parte1` (≈ 110 ms, 2,4 KB). Rollback: `drop function public.painel_simulacao_externa(integer);` |
 
 Aplicado na produção em 15/11/2026 em 4 partes (`simulacao_dados_parte1..4`, só `create or replace`). Medido: ≈ 270 ms cada, 88 KB o dia e 12 KB os indicadores. `anon` não executa. **Voltar atrás:** `drop function` das 4 (comandos no cabeçalho do arquivo; o Supabase pede confirmação) e apagar a pasta `simulacao/` e o botão no painel.
 
@@ -84,6 +119,9 @@ Aplicado na produção em 15/11/2026 em 4 partes (`simulacao_dados_parte1..4`, s
 | `simulacao/engine.mjs` | Motor da simulação (filas, estações, ronda). Versão 2.1: premissas editáveis, chegada por quantis, falta por confirmação, uso das estações |
 | `simulacao/integration.mjs` | Valida o retorno do banco, calibra e monta o dia. Guarda só a última leitura de cada dia (IndexedDB `clinica-csi-simulacao`) |
 | `simulacao/decisao.mjs` | Recomendações e painéis (funções puras, testadas) |
+| `simulacao/analise.mjs` | Etapas da área externa, pontos de atenção e cartões do painel (funções puras, testadas) |
+| `simulacao/grafico.mjs` | Gráficos SVG, cartões, espaços da área externa e lista de atenção |
+| `simulacao/cena3d.mjs` | Cena 3D (three.js), carregada só depois da análise |
 | `simulacao/scene.mjs`, `assets/` | Desenho isométrico e imagens (do pacote original, sem mudança) |
 | `simulacao/agenda.json`, `examples/snapshot.json` | Dados da demonstração e exemplo do formato |
 | `simulacao/config.mjs` | URL e chave pública do Supabase (as mesmas das outras telas), intervalo de leitura |
@@ -92,7 +130,7 @@ O service worker do chat **não guarda** `/simulacao/` (mudou `webchat-cliente-v
 
 ## Testes
 
-`cd testes && npm run test:simulacao` (14: motor, formato do banco, calibragem, recomendações, painéis), `npm run test:simulacao-sql` (13, no clone da produção: modalidades, privacidade, permissão, só leitura) e `CHROMIUM_PATH=/opt/pw-browsers/chromium npm run test:simulacao-nav` (15, no navegador com o Supabase simulado: demonstração sem login, login, dia real, encaixe, premissas, capacidade, troca de dia, celular). Entram no `npm test`.
+`cd testes && npm run test:simulacao` (22: motor, formato do banco, calibragem, recomendações, painéis, análise, gráficos), `npm run test:simulacao-sql` (13) e `npm run test:simulacao-externa-sql` (8), no clone da produção (modalidades, privacidade, permissão, só leitura, base, horizontes) e `CHROMIUM_PATH=/opt/pw-browsers/chromium npm run test:simulacao-nav` (20, no navegador com Supabase simulado e WebGL por software: demonstração, login, dia real, indicadores primeiro, área externa, 3D com pontos em destaque e o resto em contorno, clique no ponto, sem WebGL, encaixe, premissas, capacidade, troca de dia, celular). Entram no `npm test`.
 
 **Ainda não provado:** abrir a página na produção com a sua conta logada (o teste usa Supabase simulado; as funções do banco foram conferidas por chamada real, sem ler dado de paciente).
 

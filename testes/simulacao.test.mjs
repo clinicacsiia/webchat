@@ -243,3 +243,106 @@ test('painéis escapam texto e funcionam com os números do banco', () => {
   assert(recs.some((r) => /Chegam cedo em CSI 1/.test(r.title)));
   assert(recs.some((r) => /quase não é medida/.test(r.title)));
 });
+
+// ---------------- análise (indicadores primeiro), gráficos e área externa ----------------
+import * as A from '../simulacao/analise.mjs';
+import * as G from '../simulacao/grafico.mjs';
+const externaEx = JSON.parse(await readFile(new URL('../simulacao/examples/externa.json', import.meta.url), 'utf8'));
+const decisaoEx = JSON.parse(await readFile(new URL('../simulacao/examples/decisao.json', import.meta.url), 'utf8'));
+
+test('buildStages: dias de atendimento = pessoas ÷ média de atendidos por dia, e o nível sai das regras', () => {
+  const stages = A.buildStages(externaEx);
+  const by = Object.fromEntries(stages.map((s) => [s.id, s]));
+  assert.deepEqual(stages.map((s) => s.id), ['chat', 'pedidos', 'confirmar', 'agenda', 'hoje', 'resultado']);
+  assert.equal(by.pedidos.n, 40);
+  assert.equal(by.pedidos.dias, Math.round(10 * 40 / 160) / 10);
+  assert.equal(by.chat.nivel, 'serious');       // mais antiga há 150 min (≥ 60)
+  assert.equal(by.pedidos.nivel, 'serious');    // parado há 60 h (≥ 24)
+  assert.equal(by.confirmar.n, 2 + 18 + 25 + 13 + 5 + 2);
+  assert.equal(by.confirmar.nivel, 'serious');  // 65 de 278 = 23% (≥ 20)
+  assert.equal(by.confirmar.pior, 'csi1');
+  assert.equal(by.hoje.nivel, 'info');          // sem exames hoje
+  assert.equal(by.resultado.cego, false);       // há 2 concluídos registrados
+  assert.equal(by.chat.diasUnidade, 'conversas');
+  assert(stages.every((s) => s.mediaDia === 160));
+  // a clínica entra quando a simulação é informada
+  const comClinica = A.buildStages(externaEx, { waiting: 5, level: 'warning', text: 'x', units: { csi1: 5 } });
+  assert.equal(comClinica.find((s) => s.id === 'clinica').lane, 'clinica');
+  assert.deepEqual(A.buildStages(null), []);
+});
+
+test('resultado sem nenhuma entrega registrada vira ponto cego (nível alto)', () => {
+  const ext = structuredClone(externaEx); ext.resultado.concluidos_jornada = 0; ext.resultado.entregues_registrados = 0;
+  const r = A.buildStages(ext).find((s) => s.id === 'resultado');
+  assert.equal(r.cego, true); assert.equal(r.nivel, 'serious');
+  assert.match(r.texto, /nenhuma entrega de resultado registrada/);
+});
+
+test('destaquesDoPainel segue as regras do painel (funil, sem resposta, faltas por grupo)', () => {
+  const d = A.destaquesDoPainel(decisaoEx.atual, decisaoEx.anterior);
+  const txt = d.map((x) => x.texto).join(' | ');
+  assert.match(txt, /Só 24% das pessoas que procuraram o chat agendaram \(79 de 330\)/);
+  assert.match(txt, /9 pessoas nunca foram respondidas/);
+  assert.match(txt, /Sem Resposta" tem 54% de falta/);
+  assert.equal(d.find((x) => /nunca foram respondidas/.test(x.texto)).nivel, 'critical');
+  assert(d.every((x) => x.titulo && x.stage));
+  assert.deepEqual(A.destaquesDoPainel({}, {}), []);
+});
+
+test('pontosDeAtencao ordena do mais grave ao menos grave, junta as 3 fontes e respeita o limite', () => {
+  const stages = A.buildStages(externaEx);
+  const recs = [{ level: 'alta', title: 'Mais uma estação em CSI 1', text: 'x', unit: 'csi1' }, { level: 'info', title: 'ignorada', text: 'y' }, { level: 'media', title: 'Encaixes', text: 'z' }];
+  const p = A.pontosDeAtencao({ stages, decisao: decisaoEx, recs });
+  const rank = { critical: 0, serious: 1, warning: 2 };
+  for (let i = 1; i < p.length; i++) assert(rank[p[i - 1].nivel] <= rank[p[i].nivel]);
+  assert.equal(p[0].nivel, 'critical');
+  assert(new Set(p.map((x) => x.fonte)).size === 3);
+  assert(!p.some((x) => x.titulo === 'ignorada'));
+  assert.deepEqual(p.find((x) => x.titulo === 'Mais uma estação em CSI 1').unidades, { csi1: 1 });
+  assert.equal(A.pontosDeAtencao({ stages, decisao: decisaoEx, recs, limit: 3 }).length, 3);
+  assert.deepEqual(A.pontosDeAtencao({}), []);
+});
+
+test('cartões do painel: delta e sentido (falta subir é ruim)', () => {
+  const c = A.cartoesDoPainel({ atual: { chat: { funil: { entraram: 100, agendaram: 30 } }, clinica: { atendidos: 80, faltaram: 20, novas_marcacoes: 50, novas_pelo_chat: 5 } },
+    anterior: { chat: { funil: { entraram: 50, agendaram: 20 } }, clinica: { atendidos: 90, faltaram: 10, novas_marcacoes: 50 } } });
+  assert.equal(c.length, 4);
+  assert.equal(c[0].delta, 100);
+  const html = G.kpiTiles(c);
+  assert.match(html, /delta good/);   // procuraram o chat subiu
+  assert.match(html, /delta bad/);    // faltas subiram
+});
+
+test('gráfico da linha do tempo: 3 unidades, espera tracejada, tabela equivalente e tooltip', () => {
+  const p = prepareSnapshot(normalizeSnapshot(dia()));
+  const out = E.simulate(p.roster, p.plan, E.seeds[0], false, 0);
+  const series = E.presenceSeries(out.jobs, 1200);
+  assert.equal(series.length, 1200 - E.OPEN + 1);
+  assert(series.total.some((n) => n > 0));
+  const chart = G.timelineChart({ series, time: 600, focus: 'all', best: null, incidents: E.patrolIncidents(out), end: 1200 });
+  assert.match(chart.svg, /fill="#3987e5"/); assert.match(chart.svg, /stroke-dasharray="6 4"/); assert.match(chart.svg, /<title id="tlTitle">/);
+  assert.match(chart.legend, /esperando atendimento/);
+  assert.match(chart.tooltip(600), /Total: \d+/);
+  assert(chart.minuteAt(0) < chart.minuteAt(1));
+  assert.match(G.timelineTable(series, 'all'), /<th>CSI 1<\/th>/);
+  assert.doesNotMatch(G.timelineChart({ series, time: 600, focus: 'ped', end: 1200 }).svg, /#3987e5/); // foco numa unidade: só a cor dela
+});
+
+test('gráfico de espera: cor por nível e rótulo só nas barras acima da meta', () => {
+  const html = G.waitChart([{ hour: 9, n: 10, p90: 12, max: 20 }, { hour: 10, n: 10, p90: 40, max: 60 }, { hour: 11, n: 10, p90: 75, max: 90 }]);
+  assert.match(html, /fill="#3987e5"/); assert.match(html, /fill="#fab219"/); assert.match(html, /fill="#d03b3b"/);
+  assert.match(html, /● 40 min/); assert.match(html, /▲ 75 min/); assert.doesNotMatch(html, /12 min<\/text>/);
+  assert.match(G.waitChart([]), /Sem atendimentos/);
+});
+
+test('área externa e lista de atenção escapam texto e sempre trazem símbolo + palavra do nível', () => {
+  const stages = A.buildStages(externaEx);
+  stages[0].rotulo = '<img src=x onerror=alert(1)>';
+  const strip = G.stageStrip(stages, externaEx.base);
+  assert(!/<img src=x/.test(strip));
+  assert.match(strip, /dia\(s\) de conversas/); assert.match(strip, /160,0? por dia|160 por dia/);
+  for (const lv of ['critical', 'serious', 'warning']) assert(A.LEVELS[lv].symbol && A.LEVELS[lv].label);
+  const list = G.attentionList([{ id: 'a', nivel: 'critical', titulo: '<b>x</b>', texto: 't', stage: 'chat', fonte: 'f' }]);
+  assert(!/<b>x/.test(list)); assert.match(list, /▲/); assert.match(list, /Crítico/);
+  assert.match(G.attentionList([]), /Nenhum ponto de atenção/);
+});

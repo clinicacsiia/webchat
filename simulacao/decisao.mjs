@@ -61,7 +61,7 @@ export function confirmationOpportunity(roster,calibration){
 
 export function buildRecommendations({date,jobs,summary,tests,absence,confirmation,timeline,indicators,calibration,meta,mode}){
  const out=[];
- const add=(level,title,text,proof=[])=>out.push({level,title,text,proof});
+ const add=(level,title,text,proof=[],extra={})=>out.push({level,title,text,proof,...extra});
  const total=summary.total;
  if(summary.missed>0)add('alta','Dia não fecha',summary.missed+' atendimento(s) ficariam sem acontecer até o fim da simulação.',['Aumente estações nos setores com fila ou tire marcações do pico.']);
  if(summary.over>0)add('alta','Passa das 19:00','O último atendimento termina às '+E.clock(summary.last)+' ('+summary.over+' min depois das 19:00).',['Veja o setor com maior espera abaixo.']);
@@ -70,27 +70,27 @@ export function buildRecommendations({date,jobs,summary,tests,absence,confirmati
   if(gain<2&&t.before.p90-t.after.p90<5)continue; // ganho pequeno é ruído do sorteio, não decisão
   add(t.before.p90>=45||t.before.above>=8?'alta':'media','Mais uma estação em '+poolLabel(t.pool),
    'Passar de '+t.from+' para '+t.to+' reduz a espera P90 de '+t.before.p90+' para '+t.after.p90+' min e os atendimentos acima de 30 min de '+t.before.above+' para '+t.after.above+'.',
-   ['Esse setor acumulou ≈ '+t.waitPerScenario+' min de espera no dia simulado.']);
+   ['Esse setor acumulou ≈ '+t.waitPerScenario+' min de espera no dia simulado.'],{unit:t.pool.split(':')[0],pool:t.pool});
  }
  for(const t of tests?.less??[]){
   if(!t.safe)continue;
   add('info','Estação folgada em '+poolLabel(t.pool),
-   'Uso de '+pct(t.use*100)+' do horário. Com '+t.to+' estação(ões) em vez de '+t.from+', a espera P90 continua em '+t.after.p90+' min (antes '+t.before.p90+').',['Candidata a ser realocada para um setor com fila.']);
+   'Uso de '+pct(t.use*100)+' do horário. Com '+t.to+' estação(ões) em vez de '+t.from+', a espera P90 continua em '+t.after.p90+' min (antes '+t.before.p90+').',['Candidata a ser realocada para um setor com fila.'],{unit:t.pool.split(':')[0],pool:t.pool});
  }
  if(confirmation&&confirmation.total>=1){
   const parts=confirmation.lines.filter(l=>l.n>0).map(l=>l.n+' '+confirmNames[l.state].toLowerCase()+' ('+pct(l.rate)+' faltam)');
   add(confirmation.total>=3?'alta':'media','Confirmar quem ainda não respondeu',
    'Ainda sem confirmação: '+parts.join(' e ')+'. Quem confirma falta '+pct(confirmation.confirmedRate)+'. Se metade responder, voltam ≈ '+num(confirmation.total,1)+' vaga(s).',
-   ['Chame primeiro as marcações das primeiras horas e de exames longos (RM, TC).']);
+   ['Chame primeiro as marcações das primeiras horas e de exames longos (RM, TC).'],{unit:null});
  }
  const slots=(absence?.rows??[]).filter(r=>r.suggested>=1).slice(0,3);
  if(slots.length)add('media','Encaixes que o histórico sustenta',
   slots.map(r=>E.units[r.unit]+' · '+E.types[r.type][0]+' às '+String(r.hour).padStart(2,'0')+'h: '+num(r.expected,1)+' falta(s) esperada(s) de '+r.booked+', encaixe até '+r.suggested).join('; ')+'.',
-  ['Teste cada encaixe em "Testar encaixe" antes de oferecer: a simulação mostra se a espera piora.']);
+  ['Teste cada encaixe em "Testar encaixe" antes de oferecer: a simulação mostra se a espera piora.'],{unit:slots[0].unit});
  if(timeline?.best&&mode!=='observed')add('info','Melhor janela para novas marcações',E.clock(timeline.best.start)+'–'+E.clock(timeline.best.end)+' tem a menor ocupação ('+num(timeline.best.sum/timeline.interval,1)+' pacientes em média, pico '+timeline.best.peak+').');
  const punctual=(indicators?.pontualidade??[]);
  for(const u of punctual){
-  if(u.pct_15_antes>=25)add('info','Chegam cedo em '+(E.units[u.unidade]??u.unidade),pct(u.pct_15_antes)+' chegam 15 min ou mais antes do horário e '+pct(u.pct_15_depois)+' chegam 15 min ou mais depois (mediana '+num(u.p50)+' min).',['O pico da recepção começa antes da hora marcada: reforce o guichê 15–20 min antes.']);
+  if(u.pct_15_antes>=25)add('info','Chegam cedo em '+(E.units[u.unidade]??u.unidade),pct(u.pct_15_antes)+' chegam 15 min ou mais antes do horário e '+pct(u.pct_15_depois)+' chegam 15 min ou mais depois (mediana '+num(u.p50)+' min).',['O pico da recepção começa antes da hora marcada: reforce o guichê 15–20 min antes.'],{unit:u.unidade});
  }
  if(meta?.com_chegada_real===0&&mode!=='demo')add('info','Sem chegada real neste dia','Nenhum paciente tem a chegada registrada pelo Klingo; a simulação sorteia a chegada pelo padrão medido.');
  const fila=indicators?.fila_chegada;

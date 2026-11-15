@@ -11,25 +11,77 @@
 .tabs{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}h4{margin:1em 0 .4em;font-size:.95rem}.cols{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:850px){.cols{display:block}.usage-row{grid-template-columns:1fr 80px 44px}}
 .assume{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px}.assume input{width:5.2em}.assume label{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 #loginCard form{display:flex;gap:8px;flex-wrap:wrap;align-items:end}#loginCard label{display:grid;gap:4px}
+
+/* ===== Versão 2.2: visual novo ===== */
+:root{--surface:#1e3041;--ink:#ebf4f7;--ink2:#b7c8d1;--ink3:#7f98a6;--line:#3c5365;--accent:#9be8d6;--crit:#d03b3b;--high:#ec835a;--warn:#fab219;--good:#0ca30c}
+body{scroll-behavior:smooth;line-height:1.45}
+.hero h1{letter-spacing:-.01em}
+.secnav{position:sticky;top:0;z-index:20;display:flex;gap:6px;flex-wrap:wrap;padding:8px 0;margin:6px 0 12px;background:linear-gradient(#141f2c 78%,#141f2c00)}
+.secnav a{color:var(--ink2);text-decoration:none;border:1px solid var(--line);border-radius:999px;padding:.3em .8em;font-size:.85rem;background:#182b3c}
+.secnav a:hover,.secnav a:focus-visible{color:var(--ink);border-color:var(--accent);outline:none}
+.card>h2{display:flex;align-items:center;gap:10px;font-size:1.25rem;margin-bottom:.4em}
+.num{display:inline-grid;place-items:center;width:1.7em;height:1.7em;border-radius:50%;background:#284d51;color:var(--accent);font-size:.8em;font-weight:700}
+.small{font-size:.8rem}
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin:12px 0}
+.kpi{background:#182b3c;border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:grid;gap:2px}
+.kpi-label{color:var(--ink2);font-size:.82rem}.kpi-value{font-size:1.9rem;color:var(--ink);letter-spacing:-.02em;line-height:1.1}.kpi-sub{color:var(--ink3);font-size:.8rem;min-height:1.1em}
+.delta{font-size:.8rem;font-weight:600}.delta small{font-weight:400;color:var(--ink3)}.delta.good{color:#7fd67f}.delta.bad{color:#ff9d7a}
+.badge{display:inline-flex;align-items:center;gap:5px;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#0b0b0b;background:var(--lv,#7f98a6);border-radius:5px;padding:.12em .5em}
+.attention{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.attention li{border:1px solid var(--line);border-left:5px solid var(--lv);border-radius:8px;background:#182b3c}
+.attention button{all:unset;box-sizing:border-box;display:grid;gap:3px;width:100%;padding:.6em .8em;cursor:pointer}
+.attention .badge{justify-self:start}
+.attention button:hover,.attention button:focus-visible{background:#1d3347;outline:2px solid var(--accent);outline-offset:-2px;border-radius:7px}
+.att-text{color:var(--ink2);font-size:.9rem}
+.ok-note{padding:.7em;border:1px solid var(--line);border-radius:8px}
+.strip{list-style:none;margin:12px 0 6px;padding:0;display:flex;gap:10px;align-items:stretch;overflow-x:auto;padding-bottom:6px}
+.space{position:relative;min-width:150px;background:linear-gradient(#1a2e40,#16293a);border:1px solid var(--line);border-top:4px solid var(--lv,#7f98a6);border-radius:12px;padding:10px 12px;display:grid;gap:4px;align-content:start}
+.space[data-level=good],.space[data-level=info]{opacity:.78}
+.space+.space:before{content:'›';position:absolute;left:-9px;top:46%;color:var(--ink3);font-size:1.4rem;line-height:0}
+.space .badge{justify-self:start}
+.space-name{font-weight:600;font-size:.88rem}.space-n{font-size:1.8rem;letter-spacing:-.02em;line-height:1}.space-days{color:var(--accent);font-size:.78rem;min-height:1.1em}
+.space-text{color:var(--ink2);font-size:.78rem}
+.dots{display:flex;flex-wrap:wrap;gap:3px;min-height:6px}.dots i{width:7px;height:7px;border-radius:50%;background:var(--lv)}
+.scene3d{position:relative;height:460px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#101c27}
+.scene3d canvas{display:block}
+.labels3d{position:absolute;inset:0;pointer-events:none}
+.label3d{all:unset;box-sizing:border-box;position:absolute;left:0;top:0;pointer-events:auto;cursor:pointer;display:grid;gap:1px;max-width:210px;padding:.3em .55em;border-radius:8px;background:#0e1a25e6;border:1px solid var(--lv);color:var(--ink);font-size:.72rem;line-height:1.25;text-align:center}
+.label3d[data-level=good]{opacity:.55;border-style:dashed;pointer-events:none}
+.label3d .l-t{display:none}.label3d:hover,.label3d:focus-visible{z-index:5;max-width:260px}.label3d:hover .l-t,.label3d:focus-visible .l-t{display:block}
+.card,h2[id^=sec],section[id]{scroll-margin-top:64px}
+.label3d .l-name{font-weight:700}.label3d .l-n{font-size:1.05rem;font-weight:700;color:var(--lv)}.label3d .l-sym{color:var(--lv)}.label3d .l-ok{color:var(--ink3)}.label3d .l-t{color:var(--ink2)}
+.scene-msg{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:20px;color:var(--ink2)}
+.chart-svg{display:block;width:100%;height:auto;background:#152431;border-radius:8px}
+.legend2{display:flex;flex-wrap:wrap;gap:6px 16px;list-style:none;margin:8px 0;padding:0;color:var(--ink2);font-size:.82rem}.legend2 i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px}.legend2 i.dash{width:22px;height:0;border-top:2px dashed var(--ink);border-radius:0;vertical-align:3px}
+.chart-wrap{position:relative}.tip{position:absolute;pointer-events:none;z-index:5;background:#0e1a25f2;border:1px solid var(--line);border-radius:8px;padding:.45em .65em;font-size:.8rem;line-height:1.35;white-space:nowrap;box-shadow:0 4px 14px #0008}
+.rowflex{display:grid;grid-template-columns:1fr 1fr;gap:14px}@media(max-width:850px){.rowflex{display:block}.scene3d{height:380px}.secnav{position:static}}
+details.tbl summary{cursor:pointer;color:var(--ink2);font-size:.85rem}
+.card{box-shadow:0 1px 0 #ffffff08 inset}
 </style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
 <header class="hero"><div><h1>Simulação da clínica</h1><p class="muted">Dados reais do Klingo e do webchat, indicadores e testes de capacidade · horário de Salvador · <a href="../painel/">voltar ao painel</a></p></div></header>
 <section class="card" aria-labelledby="integrationTitle"><h2 id="integrationTitle">Fonte dos dados</h2><div class="controls"><label>Modo <select id="dataMode"><option value="demo">Demonstração (dados fictícios)</option><option value="forecast">Klingo + banco (dia real e previsão)</option></select></label><button id="dayBack" aria-label="Dia anterior">‹</button><label>Dia <input id="sourceDate" type="date"></label><button id="dayNext" aria-label="Próximo dia">›</button><button id="dayToday">Hoje</button><button id="sync">Carregar / atualizar</button><button id="backup">Exportar backup</button><label>Restaurar backup <input id="restore" type="file" accept=".json,application/json"></label></div><small id="sourceStatus" role="status"></small>
 <div id="loginCard" class="card" hidden style="margin-top:12px"><h3>Entrar com a conta do painel</h3><form id="loginForm"><label>E-mail <input id="loginEmail" type="email" autocomplete="username" required></label><label>Senha <input id="loginPassword" type="password" autocomplete="current-password" required></label><button type="submit">Entrar</button></form><small id="loginMessage" role="status"></small></div></section>
+<nav class="secnav" aria-label="Seções da página"><a href="#sec-indicadores">1 · Indicadores</a><a href="#sec-externa">2 · Área externa</a><a href="#sec-3d">3 · Pontos de atenção em 3D</a><a href="#sec-clinica">4 · Clínica por dentro</a><a href="#decisionCard">5 · Decisão</a></nav>
+<section class="card" id="sec-indicadores" aria-labelledby="indTitle"><h2 id="indTitle"><span class="num">1</span>Indicadores primeiro</h2>
+<p class="muted">O programa lê primeiro os indicadores que o painel já calcula, a área externa e a simulação do dia, e só então decide o que mostrar. <span id="indPeriod"></span></p>
+<div id="kpis"></div><h3>Pontos de atenção, do mais grave ao menos grave</h3><div id="attention"></div></section>
+<section class="card" id="sec-externa" aria-labelledby="extTitle"><h2 id="extTitle"><span class="num">2</span>Área externa: do pedido ao resultado</h2>
+<p class="muted">Quem está esperando fora da clínica. O tamanho de cada espaço usa o total de atendimentos antigos como régua: pessoas ÷ média de atendidos por dia.</p>
+<div id="strip"></div></section>
+<section class="card" id="sec-3d" aria-labelledby="d3Title"><h2 id="d3Title"><span class="num">3</span>Pontos de atenção em 3D</h2>
+<p class="muted">Só os pontos de atenção ganham cor, gente e luz. O que está em ordem fica como contorno. Arraste para girar, role para aproximar, toque num rótulo para ver o indicador.</p>
+<div class="controls"><button id="d3Rotate" aria-pressed="true">Girar sozinho</button><button id="d3Reset">Voltar à vista inicial</button><small id="d3Status" class="muted" role="status"></small></div>
+<div class="scene3d" id="scene3d"><div class="scene-msg" id="scene3dMsg">Preparando a cena 3D…</div></div></section>
+<h2 id="sec-clinica" style="margin:22px 0 6px"><span class="num">4</span> Clínica por dentro (simulação)</h2>
 <div class="controls"><label>Dia <select id="day"></select></label><button id="auto">Iniciar tentativas</button><button id="step">Testar 1 ajuste</button><button id="reset">Reiniciar simulação</button><small id="save" role="status"></small></div>
 <section class="card" aria-labelledby="timelineTitle">
 <div class="timeline-head"><h2 id="timelineTitle">Linha do tempo da clínica</h2><output id="occupancy"></output></div>
 <small id="occupancyScope" class="muted"></small>
-<div class="timeline-chart">
-<div class="timeline-scale muted" aria-hidden="true"><small id="chartPeak"></small><small>0</small></div>
-<svg id="occupancyChart" viewBox="0 0 1000 120" preserveAspectRatio="none" role="img" aria-label="Ocupação projetada ao longo do dia">
-<path d="M0 60H1000 M0 119H1000" stroke="#456075" fill="none" vector-effect="non-scaling-stroke"/>
-<rect id="chartWindow" y="0" height="120" fill="#f6c970" opacity=".22"/>
-<path id="chartArea" fill="#9be8d6" opacity=".14"/>
-<path id="chartLine" stroke="#9be8d6" stroke-width="2" fill="none" vector-effect="non-scaling-stroke"/>
-<line id="chartCursor" y1="0" y2="120" stroke="#fff" stroke-width="2" vector-effect="non-scaling-stroke"/>
-</svg>
-<div id="chartTicks" class="timeline-ticks muted" aria-hidden="true"></div>
-</div>
+<div class="chart-wrap" id="timelineBox"><div id="timelineChart"></div><div id="timelineTip" class="tip" hidden></div></div>
+<div id="timelineLegend"></div>
+<details class="tbl"><summary>Ver o gráfico como tabela</summary><div class="scroll" id="timelineTable"></div></details>
+<h3 style="margin-top:14px">Espera por hora de chegada (P90)</h3><div id="waitChart"></div>
 <label for="time">Hora exibida <strong id="clock"></strong></label>
 <input type="range" id="time" min="390" max="1200" step="1" aria-describedby="occupancyScope">
 <div class="timeline-footer"><span id="quietTime"></span><button id="goQuiet" disabled>Ver horário sugerido</button></div>

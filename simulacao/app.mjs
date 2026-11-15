@@ -3,8 +3,10 @@
 import * as E from './engine.mjs';
 import {createScenes} from './scene.mjs';
 import {config} from './config.mjs';
-import {fetchSnapshot,fetchIndicators,normalizeSnapshot,prepareSnapshot,localClock,openSnapshotStore,putSnapshot,listSnapshots} from './integration.mjs';
+import {fetchSnapshot,fetchIndicators,fetchExterna,fetchDecisao,normalizeSnapshot,prepareSnapshot,localClock,openSnapshotStore,putSnapshot,listSnapshots} from './integration.mjs';
 import * as D from './decisao.mjs';
+import * as G from './grafico.mjs';
+import * as A from './analise.mjs';
 const $=id=>document.getElementById(id);
 const key=config.storageNamespace+'-ui';
 const snapshots=new Map();
@@ -38,7 +40,7 @@ state.focus??='all';
 $('sceneUnit').value=state.focus;scenes.focus(state.focus);
 $('absence').value=state.absence;$('rate').value=state.speed;
 let selectedRoom='',selectedPerson=null,selectedAppointment=null,model,baseline,roster,baseRoster,current,prepared=null,activeDay;
-let decisionKey='',decisionTimer=0,liveForToday=false;
+let decisionKey='',decisionTimer=0,liveForToday=false,analysisKey='',scene3d=null,scene3dState='idle',lastAnalysis=null,lastDecision=null;
 const observed=()=>state.mode==='observed';
 const labels={reception:'Guichê',prep:'Preparo',consulta:'Consultório',us:'Ultrassom',rm:'Ressonância',tc:'Tomografia',eco:'Ecocardiografia',rx:'Radiologia',dmo:'Densitometria',mamo:'Mamografia',histero:'Histeroscopia'};
 const escapeHTML=value=>String(value).replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[char]);
@@ -108,6 +110,7 @@ function openDay(keepSelection=false){
  populateDays();
  render();
  renderDecision();
+ renderAnalysis();
 }
 function trial(plan,manual=false){
  if(observed())return;
@@ -140,7 +143,28 @@ function inRoom(j,kind,time){
  return j.type===kind&&['examQueue','exam'].includes(s);
 }
 let timeline, timelineModel, timelineFocus;
-function chartX(time){return 1000*(time-E.OPEN)/(timeline.end-E.OPEN);}
+let timelineChart=null,timelineSeries=null;
+function drawTimeline(time){
+ const end=timeline.end;
+ timelineSeries=E.presenceSeries(model.jobs,end);
+ timelineChart=G.timelineChart({series:timelineSeries,time,focus:state.focus,best:timeline.best,incidents:E.patrolIncidents(model),end});
+ $('timelineChart').innerHTML=timelineChart.svg;
+ $('timelineLegend').innerHTML=timelineChart.legend;
+ $('timelineTable').innerHTML=G.timelineTable(timelineSeries,state.focus);
+ $('waitChart').innerHTML=G.waitChart(E.waitByHour(model.jobs));
+ const svg=$('timelineChart').querySelector('svg'),tip=$('timelineTip'),hover=svg.querySelector('#chartHover');
+ const minuteOf=event=>{const box=svg.getBoundingClientRect();return {minute:timelineChart.minuteAt((event.clientX-box.left)/box.width),box};};
+ svg.onpointermove=event=>{
+  const {minute,box}=minuteOf(event);
+  const m=Math.max(timelineSeries.from,Math.min(end,Math.round(minute)));
+  tip.innerHTML=timelineChart.tooltip(m);tip.hidden=false;
+  const wrap=$('timelineBox').getBoundingClientRect();
+  tip.style.left=Math.min(wrap.width-170,Math.max(0,event.clientX-wrap.left+14))+'px';tip.style.top=Math.max(0,event.clientY-wrap.top-70)+'px';
+  hover.setAttribute('x1',timelineChart.x(m));hover.setAttribute('x2',timelineChart.x(m));hover.setAttribute('visibility','visible');
+ };
+ svg.onpointerleave=()=>{tip.hidden=true;hover.setAttribute('visibility','hidden');};
+ svg.onclick=event=>selectTime(minuteOf(event).minute);
+}
 function refreshTimeline(time){
  if(timelineModel!==model||timelineFocus!==state.focus){
   const end=maxMinute();
@@ -148,20 +172,8 @@ function refreshTimeline(time){
   if(observed())timeline.best=null;
   timelineModel=model;
   timelineFocus=state.focus;
-  const {counts,peak,best,interval}=timeline;
-  const y=count=>118-110*count/(peak||1);
-  const line='M0 '+y(counts[0])+counts.slice(1).map((count,i)=>
-   'H'+chartX(E.OPEN+i+1).toFixed(2)+'V'+y(count).toFixed(2)).join('');
-  $('chartLine').setAttribute('d',line);
-  $('chartArea').setAttribute('d',line+'V120H0Z');
-  $('chartPeak').textContent=peak;
-  $('chartWindow').setAttribute('width',best?chartX(best.end)-chartX(best.start):0);
-  $('chartWindow').setAttribute('x',best?chartX(best.start):0);
-  $('chartTicks').replaceChildren(...Array.from({length:5},(_,i)=>{
-   const tick=document.createElement('span');
-   tick.textContent=E.clock(Math.round(E.OPEN+(end-E.OPEN)*i/4));
-   return tick;
-  }));
+  const {peak,best,interval}=timeline;
+  drawTimeline(time);
   $('occupancyScope').textContent=(E.units[state.focus]??'Todas as unidades')+
    ' · Pacientes únicos presentes, da chegada à saída. Pico '+(observed()?'observado':'previsto')+': '+peak+'.';
   $('quietTime').textContent=best?'Menor ocupação: '+E.clock(best.start)+'–'+E.clock(best.end)+
@@ -172,9 +184,8 @@ function refreshTimeline(time){
  const outside=time<E.OPEN||time>timeline.end;
  const count=timeline.counts[Math.floor(time)-E.OPEN];
  $('occupancy').textContent=outside?'Fora da linha do tempo':count+(count===1?' paciente presente':' pacientes presentes');
- $('chartCursor').setAttribute('visibility',outside?'hidden':'visible');
- $('chartCursor').setAttribute('x1',chartX(time));
- $('chartCursor').setAttribute('x2',chartX(time));
+ const cursor=$('chartCursor');
+ if(cursor){cursor.setAttribute('visibility',outside?'hidden':'visible');cursor.setAttribute('x1',timelineChart.x(time));cursor.setAttribute('x2',timelineChart.x(time));}
  $('time').setAttribute('aria-valuetext',E.clock(time)+(outside?'':', '+count+' pacientes presentes'));
 }
 function selectTime(time){
@@ -339,10 +350,6 @@ $('day').onchange=()=>{state.date=$('day').value;if(state.mode==='demo'){openDay
 $('auto').onclick=()=>{if(current.done)return;state.active=!state.active;save();render();};
 $('step').onclick=()=>step();
 $('time').oninput=()=>selectTime(Number($('time').value));
-$('occupancyChart').onclick=event=>{
- const bounds=$('occupancyChart').getBoundingClientRect();
- selectTime(E.OPEN+(event.clientX-bounds.left)/bounds.width*(timeline.end-E.OPEN));
-};
 $('goQuiet').onclick=()=>{if(timeline.best)selectTime(timeline.best.start);};
 $('play').onclick=()=>{
  if(current.live){current.live=false;state.play=true;}else state.play=!state.play;
@@ -443,11 +450,15 @@ $('loginForm').onsubmit=async event=>{
  sync(true);
 };
 let indicatorsAt=0;
+let externa=null,decisaoPainel=null,demoExterna=null,demoDecisao=null;
 async function loadIndicators(force=false){
  if(!client||(!force&&Date.now()-indicatorsAt<600000&&indicators))return;
- try{indicators=await fetchIndicators(client,config.indicatorDays);indicatorsError='';indicatorsAt=Date.now();}
- catch(error){indicatorsError=error.message;}
- decisionKey='';renderDecision();
+ const [ind,ext,dec]=await Promise.allSettled([fetchIndicators(client,config.indicatorDays),fetchExterna(client,config.indicatorDays),fetchDecisao(client,config.indicatorDays)]);
+ if(ind.status==='fulfilled'){indicators=ind.value;indicatorsError='';}else indicatorsError=ind.reason.message;
+ if(ext.status==='fulfilled')externa=ext.value;
+ if(dec.status==='fulfilled')decisaoPainel=dec.value;
+ if(ind.status==='fulfilled'||ext.status==='fulfilled')indicatorsAt=Date.now();
+ decisionKey='';renderDecision();analysisKey='';renderAnalysis();
 }
 let syncing=false;
 async function sync(showDate=false){
@@ -533,6 +544,70 @@ $('restore').onchange=async()=>{
 };
 openDay();save();describeSource();
 
+function clinicStage(){
+ if(!model||!current?.best?.measure)return null;
+ const time=minute(),waitingByUnit={};
+ let waiting=0;
+ for(const unit of Object.keys(E.units)){
+  waitingByUnit[unit]=model.jobs.filter(j=>j.unit===unit&&['reception','prepQueue','examQueue'].includes(E.stage(j,time))).length;
+  waiting+=waitingByUnit[unit];
+ }
+ const p90=average(current.best.measure,'p90'),above=average(current.best.measure,'above');
+ const level=p90>=60?'critical':p90>=45?'serious':p90>=30?'warning':'good';
+ return {waiting,waitingByUnit,level,units:waitingByUnit,text:'Espera P90 simulada de '+p90+' min; '+above+' atendimento(s) acima de 30 min; '+waiting+' pessoa(s) em fila às '+E.clock(time)+'.'};
+}
+function renderAnalysis(force=false){
+ if(!current||!$('kpis'))return;
+ const demo=state.mode==='demo';
+ const ext=demo?demoExterna:externa,dec=demo?demoDecisao:decisaoPainel;
+ const sim=observed()?null:clinicStage();
+ const signature=[state.mode,state.date,ext?.gerado_em,dec?.periodo?.ate,(lastDecision?.recs??[]).map(r=>r.title).join('|'),sim?.level,state.clinicPlan?1:0].join('#');
+ if(signature===analysisKey&&!force)return;
+ analysisKey=signature;
+ const stages=A.buildStages(ext,sim);
+ const pontos=A.pontosDeAtencao({stages,decisao:dec,recs:lastDecision?.recs??[]});
+ lastAnalysis={stages,pontos,sim,ext,dec};
+ $('kpis').innerHTML=dec?G.kpiTiles(A.cartoesDoPainel(dec)):'<p class="muted">'+(state.mode==='demo'?'Sem dados de demonstração.':'Os indicadores do painel ainda não carregaram.')+'</p>';
+ $('indPeriod').textContent=dec?.periodo?'Período dos indicadores: '+dec.periodo.de+' a '+dec.periodo.ate+(demo?' (dados fictícios)':'')+'.':'';
+ $('attention').innerHTML=G.attentionList(pontos);
+ $('strip').innerHTML=G.stageStrip(stages,ext?.base);
+ update3D();
+}
+async function update3D(){
+ if(!lastAnalysis)return;
+ if(scene3dState==='idle'){
+  scene3dState='loading';
+  try{
+   const module=await import('./cena3d.mjs');
+   scene3d=module.createScene($('scene3d'),{onSelect:selectPoint});
+   if(!scene3d){scene3dState='off';$('scene3dMsg').textContent='Este navegador não abriu o 3D (WebGL indisponível). A lista de pontos de atenção acima traz as mesmas informações.';$('d3Status').textContent='3D indisponível';return;}
+   scene3dState='ready';$('scene3dMsg').remove();
+  }catch(error){scene3dState='off';$('scene3dMsg').textContent='Não foi possível carregar o 3D ('+error.message+'). A lista de pontos de atenção acima traz as mesmas informações.';$('d3Status').textContent='3D indisponível';return;}
+ }
+ if(scene3dState!=='ready')return;
+ scene3d.setData({stages:lastAnalysis.stages,pontos:lastAnalysis.pontos,sim:lastAnalysis.sim});
+ const s=scene3d.state();
+ $('d3Status').textContent=s.attention.length+' ponto(s) de atenção em destaque · '+s.ghost.length+' em ordem (contorno)';
+}
+function selectPoint(id){
+ const point=lastAnalysis?.pontos.find(p=>p.id===id);
+ if(!point)return;
+ for(const li of document.querySelectorAll('#attention li'))li.removeAttribute('aria-current');
+ const button=document.querySelector('#attention [data-point="'+id+'"]');
+ button?.closest('li')?.setAttribute('aria-current','true');
+ button?.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+$('attention').onclick=event=>{
+ const button=event.target.closest('[data-point]');
+ if(!button)return;
+ const stage=button.dataset.stage;
+ selectPoint(button.dataset.point);
+ if(scene3d&&stage)scene3d.focusOn(stage);
+ $('sec-3d').scrollIntoView({behavior:'smooth',block:'start'});
+};
+$('strip').onclick=event=>{const space=event.target.closest('[data-stage]');if(space&&scene3d){scene3d.focusOn(space.dataset.stage);$('sec-3d').scrollIntoView({behavior:'smooth',block:'start'});}};
+$('d3Rotate').onclick=()=>{if(!scene3d)return;$('d3Rotate').setAttribute('aria-pressed',String(scene3d.toggleRotate()));};
+$('d3Reset').onclick=()=>{if(!scene3d)return;scene3d.resetView();$('d3Rotate').setAttribute('aria-pressed','true');};
 function invalidate(){
  for(const levels of Object.values(state.profiles))for(const profile of Object.values(levels))profile.revision='stale';
  decisionKey='';
@@ -557,6 +632,7 @@ function computeDecision(){
  const confirmation=D.confirmationOpportunity(roster,prepared?.calibration);
  const recs=D.buildRecommendations({date:state.date,jobs:model.jobs,summary:model.summary,tests,absence:open,confirmation,timeline,indicators,calibration:prepared?.calibration,meta:prepared?.meta,mode:state.mode});
  lastDecision={recs,tests,open,confirmation};
+ renderAnalysis();
  box.innerHTML='<ul class="recs">'+recs.map(r=>'<li data-level="'+r.level+'"><span class="tag">'+({alta:'Agir hoje',media:'Avaliar',info:'Informação'})[r.level]+'</span> <strong>'+D.esc(r.title)+'</strong><br>'+D.esc(r.text)+(r.proof.length?'<br><small class="muted">'+r.proof.map(D.esc).join(' · ')+'</small>':'')+'</li>').join('')+'</ul>';
  const use=Object.entries(tests.use).filter(([pool])=>plan[pool]).sort((a,b)=>b[1]-a[1]);
  $('usage').innerHTML='<h4>Uso de cada estação no dia simulado</h4><div class="usage">'+use.map(([pool,value])=>'<span class="usage-row"><span>'+D.esc(D.poolLabel(pool))+' · '+plan[pool]+' estação(ões)</span><span class="bar" role="img" aria-label="'+D.pct(value*100)+' de uso"><i style="width:'+Math.min(100,value*100).toFixed(0)+'%;background:'+(value>.85?'#f6c970':value<.3?'#7c99a3':'#9be8d6')+'"></i></span><b>'+D.pct(value*100)+'</b></span>').join('')+'</div><p class="muted">Amarelo: acima de 85% (pouca folga para atrasos). Cinza: abaixo de 30% (sobra).</p>';
@@ -569,7 +645,6 @@ function computeDecision(){
  $('extraSuggest').innerHTML=suggestions.length?'Sugestões pelo histórico: '+suggestions.map(r=>'<button data-suggest="'+r.unit+':'+r.type+':'+r.hour+':'+r.suggested+'">'+D.esc(E.units[r.unit])+' '+D.esc(E.types[r.type][0])+' '+String(r.hour).padStart(2,'0')+'h × '+r.suggested+'</button>').join(' '):'';
  renderPanels();
 }
-let lastDecision=null;
 const panelBuilders={summary:D.panelSummary,absence:D.panelAbsence,arrival:D.panelArrival,demand:D.panelDemand,upcoming:D.panelUpcoming,process:D.panelProcess};
 state.panel??='summary';
 function renderPanels(){
@@ -656,7 +731,10 @@ setInterval(()=>{if(!observed()&&state.active&&!document.hidden)step();},1500);
 setInterval(()=>{if(state.play&&!document.hidden)save();},5000);
 document.addEventListener('visibilitychange',()=>{if(document.hidden)save();});
 window.addEventListener('pagehide',save);
+window.__simulacao={analise:()=>lastAnalysis,cena:()=>scene3d?.state?.()??null,estado3d:()=>scene3dState};
 // Início: só depois de tudo definido (o await abaixo deixa os temporizadores rodarem).
+try{[demoExterna,demoDecisao]=await Promise.all([fetch('./examples/externa.json').then(r=>r.json()),fetch('./examples/decisao.json').then(r=>r.json())]);}catch{}
+renderAnalysis(true);
 if(client){
  const active=await session();
  if(active){
@@ -664,4 +742,4 @@ if(client){
   else loadIndicators();
  }else if(wantedMode!=='demo'||stored.mode===undefined)showLogin(true,'Entre com a conta do painel para carregar os dados reais da clínica. Sem login, a demonstração continua disponível.');
 }
-setInterval(()=>{if(!document.hidden&&state.mode!=='demo'&&dayKind(state.date)==='today')sync();},Math.max(15000,config.pollMs));
+setInterval(()=>{if(!document.hidden&&state.mode!=='demo'&&dayKind(state.date)==='today'){sync();loadIndicators(true);}},Math.max(15000,config.pollMs));
