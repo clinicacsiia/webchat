@@ -751,23 +751,17 @@
     nos.push(h('p', { style: 'text-align:center' }, h('a', { href: '../' }, '← Voltar ao chat')));
     mostrar(...nos);
   }
-  // Um toque: usa o nome, o e-mail e o celular do cadastro. Sem e-mail no cadastro, pede só o e-mail.
-  async function checkinApp(btn, emailDigitado) {
+  // Um toque: o PIN já provou quem é, então o SERVIDOR (app_checkin) usa o nome, o e-mail e o celular do cadastro e põe na fila. Nunca pergunta senha nem e-mail.
+  async function checkinApp(btn) {
     btn.disabled = true;
-    const { data: perfil } = await db.rpc('app_perfil', { p_token: app.dev });
-    const p = perfil && perfil.ok ? perfil.perfil : null;
-    if (!p) { btn.disabled = false; return avisoTela('Não foi possível agora. Tente de novo.'); }
-    const email = emailDigitado || p.email;
-    if (!email) {
-      const campo = h('input', { id: 'ceApp', type: 'email', inputmode: 'email', autocomplete: 'email', maxlength: 200, style: 'width:100%;font-size:1rem;padding:12px;border:1px solid var(--linha);border-radius:10px;background:var(--papel);color:var(--texto)' });
-      const erro = h('p', { class: 'erro', role: 'alert' });
-      const f = h('div', { class: 'folha', role: 'dialog', 'aria-modal': 'true' }, h('div', {}, h('h2', {}, 'Qual é o seu e-mail?'), h('p', { class: 'suave' }, 'Só para chamar você na recepção. Guardamos no seu cadastro.'), campo, erro,
-        h('button', { class: 'principal', type: 'button', style: 'margin-top:12px', onclick: async () => { const e = campo.value.trim(); if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) { erro.textContent = 'Digite um e-mail válido.'; return; } fecharFolha(); await checkinApp(btn, e); } }, 'Fazer check-in'),
-        h('button', { class: 'link', type: 'button', style: 'width:100%;text-align:center', onclick: fecharFolha }, 'Agora não')));
-      document.body.append(f); btn.disabled = false; return;
-    }
-    const d = { nome: p.nome, email, fone: p.telefone };
-    try { await enviarCheckin(d, false); } catch (e) { btn.disabled = false; avisoTela(e.message || 'Não foi possível fazer o check-in.'); }
+    try {
+      const { data, error } = await db.rpc('app_checkin', { p_token: app.dev });
+      if (error) throw new Error(error.code === '54000' ? error.message : 'Não foi possível fazer o check-in agora. Tente de novo ou fale com a recepção.');
+      if (data && data.erro === 'bloqueado') { appDesligar(); return telaPin(); }
+      if (data && data.erro) { btn.disabled = false; return avisoTela(data.mensagem || 'Não foi possível fazer o check-in.'); }
+      if (!data || !data.ticket) throw new Error('Não foi possível fazer o check-in agora.');
+      guardarTicket(data.ticket); iniciar();
+    } catch (e) { btn.disabled = false; avisoTela(e.message || 'Não foi possível fazer o check-in.'); }
   }
 
   btnSair.addEventListener('click', async () => {

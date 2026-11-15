@@ -178,3 +178,7 @@ Comandos no cabeçalho de `supabase/acesso-rapido-paciente.sql` (apagam só obje
 - Agendar de verdade (a solicitação não cria marcação no Klingo).
 - Aviso (push) ao paciente quando a clínica confirma.
 - Texto de privacidade citando o acesso rápido, dados de crianças e o prazo de guarda (jurídico, item 2.5 de `pendencias-do-dono.md`).
+
+## Check-in de um toque sem pedir senha (15/11/2026)
+
+O botão "Fazer check-in" da `minha-vez/` (aparelho com PIN) chamava `checkin_publico` com o e-mail do cadastro. Quem tinha também uma **conta antiga** com o mesmo e-mail e celular caía em "Encontramos o seu cadastro / Digite a sua senha". Agora a tela chama `app_checkin(p_token)`: o servidor confere o PIN (`app_aparelho_validar`), usa nome, e-mail e celular do cadastro, põe na fila (sem duplicar no mesmo dia, mesmo limite diário) e devolve o ticket. PIN vencido volta à tela do PIN; nunca pede senha nem e-mail. Arquivo: `supabase/acesso-checkin-pin.sql` (rollback no cabeçalho); testes `test:acesso-checkin-pin` e `test:acompanhar`. `checkin_publico` continua para o público sem identidade.

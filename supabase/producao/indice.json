@@ -2585,6 +2585,10 @@
   "klingo_auto",
   "klingo_autogestao",
   "klingo_conferir_ativo",
+  "klingo_exames_so_api",
+  "klingo_exames_tem_min",
+  "klingo_exames_vazio_min",
+  "klingo_exames_vencimento_h",
   "klingo_funcoes_base",
   "klingo_paciente_url",
   "klingo_reconfirmar_dias",
@@ -3506,6 +3510,21 @@
    "authenticated": false,
    "publico": false,
    "md5": "8775639b222a7a0d623c0769876b7c4f"
+  },
+  {
+   "nome": "app_checkin",
+   "args": [
+    {
+     "nome": "p_token",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "94eab05604cfd7a62a83e6426337d606"
   },
   {
    "nome": "app_conferir_cadastro",
