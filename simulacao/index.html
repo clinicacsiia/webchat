@@ -22,6 +22,7 @@ body{scroll-behavior:smooth;line-height:1.45}
 .card>h2{display:flex;align-items:center;gap:10px;font-size:1.25rem;margin-bottom:.4em}
 .num{display:inline-grid;place-items:center;width:1.7em;height:1.7em;border-radius:50%;background:#284d51;color:var(--accent);font-size:.8em;font-weight:700}
 .small{font-size:.8rem}
+table.gaps th{white-space:nowrap}table.gaps td{text-align:center;min-width:92px}
 .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin:12px 0}
 .kpi{background:#182b3c;border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:grid;gap:2px}
 .kpi-label{color:var(--ink2);font-size:.82rem}.kpi-value{font-size:1.9rem;color:var(--ink);letter-spacing:-.02em;line-height:1.1}.kpi-sub{color:var(--ink3);font-size:.8rem;min-height:1.1em}
@@ -65,7 +66,7 @@ details.tbl summary{cursor:pointer;color:var(--ink2);font-size:.85rem}
 <nav class="secnav" aria-label="Seções da página"><a href="#sec-indicadores">1 · Indicadores</a><a href="#sec-externa">2 · Área externa</a><a href="#sec-3d">3 · Pontos de atenção em 3D</a><a href="#sec-clinica">4 · Clínica por dentro</a><a href="#decisionCard">5 · Decisão</a></nav>
 <section class="card" id="sec-indicadores" aria-labelledby="indTitle"><h2 id="indTitle"><span class="num">1</span>Indicadores primeiro</h2>
 <p class="muted">O programa lê primeiro os indicadores que o painel já calcula, a área externa e a simulação do dia, e só então decide o que mostrar. <span id="indPeriod"></span></p>
-<div id="kpis"></div><h3>Pontos de atenção, do mais grave ao menos grave</h3><div id="attention"></div></section>
+<div id="kpis"></div><p id="gapsLine" class="muted small"></p><h3>Pontos de atenção, do mais grave ao menos grave</h3><div id="attention"></div></section>
 <section class="card" id="sec-externa" aria-labelledby="extTitle"><h2 id="extTitle"><span class="num">2</span>Área externa: do pedido ao resultado</h2>
 <p class="muted">Quem está esperando fora da clínica. O tamanho de cada espaço usa o total de atendimentos antigos como régua: pessoas ÷ média de atendidos por dia.</p>
 <div id="strip"></div></section>
@@ -96,7 +97,7 @@ details.tbl summary{cursor:pointer;color:var(--ink2);font-size:.85rem}
 <div class="controls"><label>Unidade <select id="extraUnit"></select></label><label>Exame <select id="extraType"></select></label><label>Hora <select id="extraHour"></select></label><label>Quantos <input id="extraQty" type="number" min="1" max="20" value="1" style="width:4.5em"></label><button id="extraAdd">Simular encaixe</button><button id="extraClear">Limpar encaixes</button></div>
 <div id="extraSuggest" class="controls"></div><div id="extraList"></div>
 <h3>Indicadores reais da clínica</h3>
-<div class="tabs" role="group" aria-label="Indicadores"><button data-panel="summary">Resumo</button><button data-panel="absence">Faltas</button><button data-panel="arrival">Chegadas</button><button data-panel="demand">Demanda</button><button data-panel="upcoming">Próximos dias</button><button data-panel="process">Processo chat → clínica</button></div>
+<div class="tabs" role="group" aria-label="Indicadores"><button data-panel="summary">Resumo</button><button data-panel="absence">Faltas</button><button data-panel="arrival">Chegadas</button><button data-panel="demand">Demanda</button><button data-panel="upcoming">Próximos dias</button><button data-panel="process">Processo chat → clínica</button><button data-panel="gaps">O que falta nos dados</button></div>
 <div id="panelBody"></div></section>
 <section class="card"><div class="hero"><div><h2>Clínica em miniatura</h2><p class="muted">Toque no paciente ou no emoji para ver a jornada.</p></div><div class="controls"><label>Vista <select id="sceneUnit"><option value="all">Todas as unidades</option><option value="csi1">CSI 1</option><option value="csi2">CSI 2</option><option value="ped">Pediatria</option></select></label><label id="absenceControl">Faltas sem histórico <select id="absence"><option value="0">0%</option><option value="5">5%</option><option value="10">10%</option><option value="15">15%</option><option value="20">20%</option><option value="25">25%</option><option value="30">30%</option><option value="40">40%</option><option value="50">50%</option></select></label></div></div>
 <div id="scenes" class="miniatures" data-focus="all"></div><p class="legend"><span>😐 Aguardando</span><span>😟 Mais de 30 min</span><span>😠 Mais de 1 hora</span><span>🙂 Em atendimento</span><span>😊 Concluído</span><span>✚ Equipe</span><span>Nome em amarelo · funcionário de ronda</span><span id="absenceStatus"></span></p><div id="journey" class="card" role="region" aria-label="Dados do paciente selecionado" tabindex="-1" hidden></div></section>

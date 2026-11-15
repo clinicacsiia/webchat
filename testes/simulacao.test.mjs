@@ -346,3 +346,45 @@ test('área externa e lista de atenção escapam texto e sempre trazem símbolo 
   assert(!/<b>x/.test(list)); assert.match(list, /▲/); assert.match(list, /Crítico/);
   assert.match(G.attentionList([]), /Nenhum ponto de atenção/);
 });
+
+// ---------------- hora real e mapa do que falta ----------------
+const lacEx = JSON.parse(await readFile(new URL('../simulacao/examples/lacunas.json', import.meta.url), 'utf8'));
+
+test('hora real (chegada, início, fim): etapas observadas, espera medida e duração real usada na previsão', () => {
+  const d = dia({ asOf: '2026-11-13T09:00:00Z', n: 0 });
+  d.visits = [
+    { id: 1, person: 1, unit: 'csi1', type: 'us', slot: 540, arrive: 530, start: 545, end: 570, done: true },
+    { id: 2, person: 2, unit: 'csi1', type: 'us', slot: 560, arrive: 555, start: 560, done: true },       // ainda em exame (sem fim)
+    { id: 3, person: 3, unit: 'csi1', type: 'us', slot: 580, arrive: 575 },                                // esperando
+  ];
+  const p = prepareSnapshot(normalizeSnapshot(d, '2026-11-12'));
+  const [a, b, c] = p.observed.jobs;
+  assert.equal(E.stage(a, 520), 'future'); assert.equal(E.stage(a, 535), 'reception'); assert.equal(E.stage(a, 550), 'exam'); assert.equal(E.stage(a, 571), 'finished');
+  assert.equal(E.stage(b, 700), 'exam');
+  assert.equal(E.patientStatus(a, 600).wait, 15);              // espera real = início − chegada
+  assert.equal(E.patientStatus(c, 600).wait, 25);              // ainda esperando: cresce com o relógio
+  assert.equal(p.roster.find((r) => r.id === 1).actualDuration, 25);   // duração real alimenta a previsão
+  assert.equal(p.roster.find((r) => r.id === 2).actualDuration, null);
+  // início antes da chegada ou fim sem início são recusados pelo contrato
+  const ruim = structuredClone(d); ruim.visits[0].start = 520;
+  assert.throws(() => normalizeSnapshot(ruim, '2026-11-12'), /fora da ordem/);
+  const ruim2 = structuredClone(d); delete ruim2.visits[0].start;
+  assert.throws(() => normalizeSnapshot(ruim2, '2026-11-12'), /Saída sem início/);
+});
+
+test('mapa do que falta: só porcentagem, "—" onde não se aplica, "poucos" com menos de 5 casos, e escapa texto', () => {
+  const html = D.panelGaps(lacEx);
+  assert.match(html, /Só contagem: nenhum dado de pessoa é mostrado/);
+  assert.match(html, /Início e fim do exame/); assert.match(html, /<strong>0%<\/strong> <small>têm<\/small>/);
+  assert.match(html, /title="Não se aplica a esta situação">—/);
+  assert.match(html, /ainda não há leitura da hora real/);
+  const pouco = structuredClone(lacEx); pouco.linhas[1].campos.resultado = { de: 3, com: 0 };
+  assert.match(D.panelGaps(pouco), />poucos</);
+  const hostil = structuredClone(lacEx); hostil.linhas[0].status = '<img src=x onerror=alert(1)>';
+  assert(!/<img src=x/.test(D.panelGaps(hostil)));
+  assert.match(D.panelGaps(null), /Klingo \+ banco/);
+  const w = D.worstGaps(lacEx, 3);
+  assert.deepEqual(w.map((x) => x.key), ['inicio_fim', 'resultado', 'cadastro']);
+  assert(w.every((x) => x.de >= 20) && w[0].pct <= w[1].pct && w[1].pct <= w[2].pct);
+  assert.deepEqual(D.worstGaps(null), []);
+});

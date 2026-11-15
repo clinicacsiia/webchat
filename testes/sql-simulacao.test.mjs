@@ -10,6 +10,7 @@ const caso = async (nome, fn) => { try { const r = await fn(); registrar(nome, r
 
 const { db, falhas } = await criarBancoProducao();
 const { q, um, como, anonimo } = ajudantes(db);
+await db.exec(readFileSync(`${REPO}/supabase/simulacao-hora-real.sql`, 'utf8'));
 await db.exec(readFileSync(`${REPO}/supabase/simulacao-dados.sql`, 'utf8'));
 
 const ADMIN = '00000000-0000-4000-8000-0000000000a1', PACIENTE = '00000000-0000-4000-8000-0000000000b1';

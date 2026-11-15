@@ -2204,6 +2204,19 @@
    ],
    "rls": true,
    "politicas": 0
+  },
+  {
+   "nome": "atendimento_hora",
+   "colunas": [
+    "marcacao_id",
+    "chegada_em",
+    "inicio_em",
+    "fim_em",
+    "fonte",
+    "lido_em"
+   ],
+   "rls": true,
+   "politicas": 0
   }
  ],
  "visoes": [
@@ -4757,6 +4770,21 @@
    "authenticated": true,
    "publico": false,
    "md5": "65313208de1c672803ace8f29b359c93"
+  },
+  {
+   "nome": "atendimento_hora_gravar",
+   "args": [
+    {
+     "nome": "p_linhas",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "708a43df6691f457a8835b5c32587f57"
   },
   {
    "nome": "atendimentos_transicao_trg",
@@ -12899,7 +12927,7 @@
    "anon": false,
    "authenticated": true,
    "publico": false,
-   "md5": "60cd04765914d32daa548cb4a3253546"
+   "md5": "41f66bf170e5d2131ef035dde4a35cf5"
   },
   {
    "nome": "painel_simulacao_externa",
@@ -12929,7 +12957,22 @@
    "anon": false,
    "authenticated": true,
    "publico": false,
-   "md5": "902883369bbfb48c7fdd1618d6cca536"
+   "md5": "c68c96c5d72a50bae54f5243d92586ff"
+  },
+  {
+   "nome": "painel_simulacao_lacunas",
+   "args": [
+    {
+     "nome": "p_dias",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "75b4be0a1e78f359b622f1548d6e08dd"
   },
   {
    "nome": "papel_atual",
@@ -13791,6 +13834,21 @@
    "authenticated": false,
    "publico": false,
    "md5": "8e65c452f13b8b95384ccb3f9ef09026"
+  },
+  {
+   "nome": "sim_minuto",
+   "args": [
+    {
+     "nome": "p_quando",
+     "padrao": false
+    }
+   ],
+   "definer": false,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": true,
+   "md5": "8ed3c73ec7d87918cb0c5d75b82ad016"
   },
   {
    "nome": "sim_modalidade",

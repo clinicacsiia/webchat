@@ -10,6 +10,7 @@ const caso = async (nome, fn) => { try { const r = await fn(); registrar(nome, r
 
 const { db, falhas } = await criarBancoProducao();
 const { q, um, como, anonimo } = ajudantes(db);
+await db.exec(readFileSync(`${REPO}/supabase/simulacao-hora-real.sql`, 'utf8'));
 await db.exec(readFileSync(`${REPO}/supabase/simulacao-dados.sql`, 'utf8'));
 await db.exec(readFileSync(`${REPO}/supabase/simulacao-externa.sql`, 'utf8'));
 

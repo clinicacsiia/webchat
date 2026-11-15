@@ -1,8 +1,31 @@
 # Simulação da clínica (15/11/2026)
 
-Versão 1.1 — 15/11/2026 / Mudança: **indicadores primeiro**, **área externa** (do pedido ao resultado, com os atendimentos antigos como régua), **3D só com os pontos de atenção**, gráficos refeitos e visual novo; função `painel_simulacao_externa`. Versão 1.0 — 15/11/2026 / Mudança: criação. A simulação "Clínica CSI portátil 2.0" (pacote enviado pelo dono) foi trazida para `simulacao/`, ligada ao banco do webchat e ao relatório #14359 do Klingo, e ganhou o painel **Decisão**.
+Versão 1.2 — 15/11/2026 / Mudança: **mapa do que falta nos dados** (só porcentagens) e **hora real gravada no banco** (tabela `atendimento_hora`, `atendimento_hora_gravar`, simulação usa chegada, início e fim reais quando existirem; modo "Hora real registrada"); falta apenas ajustar o relatório do Klingo e ligar a leitura. Versão 1.1 — 15/11/2026 / Mudança: **indicadores primeiro**, **área externa** (do pedido ao resultado, com os atendimentos antigos como régua), **3D só com os pontos de atenção**, gráficos refeitos e visual novo; função `painel_simulacao_externa`. Versão 1.0 — 15/11/2026 / Mudança: criação. A simulação "Clínica CSI portátil 2.0" (pacote enviado pelo dono) foi trazida para `simulacao/`, ligada ao banco do webchat e ao relatório #14359 do Klingo, e ganhou o painel **Decisão**.
 
 **Endereço:** https://clinicacsiia.github.io/webchat/simulacao/ (também pelo botão **Simulação** no alto do painel de atendimento). Só funciona com login do painel (administrador ou atendente). Sem login, abre a **Demonstração** com dados fictícios.
+
+## Hora real de atendimento (gravada no banco)
+
+**Estado em 15/11/2026: o banco e a simulação estão prontos; falta o relatório do Klingo com a hora real e a leitura dele.** Hoje a chegada é aproximada (momento em que o Klingo marcou o atendimento) e início e fim do exame não existem.
+
+**Banco (aplicado, `supabase/simulacao-hora-real.sql`):**
+- Tabela `atendimento_hora` (uma linha por marcação: `marcacao_id` no formato `m22544`, `chegada_em`, `inicio_em`, `fim_em`, `lido_em`). Só o id da marcação e horários: nenhum dado de paciente. RLS ligada e **sem permissão** para anon e logado; só o servidor grava.
+- Função `atendimento_hora_gravar(jsonb)` (só `service_role`): recebe `[{"m":"m22544","chegada":"…","inicio":"…","fim":"…"}]`, grava sem apagar o que já havia se a nova leitura vier vazia, e **recusa** (contando) id inválido, hora fora de ordem (início antes da chegada, fim antes do início), exame de mais de 8 h e linha sem hora.
+- `painel_simulacao_dia` passou a usar a hora real: vira `arrive`, `start` e `end` (a hora real vale mais que a chegada aproximada), e as durações reais (fim − início, até 30 por hora, unidade e modalidade) entram no histórico, então o tempo de exame deixa de ser premissa e passa a ser medido. `painel_simulacao_indicadores` usa a hora real na pontualidade.
+- Na página: quando um dia tem início e fim em 30% ou mais das marcações, aparece o modo **"Hora real registrada (só o que aconteceu)"**, que mostra a espera medida (chegada → início do exame) em vez de simulada.
+
+**O que falta, e é seu (regra do `CLAUDE.md`: relatório do Klingo pendente):** ajustar o filtro do relatório que tem a hora real para poder consultar **por data e hora** (período), sem pedir prontuário ou CPF. Quando estiver pronto, me passe:
+1. o **número do relatório** e os **ids dos filtros** (período e, se houver, unidade);
+2. as **colunas** que trazem: id da marcação (o `m…` ou o número), id do atendimento, **chegada** (check-in), **início** e **fim** do atendimento, dizendo se vêm com **data e hora** ou só hora (se só hora, usa-se a data do exame);
+3. confirmar se o relatório cobre **todas as unidades** (CSI 1, CSI 2 e Pediatria) e que **dia** ele aceita (hoje e os últimos dias).
+
+Com isso eu escrevo a leitura (uma Edge Function como a `sync-jornada-klingo`, a cada poucos minutos, janela de hoje e dos 2 dias anteriores) e ela chama `atendimento_hora_gravar`. **Não suponho colunas nem filtros.** O relatório B (#14025) já tem "Check-In (chegada)" e aceita período, mas não tem início nem fim do exame.
+
+## O que falta nos dados (mapa só com porcentagens)
+
+Aba **"O que falta nos dados"** no painel Decisão, com um resumo na seção 1. Para cada **situação do exame** (agendado, confirmado, atendido, faltou, cancelado, remarcado) mostra quantas marcações e quantas **pessoas** existem e **que porcentagem tem cada dado**: hora de chegada, início e fim do exame, nº do atendimento, resultado entregue, situação da confirmação, telefone, origem da marcação, cadastro completo e motivo do cancelamento. **Só contagem** (função `painel_simulacao_lacunas`): nenhum dado de pessoa sai; com menos de 5 casos a célula mostra "poucos"; "—" quando o dado não se aplica àquela situação.
+
+Leitura de 15/11/2026 (marcações de 18/10 a 30/11): entre os **atendidos**, hora de chegada 89%, **início e fim 0%**, **resultado entregue 0%**, telefone 100%, nº do atendimento 100%, cadastro sem campo vazio 98% e origem da marcação 48% (só existe para marcações conferidas pelo relatório #14554). Entre as marcações ainda por vir, **só 22% a 27% têm cadastro completo** (falta e-mail ou celular) e 91 a 93% têm origem. Cancelados e remarcados: 99% a 100% com motivo.
 
 ## Ordem da página (indicadores primeiro)
 
@@ -106,6 +129,9 @@ Arquivo `supabase/simulacao-dados.sql` (fluxograma, versão e rollback no cabeç
 | `sim_unidade(texto)`, `sim_modalidade(texto)` | qualquer um (puras) | Traduz "CSI 1" → `csi1` e o nome do procedimento → `consulta`, `us`, `rm`, `tc`, `eco`, `rx`, `dmo`, `mamo`, `histero` (fora disso: nulo, contado em `fora_do_modelo`) |
 | `painel_simulacao_dia(date)` | `authenticated` com papel admin ou atendente | Um dia no formato da simulação (`visits`, `history`, `calibragem`, `meta`) |
 | `painel_simulacao_indicadores(integer)` | idem | Indicadores de decisão dos últimos 7 a 90 dias e dos próximos 15 |
+| `painel_simulacao_lacunas(integer)` | idem | Mapa do que falta nos dados (ver acima). ≈ 70 ms |
+| `atendimento_hora_gravar(jsonb)` | **só `service_role`** | Grava a hora real (ver acima) |
+| `sim_minuto(timestamptz)` | qualquer um (pura) | Minuto do dia em Salvador |
 | `painel_simulacao_externa(integer)` | idem | Base de atendimentos antigos e etapas fora da clínica (chat, pedidos, confirmação por horizonte e unidade, hoje, resultado). Só números. Arquivo `supabase/simulacao-externa.sql`, aplicada como `simulacao_externa_parte1` (≈ 110 ms, 2,4 KB). Rollback: `drop function public.painel_simulacao_externa(integer);` |
 
 Aplicado na produção em 15/11/2026 em 4 partes (`simulacao_dados_parte1..4`, só `create or replace`). Medido: ≈ 270 ms cada, 88 KB o dia e 12 KB os indicadores. `anon` não executa. **Voltar atrás:** `drop function` das 4 (comandos no cabeçalho do arquivo; o Supabase pede confirmação) e apagar a pasta `simulacao/` e o botão no painel.
@@ -130,7 +156,7 @@ O service worker do chat **não guarda** `/simulacao/` (mudou `webchat-cliente-v
 
 ## Testes
 
-`cd testes && npm run test:simulacao` (22: motor, formato do banco, calibragem, recomendações, painéis, análise, gráficos), `npm run test:simulacao-sql` (13) e `npm run test:simulacao-externa-sql` (8), no clone da produção (modalidades, privacidade, permissão, só leitura, base, horizontes) e `CHROMIUM_PATH=/opt/pw-browsers/chromium npm run test:simulacao-nav` (20, no navegador com Supabase simulado e WebGL por software: demonstração, login, dia real, indicadores primeiro, área externa, 3D com pontos em destaque e o resto em contorno, clique no ponto, sem WebGL, encaixe, premissas, capacidade, troca de dia, celular). Entram no `npm test`.
+`cd testes && npm run test:simulacao` (24: motor, formato do banco, calibragem, recomendações, painéis, análise, gráficos, hora real, mapa do que falta), `npm run test:simulacao-sql` (13) e `npm run test:simulacao-externa-sql` (8), `npm run test:simulacao-hora-real-sql` (10: tabela fechada, gravação e recusas, prioridade da hora real, durações no histórico, mapa do que falta), no clone da produção (modalidades, privacidade, permissão, só leitura, base, horizontes) e `CHROMIUM_PATH=/opt/pw-browsers/chromium npm run test:simulacao-nav` (22, no navegador com Supabase simulado e WebGL por software: demonstração, login, dia real, indicadores primeiro, área externa, 3D com pontos em destaque e o resto em contorno, clique no ponto, sem WebGL, encaixe, premissas, capacidade, troca de dia, celular). Entram no `npm test`.
 
 **Ainda não provado:** abrir a página na produção com a sua conta logada (o teste usa Supabase simulado; as funções do banco foram conferidas por chamada real, sem ler dado de paciente).
 

@@ -20,7 +20,7 @@ begin
   v_fut := (v_hoje + 15)::timestamp at time zone 'America/Sao_Paulo';
 
   with base as (
-    select e.id, e.card_id, e.status, e.confirm_status, e.agendado_em, e.agendado_para,
+    select e.id, e.card_id, e.marcacao_id, e.status, e.confirm_status, e.agendado_em, e.agendado_para,
            public.sim_unidade(e.unidade) as u, public.sim_modalidade(e.procedimento) as t,
            (e.agendado_para at time zone 'America/Sao_Paulo')::date as d,
            extract(hour from e.agendado_para at time zone 'America/Sao_Paulo')::int as h,
@@ -38,9 +38,9 @@ begin
   ),
   geral as (select round(100.0 * count(*) filter (where status = 'faltou') / nullif(count(*), 0), 1) as pct from fechados),
   cheg as (
-    select b.u, b.t, b.h, (extract(hour from c.q at time zone 'America/Sao_Paulo') * 60 + extract(minute from c.q at time zone 'America/Sao_Paulo')
-           - (extract(hour from b.agendado_para at time zone 'America/Sao_Paulo') * 60 + extract(minute from b.agendado_para at time zone 'America/Sao_Paulo')))::numeric as delta
-      from fechados b join lateral (select min(v.quando) as q from public.jornada_evento v where v.card_id = b.card_id and v.para_coluna = 'em_atendimento' and v.origem = 'klingo') c on c.q is not null
+    select b.u, b.t, b.h, (public.sim_minuto(c.q) - public.sim_minuto(b.agendado_para))::numeric as delta
+      from fechados b join lateral (select coalesce((select hh.chegada_em from public.atendimento_hora hh where hh.marcacao_id = b.marcacao_id),
+                                                    (select min(v.quando) from public.jornada_evento v where v.card_id = b.card_id and v.para_coluna = 'em_atendimento' and v.origem = 'klingo')) as q) c on c.q is not null
      where b.status = 'atendido' and (c.q at time zone 'America/Sao_Paulo')::date = b.d
   )
   select jsonb_build_object(

@@ -1,5 +1,5 @@
 -- FLUXOGRAMA: entrada (a tela /simulacao/, aberta por quem está logado no painel como admin ou atendente) -> validação (papel_atual() precisa ser admin ou atendente; só lê tabelas que já existem; nenhum nome, CPF, telefone, e-mail ou prontuário sai: cada pessoa vira um número de 1 a N que só vale naquela chamada) -> lógica (jornada_exame + jornada_card + jornada_evento = marcações do Klingo (relatório #14359) com o momento em que o Klingo marcou "atendido"; histórico de dias fechados; faltas por situação da confirmação) -> saída (um JSON no formato que a simulação já entende: visits, history, mais "calibragem" e "indicadores")
--- Versão 1.0 — 15/11/2026 / Mudança: criação das funções de leitura da simulação (somente leitura; nenhuma tabela nova). O resumo do dia traz também quando a Jornada leu o Klingo pela última vez (jornada_sync_estado.klingo_fim_em).
+-- Versão 1.1 — 15/11/2026 / Mudança: usa a HORA REAL de atendimento_hora (supabase/simulacao-hora-real.sql) quando existir: chegada, início e fim viram `arrive`, `start` e `end`, e as durações reais entram no histórico; sem ela, continua com a chegada aproximada pelo Klingo. Versão 1.0 — 15/11/2026 / Mudança: criação das funções de leitura da simulação (somente leitura; nenhuma tabela nova). O resumo do dia traz também quando a Jornada leu o Klingo pela última vez (jornada_sync_estado.klingo_fim_em).
 --
 -- O que NÃO existe no Klingo (conferido em 15/11/2026): hora de início e de fim do exame, hora do cadastro no guichê, hora do preparo.
 -- O que existe: hora marcada, situação (atendido, faltou, cancelado, remarcado), situação da confirmação e o MOMENTO em que a Jornada viu o Klingo marcar
@@ -11,6 +11,7 @@
 --   drop function public.painel_simulacao_dia(date);
 --   drop function public.sim_modalidade(text);
 --   drop function public.sim_unidade(text);
+-- (a versão 1.1 de painel_simulacao_dia e painel_simulacao_indicadores precisa de atendimento_hora; para voltar, reaplicar a 1.0 do git)
 
 -- Unidade do Klingo -> chave da simulação
 create or replace function public.sim_unidade(p_unidade text)
@@ -63,9 +64,9 @@ begin
                   else (extract(hour from now() at time zone 'America/Sao_Paulo') * 60 + extract(minute from now() at time zone 'America/Sao_Paulo'))::int end;
 
   with ex as (
-    select e.id, e.card_id, e.status, e.confirm_status, k.paciente_chave,
+    select e.id, e.card_id, e.marcacao_id, e.status, e.confirm_status, k.paciente_chave,
            public.sim_unidade(e.unidade) as u, public.sim_modalidade(e.procedimento) as t,
-           (extract(hour from e.agendado_para at time zone 'America/Sao_Paulo') * 60 + extract(minute from e.agendado_para at time zone 'America/Sao_Paulo'))::int as slot
+           public.sim_minuto(e.agendado_para) as slot
       from public.jornada_exame e join public.jornada_card k on k.id = e.card_id
      where e.marcacao_id like 'm%' and e.agendado_para >= v_ini and e.agendado_para < v_fim
   ),
@@ -76,11 +77,27 @@ begin
      group by v.card_id
   ),
   uteis as (select * from ex where status not in ('cancelado', 'remarcado', 'pedido') and u is not null and t is not null),
-  pessoa as (select paciente_chave, dense_rank() over (order by paciente_chave)::int as n from (select distinct paciente_chave from uteis) z)
+  pessoa as (select paciente_chave, dense_rank() over (order by paciente_chave)::int as n from (select distinct paciente_chave from uteis) z),
+  calc as (
+    select x.*, p.n as pessoa,
+           case when h.chegada_em >= v_ini and h.chegada_em < v_fim and h.chegada_em <= v_asof then least(public.sim_minuto(h.chegada_em), v_corte)
+                when c.q is not null then least(public.sim_minuto(c.q), v_corte) end as arr0,
+           case when h.inicio_em >= v_ini and h.inicio_em < v_fim and h.inicio_em <= v_asof then public.sim_minuto(h.inicio_em) end as ini0,
+           case when h.fim_em >= v_ini and h.fim_em < v_fim and h.fim_em <= v_asof then public.sim_minuto(h.fim_em) end as fim0
+      from uteis x join pessoa p on p.paciente_chave = x.paciente_chave
+      left join chegada c on c.card_id = x.card_id
+      left join public.atendimento_hora h on h.marcacao_id = x.marcacao_id
+  ),
+  etapas as (
+    select k.*, case when k.arr0 is not null and k.ini0 >= k.arr0 then k.ini0 end as ini1 from calc k
+  ),
+  etapas2 as (
+    select k.*, case when k.ini1 is not null and k.fim0 >= k.ini1 then k.fim0 end as fim1 from etapas k
+  )
   select coalesce(jsonb_agg(jsonb_strip_nulls(jsonb_build_object(
-           'id', x.id, 'person', p.n, 'unit', x.u, 'type', x.t, 'slot', x.slot,
-           'arrive', case when c.q is not null then least((extract(hour from c.q at time zone 'America/Sao_Paulo') * 60 + extract(minute from c.q at time zone 'America/Sao_Paulo'))::int, v_corte) end,
-           'absentAt', case when x.status = 'faltou' and c.q is null then least(x.slot + 15, v_corte) end,
+           'id', x.id, 'person', x.pessoa, 'unit', x.u, 'type', x.t, 'slot', x.slot,
+           'arrive', x.arr0, 'start', x.ini1, 'end', x.fim1,
+           'absentAt', case when x.status = 'faltou' and x.arr0 is null then least(x.slot + 15, v_corte) end,
            'confirm', case x.confirm_status when 'Confirmado' then 'confirmado' when 'A Confirmar' then 'a_confirmar' when 'Sem Resposta' then 'sem_resposta' end,
            'done', case when x.status = 'atendido' then true end
          )) order by x.slot, x.id), '[]'::jsonb),
@@ -88,20 +105,24 @@ begin
            'marcacoes_no_dia', (select count(*) from ex),
            'canceladas_ou_remarcadas', (select count(*) from ex where status in ('cancelado', 'remarcado')),
            'fora_do_modelo', (select count(*) from ex where status not in ('cancelado', 'remarcado', 'pedido') and (u is null or t is null)),
-           'com_chegada_real', (select count(*) from uteis x2 join chegada c2 on c2.card_id = x2.card_id),
-           'faltas_registradas', (select count(*) from uteis where status = 'faltou'),
+           'com_chegada_real', count(*) filter (where x.arr0 is not null),
+           'com_hora_real', count(*) filter (where x.fim1 is not null),
+           'faltas_registradas', count(*) filter (where x.status = 'faltou'),
            'sync_klingo_em', (select s.klingo_fim_em from public.jornada_sync_estado s limit 1))
     into v_visitas, v_meta
-    from uteis x join pessoa p on p.paciente_chave = x.paciente_chave left join chegada c on c.card_id = x.card_id;
+    from etapas2 x;
 
   -- Histórico: dias fechados (antes de hoje e antes do dia pedido), últimas 10 semanas. booked = quem tinha desfecho conhecido (atendido ou faltou).
-  select coalesce(jsonb_agg(jsonb_build_object('date', h.d, 'hour', h.h, 'unit', h.u, 'type', h.t, 'booked', h.booked, 'arrivals', h.arr) order by h.d, h.h, h.u, h.t), '[]'::jsonb)
+  select coalesce(jsonb_agg(jsonb_build_object('date', h.d, 'hour', h.h, 'unit', h.u, 'type', h.t, 'booked', h.booked, 'arrivals', h.arr, 'durations', to_jsonb(coalesce(h.durs, '{}'::int[]))) order by h.d, h.h, h.u, h.t), '[]'::jsonb)
     into v_hist
     from (select (e.agendado_para at time zone 'America/Sao_Paulo')::date as d,
                  extract(hour from e.agendado_para at time zone 'America/Sao_Paulo')::int as h,
                  public.sim_unidade(e.unidade) as u, public.sim_modalidade(e.procedimento) as t,
-                 count(*)::int as booked, (count(*) filter (where e.status = 'atendido'))::int as arr
+                 count(*)::int as booked, (count(*) filter (where e.status = 'atendido'))::int as arr,
+                 (array_agg(round(extract(epoch from (ah.fim_em - ah.inicio_em)) / 60)::int order by e.agendado_para desc)
+                    filter (where ah.fim_em is not null and ah.inicio_em is not null and ah.fim_em - ah.inicio_em between interval '1 minute' and interval '8 hours'))[1:30] as durs
             from public.jornada_exame e
+            left join public.atendimento_hora ah on ah.marcacao_id = e.marcacao_id
            where e.marcacao_id like 'm%' and e.status in ('atendido', 'faltou')
              and e.agendado_para >= ((least(v_dia, v_hoje) - 70)::timestamp at time zone 'America/Sao_Paulo')
              and e.agendado_para < least(v_ini, (v_hoje::timestamp at time zone 'America/Sao_Paulo'))
@@ -110,16 +131,17 @@ begin
 
   -- Calibragem medida na própria clínica (últimas 8 semanas fechadas)
   with base as (
-    select e.id, e.status, e.confirm_status, public.sim_unidade(e.unidade) as u, e.card_id,
-           (extract(hour from e.agendado_para at time zone 'America/Sao_Paulo') * 60 + extract(minute from e.agendado_para at time zone 'America/Sao_Paulo'))::int as slot,
+    select e.id, e.status, e.confirm_status, public.sim_unidade(e.unidade) as u, e.card_id, e.marcacao_id,
+           public.sim_minuto(e.agendado_para) as slot,
            (e.agendado_para at time zone 'America/Sao_Paulo')::date as d
       from public.jornada_exame e
      where e.marcacao_id like 'm%' and e.status in ('atendido', 'faltou') and public.sim_modalidade(e.procedimento) is not null
        and e.agendado_para >= ((v_hoje - 56)::timestamp at time zone 'America/Sao_Paulo') and e.agendado_para < (v_hoje::timestamp at time zone 'America/Sao_Paulo')
   ),
   ch as (
-    select b.u, b.id, (extract(hour from c.q at time zone 'America/Sao_Paulo') * 60 + extract(minute from c.q at time zone 'America/Sao_Paulo'))::int - b.slot as delta
-      from base b join lateral (select min(v.quando) as q from public.jornada_evento v where v.card_id = b.card_id and v.para_coluna = 'em_atendimento' and v.origem = 'klingo') c on c.q is not null
+    select b.u, b.id, public.sim_minuto(c.q) - b.slot as delta
+      from base b join lateral (select coalesce((select hh.chegada_em from public.atendimento_hora hh where hh.marcacao_id = b.marcacao_id),
+                                                (select min(v.quando) from public.jornada_evento v where v.card_id = b.card_id and v.para_coluna = 'em_atendimento' and v.origem = 'klingo')) as q) c on c.q is not null
      where b.status = 'atendido' and (c.q at time zone 'America/Sao_Paulo')::date = b.d
   )
   select jsonb_build_object(
@@ -159,7 +181,7 @@ begin
   v_fut := (v_hoje + 15)::timestamp at time zone 'America/Sao_Paulo';
 
   with base as (
-    select e.id, e.card_id, e.status, e.confirm_status, e.agendado_em, e.agendado_para,
+    select e.id, e.card_id, e.marcacao_id, e.status, e.confirm_status, e.agendado_em, e.agendado_para,
            public.sim_unidade(e.unidade) as u, public.sim_modalidade(e.procedimento) as t,
            (e.agendado_para at time zone 'America/Sao_Paulo')::date as d,
            extract(hour from e.agendado_para at time zone 'America/Sao_Paulo')::int as h,
@@ -177,9 +199,9 @@ begin
   ),
   geral as (select round(100.0 * count(*) filter (where status = 'faltou') / nullif(count(*), 0), 1) as pct from fechados),
   cheg as (
-    select b.u, b.t, b.h, (extract(hour from c.q at time zone 'America/Sao_Paulo') * 60 + extract(minute from c.q at time zone 'America/Sao_Paulo')
-           - (extract(hour from b.agendado_para at time zone 'America/Sao_Paulo') * 60 + extract(minute from b.agendado_para at time zone 'America/Sao_Paulo')))::numeric as delta
-      from fechados b join lateral (select min(v.quando) as q from public.jornada_evento v where v.card_id = b.card_id and v.para_coluna = 'em_atendimento' and v.origem = 'klingo') c on c.q is not null
+    select b.u, b.t, b.h, (public.sim_minuto(c.q) - public.sim_minuto(b.agendado_para))::numeric as delta
+      from fechados b join lateral (select coalesce((select hh.chegada_em from public.atendimento_hora hh where hh.marcacao_id = b.marcacao_id),
+                                                    (select min(v.quando) from public.jornada_evento v where v.card_id = b.card_id and v.para_coluna = 'em_atendimento' and v.origem = 'klingo')) as q) c on c.q is not null
      where b.status = 'atendido' and (c.q at time zone 'America/Sao_Paulo')::date = b.d
   )
   select jsonb_build_object(

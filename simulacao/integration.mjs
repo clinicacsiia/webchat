@@ -47,7 +47,7 @@ function normalizeCalibration(source){
 }
 function normalizeMeta(source){
  const out={};
- for(const key of ['marcacoes_no_dia','canceladas_ou_remarcadas','fora_do_modelo','com_chegada_real','faltas_registradas']){
+ for(const key of ['marcacoes_no_dia','canceladas_ou_remarcadas','fora_do_modelo','com_chegada_real','com_hora_real','faltas_registradas']){
   out[key]=number(source?.[key],0,1e6)??0;
  }
  out.sync=typeof source?.sync_klingo_em==='string'&&Number.isFinite(Date.parse(source.sync_klingo_em))?new Date(source.sync_klingo_em).toISOString():null;
@@ -208,6 +208,12 @@ export async function fetchIndicators(client,days=28){
  return data;
 }
 
+// O que falta nos dados: por situação do exame, quantas marcações e pessoas e que parte tem cada dado (só contagem).
+export async function fetchLacunas(client,days=28){
+ const {data,error}=await client.rpc('painel_simulacao_lacunas',{p_dias:days});
+ if(error)throw Error(error.message);
+ return data;
+}
 // Área externa (etapas fora da clínica, com a régua dos atendimentos antigos) e os indicadores que o painel já calcula.
 export async function fetchExterna(client,days=28){
  const {data,error}=await client.rpc('painel_simulacao_externa',{p_dias:days});

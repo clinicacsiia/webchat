@@ -3,7 +3,7 @@
 import * as E from './engine.mjs';
 import {createScenes} from './scene.mjs';
 import {config} from './config.mjs';
-import {fetchSnapshot,fetchIndicators,fetchExterna,fetchDecisao,normalizeSnapshot,prepareSnapshot,localClock,openSnapshotStore,putSnapshot,listSnapshots} from './integration.mjs';
+import {fetchSnapshot,fetchIndicators,fetchExterna,fetchDecisao,fetchLacunas,normalizeSnapshot,prepareSnapshot,localClock,openSnapshotStore,putSnapshot,listSnapshots} from './integration.mjs';
 import * as D from './decisao.mjs';
 import * as G from './grafico.mjs';
 import * as A from './analise.mjs';
@@ -61,6 +61,15 @@ function migrateLegacy(legacy){
  }
  return {...legacy,mode:'demo',profiles};
 }
+function syncObservedOption(){
+ const feed=state.mode==='demo'?null:snapshots.get(state.date);
+ const visits=feed?.visits??[];
+ const has=visits.length>0&&visits.filter(v=>v.end!==null).length>=Math.max(5,visits.length*.3);
+ const select=$('dataMode'),option=[...select.options].find(o=>o.value==='observed');
+ if(has&&!option)select.add(new Option('Hora real registrada (só o que aconteceu)','observed'));
+ else if(!has&&option&&state.mode!=='observed')option.remove();
+ select.value=state.mode;
+}
 function populateDays(){
  const choices=state.mode==='demo'?dates:[...snapshots.keys()].sort();
  $('day').replaceChildren(...choices.map(date=>new Option(new Intl.DateTimeFormat('pt-BR',{weekday:'short',day:'2-digit',month:'2-digit',year:'numeric',timeZone:'UTC'}).format(new Date(date+'T12:00:00Z')),date)));
@@ -108,6 +117,7 @@ function openDay(keepSelection=false){
  }
  if(!keepSelection){selectedRoom=selectedPerson=selectedAppointment=null;selectedIncident=null;}
  populateDays();
+ syncObservedOption();
  render();
  renderDecision();
  renderAnalysis();
@@ -450,19 +460,20 @@ $('loginForm').onsubmit=async event=>{
  sync(true);
 };
 let indicatorsAt=0;
-let externa=null,decisaoPainel=null,demoExterna=null,demoDecisao=null;
+let externa=null,decisaoPainel=null,demoExterna=null,demoDecisao=null,lacunas=null,demoLacunas=null;
 async function loadIndicators(force=false){
  if(!client||(!force&&Date.now()-indicatorsAt<600000&&indicators))return;
- const [ind,ext,dec]=await Promise.allSettled([fetchIndicators(client,config.indicatorDays),fetchExterna(client,config.indicatorDays),fetchDecisao(client,config.indicatorDays)]);
+ const [ind,ext,dec,lac]=await Promise.allSettled([fetchIndicators(client,config.indicatorDays),fetchExterna(client,config.indicatorDays),fetchDecisao(client,config.indicatorDays),fetchLacunas(client,config.indicatorDays)]);
  if(ind.status==='fulfilled'){indicators=ind.value;indicatorsError='';}else indicatorsError=ind.reason.message;
  if(ext.status==='fulfilled')externa=ext.value;
  if(dec.status==='fulfilled')decisaoPainel=dec.value;
+ if(lac.status==='fulfilled')lacunas=lac.value;
  if(ind.status==='fulfilled'||ext.status==='fulfilled')indicatorsAt=Date.now();
  decisionKey='';renderDecision();analysisKey='';renderAnalysis();
 }
-let syncing=false;
+let syncing=false,syncQueued=false;
 async function sync(showDate=false){
- if(syncing)return;
+ if(syncing){if(showDate)syncQueued=true;return;}   // um pedido do usuário durante uma leitura automática espera a vez, não se perde
  if(!client){describeSource('O Supabase não carregou. Verifique a conexão e recarregue a página.');return;}
  const requested=showDate?$('sourceDate').value:state.date;
  if(!requested){describeSource('Selecione a data que deseja carregar.');return;}
@@ -491,7 +502,7 @@ async function sync(showDate=false){
   if(newer&&!saved)describeSource('Dados atualizados em memória. O navegador não gravou este retorno.');
   loadIndicators(showDate);
  }catch(error){describeSource('Falha ao carregar. Últimos dados preservados. '+error.message);if(/Entre com/.test(error.message))showLogin(true,error.message);}
- finally{syncing=false;$('sync').disabled=false;}
+ finally{syncing=false;$('sync').disabled=false;if(syncQueued){syncQueued=false;sync(true);}}
 }
 $('sync').onclick=()=>sync(true);
 $('backup').onclick=async()=>{
@@ -570,6 +581,8 @@ function renderAnalysis(force=false){
  $('kpis').innerHTML=dec?G.kpiTiles(A.cartoesDoPainel(dec)):'<p class="muted">'+(state.mode==='demo'?'Sem dados de demonstração.':'Os indicadores do painel ainda não carregaram.')+'</p>';
  $('indPeriod').textContent=dec?.periodo?'Período dos indicadores: '+dec.periodo.de+' a '+dec.periodo.ate+(demo?' (dados fictícios)':'')+'.':'';
  $('attention').innerHTML=G.attentionList(pontos);
+ const gapList=D.worstGaps(demo?demoLacunas:lacunas,3);
+ $('gapsLine').innerHTML=gapList.length?'<strong>Dados que faltam</strong> (só porcentagem, sem revelar ninguém): '+gapList.map(w=>D.esc(w.label)+' em "'+D.esc(w.statusLabel)+'" '+D.pct(w.pct)).join(' · ')+'. <a href="#decisionCard" data-open-gaps>Ver o mapa completo</a>':'';
  $('strip').innerHTML=G.stageStrip(stages,ext?.base);
  update3D();
 }
@@ -606,6 +619,7 @@ $('attention').onclick=event=>{
  $('sec-3d').scrollIntoView({behavior:'smooth',block:'start'});
 };
 $('strip').onclick=event=>{const space=event.target.closest('[data-stage]');if(space&&scene3d){scene3d.focusOn(space.dataset.stage);$('sec-3d').scrollIntoView({behavior:'smooth',block:'start'});}};
+$('gapsLine').onclick=event=>{if(event.target.closest('[data-open-gaps]')){state.panel='gaps';save();renderPanels();}};
 $('d3Rotate').onclick=()=>{if(!scene3d)return;$('d3Rotate').setAttribute('aria-pressed',String(scene3d.toggleRotate()));};
 $('d3Reset').onclick=()=>{if(!scene3d)return;scene3d.resetView();$('d3Rotate').setAttribute('aria-pressed','true');};
 function invalidate(){
@@ -645,11 +659,11 @@ function computeDecision(){
  $('extraSuggest').innerHTML=suggestions.length?'Sugestões pelo histórico: '+suggestions.map(r=>'<button data-suggest="'+r.unit+':'+r.type+':'+r.hour+':'+r.suggested+'">'+D.esc(E.units[r.unit])+' '+D.esc(E.types[r.type][0])+' '+String(r.hour).padStart(2,'0')+'h × '+r.suggested+'</button>').join(' '):'';
  renderPanels();
 }
-const panelBuilders={summary:D.panelSummary,absence:D.panelAbsence,arrival:D.panelArrival,demand:D.panelDemand,upcoming:D.panelUpcoming,process:D.panelProcess};
+const panelBuilders={summary:D.panelSummary,absence:D.panelAbsence,arrival:D.panelArrival,demand:D.panelDemand,upcoming:D.panelUpcoming,process:D.panelProcess,gaps:()=>D.panelGaps(state.mode==='demo'?demoLacunas:lacunas)};
 state.panel??='summary';
 function renderPanels(){
  for(const button of document.querySelectorAll('[data-panel]'))button.setAttribute('aria-pressed',String(button.dataset.panel===state.panel));
- if(!indicators){$('panelBody').innerHTML='<p class="muted">'+(indicatorsError?D.esc(indicatorsError):(state.mode==='demo'?'Os indicadores reais aparecem ao carregar o modo "Klingo + banco".':'Carregando indicadores…'))+'</p>';return;}
+ if(!indicators&&state.panel!=='gaps'){$('panelBody').innerHTML='<p class="muted">'+(indicatorsError?D.esc(indicatorsError):(state.mode==='demo'?'Os indicadores reais aparecem ao carregar o modo "Klingo + banco".':'Carregando indicadores…'))+'</p>';return;}
  $('panelBody').innerHTML=panelBuilders[state.panel](indicators)+'<details><summary>O que o Klingo não informa</summary><ul class="rows">'+D.dataGaps(prepared?.meta,prepared?.calibration).map(x=>'<li>'+D.esc(x)+'</li>').join('')+'</ul></details>';
 }
 for(const button of document.querySelectorAll('[data-panel]'))button.onclick=()=>{state.panel=button.dataset.panel;save();renderPanels();};
@@ -731,9 +745,9 @@ setInterval(()=>{if(!observed()&&state.active&&!document.hidden)step();},1500);
 setInterval(()=>{if(state.play&&!document.hidden)save();},5000);
 document.addEventListener('visibilitychange',()=>{if(document.hidden)save();});
 window.addEventListener('pagehide',save);
-window.__simulacao={analise:()=>lastAnalysis,cena:()=>scene3d?.state?.()??null,estado3d:()=>scene3dState};
+window.__simulacao={lacunas:()=>lacunas,analise:()=>lastAnalysis,cena:()=>scene3d?.state?.()??null,estado3d:()=>scene3dState};
 // Início: só depois de tudo definido (o await abaixo deixa os temporizadores rodarem).
-try{[demoExterna,demoDecisao]=await Promise.all([fetch('./examples/externa.json').then(r=>r.json()),fetch('./examples/decisao.json').then(r=>r.json())]);}catch{}
+try{[demoExterna,demoDecisao,demoLacunas]=await Promise.all([fetch('./examples/externa.json').then(r=>r.json()),fetch('./examples/decisao.json').then(r=>r.json()),fetch('./examples/lacunas.json').then(r=>r.json())]);}catch{}
 renderAnalysis(true);
 if(client){
  const active=await session();

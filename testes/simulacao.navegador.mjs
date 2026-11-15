@@ -22,6 +22,7 @@ const Q = [-40, -30, -20, -14, -10, -6, -3, 0, 6, 15, 25];
 
 const THREE_DIR = resolve(import.meta.dirname, 'node_modules/three');
 const EXTERNA = JSON.parse(require('node:fs').readFileSync(resolve(RAIZ, 'simulacao/examples/externa.json'), 'utf8'));
+const LACUNAS = JSON.parse(require('node:fs').readFileSync(resolve(RAIZ, 'simulacao/examples/lacunas.json'), 'utf8'));
 const DECISAO = JSON.parse(require('node:fs').readFileSync(resolve(RAIZ, 'simulacao/examples/decisao.json'), 'utf8'));
 const ARGS_GL = ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'];
 const resultados = [];
@@ -44,8 +45,9 @@ function dia(date) {
       const slot = 8 * 60 + Math.floor(i * (600 / n)) + (i % 2) * 5;
       const v = { id, person: id, unit, type, slot, confirm: ['confirmado', 'confirmado', 'a_confirmar', 'sem_resposta'][i % 4] };
       if (slot + 15 <= corte && i % 6 === 5) v.absentAt = slot + 15;
-      else if (slot - 8 <= corte) { v.arrive = slot - 8 + (i % 7); v.done = true; }
-      if (v.arrive > corte) { delete v.arrive; delete v.done; }
+      else if (slot - 8 <= corte) { v.arrive = slot - 8 + (i % 7); v.done = true; v.start = v.arrive + 8 + (i % 5); v.end = v.start + 20; }
+      if (v.arrive > corte) { delete v.arrive; delete v.done; delete v.start; delete v.end; }
+      else if (v.end > corte) { delete v.end; }
       visits.push(v);
     }
   }
@@ -108,6 +110,7 @@ async function pagina(browser, { logado }, viewport = { width: 1280, height: 900
     if (fn === 'painel_simulacao_indicadores') return json(INDICADORES);
     if (fn === 'painel_simulacao_externa') return json({ ...EXTERNA, gerado_em: new Date().toISOString() });
     if (fn === 'painel_indicadores_decisao') return json(DECISAO);
+    if (fn === 'painel_simulacao_lacunas') return json(LACUNAS);
     return json({ message: 'não esperado: ' + fn }, 404);
   });
   if (logado) await p.addInitScript((s) => { localStorage.setItem('sb-nrvuynjwcgwpjdptkiay-auth-token', JSON.stringify(s)); }, sessao());
@@ -163,7 +166,7 @@ await caso('com sessão: carrega hoje sozinho, mostra origem do dado, chegadas r
 await caso('chama só as funções de leitura previstas, só com datas, dias e filtros fixos (nenhum dado pessoal sai)', async () => {
   const fns = [...new Set(logada.chamadas.map((c) => c.fn))].sort();
   const chaves = [...new Set(logada.chamadas.flatMap((c) => Object.keys(c.corpo)))].sort();
-  return { ok: fns.join() === 'painel_indicadores_decisao,painel_simulacao_dia,painel_simulacao_externa,painel_simulacao_indicadores' && chaves.join() === 'p_ate,p_de,p_dia,p_dias,p_incluir_teste,p_unidade', detalhe: fns.join() + ' / ' + chaves.join() };
+  return { ok: fns.join() === 'painel_indicadores_decisao,painel_simulacao_dia,painel_simulacao_externa,painel_simulacao_indicadores,painel_simulacao_lacunas' && chaves.join() === 'p_ate,p_de,p_dia,p_dias,p_incluir_teste,p_unidade', detalhe: fns.join() + ' / ' + chaves.join() };
 });
 await caso('hoje: segue a hora atual e a linha do tempo tem dados', async () => {
   const pressed = await P.getAttribute('#live', 'aria-pressed');
@@ -257,6 +260,14 @@ await caso('capacidade: salvar vale para o dia e sobrevive a recarregar a págin
   const guardada = await texto(P, '#capacityStatus');
   return { ok: /Capacidade salva/.test(status) && /Capacidade salva/.test(guardada) && /\d estação/.test(t), detalhe: t.replace(/\s+/g, ' ') };
 });
+await caso('o que falta nos dados: só porcentagens por situação, resumo na seção 1 e nenhum dado pessoal', async () => {
+  await P.waitForFunction(() => document.getElementById('gapsLine').textContent.includes('Dados que faltam'), null, { timeout: 15000 });
+  const linha = await texto_(P, '#gapsLine');
+  await P.click('[data-panel="gaps"]');
+  const t = await texto_(P, '#panelBody');
+  const celulas = await P.locator('#panelBody table.gaps tbody td').count();
+  return { ok: /Dados que faltam/.test(linha) && /Início e fim do exame/.test(t) && /Só contagem/.test(t) && celulas >= 20 && /têm/.test(t) && /ainda não há leitura da hora real/.test(t), detalhe: linha.replace(/\s+/g, ' ').slice(0, 140) };
+});
 await caso('trocar de dia: ontem é "dia fechado" e amanhã é "dia futuro", ambos carregam', async () => {
   await P.click('#dayBack');
   await P.waitForFunction(() => document.getElementById('sourceStatus').textContent.includes('Dia fechado'), null, { timeout: 15000 });
@@ -264,6 +275,17 @@ await caso('trocar de dia: ontem é "dia fechado" e amanhã é "dia futuro", amb
   await P.waitForFunction(() => document.getElementById('sourceStatus').textContent.includes('Dia futuro'), null, { timeout: 15000 });
   const rows = await P.locator('#rows tr').count();
   return { ok: rows > 50, detalhe: `${rows} linhas na jornada individual` };
+});
+await caso('hora real registrada: a opção aparece quando há início e fim e o modo mostra espera medida sem erro', async () => {
+  await P.click('#dayToday'); await espera(800); await P.click('#dayBack');
+  await P.waitForFunction(() => document.getElementById('sourceStatus').textContent.includes('Dia fechado'), null, { timeout: 15000 });
+  await P.waitForFunction(() => [...document.getElementById('dataMode').options].some((o) => o.value === 'observed'), null, { timeout: 15000 });
+  await P.selectOption('#dataMode', 'observed');
+  await P.waitForFunction(() => document.getElementById('metrics').textContent.includes('concluídos'), null, { timeout: 15000 });
+  const m = await texto_(P, '#metrics');
+  await P.selectOption('#dataMode', 'forecast');
+  await P.waitForFunction(() => document.getElementById('metrics').textContent.includes('espera P90'), null, { timeout: 15000 });
+  return { ok: /marcações com eventos/.test(m), detalhe: m.replace(/\s+/g, ' ').slice(0, 130) };
 });
 await caso('sem erro de JavaScript durante todo o uso', async () => ({ ok: logada.erros.length === 0, detalhe: logada.erros.join(' | ') }));
 await logada.ctx.close();

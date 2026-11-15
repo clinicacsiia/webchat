@@ -154,8 +154,42 @@ export function panelProcess(ind){
   '<h4>Fila "Minha vez" (espera real medida)</h4><p>'+num(ind.fila_chegada.n)+' paciente(s) com chamada registrada; espera mediana de '+num(ind.fila_chegada.espera_mediana_min,1)+' min.'+(ind.fila_chegada.n<30?' Amostra pequena demais para calibrar a simulação.':'')+'</p>';
 }
 export const dataGaps=(meta,calibration)=>[
- 'O Klingo não envia a hora de início e de fim do exame, nem do guichê e do preparo. Tempos dentro da clínica são hipóteses ajustáveis em "Premissas".',
+ 'A hora de início e de fim do exame (e do guichê e do preparo) ainda não é lida do Klingo: o relatório #14359 não traz. Enquanto isso, os tempos dentro da clínica são hipóteses ajustáveis em "Premissas". Quando o relatório com a hora real for ajustado, ela é gravada no banco (tabela atendimento_hora) e a simulação passa a usá-la.',
  'A chegada é aproximada: o momento em que o Klingo marcou o atendimento (lido a cada 30 s). '+(meta?.com_chegada_real!==undefined?num(meta.com_chegada_real)+' marcação(ões) deste dia têm chegada.':''),
  'A quantidade de salas e profissionais por setor não vem do Klingo; a capacidade começa por uma estimativa e pode ser salva como "capacidade atual da clínica".',
  (calibration?.arrival&&Object.keys(calibration.arrival).length?'':'Sem chegadas suficientes para calibrar: usando a distribuição padrão da demonstração.')
 ].filter(Boolean);
+
+// ----- O que falta nos dados (só contagens e porcentagens) -----
+export const GAP_FIELDS=[
+ ['chegada','Hora de chegada'],['inicio_fim','Início e fim do exame'],['atendimento_id','Nº do atendimento'],['resultado','Resultado entregue'],
+ ['confirmacao','Situação da confirmação'],['telefone','Telefone'],['origem','Origem da marcação'],['cadastro','Cadastro completo'],['motivo','Motivo do cancelamento']
+];
+const GAP_STATUS={agendado:'Agendado',confirmado:'Confirmado',atendido:'Atendido',faltou:'Faltou',cancelado:'Cancelado',remarcado:'Remarcado'};
+export const gapPct=cell=>cell&&cell.de>=5&&cell.com!==null&&cell.com!==undefined?100*cell.com/cell.de:null;
+// Células aplicáveis com a menor cobertura (as que mais faltam)
+export function worstGaps(lac,limit=4){
+ const out=[];
+ for(const row of lac?.linhas??[])for(const [key,label] of GAP_FIELDS){
+  const cell=row.campos?.[key],p=gapPct(cell);
+  if(p!==null&&cell.de>=20)out.push({key,label,status:row.status,statusLabel:GAP_STATUS[row.status]??row.status,pct:p,de:cell.de,com:cell.com});
+ }
+ return out.sort((a,b)=>a.pct-b.pct).slice(0,limit);
+}
+export function panelGaps(lac){
+ if(!lac)return '<p class="muted">O mapa do que falta aparece ao carregar o modo "Klingo + banco".</p>';
+ const cell=(row,key)=>{
+  const c=row.campos?.[key],p=gapPct(c);
+  if(!c||c.de===null||c.de===undefined)return '<td class="muted" title="Não se aplica a esta situação">—</td>';
+  if(p===null)return '<td class="muted" title="Poucos casos para mostrar">poucos</td>';
+  const missing=100-p;
+  return '<td style="background:rgba(246,120,100,'+Math.min(.7,missing/100*.75).toFixed(2)+')" title="'+esc(num(c.com)+' de '+num(c.de))+'"><strong>'+pct(p)+'</strong> <small>têm</small></td>';
+ };
+ const rows=(lac.linhas??[]).map(r=>'<tr><th scope="row">'+esc(GAP_STATUS[r.status]??r.status)+'<br><small class="muted">'+num(r.marcacoes)+' marcações · '+num(r.pessoas)+' pessoas</small></th>'+GAP_FIELDS.map(([k])=>cell(r,k)).join('')+'</tr>');
+ const worst=worstGaps(lac);
+ const h=lac.hora_real;
+ return '<p class="muted">Para cada situação do exame, a porcentagem que tem cada dado. <strong>Só contagem: nenhum dado de pessoa é mostrado.</strong> Quanto mais vermelho, mais falta. De '+esc(lac.periodo?.de)+' a '+esc(lac.periodo?.ate)+'.</p>'+
+  (worst.length?'<h4>O que mais falta</h4><ul class="rows">'+worst.map(w=>'<li><strong>'+esc(w.label)+'</strong> em "'+esc(w.statusLabel)+'": só '+pct(w.pct)+' têm ('+num(w.com)+' de '+num(w.de)+')</li>').join('')+'</ul>':'')+
+  '<div class="scroll"><table class="gaps"><thead><tr><th>Situação</th>'+GAP_FIELDS.map(([,l])=>'<th>'+esc(l)+'</th>').join('')+'</tr></thead><tbody>'+rows.join('')+'</tbody></table></div>'+
+  '<p class="muted">Hora real de início e fim: '+num(h?.com_inicio_e_fim)+' de '+num(h?.atendidos)+' atendimentos'+(h?.ultima_leitura?' (última leitura em '+esc(new Date(h.ultima_leitura).toLocaleString('pt-BR',{timeZone:'America/Bahia'}))+')':' (ainda não há leitura da hora real: depende de um relatório do Klingo, ver o aviso do que o Klingo não informa)')+'. A chegada é a hora aproximada pelo Klingo (lida a cada 30 s); "origem" e "cadastro" só existem para marcações conferidas pelo relatório #14554 (desde 06/11).</p>';
+}
