@@ -12876,6 +12876,36 @@
    "md5": "2dcac26ae11347c16dae6225c69d9a3b"
   },
   {
+   "nome": "painel_simulacao_dia",
+   "args": [
+    {
+     "nome": "p_dia",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "60cd04765914d32daa548cb4a3253546"
+  },
+  {
+   "nome": "painel_simulacao_indicadores",
+   "args": [
+    {
+     "nome": "p_dias",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "902883369bbfb48c7fdd1618d6cca536"
+  },
+  {
    "nome": "papel_atual",
    "args": [],
    "definer": true,
@@ -13735,6 +13765,36 @@
    "authenticated": false,
    "publico": false,
    "md5": "8e65c452f13b8b95384ccb3f9ef09026"
+  },
+  {
+   "nome": "sim_modalidade",
+   "args": [
+    {
+     "nome": "p_proc",
+     "padrao": false
+    }
+   ],
+   "definer": false,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": true,
+   "md5": "c96aed1adedc86eededfba27f877952a"
+  },
+  {
+   "nome": "sim_unidade",
+   "args": [
+    {
+     "nome": "p_unidade",
+     "padrao": false
+    }
+   ],
+   "definer": false,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": true,
+   "md5": "2e82823f3d8e0842c79aa328e0b19b8c"
   },
   {
    "nome": "teste_ids",
