@@ -66,6 +66,7 @@ async function responder(p, escolhas = {}) {
     const ex = await rpc('chat_exames', { p_conversa: p.c, p_token: p.t, p_modalidade: 'RM', p_regiao: 'joelho' });
     r = await rpc('chat_pedido_enviar', { p_conversa: p.c, p_token: p.t, p_itens: [{ modalidade: 'RM', regiao: 'joelho', lado: 'D', procedimento_id: ex[0].id }] });
   } else if (o.tipo === 'calendario') {
+    await semearOfertas(p.c);
     const hs = await rpc('chat_horarios', { p_conversa: p.c, p_token: p.t, p_grupo: o.grupo || 1, p_de: dia(0), p_ate: dia(20) });
     p.horarios = hs;
     if (escolhas.horario === 'sem_horario') r = await rpc('chat_responder', { p_conversa: p.c, p_token: p.t, p_passo: o.passo, p_valor: JSON.stringify('sem_horario'), p_texto: 'Nenhum horário serve para mim' });
@@ -85,6 +86,18 @@ async function responder(p, escolhas = {}) {
 }
 async function ateOFim(p, escolhas) { for (let i = 0; i < 30 && await responder(p, escolhas); i++); await como(''); return p; }
 const dia = (n) => { const d = new Date(Date.now() + n * 864e5); return d.toLocaleString('sv-SE', { timeZone: 'America/Bahia' }).slice(0, 10); };
+
+// Desde 14/11/2026 o calendário só mostra horário que a API do Klingo ofereceu (tabela klingo_oferta + consulta registrada).
+// Aqui o teste faz o papel da Edge Function chat-agenda-api: grava as ofertas da conversa e a consulta que as originou.
+const semearOfertas = async (conversa) => {
+  await como('');
+  const it = await um(`select procedimento_id id from public.pre_agendamento_itens where conversa_id = $1 and ativo and procedimento_id is not null order by id limit 1`, [conversa]);
+  if (!it) throw new Error('sem exame/consulta no pedido para semear horários');
+  const lista = [1, 2, 3].flatMap((n) => ['08:30', '10:00'].map((h) => ({ chave: `${dia(n)}|63|308|2|${h}`, data: dia(n), hora: h, profissional: 'DRA EXEMPLO IMAGEM', unidade: UNIDADE })));
+  await db.query(`select public.klingo_oferta_gravar_v2($1, $2, 1, $3::jsonb, false, true)`, [conversa, it.id, JSON.stringify(lista)]);
+  await db.query(`select public.klingo_consulta_registrar($1, 'sim', 'exame', $2, 1, 'ok_com_horarios', 200, 6, 6, 0, 6, 900, null)`, [conversa, it.id]);
+  await anonimo();
+};
 
 const voltar = async (p) => {
   await anonimo();
@@ -137,7 +150,8 @@ await caso('voltar dos DADOS (contato) leva aos dados de identificação, já pr
   for (let i = 0; i < 20 && p.ult.opcoes.passo !== 'dados_contato'; i++) await responder(p, { motivo: 'exame', plano: 'Particular' });
   const r = await voltar(p);
   const campos = Object.fromEntries((p.ult.opcoes.campos || []).map((c) => [c.nome, c.valor]));
-  return { ok: r.passo === 'dados_ident' && campos.nome === 'Maria Teste da Silva' && !!campos.dt_nasc, detalhe: `${p.passos.join(' > ')} | nome preenchido: ${campos.nome}` };
+  // 15/11/2026: dados_ident pede só nome e sexo; nascimento, CPF e nome da mãe não são perguntados de novo (supabase/dados-ident-sem-repetir.sql)
+  return { ok: r.passo === 'dados_ident' && campos.nome === 'Maria Teste da Silva' && !('dt_nasc' in campos) && !('cpf' in campos) && !('mae' in campos), detalhe: `${p.passos.join(' > ')} | nome preenchido: ${campos.nome}` };
 });
 await caso('voltar da CONFIRMAÇÃO leva ao último grupo de dados; voltar de novo segue andando para trás, um passo por vez', async () => {
   const p = await iniciar('Voltar Confirma Teste');

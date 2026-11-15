@@ -12,12 +12,22 @@ await db.exec(`insert into public.config (chave, valor) values ('ia_segredo', 's
   on conflict (chave) do update set valor = excluded.valor`);
 // 1) ANTES: o motivo sai na ordem de sempre (Exame, Consulta, Outro assunto)
 const iniciar = async (nome, tel) => { await anonimo(); const r = (await q(`select public.chat_iniciar(p_nome => $1, p_telefone => $2, p_email => 'x@exemplo.invalid', p_aceite => true, p_paciente_tipo => 'proprio') r`, [nome, tel]))[0].r; await como(''); return r; };
+// Desde 14/11/2026 a 1ª pergunta é CPF e nascimento; o motivo vem logo depois.
+const passarCpf = async (r) => {
+  const o = r.respostas.at(-1).opcoes;
+  if (!o || o.passo !== 'cpf_nasc') return r;
+  const v = {}; for (const cp of o.campos || []) v[cp.nome] = cp.tipo === 'cpf' ? '111.444.777-35' : cp.tipo === 'data' ? '25/03/1980' : 'Texto de teste';
+  await anonimo();
+  const x = (await q(`select public.chat_responder(p_conversa => $1, p_token => $2, p_passo => 'cpf_nasc', p_valor => $3::jsonb, p_texto => null) r`, [r.conversa_id, r.token, JSON.stringify(v)]))[0].r;
+  await como('');
+  return x;
+};
 const motivoDe = (r) => (r.respostas.at(-1).opcoes.itens || []).map((i) => i.valor).join(',');
 const antes = await iniciar('Antes Teste', '71985000001');
-const ordemAntes = motivoDe(antes);
+const ordemAntes = motivoDe(await passarCpf(antes));
 await db.exec(SQL);
 const depois = await iniciar('Depois Teste', '71985000002');
-const ordemDepois = motivoDe(depois);
+const ordemDepois = motivoDe(await passarCpf(depois));
 registrar('motivo: antes "exame,consulta,assunto"; depois a Consulta vem primeiro', ordemAntes === 'exame,consulta,assunto' && ordemDepois === 'consulta,exame,assunto', `${ordemAntes} -> ${ordemDepois}`);
 // 2) plano e assunto pela função (mesma que o motor chama)
 const ord = async (passo, itens) => (await q(`select public.fluxo_ordenar($1, $2::jsonb) r`, [passo, JSON.stringify(itens.map((v) => ({ valor: v, rotulo: v })))]))[0].r.map((i) => i.valor).join(',');

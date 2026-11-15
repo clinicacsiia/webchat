@@ -66,6 +66,7 @@ async function responder(p, escolhas = {}) {
     const ex = await rpc('chat_exames', { p_conversa: p.c, p_token: p.t, p_modalidade: 'RM', p_regiao: 'joelho' });
     r = await rpc('chat_pedido_enviar', { p_conversa: p.c, p_token: p.t, p_itens: [{ modalidade: 'RM', regiao: 'joelho', lado: 'D', procedimento_id: ex[0].id }] });
   } else if (o.tipo === 'calendario') {
+    await semearOfertas(p.c);
     const hs = await rpc('chat_horarios', { p_conversa: p.c, p_token: p.t, p_grupo: o.grupo || 1, p_de: dia(0), p_ate: dia(20) });
     p.horarios = hs;
     if (escolhas.horario === 'sem_horario') r = await rpc('chat_responder', { p_conversa: p.c, p_token: p.t, p_passo: o.passo, p_valor: JSON.stringify('sem_horario'), p_texto: 'Nenhum horário serve para mim' });
@@ -85,6 +86,18 @@ async function responder(p, escolhas = {}) {
 }
 async function ateOFim(p, escolhas) { for (let i = 0; i < 30 && await responder(p, escolhas); i++); await como(''); return p; }
 const dia = (n) => { const d = new Date(Date.now() + n * 864e5); return d.toLocaleString('sv-SE', { timeZone: 'America/Bahia' }).slice(0, 10); };
+
+// Desde 14/11/2026 o calendário só mostra horário que a API do Klingo ofereceu (tabela klingo_oferta + consulta registrada).
+// Aqui o teste faz o papel da Edge Function chat-agenda-api: grava as ofertas da conversa e a consulta que as originou.
+const semearOfertas = async (conversa) => {
+  await como('');
+  const it = await um(`select i.procedimento_id id, c.medico_preferido medico from public.pre_agendamento_itens i join public.conversas c on c.id = i.conversa_id where i.conversa_id = $1 and i.ativo and i.procedimento_id is not null order by i.id limit 1`, [conversa]);
+  if (!it) throw new Error('sem exame/consulta no pedido para semear horários');
+  const lista = [1, 2, 3].flatMap((n) => ['08:30', '10:00'].map((h) => ({ chave: `${dia(n)}|63|308|2|${h}`, data: dia(n), hora: h, profissional: it.medico || 'DRA EXEMPLO IMAGEM', unidade: UNIDADE })));
+  await db.query(`select public.klingo_oferta_gravar_v2($1, $2, 1, $3::jsonb, false, true)`, [conversa, it.id, JSON.stringify(lista)]);
+  await db.query(`select public.klingo_consulta_registrar($1, 'sim', 'exame', $2, 1, 'ok_com_horarios', 200, 6, 6, 0, 6, 900, null)`, [conversa, it.id]);
+  await anonimo();
+};
 const pedidoDe = (c) => um(`select status, etapa, tipo, plano, procedimento, profissional, jsonb_array_length(coalesce(escolha_horario, '[]'::jsonb))::int as horarios, paciente from public.pre_agendamentos where conversa_id = $1`, [c]);
 const conversaDe = (c) => um(`select status, ia_ativa, agente_id, motivo_encerramento, encerramento_origem, primeiro_humano_em, encerrada_em from public.conversas where id = $1`, [c]);
 const erroDe = async (fn) => { try { await fn(); return null; } catch (e) { return { code: e.code, msg: String(e.message).split('\n')[0] }; } };
