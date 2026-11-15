@@ -143,6 +143,18 @@ await caso('Seus exames: resumo "1 de 3 feitos · faltam 2", passo de cada exame
   const t = await texto(page); const feitos = await page.locator('.passos li.feito').count(); const agora = await page.locator('.passos li.agora').count(); await ctx.close();
   return { ok: /1 de 3 exames feitos · faltam 2/.test(t) && /Seu exame está sendo feito agora/.test(t) && /Laudo está sendo preparado|laudo está sendo preparado/.test(t) && /foi cancelado/.test(t) && /em andamento/.test(t) && feitos === 5 + 4 + 2 && agora === 3 && !/\d{1,2}:\d{2}/.test(t), detalhe: feitos + ' ' + agora + ' ' + t.replace(/\n+/g, ' | ').slice(0, 160) };
 });
+await caso('conta: com exame de hoje no Klingo mostra "Você está na clínica", etapa e número da marcação, e não o lugar na fila', async () => {
+  const hoje = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(new Date());
+  const { page, ctx, estado } = await abrir({ logado: true });
+  estado.jornada = { conferida: true, resumo: { total: 2, feitos: 0, faltam: 2, laudos: 0 }, visitas: [{ data: hoje, unidade: 'Centro', exames: [
+    { nome: 'RM JOELHO', ok: 4, em_atendimento: false, excecao: null, voucher: '9101', chegada: '07:50' }, { nome: 'US ABDOME', ok: 3, em_atendimento: false, excecao: null, voucher: '9102', chegada: null }] }] };
+  await page.waitForFunction(() => /Chegou na clínica/.test(document.body.innerText));
+  estado.fila = { situacao: 'aguardando', senha: 5, posicao: 2, a_frente: 1, total: 4 };
+  await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+  await page.waitForFunction(() => /Você está na clínica/.test(document.body.innerText), null, { timeout: 5000 });
+  const t = await texto(page); await ctx.close();
+  return { ok: /Marcação nº 9101/.test(t) && /Chegada registrada às 07:50/.test(t) && /Marcação nº 9102/.test(t) && /Aguardando a recepção/.test(t) && /Sua senha: 5/.test(t) && !/Você está na fila/.test(t) && !/2º/.test(t), detalhe: t.slice(0, 200) };
+});
 await caso('Sair volta ao início', async () => {
   const { page, ctx } = await abrir({ logado: true }); await page.waitForSelector('#btnSair:not([hidden])'); await page.click('#btnSair');
   await page.waitForSelector('#btnCheckin'); await ctx.close(); return { ok: true };

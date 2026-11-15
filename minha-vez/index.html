@@ -80,6 +80,8 @@
   .pedido .pessoa { font-weight:700; } .pedido .dica { color:var(--suave); font-size:.85rem; margin:8px 0 0; }
   .novo { display:inline-block; background:#e5484d; color:#fff; border-radius:999px; font-size:.75rem; font-weight:800; padding:3px 9px; }
   .quando { color:var(--azul); font-weight:700; margin:4px 0 2px; font-size:.98rem; }
+  .voucher { color:var(--suave); font-size:.92rem; margin:2px 0 6px; } .voucher b { display:inline; color:var(--texto); }
+  .etapa-hoje { margin:6px 0 4px; }
   .res-box { border-radius:var(--radius-md); padding:10px 12px; margin:8px 0 4px; font-size:.95rem; background:var(--azul-claro); }
   .res-box.disp { background:var(--ok-claro); border:1px solid var(--ok); }
   button.sec { width:100%; background:var(--azul-claro); color:var(--azul); border:0; border-radius:12px; padding:14px; font-size:1rem; font-weight:700; cursor:pointer; margin-top:8px; }
@@ -354,6 +356,36 @@
     if (error) { desenhar(ultimo, error.message); return; }
     aoMudar(data); desenhar(data);
   }
+  // Quem já tem exame hoje vê a ETAPA de cada exame e o número da marcação (a recepção acha o paciente pelo número no Klingo), não o lugar na fila.
+  // Sem exame de hoje no Klingo (ou sem como saber quem é), continua o lugar na fila. Mude para true para mostrar o lugar também.
+  const MOSTRAR_POSICAO_COM_EXAMES = false;
+  function examesDeHoje() {
+    const hoje = hojeBR(), r = [];
+    if (modo === 'ticket' && app.dados && Array.isArray(app.dados.pedidos)) {
+      for (const p of app.dados.pedidos) for (const e of p.exames || []) if (e.data === hoje && !e.excecao && e.voucher) r.push({ quem: fonePessoa(p), p, e, hora: e.hora, unidade: e.unidade });
+    } else if (modo === 'conta' && jornada && Array.isArray(jornada.visitas)) {
+      for (const v of jornada.visitas) if (v.data === hoje) for (const e of v.exames || []) if (!e.excecao && e.voucher) r.push({ quem: '', p: null, e, hora: '', unidade: v.unidade });
+    }
+    return r.sort((a, b) => String(a.hora).localeCompare(String(b.hora)));
+  }
+  function etapaHoje(e) {
+    if (e.ok >= 5) return { txt: 'Em atendimento', classe: 'ok' };   // o Klingo abriu o atendimento (ainda não existe hora de início/fim do exame)
+    if (e.ok === 4) return { txt: e.chegada ? 'Chegada registrada às ' + e.chegada : 'Chegada registrada', classe: 'ok' };
+    return { txt: 'Aguardando a recepção', classe: '' };
+  }
+  function cartaoHoje(f, lista) {
+    const varias = new Set(lista.map((x) => x.quem)).size > 1;
+    return h('div', { class: 'cartao hoje', role: 'status', 'aria-live': 'polite' },
+      h('h1', {}, 'Você está na clínica'),
+      h('p', { class: 'suave', style: 'margin:0 0 6px' }, (f.senha ? 'Sua senha: ' + f.senha + '.' : 'Você já está na lista da recepção.')),
+      lista.map(({ quem, e, hora, unidade }) => {
+        const et = etapaHoje(e);
+        return h('div', { class: 'exame' }, h('b', {}, (varias && quem ? quem + ': ' : '') + tituloExame(e.nome)),
+          h('p', { class: 'voucher' }, 'Marcação nº ', h('b', {}, e.voucher), hora && hora !== '00:00' ? ' · ' + hora : '', unidade ? ' · ' + unidade : ''),
+          h('div', { class: 'etapa-hoje' }, h('span', { class: 'selo ' + et.classe }, et.txt)));
+      }),
+      h('p', { class: 'suave', style: 'margin:10px 0 0' }, 'Se a recepção pedir, diga o número da marcação.'));
+  }
   function desenhar(f, aviso) {
     btnSair.hidden = false;
     const nos = [];
@@ -363,6 +395,8 @@
     if (modo === 'ticket') nos.push(...cartoesTicket(f));
     if (f.situacao === 'chamado') {
       nos.push(h('div', { class: 'cartao vez', role: 'status' }, h('h1', {}, 'É a sua vez!'), h('p', {}, 'Pode se dirigir ao atendimento. A equipe está esperando você.'), f.senha ? h('p', { class: 'suave' }, 'Sua senha: ' + f.senha) : null));
+    } else if (f.situacao === 'aguardando' && !MOSTRAR_POSICAO_COM_EXAMES && examesDeHoje().length) {
+      nos.push(cartaoHoje(f, examesDeHoje()));
     } else if (f.situacao === 'aguardando') {
       const perto = f.a_frente <= AVISAR_PERTO;
       nos.push(h('div', { class: 'cartao posicao' + (perto ? ' perto' : ''), role: 'status', 'aria-live': 'polite' },
@@ -442,6 +476,7 @@
   const tituloExame = (nome) => { try { return window.NomesExame ? window.NomesExame.apresentar(nome, { semPrefixo: false }).titulo : String(nome || 'Exame'); } catch { return String(nome || 'Exame'); } };
   function exameNo(e) {
     const filhos = [h('b', {}, tituloExame(e.nome))];
+    if (e.voucher) filhos.push(h('p', { class: 'voucher' }, 'Marcação nº ', h('b', {}, e.voucher), e.chegada ? ' · chegada às ' + e.chegada : ''));
     if (e.excecao) { filhos.push(h('div', { class: 'excecao' }, FRASE_EXC[e.excecao] || 'Fale com a recepção sobre este exame.')); return h('div', { class: 'exame' }, filhos); }
     const ok = Math.max(0, Math.min(6, e.ok || 0));
     filhos.push(h('ol', { class: 'passos', 'aria-label': 'Andamento do exame' }, PASSOS.map((nome, i) => {
@@ -584,6 +619,7 @@
   function exameApp(p, e) {
     const filhos = [h('b', {}, tituloExame(e.nome))];
     if (e.data) filhos.push(h('p', { class: 'quando' }, dataBR(e.data) + (e.hora && e.hora !== '00:00' ? ' às ' + e.hora : '') + (e.unidade ? ' · ' + e.unidade : '')));
+    if (e.voucher) filhos.push(h('p', { class: 'voucher' }, 'Marcação nº ', h('b', {}, e.voucher), e.chegada ? ' · chegada às ' + e.chegada : ''));
     if (e.excecao) { filhos.push(h('div', { class: 'excecao' }, EXC_MSG[e.excecao] || 'Fale com a clínica pela conversa.')); return h('div', { class: 'exame' }, filhos); }
     const ok = Math.max(0, Math.min(6, e.ok || 0));
     if (!p.aberta && ok <= 1) { filhos.push(h('p', { class: 'msg' }, 'Sem horário marcado.')); return h('div', { class: 'exame' }, filhos); }   // encerrado sem marcar: nada de "estamos organizando"
