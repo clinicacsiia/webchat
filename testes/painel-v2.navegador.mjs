@@ -131,30 +131,29 @@ await caso('DISPONIBILIDADE FUTURA: "Cancelar procura" chama painel_disponibilid
   await ctx.close();
   return { ok: botoes.find((b) => b[0])[2] === true && botoes.find((b) => b[1])[2] === false && !!cancel && JSON.stringify(cancel).includes('s1'), detalhe: JSON.stringify(cancel ?? null) };
 });
-await caso('CONFIGURAÇÕES: o mestre é "teto" e cada capacidade do autoatendimento tem a sua chave (horários, marcar, pré-cadastro, ver, cancelar, remarcar, disponibilidade, motor de vagas, aviso)', async () => {
-  const { page, ctx } = await abrir();
-  await page.click('button[data-aba="config"]'); await page.waitForSelector('#cfg-klingoauto', { timeout: 8000 });
-  const chaves = await page.$$eval('#cfg-klingoauto select, #cfg-klingoauto input', (e) => e.map((x) => x.id.replace('cfg_', '')));
-  const desc = await page.$eval('#cfg-klingoauto .cfg-desc', (e) => e.textContent);
-  await ctx.close();
-  const esperadas = ['klingo_auto', 'klingo_api_horarios', 'klingo_api_marcar', 'klingo_api_pre_cadastro', 'klingo_api_consultar', 'klingo_api_cancelar', 'klingo_api_remarcar', 'previsao_modo', 'previsao_monitor_modo', 'notificacao_modo', 'klingo_api_percentual'];
-  return { ok: esperadas.every((k) => chaves.includes(k)) && /TETO/.test(desc), detalhe: chaves.join(',') };
-});
-await caso('CONFIGURAÇÕES: alterar UMA chave grava só essa chave (as outras não são tocadas)', async () => {
+// 14/11/2026 (commit 4dc3745, "sempre ligado"): o autoatendimento do Klingo não tem mais interruptor nem chave por capacidade no painel.
+await caso('CONFIGURAÇÕES: não há mais mestre nem chave por capacidade do autoatendimento (ele é sempre ligado); a aba abre sem erro', async () => {
   const { page, ctx, reg } = await abrir();
-  await page.click('button[data-aba="config"]'); await page.waitForSelector('#cfg_klingo_api_cancelar', { timeout: 8000 });
-  await page.selectOption('#cfg_klingo_api_cancelar', 'sim');
-  await page.click('button:has-text("Salvar alterações")'); await new Promise((r) => setTimeout(r, 600));
-  const gravou = reg.rpcs.filter((x) => x.rpc === 'config');
+  await page.click('button[data-aba="config"]'); await page.waitForSelector('.pagina.cfg, .cfg-grupo, .cfg-topo', { timeout: 8000 });
+  const ids = await page.$$eval('select[id^="cfg_klingo_api_"], input[id^="cfg_klingo_api_"], #cfg_klingo_auto, #cfg_previsao_modo, #cfg_notificacao_modo, #cfg-klingoauto', (e) => e.length);
   await ctx.close();
-  return { ok: gravou.length === 1 && /klingo_api_cancelar/.test(gravou[0].url) && gravou[0].corpo.valor === 'sim', detalhe: JSON.stringify(gravou) };
+  return { ok: ids === 0 && !reg.excecoes.length, detalhe: `controles antigos na tela: ${ids}; ${reg.excecoes[0] ?? ''}` };
+});
+await caso('CONFIGURAÇÕES: salvar sem mexer em nada não grava chave nenhuma do autoatendimento', async () => {
+  const { page, ctx, reg } = await abrir();
+  await page.click('button[data-aba="config"]'); await page.waitForSelector('.cfg-topo', { timeout: 8000 });
+  const salvar = page.locator('button:has-text("Salvar alterações")');
+  if (await salvar.count()) { await salvar.first().click().catch(() => {}); await new Promise((r) => setTimeout(r, 600)); }
+  const gravou = reg.rpcs.filter((x) => x.rpc === 'config' && /klingo_api_|klingo_auto|previsao_modo|notificacao_modo/.test(x.url));
+  await ctx.close();
+  return { ok: gravou.length === 0, detalhe: JSON.stringify(gravou) };
 });
 await caso('INDICADORES: mostra as consultas de marcações, os cancelamentos e as remarcações confirmados pelo Klingo e o que foi para a equipe', async () => {
   const { page, ctx } = await abrir();
   await page.click('button[data-aba="indicadores"]').catch(() => {}); await page.waitForSelector('.ind-auto', { timeout: 10000 });
   const t = await page.$eval('.ind-auto', (e) => e.textContent.replace(/\s+/g, ' '));
   await ctx.close();
-  return { ok: /11\s*consultas de marcações/.test(t) && /3\s*cancelamentos confirmados pelo Klingo/.test(t) && /2\s*remarcações confirmadas/.test(t) && /1\s*cancelar\/remarcar que foram para a equipe/.test(t) && /teto/.test(t), detalhe: t.slice(0, 160) };
+  return { ok: /11\s*consultas de marcações/.test(t) && /3\s*cancelamentos confirmados pelo Klingo/.test(t) && /2\s*remarcações confirmadas/.test(t) && /1\s*cancelar\/remarcar que foram para a equipe/.test(t) && /sempre ligado/.test(t), detalhe: t.slice(0, 160) };
 });
 
 await browser.close(); srv.close();

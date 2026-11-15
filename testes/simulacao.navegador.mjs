@@ -47,6 +47,7 @@ function dia(date) {
       if (slot + 15 <= corte && i % 6 === 5) v.absentAt = slot + 15;
       else if (slot - 8 <= corte) { v.arrive = slot - 8 + (i % 7); v.done = true; v.start = v.arrive + 8 + (i % 5); v.end = v.start + 20; }
       if (v.arrive > corte) { delete v.arrive; delete v.done; delete v.start; delete v.end; }
+      else if (v.start > corte) { delete v.start; delete v.end; }   // perto do fim do expediente o início cairia depois do "agora" e a tela recusa o dado (como deve)
       else if (v.end > corte) { delete v.end; }
       visits.push(v);
     }
@@ -294,10 +295,12 @@ await caso('sem WebGL: a página avisa, mantém a lista de pontos de atenção e
   const semGl = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH, args: ['--no-sandbox', '--disable-3d-apis', '--disable-gpu', '--disable-webgl', '--disable-webgl2'] } : {});
   const { p, ctx, erros } = await pagina(semGl, { logado: true });
   await p.goto(URL_BASE);
-  await p.waitForFunction(() => ['off', 'ready'].includes(window.__simulacao.estado3d()), null, { timeout: 30000 });
+  await p.waitForFunction(() => !!window.__simulacao && ['off', 'ready'].includes(window.__simulacao.estado3d()), null, { timeout: 30000 });
   const estado = await p.evaluate(() => window.__simulacao.estado3d());
   const msg = estado === 'off' ? await p.locator('#scene3dMsg').innerText() : '';
-  const itens = await p.locator('#attention li').count();
+  // a lista é refeita quando chegam os indicadores e a área externa: conta até estabilizar em 3 ou mais
+  let itens = 0;
+  for (let i = 0; i < 50 && itens < 3; i++) { itens = await p.locator('#attention li').count(); if (itens < 3) await espera(300); }
   await ctx.close(); await semGl.close();
   return { ok: estado === 'off' && /WebGL/.test(msg) && itens >= 3 && !erros.length, detalhe: `estado ${estado}; ${itens} pontos; erros ${erros.join('|')}` };
 });
