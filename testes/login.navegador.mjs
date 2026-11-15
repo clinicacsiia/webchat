@@ -294,6 +294,26 @@ await caso('acesso rápido DESLIGADO: nada muda para quem tem conta antiga (sem 
   return { ok: r.faixa && !r.bloco, detalhe: JSON.stringify(r) };
 });
 
+// ---------------------------------------------------------------- criança com o mesmo nome do responsável (a mãe que escreve o próprio nome)
+await caso('"Para meu filho" com o nome da criança IGUAL ao do responsável: avisa e não inicia; tocar de novo (confirmação) inicia', async () => {
+  const x = await abrir({ ativo: false });
+  await x.page.click('#fQuem .unidade >> nth=1'); await x.page.fill('#fNome', 'Marta Lima Teste'); await x.page.fill('#fFilho', 'marta lima  teste'); await x.page.fill('#fTel', '71999990000'); await x.page.fill('#fEmail', 'marta@teste.local'); await x.page.check('#fAceite'); await x.page.check('#fPrevisao');
+  await x.page.click('#btnIniciar'); await espera(400);
+  const aviso = await texto(x.page, '#erroForm'), antes = chamou(x.mundo, 'chat_iniciar').length;
+  await x.page.click('#btnIniciar'); await espera(800);
+  const depois = chamou(x.mundo, 'chat_iniciar').length;
+  await x.ctx.close();
+  return { ok: /igual ao seu/.test(aviso || '') && antes === 0 && depois === 1, detalhe: `${antes} -> ${depois}; ${aviso}` };
+});
+await caso('"Para meu filho" com nome de criança diferente inicia direto (sem aviso)', async () => {
+  const x = await abrir({ ativo: false });
+  await x.page.click('#fQuem .unidade >> nth=1'); await x.page.fill('#fNome', 'Marta Lima Teste'); await x.page.fill('#fFilho', 'Leo Lima Teste'); await x.page.fill('#fTel', '71999990000'); await x.page.fill('#fEmail', 'marta@teste.local'); await x.page.check('#fAceite'); await x.page.check('#fPrevisao');
+  await x.page.click('#btnIniciar'); await espera(800);
+  const n = chamou(x.mundo, 'chat_iniciar').length;
+  await x.ctx.close();
+  return { ok: n === 1, detalhe: String(n) };
+});
+
 await caso('nenhuma exceção de JavaScript em toda a tela de login (ligada e desligada)', async () => {
   const a = await abrir(), b = await abrir({ ativo: false });
   await a.page.click('#btnContaCriar'); await a.page.waitForSelector('#cNome'); await a.page.click('text=Já tenho conta'); await a.page.waitForSelector('#cEmail');

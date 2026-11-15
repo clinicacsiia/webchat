@@ -3266,10 +3266,10 @@
    ],
    "definer": true,
    "gatilho": false,
-   "anon": false,
-   "authenticated": false,
+   "anon": true,
+   "authenticated": true,
    "publico": false,
-   "md5": "9220e750472126ff0b5198f7d84d8f6e"
+   "md5": "bd69a3db45e20f7ac482ff4c5ccf2614"
   },
   {
    "nome": "app_chat_dados",
@@ -3432,7 +3432,67 @@
    "anon": false,
    "authenticated": true,
    "publico": false,
-   "md5": "4e790f5b1abfe40c80473a3a2bd5754c"
+   "md5": "b927232bc29c550dd70f7c772919aa5e"
+  },
+  {
+   "nome": "app_conta_antiga_filhos",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "69a7d064fcb0c3767959c41ff78e2f95"
+  },
+  {
+   "nome": "app_conta_antiga_historico_filhos",
+   "args": [
+    {
+     "nome": "p_conta",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "6658c6793b9e9a5a908851a678a317b4"
+  },
+  {
+   "nome": "app_conta_antiga_migrar",
+   "args": [
+    {
+     "nome": "p_pin",
+     "padrao": false
+    },
+    {
+     "nome": "p_telefone",
+     "padrao": true
+    },
+    {
+     "nome": "p_nome",
+     "padrao": true
+    },
+    {
+     "nome": "p_nascimento",
+     "padrao": true
+    },
+    {
+     "nome": "p_filhos",
+     "padrao": true
+    },
+    {
+     "nome": "p_aparelho",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "f4981baaeff7d1a5bc28ffa39f598482"
   },
   {
    "nome": "app_conta_antiga_resumo",
@@ -3473,6 +3533,21 @@
    "authenticated": false,
    "publico": false,
    "md5": "28698aeb9049c42a6bf7a14d41290ea8"
+  },
+  {
+   "nome": "app_data_flex",
+   "args": [
+    {
+     "nome": "t",
+     "padrao": false
+    }
+   ],
+   "definer": false,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "7bba530be8207df3c0d8e48ff28367d6"
   },
   {
    "nome": "app_desbloquear",
@@ -3543,6 +3618,64 @@
    "md5": "4185408901f6caaeedadd7638bb7f970"
   },
   {
+   "nome": "app_filho_adicionar",
+   "args": [
+    {
+     "nome": "p_token",
+     "padrao": false
+    },
+    {
+     "nome": "p_nome",
+     "padrao": false
+    },
+    {
+     "nome": "p_nascimento",
+     "padrao": false
+    },
+    {
+     "nome": "p_mesmo_nome_confirmado",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "582f0bb81f13c2e4e25b5b7ac9bfa367"
+  },
+  {
+   "nome": "app_filho_conflito",
+   "args": [
+    {
+     "nome": "p_titular_nome",
+     "padrao": false
+    },
+    {
+     "nome": "p_titular_nasc",
+     "padrao": false
+    },
+    {
+     "nome": "p_nome",
+     "padrao": false
+    },
+    {
+     "nome": "p_nasc",
+     "padrao": false
+    },
+    {
+     "nome": "p_confirmado",
+     "padrao": false
+    }
+   ],
+   "definer": false,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "ab1ed94c4742299524afa81087ecd9ca"
+  },
+  {
    "nome": "app_filho_remover",
    "args": [
     {
@@ -3579,10 +3712,10 @@
    ],
    "definer": true,
    "gatilho": false,
-   "anon": false,
-   "authenticated": false,
+   "anon": true,
+   "authenticated": true,
    "publico": false,
-   "md5": "69962a3a678d32601784477bbd506edd"
+   "md5": "5b4443ec6fb9db5fdc4fd56d63551df6"
   },
   {
    "nome": "app_hoje",

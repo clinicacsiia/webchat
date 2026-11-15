@@ -1,5 +1,5 @@
 -- public.app_cadastrar(p_telefone text, p_nome text, p_nascimento text, p_pin text, p_filhos jsonb, p_confianca jsonb, p_aparelho text)
--- Pode executar: service_role
+-- Pode executar: anon, authenticated
 CREATE OR REPLACE FUNCTION public.app_cadastrar(p_telefone text, p_nome text, p_nascimento text, p_pin text, p_filhos jsonb DEFAULT '[]'::jsonb, p_confianca jsonb DEFAULT NULL::jsonb, p_aparelho text DEFAULT NULL::text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -12,6 +12,7 @@ declare
   v_nasc date := public.app_data(p_nascimento);
   v_filhos jsonb := coalesce(p_filhos, '[]'::jsonb);
   v_f jsonb; v_fd date; v_id uuid; v_sug uuid; v_max integer; v_ctel text; v_token text;
+  v_c jsonb; v_vistos text[] := '{}'; v_chave text;
 begin
   if not public.app_modo() then return public.app_erro_json('indisponivel'); end if;
   if v_tel !~ '^[1-9]{2}9[0-9]{8}$' then return jsonb_build_object('ok', false, 'erro', 'celular', 'mensagem', 'Celular inválido. Use DDD + 9 dígitos.'); end if;
@@ -24,6 +25,8 @@ begin
     v_fd := public.app_data(v_f ->> 'nascimento');
     if jsonb_typeof(v_f) <> 'object' or not public.app_nome_ok(v_f ->> 'nome') then return jsonb_build_object('ok', false, 'erro', 'filho', 'mensagem', 'Informe nome e sobrenome do filho(a).'); end if;
     if v_fd is null or v_fd > public.app_hoje() or v_fd < date '1900-01-01' then return jsonb_build_object('ok', false, 'erro', 'filho', 'mensagem', 'Data de nascimento do filho(a) inválida.'); end if;
+    v_c := public.app_filho_conflito(v_nome, v_nasc, v_f ->> 'nome', v_fd, coalesce(v_f ->> 'mesmo_nome_confirmado', '') = 'true');   -- filho com o nome do titular: é ela mesma ou precisa de confirmação
+    if v_c is not null then return v_c; end if;
   end loop;
   if p_confianca is not null and p_confianca <> 'null'::jsonb then
     v_ctel := regexp_replace(coalesce(p_confianca ->> 'telefone', ''), '\D', '', 'g');
@@ -52,7 +55,10 @@ begin
     return jsonb_build_object('ok', false, 'erro', 'telefone_cadastrado', 'mensagem', 'Este celular já tem cadastro. Entre com o seu PIN.');
   end;
   for v_f in select * from jsonb_array_elements(v_filhos) loop
-    insert into public.app_filho (responsavel_id, nome, nascimento, criado_em)
+    v_chave := public.app_norm(v_f ->> 'nome') || '|' || (v_f ->> 'nascimento');
+    continue when v_chave = any(v_vistos);   -- o mesmo filho digitado duas vezes vale uma vez só
+    v_vistos := v_vistos || v_chave;
+    insert into public.app_filho (responsavel_id, nome, nascimento, criado_em)   -- clock_timestamp: a ordem digitada é a ordem mostrada
     values (v_id, btrim(regexp_replace(v_f ->> 'nome', '\s+', ' ', 'g')), public.app_data(v_f ->> 'nascimento'), clock_timestamp());
   end loop;
   if v_ctel is not null then

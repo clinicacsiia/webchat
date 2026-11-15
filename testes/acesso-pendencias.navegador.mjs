@@ -14,6 +14,7 @@ const { q } = ajudantes(db);
 await db.exec(readFileSync(`${REPO}/supabase/acesso-rapido-paciente.sql`, 'utf8'));
 await db.exec(readFileSync(`${REPO}/supabase/acesso-rapido-chat.sql`, 'utf8'));
 await db.exec(readFileSync(`${REPO}/supabase/acesso-rapido-pendencias.sql`, 'utf8'));
+await db.exec(readFileSync(`${REPO}/supabase/acesso-rapido-filhos.sql`, 'utf8'));
 await db.exec(`update public.config set valor = 'sim' where chave = 'app_acesso_modo'`);
 
 const HTML = readFileSync(`${REPO}/acesso/index.html`, 'utf8');
@@ -37,7 +38,7 @@ async function chamarFuncao(nome, corpo) {
   Object.entries(corpo || {}).forEach(([k, v]) => {
     const i = info.nomes.indexOf(k);
     if (i < 0) throw new Error(`parâmetro desconhecido em ${nome}: ${k}`);
-    valores.push(info.tipos[i] === 'jsonb' ? (v === null ? null : JSON.stringify(v)) : v === null ? null : String(v));
+    valores.push(info.tipos[i] === 'jsonb' ? (v === null ? null : JSON.stringify(v)) : info.tipos[i] === 'boolean' ? v === true : v === null ? null : String(v));
     partes.push(`${k} => $${valores.length}::${info.tipos[i]}`);
   });
   await db.exec('reset role; set role anon');
@@ -150,6 +151,39 @@ await caso('"Agora não" esconde o cartão nesta visita, sem chamar o servidor',
   await pin(c.page, '1357'); await pin(c.page, '1357'); await esperaTexto(c.page, /Falta pouco/);
   const antes = chamadasRede.length; await c.page.click('[data-act="pendmais"]');
   return { ok: (await c.page.locator('#pend').count()) === 0 && chamadasRede.length === antes };
+});
+// ---- filho com o nome da mãe (o caso real: uma mãe cadastrou um "filho" com o próprio nome)
+const h = await novaPagina();
+await h.page.fill('#tel', '71991230020'); await h.page.click('[data-act="c1"]');
+await h.page.fill('#nome', 'Elisa Prado Teste'); await h.page.fill('#nasc', '1990-01-01'); await h.page.click('[data-act="c2"]');
+await h.page.click('[data-act="tf"][data-v="1"]');
+await caso('cadastro: colocar a si mesma como filha (mesmo nome e mesmo nascimento) é recusado na tela, sem chamar o servidor', async () => {
+  const antes = chamadasRede.length;
+  await h.page.fill('#fnome', 'Elisa Prado Teste'); await h.page.fill('#fnasc', '1990-01-01'); await h.page.click('[data-act="addf"]');
+  return { ok: /seu próprio cadastro/.test(await texto(h.page)) && chamadasRede.length === antes && (await h.page.locator('[data-act="rmf"]').count()) === 0 };
+});
+await caso('mesmo nome da mãe com outro nascimento: pergunta "É outra pessoa?"; ao confirmar a filha entra na lista', async () => {
+  await h.page.fill('#fnome', 'Elisa Prado Teste'); await h.page.fill('#fnasc', '2016-06-06'); await h.page.click('[data-act="addf"]');
+  await esperaTexto(h.page, /O nome é igual ao seu/);
+  await h.page.click('[data-act="confirmar"]');
+  await esperaTexto(h.page, /06\/06\/2016/);
+  return { ok: (await h.page.locator('[data-act="rmf"]').count()) === 1 };
+});
+await caso('um filho de nome diferente entra direto, e o mesmo filho digitado duas vezes vira um só no banco', async () => {
+  for (let i = 0; i < 2; i++) { await h.page.fill('#fnome', 'Rui Prado Teste'); await h.page.fill('#fnasc', '2018-08-08'); await h.page.click('[data-act="addf"]'); }
+  await h.page.click('[data-act="c3"]'); await h.page.click('[data-act="c4skip"]');
+  await pin(h.page, '1357'); await pin(h.page, '1357'); await esperaTexto(h.page, /Olá, Elisa/);
+  const f = await q(`select f.nome from public.app_filho f join public.app_paciente p on p.id = f.responsavel_id where p.telefone = '71991230020' order by f.nome`);
+  return { ok: f.length === 2 && f[0].nome === 'Elisa Prado Teste' && f[1].nome === 'Rui Prado Teste', detalhe: f.map((x) => x.nome).join('|') };
+});
+await caso('Meus dados > adicionar filho com o nome dela: pede confirmação e só entra depois de confirmar (não duplica)', async () => {
+  await h.page.click('[data-act="go"][data-v="dados"]'); await esperaTexto(h.page, /Meus dados/);
+  await h.page.click('[data-act="sheet"][data-t="filho"]');
+  await h.page.fill('#fnome', 'Elisa Prado Teste'); await h.page.fill('#fnasc', '2012-02-02'); await h.page.click('[data-act="sf"]');
+  await esperaTexto(h.page, /O nome é igual ao seu/);
+  await h.page.click('[data-act="confirmar"]'); await espera(500);
+  const n1 = (await q(`select count(*)::int n from public.app_filho f join public.app_paciente p on p.id = f.responsavel_id where p.telefone = '71991230020'`))[0].n;
+  return { ok: n1 === 3, detalhe: String(n1) };
 });
 await caso('nenhum erro de script nem violação da política de segurança do navegador durante todo o roteiro', async () => ({ ok: erros.length === 0, detalhe: erros.slice(0, 3).join(' ; ') }));
 

@@ -80,3 +80,11 @@ do $$ begin
     grant execute on function public.painel_app_revisoes(), public.painel_app_revisao_resolver(uuid) to authenticated;
   end if;
 end $$;
+
+-- As funções de filhos (supabase/acesso-rapido-filhos.sql) também perdem a permissão no bloco acima; devolve se já existirem.
+do $$ begin
+  if to_regprocedure('public.app_filho_adicionar(text, text, text, boolean)') is not null then
+    grant execute on function public.app_filho_adicionar(text, text, text, boolean) to anon, authenticated;
+    grant execute on function public.app_conta_antiga_filhos(), public.app_conta_antiga_migrar(text, text, text, text, jsonb, text) to authenticated;
+  end if;
+end $$;
