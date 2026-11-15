@@ -99,6 +99,8 @@
   /* Formulário inicial */
   /* Tela inicial: coluna flexível para o bloco da clínica ficar no fim da tela */
   .inicio { flex: 1; overflow-y: auto; padding: 18px 16px calc(24px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; }
+  /* Em coluna com rolagem, os blocos não podem encolher (com letra grande ou teclado aberto o texto vazava e se sobrepunha): a tela rola */
+  .inicio > *, .msgs > * { flex-shrink: 0; }
   .hero { text-align: center; padding: 6px 0 14px; }
   .hero-logo { width: min(250px, 68%); height: auto; display: inline-block; }
   .hero-nome { margin: 4px 0 0; font-size: calc(15px * var(--esc)); font-weight: 650; letter-spacing: .02em; color: var(--csi-sidebar-bg); }
@@ -126,11 +128,11 @@
   @keyframes chama { 0%, 100% { box-shadow: 0 6px 16px rgba(0,107,161,.28); } 50% { box-shadow: 0 8px 26px rgba(0,136,204,.55); } }
   @media (prefers-reduced-motion: reduce) { .inicio *, .inicio *::after { animation: none !important; } }
   /* Entrar / Criar conta no cabeçalho, do lado oposto ao "Online" (só na tela inicial) */
-  .inicio .conta-faixa { position: absolute; top: calc(8px + env(safe-area-inset-top)); right: 12px; z-index: 6; margin: 0; height: 36px; align-items: center; justify-content: flex-end; gap: 0; }
+  .inicio .conta-faixa { position: absolute; top: calc(4px + env(safe-area-inset-top)); right: 12px; z-index: 6; margin: 0; height: 44px; align-items: center; justify-content: flex-end; gap: 0; }
   .inicio .conta-faixa .txt { display: none; }
   .inicio .conta-faixa .acoes { gap: 16px; }
   .inicio .conta-faixa .link-add { padding: 6px 0; }
-  .app:has(#telaInicio:not([hidden]) #faixaConta:not([hidden])) .topo { padding-right: 160px; }
+  .app:has(#telaInicio:not([hidden]) #faixaConta:not([hidden])) .topo { padding-right: 160px; min-height: calc(52px + env(safe-area-inset-top)); }
   .app:has(#telaInicio:not([hidden]) #btnContaDados:not([hidden])) .topo { padding-right: 210px; }
   @media (max-width: 380px) { .app:has(#telaInicio:not([hidden]) #btnContaDados:not([hidden])) .topo-logo { display: none; } }
   .inicio h1 { font-size: calc(26px * var(--esc)); line-height: 1.2; margin: 0; text-align: left; min-width: 0; overflow-wrap: anywhere; }
@@ -140,13 +142,13 @@
   .acoes-saudacao { display: flex; align-items: center; gap: 16px; flex: none; }
   .acoes-saudacao[hidden] { display: none; }
   .acoes-saudacao .link-add { margin: 0; padding: 10px 0; min-height: 44px; font-size: calc(15.5px * var(--esc)); text-decoration: none; display: inline-flex; align-items: center; }
-  .acoes-saudacao #acessoSair { color: var(--texto-suave); font-weight: 600; }
+  .acoes-saudacao #acessoSair { color: var(--texto-suave); font-weight: 600; min-width: 44px; justify-content: center; }
   .inicio p.sub { margin: -6px 0 10px; color: var(--texto-suave); text-align: left; }
   .inicio > form { margin-bottom: 14px; }
   .inicio > .link-add { align-self: flex-start; margin-bottom: 16px; }
   /* Dados da clínica (somente leitura) */
   .inst-clinica { margin-top: auto; background: var(--csi-surface); border: 1px solid var(--csi-border); border-top: 4px solid var(--csi-primary); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); padding: 12px 16px; font-size: calc(15px * var(--esc)); line-height: 1.5; }
-  .inst-clinica summary { cursor: pointer; font-weight: 650; color: var(--csi-sidebar-bg); list-style: none; }
+  .inst-clinica summary { cursor: pointer; font-weight: 650; color: var(--csi-sidebar-bg); list-style: none; min-height: 44px; display: flex; align-items: center; }
   .inst-clinica summary::-webkit-details-marker { display: none; }
   .inst-clinica[open] summary { margin-bottom: 10px; }
   .inst-clinica p { margin: 0 0 8px; color: var(--texto-suave); overflow-wrap: anywhere; }
@@ -169,7 +171,7 @@
   .irmao-linha input { flex: 1; min-width: 0; padding: 12px; font: inherit; border: 1.5px solid var(--linha); border-radius: 12px; background: var(--papel); color: inherit; }
   .irmao-linha input:focus { border-color: var(--verde); outline: none; box-shadow: var(--csi-focus); }
   .irmao-linha button { border: 0; background: none; color: var(--texto-suave); font-size: calc(23px * var(--esc)); cursor: pointer; padding: 0 8px; }
-  .link-add { margin-top: 8px; background: none; border: 0; color: var(--verde); font: inherit; font-weight: 650; cursor: pointer; padding: 6px 0; }
+  .link-add { margin-top: 8px; background: none; border: 0; color: var(--verde); font: inherit; font-weight: 650; cursor: pointer; padding: 6px 0; min-height: 44px; display: inline-flex; align-items: center; }
   .proximo { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 12px; background: var(--verde-claro); border-top: 1px solid var(--linha); font-size: calc(15.5px * var(--esc)); }
   .proximo[hidden] { display: none; }
   .unidade { text-align: left; border: 1px solid var(--csi-border-strong); background: var(--papel); border-radius: var(--radius-md); box-shadow: var(--shadow-sm); padding: 12px 14px; cursor: pointer; font: inherit; color: inherit; transition: border-color var(--csi-ease), box-shadow var(--csi-ease); }
@@ -192,7 +194,7 @@
   .conta-faixa .acoes { display: flex; gap: 14px; }
   .conta-faixa .link-add { margin: 0; padding: 4px 0; }
   .conta-form .sub { margin: 0 0 14px; color: var(--texto-suave); }
-  .conta-form .mostrar { display: flex; gap: 8px; align-items: center; font-size: calc(15.5px * var(--esc)); color: var(--texto-suave); margin: -6px 0 14px; }
+  .conta-form .mostrar { display: flex; gap: 8px; align-items: center; min-height: 44px; font-size: calc(15.5px * var(--esc)); color: var(--texto-suave); margin: -6px 0 14px; }
   .conta-form .mostrar input { width: 18px; height: 18px; accent-color: var(--verde); }
   .conta-form .rodape-links { display: flex; flex-wrap: wrap; gap: 4px 18px; justify-content: center; margin-top: 12px; }
   .conta-ok { background: var(--verde-claro); border-radius: 12px; padding: 14px; margin: 0 0 14px; }
@@ -219,7 +221,7 @@
   .msg.pendente { opacity: .6; }
   .msg .quem { display: block; font-size: calc(13.5px * var(--esc)); font-weight: 650; color: var(--verde); margin-bottom: 2px; }
   .msg .hora { display: block; text-align: right; font-size: calc(13.5px * var(--esc)); color: var(--texto-suave); margin-top: 2px; white-space: normal; }
-  .msg a { color: #0b5cad; }
+  .msg a:not(.btn-w) { color: #0b5cad; }
   .msg.sistema { align-self: center; background: rgba(15,42,74,.08); box-shadow: none; color: var(--texto-suave); font-size: calc(15.5px * var(--esc)); text-align: center; max-width: 90%; padding: 5px 12px; }
   .msg.sistema .hora { display: none; }
   .msg.apagada > span:not(.hora):not(.quem) { font-style: italic; opacity: .75; }
@@ -337,14 +339,14 @@
   .carrinho li:first-child { border-top: 0; }
   /* Só os filhos diretos do item: os botões de lado ficam dentro do item e não podem herdar o estilo do "×" */
   .carrinho li > span { flex: 1; min-width: 0; font-weight: 650; overflow-wrap: anywhere; }
-  .carrinho li > button { border: 0; background: rgba(15,42,74,.12); border-radius: 50%; width: 36px; height: 36px; margin: -4px -4px 0 0; font-size: calc(20px * var(--esc)); line-height: 1; color: var(--texto); cursor: pointer; flex: none; }
+  .carrinho li > button { border: 0; background: rgba(15,42,74,.12); border-radius: 50%; width: 36px; height: 36px; margin: -4px 0 0 0; font-size: calc(20px * var(--esc)); line-height: 1; color: var(--texto); cursor: pointer; flex: none; }
   .carrinho li > button:hover { background: rgba(15,42,74,.2); }
   .carrinho li > .lado-escolha { flex: 0 0 100%; }
 
   /* Calendário */
   .cal-nav { display: flex; align-items: center; justify-content: space-between; margin: 4px 0 8px; }
   .cal-nav strong { font-size: calc(17px * var(--esc)); }
-  .cal-nav button { border: 1.5px solid var(--linha); background: var(--papel); border-radius: 10px; width: 42px; height: 38px; font-size: calc(21px * var(--esc)); cursor: pointer; }
+  .cal-nav button { border: 1.5px solid var(--linha); background: var(--papel); border-radius: 10px; width: 42px; min-height: 42px; font-size: calc(21px * var(--esc)); line-height: 1; cursor: pointer; }
   .cal-nav button:disabled { opacity: .4; cursor: default; }
   .cal-grade { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
   .cal-grade .sem { text-align: center; font-size: calc(13.5px * var(--esc)); color: var(--texto-suave); padding: 2px 0; font-weight: 700; }
@@ -392,9 +394,9 @@
   .acompanhar-grande { display: flex; align-items: center; gap: 12px; position: relative; margin: 0 0 14px; padding: 12px 16px; min-height: 64px; border-radius: var(--radius-lg); background: var(--csi-surface); border: 2px solid var(--csi-primary); color: var(--csi-primary-strong); text-decoration: none; font-weight: 800; font-size: calc(17px * var(--esc)); text-align: left; box-shadow: var(--shadow-sm); }
   .acompanhar-grande[hidden] { display: none; }
   .acompanhar-grande:active { background: var(--verde-claro); transform: translateY(1px); }
-  .acompanhar-grande .ac-icone { font-size: calc(26px * var(--esc)); line-height: 1; flex: none; }
+  .acompanhar-grande .ac-icone { font-size: calc(26px * var(--esc)); line-height: 1.25; flex: none; }
   .acompanhar-grande .ac-txt { flex: 1; min-width: 0; }
-  .acompanhar-grande .ac-seta { font-size: calc(30px * var(--esc)); line-height: 1; flex: none; font-weight: 400; }
+  .acompanhar-grande .ac-seta { font-size: calc(30px * var(--esc)); line-height: 1.25; flex: none; font-weight: 400; }
   .acompanhar-grande small { display: block; font-weight: 600; font-size: calc(14px * var(--esc)); color: var(--texto-suave); margin-top: 1px; }
   .balao { display: inline-flex; align-items: center; justify-content: center; min-width: 26px; height: 26px; padding: 0 7px; border-radius: 999px; background: #e5484d; color: #fff; font-size: 15px; font-weight: 800; line-height: 1; box-shadow: 0 0 0 3px rgba(255,255,255,.9); }
   .acompanhar-grande .balao { position: absolute; top: -10px; right: 12px; }
@@ -704,7 +706,7 @@
   const CHAVE_HIST = 'webchat.historico.v1';   // as últimas conversas deste aparelho (cada uma com o seu token): dá para voltar a elas
   const MAX_HIST = 5;                          // mínimo pedido: 3
   // Muda a cada alteração do chat. Cópia de mensagens guardada por outra versão é descartada (era isso que mostrava conversa velha e travada).
-  const VERSAO_APP = '2026.11.15-16';
+  const VERSAO_APP = '2026.11.15-17';
   // Mesmas regras do banco (fluxo_nome_ok, fluxo_telefone_ok, fluxo_email_ok): o banco confere de novo, aqui é só para avisar logo.
   const LET = 'A-Za-zÀ-ÖØ-öø-ÿ';
   const nomeCompletoOk = (v) => { const t = String(v || '').trim(); return t.length >= 5 && t.length <= 120 && new RegExp(`^[${LET}][${LET}'’.-]*( +[${LET}][${LET}'’.-]*)+$`).test(t) && t.split(/ +/).filter((w) => w.replace(new RegExp(`[^${LET}]`, 'g'), '').length >= 2).length >= 2; };

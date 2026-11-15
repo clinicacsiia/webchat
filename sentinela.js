@@ -280,7 +280,7 @@
     const filhos = [no('strong', null, c.titulo), no('p', null, c.texto)];
     if (c.codigo) {
       const p = no('p', 'ap-codigo'); p.append('Código de suporte: ', no('b', null, c.codigo), ' ');
-      const cp = no('button', 'ap-btn', 'Copiar'); cp.type = 'button'; cp.style.minHeight = '36px'; cp.style.padding = '4px 10px';
+      const cp = no('button', 'ap-btn', 'Copiar'); cp.type = 'button'; cp.style.minHeight = '44px'; cp.style.padding = '4px 14px';
       cp.addEventListener('click', () => copiarTexto(textoSuporte(c.codigo)).then((ok) => { cp.textContent = ok ? 'Copiado' : 'Anote o código'; }));
       p.append(cp); filhos.push(p);
     }

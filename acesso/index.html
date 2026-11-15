@@ -49,6 +49,7 @@ button{font:inherit;cursor:pointer}
 .chip{padding:10px 16px;border-radius:999px;border:1.5px solid var(--bd);background:var(--card);font-weight:600;color:var(--tx)}
 .chip.on{background:var(--pri);border-color:var(--pri);color:var(--on-pri)}
 .item{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--bd)}
+.item>div{min-width:0;overflow-wrap:anywhere}
 .item:last-child{border-bottom:0}
 .item small{color:var(--mut);display:block}
 .x{background:none;border:0;color:var(--err);font-size:1.3rem;padding:6px 10px}
@@ -286,7 +287,7 @@ const MSG_PIN_FRACO='Escolha um PIN menos óbvio: não use números repetidos (1
 const prog=n=>`<div class="prog">${[1,2,3,4,5].map(i=>`<i class="${i<=n?'on':''}"></i>`).join('')}</div>`;
 const voltar=v=>`<button class="link" data-act="go" data-v="${v}">← Voltar</button>`;
 /* CPF salvo: o chat não pergunta CPF e nascimento de novo. A página só vê a máscara; o número inteiro fica no banco. */
-function cpfLinha(id,x){return`<small>CPF: ${x.cpf_salvo?esc(x.cpf_mascara||'salvo'):'ainda não salvo'} · <button class="link" data-act="sheet" data-t="cpf" data-p="${esc(id)}" style="padding:0">${x.cpf_salvo?'Alterar':'Informar'}</button></small>`}
+function cpfLinha(id,x){return`<small>CPF: ${x.cpf_salvo?esc(x.cpf_mascara||'salvo'):'ainda não salvo'} · <button class="link" data-act="sheet" data-t="cpf" data-p="${esc(id)}" style="padding:12px 0;margin:-12px 0">${x.cpf_salvo?'Alterar':'Informar'}</button></small>`}
 function contatoForm(){
   return`<label for="ctnome">Nome</label><input id="ctnome" placeholder="Ex.: Maria" autocomplete="off">
   <label for="cttel">Celular com DDD</label><input id="cttel" inputmode="numeric" placeholder="(71) 99999-9999" autocomplete="off">
@@ -381,7 +382,7 @@ const V={
     <div class="item"><div><small>Nascimento</small><b>${fmtData(p.nascimento)} · ${fmtIdade(p.nascimento)}</b></div></div>
     <div class="item"><div><small>Celular (seu login)</small><b>${fmtTel(p.telefone)}</b></div></div>
     <div class="item"><div><small>E-mail</small><b>${p.email?esc(p.email):'não informado'}</b></div></div>
-    <div class="item"><div><small>CPF</small><b>${p.cpf_salvo?esc(p.cpf_mascara||'salvo'):'ainda não salvo'}</b><small><button class="link" data-act="sheet" data-t="cpf" data-p="eu" style="padding:0">${p.cpf_salvo?'Alterar':'Informar'}</button> · o chat usa este CPF e não pergunta de novo</small></div></div></div>
+    <div class="item"><div><small>CPF</small><b>${p.cpf_salvo?esc(p.cpf_mascara||'salvo'):'ainda não salvo'}</b><small><button class="link" data-act="sheet" data-t="cpf" data-p="eu" style="padding:12px 0;margin:-12px 0">${p.cpf_salvo?'Alterar':'Informar'}</button> · o chat usa este CPF e não pergunta de novo</small></div></div></div>
     <h2>Filhos</h2><div class="card">${p.filhos.length?p.filhos.map(f=>`<div class="item"><div><b>${esc(f.nome)}</b><small>${fmtData(f.nascimento)} · ${fmtIdade(f.nascimento)}</small>${cpfLinha(f.id,f)}</div><button class="x" data-act="delf" data-id="${esc(f.id)}" aria-label="Remover">×</button></div>`).join(''):'<p class="sub">Nenhum filho cadastrado.</p>'}
     <button class="btn sec" data-act="sheet" data-t="filho">+ Adicionar filho</button></div>
     <h2>Números de confiança</h2><div class="card">${p.confiaveis.length?p.confiaveis.map(c=>`<div class="item"><div><b>${esc(c.nome)}</b><small>${fmtTel(c.telefone)} · ${esc(c.relacao)}</small>
