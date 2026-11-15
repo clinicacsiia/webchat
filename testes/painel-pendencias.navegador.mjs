@@ -58,6 +58,11 @@ const SOLIC = [
 const SOLIC_CONF = [{ grupo: 'g3', criado_em: agora, responsavel: 'Cris Alves', celular: '71991230003', cadastro_sugerido: false, pessoas: [{ nome: 'Cris Alves', nascimento: '1992-03-04', filho: false }], exame: 'Consulta', data_preferida: '2026-11-25', turno: 'Qualquer horário', obs: null, status: 'confirmada' }];
 const REV = [{ id: 'r1', nome: 'Davi Lima', celular: '71991230004', nascimento: '1985-01-01', cpf_mascara: '***.***.***-35', motivo: 'cpf_repetido_na_clinica', cadastros_com_o_celular: 0, criado_em: agora }];
 const CONTAS = [{ id: 'k1', nome: 'Conta Um', celular: '71991230061', email: 'um@x.invalid', criado_em: agora, ultimo_acesso_em: null, filhos_no_historico: 2 }, { id: 'k2', nome: 'Conta Dois', celular: null, email: 'dois@x.invalid', criado_em: agora, ultimo_acesso_em: agora, filhos_no_historico: 0 }];
+const ACESSOS = [
+  { paciente_id: 'p1', nome: 'Eva <i>Reis</i>', evento: 'login', em: agora, ip: '203.0.113.7', aparelho: 'Celular da Eva', agente: 'x', fuso: 'America/Bahia', na_clinica: false, distancia_m: 8200, precisao_m: 35, local_negado: false, exames_hoje: 1, divergente: true },
+  { paciente_id: 'p2', nome: 'Fábio Dias', evento: 'abertura', em: agora, ip: '203.0.113.8', aparelho: null, agente: 'x', fuso: 'America/Bahia', na_clinica: true, distancia_m: 40, precisao_m: 20, local_negado: false, exames_hoje: 1, divergente: false },
+  { paciente_id: 'p3', nome: 'Gil Prado', evento: 'cadastro', em: agora, ip: null, aparelho: 'Tablet', agente: 'x', fuso: null, na_clinica: null, distancia_m: null, precisao_m: null, local_negado: true, exames_hoje: 0, divergente: false },
+  { paciente_id: 'p4', nome: 'Ivo Lins', evento: 'pin_esqueci', em: agora, ip: '203.0.113.9', aparelho: null, agente: 'x', fuso: null, na_clinica: null, distancia_m: null, precisao_m: null, local_negado: false, exames_hoje: 0, divergente: false }];
 const jwt = (sub) => { const b = (o) => Buffer.from(JSON.stringify(o)).toString('base64url'); return `${b({ alg: 'HS256', typ: 'JWT' })}.${b({ sub, role: 'authenticated', exp: Math.floor(Date.now() / 1000) + 86400 })}.x`; };
 
 function servidor() {
@@ -102,6 +107,7 @@ async function pagina(browser, { nivel = 'supervisor', falha = false, falhaAcao 
     else if (p.endsWith('/rpc/painel_app_pendencias_resumo')) { reg.rpcs.push('resumo'); corpo = falha ? { message: 'falhou' } : RESUMO; if (falha) status = 500; }
     else if (p.endsWith('/rpc/painel_app_solicitacoes')) { const a = JSON.parse(req.postData() || '{}'); reg.rpcs.push({ rpc: 'solic', ...a }); if (falha) { status = 500; corpo = { message: 'falhou' }; } else corpo = a.p_status === 'confirmada' ? SOLIC_CONF : SOLIC; }
     else if (p.endsWith('/rpc/painel_app_revisoes')) { reg.rpcs.push({ rpc: 'rev' }); corpo = REV; }
+    else if (p.endsWith('/rpc/painel_app_acessos')) { reg.rpcs.push({ rpc: 'acessos', ...JSON.parse(req.postData() || '{}') }); corpo = ACESSOS; }
     else if (p.endsWith('/rpc/painel_app_contas_antigas')) { reg.rpcs.push({ rpc: 'contas' }); corpo = CONTAS; }
     else if (p.endsWith('/rpc/painel_app_solicitacao_status') || p.endsWith('/rpc/painel_app_revisao_resolver')) { const a = JSON.parse(req.postData() || '{}'); reg.rpcs.push({ rpc: p.split('/').pop(), ...a }); if (falhaAcao) { status = 500; corpo = { message: 'falhou' }; } else corpo = 1; }
     else if (p.startsWith('/rest/v1/rpc/')) corpo = {};
@@ -183,6 +189,26 @@ await caso('Contas antigas sem PIN: nome, contato, filhos no histórico, "nunca"
   const linhas = await page.$$eval('#tabPendContas tbody tr', (trs) => trs.map((t) => ({ txt: t.textContent, zap: t.querySelector('a') ? t.querySelector('a').getAttribute('href') : null })));
   await ctx.close();
   return { ok: linhas.length === 2 && /Conta Um/.test(linhas[0].txt) && /nunca/.test(linhas[0].txt) && /2/.test(linhas[0].txt) && linhas[0].zap === 'https://wa.me/5571991230061' && linhas[1].zap === null, detalhe: JSON.stringify(linhas.map((l) => l.zap)) };
+});
+await caso('Acessos: lista com o que a pessoa fez e onde estava (na clínica, fora, sem permissão, sem localização), exames de hoje, IP e a divergência destacada; nome vira texto (nunca HTML)', async () => {
+  const { page, ctx, reg } = await aberto({ nivel: 'atendente' });
+  await page.click('dialog .chip[data-pend="acessos"]'); await page.waitForSelector('#tabPendAcessos tbody tr');
+  const linhas = await page.$$eval('#tabPendAcessos tbody tr', (trs) => trs.map((t) => t.textContent));
+  const tags = await page.locator('#tabPendAcessos i').count(), pediu = reg.rpcs.find((r) => r.rpc === 'acessos');
+  await ctx.close();
+  return { ok: linhas.length === 4 && /Eva <i>Reis<\/i>/.test(linhas[0]) && tags === 0 && /Entrou com o PIN/.test(linhas[0]) && /Fora da clínica \(a 8200 m\)/.test(linhas[0]) && /Divergente/.test(linhas[0]) && /IP 203\.0\.113\.7/.test(linhas[0])
+    && /Na clínica \(a 40 m\)/.test(linhas[1]) && !/Divergente/.test(linhas[1]) && /Não permitiu a localização/.test(linhas[2]) && /Sem localização/.test(linhas[3]) && /Recuperou o PIN/.test(linhas[3]) && pediu && pediu.p_limite === 100 && !reg.excecoes.length, detalhe: linhas[0].slice(0, 140) };
+});
+await caso('Acessos: "Só divergentes" mostra apenas quem tem exame hoje e não estava na clínica; voltar para "Todos" traz tudo de novo; o contador de pendências não muda', async () => {
+  const { page, ctx } = await aberto({ nivel: 'atendente' });
+  await page.click('dialog .chip[data-pend="acessos"]'); await page.waitForSelector('#tabPendAcessos tbody tr');
+  await page.click('dialog .chip[data-acesso-filtro="true"]');
+  const so = await page.locator('#tabPendAcessos tbody tr').count();
+  await page.click('dialog .chip[data-acesso-filtro="false"]');
+  const todos = await page.locator('#tabPendAcessos tbody tr').count();
+  const aba = await page.locator('dialog .chip[data-pend="acessos"]').textContent();
+  await ctx.close();
+  return { ok: so === 1 && todos === 4 && aba === 'Acessos', detalhe: `${so}/${todos}/${aba}` };
 });
 await caso('Erro do banco mostra aviso e o painel continua funcionando; erro ao salvar avisa e não some com a linha', async () => {
   const a = await abrir({ nivel: 'atendente', falha: true }); await a.page.click('#btnPendencias'); await a.page.waitForSelector('dialog [role=alert]');
