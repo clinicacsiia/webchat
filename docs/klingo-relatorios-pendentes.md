@@ -111,3 +111,7 @@ O banco já tem onde gravar a hora real de chegada, início e fim do atendimento
 
 ## Simulação da clínica (15/11/2026): nenhum relatório novo
 A simulação (`simulacao.md`) usa só o #14359 pela Jornada (marcações, situação, confirmação e o momento em que o Klingo marcou o atendimento). **Nenhum relatório precisa ser criado ou editado.** O que continua sem fonte no Klingo e limita a simulação: hora de início e de fim do exame, hora do guichê e do preparo, salas e profissionais por setor (pergunta 4 do suporte, acima, é a que destrava). O #14025 (B) tem "Check-In (chegada)", mas só por prontuário ou CPF.
+
+
+## #14359 com colunas novas (15/11/2026)
+O dono acrescentou Check-In - Data, um 2º Prontuário e Primeira Vez; Celular e Atendido trocaram de lugar (`col16` Celular, `col17` Atendido, `col18` Check-In, `col19` Prontuário repetido, `col20` Primeira Vez). Leitura corrigida (`sync-jornada-klingo` v8, com trava contra nova mudança de ordem). Análise completa, mapa das colunas e como ler check-in/atendido em `docs/klingo-14359-colunas-2026-11-15.md`. **Regra: ao mexer nas colunas deste relatório, avisar antes**, porque a leitura é por posição.

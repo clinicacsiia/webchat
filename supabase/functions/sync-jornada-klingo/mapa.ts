@@ -1,5 +1,5 @@
 // FLUXOGRAMA: entrada (linhas do relatório de marcações do Klingo, #13825 ou o duplicado por data do exame) -> validação (id da marcação, data do exame e uma forma de identificar o paciente: prontuário, ou nome + telefone; textos cortados) -> lógica (janela de leitura por modo e filtro; telefone vira marca/hash; sem valor em R$) -> saída (linhas enxutas {m,a,p,n,f,x,o,u,e,d,s,t,r,c} em lotes para jornada_klingo_lote)
-// Versão 1.2 — 14/11/2026 / Mudança: colunas por relatório (layout); janela do #14359 sempre de hoje até 1 ano à frente
+// Versão 1.3 — 15/11/2026 / Mudança: #14359 ganhou colunas (Celular=col16, Atendido=col17, Check-In=col18, 2º Prontuário=col19, Primeira Vez=col20); trava que para a leitura se o layout mudar de novo
 //
 // Tudo aqui é função pura (sem rede, sem banco), para testar sem Klingo. As linhas trazem nome e telefone de pacientes: ficam só na memória da Edge Function;
 // o telefone nunca sai daqui, vira só uma marca (SHA-256 dos 8 últimos dígitos + o segredo da clínica) que o banco usa para achar a conversa do chat.
@@ -16,7 +16,8 @@ export type Filtro = "criacao" | "exame";
 // Em que coluna (colN) está cada campo, por relatório. "criacao" = #13825; "exame" = #14359, refeito em 14/11/2026 (nome e responsável vieram para o começo).
 export type Layout = { m: string; a: string; pront: string; nome: string; resp: string; em: string; d: string; proc: string; oper: string; unid: string; conf: string; motivo: string; status: string; atend: string; cel: string; tel: string };
 export const LAYOUT_CRIACAO: Layout = { m: "col0", a: "col1", pront: "col2", em: "col3", d: "col4", proc: "col5", oper: "col6", unid: "col14", conf: "col10", motivo: "col11", status: "col12", atend: "col13", nome: "col15", cel: "col16", tel: "col17", resp: "col7" };
-export const LAYOUT_EXAME: Layout = { m: "col0", a: "col1", nome: "col2", resp: "col3", pront: "col4", em: "col5", d: "col6", proc: "col7", oper: "col8", unid: "col9", conf: "col12", motivo: "col13", tel: "col14", status: "col15", atend: "col16", cel: "col17" };
+// 15/11/2026: o dono acrescentou colunas ao #14359 e o Celular passou para col16 e o Atendido para col17 (antes era o contrário). col18 = Check-In - Data (ainda não lida), col19 = um 2º "Prontuário" (repetido; ignorar), col20 = Primeira Vez.
+export const LAYOUT_EXAME: Layout = { m: "col0", a: "col1", nome: "col2", resp: "col3", pront: "col4", em: "col5", d: "col6", proc: "col7", oper: "col8", unid: "col9", conf: "col12", motivo: "col13", tel: "col14", status: "col15", cel: "col16", atend: "col17" };
 export const layoutDe = (f: Filtro): Layout => (f === "exame" ? LAYOUT_EXAME : LAYOUT_CRIACAO);
 
 // Quantos dias para trás e para a frente da data de hoje a Jornada mostra (tem que bater com jornada_klingo_fechar).
@@ -111,6 +112,22 @@ export async function prepararLinhas(linhas: Row[], segredo: string, hoje: strin
     porId.set(l.m, l);
   }
   return { linhas: [...porId.values()], descartadas, descartes, fora, semProntuario };
+}
+
+
+// Trava contra mudança de colunas no relatório: "Atendido" só pode ser S, N ou vazio e "Status" só Aberta/Cancelada/Bloqueada. Se muitas linhas fugirem disso, o relatório mudou de ordem:
+// é melhor parar a leitura (e avisar pelo erro) do que gravar telefone no lugar de "Atendido" e criar pacientes duplicados. Só conta e devolve o motivo: nunca o conteúdo.
+export function layoutSuspeito(linhas: Row[], L: Layout): string | null {
+  if (linhas.length < 20) return null;
+  let atendRuim = 0, statusRuim = 0;
+  for (const r of linhas) {
+    if (!/^(S|N|)$/i.test(txt(r[L.atend], 10))) atendRuim++;
+    if (!/^(aberta|cancelada|bloqueada)$/i.test(txt(r[L.status], 20))) statusRuim++;
+  }
+  const limite = linhas.length * 0.02;
+  if (atendRuim > limite) return `Layout do relatório mudou: ${atendRuim} de ${linhas.length} linhas com "Atendido" fora de S/N na ${L.atend}`;
+  if (statusRuim > limite) return `Layout do relatório mudou: ${statusRuim} de ${linhas.length} linhas com "Status" inesperado na ${L.status}`;
+  return null;
 }
 
 export function emLotes<T>(itens: T[], tamanho: number): T[][] {
