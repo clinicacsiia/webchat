@@ -110,7 +110,7 @@ await caso('LIGADO e tudo em dia (PIN dos últimos 30 minutos, CPF dela e dos fi
   await completa(); await destrava();
   const { page, ctx } = await abrir();
   await page.waitForSelector('#formInicio', { state: 'visible', timeout: 10000 });
-  await aguardaTexto(page, /Acesso rápido: Ana/);
+  await aguardaTexto(page, /Olá, Ana!/);
   const ok = noChat(page) && await page.locator('#porta').isHidden();
   await ctx.close(); return { ok };
 });
@@ -121,7 +121,7 @@ await caso('LIGADO e PIN vencido: o chat leva ao teclado do PIN; com o PIN certo
   await aguardaTexto(page, /Digite seu PIN/);
   await pinAcesso(page, '1357');
   await page.waitForURL(/\/index\.html|\/$/, { timeout: 8000 }); await page.waitForSelector('#formInicio', { state: 'visible', timeout: 10000 });
-  await aguardaTexto(page, /Acesso rápido: Ana/);
+  await aguardaTexto(page, /Olá, Ana!/);
   const ok = !naPorta(page) && await page.locator('#porta').isHidden();
   const ev = (await q(`select evento from public.app_acesso_log order by id desc limit 1`))[0];
   await ctx.close(); return { ok: ok && ev.evento === 'desbloqueio', detalhe: page.url() };
@@ -138,14 +138,14 @@ await caso('LIGADO e cadastro incompleto: depois do PIN, "Falta pouco" obriga o 
   await inputs.nth(0).fill('52998224725'); for (let i = 1; i < n; i++) await inputs.nth(i).fill(i % 2 ? '11144477735' : '52998224725');
   await page.click('[data-act="completarsalvar"]');
   await page.waitForURL((u) => !/\/acesso\//.test(String(u)), { timeout: 20000 });
-  await page.waitForSelector('#formInicio', { state: 'visible', timeout: 10000 }); await aguardaTexto(page, /Acesso rápido: Ana/);
+  await page.waitForSelector('#formInicio', { state: 'visible', timeout: 10000 }); await aguardaTexto(page, /Olá, Ana!/);
   const faltam = (await q(`select (select count(*) from public.app_paciente where cpf is null)::int + (select count(*) from public.app_filho where cpf is null)::int n`))[0].n;
   await ctx.close(); return { ok: /CPF/.test(t) && !/Agora não/.test(t) && n === 3 && faltam === 0 && noChat(page), detalhe: `${n} campos; faltam ${faltam}; ${page.url()}; ${/CPF/.test(t)} ${!/Agora não/.test(t)}` };
 });
 await caso('30 minutos sem usar o chat: a tela volta ao teclado do PIN', async () => {
   await completa(); await destrava();
   const { page, ctx } = await abrir({ clock: true });
-  await page.waitForSelector('#formInicio', { state: 'visible', timeout: 10000 }); await aguardaTexto(page, /Acesso rápido: Ana/);
+  await page.waitForSelector('#formInicio', { state: 'visible', timeout: 10000 }); await aguardaTexto(page, /Olá, Ana!/);
   const antes = noChat(page);
   await page.clock.fastForward('31:00');
   await page.waitForURL(/\/acesso\//, { timeout: 8000 });
@@ -154,14 +154,14 @@ await caso('30 minutos sem usar o chat: a tela volta ao teclado do PIN', async (
 await caso('usando o chat (toques) o prazo recomeça: 20 minutos + toque + 20 minutos não pede o PIN', async () => {
   await completa(); await destrava();
   const { page, ctx } = await abrir({ clock: true });
-  await page.waitForSelector('#formInicio', { state: 'visible', timeout: 10000 }); await aguardaTexto(page, /Acesso rápido: Ana/);
+  await page.waitForSelector('#formInicio', { state: 'visible', timeout: 10000 }); await aguardaTexto(page, /Olá, Ana!/);
   await page.clock.fastForward('20:00'); await page.mouse.click(5, 5); await page.clock.fastForward('20:00'); await espera(300);
   await ctx.close(); return { ok: noChat(page) };
 });
 await caso('o servidor venceu o PIN enquanto a aba estava aberta: ao voltar à aba o chat pede o PIN', async () => {
   await completa(); await destrava();
   const { page, ctx } = await abrir();
-  await page.waitForSelector('#formInicio', { state: 'visible', timeout: 10000 }); await aguardaTexto(page, /Acesso rápido: Ana/);
+  await page.waitForSelector('#formInicio', { state: 'visible', timeout: 10000 }); await aguardaTexto(page, /Olá, Ana!/);
   await trava();
   await page.evaluate(() => { Object.defineProperty(document, 'hidden', { value: false, configurable: true }); document.dispatchEvent(new Event('visibilitychange')); });
   await page.waitForURL(/\/acesso\//, { timeout: 8000 });
