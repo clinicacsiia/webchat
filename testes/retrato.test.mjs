@@ -22,6 +22,7 @@ const TELAS = [
   { arquivo: 'index.html', nome: 'chat' },
   { arquivo: 'painel/index.html', nome: 'painel' },
   { arquivo: 'minha-vez/index.html', nome: 'minha-vez' },
+  { arquivo: 'acesso/index.html', nome: 'acesso' },   // acesso rápido do paciente (celular + PIN): só chama funções app_*
 ];
 // Chamadas feitas com o nome numa variável (não aparecem como texto ao lado de "rpc("): declaradas aqui para não ficarem sem conferência.
 const INDIRETAS = [{ tela: 'painel', nome: 'convenio_suspender', chaves: null }, { tela: 'painel', nome: 'convenio_reativar', chaves: null }];

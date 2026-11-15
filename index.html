@@ -390,6 +390,19 @@
   .volta .link-add { flex: none; font-size: calc(14.5px * var(--esc)); }
   .volta .link-add { margin: 0; padding: 4px 0; }
   .unidades.dois .unidade { min-height: 66px; }
+  /* acesso rápido (celular + PIN) */
+  #blocoAcesso { flex-wrap: wrap; }
+  #blocoAcesso .acoes-acesso { display: flex; gap: 14px; flex-wrap: wrap; }
+  #blocoAcesso a.link-add { text-decoration: none; }
+  #formInicio.com-acesso #btnAddIrmao, #formInicio.com-acesso #listaIrmaos, #formInicio.com-acesso #fFilho, #formInicio.com-acesso label[for="fFilho"] { display: none; }   /* os nomes vêm do cadastro */
+  .pin-pontos { display: flex; justify-content: center; gap: 16px; margin: 14px 0 4px; }
+  .pin-pontos i { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--verde); }
+  .pin-pontos i.on { background: var(--verde); }
+  .pin-teclas { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; max-width: 280px; margin: 14px auto 6px; }
+  .pin-teclas button { height: 60px; border-radius: 50%; border: 1px solid var(--linha); background: var(--papel); font: inherit; font-size: 1.4rem; font-weight: 600; color: inherit; cursor: pointer; }
+  .pin-teclas button:active { background: var(--verde-claro); }
+  .pin-teclas .vazio { visibility: hidden; }
+  .pin-msg { text-align: center; min-height: 1.3em; margin: 6px 0; }
   .unidades.dois .unidade strong { font-size: calc(18px * var(--esc)); }
 
   /* Motor de atendimento: opções grandes, filtro, campos e acompanhamento */
@@ -660,7 +673,7 @@
   const CHAVE_HIST = 'webchat.historico.v1';   // as últimas conversas deste aparelho (cada uma com o seu token): dá para voltar a elas
   const MAX_HIST = 5;                          // mínimo pedido: 3
   // Muda a cada alteração do chat. Cópia de mensagens guardada por outra versão é descartada (era isso que mostrava conversa velha e travada).
-  const VERSAO_APP = '2026.11.14-4';
+  const VERSAO_APP = '2026.11.14-5';
   // Mesmas regras do banco (fluxo_nome_ok, fluxo_telefone_ok, fluxo_email_ok): o banco confere de novo, aqui é só para avisar logo.
   const LET = 'A-Za-zÀ-ÖØ-öø-ÿ';
   const nomeCompletoOk = (v) => { const t = String(v || '').trim(); return t.length >= 5 && t.length <= 120 && new RegExp(`^[${LET}][${LET}'’.-]*( +[${LET}][${LET}'’.-]*)+$`).test(t) && t.split(/ +/).filter((w) => w.replace(new RegExp(`[^${LET}]`, 'g'), '').length >= 2).length >= 2; };
@@ -764,6 +777,10 @@
   // Quem já usou o chat neste aparelho não preenche nada de novo: nome, telefone e e-mail vêm do cache.
   function perfilSalvo() {
     if (conta && conta.nome && conta.telefone) return { nome: conta.nome, telefone: mascaraTel(conta.telefone), email: conta.email, aceite: true, conta: true };
+    if (acessoPerfil) {   // acesso rápido (celular + PIN): o cadastro vale como "perfil salvo" quando o e-mail já é conhecido
+      const loc = lerLocal(CHAVE_PERFIL), email = acessoPerfil.email || (loc && loc.email) || '';
+      if (email) return { nome: acessoPerfil.nome, telefone: mascaraTel(acessoPerfil.telefone), email, aceite: true, acesso: true, conta: true };
+    }
     const p = lerLocal(CHAVE_PERFIL);
     return p && p.nome && p.telefone && p.email && p.aceite ? p : null;
   }
@@ -798,6 +815,9 @@
     el.btnNaoSouEu.hidden = !!(salvo && salvo.conta);   // conta logada: quem sai é a conta ("Sair da conta")
     el.fEmail.readOnly = !!(conta && !salvo);           // conta logada sem perfil salvo: o e-mail é o da conta
     if (conta && !salvo) el.fEmail.value = conta.email;
+    const travaAcesso = !!(acessoPerfil && !salvo && !conta);   // acesso rápido sem e-mail ainda: nome e celular são os do cadastro (o servidor confere o celular)
+    el.fNome.readOnly = el.fTel.readOnly = travaAcesso;
+    if (travaAcesso) { el.fNome.value = acessoPerfil.nome; el.fTel.value = mascaraTel(acessoPerfil.telefone); }
     el.tituloInicio.textContent = salvo ? `Olá, ${primeiroNome(salvo.nome)}!` : 'Vamos agendar?';
     if (salvo) el.voltaDados.textContent = `${salvo.nome} · ${salvo.telefone}`;
     el.boasForm.hidden = !!salvo;   // quem volta já sabe o que fazer: vai direto à pergunta
@@ -898,7 +918,31 @@
       ? 'Sou o pai, a mãe ou o responsável legal da criança e concordo que a clínica guarde os dados dela e os meus (nome, telefone, e-mail e a conversa) para atendê-la e entrar em contato.'
       : 'Concordo que a clínica guarde meu nome, telefone, e-mail e a conversa para me atender e entrar em contato.', ...links];
   }
+  // Acesso rápido: as pessoas vêm do cadastro (Eu, cada filho, Todos os filhos). Usa o que o chat já tem: filho + irmãos "juntos" ou "um de cada vez".
+  let acessoSel = null;   // 'eu' | id do filho | 'filhos'
+  function desenharQuemAcesso() {
+    const kids = acessoPerfil.filhos || [];
+    if (acessoSel && !(acessoSel === 'eu' || (acessoSel === 'filhos' && kids.length > 1) || kids.some((k) => k.id === acessoSel))) acessoSel = null;
+    if (!acessoSel && !kids.length) acessoSel = 'eu';
+    if (acessoSel === 'eu') { escolha = { tipo: 'proprio' }; el.fFilho.value = ''; irmaosForm = []; }
+    else if (acessoSel === 'filhos') { escolha = { tipo: 'filho' }; el.fFilho.value = kids[0].nome; irmaosForm = kids.slice(1, 1 + MAX_IRMAOS).map((k) => k.nome); }
+    else if (acessoSel) { const k = kids.find((x) => x.id === acessoSel); escolha = { tipo: 'filho' }; el.fFilho.value = k.nome; irmaosForm = []; }
+    else escolha = null;
+    const pick = (id) => () => { acessoSel = id; el.erroForm.textContent = ''; desenharQuem(); };
+    el.fQuem.replaceChildren(
+      cartao('Para mim', '', acessoSel === 'eu', pick('eu')),
+      ...kids.map((k) => cartao('Para ' + primeiroNome(k.nome), '', acessoSel === k.id, pick(k.id))),
+      ...(kids.length > 1 ? [cartao('Todos os filhos', 'Mesmo pedido ou um de cada vez', acessoSel === 'filhos', pick('filhos'))] : []));
+    const filho = !!escolha && escolha.tipo === 'filho';
+    el.lNome.textContent = filho ? 'Seu nome (responsável)' : 'Seu nome completo';
+    const at = $('#aceiteTxt'); if (at) at.replaceChildren(...textoAceite(filho));
+    desenharIrmaos(filho);
+    // os nomes vêm do cadastro: só ficam visíveis os cartões "como agendar" quando são vários filhos
+    el.blocoFilho.hidden = !(filho && irmaosForm.length);
+  }
   function desenharQuem() {
+    $('#formInicio').classList.toggle('com-acesso', !!acessoPerfil);
+    if (acessoPerfil) return desenharQuemAcesso();
     const quem = (tipo, titulo, texto) => cartao(titulo, texto, !!escolha && escolha.tipo === tipo, () => { escolha = { tipo }; el.erroForm.textContent = ''; desenharQuem(); });
     el.fQuem.replaceChildren(quem('proprio', 'Para mim', ''), quem('filho', 'Para meu filho(a)', ''));
     const filho = !!escolha && escolha.tipo === 'filho';
@@ -1792,6 +1836,12 @@
     } catch { /* sem o serviço do CEP o paciente digita o endereço */ }
   }
   function widgetCampos(w, o) {
+    if (acessoPerfil && conv && ACESSO_PASSOS.has(o.passo) && !acessoTentou.has(conv.id + ':' + o.passo)) {
+      acessoTentou.add(conv.id + ':' + o.passo);
+      w.append(h('p', { class: 'w-nota', role: 'status' }, 'Usando os dados salvos no seu acesso rápido…'));
+      acessoDados().then((ok) => { if (!ok && w.isConnected) { w.replaceChildren(); widgetCampos(w, o); } }, () => { if (w.isConnected) { w.replaceChildren(); widgetCampos(w, o); } });
+      return;
+    }
     const campos = (Array.isArray(o.campos) ? o.campos : []).filter((c) => c && c.nome);
     const ins = {}, vals = {}, erros = {};
     const form = h('form', { novalidate: true });
@@ -1846,7 +1896,7 @@
         if (v) saida[c.nome] = v;
       }
       if (primeiro) { if (primeiro.focus) primeiro.focus(); primeiro.scrollIntoView({ block: 'center' }); return; }
-      responder(o.passo, saida, null, btn);
+      responder(o.passo, saida, null, btn).then((ok) => { if (ok && acessoPerfil && ACESSO_PASSOS.has(o.passo)) acessoDados(); });   // o banco aprende o CPF digitado
     });
     w.append(form);
   }
@@ -3101,6 +3151,7 @@
   // Só aparece quando o banco liga o interruptor (login_paciente_ativo). O e-mail serve só para confirmar a conta e redefinir a senha.
   const PAGINA_URL = location.origin + location.pathname;
   const TURNSTILE_SITEKEY = '';   // CAPTCHA (Cloudflare Turnstile, grátis). Se ligar "CAPTCHA protection" no Supabase, cole aqui a chave do site.
+  let acessoAtivo = false, acessoPerfil = null, acessoTrava = false;   // acesso rápido (celular + PIN): ver mais abaixo
   let loginAtivo = false, conta = null;   // conta = resumo devolvido por conta_paciente_resumo (conta:true, email, nome, telefone) ou null
   const senhaValida = (s) => s.length >= 8 && /[A-Za-z]/.test(s) && /\d/.test(s);
   const SENHA_REGRA = 'A senha precisa ter pelo menos 8 caracteres, com letras e números.';
@@ -3191,6 +3242,95 @@
     try { await carregarConta(); } catch { /* sem rede: segue como convidado */ }
     atualizarContaUI();
     if (veioDoLinkDeSenha) await abrirNovaSenha();
+  }
+
+  /* ---------- acesso rápido (celular + PIN) ----------
+     Quem se cadastrou em /acesso/ guarda no cadastro o CPF e o nascimento de cada pessoa (eu e filhos): o chat pergunta uma vez na vida.
+     O aparelho guarda só um código (mesma chave da página /acesso/); o PIN vale 30 minutos no servidor. Só aparece com o interruptor app_acesso_modo ligado. */
+  const ACESSO_CHAVE = 'csi_acesso_v2';
+  const ACESSO_PASSOS = new Set(['cpf_nasc', 'cpf_confirma', 'identidade']);   // perguntas do motor que o cadastro sabe responder
+  const acessoTentou = new Set();
+  const acessoDev = () => { const st = lerLocal(ACESSO_CHAVE); return st && typeof st.dev === 'string' && st.dev ? st.dev : ''; };
+  async function acessoCarregar() {
+    acessoPerfil = null; acessoTrava = false;
+    const dev = acessoDev();
+    if (!acessoAtivo || !dev) return;
+    const { data, error } = await db.rpc('app_perfil', { p_token: dev });
+    if (error || !data) return;
+    if (data.ok) acessoPerfil = data.perfil;
+    else if (data.erro === 'bloqueado') acessoTrava = true;      // falta digitar o PIN
+    else if (data.erro === 'sessao') apagarLocal(ACESSO_CHAVE);   // aparelho desconhecido pelo servidor
+  }
+  function atualizarAcessoUI(semForm) {
+    let b = $('#blocoAcesso');
+    if (!b) { b = h('div', { id: 'blocoAcesso', class: 'volta' }); $('#formInicio').prepend(b); }
+    b.hidden = !acessoAtivo || !!conta;   // quem entrou com e-mail e senha segue pelo caminho de sempre
+    if (!b.hidden) {
+      const st = lerLocal(ACESSO_CHAVE) || {};
+      if (acessoPerfil) {
+        b.replaceChildren(h('p', { class: 'volta-dados' }, `⚡ Acesso rápido: ${primeiroNome(acessoPerfil.nome)}`),
+          h('span', { class: 'acoes-acesso' }, h('a', { class: 'link-add', id: 'acessoMeusDados', href: 'acesso/' }, 'Meus dados'), h('button', { type: 'button', class: 'link-add', id: 'acessoSair', onclick: acessoSair }, 'Sair')));
+      } else if (acessoDev() && acessoTrava) {
+        b.replaceChildren(h('p', { class: 'volta-dados' }, `⚡ Olá${st.nome1 ? ', ' + st.nome1 : ''}! Digite seu PIN para usar seus dados salvos.`),
+          h('span', { class: 'acoes-acesso' }, h('button', { type: 'button', class: 'link-add', id: 'acessoPin', onclick: acessoPedirPin }, 'Digitar PIN'), h('button', { type: 'button', class: 'link-add', id: 'acessoSair', onclick: acessoSair }, 'Não sou eu')));
+      } else {
+        b.replaceChildren(h('p', { class: 'volta-dados' }, '⚡ Acesso rápido: com celular e PIN você não digita seus dados toda vez.'),
+          h('span', { class: 'acoes-acesso' }, h('a', { class: 'link-add', id: 'acessoCriar', href: 'acesso/?voltar=chat' }, 'Criar ou entrar')));
+      }
+    }
+    if (!semForm && !el.telaInicio.hidden) mostrarForm(!!escolha);
+  }
+  async function acessoIniciar() {
+    try { const { data, error } = await db.rpc('app_ativo'); acessoAtivo = !error && data === true; } catch { acessoAtivo = false; }
+    if (acessoAtivo) { try { await acessoCarregar(); } catch { /* sem rede: segue como convidado */ } }
+    atualizarAcessoUI();
+  }
+  async function acessoSair() {
+    const dev = acessoDev();
+    if (dev) { try { await db.rpc('app_sair', { p_token: dev }); } catch { /* sai deste aparelho mesmo assim */ } }
+    apagarLocal(ACESSO_CHAVE); acessoPerfil = null; acessoTrava = false; acessoSel = null; escolha = null;
+    atualizarAcessoUI();
+  }
+  // Teclado do PIN dentro do chat (a mesma regra da página /acesso/: o servidor confere, bloqueia depois de 5 erros).
+  function acessoPedirPin() {
+    const dev = acessoDev(); if (!dev) return;
+    const { corpo, rodape } = abrirFolha('Digite seu PIN');
+    let buf = '', ocupado = false;
+    const pontos = h('div', { class: 'pin-pontos', 'aria-hidden': 'true' }, [0, 1, 2, 3].map(() => h('i')));
+    const msg = h('p', { class: 'erro-form pin-msg', role: 'alert' });
+    const marcar = () => [...pontos.children].forEach((p, i) => p.classList.toggle('on', i < buf.length));
+    async function conferir() {
+      ocupado = true;
+      try {
+        const { data, error } = await db.rpc('app_desbloquear', { p_token: dev, p_pin: buf });
+        if (error || !data) { msg.textContent = 'Não foi possível conferir agora. Tente de novo.'; return; }
+        if (data.ok) { acessoPerfil = data.perfil; acessoTrava = false; fecharFolha(); atualizarAcessoUI(); return; }
+        if (data.erro === 'sessao') { apagarLocal(ACESSO_CHAVE); fecharFolha(); atualizarAcessoUI(); return; }
+        msg.textContent = data.mensagem || 'PIN incorreto.';
+      } catch { msg.textContent = 'Sem conexão. Tente de novo.'; }
+      finally { ocupado = false; buf = ''; marcar(); }
+    }
+    const tecla = (d) => h('button', { type: 'button', 'data-tecla': d, onclick: () => { if (ocupado || buf.length >= 4) return; buf += d; msg.textContent = ''; marcar(); if (buf.length === 4) setTimeout(conferir, 120); } }, d);
+    const teclas = h('div', { class: 'pin-teclas' }, ...[1, 2, 3, 4, 5, 6, 7, 8, 9].map(tecla), h('button', { type: 'button', class: 'vazio', tabindex: '-1', 'aria-hidden': 'true' }), tecla(0),
+      h('button', { type: 'button', 'aria-label': 'Apagar', onclick: () => { if (!ocupado) { buf = buf.slice(0, -1); marcar(); } } }, '⌫'));
+    corpo.replaceChildren(h('p', { class: 'escolha-txt' }, 'Digite os 4 números do seu PIN.'), pontos, msg, teclas);
+    rodape.replaceChildren(h('a', { class: 'link-add', href: 'acesso/?voltar=chat' }, 'Esqueci o PIN'));
+  }
+  // O banco responde sozinho o que o cadastro já sabe (CPF e nascimento) e aprende o que a pessoa acabou de digitar. true = respondeu alguma pergunta.
+  async function acessoDados() {
+    const dev = acessoDev(), c = conv;
+    if (!acessoPerfil || !dev || !c || !c.id) return false;
+    try {
+      const { data, error } = await db.rpc('app_chat_dados', { p_token: dev, p_conversa: c.id, p_conv_token: c.token });
+      if (error || !data) return false;
+      if (data.erro === 'bloqueado' || data.erro === 'sessao') {   // passou o tempo do PIN: o chat segue perguntando normalmente
+        acessoPerfil = null; acessoTrava = data.erro === 'bloqueado'; if (data.erro === 'sessao') apagarLocal(ACESSO_CHAVE);
+        atualizarAcessoUI(true); return false;
+      }
+      if (data.ok && data.guardou) acessoCarregar().then(() => atualizarAcessoUI(true), () => {});   // atualiza "CPF salvo" no cadastro
+      if (data.ok && data.respondeu > 0) { if (conv && conv.id === c.id) await carregar(); return true; }
+    } catch { /* sem rede: a pessoa digita */ }
+    return false;
   }
 
   // Janela de entrar, criar conta, esqueci a senha e nova senha (depois do link do e-mail).
@@ -3377,6 +3517,7 @@
     iniciarSentinela();
     if (conv && conv.id && conv.token) { registrarHistorico(conv); abrirChat(); } else mostrarForm();   // registrar: conversa de antes desta versão entra na lista
     iniciarConta();   // sem esperar: o formulário já está na tela; a conta (se existir) refaz o formulário quando chegar
+    acessoIniciar();  // idem para o acesso rápido (celular + PIN); desligado no banco, nada aparece
   }
   init();
   if (window.__WEBCHAT_TESTE__) window.__WEBCHAT_TESTE__.adicionar = adicionar;   // gancho dos testes de navegador (não existe em produção)

@@ -1,6 +1,6 @@
 # Pendências que dependem do dono
 
-Versão 1.4 — 14/11/2026 / Mudança: depois das decisões do dono: 1.3 reescrita (a função `klingo-agendamento` é MANTIDA e protegida no servidor), 2.13 atualizada (partes 4 e 5, configuração pública, histórico do telefone tratado). Versão 1.3 — 14/11/2026 / Mudança: seção 1.3 (risco ativo) e 2.13 (reestruturação do WebChat); 2.10 substituída. Versão 1.2 — 13/11/2026 / Mudança: seção 2.11 (revisão mensal das conversas). Versão 1.1 — 12/11/2026: seção 2.8 (autoatendimento Klingo). Versão 1.0 — 11/11/2026: lista única, conferida na produção em 11/11/2026 às 14:50 (Brasília)
+Versão 1.5 — 14/11/2026 / Mudança: seção 2.14 (acesso rápido do paciente). Versão 1.4 — 14/11/2026 / Mudança: depois das decisões do dono: 1.3 reescrita (a função `klingo-agendamento` é MANTIDA e protegida no servidor), 2.13 atualizada (partes 4 e 5, configuração pública, histórico do telefone tratado). Versão 1.3 — 14/11/2026 / Mudança: seção 1.3 (risco ativo) e 2.13 (reestruturação do WebChat); 2.10 substituída. Versão 1.2 — 13/11/2026 / Mudança: seção 2.11 (revisão mensal das conversas). Versão 1.1 — 12/11/2026: seção 2.8 (autoatendimento Klingo). Versão 1.0 — 11/11/2026: lista única, conferida na produção em 11/11/2026 às 14:50 (Brasília)
 
 Só entra aqui o que **só você consegue fazer**: decidir, colar um segredo, autorizar, falar com terceiros. O que é técnico e não depende de você está no fim, para você saber que não está esquecido. Cada item tem o link direto da tela onde a ação acontece.
 
@@ -110,6 +110,15 @@ Resumo e plano completo: [`reestruturacao-2026-11-14/00-leia-primeiro.md`](reest
 5. **Jurídico**: `privacidade.html` precisa citar solicitação de disponibilidade, consulta de marcações, aviso no chat, retenção e opt-out (item 2.5).
 6. **Telefone de teste no GitHub:** tratado na minha branch (histórico reescrito, com a sua autorização). **Sobra:** o mesmo número já estava na `main` desde 10/11 e nas branches antigas, e o GitHub guarda commits antigos por código. Decisão sua: ver [`08-limpeza-do-telefone-no-github.md`](reestruturacao-2026-11-14/08-limpeza-do-telefone-no-github.md). Trocar o telefone na lista de teste resolve o risco prático.
 7. Apagar as funções temporárias `klingo-comparar-chat`, `klingo-comparar-14554`, `klingo-teste-api` e `klingo-inspecionar-chat` (a `klingo-agendamento` **fica**).
+
+### 2.14 Acesso rápido do paciente (14/11/2026) — banco em aplicação, **desligado**
+Detalhes em [`acesso-rapido-paciente.md`](acesso-rapido-paciente.md). O que só você decide ou faz:
+1. **Confirmar a aplicação no Supabase** (o conector pede confirmação nos comandos com `delete` e expira em 60 s). Link do editor SQL, se preferir colar você mesmo: https://supabase.com/dashboard/project/nrvuynjwcgwpjdptkiay/sql/new
+2. **Testar no celular** antes de ligar: `update public.config set valor = 'sim' where chave = 'app_acesso_modo';` (desliga com `'nao'`).
+3. **Decidir sobre o "esqueci o PIN"** (hoje celular + nome + nascimento) e o **código por SMS** (confirma o celular de verdade).
+4. **Quem atende as solicitações:** hoje só por SQL (`painel_app_solicitacoes`); falta o botão no painel.
+5. **Jurídico:** `privacidade.html` precisa citar o acesso rápido, dados de crianças e prazo de guarda (junto com 2.5).
+6. **CPF guardado no cadastro (15/11/2026):** o acesso rápido passa a guardar o CPF de quem usa (e dos filhos) para o chat não perguntar toda vez. Confirme que está de acordo e inclua na política de privacidade (finalidade, prazo, direito de apagar: já existe o botão *Apagar o CPF salvo* em Meus dados).
 
 ## 3. Contas e segurança
 
