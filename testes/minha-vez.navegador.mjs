@@ -151,7 +151,7 @@ await caso('conta: com exame de hoje no Klingo mostra "Você está na clínica",
   await page.waitForFunction(() => /Chegou na clínica/.test(document.body.innerText));
   estado.fila = { situacao: 'aguardando', senha: 5, posicao: 2, a_frente: 1, total: 4 };
   await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
-  await page.waitForFunction(() => /Você está na clínica/.test(document.body.innerText), null, { timeout: 5000 });
+  await page.waitForSelector('.cartao.hoje', { timeout: 15000 });   // o cartão novo (o texto 'Você está na clínica' também existe na frase da etapa 4); a tela só consulta de 5 em 5 s
   const t = await texto(page); await ctx.close();
   return { ok: /Marcação nº 9101/.test(t) && /Chegada registrada às 07:50/.test(t) && /Marcação nº 9102/.test(t) && /Aguardando a recepção/.test(t) && /Sua senha: 5/.test(t) && !/Você está na fila/.test(t) && !/2º/.test(t), detalhe: t.slice(0, 200) };
 });
