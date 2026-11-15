@@ -330,12 +330,16 @@
   .bloco { background: var(--papel); border: 1px solid var(--linha); border-radius: 12px; padding: 10px 12px; margin: 0 0 10px; }
   .bloco h3 { margin: 0 0 6px; font-size: calc(16.5px * var(--esc)); }
   .bloco .w-op { padding: 8px 2px; }
-  .carrinho { background: #fff7e5; border: 1px solid #f0dfb8; border-radius: 12px; padding: 8px 12px; margin: 0 0 12px; }
-  .carrinho h3 { margin: 0 0 6px; font-size: calc(15.5px * var(--esc)); color: var(--aviso); }
-  .carrinho li { display: flex; gap: 8px; align-items: flex-start; padding: 3px 0; font-size: calc(15.5px * var(--esc)); }
+  .carrinho { background: #fff7e5; border: 1px solid #f0dfb8; border-radius: 14px; padding: 10px 14px 6px; margin: 0 0 14px; }
+  .carrinho h3 { margin: 0 0 4px; font-size: calc(15.5px * var(--esc)); color: var(--aviso); }
   .carrinho ul { list-style: none; margin: 0; padding: 0; }
-  .carrinho li span { flex: 1; }
-  .carrinho button { border: 0; background: rgba(15,42,74,.12); border-radius: 50%; width: 24px; height: 24px; cursor: pointer; flex: none; }
+  .carrinho li { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: flex-start; padding: 10px 0; border-top: 1px solid #f0dfb8; font-size: calc(16.5px * var(--esc)); }
+  .carrinho li:first-child { border-top: 0; }
+  /* Só os filhos diretos do item: os botões de lado ficam dentro do item e não podem herdar o estilo do "×" */
+  .carrinho li > span { flex: 1; min-width: 0; font-weight: 650; overflow-wrap: anywhere; }
+  .carrinho li > button { border: 0; background: rgba(15,42,74,.12); border-radius: 50%; width: 36px; height: 36px; margin: -4px -4px 0 0; font-size: calc(20px * var(--esc)); line-height: 1; color: var(--texto); cursor: pointer; flex: none; }
+  .carrinho li > button:hover { background: rgba(15,42,74,.2); }
+  .carrinho li > .lado-escolha { flex: 0 0 100%; }
 
   /* Calendário */
   .cal-nav { display: flex; align-items: center; justify-content: space-between; margin: 4px 0 8px; }
@@ -444,9 +448,34 @@
   .acomp b { display: block; font-size: calc(17px * var(--esc)); }
   .acomp .relogio { font-variant-numeric: tabular-nums; font-size: calc(25px * var(--esc)); font-weight: 700; margin: 4px 0; }
   .acomp p { margin: 2px 0; font-size: calc(15.5px * var(--esc)); color: var(--texto-suave); }
-  .res-item { display: flex; gap: 10px; align-items: flex-start; padding: 11px 6px; border-bottom: 1px solid var(--linha); cursor: pointer; }
-  .res-item input { width: 22px; height: 22px; accent-color: var(--verde); flex: none; margin-top: 1px; }
+  .res-item { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; margin: 0 0 8px; min-height: 52px; border: 1.5px solid var(--linha); border-radius: 12px; background: var(--papel); line-height: 1.35; cursor: pointer; transition: border-color .12s, background-color .12s; }
+  .res-item:hover { border-color: #9db8dd; }
+  .res-item:has(input:checked) { border-color: var(--verde); background: var(--verde-claro); }
+  .res-item:has(input:focus-visible) { box-shadow: var(--csi-focus); }
+  .res-item input { width: 24px; height: 24px; accent-color: var(--verde); flex: none; margin: 0; }
   .res-item small { display: block; color: var(--texto-suave); }
+  .sec-tit { margin: 16px 0 8px; font-size: calc(14px * var(--esc)); font-weight: 700; letter-spacing: .03em; text-transform: uppercase; color: var(--texto-suave); }
+  /* Busca de exame: lupa à esquerda e o campo sempre à vista enquanto a lista rola */
+  .busca-exame { position: sticky; top: -14px; z-index: 2; margin: -14px -14px 10px; padding: 12px 14px 10px; background: var(--fundo); }
+  .busca-exame .filtro { margin: 0; padding-left: 44px; background: var(--papel) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%236b7a90' stroke-width='2.4' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E") no-repeat 14px center; }
+  /* "Tenho o pedido médico": a foto fica recolhida para não empurrar a busca para baixo */
+  .foto-opcao { border: 1.5px solid var(--linha); border-radius: 14px; background: var(--papel); margin: 0 0 12px; }
+  .foto-opcao > summary { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 10px 14px; cursor: pointer; font-weight: 650; color: var(--verde); font-size: calc(16.5px * var(--esc)); list-style: none; }
+  .foto-opcao > summary::-webkit-details-marker { display: none; }
+  .foto-opcao > summary::after { content: "▾"; margin-left: auto; transition: transform .15s; }
+  .foto-opcao[open] > summary::after { transform: rotate(180deg); }
+  .foto-opcao > summary small { display: block; font-weight: 400; color: var(--texto-suave); font-size: calc(14px * var(--esc)); }
+  .foto-opcao > .acoes-w { padding: 0 14px 14px; margin-top: 0; }
+  /* Escolha do lado: três botões iguais, um ao lado do outro */
+  .lado-escolha { margin: 4px 0 2px; font-weight: 400; }
+  .lado-ask { margin: 0 0 6px; font-size: calc(15px * var(--esc)); color: var(--texto-suave); font-weight: 600; }
+  .lado-escolha.falta .lado-ask { color: var(--aviso); }
+  .lado-botoes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .lado-botoes button { min-height: 46px; padding: 6px 4px; border: 1.5px solid var(--linha); border-radius: 10px; background: var(--papel); color: var(--texto); font: inherit; font-size: calc(15.5px * var(--esc)); font-weight: 650; line-height: 1.15; cursor: pointer; }
+  .lado-botoes button[aria-pressed="true"] { background: var(--verde); border-color: var(--verde); color: #fff; }
+  .lado-escolha.falta .lado-botoes button { border-color: #e2c27a; background: #fffaf0; }
+  .lado-escolha.pisca { animation: pisca .9s ease-out; }
+  @media (prefers-reduced-motion: no-preference) { @keyframes pisca { 0%, 60% { box-shadow: 0 0 0 4px rgba(226,194,122,.7); border-radius: 12px; } 100% { box-shadow: 0 0 0 4px transparent; } } }
   .foto-status { font-size: calc(16.5px * var(--esc)); color: var(--texto); background: var(--verde-claro); border-radius: 10px; padding: 10px 12px; margin: 8px 0 10px; }
   .girando { display: inline-block; width: 14px; height: 14px; margin-right: 8px; vertical-align: -2px; border: 2px solid var(--verde); border-right-color: transparent; border-radius: 50%; }
   @media (prefers-reduced-motion: no-preference) { .girando { animation: gira .9s linear infinite; } @keyframes gira { to { transform: rotate(360deg); } } }
@@ -675,7 +704,7 @@
   const CHAVE_HIST = 'webchat.historico.v1';   // as últimas conversas deste aparelho (cada uma com o seu token): dá para voltar a elas
   const MAX_HIST = 5;                          // mínimo pedido: 3
   // Muda a cada alteração do chat. Cópia de mensagens guardada por outra versão é descartada (era isso que mostrava conversa velha e travada).
-  const VERSAO_APP = '2026.11.15-15';
+  const VERSAO_APP = '2026.11.15-16';
   // Mesmas regras do banco (fluxo_nome_ok, fluxo_telefone_ok, fluxo_email_ok): o banco confere de novo, aqui é só para avisar logo.
   const LET = 'A-Za-zÀ-ÖØ-öø-ÿ';
   const nomeCompletoOk = (v) => { const t = String(v || '').trim(); return t.length >= 5 && t.length <= 120 && new RegExp(`^[${LET}][${LET}'’.-]*( +[${LET}][${LET}'’.-]*)+$`).test(t) && t.split(/ +/).filter((w) => w.replace(new RegExp(`[^${LET}]`, 'g'), '').length >= 2).length >= 2; };
@@ -2072,7 +2101,7 @@
     if (!conv) return;
     const f = abrirFolha('Escolher o exame');
     B = { itens: new Map(), res: [], titulo: '', t: null, lista: null, status: null, rodape: f.rodape, leituras: [], termo: '', recusados: new Set() };
-    const busca = h('input', { class: 'filtro', type: 'search', placeholder: 'Digite o exame (ex.: ressonância joelho)', 'aria-label': 'Procurar exame', autocomplete: 'off', value: (o && o.termo) || '' });
+    const busca = h('input', { class: 'filtro', type: 'search', placeholder: 'Digite o nome do exame', 'aria-label': 'Procurar exame', autocomplete: 'off', enterkeyhint: 'search', value: (o && o.termo) || '' });
     const camera = h('input', { type: 'file', accept: 'image/*', capture: 'environment', hidden: true });
     const galeria = h('input', { type: 'file', accept: 'image/*', hidden: true });
     B.camera = camera; B.galeria = galeria;
@@ -2085,11 +2114,14 @@
       B.itens.set('t' + Date.now(), { texto: v, nome: v }); livre.value = ''; naoAchei.hidden = true; desenharResultados();
     } }, 'Adicionar ao pedido'));
     const aut = blocoAutorizaFoto();
-    B.botoesFoto = h('div', { class: 'acoes-w' }, aut.el,
-      h('button', { class: 'btn-w sec', type: 'button', onclick: aut.abrir(camera) }, '📷 Tirar foto do pedido agora'),
-      h('button', { class: 'btn-w sec', type: 'button', onclick: aut.abrir(galeria) }, '🖼️ Escolher a foto do pedido na galeria'),
-      h('p', { class: 'w-nota' }, 'Dica: ponha a folha numa mesa com boa luz e pegue a folha inteira. A foto fica guardada pela clínica para o atendente conferir o seu pedido.'));
-    f.corpo.replaceChildren(B.botoesFoto, B.status, busca, B.lista, camera, galeria,
+    // A foto fica recolhida (a busca pelo nome vem primeiro); abre sozinha quando o paciente chegou por "Tenho o pedido".
+    B.botoesFoto = h('details', { class: 'foto-opcao', open: !!comFoto },
+      h('summary', {}, h('span', {}, '📷 Tenho o pedido médico', h('small', {}, 'Tire uma foto que eu acho o exame')))
+      , h('div', { class: 'acoes-w' }, aut.el,
+        h('button', { class: 'btn-w sec', type: 'button', onclick: aut.abrir(camera) }, '📷 Tirar foto do pedido agora'),
+        h('button', { class: 'btn-w sec', type: 'button', onclick: aut.abrir(galeria) }, '🖼️ Escolher a foto do pedido na galeria'),
+        h('p', { class: 'w-nota' }, 'Dica: ponha a folha numa mesa com boa luz e pegue a folha inteira. A foto fica guardada pela clínica para o atendente conferir o seu pedido.')));
+    f.corpo.replaceChildren(h('div', { class: 'busca-exame' }, busca), B.botoesFoto, B.status, B.lista, camera, galeria,
       h('div', { class: 'acoes-w', style: 'margin-top:12px' },
         h('button', { class: 'btn-w sec', type: 'button', onclick: () => { fecharFolha(); abrirPedido(); } }, 'Prefiro escolher pelo desenho do corpo'),
         h('button', { class: 'btn-w sec', type: 'button', onclick: () => { naoAchei.hidden = false; livre.focus(); } }, 'Não encontrei meu exame')),
@@ -2165,9 +2197,20 @@
   }
   const precisaLado = (x) => !x.texto && x.tem_lado && !x.bilateral;
   const ORDINAL = ['1º', '2º', '3º', '4º', '5º', '6º', '7º', '8º', '9º', '10º', '11º', '12º'];
-  function escolhaLado(x) {
-    return h('div', { class: 'chips', style: 'margin:6px 0 0', role: 'group', 'aria-label': 'Lado do exame' }, ['D', 'E', 'A'].map((l) => h('button', { type: 'button', class: 'chip', 'aria-pressed': String(x.lado === l),
-      onclick: () => { x.lado = l; x.auto = false; desenharResultados(); } }, l === 'D' ? 'Lado direito' : l === 'E' ? 'Lado esquerdo' : 'Os dois lados')));
+  // Três botões iguais (direito, esquerdo, os dois). Com `pergunta`, mostra a frase "De qual lado é o exame?" em cima.
+  function escolhaLado(x, pergunta) {
+    const falta = !x.lado;
+    return h('div', { class: 'lado-escolha' + (falta ? ' falta' : ''), role: 'group', 'aria-label': 'Lado do exame' },
+      pergunta ? h('p', { class: 'lado-ask' }, falta ? '👉 De qual lado é o exame?' : 'Lado do exame:') : null,
+      h('div', { class: 'lado-botoes' }, ['D', 'E', 'A'].map((l) => h('button', { type: 'button', 'aria-pressed': String(x.lado === l),
+        onclick: () => { x.lado = l; x.auto = false; desenharResultados(); } }, l === 'D' ? 'Direito' : l === 'E' ? 'Esquerdo' : 'Os dois'))));
+  }
+  // O botão de baixo, quando falta o lado, leva o paciente até a pergunta (que pode estar lá em cima) e a destaca.
+  function irParaLado() {
+    const el = B && B.lista.querySelector('.lado-escolha.falta'); if (!el) return;
+    const calmo = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    el.scrollIntoView({ behavior: calmo ? 'auto' : 'smooth', block: 'center' });
+    el.classList.remove('pisca'); void el.offsetWidth; el.classList.add('pisca');
   }
   // Cartão de um exame lido do pedido.
   function cartaoGrupo(e, g, i) {
@@ -2232,12 +2275,13 @@
     const avulsos = [...e.itens.entries()].filter(([, x]) => !x.grupo);
     if (avulsos.length) {
       filhos.push(h('div', { class: 'carrinho' }, h('h3', {}, e.leituras.length ? 'Outros exames que você marcou' : 'Seu pedido'), h('ul', {}, avulsos.map(([k, x]) => h('li', {},
-        h('span', {}, x.texto ? x.texto + ' (o atendente confere)' : exameTexto(x.nome), precisaLado(x) ? escolhaLado(x) : null),
-        h('button', { type: 'button', 'aria-label': 'Tirar do pedido', onclick: () => { e.itens.delete(k); if (!x.texto) e.recusados.add(x.id); desenharResultados(); } }, '×'))))));
+        h('span', {}, x.texto ? x.texto + ' (o atendente confere)' : exameTexto(x.nome)),
+        h('button', { type: 'button', 'aria-label': 'Tirar do pedido: ' + (x.texto || exameTexto(x.nome)), onclick: () => { e.itens.delete(k); if (!x.texto) e.recusados.add(x.id); desenharResultados(); } }, '×'),
+        precisaLado(x) ? escolhaLado(x, true) : null)))));
     }
     // Com o pedido lido, a lista de "mais pedidos" só aparece quando o paciente digita.
     if (e.modo !== 'foto' && (!e.leituras.length || e.termo)) {
-      filhos.push(h('p', { class: 'p-dica' }, e.leituras.length ? 'Procurar outro exame:' : e.titulo));
+      filhos.push(h('p', { class: 'sec-tit' }, e.leituras.length ? 'Procurar outro exame' : e.titulo.replace(/:$/, '').replace(' (ou digite acima)', ' · ou digite acima')));
       if (!e.res.length) filhos.push(h('p', { class: 'p-dica' }, 'Nenhum exame encontrado com esse nome. Tente outra palavra ou toque em "Não encontrei meu exame".'));
       for (const x of e.res) {
         const cb = h('input', { type: 'checkbox', checked: e.itens.has(x.id), onchange: () => { marcarExame(x, cb.checked); if (cb.checked) e.recusados.delete(x.id); else e.recusados.add(x.id); desenharResultados(); } });
@@ -2253,12 +2297,12 @@
         e.fotos ? h('p', { class: 'w-nota' }, `📎 ${e.fotos} ${e.fotos === 1 ? 'foto enviada' : 'fotos enviadas'} ao atendente.`) : null,
         semLeitura
           ? h('button', { class: 'btn-w', type: 'button', onclick: () => { e.itens.set('foto', { texto: 'Exame do pedido médico enviado em foto', nome: 'Exame do pedido médico' }); fotoParaPedido(); } }, 'Seguir só com a foto: o atendente confere')
-          : h('button', { class: 'btn-w', type: 'button', disabled: !n || falta || semResposta, onclick: fotoParaPedido },
-            semResposta ? 'Responda qual é o exame acima' : !e.fotos && !n ? 'Envie a foto do pedido' : !n ? 'Marque o exame' : falta ? 'Escolha o lado do exame' : `Continuar (${n} ${n === 1 ? 'exame' : 'exames'})`));
+          : h('button', { class: 'btn-w', type: 'button', disabled: !n || semResposta, onclick: falta ? irParaLado : fotoParaPedido },
+            semResposta ? 'Responda qual é o exame acima' : !e.fotos && !n ? 'Envie a foto do pedido' : !n ? 'Marque o exame' : falta ? 'Escolher o lado do exame ↑' : `Continuar (${n} ${n === 1 ? 'exame' : 'exames'})`));
       return;
     }
-    e.rodape.replaceChildren(h('button', { class: 'btn-w', type: 'button', disabled: !n || falta || semResposta, onclick: enviarBusca },
-      semResposta ? 'Responda qual é o exame acima' : !n ? 'Marque o exame' : falta ? 'Escolha o lado do exame' : `Enviar pedido (${n} ${n === 1 ? 'exame' : 'exames'})`));
+    e.rodape.replaceChildren(h('button', { class: 'btn-w', type: 'button', disabled: !n || semResposta, onclick: falta ? irParaLado : enviarBusca },
+      semResposta ? 'Responda qual é o exame acima' : !n ? 'Marque o exame' : falta ? 'Escolher o lado do exame ↑' : `Enviar pedido (${n} ${n === 1 ? 'exame' : 'exames'})`));
   }
   async function enviarBusca(ev) {
     const e = B; if (!e) return;
