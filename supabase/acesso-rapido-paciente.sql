@@ -305,8 +305,8 @@ begin
     return jsonb_build_object('ok', false, 'erro', 'telefone_cadastrado', 'mensagem', 'Este celular já tem cadastro. Entre com o seu PIN.');
   end;
   for v_f in select * from jsonb_array_elements(v_filhos) loop
-    insert into public.app_filho (responsavel_id, nome, nascimento)
-    values (v_id, btrim(regexp_replace(v_f ->> 'nome', '\s+', ' ', 'g')), public.app_data(v_f ->> 'nascimento'));
+    insert into public.app_filho (responsavel_id, nome, nascimento, criado_em)   -- clock_timestamp: a ordem digitada é a ordem mostrada
+    values (v_id, btrim(regexp_replace(v_f ->> 'nome', '\s+', ' ', 'g')), public.app_data(v_f ->> 'nascimento'), clock_timestamp());
   end loop;
   if v_ctel is not null then
     insert into public.app_contato_confianca (responsavel_id, nome, telefone, relacao, codigo)

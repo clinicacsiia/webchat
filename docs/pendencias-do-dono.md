@@ -118,6 +118,7 @@ Detalhes em [`acesso-rapido-paciente.md`](acesso-rapido-paciente.md). O que só 
 3. **Decidir sobre o "esqueci o PIN"** (hoje celular + nome + nascimento) e o **código por SMS** (confirma o celular de verdade).
 4. **Quem atende as solicitações:** hoje só por SQL (`painel_app_solicitacoes`); falta o botão no painel.
 5. **Jurídico:** `privacidade.html` precisa citar o acesso rápido, dados de crianças e prazo de guarda (junto com 2.5).
+6. **CPF guardado no cadastro (15/11/2026):** o acesso rápido passa a guardar o CPF de quem usa (e dos filhos) para o chat não perguntar toda vez. Confirme que está de acordo e inclua na política de privacidade (finalidade, prazo, direito de apagar: já existe o botão *Apagar o CPF salvo* em Meus dados).
 
 ## 3. Contas e segurança
 

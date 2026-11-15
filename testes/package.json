@@ -50,6 +50,8 @@
     "test:contas": "node sql-contas.test.mjs",
     "test:acesso-sql": "node sql-acesso-app.test.mjs",
     "test:acesso": "node acesso-app.navegador.mjs",
+    "test:acesso-chat-sql": "node sql-acesso-chat.test.mjs",
+    "test:acesso-chat": "node acesso-chat.navegador.mjs",
     "test:protecao": "node sql-protecao.test.mjs",
     "test:login-sql": "node sql-login.test.mjs",
     "test:meus-dados": "node sql-meus-dados.test.mjs",

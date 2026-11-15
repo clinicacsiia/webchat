@@ -1,8 +1,8 @@
 # Acesso rápido do paciente (celular + PIN de 4 dígitos)
 
-Versão 1.0 — 14/11/2026 / Mudança: Implementação inicial (primeira versão guardava tudo só no celular; esta liga ao Supabase)
+Versão 1.1 — 15/11/2026 / Mudança: acesso rápido dentro do chat real (CPF e nascimento perguntados uma vez só). Versão 1.0 — 14/11/2026 / Mudança: Implementação inicial (primeira versão guardava tudo só no celular; esta liga ao Supabase)
 
-**Página:** `acesso/index.html` (`https://clinicacsiia.github.io/webchat/acesso/`, ainda sem link em nenhuma outra tela). **Banco:** `supabase/acesso-rapido-paciente.sql`. **Testes:** `npm run test:acesso-sql` (57 casos) e `npm run test:acesso` (33 casos, a página real num Chromium falando com o banco de teste).
+**Página:** `acesso/index.html` (`https://clinicacsiia.github.io/webchat/acesso/`, ainda sem link em nenhuma outra tela). **Banco:** `supabase/acesso-rapido-paciente.sql`. **Testes:** `npm run test:acesso-sql` (57), `npm run test:acesso` (36, a página `/acesso/` num Chromium falando com o banco de teste), `npm run test:acesso-chat-sql` (20, motor real do chat) e `npm run test:acesso-chat` (12, o `index.html` real do chat num Chromium falando com o motor real).
 
 ## O que a pessoa vê
 1. **Primeiro acesso:** celular com DDD (vira o login) → nome completo e nascimento (maior de 18) → "Tem filhos?" (um ou vários) → número de confiança (opcional) → cria e confirma o PIN.
@@ -32,6 +32,24 @@ Todas as tabelas têm RLS ligada **sem nenhuma regra** e o público não tem per
 
 ## Ligação com a base da clínica (o antigo `validarNaBase`)
 Feita **só dentro do banco**, só como **sugestão**: se existir um único paciente em `public.pacientes` com o mesmo celular, nascimento e nome, grava `app_paciente.paciente_sugerido_id`. Nunca vincula sozinho (mesma regra de `contas_paciente`), não impede cadastro e nada disso volta para a tela. A equipe vê `cadastro_sugerido` em `painel_app_solicitacoes`. **Klingo/relatórios:** não foi ligado e nenhum relatório novo é necessário para esta etapa.
+
+## No chat real: o fim do "CPF e data de nascimento toda hora" (15/11/2026)
+**Causa:** o motor do chat trata CPF + nascimento como a **primeira pergunta de toda conversa nova** (`cpf_nasc`, em `fluxo_proximo`), e ainda pode pedir o CPF de novo (`cpf_confirma`, paciente que o chat já conhecia) e o nascimento (`identidade`). Nada guardava isso entre conversas, e cada filho também era perguntado de novo.
+
+**O que muda para quem tem acesso rápido** (`supabase/acesso-rapido-chat.sql` + `index.html`, tudo atrás de `app_acesso_modo`):
+1. Tela inicial do chat: faixa "⚡ Acesso rápido: Ana" (ou "Digitar PIN", com o teclado dentro do próprio chat). Nome e celular vêm do cadastro.
+2. "Para quem é o atendimento?" vira **Para mim / Para <filho> / Todos os filhos**, reaproveitando o que o chat já tem (filho e irmãos "juntos" ou "um de cada vez").
+3. Na **1ª** conversa de cada pessoa o chat pergunta CPF e nascimento como sempre; o banco **guarda o CPF** (`app_paciente.cpf` / `app_filho.cpf`) e o e-mail digitados.
+4. Da **2ª** em diante, quando o motor mostra `cpf_nasc`, `cpf_confirma` ou `identidade`, a página chama `app_chat_dados`, que responde **pelo mesmo caminho do chat** (`chat_responder`), então o motor, o Klingo e os avisos se comportam como se a pessoa tivesse digitado. Na conversa aparece só "Usei os dados salvos no meu acesso rápido." (sem o CPF).
+5. Nenhuma função do motor (`fluxo_*`, `chat_*`) foi alterada.
+
+**Segurança:** o PIN é a prova de identidade (por isso o `cpf_confirma` pode ser respondido sozinho). O navegador nunca recebe o CPF inteiro, só `***.***.***-25`. A conversa precisa ser do celular do cadastro e a criança precisa ser filho do cadastro (pelo nome); senão o chat pergunta normalmente. Se o PIN passar de 30 minutos, o chat volta a perguntar normalmente. Em **Meus dados** (`/acesso/`) dá para informar, alterar ou apagar o CPF salvo de cada pessoa.
+
+**Limites conhecidos:**
+- "Todos os filhos" usa os irmãos do chat (só filhos). **Pai/mãe + filhos no mesmo pedido** não existe no motor (uma conversa é de uma pessoa); fica para outra etapa.
+- O **nome da mãe** e o **sexo** (`dados_ident`) ainda são perguntados nas conversas com a API do Klingo; só CPF e nascimento foram resolvidos.
+- Quem usa e-mail e senha (conta antiga) continua pelo caminho de antes; a faixa do acesso rápido some para ele.
+- Se o CPF guardado estiver errado, a pessoa corrige em *Meus dados > Alterar* (o chat não sobrescreve um CPF já salvo).
 
 ## Equipe
 - `select public.painel_app_solicitacoes('solicitada');` lista as solicitações (responsável, celular, pessoas com nascimento, exame, data, turno, observação). Só administrador e atendente.
