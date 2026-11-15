@@ -694,7 +694,7 @@
   const CHAVE_HIST = 'webchat.historico.v1';   // as últimas conversas deste aparelho (cada uma com o seu token): dá para voltar a elas
   const MAX_HIST = 5;                          // mínimo pedido: 3
   // Muda a cada alteração do chat. Cópia de mensagens guardada por outra versão é descartada (era isso que mostrava conversa velha e travada).
-  const VERSAO_APP = '2026.11.15-11';
+  const VERSAO_APP = '2026.11.15-12';
   // Mesmas regras do banco (fluxo_nome_ok, fluxo_telefone_ok, fluxo_email_ok): o banco confere de novo, aqui é só para avisar logo.
   const LET = 'A-Za-zÀ-ÖØ-öø-ÿ';
   const nomeCompletoOk = (v) => { const t = String(v || '').trim(); return t.length >= 5 && t.length <= 120 && new RegExp(`^[${LET}][${LET}'’.-]*( +[${LET}][${LET}'’.-]*)+$`).test(t) && t.split(/ +/).filter((w) => w.replace(new RegExp(`[^${LET}]`, 'g'), '').length >= 2).length >= 2; };
@@ -1035,11 +1035,12 @@
   // Aviso fixo no começo da conversa: quem fala (assistente automático), a missão (equidade, melhoria contínua feita pela equipe) e que quem confirma é uma pessoa.
   function preencherAvisoIA(caixa) {
     caixa = caixa || document.getElementById('avisoIA'); if (!caixa) return;
+    if (motorAtivo) document.querySelectorAll('#msgs .boas-vindas').forEach((n) => n.remove());   // o assistente já conduz: sem a frase "um atendente responde em instantes"
     if (statusAtual === 'em_atendimento') {
       caixa.replaceChildren(h('p', {}, h('b', {}, 'Agora você está falando com uma pessoa da nossa equipe.'), ' Pode escrever à vontade, no campo aqui embaixo.'));
     } else if (motorAtivo) {
       caixa.replaceChildren(
-        h('p', {}, h('b', {}, 'Sou o assistente automático da CSI.'), ' Estamos criando uma solução para facilitar o seu dia a dia e levar equidade para todos: a nossa equipe melhora este espaço a cada dia, ouvindo como as pessoas o usam. ', h('b', {}, 'Quem confirma o agendamento é um atendente'), ', sempre.'));
+        h('p', {}, h('b', {}, 'Sou o assistente automático da CSI.'), ' ', h('b', {}, 'Quem confirma o agendamento é um atendente'), ', sempre.'));
     } else {
       caixa.replaceChildren(h('p', {}, h('b', {}, 'Recebemos o seu pedido.'), ' Uma pessoa da equipe vai responder aqui. O que você já escolheu fica registrado e o ', h('b', {}, 'atendente confirma com você'), '.'));
     }
@@ -1152,7 +1153,7 @@
     } else if (status === 'encerrada') {
       el.ponto.className = 'ponto'; el.status.textContent = 'Atendimento encerrado';
     } else if (motorAtivo) {
-      el.ponto.className = 'ponto atendendo'; el.status.textContent = 'Assistente automático · atendente pelo botão abaixo';
+      el.ponto.className = 'ponto atendendo'; el.status.textContent = 'Assistente automático';
     } else {
       el.ponto.className = 'ponto aguardando'; el.status.textContent = 'Aguardando um atendente';
     }
