@@ -129,7 +129,8 @@ async function abrirPortal({ dev = true, dados = dadosPadrao(), bloqueado = fals
         case 'app_pedido_reabrir': return j(estado.reabrir ? estado.reabrir(c) : { ok: true, conversa: c.p_conversa, token: 'tok-reaberto', aberta: true, reaberta: true, tipo: 'proprio', paciente_nome: null });
         case 'app_pedido_avaliar': return j(estado.avaliar ? estado.avaliar(c) : { ok: true, nova: true });
         case 'app_resultado_arquivo': return j({ ok: true, mime: 'application/pdf', nome: 'laudo.pdf', base64: Buffer.from('%PDF-1.4 teste').toString('base64') });
-        case 'checkin_publico': estado.checkin = c; return j({ situacao: 'aguardando', ticket: 'tk-9', senha: 7, posicao: 3, a_frente: 2 });
+        case 'checkin_publico': estado.checkinPublico = c; return j({ situacao: 'conta_existente', email: c.p_email });   // o que o banco faz com e-mail de conta antiga: pede senha (NÃO pode ser chamado com o PIN ativo)
+        case 'app_checkin': estado.checkin = c; return estado.bloqueado ? j({ ok: false, erro: 'bloqueado', mensagem: 'Digite seu PIN para continuar.' }) : j({ ok: true, situacao: 'aguardando', ticket: 'tk-9', senha: 7, posicao: 3, a_frente: 2 });
         case 'fila_minha_vez_ticket': return j({ situacao: 'aguardando', senha: 7, posicao: 3, a_frente: 2, total: 5, pode_chegar: true });
         case 'fila_config_publica': return j({ vapid: null });
         default: return j(null);
@@ -221,25 +222,33 @@ await caso('resultados entregues ficam guardados à parte; "Ver o resultado" bai
   await ctx.close();
   return { ok: /Resultados guardados/.test(t) && /Leo/.test(t) && !!chamada && chamada.p_id === 'r1' && chamada.p_token === DEV && !!popup, detalhe: `${JSON.stringify(chamada)} popup=${!!popup}` };
 });
-await caso('check-in de um toque: usa nome, e-mail e celular do cadastro (nada digitado) e já abre a fila', async () => {
+await caso('check-in de um toque: o servidor usa o cadastro (a tela só manda o código do aparelho), NÃO pede senha nem e-mail e já abre a fila', async () => {
   const { page, ctx, estado } = await abrirPortal();
   await page.click('#btnCheckinApp');
   await espera(900);
   const t = await textoDe(page);
   const c = estado.checkin;
   await ctx.close();
-  return { ok: !!c && c.p_nome === 'Ana Souza Teste' && c.p_email === 'ana@exemplo.invalid' && c.p_telefone === '71991230001' && /Você está na fila|3º/.test(t) && /Acompanhe seus pedidos/.test(t), detalhe: `${JSON.stringify(c)} :: ${t.slice(0, 120).replace(/\n/g, ' | ')}` };
+  return { ok: !!c && c.p_token === DEV && Object.keys(c).length === 1 && !estado.checkinPublico && !estado.rpcs.includes('app_perfil') && !/senha|Encontramos o seu cadastro|e-mail/i.test(t.replace(/Sua senha:\s*\d+|Senha \d+/gi, '')) && /Você está na fila|3º/.test(t) && /Acompanhe seus pedidos/.test(t), detalhe: `${JSON.stringify(c)} :: ${t.slice(0, 120).replace(/\n/g, ' | ')}` };
 });
-await caso('check-in sem e-mail no cadastro: pergunta só o e-mail, uma vez', async () => {
+await caso('check-in com o cadastro SEM e-mail: faz do mesmo jeito, sem perguntar o e-mail', async () => {
   const { page, ctx, estado } = await abrirPortal({ perfilResp: perfil({ email: null }) });
   await page.click('#btnCheckinApp');
-  await page.waitForSelector('#ceApp', { timeout: 4000 });
-  await page.fill('#ceApp', 'nova@exemplo.invalid');
-  await page.click('.folha button:has-text("Fazer check-in")');
   await espera(900);
-  const c = estado.checkin;
+  const t = await textoDe(page);
+  const c = estado.checkin, pediu = await page.$('#ceApp');
   await ctx.close();
-  return { ok: !!c && c.p_email === 'nova@exemplo.invalid' };
+  return { ok: !!c && !pediu && !estado.checkinPublico && /Você está na fila|3º/.test(t) };
+});
+await caso('check-in com o PIN vencido: volta para a tela do PIN (nunca pede senha)', async () => {
+  const { page, ctx, estado } = await abrirPortal();
+  estado.bloqueado = true;
+  await page.click('#btnCheckinApp');
+  await espera(900);
+  const teclas = await page.$$eval('.pin-teclas button[data-tecla]', (bs) => bs.length);
+  const t = await textoDe(page);
+  await ctx.close();
+  return { ok: teclas === 10 && /PIN/.test(t) && !/senha/i.test(t) && !estado.checkinPublico, detalhe: t.slice(0, 80).replace(/\n/g, '|') };
 });
 await caso('PIN vencido (30 min): o portal pede o PIN em vez de mostrar dado; PIN errado avisa; PIN certo abre os pedidos', async () => {
   const { page, ctx, estado } = await abrirPortal({ bloqueado: true });

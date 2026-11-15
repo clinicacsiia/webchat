@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!--
 FLUXOGRAMA: entrada (celular + PIN de 4 dígitos; no primeiro acesso, cadastro único em 5 passos) -> validação (a página confere o formato; quem decide é o servidor: funções app_* do Supabase, supabase/acesso-rapido-paciente.sql) -> lógica (o aparelho guarda só um código de acesso e o primeiro nome; PIN, filhos, números de confiança e marcações ficam no banco; o PIN é pedido de novo depois de 5 minutos em segundo plano) -> saída (tela inicial com Eu / cada filho / Todos juntos; solicitações de marcação; quem confia em você)
-Versão 2.9 — 15/11/2026 / Mudança: apagada a tela inicial do acesso rápido ("Quem vai ser atendido?", "Marcar pelo chat", "Deixar uma solicitação (sem chat)", "Suas solicitações"): era cópia do chat (o botão só abria o chat), a solicitação sem chat nunca foi usada (0 na produção) e o chat já tem "Meus dados" e "Sair"; depois do PIN a pessoa vai direto ao chat. Versão 2.8 — 15/11/2026 / Mudança: o botão "Meus dados" do chat (?ir=dados) abre direto em Meus dados quando o PIN dos últimos 30 minutos ainda vale (antes pedia o PIN de novo e caía na tela inicial); o site (acesso e Minha vez) deixou de mudar para o tema escuro do celular e segue sempre o visual claro do chat. Versão 2.7 — 15/11/2026 / Mudança: quem tem conta de e-mail E já criou o PIN pelo celular (cadastro separado, sem ligação com a conta) não cai mais em "Confira os seus dados": a página pergunta ao servidor se o celular já tem PIN (app_pre_cadastro, só leitura) e leva direto para digitar o PIN, tanto ao abrir pelo chat quanto ao tocar em Continuar. Versão 2.6 — 15/11/2026 / Mudança: visual do site (cabeçalho com a logo da CSI, cores e fonte do chat, tema escuro); CPF conferido na hora, com os dígitos verificadores, em todas as telas que pedem CPF; o que a pessoa já digitou no cadastro (nome, nascimento, filho, CPF, contato) não se perde ao voltar, ao trocar Sim/Não ou ao ser mandada de volta por um erro do servidor. Versão 2.5 — 15/11/2026 / Mudança: some o cartão "Falta pouco" da tela inicial e de Meus dados (o que falta só é pedido na entrada, com o PIN obrigatório). Versão 2.4 — 15/11/2026 / Mudança: PIN OBRIGATÓRIO (quando config.app_pin_obrigatorio = sim): o primeiro acesso pede também o CPF (só o que o banco ainda não sabe) antes do PIN, quem entra com cadastro incompleto é obrigado a completar antes de seguir, e cada entrada é registrada (aparelho e, com permissão, a posição) (supabase/acesso-rapido-pin-obrigatorio.sql). Versão 2.3 — 15/11/2026 / Mudança: filhos da conta antiga (lista do histórico para conferir), filho com o nome do responsável (é ela mesma ou confirma), filho repetido (supabase/acesso-rapido-filhos.sql). Versão 2.2 — 15/11/2026 / Mudança: cartão "Falta pouco" (CPF dela e dos filhos, e-mail) para TODO paciente (supabase/acesso-rapido-pendencias.sql). Versão 2.1 — 15/11/2026 / Mudança: quem tem conta antiga (e-mail e senha) entra uma última vez, confere os dados que já temos e cria o PIN (supabase/acesso-rapido-conta-antiga.sql); "Meus dados" mais claro. Versão 2.0 — 14/11/2026 / Mudança: ligado ao Supabase (versão 1 guardava tudo só no celular)
+Versão 3.0 — 15/11/2026 / Mudança: quem já tem PIN e entra pela conta antiga (e-mail e senha) agora tem as duas JUNTAS (`app_conta_antiga_unir`: senha + PIN, só se for a mesma pessoa; traz as conversas da conta); antes a sessão antiga era descartada sem ligar nada. Versão 2.9 — 15/11/2026 / Mudança: apagada a tela inicial do acesso rápido ("Quem vai ser atendido?", "Marcar pelo chat", "Deixar uma solicitação (sem chat)", "Suas solicitações"): era cópia do chat (o botão só abria o chat), a solicitação sem chat nunca foi usada (0 na produção) e o chat já tem "Meus dados" e "Sair"; depois do PIN a pessoa vai direto ao chat. Versão 2.8 — 15/11/2026 / Mudança: o botão "Meus dados" do chat (?ir=dados) abre direto em Meus dados quando o PIN dos últimos 30 minutos ainda vale (antes pedia o PIN de novo e caía na tela inicial); o site (acesso e Minha vez) deixou de mudar para o tema escuro do celular e segue sempre o visual claro do chat. Versão 2.7 — 15/11/2026 / Mudança: quem tem conta de e-mail E já criou o PIN pelo celular (cadastro separado, sem ligação com a conta) não cai mais em "Confira os seus dados": a página pergunta ao servidor se o celular já tem PIN (app_pre_cadastro, só leitura) e leva direto para digitar o PIN, tanto ao abrir pelo chat quanto ao tocar em Continuar. Versão 2.6 — 15/11/2026 / Mudança: visual do site (cabeçalho com a logo da CSI, cores e fonte do chat, tema escuro); CPF conferido na hora, com os dígitos verificadores, em todas as telas que pedem CPF; o que a pessoa já digitou no cadastro (nome, nascimento, filho, CPF, contato) não se perde ao voltar, ao trocar Sim/Não ou ao ser mandada de volta por um erro do servidor. Versão 2.5 — 15/11/2026 / Mudança: some o cartão "Falta pouco" da tela inicial e de Meus dados (o que falta só é pedido na entrada, com o PIN obrigatório). Versão 2.4 — 15/11/2026 / Mudança: PIN OBRIGATÓRIO (quando config.app_pin_obrigatorio = sim): o primeiro acesso pede também o CPF (só o que o banco ainda não sabe) antes do PIN, quem entra com cadastro incompleto é obrigado a completar antes de seguir, e cada entrada é registrada (aparelho e, com permissão, a posição) (supabase/acesso-rapido-pin-obrigatorio.sql). Versão 2.3 — 15/11/2026 / Mudança: filhos da conta antiga (lista do histórico para conferir), filho com o nome do responsável (é ela mesma ou confirma), filho repetido (supabase/acesso-rapido-filhos.sql). Versão 2.2 — 15/11/2026 / Mudança: cartão "Falta pouco" (CPF dela e dos filhos, e-mail) para TODO paciente (supabase/acesso-rapido-pendencias.sql). Versão 2.1 — 15/11/2026 / Mudança: quem tem conta antiga (e-mail e senha) entra uma última vez, confere os dados que já temos e cria o PIN (supabase/acesso-rapido-conta-antiga.sql); "Meus dados" mais claro. Versão 2.0 — 14/11/2026 / Mudança: ligado ao Supabase (versão 1 guardava tudo só no celular)
 -->
 <html lang="pt-BR">
 <head>
@@ -181,7 +181,7 @@ function lerCacheChat(){
 const aparelho=()=>(navigator.userAgentData&&navigator.userAgentData.platform)||(/iPhone|iPad/.test(navigator.userAgent)?'iPhone/iPad':/Android/.test(navigator.userAgent)?'Android':'Navegador');
 
 /* ===== Estado ===== */
-const S={dev:null,perfil:null,view:'',d:{filhos:[],confiavel:null},buf:'',mode:'unlock',tmp:'',old:'',after:null,unlocked:false,sheet:null,temFilhos:null,hiddenAt:0,busy:false,volta:'home',esq:null,tel:'',resumo:'',confirma:null,conta:null,aem:'',pend:null,pendOculta:false,porta:null,falta:[],completar:[],rasc:{},evento:null,soHome:false,cacheEmail:''};
+const S={dev:null,perfil:null,view:'',d:{filhos:[],confiavel:null},buf:'',mode:'unlock',tmp:'',old:'',after:null,unlocked:false,sheet:null,temFilhos:null,hiddenAt:0,busy:false,volta:'home',esq:null,tel:'',resumo:'',confirma:null,conta:null,aem:'',pend:null,pendOculta:false,porta:null,falta:[],completar:[],rasc:{},evento:null,soHome:false,cacheEmail:'',uniao:null};
 const app=$('#app');
 function toast(t){const e=document.createElement('div');e.className='toast';e.textContent=t;document.body.appendChild(e);setTimeout(()=>e.remove(),2600)}
 function erro(m){const e=$('#err');if(e)e.textContent=m||''}
@@ -264,7 +264,7 @@ async function onPin(pin){
   }
   if(m==='login'){
     ocupado(true);const r=await rpc('app_login',{p_telefone:S.tel,p_pin:pin,p_aparelho:aparelho()});ocupado(false);
-    if(r.ok){entrou(r);toast('Que bom ter você de volta');aposEntrar('login');return}
+    if(r.ok){entrou(r);if(S.uniao)await unirContaAntiga(r.token);else toast('Que bom ter você de volta');aposEntrar('login');return}
     if(r.erro==='indisponivel'){go('indisp');return}
     erro(r.mensagem);return;
   }
@@ -583,7 +583,7 @@ const A={
     if(lf.e)return erro(lf.e);
     S.conta.lista=lf.lista;
     ocupado(true);const tem=await celularTemPin(tel);ocupado(false);
-    if(tem)return irParaPin(tel,'Este celular já tem PIN. Digite o seu PIN para entrar.');
+    if(tem){S.uniao=S.conta.token;S.conta=null;return irParaPin(tel,'Este celular já tem PIN. Digite o seu PIN para entrar e juntar com a sua conta antiga.')}
     iniciaPinAntiga();
   },
   esqueci2:()=>{
@@ -687,6 +687,13 @@ function sairContaAntiga(){
   try{localStorage.removeItem('csi-paciente-auth')}catch(e){}   // o chat deixa de usar a conta e passa a usar o acesso rápido
   if(t)fetch(`${SUPABASE_URL}/auth/v1/logout`,{method:'POST',headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+t}}).catch(()=>{});
 }
+/* Conta antiga + acesso rápido da mesma pessoa viram UMA só: com o PIN já digitado, o servidor confere a senha (sessão da conta) e junta. Só sai da conta antiga se deu certo. */
+async function unirContaAntiga(dev){
+  const t=S.uniao;S.uniao=null;if(!t)return;
+  const u=await rpc('app_conta_antiga_unir',{p_token:dev},t);
+  if(u&&u.ok){S.conta={token:t};sairContaAntiga();toast('Pronto! Sua conta antiga e o seu PIN agora são uma só');return}
+  toast((u&&u.mensagem)||'Você entrou com o PIN, mas não conseguimos juntar a conta antiga agora.');
+}
 /* O celular já tem acesso rápido (PIN)? Só leitura; se a resposta falhar, segue o caminho normal. */
 async function celularTemPin(tel){
   const r=await rpc('app_pre_cadastro',{p_telefone:tel,p_nome:'',p_nascimento:'',p_filhos:[]});
@@ -699,7 +706,8 @@ async function abrirContaAntiga(token){
   if(!r.conta){S.conta={token};sairContaAntiga();go('antiga');setTimeout(()=>erro('Esta conta não é de paciente.'),0);return}
   if(r.migrada){sairContaAntiga();S.tel='';go('entrar');setTimeout(()=>erro('Você já criou o seu PIN. Entre com o celular e o PIN.'),0);return}
   // PIN criado pelo celular, sem ligação com esta conta: não faz sentido repetir o cadastro, vai direto para o PIN
-  if(r.telefone&&await celularTemPin(r.telefone)){sairContaAntiga();irParaPin(r.telefone,'Você já tem PIN. Digite o seu PIN para entrar.');return}
+  // (a sessão da conta fica na memória até o PIN: o servidor só junta as duas com a senha E o PIN, e só se for a mesma pessoa. Ver unirContaAntiga)
+  if(r.telefone&&await celularTemPin(r.telefone)){S.uniao=token;S.conta=null;irParaPin(r.telefone,'Você já tem PIN. Digite o seu PIN para juntar com a sua conta antiga.');return}
   ocupado(true);const fl=await rpc('app_conta_antiga_filhos',{},token);ocupado(false);
   const filhos=(fl&&fl.ok?fl.filhos:[]).map(f=>({nome:f.nome,nasc:f.nascimento||'',cpf:f.cpf_mascara||'',n:f.atendimentos,mesmoNome:!!f.mesmo_nome,mesmoCadastro:!!f.mesmo_cadastro,
     incluir:!f.mesmo_nome,ehFilho:f.mesmo_nome&&f.nascimento?idade(f.nascimento)<18:false}));

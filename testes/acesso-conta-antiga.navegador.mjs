@@ -17,6 +17,7 @@ await db.exec(readFileSync(`${REPO}/supabase/acesso-rapido-conta-antiga.sql`, 'u
 await db.exec(readFileSync(`${REPO}/supabase/acesso-rapido-pendencias.sql`, 'utf8'));
 await db.exec(readFileSync(`${REPO}/supabase/acesso-rapido-filhos.sql`, 'utf8'));
 await db.exec(readFileSync(`${REPO}/supabase/acesso-rapido-pin-obrigatorio.sql`, 'utf8'));   // app_pre_cadastro (a página pergunta se o celular já tem PIN)
+await db.exec(readFileSync(`${REPO}/supabase/acesso-conta-antiga-unir.sql`, 'utf8'));   // app_conta_antiga_unir (a página junta a conta antiga ao PIN que já existe)
 await db.exec(`update public.config set valor = 'sim' where chave = 'app_acesso_modo'`);
 
 const HTML = readFileSync(`${REPO}/acesso/index.html`, 'utf8');
@@ -236,11 +237,12 @@ await caso('vindo do chat com a conta logada e o celular dela JÁ com PIN: vai d
   const t = await texto(ev.page);
   return { ok: !/Confira os seus dados/.test(t) && (await ev.page.locator('.pad button[data-k="1"]').count()) === 1, detalhe: t.slice(0, 120).replace(/\n/g, ' | ') };
 });
-await caso('a sessão da conta de e-mail sai do aparelho e o PIN certo abre o acesso rápido; nada é criado a mais', async () => {
+await caso('o PIN certo abre o acesso rápido E junta a conta de e-mail ao PIN (uma pessoa só); a sessão antiga sai do aparelho; nada é criado a mais', async () => {
   await pin(ev.page, '2468');
   await ev.page.waitForURL((u) => u.pathname === '/', { timeout: 6000 });
   const st = await ev.page.evaluate(() => ({ antiga: localStorage.getItem('csi-paciente-auth') }));
-  return { ok: st.antiga === null && (await n(`select count(*)::int n from public.app_paciente`)) === antesEva, detalhe: JSON.stringify(st) };
+  const lig = await n(`select count(*)::int n from public.app_paciente where telefone = '71991230011' and conta_antiga_id = '${ids.eva}'`);
+  return { ok: st.antiga === null && lig === 1 && (await n(`select count(*)::int n from public.app_paciente`)) === antesEva, detalhe: JSON.stringify(st) + ' ligada=' + lig };
 });
 const fb = await novaPagina(); await fb.page.click('[data-act="go"][data-v="antiga"]'); await entrarComEmail(fb.page, 'fabi@exemplo.invalid', SENHA);
 await esperaTexto(fb.page, /Confira os seus dados/);

@@ -178,3 +178,19 @@ Comandos no cabeçalho de `supabase/acesso-rapido-paciente.sql` (apagam só obje
 - Agendar de verdade (a solicitação não cria marcação no Klingo).
 - Aviso (push) ao paciente quando a clínica confirma.
 - Texto de privacidade citando o acesso rápido, dados de crianças e o prazo de guarda (jurídico, item 2.5 de `pendencias-do-dono.md`).
+
+## Check-in de um toque sem pedir senha (15/11/2026)
+
+O botão "Fazer check-in" da `minha-vez/` (aparelho com PIN) chamava `checkin_publico` com o e-mail do cadastro. Quem tinha também uma **conta antiga** com o mesmo e-mail e celular caía em "Encontramos o seu cadastro / Digite a sua senha". Agora a tela chama `app_checkin(p_token)`: o servidor confere o PIN (`app_aparelho_validar`), usa nome, e-mail e celular do cadastro, põe na fila (sem duplicar no mesmo dia, mesmo limite diário) e devolve o ticket. PIN vencido volta à tela do PIN; nunca pede senha nem e-mail. Arquivo: `supabase/acesso-checkin-pin.sql` (rollback no cabeçalho); testes `test:acesso-checkin-pin` e `test:acompanhar`. `checkin_publico` continua para o público sem identidade.
+
+## Conta antiga e PIN viram uma pessoa só (15/11/2026)
+
+**Situação medida na produção (só contagens):** 8 contas de e-mail e senha, 2 acessos rápidos, **0 ligados**. A conta do dono tinha acesso rápido com o mesmo celular e e-mail, mas as duas estavam separadas; as outras 7 contas nunca criaram PIN. Além disso, as conversas feitas pela conta antiga (`conversas.conta_id`) **não entravam** no "Acompanhe seus pedidos".
+
+**Como fica:** `supabase/acesso-conta-antiga-unir.sql` (rollback no cabeçalho; `npm run test:acesso-antiga-unir`, 15 casos; `test:acesso-antiga` 20).
+- `app_conta_antiga_unir(p_token)`: exige **as duas provas** (sessão da conta antiga = senha, e aparelho com o PIN dos últimos 30 min) e que seja a **mesma pessoa** (celular do acesso é um dos da conta ou do cadastro da clínica, **ou** o e-mail é o mesmo). Liga `conta_antiga_id`, completa e-mail e CPF sem sobrescrever e traz as conversas da conta (já vistas, sem virar novidade). Recusas: `bloqueado`, `sessao`, `ja_ligada`, `outra_pessoa`, `sem_conta`. Pode ser repetida sem duplicar.
+- `/acesso/` (v3.0): quem tem PIN e entra pela conta antiga (pelo chat ou por "Tenho conta com e-mail") digita o PIN e a página chama a união; só então sai da conta antiga neste aparelho. Se a união falhar, a pessoa entra com o PIN e vê o motivo.
+- `app_conta_antiga_migrar` (conta antiga que cria o PIN agora) também traz as conversas.
+- A conta ligada some da aba "Contas antigas sem PIN" do painel. A conta antiga **não é apagada**.
+- **Não junta sozinho** por e-mail/celular iguais: ambos são digitados sem confirmação, e qualquer pessoa poderia declarar os de outra para ler o histórico dela. Filhos não são importados nessa união (precisam de conferência).
+- **Falta fazer por cada pessoa:** a do dono precisa entrar uma vez em `/acesso/?antiga=1` (e-mail e senha, depois o PIN). As outras 7 seguem o caminho normal de criar o PIN. Quando todas estiverem ligadas, dá para desligar o login por e-mail (`login_paciente = 'nao'`), decisão do dono.
