@@ -1,6 +1,6 @@
 # Acesso rápido do paciente (celular + PIN de 4 dígitos)
 
-Versão 1.4 — 15/11/2026 / Mudança: filhos dos contatos antigos; nada de SMS. Versão 1.3 — 15/11/2026 / Mudança: pendências para TODO paciente (CPF, e-mail) e dúvidas para a equipe. Versão 1.2 — 15/11/2026 / Mudança: contas antigas (e-mail e senha) viram acesso rápido, uma forma de login só. Versão 1.1 — 15/11/2026 / Mudança: acesso rápido dentro do chat real (CPF e nascimento perguntados uma vez só). Versão 1.0 — 14/11/2026 / Mudança: Implementação inicial (primeira versão guardava tudo só no celular; esta liga ao Supabase)
+Versão 1.5 — 15/11/2026 / Mudança: **LIGADO em produção** (`app_acesso_modo = 'sim'`, depois da "última parte" aplicada pelo dono). Versão 1.4 — 15/11/2026 / Mudança: filhos dos contatos antigos; nada de SMS. Versão 1.3 — 15/11/2026 / Mudança: pendências para TODO paciente (CPF, e-mail) e dúvidas para a equipe. Versão 1.2 — 15/11/2026 / Mudança: contas antigas (e-mail e senha) viram acesso rápido, uma forma de login só. Versão 1.1 — 15/11/2026 / Mudança: acesso rápido dentro do chat real (CPF e nascimento perguntados uma vez só). Versão 1.0 — 14/11/2026 / Mudança: Implementação inicial (primeira versão guardava tudo só no celular; esta liga ao Supabase)
 
 **Página:** `acesso/index.html` (`https://clinicacsiia.github.io/webchat/acesso/`, ainda sem link em nenhuma outra tela). **Banco:** `supabase/acesso-rapido-paciente.sql`. **Testes:** `npm run test:acesso-sql` (57), `npm run test:acesso` (36, a página `/acesso/` num Chromium falando com o banco de teste), `npm run test:acesso-chat-sql` (20, motor real do chat) e `npm run test:acesso-chat` (12, o `index.html` real do chat num Chromium falando com o motor real).
 
@@ -105,7 +105,7 @@ Feita **só dentro do banco**, só como **sugestão**: se existir um único paci
 - **Ainda não há botão no painel** para isso. A página diz só "Solicitação registrada… para agilizar, envie o resumo ao atendimento", sem prometer que alguém já viu.
 
 ## Ligar e desligar
-Nasce **desligado**. Ligar: `update public.config set valor = 'sim' where chave = 'app_acesso_modo';` Desligar na hora (derruba também quem já está dentro, que passa a ver "ainda não disponível"): `... valor = 'nao' ...`.
+**Está LIGADO desde 15/11/2026** (nasceu desligado). Ligar: `update public.config set valor = 'sim' where chave = 'app_acesso_modo';` Desligar na hora (derruba também quem já está dentro, que passa a ver "ainda não disponível"): `... valor = 'nao' ...`.
 
 ## Voltar atrás
 Comandos no cabeçalho de `supabase/acesso-rapido-paciente.sql` (apagam só objetos `app_*` e as duas chaves de config).

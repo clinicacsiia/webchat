@@ -1,5 +1,5 @@
 -- public.app_desbloquear(p_token text, p_pin text)
--- Pode executar: service_role
+-- Pode executar: anon, authenticated, service_role
 CREATE OR REPLACE FUNCTION public.app_desbloquear(p_token text, p_pin text)
  RETURNS jsonb
  LANGUAGE plpgsql

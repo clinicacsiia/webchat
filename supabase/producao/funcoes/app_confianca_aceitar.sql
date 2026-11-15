@@ -1,5 +1,5 @@
 -- public.app_confianca_aceitar(p_token text, p_codigo text)
--- Pode executar: service_role
+-- Pode executar: anon, authenticated, service_role
 CREATE OR REPLACE FUNCTION public.app_confianca_aceitar(p_token text, p_codigo text)
  RETURNS jsonb
  LANGUAGE plpgsql

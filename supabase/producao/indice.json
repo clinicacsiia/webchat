@@ -2152,7 +2152,9 @@
   "ocr_treino",
   "v_agendamento_aberto",
   "v_jornada_quadro",
-  "v_remarcacao_pendente"
+  "v_remarcacao_pendente",
+  "v_olho_fila",
+  "v_olho_marcacao"
  ],
  "rotinas": [
   {
@@ -3269,7 +3271,7 @@
    "anon": true,
    "authenticated": true,
    "publico": false,
-   "md5": "bd69a3db45e20f7ac482ff4c5ccf2614"
+   "md5": "23e051ff30463963f690c7c4d1a738e8"
   },
   {
    "nome": "app_chat_dados",
@@ -3323,8 +3325,8 @@
    ],
    "definer": true,
    "gatilho": false,
-   "anon": false,
-   "authenticated": false,
+   "anon": true,
+   "authenticated": true,
    "publico": false,
    "md5": "21426747fb97047497e0358ea0b0c114"
   },
@@ -3352,8 +3354,8 @@
    ],
    "definer": true,
    "gatilho": false,
-   "anon": false,
-   "authenticated": false,
+   "anon": true,
+   "authenticated": true,
    "publico": false,
    "md5": "f9eb138df57cf920b37717f7d1888851"
   },
@@ -3371,8 +3373,8 @@
    ],
    "definer": true,
    "gatilho": false,
-   "anon": false,
-   "authenticated": false,
+   "anon": true,
+   "authenticated": true,
    "publico": false,
    "md5": "89ce4951e0228ed80c5c7033d4386569"
   },
@@ -3398,8 +3400,8 @@
    ],
    "definer": true,
    "gatilho": false,
-   "anon": false,
-   "authenticated": false,
+   "anon": true,
+   "authenticated": true,
    "publico": false,
    "md5": "8719e388de498e01b3bc6bf5a80a9f66"
   },
@@ -3492,7 +3494,7 @@
    "anon": false,
    "authenticated": true,
    "publico": false,
-   "md5": "f4981baaeff7d1a5bc28ffa39f598482"
+   "md5": "9ce53072846698345d767d41bb967aa7"
   },
   {
    "nome": "app_conta_antiga_resumo",
@@ -3563,8 +3565,8 @@
    ],
    "definer": true,
    "gatilho": false,
-   "anon": false,
-   "authenticated": false,
+   "anon": true,
+   "authenticated": true,
    "publico": false,
    "md5": "ba03e20730a9bafdda1c5603e2601c11"
   },
@@ -3689,8 +3691,8 @@
    ],
    "definer": true,
    "gatilho": false,
-   "anon": false,
-   "authenticated": false,
+   "anon": true,
+   "authenticated": true,
    "publico": false,
    "md5": "b26709654f32aed5c50d3a7dcce3f55f"
   },
@@ -3760,8 +3762,8 @@
    ],
    "definer": true,
    "gatilho": false,
-   "anon": false,
-   "authenticated": false,
+   "anon": true,
+   "authenticated": true,
    "publico": false,
    "md5": "a5c1877f98e58d129f62cde0edf34f04"
   },
@@ -3779,8 +3781,8 @@
    ],
    "definer": true,
    "gatilho": false,
-   "anon": false,
-   "authenticated": false,
+   "anon": true,
+   "authenticated": true,
    "publico": false,
    "md5": "9907946e26942fac2237dae73fd03795"
   },
@@ -3829,8 +3831,8 @@
    ],
    "definer": true,
    "gatilho": false,
-   "anon": false,
-   "authenticated": false,
+   "anon": true,
+   "authenticated": true,
    "publico": false,
    "md5": "a9eba5c23f46da84e93a7b57364f803e"
   },
@@ -3941,8 +3943,8 @@
    ],
    "definer": true,
    "gatilho": false,
-   "anon": false,
-   "authenticated": false,
+   "anon": true,
+   "authenticated": true,
    "publico": false,
    "md5": "09ba93ccd5e3ff87fe128c2349b1a3d1"
   },
@@ -4002,8 +4004,8 @@
    ],
    "definer": true,
    "gatilho": false,
-   "anon": false,
-   "authenticated": false,
+   "anon": true,
+   "authenticated": true,
    "publico": false,
    "md5": "46773ad59379e8a6a26be42022eef338"
   },
@@ -4021,8 +4023,8 @@
    ],
    "definer": true,
    "gatilho": false,
-   "anon": false,
-   "authenticated": false,
+   "anon": true,
+   "authenticated": true,
    "publico": false,
    "md5": "97c0e8d16ca434d6f19acd38d7b8b936"
   },
@@ -4055,6 +4057,71 @@
    "authenticated": false,
    "publico": false,
    "md5": "09e9bd768788d0eaaac5cfe3efb22a5b"
+  },
+  {
+   "nome": "app_aparelho_abrir",
+   "args": [
+    {
+     "nome": "p_pac",
+     "padrao": false
+    },
+    {
+     "nome": "p_aparelho",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "85b1238fd9a4e76545536724a61aa277"
+  },
+  {
+   "nome": "app_pin_esqueci",
+   "args": [
+    {
+     "nome": "p_telefone",
+     "padrao": false
+    },
+    {
+     "nome": "p_nome",
+     "padrao": false
+    },
+    {
+     "nome": "p_nascimento",
+     "padrao": false
+    },
+    {
+     "nome": "p_pin_novo",
+     "padrao": false
+    },
+    {
+     "nome": "p_aparelho",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "96c6984f4f897d45a370680eed50ccb9"
+  },
+  {
+   "nome": "app_sair",
+   "args": [
+    {
+     "nome": "p_token",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "4d20b2a7aa5e729af3e9b8e1107c9223"
   },
   {
    "nome": "assinatura_contexto",
@@ -7340,6 +7407,16 @@
    "authenticated": true,
    "publico": false,
    "md5": "b123afae8058791340df83f973ea3a2b"
+  },
+  {
+   "nome": "fila_olho_hoje",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "734c047f877d6f057b3371d8cc14a385"
   },
   {
    "nome": "fila_posicao",
@@ -11754,7 +11831,7 @@
    "definer": true,
    "gatilho": false,
    "anon": false,
-   "authenticated": false,
+   "authenticated": true,
    "publico": false,
    "md5": "734e3460bd18d2e83d44d80a019b4d1b"
   },
@@ -11769,7 +11846,7 @@
    "definer": true,
    "gatilho": false,
    "anon": false,
-   "authenticated": false,
+   "authenticated": true,
    "publico": false,
    "md5": "585a58d8edb884a9b60315d528059cf9"
   },

@@ -19,3 +19,4 @@ begin
       ) t
      where t.m is not null), '[]'::jsonb);
 end $function$;
+

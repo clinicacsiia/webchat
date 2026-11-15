@@ -1,5 +1,5 @@
 -- public.app_conta_antiga_migrar(p_pin text, p_telefone text, p_nome text, p_nascimento text, p_filhos jsonb, p_aparelho text)
--- Pode executar: authenticated
+-- Pode executar: authenticated, service_role
 CREATE OR REPLACE FUNCTION public.app_conta_antiga_migrar(p_pin text, p_telefone text DEFAULT NULL::text, p_nome text DEFAULT NULL::text, p_nascimento text DEFAULT NULL::text, p_filhos jsonb DEFAULT NULL::jsonb, p_aparelho text DEFAULT NULL::text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -27,7 +27,6 @@ begin
   if v_nasc is null or v_nasc > public.app_hoje() or v_nasc < date '1900-01-01' then return jsonb_build_object('ok', false, 'erro', 'nascimento', 'mensagem', 'Informe a data de nascimento.'); end if;
   if public.app_idade(v_nasc) < 18 then return jsonb_build_object('ok', false, 'erro', 'menor', 'mensagem', 'O cadastro principal precisa ser de um maior de 18 anos.'); end if;
 
-  -- filhos: tudo conferido ANTES de gravar qualquer coisa
   if jsonb_typeof(v_filhos) <> 'array' or jsonb_array_length(v_filhos) > 10 then return jsonb_build_object('ok', false, 'erro', 'filho', 'mensagem', 'Lista de filhos inválida (no máximo 10).'); end if;
   for v_f in select * from jsonb_array_elements(v_filhos) loop
     v_fn := btrim(regexp_replace(coalesce(v_f ->> 'nome', ''), '\s+', ' ', 'g')); v_fd := public.app_data(v_f ->> 'nascimento');
@@ -58,7 +57,6 @@ begin
     v_chave := public.app_norm(v_fn) || '|' || v_fd::text;
     continue when v_chave = any(v_vistos);
     v_vistos := v_vistos || v_chave;
-    -- CPF só do histórico da PRÓPRIA conta, e só se o nome bate e o nascimento não contradiz
     select h.cpf into v_fcpf from public.app_conta_antiga_historico_filhos(cp.id) h where h.chave = public.app_norm(v_fn) and (h.nasc is null or h.nasc = v_fd) and h.cpf is not null limit 1;
     insert into public.app_filho (responsavel_id, nome, nascimento, cpf, criado_em) values (v_id, v_fn, v_fd, v_fcpf, clock_timestamp());
   end loop;

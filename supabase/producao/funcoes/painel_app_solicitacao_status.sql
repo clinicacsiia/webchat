@@ -1,5 +1,5 @@
 -- public.painel_app_solicitacao_status(p_grupo uuid, p_status text)
--- Pode executar: service_role
+-- Pode executar: authenticated, service_role
 CREATE OR REPLACE FUNCTION public.painel_app_solicitacao_status(p_grupo uuid, p_status text)
  RETURNS integer
  LANGUAGE plpgsql

@@ -1,5 +1,5 @@
 -- public.app_conta_antiga_historico_filhos(p_conta uuid)
--- Pode executar: ninguém pela API (só o dono/gatilhos/rotinas)
+-- Pode executar: service_role
 CREATE OR REPLACE FUNCTION public.app_conta_antiga_historico_filhos(p_conta uuid)
  RETURNS TABLE(nome text, chave text, nasc date, cpf text, atendimentos integer)
  LANGUAGE sql

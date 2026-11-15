@@ -1,5 +1,5 @@
 -- public.app_pendencia_responder(p_token text, p_pessoa text, p_campo text, p_valor text)
--- Pode executar: anon, authenticated
+-- Pode executar: anon, authenticated, service_role
 CREATE OR REPLACE FUNCTION public.app_pendencia_responder(p_token text, p_pessoa text, p_campo text, p_valor text)
  RETURNS jsonb
  LANGUAGE plpgsql

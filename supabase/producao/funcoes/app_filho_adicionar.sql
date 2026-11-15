@@ -1,5 +1,5 @@
 -- public.app_filho_adicionar(p_token text, p_nome text, p_nascimento text, p_mesmo_nome_confirmado boolean)
--- Pode executar: anon, authenticated
+-- Pode executar: anon, authenticated, service_role
 CREATE OR REPLACE FUNCTION public.app_filho_adicionar(p_token text, p_nome text, p_nascimento text, p_mesmo_nome_confirmado boolean DEFAULT false)
  RETURNS jsonb
  LANGUAGE plpgsql

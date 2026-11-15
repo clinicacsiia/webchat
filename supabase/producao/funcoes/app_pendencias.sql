@@ -1,5 +1,5 @@
 -- public.app_pendencias(p_token text)
--- Pode executar: anon, authenticated
+-- Pode executar: anon, authenticated, service_role
 CREATE OR REPLACE FUNCTION public.app_pendencias(p_token text)
  RETURNS jsonb
  LANGUAGE plpgsql

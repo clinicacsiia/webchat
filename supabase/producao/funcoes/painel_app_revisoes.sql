@@ -1,5 +1,5 @@
 -- public.painel_app_revisoes()
--- Pode executar: authenticated
+-- Pode executar: authenticated, service_role
 CREATE OR REPLACE FUNCTION public.painel_app_revisoes()
  RETURNS jsonb
  LANGUAGE plpgsql

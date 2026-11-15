@@ -1,5 +1,5 @@
 -- public.app_confianca_novo_codigo(p_token text, p_id uuid)
--- Pode executar: service_role
+-- Pode executar: anon, authenticated, service_role
 CREATE OR REPLACE FUNCTION public.app_confianca_novo_codigo(p_token text, p_id uuid)
  RETURNS jsonb
  LANGUAGE plpgsql
