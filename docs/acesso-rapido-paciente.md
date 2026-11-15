@@ -100,6 +100,7 @@ Feita **só dentro do banco**, só como **sugestão**: se existir um único paci
 **Contatos que só têm celular (sem conta) NÃO têm filhos trazidos do histórico:** sem confirmar o celular, isso mostraria nomes e dados de crianças a quem só digitou um número. Eles digitam os filhos e o CPF uma vez, com as regras acima. No chat sem acesso rápido, nome da criança igual ao do responsável avisa antes de iniciar (tocar de novo confirma).
 
 ## Equipe
+**Painel (15/11/2026):** botão **Atendimento > Pendências** (admin e atendente), com contador e 3 abas: Solicitações (Confirmar, Concluir, Cancelar), Cadastros para conferir (Marcar como conferido) e Contas antigas sem PIN (WhatsApp). Banco: `supabase/acesso-rapido-painel.sql` (`npm run test:acesso-painel-sql`, 10 casos); tela: `npm run test:painel-pendencias` (9 casos). As funções abaixo continuam valendo para quem prefere SQL.
 - `select public.painel_app_solicitacoes('solicitada');` lista as solicitações (responsável, celular, pessoas com nascimento, exame, data, turno, observação). Só administrador e atendente.
 - `select public.painel_app_solicitacao_status('<grupo>', 'confirmada');` muda a situação (`confirmada`, `concluida`, `cancelada`, `solicitada`); o paciente vê "Confirmada pela clínica".
 - **Ainda não há botão no painel** para isso. A página diz só "Solicitação registrada… para agilizar, envie o resumo ao atendimento", sem prometer que alguém já viu.

@@ -1,12 +1,27 @@
 # Pendências que dependem do dono
 
-Versão 1.9 — 15/11/2026 / Mudança: acesso rápido ligado; itens 1 e 2 da seção 2.14 concluídos. Versão 1.8 — 15/11/2026 / Mudança: item 9 da seção 2.14 (filhos dos contatos antigos); SMS descartado. Versão 1.7 — 15/11/2026 / Mudança: item 8 da seção 2.14 (pendências e dúvidas para todos). Versão 1.6 — 15/11/2026 / Mudança: item 7 da seção 2.14 (contas antigas viram acesso rápido). Versão 1.5 — 14/11/2026 / Mudança: seção 2.14 (acesso rápido do paciente). Versão 1.4 — 14/11/2026 / Mudança: depois das decisões do dono: 1.3 reescrita (a função `klingo-agendamento` é MANTIDA e protegida no servidor), 2.13 atualizada (partes 4 e 5, configuração pública, histórico do telefone tratado). Versão 1.3 — 14/11/2026 / Mudança: seção 1.3 (risco ativo) e 2.13 (reestruturação do WebChat); 2.10 substituída. Versão 1.2 — 13/11/2026 / Mudança: seção 2.11 (revisão mensal das conversas). Versão 1.1 — 12/11/2026: seção 2.8 (autoatendimento Klingo). Versão 1.0 — 11/11/2026: lista única, conferida na produção em 11/11/2026 às 14:50 (Brasília)
+Versão 2.0 — 15/11/2026 / Mudança: catálogos CSI e CSI RM/TC ligados; notificações e modos do Klingo ligados; botão Pendências no painel; texto de privacidade com o acesso rápido; lista do que continua dependendo do dono (seção 0). Versão 1.9 — 15/11/2026 / Mudança: acesso rápido ligado; itens 1 e 2 da seção 2.14 concluídos. Versão 1.8 — 15/11/2026 / Mudança: item 9 da seção 2.14 (filhos dos contatos antigos); SMS descartado. Versão 1.7 — 15/11/2026 / Mudança: item 8 da seção 2.14 (pendências e dúvidas para todos). Versão 1.6 — 15/11/2026 / Mudança: item 7 da seção 2.14 (contas antigas viram acesso rápido). Versão 1.5 — 14/11/2026 / Mudança: seção 2.14 (acesso rápido do paciente). Versão 1.4 — 14/11/2026 / Mudança: depois das decisões do dono: 1.3 reescrita (a função `klingo-agendamento` é MANTIDA e protegida no servidor), 2.13 atualizada (partes 4 e 5, configuração pública, histórico do telefone tratado). Versão 1.3 — 14/11/2026 / Mudança: seção 1.3 (risco ativo) e 2.13 (reestruturação do WebChat); 2.10 substituída. Versão 1.2 — 13/11/2026 / Mudança: seção 2.11 (revisão mensal das conversas). Versão 1.1 — 12/11/2026: seção 2.8 (autoatendimento Klingo). Versão 1.0 — 11/11/2026: lista única, conferida na produção em 11/11/2026 às 14:50 (Brasília)
 
 Só entra aqui o que **só você consegue fazer**: decidir, colar um segredo, autorizar, falar com terceiros. O que é técnico e não depende de você está no fim, para você saber que não está esquecido. Cada item tem o link direto da tela onde a ação acontece.
 
 A mesma lista existe como página (com caixas de marcar): peça ao Claude "abra a página de pendências".
 
 ---
+
+## 0. Ligado em 15/11/2026 e o que ainda depende de você
+
+**Ligado hoje (por pedido seu):** acesso rápido (`app_acesso_modo`), catálogos **CSI** e **CSI RM/TC** (`catalogo_csi`, `catalogo_rmtc`; agora o chat mostra as 3 unidades), notificações e vagas (`notificacao_modo`, `previsao_modo`, `previsao_monitor_modo`) e os modos do autoatendimento do Klingo (`klingo_api_horarios`, `_marcar`, `_pre_cadastro`, `_cancelar`, `_remarcar`, `_consultar` = `sim`; o motor já tratava tudo como ligado desde 14/11, então o painel só passou a mostrar a verdade). **Para desligar qualquer um na hora:** Configurações no painel, ou `update public.config set valor = 'nao' where chave = '<chave>';`.
+
+**Continua desligado de propósito, porque depende de você ou do Klingo:**
+| Chave / item | Por que não liguei | O que falta |
+|---|---|---|
+| `klingo_api_resultado` (laudo) | Nunca foi testado com laudo liberado real; o link e a senha do resultado seguem pela equipe | Resposta do suporte do Klingo (item 2.3) e um paciente real para o teste |
+| `klingo_webhook` | O Klingo ainda não cadastrou a URL | Pedir ao Klingo para cadastrar |
+| `permissao_modo` = `observacao` | Ligar bloqueia o que a equipe vê por unidade; a estrutura (Luzia, Juliana, atendentes, unidades) ainda não está fechada | Itens 1.1 e 2.1 |
+| `cadastro_equipe_sem_convite`, `reaproveitar_cadastro_convidado` | `nao` é o estado **seguro** (só convite cria equipe; convidado não reaproveita cadastro) | Nada: não ligar |
+| `disponibilidade_encerra_conversa`, `agendamento_reconhecer_msg_encerradas` | Decisão operacional sua | Dizer se quer |
+| E-mail do sistema (SMTP) | Só você cria a senha de app do Gmail | Item 1.1 |
+| Proteção contra senha vazada (Supabase Auth) | Chave do painel do Supabase, depende do plano | https://supabase.com/dashboard/project/nrvuynjwcgwpjdptkiay/auth/providers |
 
 ## 1. Faça primeiro (afeta gente hoje)
 

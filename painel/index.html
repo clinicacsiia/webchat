@@ -1825,6 +1825,108 @@
         h('li', {}, h('b', {}, 'Marcou hoje: '), 'exames agendados hoje nas conversas da pessoa (marcados por ela ou confirmados sozinhos com o Klingo).')),
       h('div', { class: 'rodape' }, h('button', { class: 'btn', type: 'button', onclick: () => dlg.close() }, 'Fechar')));
   }
+
+  /* ---------- Pendências do acesso rápido (15/11/2026) ----------
+     Botão com contador e uma janela com 3 listas: solicitações de marcação feitas no acesso rápido (confirmar / concluir / cancelar), cadastros em dúvida com a base da clínica
+     (marcar como conferido) e contas antigas (e-mail e senha) que ainda não criaram o PIN (chamar no WhatsApp). Dados: painel_app_* (admin e atendente). Nada de CPF inteiro. */
+  const PEND_MOTIVO = {
+    cpf_com_outro_celular: 'O CPF informado já existe na clínica, mas com outro celular.',
+    cpf_repetido_na_clinica: 'O CPF informado aparece em mais de um cadastro da clínica.',
+    cpf_nao_bate_com_o_celular: 'O celular já existe na clínica, mas o CPF informado não bate.',
+    celular_na_base_sem_vinculo: 'O celular já existe na clínica; falta conferir se é a mesma pessoa.' };
+  const PEND_STATUS = { solicitada: 'Aguardando confirmação', confirmada: 'Confirmada', concluida: 'Concluída', cancelada: 'Cancelada' };
+  const PEND = { aba: 'solic', status: 'solicitada', resumo: null, dados: null, erro: null };
+  const pendNum = (v) => Number(v) || 0;
+  const pendTotal = (r) => (r ? pendNum(r.solicitacoes) + pendNum(r.revisoes) + pendNum(r.contas_antigas) : 0);
+  const pendWhats = (tel) => { const d = String(tel || '').replace(/\D/g, ''); return d.length >= 10 ? 'https://wa.me/' + (d.startsWith('55') ? d : '55' + d) : null; };
+  async function carregarSeloPendencias() {
+    if (!podeAtender()) return;
+    try {
+      const { data, error } = await db.rpc('painel_app_pendencias_resumo');
+      if (error || !data) return;
+      PEND.resumo = data;
+      const b = document.getElementById('seloPendencias'); if (!b) return;
+      const n = pendTotal(data); b.textContent = String(n); b.hidden = n === 0;
+    } catch { /* sem rede: o botão continua sem número */ }
+  }
+  function renderPendencias() {
+    if (!dlg.open || dlg.dataset.pendencias !== '1') return;
+    const r = PEND.resumo || {}, d = PEND.dados;
+    const abas = [['solic', 'Solicitações', r.solicitacoes], ['rev', 'Cadastros para conferir', r.revisoes], ['contas', 'Contas antigas sem PIN', r.contas_antigas]];
+    const nomes = (pp) => h('div', {}, (pp || []).map((x) => h('div', {}, x.nome, x.filho ? h('span', { class: 'dica' }, ' (filho/a)') : null, h('span', { class: 'dica' }, ' · ' + dataPrev(x.nascimento)))));
+    const acao = async (ev, rpc, args, texto) => {
+      const b = ev.currentTarget; b.disabled = true;
+      try { const { error } = await db.rpc(rpc, args); if (error) throw error; toast(texto); }
+      catch { b.disabled = false; toast('Não foi possível salvar agora. Tente de novo.'); return; }
+      await carregarPendencias();
+    };
+    let conteudo;
+    if (PEND.erro) conteudo = h('p', { class: 'dica', role: 'alert' }, PEND.erro);
+    else if (d === null) conteudo = h('p', { class: 'dica' }, 'Carregando…');
+    else if (PEND.aba === 'solic') {
+      conteudo = h('div', {},
+        h('div', { class: 'chips', role: 'group', 'aria-label': 'Situação da solicitação' }, ['solicitada', 'confirmada'].map((st) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(PEND.status === st),
+          onclick: () => { PEND.status = st; carregarPendencias(); } }, PEND_STATUS[st]))),
+        d.length === 0 ? h('p', { class: 'dica' }, 'Nenhuma solicitação nesta situação.')
+          : h('div', { class: 'eq-rolagem' }, h('table', { class: 'tab eq-tab', id: 'tabPendSolic' },
+            h('thead', {}, h('tr', {}, ['Quem pediu', 'Para quem', 'Pedido', 'Situação', ''].map((t) => h('th', { scope: 'col' }, t)))),
+            h('tbody', {}, d.map((l) => h('tr', { class: l.status === 'solicitada' ? 'eq-livre' : '' },
+              h('th', { scope: 'row' }, l.responsavel || 'Paciente', h('div', { class: 'dica' }, l.celular || ''), l.cadastro_sugerido ? h('div', { class: 'dica' }, 'Pode ser paciente da clínica') : null,
+                pendWhats(l.celular) ? h('a', { href: pendWhats(l.celular), target: '_blank', rel: 'noopener noreferrer' }, 'WhatsApp') : null),
+              h('td', {}, nomes(l.pessoas)),
+              h('td', {}, [l.exame, `${dataPrev(l.data_preferida)} · ${l.turno || ''}`].join(' · '), l.obs ? h('div', { class: 'dica' }, l.obs) : null),
+              h('td', {}, h('b', {}, PEND_STATUS[l.status] || l.status)),
+              h('td', {},
+                l.status === 'solicitada' ? h('button', { class: 'btn', type: 'button', onclick: (ev) => acao(ev, 'painel_app_solicitacao_status', { p_grupo: l.grupo, p_status: 'confirmada' }, 'Solicitação confirmada. O paciente já vê.') }, 'Confirmar') : null,
+                l.status === 'confirmada' ? h('button', { class: 'btn', type: 'button', onclick: (ev) => acao(ev, 'painel_app_solicitacao_status', { p_grupo: l.grupo, p_status: 'concluida' }, 'Solicitação concluída.') }, 'Concluir') : null,
+                h('button', { class: 'btn sec', type: 'button', onclick: (ev) => { if (confirm('Cancelar esta solicitação? O paciente verá que foi cancelada.')) acao(ev, 'painel_app_solicitacao_status', { p_grupo: l.grupo, p_status: 'cancelada' }, 'Solicitação cancelada.'); } }, 'Cancelar'))))))));
+    } else if (PEND.aba === 'rev') {
+      conteudo = d.length === 0 ? h('p', { class: 'dica' }, 'Nenhum cadastro para conferir.')
+        : h('div', { class: 'eq-rolagem' }, h('table', { class: 'tab eq-tab', id: 'tabPendRev' },
+          h('thead', {}, h('tr', {}, ['Paciente', 'Por que conferir', ''].map((t) => h('th', { scope: 'col' }, t)))),
+          h('tbody', {}, d.map((l) => h('tr', { class: 'eq-livre' },
+            h('th', { scope: 'row' }, l.nome, h('div', { class: 'dica' }, `${l.celular || ''} · nasc. ${dataPrev(l.nascimento)}${l.cpf_mascara ? ' · CPF ' + l.cpf_mascara : ''}`),
+              pendWhats(l.celular) ? h('a', { href: pendWhats(l.celular), target: '_blank', rel: 'noopener noreferrer' }, 'WhatsApp') : null),
+            h('td', {}, PEND_MOTIVO[l.motivo] || l.motivo, h('div', { class: 'dica' }, `Cadastros da clínica com este celular: ${pendNum(l.cadastros_com_o_celular)}`)),
+            h('td', {}, h('button', { class: 'btn', type: 'button', title: 'Use depois de conferir com a pessoa ou no cadastro da clínica', onclick: (ev) => acao(ev, 'painel_app_revisao_resolver', { p_id: l.id }, 'Marcado como conferido.') }, 'Marcar como conferido')))))));
+    } else {
+      conteudo = h('div', {}, h('p', { class: 'dica' }, 'Quem ainda tem só e-mail e senha. Ao entrar uma última vez a pessoa confere os dados, os filhos e cria o PIN. Chame no WhatsApp para avisar.'),
+        d.length === 0 ? h('p', { class: 'dica' }, 'Todas as contas antigas já criaram o PIN.')
+          : h('div', { class: 'eq-rolagem' }, h('table', { class: 'tab eq-tab', id: 'tabPendContas' },
+            h('thead', {}, h('tr', {}, ['Pessoa', 'Contato', 'Filhos no histórico', 'Último acesso', ''].map((t) => h('th', { scope: 'col' }, t)))),
+            h('tbody', {}, d.map((l) => h('tr', {},
+              h('th', { scope: 'row' }, l.nome || '(sem nome)'),
+              h('td', {}, l.celular || '—', h('div', { class: 'dica' }, l.email || '')),
+              h('td', {}, String(pendNum(l.filhos_no_historico))),
+              h('td', {}, l.ultimo_acesso_em ? dispQuando(l.ultimo_acesso_em) : 'nunca'),
+              h('td', {}, pendWhats(l.celular) ? h('a', { class: 'btn', href: pendWhats(l.celular), target: '_blank', rel: 'noopener noreferrer' }, 'Chamar no WhatsApp') : null)))))));
+    }
+    dlg.replaceChildren(h('h3', {}, 'Pendências'),
+      h('p', { class: 'dica', style: 'margin:-8px 0 10px' }, 'O que está esperando a equipe no acesso rápido do paciente (celular + PIN).'),
+      h('div', { class: 'chips', role: 'group', 'aria-label': 'Tipo de pendência' }, abas.map(([id, rot, n]) => h('button', { class: 'chip', type: 'button', 'data-pend': id, 'aria-pressed': String(PEND.aba === id),
+        onclick: () => { PEND.aba = id; carregarPendencias(); } }, `${rot} (${pendNum(n)})`))),
+      conteudo,
+      h('div', { class: 'rodape' }, h('button', { class: 'btn', type: 'button', onclick: () => dlg.close() }, 'Fechar')));
+  }
+  async function carregarPendencias() {
+    PEND.dados = null; PEND.erro = null; renderPendencias();
+    try {
+      const chamada = PEND.aba === 'solic' ? db.rpc('painel_app_solicitacoes', { p_status: PEND.status }) : PEND.aba === 'rev' ? db.rpc('painel_app_revisoes') : db.rpc('painel_app_contas_antigas');
+      const [lista, resumo] = await Promise.all([chamada, db.rpc('painel_app_pendencias_resumo')]);
+      if (lista.error) throw lista.error;
+      PEND.dados = Array.isArray(lista.data) ? lista.data : [];
+      if (resumo.data) { PEND.resumo = resumo.data; const b = document.getElementById('seloPendencias'); if (b) { const n = pendTotal(resumo.data); b.textContent = String(n); b.hidden = n === 0; } }
+    } catch { PEND.dados = null; PEND.erro = 'Não foi possível carregar agora. Tente de novo em instantes.'; }
+    renderPendencias();
+  }
+  async function abrirPendencias() {
+    if (!podeAtender()) return;
+    dlg.className = 'equipe'; dlg.dataset.pendencias = '1';
+    PEND.aba = 'solic'; PEND.status = 'solicitada'; PEND.dados = null; PEND.erro = null;
+    renderPendencias(); if (!dlg.open) dlg.showModal();
+    await carregarPendencias();
+    dlg.addEventListener('close', () => { delete dlg.dataset.pendencias; carregarSeloPendencias(); }, { once: true });
+  }
   function abrirEquipe() {
     if (!ehChefia()) return;
     dlg.className = 'equipe'; dlg.dataset.equipe = '1';
@@ -2284,10 +2386,12 @@
         h('div', {}, h('h2', {}, icone('fone'), 'Painel de Atendimento'), h('p', { class: 'sub' }, 'Acompanhe as conversas do dia, o que está em espera e os alertas.')),
         h('div', { class: 'cab-acoes' },
           podeAtender() ? h('button', { class: 'btn', type: 'button', id: 'btnPrevisao', title: 'Pacientes que pediram aviso quando surgir vaga compatível (não é agendamento nem reserva)', onclick: abrirPrevisao }, icone('calendario'), 'Disponibilidade futura') : null,
+          podeAtender() ? h('button', { class: 'btn', type: 'button', id: 'btnPendencias', title: 'O que espera a equipe: solicitações do acesso rápido, cadastros para conferir e contas antigas sem PIN', onclick: abrirPendencias },
+            icone('lista'), 'Pendências', h('span', { class: 'selo', id: 'seloPendencias', hidden: true }, '0')) : null,
           ehChefia() ? h('button', { class: 'btn', type: 'button', id: 'btnEquipe', title: 'Quanto cada atendente está atendendo agora (só TI, gerência e supervisão)', onclick: abrirEquipe }, icone('pessoas'), 'Equipe agora') : null,
           h('div', { class: 'data-hoje' }, icone('calendario'), 'Hoje, ' + new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'short', year: 'numeric' })))),
       h('div', { class: 'kpis', id: 'kpis', 'aria-label': 'Indicadores do dia' }));
-    c.append(cab, inbox); atualizarKpis(); renderLista(); renderChat();
+    c.append(cab, inbox); atualizarKpis(); renderLista(); renderChat(); carregarSeloPendencias();
     if (S.modo === 'quadro') { renderQuadro(); carregarQuadro(); }
   }
   function renderLista() {
