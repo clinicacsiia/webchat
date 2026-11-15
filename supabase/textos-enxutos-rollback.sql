@@ -9,3 +9,7 @@ update public.fluxo_texto set texto = $t$Olá, {nome}! Que bom ter você e {paci
  where chave = 'ola_filho' and texto = $t$Olá, {nome}! Vamos organizar o atendimento de {paciente}: é só tocar nas opções.$t$;
 update public.fluxo_texto set texto = $t$Para localizar o seu cadastro na clínica e agilizar o seu atendimento, preciso do CPF e da data de nascimento{de_quem}. Eles ficam protegidos e só servem para conferir quem é o paciente.$t$
  where chave = 'cpf_nasc' and texto = $t$Para localizar o seu cadastro, preciso do CPF e da data de nascimento{de_quem}. Eles ficam protegidos e servem só para conferir quem é o paciente.$t$;
+-- Parte 3
+update public.fluxo_texto set texto = replace(texto, $a$Ao confirmar, eu marco o agendamento no sistema da clínica. Se algo não der certo, um atendente entra para resolver com você.$a$,
+  $b$Ao confirmar, o seu pedido segue para a nossa equipe. Uma pessoa vai conferir tudo e confirmar com você a data, o horário e o valor.$b$)
+ where chave = 'confirmar' and texto like '%eu marco o agendamento no sistema da clínica%';
