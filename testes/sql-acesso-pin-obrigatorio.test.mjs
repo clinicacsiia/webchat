@@ -176,11 +176,15 @@ await caso('IP e dados do aparelho: o IP vem do cabeçalho da requisição e o t
   await db.query(`select set_config('request.headers', '', false)`);
   return { ok: l.ip === '203.0.113.7' && l.agente.length === 200, detalhe: `${l.ip} ${l.agente.length}` };
 });
-await caso('registros com mais de 180 dias são apagados no próximo registro', async () => {
+await caso('registros com mais de 180 dias são apagados pela limpeza diária; os recentes ficam', async () => {
   const pac = (await linha('71991230030')).id;
   await db.query(`insert into public.app_acesso_log (paciente_id, evento, em) values ($1, 'login', now() - interval '200 days')`, [pac]);
+  const antes = Number((await um(`select count(*) n from public.app_acesso_log where em < now() - interval '180 days'`)).n);
   await rpc('app_acesso_registrar', { p_token: dani.token, p_evento: 'login', p_dispositivo: DISP });
-  return { ok: Number((await um(`select count(*) n from public.app_acesso_log where em < now() - interval '180 days'`)).n) === 0 };
+  const apagados = (await q(`select public.app_acesso_limpar() n`))[0].n;
+  const depois = Number((await um(`select count(*) n from public.app_acesso_log where em < now() - interval '180 days'`)).n);
+  const recentes = Number((await um(`select count(*) n from public.app_acesso_log where em >= now() - interval '1 day'`)).n);
+  return { ok: antes >= 1 && apagados === antes && depois === 0 && recentes >= 1, detalhe: `${antes} antigos, ${apagados} apagados` };
 });
 await caso('a tabela do histórico não pode ser lida pelo público', async () => {
   await anonimo();

@@ -11,7 +11,7 @@
 --
 -- POSIÇÃO: só com config.app_local_ativo = 'sim' e com a permissão do aparelho. Guarda a posição arredondada (3 casas, cerca de 100 m), a precisão, a
 -- distância até a clínica e "na clínica sim/não". Sem as coordenadas da clínica em config (clinica_lat, clinica_lng) não há como dizer "na clínica".
--- Registros com mais de 180 dias são apagados por quem registra o acesso seguinte.
+-- Registros com mais de 180 dias são apagados pela rotina diária (app_acesso_limpar, arquivo acesso-rapido-pin-obrigatorio-rotina.sql).
 --
 -- LIGAR (nasce DESLIGADO; nada muda para o paciente até lá):
 --   update public.config set valor = 'sim' where chave = 'app_pin_obrigatorio';
@@ -139,8 +139,16 @@ begin
   insert into public.app_acesso_log (paciente_id, aparelho_id, evento, ip, agente, idioma, fuso, tela, plataforma, lat, lng, precisao_m, distancia_m, na_clinica, local_negado, exames_hoje)
   values (p_pac, p_aparelho, p_evento, v_ip, left(p_disp ->> 'agente', 200), left(p_disp ->> 'idioma', 20), left(p_disp ->> 'fuso', 60), left(p_disp ->> 'tela', 20), left(p_disp ->> 'plataforma', 60),
           v_lat, v_lng, v_prec, v_dist, v_na, v_neg, v_ex);
-  delete from public.app_acesso_log where id in (select id from public.app_acesso_log where em < now() - interval '180 days' limit 50);
   return jsonb_build_object('na_clinica', v_na, 'exames_hoje', coalesce(v_ex, 0), 'local_negado', v_neg);
+end $$;
+
+-- Limpeza dos registros com mais de 180 dias: rodada pela rotina diária (acesso-rapido-pin-obrigatorio-rotina.sql), não a cada entrada.
+create or replace function public.app_acesso_limpar() returns integer language plpgsql security definer set search_path to '' as $$
+declare v_n integer;
+begin
+  with apagados as (delete from public.app_acesso_log where em < now() - interval '180 days' returning 1)
+  select count(*)::integer into v_n from apagados;
+  return v_n;
 end $$;
 
 -- Primeiro acesso completo: CPF (dela e dos filhos) + PIN na MESMA chamada, tudo ou nada. O que a clínica já sabe é aproveitado em silêncio.
@@ -263,7 +271,7 @@ end $$;
 revoke all on function public.app_distancia_m(numeric, numeric, numeric, numeric), public.app_cpf_historico(text, text, date, text), public.app_porta(),
   public.app_pre_cadastro(text, text, text, jsonb), public.app_acesso_gravar(uuid, uuid, text, jsonb, jsonb),
   public.app_pin_criar(text, text, text, text, text, jsonb, jsonb, text, text), public.app_acesso_registrar(text, text, jsonb, jsonb), public.painel_app_acessos(uuid, integer),
-  public.app_chat_pessoa(uuid, uuid), public.app_chat_dados_resumo(text, uuid, text), public.app_dados_atualizar(text, uuid, text)
+  public.app_chat_pessoa(uuid, uuid), public.app_chat_dados_resumo(text, uuid, text), public.app_dados_atualizar(text, uuid, text), public.app_acesso_limpar()
   from public, anon, authenticated;
 grant execute on function public.app_porta(), public.app_pre_cadastro(text, text, text, jsonb), public.app_pin_criar(text, text, text, text, text, jsonb, jsonb, text, text),
   public.app_acesso_registrar(text, text, jsonb, jsonb), public.app_chat_dados_resumo(text, uuid, text), public.app_dados_atualizar(text, uuid, text) to anon, authenticated;

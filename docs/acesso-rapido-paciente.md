@@ -99,10 +99,12 @@ Feita **só dentro do banco**, só como **sugestão**: se existir um único paci
 **Conta antiga (e-mail e senha): os filhos vêm do histórico, mas só da PRÓPRIA conta.** Depois de entrar, a página lista os filhos dos atendimentos ligados àquela conta (`conversas.conta_id`, que só existe quando a conversa foi feita logado ou adotada com o token dela). A pessoa confere, corrige ou preenche o nascimento e desmarca quem não é filho. Quem tem o mesmo nome dela vê "Quem é? Sou eu / É outra pessoa". O CPF do filho vem do histórico **só** se o nome bate e o nascimento não contradiz; o que faltar cai no cartão "Falta pouco". Hoje, 4 das 5 contas com histórico têm filhos.
 **Contatos que só têm celular (sem conta) NÃO têm filhos trazidos do histórico:** sem confirmar o celular, isso mostraria nomes e dados de crianças a quem só digitou um número. Eles digitam os filhos e o CPF uma vez, com as regras acima. No chat sem acesso rápido, nome da criança igual ao do responsável avisa antes de iniciar (tocar de novo confirma).
 
-## PIN obrigatório na porta do chat (15/11/2026) — **pronto no repositório, interruptor DESLIGADO**
-**Banco:** `supabase/acesso-rapido-pin-obrigatorio.sql` (`npm run test:acesso-pin-sql`, 26 casos). **Telas:** `acesso/index.html` (`npm run test:acesso-pin`, 17 casos) e `index.html` (`npm run test:acesso-porta`, 12 casos). Com o interruptor desligado, tudo se comporta como antes (os testes antigos continuam passando).
+## PIN obrigatório na porta do chat (15/11/2026) — **aplicado na produção e LIGADO no banco** (as telas só valem para o paciente quando forem para a `main`)
+**Banco:** `supabase/acesso-rapido-pin-obrigatorio.sql` (`npm run test:acesso-pin-sql`, 31 casos; aplicado em 5 partes: `acesso_rapido_pin_p1..p5`). **Telas:** `acesso/index.html` (`npm run test:acesso-pin`, 17 casos) e `index.html` (`npm run test:acesso-porta`, 12 casos). Com o interruptor desligado, tudo se comporta como antes (os testes antigos continuam passando).
 
-**Ligar:** `update public.config set valor = 'sim' where chave = 'app_pin_obrigatorio';` — **Desligar na hora:** `... valor = 'nao' ...` (o chat volta a abrir sem PIN).
+**Estado em 15/11/2026:** `app_pin_obrigatorio = sim` e `app_local_ativo = sim` na produção. Como as telas novas ainda não estão na `main`, o paciente ainda não sente nada. **Desligar na hora:** `update public.config set valor = 'nao' where chave in ('app_pin_obrigatorio','app_local_ativo');`. **Posição "na clínica" ainda não funciona:** faltam `clinica_lat` e `clinica_lng` (vazios).
+
+**Rotina:** `app-acesso-limpar` (todo dia 03:47, Brasília) apaga o histórico com mais de 180 dias (`supabase/acesso-rapido-pin-obrigatorio-rotina.sql`).
 
 ### O que a pessoa vê (com o interruptor ligado)
 1. **Abre o chat.** O chat pergunta à porta (`app_porta`) e, enquanto confere, mostra uma capa "Abrindo com segurança…".
