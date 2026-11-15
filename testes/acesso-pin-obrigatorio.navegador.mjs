@@ -218,7 +218,7 @@ await caso('PIN obrigatório DESLIGADO: o cadastro volta ao jeito antigo (sem pa
   await velho.page.fill('#nome', 'Davi Lima Teste'); await velho.page.fill('#nasc', '1991-01-01'); await velho.page.click('[data-act="c2"]');
   await velho.page.click('[data-act="tf"][data-v="0"]'); await velho.page.click('[data-act="c3"]');
   await esperaTexto(velho.page, /Número de confiança/);
-  await velho.page.click('[data-act="c4skip"]'); await pin(velho.page, '1111'); await pin(velho.page, '1111');
+  await velho.page.click('[data-act="c4skip"]'); await pin(velho.page, '7391'); await pin(velho.page, '7391');
   await esperaTexto(velho.page, /Olá, Davi/);
   return { ok: ult('app_cadastrar') === 1 && (await q(`select cpf from public.app_paciente where telefone = '71991230010'`))[0].cpf === null };
 });

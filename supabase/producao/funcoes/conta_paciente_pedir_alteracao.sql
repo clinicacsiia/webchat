@@ -10,6 +10,7 @@ declare
   v_uid uuid := (select auth.uid()); v_cp record; p record; v_email text := lower(btrim(coalesce(p_email, '')));
   v_tel text := regexp_replace(coalesce(p_telefone, ''), '\D', '', 'g'); v_dif text[] := '{}';
 begin
+  perform public.app_pin_exigir_leitura();   -- PIN também no servidor (config.app_pin_servidor)
   select * into v_cp from public.contas_paciente where id = v_uid for update;
   if v_uid is null or not found then raise exception 'Entre na sua conta para pedir a mudança.' using errcode = '42501'; end if;
   if v_email = '' then v_email := null; end if;

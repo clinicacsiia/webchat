@@ -8,6 +8,7 @@ CREATE OR REPLACE FUNCTION public.chat_voltar(p_conversa uuid, p_token text)
 AS $function$
 declare c public.conversas; v_passo text; v_p text; v_novo text; i int; v_antes bigint;
 begin
+  perform public.app_pin_exigir_leitura();   -- PIN também no servidor (config.app_pin_servidor)
   perform public.chat_valida(p_conversa, p_token);
   select * into c from public.conversas where id = p_conversa for update;
   select passo into v_passo from public.conversa_fluxo where conversa_id = p_conversa;

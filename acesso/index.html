@@ -266,12 +266,18 @@ async function onPin(pin){
     erro(r.mensagem);return;
   }
   if(m==='old'){S.old=pin;S.mode='new1';render();return}
-  if(m==='new1'){S.tmp=pin;S.mode='new2';render();return}
+  if(m==='new1'){
+    if(pinFraco(pin)){S.buf='';render();erro(MSG_PIN_FRACO);return}   // o servidor também recusa (app_pin_fraco); aqui a pessoa vê na hora
+    S.tmp=pin;S.mode='new2';render();return}
   if(m==='new2'){
     if(pin!==S.tmp){S.mode='new1';S.tmp='';render();erro('Os PINs não conferem. Tente de novo.');return}
     await S.after(pin);
   }
 }
+
+/* PIN óbvio (a mesma regra do banco, app_pin_fraco): repetido 1111, em sequência 1234/4321, pares repetidos 1212/1122 */
+const pinFraco=p=>/^(\d)\1{3}$/.test(p)||/^(0123|1234|2345|3456|4567|5678|6789|3210|4321|5432|6543|7654|8765|9876)$/.test(p)||/^(\d)(\d)\1\2$/.test(p)||/^(\d)\1(\d)\2$/.test(p);
+const MSG_PIN_FRACO='Escolha um PIN menos óbvio: não use números repetidos (1111), em sequência (1234) nem pares repetidos (1212).';
 
 /* ===== Layout ===== */
 const prog=n=>`<div class="prog">${[1,2,3,4,5].map(i=>`<i class="${i<=n?'on':''}"></i>`).join('')}</div>`;
@@ -729,6 +735,7 @@ function iniciaPin(){
     ocupado(true);const r=await rpc(obrig?'app_pin_criar':'app_cadastrar',args);ocupado(false);
     if(r.ok){entrou(r);S.d={filhos:[],confiavel:null};toast('Cadastro concluído');aposEntrar('cadastro');return}
     if(r.erro==='indisponivel')return go('indisp');
+    if(r.erro==='pin_fraco'){S.mode='new1';S.buf='';S.tmp='';go('c5');setTimeout(()=>erro(r.mensagem||MSG_PIN_FRACO),0);return}   // PIN óbvio: fica na etapa do PIN
     // volta para a etapa que tem o problema, com a explicação do servidor
     const etapa={celular:'c1',telefone_cadastrado:'c1',nome:'c2',nascimento:'c2',menor:'c2',filho:'c3',homonimo:'c3',mesmo_cadastro:'c3',confianca:'c4',cpf:'c3b',cpf_falta:'c3b',filho_cpf:'c3b',filho_cpf_falta:'c3b'}[r.erro]||'c4';
     if(etapa==='c3b')S.falta=[{pessoa:'eu'},...d.filhos.map((f,i)=>({pessoa:'filho',indice:i}))];   // o servidor recusou o CPF: pede de novo todos os CPFs

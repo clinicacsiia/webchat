@@ -7,6 +7,7 @@ CREATE OR REPLACE FUNCTION public.chat_medicos_disponiveis(p_conversa uuid, p_to
  SET search_path TO ''
 AS $function$
 begin
+  perform public.app_pin_exigir_leitura();   -- PIN também no servidor (config.app_pin_servidor)
   perform public.chat_valida(p_conversa, p_token);
   return public.medicos_disponiveis_interno(p_conversa);
 end $function$;

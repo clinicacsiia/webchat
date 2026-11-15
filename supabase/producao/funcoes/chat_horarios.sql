@@ -11,6 +11,7 @@ declare
   v_escolhas jsonb; v_pref text; v_med text; v_med_sem boolean := false; v_sug jsonb; v_estado text; v_motivo text; v_ult record; v_n int; v_aviso text;
   v_agora timestamp := now() at time zone 'America/Bahia'; v_todos integer;
 begin
+  perform public.app_pin_exigir_leitura();   -- PIN também no servidor (config.app_pin_servidor)
   perform public.chat_valida(p_conversa, p_token);
   perform set_config('app.conversa', p_conversa::text, true);
   v_ate := least(coalesce(p_ate, v_de + 30), v_de + 45);

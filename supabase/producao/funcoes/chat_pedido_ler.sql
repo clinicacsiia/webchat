@@ -9,6 +9,7 @@ AS $function$
 declare v_linhas jsonb; l jsonb; t text; k text; v_lado text; v_apr integer; v_ops jsonb; v_grupos jsonb := '[]'::jsonb;
         v_vistos integer[] := '{}'; v_id integer; n integer := 0; v_crianca boolean;
 begin
+  perform public.app_pin_exigir_leitura();   -- PIN também no servidor (config.app_pin_servidor)
   perform public.chat_valida(p_conversa, p_token);
   if not exists (select 1 from public.conversa_anexo where id = p_anexo and conversa_id = p_conversa) then
     raise exception 'Foto não encontrada.' using errcode = '22023';
