@@ -2179,6 +2179,31 @@
    ],
    "rls": true,
    "politicas": 2
+  },
+  {
+   "nome": "app_acesso_log",
+   "colunas": [
+    "id",
+    "paciente_id",
+    "aparelho_id",
+    "evento",
+    "em",
+    "ip",
+    "agente",
+    "idioma",
+    "fuso",
+    "tela",
+    "plataforma",
+    "lat",
+    "lng",
+    "precisao_m",
+    "distancia_m",
+    "na_clinica",
+    "local_negado",
+    "exames_hoje"
+   ],
+   "rls": true,
+   "politicas": 0
   }
  ],
  "visoes": [
@@ -2232,6 +2257,12 @@
    "quando": "30 seconds",
    "ativa": true,
    "comando": "select public.agendamento_reconhecer_disparar()"
+  },
+  {
+   "nome": "app-acesso-limpar",
+   "quando": "47 6 * * *",
+   "ativa": true,
+   "comando": "select public.app_acesso_limpar()"
   },
   {
    "nome": "app-resultados-vigia",
@@ -2486,6 +2517,8 @@
   "agendamento_reconhecer_msg_encerradas",
   "app_acesso_modo",
   "app_cadastros_max_hora",
+  "app_local_ativo",
+  "app_pin_obrigatorio",
   "app_resultado_vigia",
   "autoencerrar_horas",
   "autoencerrar_modo",
@@ -2497,6 +2530,9 @@
   "catalogo_rmtc",
   "chat_push_url",
   "checkin_sem_login_max_dia",
+  "clinica_lat",
+  "clinica_lng",
+  "clinica_raio_m",
   "convenio_seguir_klingo",
   "convenio_suspenso_texto",
   "despedida_configurada",
@@ -3240,6 +3276,74 @@
    "md5": "6cfc35584f8f5239f37de0def06e0611"
   },
   {
+   "nome": "app_acesso_gravar",
+   "args": [
+    {
+     "nome": "p_pac",
+     "padrao": false
+    },
+    {
+     "nome": "p_aparelho",
+     "padrao": false
+    },
+    {
+     "nome": "p_evento",
+     "padrao": false
+    },
+    {
+     "nome": "p_local",
+     "padrao": false
+    },
+    {
+     "nome": "p_disp",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "3ff498b257779912467da17e7d9376d2"
+  },
+  {
+   "nome": "app_acesso_limpar",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "c160875ed964a2b7830f148b7773d30f"
+  },
+  {
+   "nome": "app_acesso_registrar",
+   "args": [
+    {
+     "nome": "p_token",
+     "padrao": false
+    },
+    {
+     "nome": "p_evento",
+     "padrao": false
+    },
+    {
+     "nome": "p_local",
+     "padrao": true
+    },
+    {
+     "nome": "p_dispositivo",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "e80ba11e6db99826ceeba581a4687506"
+  },
+  {
    "nome": "app_aparelho_validar",
    "args": [
     {
@@ -3344,6 +3448,48 @@
    "authenticated": true,
    "publico": false,
    "md5": "57c269411a837c4a670a10983ab77b32"
+  },
+  {
+   "nome": "app_chat_dados_resumo",
+   "args": [
+    {
+     "nome": "p_token",
+     "padrao": false
+    },
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_conv_token",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "634e7d5e76747df2d59497f9e1a7d2b2"
+  },
+  {
+   "nome": "app_chat_pessoa",
+   "args": [
+    {
+     "nome": "p_pac",
+     "padrao": false
+    },
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "8775639b222a7a0d623c0769876b7c4f"
   },
   {
    "nome": "app_conferir_cadastro",
@@ -3579,6 +3725,33 @@
    "md5": "e4b80a4eda0060ad6a5af237421115a9"
   },
   {
+   "nome": "app_cpf_historico",
+   "args": [
+    {
+     "nome": "p_tel",
+     "padrao": false
+    },
+    {
+     "nome": "p_nome",
+     "padrao": false
+    },
+    {
+     "nome": "p_nasc",
+     "padrao": false
+    },
+    {
+     "nome": "p_tipo",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "b33421583dd7a327107a62efa6f685ab"
+  },
+  {
    "nome": "app_cpf_mascara",
    "args": [
     {
@@ -3592,6 +3765,29 @@
    "authenticated": false,
    "publico": false,
    "md5": "7a911fbbb9cbf271402afae3ae2d2216"
+  },
+  {
+   "nome": "app_dados_atualizar",
+   "args": [
+    {
+     "nome": "p_token",
+     "padrao": false
+    },
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_conv_token",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "b1a49fc29928fcf1e3a048d36e89f5d6"
   },
   {
    "nome": "app_data",
@@ -3641,6 +3837,33 @@
    "authenticated": true,
    "publico": false,
    "md5": "ba03e20730a9bafdda1c5603e2601c11"
+  },
+  {
+   "nome": "app_distancia_m",
+   "args": [
+    {
+     "nome": "p_lat1",
+     "padrao": false
+    },
+    {
+     "nome": "p_lng1",
+     "padrao": false
+    },
+    {
+     "nome": "p_lat2",
+     "padrao": false
+    },
+    {
+     "nome": "p_lng2",
+     "padrao": false
+    }
+   ],
+   "definer": false,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "e57bee0bb7ed1f3e95266807d2ef428b"
   },
   {
    "nome": "app_erro_json",
@@ -4158,6 +4381,53 @@
    "md5": "8b3205cbb323bcb4081b5b4f483f6ccb"
   },
   {
+   "nome": "app_pin_criar",
+   "args": [
+    {
+     "nome": "p_telefone",
+     "padrao": false
+    },
+    {
+     "nome": "p_nome",
+     "padrao": false
+    },
+    {
+     "nome": "p_nascimento",
+     "padrao": false
+    },
+    {
+     "nome": "p_pin",
+     "padrao": false
+    },
+    {
+     "nome": "p_cpf",
+     "padrao": true
+    },
+    {
+     "nome": "p_filhos",
+     "padrao": true
+    },
+    {
+     "nome": "p_confianca",
+     "padrao": true
+    },
+    {
+     "nome": "p_aparelho",
+     "padrao": true
+    },
+    {
+     "nome": "p_email",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "f828ae9fab74fc39cc91a97e4d924958"
+  },
+  {
    "nome": "app_pin_trocar",
    "args": [
     {
@@ -4179,6 +4449,43 @@
    "authenticated": true,
    "publico": false,
    "md5": "46773ad59379e8a6a26be42022eef338"
+  },
+  {
+   "nome": "app_porta",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "51cc3972596e29b2bb3d88703fe4540a"
+  },
+  {
+   "nome": "app_pre_cadastro",
+   "args": [
+    {
+     "nome": "p_telefone",
+     "padrao": false
+    },
+    {
+     "nome": "p_nome",
+     "padrao": false
+    },
+    {
+     "nome": "p_nascimento",
+     "padrao": false
+    },
+    {
+     "nome": "p_filhos",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "b9321b47a42b2b544ce22e3c5e473dc4"
   },
   {
    "nome": "app_resultado_arquivo",
@@ -12045,6 +12352,25 @@
    "authenticated": true,
    "publico": false,
    "md5": "30b5dc91f4dc8ccdf0573505c6af7508"
+  },
+  {
+   "nome": "painel_app_acessos",
+   "args": [
+    {
+     "nome": "p_paciente",
+     "padrao": true
+    },
+    {
+     "nome": "p_limite",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "3f293a8f2bc072158479f2e4f97efa18"
   },
   {
    "nome": "painel_app_contas_antigas",

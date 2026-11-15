@@ -14,8 +14,14 @@ await db.exec(readFileSync(`${REPO}/supabase/acesso-rapido-paciente.sql`, 'utf8'
 await db.exec(readFileSync(`${REPO}/supabase/acesso-rapido-chat.sql`, 'utf8'));
 await db.exec(readFileSync(`${REPO}/supabase/acesso-rapido-pendencias.sql`, 'utf8'));
 const sql = readFileSync(`${REPO}/supabase/acesso-rapido-pin-obrigatorio.sql`, 'utf8');
+const sqlFechar = readFileSync(`${REPO}/supabase/acesso-rapido-acesso-log-fechar.sql`, 'utf8');
 await caso('o clone da produção monta sem falhas', async () => ({ ok: falhas.length === 0, detalhe: `${falhas.length} falhas` }));
 await caso('acesso-rapido-pin-obrigatorio.sql aplica duas vezes sem erro (idempotente)', async () => { await db.exec(sql); await db.exec(sql); return { ok: true }; });
+await caso('acesso-rapido-acesso-log-fechar.sql aplica duas vezes e tira toda permissão de tabela do público', async () => {
+  await db.exec(sqlFechar); await db.exec(sqlFechar);
+  const r = await um(`select has_table_privilege('anon', 'public.app_acesso_log', 'select') a, has_table_privilege('authenticated', 'public.app_acesso_log', 'select') b, has_table_privilege('anon', 'public.app_acesso_log', 'insert') c, has_table_privilege('authenticated', 'public.app_acesso_log', 'delete') d`);
+  return { ok: !r.a && !r.b && !r.c && !r.d, detalhe: JSON.stringify(r) };
+});
 await db.exec(`update public.config set valor = 'sim' where chave = 'app_acesso_modo'`);
 
 const C1 = '52998224725', C1_TXT = '529.982.247-25', C2 = '11144477735';
