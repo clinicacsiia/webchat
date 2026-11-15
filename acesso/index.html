@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!--
 FLUXOGRAMA: entrada (celular + PIN de 4 dígitos; no primeiro acesso, cadastro único em 5 passos) -> validação (a página confere o formato; quem decide é o servidor: funções app_* do Supabase, supabase/acesso-rapido-paciente.sql) -> lógica (o aparelho guarda só um código de acesso e o primeiro nome; PIN, filhos, números de confiança e marcações ficam no banco; o PIN é pedido de novo depois de 5 minutos em segundo plano) -> saída (tela inicial com Eu / cada filho / Todos juntos; solicitações de marcação; quem confia em você)
-Versão 2.5 — 15/11/2026 / Mudança: some o cartão "Falta pouco" da tela inicial e de Meus dados (o que falta só é pedido na entrada, com o PIN obrigatório). Versão 2.4 — 15/11/2026 / Mudança: PIN OBRIGATÓRIO (quando config.app_pin_obrigatorio = sim): o primeiro acesso pede também o CPF (só o que o banco ainda não sabe) antes do PIN, quem entra com cadastro incompleto é obrigado a completar antes de seguir, e cada entrada é registrada (aparelho e, com permissão, a posição) (supabase/acesso-rapido-pin-obrigatorio.sql). Versão 2.3 — 15/11/2026 / Mudança: filhos da conta antiga (lista do histórico para conferir), filho com o nome do responsável (é ela mesma ou confirma), filho repetido (supabase/acesso-rapido-filhos.sql). Versão 2.2 — 15/11/2026 / Mudança: cartão "Falta pouco" (CPF dela e dos filhos, e-mail) para TODO paciente (supabase/acesso-rapido-pendencias.sql). Versão 2.1 — 15/11/2026 / Mudança: quem tem conta antiga (e-mail e senha) entra uma última vez, confere os dados que já temos e cria o PIN (supabase/acesso-rapido-conta-antiga.sql); "Meus dados" mais claro. Versão 2.0 — 14/11/2026 / Mudança: ligado ao Supabase (versão 1 guardava tudo só no celular)
+Versão 2.6 — 15/11/2026 / Mudança: visual do site (cabeçalho com a logo da CSI, cores e fonte do chat, tema escuro); CPF conferido na hora, com os dígitos verificadores, em todas as telas que pedem CPF; o que a pessoa já digitou no cadastro (nome, nascimento, filho, CPF, contato) não se perde ao voltar, ao trocar Sim/Não ou ao ser mandada de volta por um erro do servidor. Versão 2.5 — 15/11/2026 / Mudança: some o cartão "Falta pouco" da tela inicial e de Meus dados (o que falta só é pedido na entrada, com o PIN obrigatório). Versão 2.4 — 15/11/2026 / Mudança: PIN OBRIGATÓRIO (quando config.app_pin_obrigatorio = sim): o primeiro acesso pede também o CPF (só o que o banco ainda não sabe) antes do PIN, quem entra com cadastro incompleto é obrigado a completar antes de seguir, e cada entrada é registrada (aparelho e, com permissão, a posição) (supabase/acesso-rapido-pin-obrigatorio.sql). Versão 2.3 — 15/11/2026 / Mudança: filhos da conta antiga (lista do histórico para conferir), filho com o nome do responsável (é ela mesma ou confirma), filho repetido (supabase/acesso-rapido-filhos.sql). Versão 2.2 — 15/11/2026 / Mudança: cartão "Falta pouco" (CPF dela e dos filhos, e-mail) para TODO paciente (supabase/acesso-rapido-pendencias.sql). Versão 2.1 — 15/11/2026 / Mudança: quem tem conta antiga (e-mail e senha) entra uma última vez, confere os dados que já temos e cria o PIN (supabase/acesso-rapido-conta-antiga.sql); "Meus dados" mais claro. Versão 2.0 — 14/11/2026 / Mudança: ligado ao Supabase (versão 1 guardava tudo só no celular)
 -->
 <html lang="pt-BR">
 <head>
@@ -9,41 +9,46 @@ Versão 2.5 — 15/11/2026 / Mudança: some o cartão "Falta pouco" da tela inic
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex">
 <meta name="referrer" content="no-referrer">
-<meta name="theme-color" content="#ffffff">
+<meta name="theme-color" content="#1e3a5f">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; connect-src https://nrvuynjwcgwpjdptkiay.supabase.co; base-uri 'none'; form-action 'none'">
 <link rel="icon" href="../icon-192.png">
 <title>CSI • Acesso rápido do paciente</title>
 <style>
-:root{--pri:#006ba1;--pri2:#005a89;--azul:#0088cc;--marinho:#1e3a5f;--soft:#e6f4fb;--bg:#f8f9fa;--card:#fff;--tx:#333333;--mut:#5a6878;--bd:#cfd6df;--err:#b3261e;--ok:#067647}
+:root{--csi-primary:#0088cc;--csi-primary-strong:#006ba1;--csi-primary-soft:#e6f4fb;--csi-sidebar-bg:#1e3a5f;--csi-danger-bg:#fdf2f0;--csi-danger-strong:#b3261e;--csi-success-strong:#167a43;--csi-success-soft:#e8f8ef;--csi-warning-strong:#8a5a00;--csi-warning-soft:#fff4dc;--csi-surface:#ffffff;--csi-background:#f8f9fa;--csi-border:#eaedf1;--csi-border-strong:#cfd6df;--csi-text-main:#333333;--csi-text-secondary:#5a6878;
+--font-family:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+--pri:var(--csi-primary-strong);--pri2:var(--csi-sidebar-bg);--bg:var(--csi-background);--card:var(--csi-surface);--tx:var(--csi-text-main);--mut:var(--csi-text-secondary);--bd:var(--csi-border-strong);--err:var(--csi-danger-strong);--ok:var(--csi-success-strong);--soft:var(--csi-primary-soft);--err-bg:var(--csi-danger-bg);--ok-bg:var(--csi-success-soft);--aviso:var(--csi-warning-strong);--aviso-bg:var(--csi-warning-soft);--cab:var(--csi-surface);--cab-tx:var(--csi-sidebar-bg);--on-pri:#fff}
+@media (prefers-color-scheme:dark){:root{--csi-background:#0b1522;--csi-surface:#14233a;--csi-text-main:#e6edf6;--csi-text-secondary:#9fb0c4;--csi-border:#2a3d57;--csi-border-strong:#3a5072;--csi-primary-soft:#1a3558;--csi-success-soft:#12331f;--csi-warning-soft:#3a2c0b;--csi-danger-bg:#3a1a17;--csi-primary-strong:#4aa8dd;--csi-success-strong:#4cc582;--csi-danger-strong:#ff8a80;--csi-warning-strong:#f0b955;--pri2:#9ccdef;--cab:var(--csi-sidebar-bg);--cab-tx:#fff;--on-pri:#0b1522}}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.4 'Inter',system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-:focus-visible{outline:3px solid var(--azul);outline-offset:2px}
-.topo{background:#fff;color:var(--marinho);padding:max(8px,env(safe-area-inset-top)) 14px 8px;display:flex;align-items:center;gap:10px;border-bottom:3px solid var(--azul);box-shadow:0 2px 4px rgba(0,0,0,.04)}
-.topo img{height:30px;width:auto;display:block}
-.topo b{font-size:.95rem;line-height:1.2}
-h1,h2{color:var(--marinho)}
-#app{max-width:480px;margin:0 auto;min-height:calc(100vh - 52px);padding:max(16px,env(safe-area-inset-top)) 16px max(24px,env(safe-area-inset-bottom))}
+:focus-visible{outline:3px solid var(--csi-primary);outline-offset:2px}
+html,body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.4 var(--font-family)}
+#app{max-width:480px;margin:0 auto;min-height:calc(100vh - 56px);padding:16px 16px max(24px,env(safe-area-inset-bottom))}
+/* Cabeçalho do site: logo da CSI sobre fundo branco e filete azul, igual ao chat, ao painel e ao Minha vez */
+.topo{background:var(--cab);color:var(--cab-tx);border-bottom:3px solid var(--csi-primary);padding:calc(10px + env(safe-area-inset-top)) 16px 10px;box-shadow:0 1px 6px rgba(0,0,0,.06)}
+.topo-in{max-width:480px;margin:0 auto;display:flex;align-items:center;gap:10px}
+.topo-logo{height:28px;width:auto;flex:none;display:block}
+.topo b{font-size:1rem;line-height:1.2}
+@media (prefers-color-scheme:dark){.topo-logo{background:#fff;border-radius:6px;padding:3px 6px;height:34px}}
 h1{font-size:1.5rem;margin:.2rem 0 .3rem}
 h2{font-size:1.05rem;margin:1.2rem 0 .5rem}
 p{margin:.2rem 0}
 .sub{color:var(--mut)}
 .card{background:var(--card);border:1px solid var(--bd);border-radius:16px;padding:16px;margin:12px 0}
 label{display:block;font-weight:600;font-size:.9rem;margin:12px 0 4px}
-input,select,textarea{width:100%;padding:13px 12px;font:inherit;border:1.5px solid var(--bd);border-radius:12px;background:#fff;color:var(--tx)}
+input,select,textarea{width:100%;padding:13px 12px;font:inherit;border:1.5px solid var(--bd);border-radius:12px;background:var(--card);color:var(--tx)}
 input:focus,select:focus,textarea:focus{outline:2px solid var(--pri);border-color:var(--pri)}
 button{font:inherit;cursor:pointer}
-.btn{display:block;width:100%;padding:14px;border:0;border-radius:12px;background:var(--pri);color:#fff;font-weight:700;margin-top:16px}
+.btn{display:block;width:100%;padding:14px;border:0;border-radius:12px;background:var(--pri);color:var(--on-pri);font-weight:700;margin-top:16px}
 .btn:active{background:var(--pri2)}
 .btn.sec{background:var(--soft);color:var(--pri2)}
-.btn.danger{background:#fde8e6;color:var(--err)}
+.btn.danger{background:var(--err-bg);color:var(--err)}
 .link{background:none;border:0;color:var(--pri2);font-weight:600;padding:10px 4px;text-decoration:underline}
 .err{color:var(--err);font-size:.9rem;min-height:1.2em;margin-top:8px}
 .prog{display:flex;gap:6px;margin:4px 0 14px}
 .prog i{flex:1;height:5px;border-radius:3px;background:var(--bd)}
 .prog i.on{background:var(--pri)}
 .chips{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
-.chip{padding:10px 16px;border-radius:999px;border:1.5px solid var(--bd);background:#fff;font-weight:600;color:var(--tx)}
-.chip.on{background:var(--pri);border-color:var(--pri);color:#fff}
+.chip{padding:10px 16px;border-radius:999px;border:1.5px solid var(--bd);background:var(--card);font-weight:600;color:var(--tx)}
+.chip.on{background:var(--pri);border-color:var(--pri);color:var(--on-pri)}
 .item{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--bd)}
 .item:last-child{border-bottom:0}
 .item small{color:var(--mut);display:block}
@@ -53,23 +58,28 @@ button{font:inherit;cursor:pointer}
 .dots i{width:16px;height:16px;border-radius:50%;border:2px solid var(--pri)}
 .dots i.on{background:var(--pri)}
 .pad{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;max-width:300px;margin:18px auto}
-.pad button{height:64px;border-radius:50%;border:0;background:#fff;border:1px solid var(--bd);font-size:1.5rem;font-weight:600;color:var(--tx)}
+.pad button{height:64px;border-radius:50%;border:0;background:var(--card);border:1px solid var(--bd);font-size:1.5rem;font-weight:600;color:var(--tx)}
 .pad button:active{background:var(--soft)}
 .pad .ghost{background:none;border:0;font-size:.9rem;color:var(--pri2)}
 .tag{display:inline-block;font-size:.75rem;padding:3px 8px;border-radius:999px;background:var(--soft);color:var(--pri2);font-weight:700}
-.tag.w{background:#fff4d6;color:#8a5a00}
-.tag.ok{background:#dcfae6;color:var(--ok)}
+.tag.w{background:var(--aviso-bg);color:var(--aviso)}
+.tag.ok{background:var(--ok-bg);color:var(--ok)}
 .top{display:flex;justify-content:space-between;align-items:center}
-.sheet{position:fixed;inset:0;background:rgba(30,58,95,.5);display:flex;align-items:flex-end;justify-content:center;z-index:9}
-.sheet>div{background:#fff;width:100%;max-width:480px;border-radius:20px 20px 0 0;padding:18px 16px max(20px,env(safe-area-inset-bottom));max-height:90vh;overflow:auto}
-.toast{position:fixed;left:50%;bottom:max(24px,env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--marinho);color:#fff;padding:12px 18px;border-radius:12px;z-index:20;font-size:.95rem;max-width:90vw;text-align:center}
+.sheet{position:fixed;inset:0;background:rgba(10,30,28,.5);display:flex;align-items:flex-end;justify-content:center;z-index:9}
+.sheet>div{background:var(--card);width:100%;max-width:480px;border-radius:20px 20px 0 0;padding:18px 16px max(20px,env(safe-area-inset-bottom));max-height:90vh;overflow:auto}
+.toast{position:fixed;left:50%;bottom:max(24px,env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--csi-sidebar-bg);color:#fff;padding:12px 18px;border-radius:12px;z-index:20;font-size:.95rem;max-width:90vw;text-align:center}
 .codigo{font-size:1.6rem;letter-spacing:.25em;font-weight:800;color:var(--pri2);margin:6px 0}
-.busy{cursor:progress}.busy button{opacity:.6;pointer-events:none}
-pre{white-space:pre-wrap;background:var(--soft);border-radius:12px;padding:12px;font:inherit;font-size:.92rem}
+.busy{cursor:progress}
+/* CPF conferido na hora, enquanto a pessoa digita */
+input[aria-invalid="true"]{border-color:var(--err);outline-color:var(--err)}
+input.cpf-ok{border-color:var(--ok)}
+.cpfmsg{display:block;min-height:1.2em;margin-top:4px;font-size:.85rem;color:var(--mut)}
+.cpfmsg.e{color:var(--err)}.cpfmsg.v{color:var(--ok)}.busy button{opacity:.6;pointer-events:none}
+pre{white-space:pre-wrap;background:var(--bg);border-radius:12px;padding:12px;font:inherit;font-size:.92rem}
 </style>
 </head>
 <body>
-<header class="topo"><img src="../img/logo-csi-simbolo.svg" alt="CSI" width="89" height="30"><b>CSI · Clínica de Saúde e Imagem</b></header>
+<header class="topo"><div class="topo-in"><img class="topo-logo" src="../img/logo-csi-simbolo.svg" alt="CSI - Clínica de Saúde e Imagem" width="84" height="28"><b>Acesso rápido</b></div></header>
 <div id="app"></div>
 <script>
 'use strict';
@@ -100,6 +110,10 @@ const dataOk=v=>{if(!/^\d{4}-\d{2}-\d{2}$/.test(v))return false;const d=new Date
 const idade=v=>{const d=new Date(v+'T00:00:00'),n=new Date();let a=n.getFullYear()-d.getFullYear();if(n<new Date(n.getFullYear(),d.getMonth(),d.getDate()))a--;return a};
 const fmtIdade=v=>{const a=idade(v);return a<1?'menos de 1 ano':a+(a===1?' ano':' anos')};
 const fmtData=v=>v?String(v).slice(0,10).split('-').reverse().join('/'):'';
+const mascaraCpf=v=>{const d=digits(v).slice(0,11);return d.replace(/(\d{3})(\d{1,3})?(\d{1,3})?(\d{1,2})?/,(m,a,b,c,e)=>a+(b?'.'+b:'')+(c?'.'+c:'')+(e?'-'+e:''))};
+/* Mesma conta do banco (cpf_valido): 11 números, não todos iguais, e os dois dígitos verificadores. */
+const cpfOk=c=>{const d=digits(c);if(d.length!==11||/^(\d)\1+$/.test(d))return false;let t=0;for(let i=0;i<9;i++)t+=+d[i]*(10-i);if((t*10)%11%10!==+d[9])return false;t=0;for(let i=0;i<10;i++)t+=+d[i]*(11-i);return(t*10)%11%10===+d[10]};
+const MSG_CPF='Os números do CPF não conferem. Confira, por favor.';
 const primeiro=n=>String(n||'').trim().split(/\s+/)[0];
 const STATUS={solicitada:['Aguardando confirmação','w'],confirmada:['Confirmada pela clínica','ok'],concluida:['Concluída','']};
 
@@ -167,7 +181,7 @@ function lerCacheChat(){
 const aparelho=()=>(navigator.userAgentData&&navigator.userAgentData.platform)||(/iPhone|iPad/.test(navigator.userAgent)?'iPhone/iPad':/Android/.test(navigator.userAgent)?'Android':'Navegador');
 
 /* ===== Estado ===== */
-const S={dev:null,perfil:null,view:'',d:{filhos:[],confiavel:null},buf:'',mode:'unlock',tmp:'',old:'',after:null,who:['eu'],unlocked:false,sheet:null,temFilhos:null,hiddenAt:0,busy:false,volta:'home',esq:null,tel:'',resumo:'',confirma:null,conta:null,aem:'',pend:null,pendOculta:false,porta:null,falta:[],completar:[],evento:null,soHome:false,cacheEmail:''};
+const S={dev:null,perfil:null,view:'',d:{filhos:[],confiavel:null},buf:'',mode:'unlock',tmp:'',old:'',after:null,who:['eu'],unlocked:false,sheet:null,temFilhos:null,hiddenAt:0,busy:false,volta:'home',esq:null,tel:'',resumo:'',confirma:null,conta:null,aem:'',pend:null,pendOculta:false,porta:null,falta:[],completar:[],rasc:{},evento:null,soHome:false,cacheEmail:''};
 const app=$('#app');
 function toast(t){const e=document.createElement('div');e.className='toast';e.textContent=t;document.body.appendChild(e);setTimeout(()=>e.remove(),2600)}
 function erro(m){const e=$('#err');if(e)e.textContent=m||''}
@@ -442,10 +456,43 @@ function render(){
   app.innerHTML=(V[S.view]?V[S.view]():'')+sheetHtml();
   const t=$('#tel');if(t)t.addEventListener('input',()=>{t.value=fmtTel(t.value)});
   const c=$('#cttel');if(c)c.addEventListener('input',()=>{c.value=fmtTel(c.value)});
-  document.querySelectorAll('#pend input[data-pc="cpf"]').forEach(i=>i.addEventListener('input',()=>{const d=digits(i.value).slice(0,11);i.value=d.replace(/(\d{3})(\d{1,3})?(\d{1,3})?(\d{1,2})?/,(m,a,b,c2,e)=>a+(b?'.'+b:'')+(c2?'.'+c2:'')+(e?'-'+e:''))}));
-  document.querySelectorAll('input[data-cp]').forEach(i=>i.addEventListener('input',()=>{const d=digits(i.value).slice(0,11);i.value=d.replace(/(\d{3})(\d{1,3})?(\d{1,3})?(\d{1,2})?/,(m,a,b,c2,e)=>a+(b?'.'+b:'')+(c2?'.'+c2:'')+(e?'-'+e:''))}));
-  const cp=$('#cpfn');if(cp)cp.addEventListener('input',()=>{const d=digits(cp.value).slice(0,11);cp.value=d.replace(/(\d{3})(\d{1,3})?(\d{1,3})?(\d{1,2})?/,(m,a,b,c2,e)=>a+(b?'.'+b:'')+(c2?'.'+c2:'')+(e?'-'+e:''))});
+  restaurarRascunho();
+  document.querySelectorAll('input[data-cp],#pend input[data-pc="cpf"],#cpfn').forEach(ligarCpf);
 }
+/* O que a pessoa já digitou nas telas do cadastro fica guardado só na memória da página: voltar, trocar Sim/Não ou ser mandada de volta por um erro não apaga nada. */
+const RASC_TELAS=['c1','c2','c3','c4'];   // a tela do CPF (c3b) guarda direto no cadastro em andamento (S.d): os campos dela mudam de posição conforme o que o banco já sabe
+function guardarRascunho(el){if(!RASC_TELAS.includes(S.view)||!el.id||el.type==='password')return;S.rasc[S.view+'.'+el.id]=el.value}
+function limparRascunho(...ids){ids.forEach(id=>delete S.rasc[S.view+'.'+id])}
+function restaurarRascunho(){
+  if(!RASC_TELAS.includes(S.view))return;
+  document.querySelectorAll('#app input[id],#app select[id]').forEach(el=>{
+    const k=S.view+'.'+el.id;if(el.type!=='password'&&k in S.rasc)el.value=S.rasc[k];
+    el.addEventListener('input',()=>guardarRascunho(el));el.addEventListener('change',()=>guardarRascunho(el));
+  });
+}
+/* CPF conferido enquanto digita (a mesma conta do banco): ao chegar nos 11 números já diz se está certo, em vez de só descobrir no fim do cadastro. */
+function cpfAviso(i,final){
+  const d=digits(i.value);let m='',k='';
+  if(d.length===11){if(cpfOk(d)){m='✓ CPF confere';k='v'}else{m=MSG_CPF;k='e'}}
+  else if(final&&d.length){m=`O CPF tem 11 números (faltam ${11-d.length}).`;k='e'}
+  i.setAttribute('aria-invalid',k==='e'?'true':'false');i.classList.toggle('cpf-ok',k==='v');
+  let el=i.nextElementSibling;
+  if(!el||!el.classList.contains('cpfmsg')){el=document.createElement('small');el.setAttribute('aria-live','polite');i.after(el)}
+  el.className='cpfmsg '+k;el.textContent=m;
+}
+function ligarCpf(i){
+  i.value=mascaraCpf(i.value);cpfAviso(i);
+  i.addEventListener('input',()=>{i.value=mascaraCpf(i.value);guardarRascunho(i);guardarCpf(i);cpfAviso(i,false);const e=$('#err');if(e)e.textContent=''});
+  i.addEventListener('blur',()=>cpfAviso(i,true));
+}
+/* Na tela do CPF o número vai para o cadastro em andamento a cada letra: voltar e continuar não pede de novo. */
+function guardarCpf(i){
+  if(S.view!=='c3b'||i.dataset.cp===undefined)return;
+  const v=digits(i.value);
+  if(i.dataset.cp==='eu')S.d.cpf=v;else if(S.d.filhos[Number(i.dataset.cp)])S.d.filhos[Number(i.dataset.cp)].cpf=v;
+}
+/* Mensagem ao enviar com o CPF errado: avisa, marca o campo e leva o cursor até ele. */
+function cpfRecusado(i,msg){cpfAviso(i,true);i.focus();return erro(msg)}
 
 /* ===== Validações reutilizáveis ===== */
 function lerContato(){
@@ -493,14 +540,14 @@ const A={
   },
   tf:el=>{S.temFilhos=el.dataset.v==='1';render()},
   addf:()=>{const r=lerFilho();if(r.vazio)return erro('Preencha nome e nascimento.');if(r.e)return erro(r.e);
-    conferirHomonimo(r.f,S.d.nome,S.d.nascimento,f=>{S.d.filhos.push(f);render()})},
+    conferirHomonimo(r.f,S.d.nome,S.d.nascimento,f=>{S.d.filhos.push(f);limparRascunho('fnome','fnasc');render()})},
   rmf:el=>{S.d.filhos.splice(Number(el.dataset.i),1);render()},
   c3:()=>{
     if(S.temFilhos===null)return erro('Escolha Sim ou Não.');
     if(S.temFilhos){
       const r=lerFilho();
       if(r.e)return erro(r.e);
-      if(r.f){return conferirHomonimo(r.f,S.d.nome,S.d.nascimento,f=>{S.d.filhos.push(f);if(!S.d.filhos.length)return erro('Adicione ao menos um filho ou escolha Não.');depoisFilhos()})}
+      if(r.f){return conferirHomonimo(r.f,S.d.nome,S.d.nascimento,f=>{S.d.filhos.push(f);limparRascunho('fnome','fnasc');if(!S.d.filhos.length)return erro('Adicione ao menos um filho ou escolha Não.');depoisFilhos()})}
       if(!S.d.filhos.length)return erro('Adicione ao menos um filho ou escolha Não.');
     }else S.d.filhos=[];
     depoisFilhos();
@@ -508,7 +555,8 @@ const A={
   c3b:()=>{
     const fl=S.falta||[],campos=[...document.querySelectorAll('input[data-cp]')];
     for(const i of campos){
-      if(digits(i.value).length!==11)return erro(i.dataset.cp==='eu'?'Informe o seu CPF (11 números).':'Informe o CPF de '+primeiro((S.d.filhos[Number(i.dataset.cp)]||{}).nome)+' (11 números).');
+      if(digits(i.value).length!==11)return cpfRecusado(i,i.dataset.cp==='eu'?'Informe o seu CPF (11 números).':'Informe o CPF de '+primeiro((S.d.filhos[Number(i.dataset.cp)]||{}).nome)+' (11 números).');
+      if(!cpfOk(i.value))return cpfRecusado(i,(i.dataset.cp==='eu'?'O seu CPF':'O CPF de '+primeiro((S.d.filhos[Number(i.dataset.cp)]||{}).nome))+' não confere. Confira os números, por favor.');
     }
     campos.forEach(i=>{const v=digits(i.value);if(i.dataset.cp==='eu')S.d.cpf=v;else S.d.filhos[Number(i.dataset.cp)].cpf=v});
     go('c4');
@@ -518,7 +566,8 @@ const A={
     for(const i of campos){
       const v=i.value.trim(),op=i.dataset.op==='1';
       if(!v){if(op)continue;return erro(i.dataset.pc==='cpf'?'Preencha o CPF para continuar.':'Preencha para continuar.')}
-      if(i.dataset.pc==='cpf'&&digits(v).length!==11)return erro('O CPF tem 11 números.');
+      if(i.dataset.pc==='cpf'&&digits(v).length!==11)return cpfRecusado(i,'O CPF tem 11 números.');
+      if(i.dataset.pc==='cpf'&&!cpfOk(v))return cpfRecusado(i,MSG_CPF);
       if(i.dataset.pc==='email'&&!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v))return erro('Esse e-mail não parece certo.');
     }
     for(const i of campos){
@@ -538,7 +587,8 @@ const A={
     const campos=[...document.querySelectorAll('#pend input')].filter(i=>i.value.trim());
     if(!campos.length)return erro('Preencha pelo menos um campo ou toque em "Agora não".');
     for(const i of campos){
-      if(i.dataset.pc==='cpf'&&digits(i.value).length!==11)return erro('O CPF tem 11 números.');
+      if(i.dataset.pc==='cpf'&&digits(i.value).length!==11)return cpfRecusado(i,'O CPF tem 11 números.');
+      if(i.dataset.pc==='cpf'&&!cpfOk(i.value))return cpfRecusado(i,MSG_CPF);
       if(i.dataset.pc==='email'&&!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(i.value.trim()))return erro('Esse e-mail não parece certo.');
     }
     for(const i of campos){
@@ -633,7 +683,7 @@ const A={
   delc:el=>pedirConfirmacao('Remover este número de confiança?','Essa pessoa deixa de ver seus filhos e as marcações na hora.','Remover',async()=>{
     const r=await chamar('app_confianca_remover',{p_id:el.dataset.id});S.sheet=null;if(r&&!r.ok)toast(r.mensagem);render()}),
   novocod:async el=>{const r=await chamar('app_confianca_novo_codigo',{p_id:el.dataset.id});if(r&&r.ok){toast('Código novo gerado');render()}},
-  scpf:async()=>{const c=digits($('#cpfn').value);if(c.length!==11)return erro('O CPF tem 11 números.');
+  scpf:async()=>{const c=digits($('#cpfn').value);if(c.length!==11)return cpfRecusado($('#cpfn'),'O CPF tem 11 números.');if(!cpfOk(c))return cpfRecusado($('#cpfn'),MSG_CPF);
     const x=await chamar('app_pessoa_cpf_salvar',{p_pessoa:S.sheet.p,p_cpf:c});if(!x)return;if(!x.ok)return aviso(x);S.sheet=null;toast('CPF salvo');render()},
   apagacpf:async()=>{const x=await chamar('app_pessoa_cpf_salvar',{p_pessoa:S.sheet.p,p_cpf:''});if(!x)return;if(!x.ok)return aviso(x);S.sheet=null;toast('CPF apagado');render()},
   scod:async()=>{const c=digits($('#cod').value);if(c.length!==6)return erro('O código tem 6 números.');
@@ -733,7 +783,7 @@ function iniciaPin(){
     if(d.confiavel)args.p_confianca=d.confiavel;
     if(obrig){args.p_cpf=d.cpf||null;if(/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(S.cacheEmail||''))args.p_email=S.cacheEmail}
     ocupado(true);const r=await rpc(obrig?'app_pin_criar':'app_cadastrar',args);ocupado(false);
-    if(r.ok){entrou(r);S.d={filhos:[],confiavel:null};toast('Cadastro concluído');aposEntrar('cadastro');return}
+    if(r.ok){entrou(r);S.d={filhos:[],confiavel:null};S.rasc={};toast('Cadastro concluído');aposEntrar('cadastro');return}
     if(r.erro==='indisponivel')return go('indisp');
     if(r.erro==='pin_fraco'){S.mode='new1';S.buf='';S.tmp='';go('c5');setTimeout(()=>erro(r.mensagem||MSG_PIN_FRACO),0);return}   // PIN óbvio: fica na etapa do PIN
     // volta para a etapa que tem o problema, com a explicação do servidor
