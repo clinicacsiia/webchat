@@ -12950,6 +12950,21 @@
    "md5": "2dcac26ae11347c16dae6225c69d9a3b"
   },
   {
+   "nome": "painel_simulacao_acerto",
+   "args": [
+    {
+     "nome": "p_dias",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "609677a244dfae925097e2c21eeea097"
+  },
+  {
    "nome": "painel_simulacao_dia",
    "args": [
     {
@@ -13869,6 +13884,21 @@
    "authenticated": false,
    "publico": false,
    "md5": "8e65c452f13b8b95384ccb3f9ef09026"
+  },
+  {
+   "nome": "sim_causa",
+   "args": [
+    {
+     "nome": "p_motivo",
+     "padrao": false
+    }
+   ],
+   "definer": false,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": true,
+   "md5": "a9eea3253c89e1591925b06431ad828d"
   },
   {
    "nome": "sim_minuto",
