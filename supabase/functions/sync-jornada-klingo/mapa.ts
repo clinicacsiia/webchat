@@ -14,11 +14,44 @@ export type Modo = "rapido" | "completo";
 export type Filtro = "criacao" | "exame";
 
 // Em que coluna (colN) está cada campo, por relatório. "criacao" = #13825; "exame" = #14359, refeito em 14/11/2026 (nome e responsável vieram para o começo).
-export type Layout = { m: string; a: string; pront: string; nome: string; resp: string; em: string; d: string; proc: string; oper: string; unid: string; conf: string; motivo: string; status: string; atend: string; cel: string; tel: string };
+export type Layout = { m: string; a: string; pront: string; nome: string; resp: string; em: string; d: string; proc: string; oper: string; unid: string; conf: string; motivo: string; status: string; atend: string; cel: string; tel: string; checkin?: string; primeira?: string };
 export const LAYOUT_CRIACAO: Layout = { m: "col0", a: "col1", pront: "col2", em: "col3", d: "col4", proc: "col5", oper: "col6", unid: "col14", conf: "col10", motivo: "col11", status: "col12", atend: "col13", nome: "col15", cel: "col16", tel: "col17", resp: "col7" };
 // 15/11/2026: o dono acrescentou colunas ao #14359 e o Celular passou para col16 e o Atendido para col17 (antes era o contrário). col18 = Check-In - Data (ainda não lida), col19 = um 2º "Prontuário" (repetido; ignorar), col20 = Primeira Vez.
 export const LAYOUT_EXAME: Layout = { m: "col0", a: "col1", nome: "col2", resp: "col3", pront: "col4", em: "col5", d: "col6", proc: "col7", oper: "col8", unid: "col9", conf: "col12", motivo: "col13", tel: "col14", status: "col15", cel: "col16", atend: "col17" };
 export const layoutDe = (f: Filtro): Layout => (f === "exame" ? LAYOUT_EXAME : LAYOUT_CRIACAO);
+
+// Colunas pelo TÍTULO (15/11/2026). O Klingo manda, junto com as linhas, a lista de colunas {name: "col17", title: "Atendido"}. Achando cada campo pelo título,
+// reordenar ou acrescentar colunas no relatório não quebra a leitura. Título repetido (hoje "Prontuário" aparece em col4 e col19): vale a de menor número.
+// Se um título OBRIGATÓRIO sumir (renomeado ou apagado), a leitura PARA dizendo qual (os títulos não são dado de paciente), em vez de adivinhar.
+export type Coluna = { name?: unknown; title?: unknown };
+export const TITULOS_EXAME: Record<string, string> = {
+  m: "Id da Marcação", a: "Id do Atendimento", nome: "Paciente - Nome", resp: "Responsável", pront: "Prontuário", em: "Data Agendado Em", d: "Data Agendado Para",
+  proc: "Procedimento", oper: "Operadora", unid: "Unidade", conf: "Confirm Status", motivo: "Cancelamento - Motivo", tel: "Paciente - Telefone", status: "Status",
+  cel: "Paciente - Celular", atend: "Atendido", checkin: "Check-In - Data", primeira: "Primeira Vez",
+};
+// Não bloqueiam a leitura se faltarem (não são usados para gravar nada hoje).
+const OPCIONAIS = new Set<string>(["resp", "checkin", "primeira"]);
+
+const normTitulo = (v: unknown): string => String(v ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+const numeroDaColuna = (n: unknown): number => { const m = /^col(\d+)$/.exec(String(n ?? "").trim()); return m ? Number(m[1]) : Number.NaN; };
+
+export function layoutPorTitulos(colunas: Coluna[], reserva: Layout): { layout: Layout; faltando: string[]; diferenteDoFixo: string[] } {
+  const validas = colunas
+    .map((c) => ({ n: numeroDaColuna(c?.name), nome: String(c?.name ?? "").trim(), t: normTitulo(c?.title) }))
+    .filter((c) => Number.isFinite(c.n) && c.t)
+    .sort((a, b) => a.n - b.n);
+  const achada = (titulo: string): string | undefined => validas.find((c) => c.t === normTitulo(titulo))?.nome;
+  const layout: Layout = { ...reserva };
+  const faltando: string[] = [], diferenteDoFixo: string[] = [];
+  const L = layout as Record<string, string | undefined>, R = reserva as Record<string, string | undefined>;
+  for (const campo of Object.keys(TITULOS_EXAME)) {
+    const col = achada(TITULOS_EXAME[campo]);
+    if (!col) { if (!OPCIONAIS.has(campo)) faltando.push(TITULOS_EXAME[campo]); continue; }
+    if (campo !== "checkin" && campo !== "primeira" && R[campo] !== col) diferenteDoFixo.push(campo);
+    L[campo] = col;
+  }
+  return { layout, faltando, diferenteDoFixo };
+}
 
 // Quantos dias para trás e para a frente da data de hoje a Jornada mostra (tem que bater com jornada_klingo_fechar).
 export const CARTOES_ATRAS = 2;
