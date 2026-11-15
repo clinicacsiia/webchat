@@ -1,5 +1,5 @@
 -- RETRATO DA ESTRUTURA DO BANCO DE PRODUÇÃO (projeto webchat-atendimento). GERADO: não editar à mão.
--- Atualização parcial em 2026-11-15T02:45:00+00:00 (funções app_* e painel_app_*, tabelas app_*). Retrato inteiro tirado em 2026-11-14T20:32:54.165875+00:00 · Postgres 17.11. Só estrutura: nenhuma linha de tabela, nenhum valor de configuração.
+-- Atualização parcial em 2026-11-15T03:30:00+00:00 (funções app_* e painel_app_*, tabelas app_*). Retrato inteiro tirado em 2026-11-14T20:32:54.165875+00:00 · Postgres 17.11. Só estrutura: nenhuma linha de tabela, nenhum valor de configuração.
 -- Serve de referência e para os testes. NÃO rodar inteiro sobre a produção. Como refazer: supabase/producao/LEIAME.md.
 
 -- ===== Extensões =====
@@ -2553,6 +2553,7 @@ comment on table public.app_paciente is 'Titular do acesso rápido (celular + PI
 CREATE UNIQUE INDEX app_paciente_conta_antiga ON public.app_paciente USING btree (conta_antiga_id) WHERE (conta_antiga_id IS NOT NULL);
 CREATE INDEX app_paciente_sugerido ON public.app_paciente USING btree (paciente_sugerido_id) WHERE (paciente_sugerido_id IS NOT NULL);
 alter table public.app_paciente enable row level security;
+
 
 
 

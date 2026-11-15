@@ -88,3 +88,10 @@ do $$ begin
     grant execute on function public.app_conta_antiga_filhos(), public.app_conta_antiga_migrar(text, text, text, text, jsonb, text) to authenticated;
   end if;
 end $$;
+
+-- As funções do painel de pendências (supabase/acesso-rapido-painel.sql) também perdem a permissão no bloco acima; devolve se já existirem.
+do $$ begin
+  if to_regprocedure('public.painel_app_pendencias_resumo()') is not null then
+    grant execute on function public.painel_app_pendencias_resumo(), public.painel_app_contas_antigas() to authenticated;
+  end if;
+end $$;
