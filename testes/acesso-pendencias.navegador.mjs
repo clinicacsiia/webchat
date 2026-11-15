@@ -54,7 +54,7 @@ async function novaPagina(caminho = '/') {
   const page = await ctx.newPage();
   page.on('pageerror', (e) => erros.push('pageerror: ' + e.message));
   page.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) erros.push('console: ' + m.text()); });
-  await ctx.route(`${ORIGEM}/**`, (r) => r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: HTML }));
+  await ctx.route(`${ORIGEM}/**`, (r) => r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: new URL(r.request().url()).pathname === '/' ? '<!doctype html><title>chat</title><body>CHAT-DE-MENTIRA</body>' : HTML }));
   await ctx.route(`${API}/**`, async (r) => {
     const req = r.request();
     const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'POST, OPTIONS' };
@@ -65,7 +65,7 @@ async function novaPagina(caminho = '/') {
     const res = await serializar(() => chamarFuncao(nome, corpo));
     return r.fulfill({ status: res.status, headers: { ...cors, 'content-type': 'application/json' }, body: JSON.stringify(res.corpo) });
   });
-  await page.goto(`${ORIGEM}${caminho}`);
+  await page.goto(`${ORIGEM}/acesso${caminho}`);
   return { ctx, page };
 }
 const espera = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -88,11 +88,11 @@ await a.page.click('[data-act="tf"][data-v="1"]');
 await a.page.fill('#fnome', 'Leo Souza Teste'); await a.page.fill('#fnasc', '2019-08-30'); await a.page.click('[data-act="addf"]');
 await a.page.click('[data-act="c3"]'); await a.page.click('[data-act="c4skip"]');
 await pin(a.page, '1357'); await pin(a.page, '1357');
-await esperaTexto(a.page, /Olá, Ana/);
+await a.page.waitForURL((u) => u.pathname === '/', { timeout: 6000 });
 
-await caso('depois do cadastro o início NÃO mostra cartão pedindo informação (15/11/2026: o que falta só é pedido na entrada, com o PIN obrigatório)', async () => {
+await caso('depois do cadastro a pessoa vai ao chat e não vê cartão pedindo informação (15/11/2026: o que falta só é pedido na entrada, com o PIN obrigatório)', async () => {
   await espera(500);
-  const t = await texto(a.page);
+  const t = await a.page.locator('body').innerText();
   return { ok: !/Falta pouco/.test(t) && (await a.page.locator('#pend').count()) === 0, detalhe: t.slice(0, 100).replace(/\n/g, ' | ') };
 });
 await caso('nada da base da clínica aparece na tela (nem CPF, nem "cadastro encontrado")', async () => {
@@ -100,7 +100,7 @@ await caso('nada da base da clínica aparece na tela (nem CPF, nem "cadastro enc
   return { ok: !t.includes('529.982.247-25') && !t.includes('52998224725') && !/encontramos|já temos seu cadastro/i.test(t) };
 });
 await caso('Meus dados também não mostra cartão pedindo informação', async () => {
-  await a.page.click('[data-act="go"][data-v="dados"]'); await espera(300);
+  await a.page.goto(`${ORIGEM}/acesso/?ir=dados`); await esperaTexto(a.page, /Nascimento/);
   return { ok: (await a.page.locator('#pend').count()) === 0 };
 });
 
@@ -124,12 +124,12 @@ await caso('mesmo nome da mãe com outro nascimento: pergunta "É outra pessoa?"
 await caso('um filho de nome diferente entra direto, e o mesmo filho digitado duas vezes vira um só no banco', async () => {
   for (let i = 0; i < 2; i++) { await h.page.fill('#fnome', 'Rui Prado Teste'); await h.page.fill('#fnasc', '2018-08-08'); await h.page.click('[data-act="addf"]'); }
   await h.page.click('[data-act="c3"]'); await h.page.click('[data-act="c4skip"]');
-  await pin(h.page, '1357'); await pin(h.page, '1357'); await esperaTexto(h.page, /Olá, Elisa/);
+  await pin(h.page, '1357'); await pin(h.page, '1357'); await h.page.waitForURL((u) => u.pathname === '/', { timeout: 6000 });
   const f = await q(`select f.nome from public.app_filho f join public.app_paciente p on p.id = f.responsavel_id where p.telefone = '71991230020' order by f.nome`);
   return { ok: f.length === 2 && f[0].nome === 'Elisa Prado Teste' && f[1].nome === 'Rui Prado Teste', detalhe: f.map((x) => x.nome).join('|') };
 });
 await caso('Meus dados > adicionar filho com o nome dela: pede confirmação e só entra depois de confirmar (não duplica)', async () => {
-  await h.page.click('[data-act="go"][data-v="dados"]'); await esperaTexto(h.page, /Meus dados/);
+  await h.page.goto(`${ORIGEM}/acesso/?ir=dados`); await esperaTexto(h.page, /Meus dados/);
   await h.page.click('[data-act="sheet"][data-t="filho"]');
   await h.page.fill('#fnome', 'Elisa Prado Teste'); await h.page.fill('#fnasc', '2012-02-02'); await h.page.click('[data-act="sf"]');
   await esperaTexto(h.page, /O nome é igual ao seu/);

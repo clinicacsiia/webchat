@@ -84,7 +84,7 @@ async function novaPagina(caminho = '/', semente = null) {
   const page = await ctx.newPage();
   page.on('pageerror', (e) => erros.push('pageerror: ' + e.message));
   page.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) erros.push('console: ' + m.text()); });
-  await ctx.route(`${ORIGEM}/**`, (r) => r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: HTML }));
+  await ctx.route(`${ORIGEM}/**`, (r) => r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: new URL(r.request().url()).pathname === '/' ? '<!doctype html><title>chat</title><body>CHAT-DE-MENTIRA</body>' : HTML }));
   await ctx.route(`${API}/**`, async (r) => {
     const req = r.request(), u = new URL(req.url());
     const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'POST, OPTIONS' };
@@ -104,7 +104,7 @@ async function novaPagina(caminho = '/', semente = null) {
     const res = await serializar(() => chamarFuncao(nome, req.postDataJSON(), uid));
     return json(res.status, res.corpo);
   });
-  await page.goto(`${ORIGEM}${caminho}`);
+  await page.goto(`${ORIGEM}/acesso${caminho}`);
   return { ctx, page };
 }
 const espera = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -153,7 +153,7 @@ await caso('Continuar leva ao PIN; PINs diferentes são recusados; PINs iguais c
   await pin(a.page, '1357'); await esperaTexto(a.page, /Confirme o PIN/);
   await pin(a.page, '9999'); await esperaTexto(a.page, /não conferem/);
   await pin(a.page, '1357'); await pin(a.page, '1357');
-  await esperaTexto(a.page, /Olá, Ana/);
+  await a.page.waitForURL((u) => u.pathname === '/', { timeout: 6000 });
   const r = (await q(`select cpf, email, telefone, conta_antiga_id from public.app_paciente`))[0];
   const fs = await q(`select nome, cpf from public.app_filho order by nome`);
   return { ok: r.cpf === CPF && r.email === 'ana@exemplo.invalid' && r.telefone === '71991230001' && r.conta_antiga_id === ids.ana && fs.length === 2 && fs[0].nome === 'Leo Souza Teste' && fs[0].cpf === CPF && fs[1].nome === 'Lia Souza Teste' && fs[1].cpf === null, detalhe: JSON.stringify({ ...r, cpf: '***' }) + fs.map((x) => x.nome).join('|') };
@@ -163,7 +163,7 @@ await caso('a conta antiga sai do aparelho (logout no Auth) e o aparelho guarda 
   return { ok: logouts.includes('Bearer ' + tokenDe(ids.ana)) && !!st.acesso && JSON.parse(st.acesso).dev && st.antiga === null && !/1357|ana@exemplo|529/.test(st.acesso), detalhe: st.acesso && st.acesso.slice(0, 30) };
 });
 await caso('Meus dados mostra nome, nascimento, celular, e-mail e CPF mascarado de forma clara', async () => {
-  await a.page.click('[data-act="go"][data-v="dados"]');
+  await a.page.goto(`${ORIGEM}/acesso/?ir=dados`);
   await esperaTexto(a.page, /Meus dados/);
   const t = await texto(a.page);
   return { ok: /Ana Souza Teste/.test(t) && /12\/04\/1988/.test(t) && /\(71\) 99123-0001/.test(t) && /ana@exemplo\.invalid/.test(t) && /\*\*\*\.\*\*\*\.\*\*\*-25/.test(t) && !t.includes(CPF), detalhe: t.slice(0, 200).replace(/\n/g, ' | ') };
@@ -185,7 +185,7 @@ await caso('conta só com e-mail: campos em branco, e o servidor/página não de
 await caso('completando os dados e criando o PIN a Bia entra; o celular novo vira o login', async () => {
   await b.page.fill('#nasc', '1990-02-03'); await b.page.click('[data-act="antiga2"]');
   await pin(b.page, '2468'); await pin(b.page, '2468');
-  await esperaTexto(b.page, /Olá, Bia/);
+  await b.page.waitForURL((u) => u.pathname === '/', { timeout: 6000 });
   const r = (await q(`select telefone, cpf from public.app_paciente where conta_antiga_id = '${ids.bia}'`))[0];
   return { ok: r.telefone === '71991230009' && r.cpf === null, detalhe: JSON.stringify(r) };
 });
@@ -216,7 +216,7 @@ await caso('homônimo de criança (Dani, nascimento de menor): já vem como "É 
   const antes = await texto(dn.page);
   const v = await dn.page.inputValue('#fn0');
   await dn.page.fill('#nasc', '1980-01-01'); await dn.page.click('[data-act="antiga2"]');
-  await pin(dn.page, '1357'); await pin(dn.page, '1357'); await esperaTexto(dn.page, /Olá, Dani/);
+  await pin(dn.page, '1357'); await pin(dn.page, '1357'); await dn.page.waitForURL((u) => u.pathname === '/', { timeout: 6000 });
   const f = await q(`select f.nome, f.nascimento::text n from public.app_filho f join public.app_paciente p on p.id = f.responsavel_id where p.conta_antiga_id = '${ids.dani}'`);
   return { ok: /Quem é\?/.test(antes) && v === '2013-03-03' && f.length === 1 && f[0].nome === 'Dani Teste Costa' && f[0].n === '2013-03-03', detalhe: JSON.stringify(f) };
 });
@@ -238,7 +238,7 @@ await caso('vindo do chat com a conta logada e o celular dela JÁ com PIN: vai d
 });
 await caso('a sessão da conta de e-mail sai do aparelho e o PIN certo abre o acesso rápido; nada é criado a mais', async () => {
   await pin(ev.page, '2468');
-  await esperaTexto(ev.page, /Olá, Eva/);
+  await ev.page.waitForURL((u) => u.pathname === '/', { timeout: 6000 });
   const st = await ev.page.evaluate(() => ({ antiga: localStorage.getItem('csi-paciente-auth') }));
   return { ok: st.antiga === null && (await n(`select count(*)::int n from public.app_paciente`)) === antesEva, detalhe: JSON.stringify(st) };
 });

@@ -56,7 +56,7 @@ async function novaPagina(caminho = '/', opcoes = {}, antes = null) {
   const page = await ctx.newPage();
   page.on('pageerror', (e) => erros.push('pageerror: ' + e.message));
   page.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) erros.push('console: ' + m.text()); });
-  await ctx.route(`${ORIGEM}/**`, (r) => r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: HTML }));
+  await ctx.route(`${ORIGEM}/**`, (r) => r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: new URL(r.request().url()).pathname === '/' ? '<!doctype html><title>chat</title><body>CHAT-DE-MENTIRA</body>' : HTML }));
   await ctx.route(`${API}/**`, async (r) => {
     const req = r.request();
     const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'POST, OPTIONS' };
@@ -68,7 +68,7 @@ async function novaPagina(caminho = '/', opcoes = {}, antes = null) {
     return r.fulfill({ status: res.status, headers: { ...cors, 'content-type': 'application/json' }, body: JSON.stringify(res.corpo) });
   });
   if (antes) await ctx.addInitScript(antes);
-  await page.goto(`${ORIGEM}${caminho}`);
+  await page.goto(`${ORIGEM}/acesso${caminho}`);
   return { ctx, page };
 }
 const espera = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -153,14 +153,16 @@ await caso('corrigido o CPF do filho, segue; o contato de confiança digitado so
 });
 await caso('cadastro termina com os dois CPFs certos gravados', async () => {
   await page.click('[data-act="c4"]'); await esperaTexto(page, /Crie seu PIN/);
-  await pin(page, '1357'); await pin(page, '1357'); await esperaTexto(page, /Olá, Ana/);
+  await pin(page, '1357'); await pin(page, '1357'); await page.waitForURL((u) => u.pathname === '/', { timeout: 6000 });
   const eu = (await q(`select cpf from public.app_paciente where telefone = '71991230001'`))[0].cpf;
   const f = (await q(`select cpf from public.app_filho order by criado_em`))[0].cpf;
   return { ok: eu === '52998224725' && f === '11144477735', detalhe: `${eu} ${f}` };
 });
-await caso('terminado o cadastro, os rascunhos são apagados da memória da página', async () => ({ ok: (await page.evaluate(() => Object.keys(S.rasc).length)) === 0 }));
+await caso('terminado o cadastro, os rascunhos são apagados da memória da página', async () => {
+  await page.goto(`${ORIGEM}/acesso/?ir=dados`); await esperaTexto(page, /Nascimento/);   // a página foi para o chat: volta a ela só para olhar a memória
+  return { ok: (await page.evaluate(() => Object.keys(S.rasc).length)) === 0 };
+});
 await caso('Meus dados: o CPF é conferido na hora no painel de baixo; errado não vai ao servidor', async () => {
-  await page.click('[data-act="go"][data-v="dados"]');
   await page.click('[data-act="sheet"][data-t="cpf"][data-p="eu"]');
   const antes = ult('app_pessoa_cpf_salvar');
   await page.fill('#cpfn', CPF_ERRADO.replace(/\D/g, '')); const m = await msgCpf(page, '#cpfn');
@@ -168,7 +170,7 @@ await caso('Meus dados: o CPF é conferido na hora no painel de baixo; errado n�
   return { ok: /não conferem/.test(m) && ult('app_pessoa_cpf_salvar') === antes, detalhe: m };
 });
 await caso('logo também aparece na tela do PIN (aparelho já cadastrado)', async () => {
-  await page.reload(); await esperaTexto(page, /Digite seu PIN/);
+  await page.goto(`${ORIGEM}/acesso/`); await esperaTexto(page, /Digite seu PIN/);
   return { ok: (await page.locator('header.topo img.topo-logo').count()) === 1 };
 });
 await caso('nenhum erro de script nem violação da política de segurança', async () => ({ ok: erros.length === 0, detalhe: erros.slice(0, 3).join(' | ') }));

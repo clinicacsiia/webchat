@@ -56,7 +56,7 @@ async function novaPagina(caminho = '/', opcoes = {}, antes = null) {
   const page = await ctx.newPage();
   page.on('pageerror', (e) => erros.push('pageerror: ' + e.message));
   page.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) erros.push('console: ' + m.text()); });
-  await ctx.route(`${ORIGEM}/**`, (r) => r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: HTML }));
+  await ctx.route(`${ORIGEM}/**`, (r) => r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: new URL(r.request().url()).pathname === '/' ? '<!doctype html><title>chat</title><body>CHAT-DE-MENTIRA</body>' : HTML }));
   await ctx.route(`${API}/**`, async (r) => {
     const req = r.request();
     const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'POST, OPTIONS' };
@@ -68,7 +68,7 @@ async function novaPagina(caminho = '/', opcoes = {}, antes = null) {
     return r.fulfill({ status: res.status, headers: { ...cors, 'content-type': 'application/json' }, body: JSON.stringify(res.corpo) });
   });
   if (antes) await ctx.addInitScript(antes);
-  await page.goto(`${ORIGEM}${caminho}`);
+  await page.goto(`${ORIGEM}/acesso${caminho}`);
   return { ctx, page };
 }
 const espera = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -130,10 +130,10 @@ await caso('quem a clínica já conhece não digita o CPF: filhos → direto ao 
 });
 await caso('só falta criar o PIN: o cadastro nasce com o CPF da clínica e a tela nunca recebeu o CPF', async () => {
   await bia.page.click('[data-act="c4skip"]'); await pin(bia.page, '2468'); await pin(bia.page, '2468');
-  await esperaTexto(bia.page, /Olá, Bia/);
+  await bia.page.waitForURL((u) => u.pathname === '/', { timeout: 6000 });
   const l = (await q(`select cpf from public.app_paciente where telefone = '71991230002'`))[0];
   const naRede = JSON.stringify(chamadasRede);
-  return { ok: l.cpf === C1 && !/529\.?982/.test(await texto(bia.page)) && !naRede.includes(C1), detalhe: '' };
+  return { ok: l.cpf === C1 && !/529\.?982/.test(await bia.page.locator('body').innerText()) && !naRede.includes(C1), detalhe: '' };
 });
 
 // ================================================================= celular que já tem PIN
@@ -179,7 +179,7 @@ await q(`update public.app_aparelho set desbloqueada_ate = now() - interval '1 m
 let po = await novaPagina('/', { permissions: ['geolocation'], geolocation: { latitude: -12.97141, longitude: -38.50121, accuracy: 25 } }, `localStorage.setItem('csi_acesso_v2', JSON.stringify({dev: '${tokAna}', nome1: 'Ana'}))`);
 await caso('com a posição ligada o teclado avisa o motivo, e a posição permitida vai ao servidor: "na clínica"', async () => {
   const t = await texto(po.page);
-  await pin(po.page, '1357'); await esperaTexto(po.page, /Marcar pelo chat/);
+  await pin(po.page, '1357'); await po.page.waitForURL((u) => u.pathname === '/', { timeout: 6000 });
   const l = (await q(`select evento, na_clinica, distancia_m, precisao_m from public.app_acesso_log order by id desc limit 1`))[0];
   const pres = await po.page.evaluate(() => sessionStorage.getItem('csi_presenca'));
   return { ok: /pedir a sua localização/.test(t) && l.evento === 'desbloqueio' && l.na_clinica === true && l.distancia_m < 50 && !!pres, detalhe: JSON.stringify(l) };
@@ -187,7 +187,7 @@ await caso('com a posição ligada o teclado avisa o motivo, e a posição permi
 await q(`update public.app_aparelho set desbloqueada_ate = now() - interval '1 minute'`);
 let neg = await novaPagina('/', { permissions: [] }, `localStorage.setItem('csi_acesso_v2', JSON.stringify({dev: '${tokAna}', nome1: 'Ana'}))`);
 await caso('localização negada: entra do mesmo jeito e a recusa fica registrada', async () => {
-  await pin(neg.page, '1357'); await esperaTexto(neg.page, /Marcar pelo chat/);
+  await pin(neg.page, '1357'); await neg.page.waitForURL((u) => u.pathname === '/', { timeout: 6000 });
   const l = (await q(`select na_clinica, local_negado from public.app_acesso_log order by id desc limit 1`))[0];
   return { ok: l.na_clinica === null && l.local_negado === true, detalhe: JSON.stringify(l) };
 });
@@ -205,7 +205,7 @@ await caso('o e-mail guardado no chat vai junto no cadastro (opcional)', async (
   await esperaTexto(cache.page, /Seu CPF/);
   await cache.page.fill('input[data-cp="eu"]', C1); await cache.page.click('[data-act="c3b"]'); await esperaTexto(cache.page, /Número de confiança/);
   await cache.page.click('[data-act="c4skip"]'); await pin(cache.page, '1470'); await pin(cache.page, '1470');
-  await esperaTexto(cache.page, /Olá, Gabi/);
+  await cache.page.waitForURL((u) => u.pathname === '/', { timeout: 6000 });
   const l = (await q(`select email from public.app_paciente where telefone = '71991230009'`))[0];
   return { ok: l.email === 'gabi@exemplo.invalid' };
 });
@@ -219,7 +219,7 @@ await caso('PIN obrigatório DESLIGADO: o cadastro volta ao jeito antigo (sem pa
   await velho.page.click('[data-act="tf"][data-v="0"]'); await velho.page.click('[data-act="c3"]');
   await esperaTexto(velho.page, /Número de confiança/);
   await velho.page.click('[data-act="c4skip"]'); await pin(velho.page, '7391'); await pin(velho.page, '7391');
-  await esperaTexto(velho.page, /Olá, Davi/);
+  await velho.page.waitForURL((u) => u.pathname === '/', { timeout: 6000 });
   return { ok: ult('app_cadastrar') === 1 && (await q(`select cpf from public.app_paciente where telefone = '71991230010'`))[0].cpf === null };
 });
 await caso('nenhum erro de script nem violação da política de segurança durante todo o roteiro', async () => ({ ok: erros.length === 0, detalhe: erros.slice(0, 3).join(' | ') }));
