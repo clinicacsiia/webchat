@@ -47,7 +47,7 @@ Feita **só dentro do banco**, só como **sugestão**: se existir um único paci
 
 **Limites conhecidos:**
 - "Todos os filhos" usa os irmãos do chat (só filhos). **Pai/mãe + filhos no mesmo pedido** não existe no motor (uma conversa é de uma pessoa); fica para outra etapa.
-- O **nome da mãe** e o **sexo** (`dados_ident`) ainda são perguntados nas conversas com a API do Klingo; só CPF e nascimento foram resolvidos.
+- ~~O **nome da mãe** e o **sexo** ainda são perguntados~~ — **resolvido em 15/11/2026** (`supabase/dados-ident-sem-repetir.sql`): o passo `dados_ident` pergunta só **nome e sexo**; CPF e nascimento (já dados no `cpf_nasc`) e o nome da mãe não são mais pedidos, e a 1ª mensagem não repete o pedido de CPF. O nome da mãe é opcional na API do Klingo (o cadastro novo e a conferência funcionam sem ele).
 - ~~Quem usa e-mail e senha (conta antiga) continua pelo caminho de antes~~ — resolvido na seção abaixo (15/11/2026).
 - Se o CPF guardado estiver errado, a pessoa corrige em *Meus dados > Alterar* (o chat não sobrescreve um CPF já salvo).
 

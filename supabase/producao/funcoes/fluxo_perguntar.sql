@@ -9,7 +9,7 @@ AS $function$
 declare
   ctx jsonb := public.fluxo_ctx(p_conversa); c public.conversas; pa public.pre_agendamentos; d jsonb;
   v_txt text; v_op jsonb; v_hist jsonb; v_it jsonb := '[]'::jsonb; v_ult jsonb; v_pend jsonb; v_med text[]; v_nome text; v_tel text; x text; v_dig jsonb;
-  v_etapa text; v_nse boolean;
+  v_etapa text; v_nse boolean; v_pref text := p_prefixo;
 begin
   select * into c from public.conversas where id = p_conversa;
   select * into pa from public.pre_agendamentos where conversa_id = p_conversa;
@@ -119,25 +119,21 @@ begin
       jsonb_build_object('nome', 'cpf', 'rotulo', 'Digite o seu CPF', 'tipo', 'cpf', 'obrigatorio', true)));
   when 'cpf_nasc' then   -- klingo-auto
     v_txt := public.fluxo_t('cpf_nasc', ctx);
+    -- sem-repetir: a 1ª mensagem ("Olá, ...! Para começar, informe o CPF...") já pede a mesma coisa; não manda o segundo texto igual
+    if p_prefixo is not null and p_prefixo = public.fluxo_t(case when (ctx ->> 'filho')::boolean then 'ola_cpf_filho' else 'ola_cpf_proprio' end, ctx) then
+      v_txt := p_prefixo; v_pref := null;
+    end if;
     v_op := jsonb_build_object('tipo', 'campos', 'passo', p_passo, 'botao', 'Continuar', 'campos', jsonb_build_array(
       jsonb_build_object('nome', 'cpf', 'rotulo', case when (ctx ->> 'filho')::boolean then 'CPF da criança (ou do responsável, se ela não tiver)' else 'CPF' end,
                          'tipo', 'cpf', 'obrigatorio', true, 'valor', v_dig ->> 'cpf'),
       jsonb_build_object('nome', 'dt_nasc', 'rotulo', 'Data de nascimento' || (ctx ->> 'de_quem'), 'tipo', 'data', 'obrigatorio', true, 'valor', v_dig ->> 'dt_nasc')));
   when 'dados_ident' then
+    -- sem-repetir: CPF e nascimento já foram pedidos (e conferidos) no passo cpf_nasc; o nome da mãe deixou de ser pedido. Aqui só nome e sexo.
     v_nome := coalesce(v_dig ->> 'nome', case when v_nse then null when (ctx ->> 'filho')::boolean then c.paciente_nome else c.nome_informado end);
     v_txt := public.fluxo_t('dados_ident', ctx);
     v_op := jsonb_build_object('tipo', 'campos', 'passo', p_passo, 'botao', 'Continuar', 'campos', jsonb_build_array(
       jsonb_build_object('nome', 'nome', 'rotulo', 'Nome completo' || (ctx ->> 'de_quem'), 'tipo', 'texto', 'obrigatorio', true, 'valor', v_nome),
-      jsonb_build_object('nome', 'sexo', 'rotulo', 'Sexo', 'tipo', 'sexo', 'obrigatorio', true, 'valor', v_dig ->> 'sexo'),
-      jsonb_build_object('nome', 'dt_nasc', 'rotulo', 'Data de nascimento', 'tipo', 'data', 'obrigatorio', true, 'valor', v_dig ->> 'dt_nasc'),
-      jsonb_build_object('nome', 'cpf', 'rotulo', case when (ctx ->> 'filho')::boolean then 'CPF da criança (ou do responsável, se ela não tiver)' else 'CPF' end,
-                         'tipo', 'cpf', 'obrigatorio', true, 'valor', v_dig ->> 'cpf')))   -- klingo-auto: CPF obrigatório
-      || case when public.klingo_ativo(p_conversa, 'klingo_api_marcar') then jsonb_build_object('campos', (jsonb_build_array(
-           jsonb_build_object('nome', 'nome', 'rotulo', 'Nome completo' || (ctx ->> 'de_quem'), 'tipo', 'texto', 'obrigatorio', true, 'valor', v_nome),
-           jsonb_build_object('nome', 'sexo', 'rotulo', 'Sexo', 'tipo', 'sexo', 'obrigatorio', true, 'valor', v_dig ->> 'sexo'),
-           jsonb_build_object('nome', 'dt_nasc', 'rotulo', 'Data de nascimento', 'tipo', 'data', 'obrigatorio', true, 'valor', v_dig ->> 'dt_nasc'),
-           jsonb_build_object('nome', 'cpf', 'rotulo', case when (ctx ->> 'filho')::boolean then 'CPF da criança (ou do responsável, se ela não tiver)' else 'CPF' end, 'tipo', 'cpf', 'obrigatorio', true, 'valor', v_dig ->> 'cpf'),
-           jsonb_build_object('nome', 'mae', 'rotulo', 'Nome completo da mãe' || (ctx ->> 'de_quem'), 'tipo', 'texto', 'obrigatorio', true, 'valor', v_dig ->> 'mae')))) else '{}'::jsonb end;   -- klingo-auto: com a API ligada, o nome da mãe também é conferido
+      jsonb_build_object('nome', 'sexo', 'rotulo', 'Sexo', 'tipo', 'sexo', 'obrigatorio', true, 'valor', v_dig ->> 'sexo')));
   when 'dados_contato' then
     select ct.telefone into v_tel from public.contatos ct where ct.id = c.contato_id;
     v_txt := public.fluxo_t(case when v_nse then 'nse_dados' else 'dados_contato' end, ctx);
@@ -173,7 +169,7 @@ begin
     return;
   end case;
 
-  if p_prefixo is not null and btrim(p_prefixo) <> '' then v_txt := btrim(p_prefixo) || E'\n\n' || v_txt; end if;
+  if v_pref is not null and btrim(v_pref) <> '' then v_txt := btrim(v_pref) || E'\n\n' || v_txt; end if;
   if p_passo in ('motivo', 'plano', 'assunto') and jsonb_typeof(v_op -> 'itens') = 'array' then v_op := jsonb_set(v_op, '{itens}', public.fluxo_ordenar(p_passo, v_op -> 'itens')); end if;
   perform public.fluxo_dizer(p_conversa, v_txt, v_op);
   update public.conversa_fluxo set tentativas = case when passo is distinct from p_passo then 0 else tentativas end, passo = p_passo, atualizado_em = now()

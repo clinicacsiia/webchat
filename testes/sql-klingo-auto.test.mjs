@@ -111,8 +111,8 @@ await caso('CPF e nascimento viram passo obrigatório (antes do plano); com a au
   const pa = await pedidoDe(base.c), cv = await conversaDe(base.c);
   const esperado = 'motivo > exame > cpf_nasc > plano > horario > dados_ident > dados_contato > confirmar > acompanhar';
   const camposCpf = base.campos.cpf_nasc || [], obrig = (n) => (camposCpf.find((c) => c.nome === n) || {}).obrigatorio;
-  const cpfIdent = (base.campos.dados_ident || []).find((c) => c.nome === 'cpf');
-  return { ok: base.passos.join(' > ') === esperado && pa.status === 'pronto' && obrig('cpf') === true && obrig('dt_nasc') === true && cpfIdent && cpfIdent.obrigatorio === true
+  const semRepetir = (base.campos.dados_ident || []).map((c) => c.nome).join() === 'nome,sexo';   // sem-repetir: CPF e nascimento só no cpf_nasc; sem nome da mãe
+  return { ok: base.passos.join(' > ') === esperado && pa.status === 'pronto' && obrig('cpf') === true && obrig('dt_nasc') === true && semRepetir
     && pa.paciente.cpf === '11144477735' && pa.paciente.dt_nasc === '1980-03-25' && cv.ia_ativa === false && pa.agendado_origem === null, detalhe: base.passos.join(' > ') };
 });
 await caso('CPF inválido ou data impossível no passo novo: o chat recusa e pergunta de novo, sem avançar', async () => {
@@ -768,7 +768,7 @@ await caso('DIVERGÊNCIA não é falha técnica: a autogestão em "sim" não rec
   await db.query(`delete from public.klingo_operacao where chave_idem like 'div-%'`); await cfg('klingo_auto', 'legado');
   return { ok: (r.acoes || []).length === 0 && m.valor === 'sim', detalhe: `acoes=${JSON.stringify(r.acoes)} valor=${m.valor}` };
 });
-await caso('NOME DA MÃE: com a API ligada o passo de identificação pede o nome da mãe; com o interruptor desligado, não', async () => {
+await caso('NOME DA MÃE: o passo de identificação não pede mais o nome da mãe, nem CPF e nascimento de novo (com a API ligada ou desligada)', async () => {
   const { p } = await marcando('Mae Teste Paciente');
   const campos = async () => {
     await como('');
@@ -778,7 +778,7 @@ await caso('NOME DA MÃE: com a API ligada o passo de identificação pede o nom
   };
   const ligado = await campos();
   await cfg('klingo_auto', 'nao'); const desligado = await campos(); await cfg('klingo_auto', 'legado');
-  return { ok: ligado.includes('mae') && !desligado.includes('mae') && desligado.includes('cpf'), detalhe: `ligado=${ligado} | desligado=${desligado}` };
+  return { ok: ligado.join() === 'nome,sexo' && desligado.join() === 'nome,sexo', detalhe: `ligado=${ligado} | desligado=${desligado}` };
 });
 
 
@@ -819,14 +819,14 @@ await caso('PACIENTE CONHECIDO: o chat pede só o CPF; o CPF errado não passa; 
   const b = await proximo(p.c);
   return { ok: a === 'cpf_confirma' && errado.ok === false && /não confere/.test(errado.erro) && certo.ok !== false && b !== 'cpf_confirma' && b !== 'cpf_nasc', detalhe: `antes=${a}; errado=${errado.ok}; depois=${b}` };
 });
-await caso('NÃO SOU EU: apaga os dados guardados, não preenche nada e pede CPF, nascimento, nome, contato e mãe de novo', async () => {
+await caso('NÃO SOU EU: apaga os dados guardados, não preenche nada e pede CPF e nascimento (e depois nome, sexo e contato) de novo', async () => {
   const { p } = await conhecido('Nao Sou Eu Teste');
   await um(`select public.fluxo_aplicar($1, 'cpf_confirma', $2::jsonb) r`, [p.c, JSON.stringify({ pular: true })]);
   const pa = await pedidoDe(p.c), a = await proximo(p.c);
   await como(''); await db.query(`select public.fluxo_perguntar($1, 'dados_ident', '')`, [p.c]);
   const m = (await q(`select opcoes from public.mensagens where conversa_id = $1 and autor = 'agente' order by id desc limit 1`, [p.c]))[0];
   const campos = (m.opcoes.campos || []), cheio = campos.filter((c) => c.valor);
-  return { ok: JSON.stringify(pa.paciente) === '{}' && a === 'cpf_nasc' && campos.some((c) => c.nome === 'mae') && cheio.length === 0, detalhe: `paciente=${JSON.stringify(pa.paciente)}; próximo=${a}; campos preenchidos=${cheio.length}` };
+  return { ok: JSON.stringify(pa.paciente) === '{}' && a === 'cpf_nasc' && !campos.some((c) => c.nome === 'mae') && cheio.length === 0, detalhe: `paciente=${JSON.stringify(pa.paciente)}; próximo=${a}; campos preenchidos=${cheio.length}` };
 });
 await caso('3 CPFs errados viram "não sou eu" (tudo de novo)', async () => {
   const { p } = await conhecido('Tres Erros Teste');
