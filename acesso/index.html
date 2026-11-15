@@ -464,7 +464,7 @@ const normNome=n=>String(n||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').
 function conferirHomonimo(f,nomeTit,nascTit,ok){
   if(!nomeTit||normNome(f.nome)!==normNome(nomeTit))return ok(f);
   if(nascTit&&f.nascimento===nascTit)return erro('Esse é o seu próprio cadastro: não precisa colocar você como filho(a).');
-  pedirConfirmacao('O nome é igual ao seu','É outra pessoa com o mesmo nome (por exemplo, um(a) filho(a))? Se for você mesma, não precisa adicionar.','Sim, é outra pessoa',()=>{S.sheet=null;ok(Object.assign({mesmo_nome_confirmado:true},f))});
+  pedirConfirmacao('O nome é igual ao seu','É outra pessoa com o mesmo nome (por exemplo, um(a) filho(a))? Se for você, não precisa adicionar.','Sim, é outra pessoa',()=>{S.sheet=null;ok(Object.assign({mesmo_nome_confirmado:true},f))});
 }
 function lerFilho(){
   const nome=$('#fnome').value.trim(),n=$('#fnasc').value;
@@ -615,7 +615,7 @@ const A={
   confirmar:async()=>{const f=S.confirma;S.confirma=null;if(f)await f()},
   sf:async()=>{const r=lerFilho();if(r.vazio)return erro('Preencha nome e nascimento.');if(r.e)return erro(r.e);
     const envia=async(conf)=>{const x=await chamar('app_filho_adicionar',{p_nome:r.f.nome,p_nascimento:r.f.nascimento,p_mesmo_nome_confirmado:!!conf});if(!x)return;
-      if(!x.ok&&x.erro==='homonimo')return pedirConfirmacao('O nome é igual ao seu','É outra pessoa com o mesmo nome (por exemplo, um(a) filho(a))? Se for você mesma, não precisa adicionar.','Sim, é outra pessoa',()=>envia(true));
+      if(!x.ok&&x.erro==='homonimo')return pedirConfirmacao('O nome é igual ao seu','É outra pessoa com o mesmo nome (por exemplo, um(a) filho(a))? Se for você, não precisa adicionar.','Sim, é outra pessoa',()=>envia(true));
       if(!x.ok)return aviso(x);S.sheet=null;toast('Filho adicionado');
       if(S.porta&&S.porta.obrigatorio){S.soHome=true;S.evento=null;if(await exigirCompleto())return;S.soHome=false}
       render()};

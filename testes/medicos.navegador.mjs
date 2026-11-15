@@ -258,20 +258,20 @@ await caso('folgas: mostra as datas, adiciona e remove', async () => {
   return { ok: /24\/12\/2026 a 26\/12\/2026 · Recesso/.test(lista.join()) && a && a.p_ini === '2027-01-15' && a.p_fim === '2027-01-15' && a.p_motivo === 'Congresso' && r && r.p_id === 5, detalhe: `${lista} | ${JSON.stringify(a)} | ${JSON.stringify(r)}` };
 });
 
-await caso('Pendência de Validação: mostra a frase pedida, Confirmar e Ativar chama o banco e Ajustar abre o médico', async () => {
+await caso('Pendência de validação: mostra a frase pedida, Confirmar e ativar chama o banco e Ajustar abre o médico', async () => {
   const { page, ctx, reg } = await pagina(browser);
   await page.goto(`${base}/painel/`);
   await page.click('.nav button[data-aba=medicos]');
   await page.waitForSelector('#medicosPendencia');
   const txt = await page.locator('#medicosPendencia').innerText();
   const selo = await page.locator('tr:has-text("Daniela") .selo:text-is("validar exames")').count();
-  await page.locator('#medicosPendencia button:text-is("Ajustar Regras Antes de Ativar")').click();
+  await page.locator('#medicosPendencia button:text-is("Ajustar regras antes de ativar")').click();
   await page.waitForSelector('button[data-sub=hor]');
-  await page.locator('#medicosPendencia button:text-is("Confirmar e Ativar")').click();
+  await page.locator('#medicosPendencia button:text-is("Confirmar e ativar")').click();
   await page.waitForTimeout(300);
   const r = reg.rpcs.find((x) => x.rpc === 'medico_proc_resolver');
   await ctx.close();
-  return { ok: /Pendência de Validação/.test(txt) && /O médico Daniela Ladeia aceitou realizar o exame Ultrassom de Joelho via Klingo\. Deseja validar esta regra para os próximos agendamentos\?/i.test(txt) && selo === 1 && r && r.p_ids.join() === '31', detalhe: `${txt.replace(/\n/g, ' ')} | ${selo} | ${JSON.stringify(r)}` };
+  return { ok: /Pendência de validação/.test(txt) && /O médico Daniela Ladeia aceitou realizar o exame Ultrassom de Joelho via Klingo\. Deseja validar esta regra para os próximos agendamentos\?/i.test(txt) && selo === 1 && r && r.p_ids.join() === '31', detalhe: `${txt.replace(/\n/g, ' ')} | ${selo} | ${JSON.stringify(r)}` };
 });
 
 await caso('mapa de salas: sem seletor próprio, segue a unidade do topo (todas = uma tabela por unidade)', async () => {

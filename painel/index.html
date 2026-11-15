@@ -953,9 +953,9 @@
       // Dados institucionais: bloco só de leitura, sem evento nem estado
       h('section', { class: 'inst', 'aria-label': 'Dados institucionais' },
         h('b', {}, 'CSI - Clínica de Saúde e Imagem'),
-        h('p', {}, 'Rua Teixeira de Barros, 27, Brotas. Salvador - Bahia'),
+        h('p', {}, 'Rua Teixeira de Barros, 27, Brotas, Salvador - Bahia'),
         h('p', {}, 'Tel: (71) 3181-7666 | WhatsApp: (71) 99980-3806'),
-        h('p', {}, 'Seg a Sex: 7hs às 18h30 | Sáb: 8hs às 12hs'),
+        h('p', {}, 'Seg a Sex: 7h às 18h30 | Sáb: 8h às 12h'),
         h('p', {}, 'Resp. Técnico: Dr. João Rafael Santos Carneiro | CRM 24778 - CBR'),
         h('p', { class: 'versao', id: 'versaoSite' }, 'v1 beta')));
     const topo = h('header', { class: 'topo' },
@@ -1011,7 +1011,7 @@
   function seletorUnidade() {
     return h('select', { id: 'selUnidade', class: 'sel-unidade', 'aria-label': 'Filtrar tudo por unidade', title: 'Vale para Atendimento, Fila, Avisos, Jornada, Contatos, Médicos (lista e mapa de salas) e Aprendizado. Convênios, Catálogo, Equipe e Configurações são da clínica toda',
       onchange: (e) => { UN.sel = e.target.value; try { localStorage.setItem('painel.unidade', UN.sel); } catch {} aplicarUnidade(); } },
-      h('option', { value: '' }, 'Todas unidades'), UNIDADES_PAINEL.map(([k, r]) => h('option', { value: k, selected: k === UN.sel }, r)));
+      h('option', { value: '' }, 'Todas as unidades'), UNIDADES_PAINEL.map(([k, r]) => h('option', { value: k, selected: k === UN.sel }, r)));
   }
   function aplicarUnidade() {
     atualizarAtencao(true); atualizarSelo(); renderAba();
@@ -1052,7 +1052,7 @@
   // Conta criada / senha redefinida: a equipe lê a senha provisória e passa para o paciente (ela só aparece aqui, uma vez).
   async function acessoFila(x, tipo) {
     const msg = tipo === 'criar' ? 'Criar a conta de ' + x.nome + ' (' + x.email + ') com a senha provisória csi?'
-      : 'Gerar uma senha provisória para ' + x.nome + '? Confira que é a pessoa mesma, aí no balcão. A senha antiga deixa de valer.';
+      : 'Gerar uma senha provisória para ' + x.nome + '? Confirme que é a própria pessoa, aí no balcão. A senha antiga deixa de valer.';
     if (!confirm(msg)) return;
     try {
       const { data, error } = await db.rpc(tipo === 'criar' ? 'fila_criar_conta' : 'fila_redefinir_senha', { p_id: x.id });
@@ -2404,7 +2404,7 @@
       h('section', { class: 'chat', id: 'chat', 'aria-label': 'Conversa' }));
     const cab = h('div', { class: 'painel-cab' },
       h('div', { class: 'cab-linha' },
-        h('div', {}, h('h2', {}, icone('fone'), 'Painel de Atendimento'), h('p', { class: 'sub' }, 'Acompanhe as conversas do dia, o que está em espera e os alertas.')),
+        h('div', {}, h('h2', {}, icone('fone'), 'Painel de atendimento'), h('p', { class: 'sub' }, 'Acompanhe as conversas do dia, o que está em espera e os alertas.')),
         h('div', { class: 'cab-acoes' },
           podeAtender() ? h('button', { class: 'btn', type: 'button', id: 'btnPrevisao', title: 'Pacientes que pediram aviso quando surgir vaga compatível (não é agendamento nem reserva)', onclick: abrirPrevisao }, icone('calendario'), 'Disponibilidade futura') : null,
           podeAtender() ? h('button', { class: 'btn', type: 'button', id: 'btnPendencias', title: 'O que espera a equipe: solicitações do acesso rápido, cadastros para conferir e contas antigas sem PIN', onclick: abrirPendencias },
@@ -3199,7 +3199,7 @@
       } catch (e) { lista.replaceChildren(h('li', { class: 'erro' }, msgErro(e))); }
     }
     c.append(h('div', { class: 'pagina' },
-      h('div', { class: 'cfg-topo' }, h('div', {}, h('h2', {}, 'Respostas Prontas'), h('p', { class: 'sub' }, 'Respostas prontas são modelos de resposta pré-escritos que ajudam a responder rapidamente a uma conversa. Os atendentes podem digitar o caractere “/” seguido pelo atalho para inserir uma resposta pronta durante uma conversa.')),
+      h('div', { class: 'cfg-topo' }, h('div', {}, h('h2', {}, 'Respostas prontas'), h('p', { class: 'sub' }, 'Respostas prontas são modelos de resposta pré-escritos que ajudam a responder rapidamente a uma conversa. Os atendentes podem digitar o caractere “/” seguido pelo atalho para inserir uma resposta pronta durante uma conversa.')),
         h('button', { type: 'button', class: 'btn prim', onclick: () => abrirForm(null) }, 'Adicionar resposta pronta')),
       formBox, lista));
     recarregar();
@@ -3513,10 +3513,10 @@
       { k: 'catalogo_csi', tipo: 'sim', rot: 'CSI (exames e consultas)', dica: 'Desligado: a CSI some da escolha de unidade no começo do chat.' },
       { k: 'catalogo_rmtc', tipo: 'sim', rot: 'CSI RM/TC (ressonância e tomografia)', dica: 'Desligado: a CSI RM/TC some da escolha de unidade no começo do chat.' },
     ] },
-    { id: 'atualizacao', icone: 'livro', titulo: 'Encerramento e avaliação', desc: 'Chaves da Atualização do WebChat. Ligue uma por vez e confira o dia seguinte; desligar volta ao comportamento anterior na hora.', custom: 'autoencerrar', campos: [
+    { id: 'atualizacao', icone: 'livro', titulo: 'Encerramento e avaliação', desc: 'Chaves da atualização do WebChat. Ligue uma por vez e confira o dia seguinte; desligar volta ao comportamento anterior na hora.', custom: 'autoencerrar', campos: [
       { k: 'encerramento_exige_motivo', tipo: 'sim', rot: 'Exigir motivo ao encerrar', dica: 'Ligado: o painel só encerra a conversa com um motivo escolhido. Desligado: o motivo fica opcional.' },
       { k: 'autoencerrar_modo', tipo: 'escolha', rot: 'Aviso de 24 h sem resposta do paciente (chamar no WhatsApp)', opcoes: [['desligado', 'Desligado'], ['simulacao', 'Simulação (só conta, não marca nada)'], ['ligado', 'Ligado']], dica: 'Nenhuma conversa é encerrada sozinha. Passadas 24 h sem resposta do paciente (depois de uma mensagem de pessoa da equipe), a conversa continua aberta e aparece em "Chamar no WhatsApp" para a equipe pedir ao paciente que responda no site. Comece em Simulação e olhe a contagem abaixo.' },
-      { k: 'agendamento_reconhecer', tipo: 'sim', rot: 'Reconhecer agendamentos feitos no Klingo', dica: 'Ligado: a cada 10 min o sistema procura no Klingo, pelo nome completo do paciente, marcações feitas depois da conversa cujo exame bate com o pedido (conversa aberta ou já encerrada). O pedido vira “Agendado” com a data, hora e unidade reais do Klingo; conversa aberta recebe a confirmação, e diferenças só geram um aviso para a atendente.' },
+      { k: 'agendamento_reconhecer', tipo: 'sim', rot: 'Reconhecer agendamentos feitos no Klingo', dica: 'Ligado: a cada 10 min o sistema procura no Klingo, pelo nome completo do paciente, marcações feitas depois da conversa cujo exame bate com o pedido (conversa aberta ou já encerrada). O pedido vira “Agendado” com a data, hora e unidade reais do Klingo; conversa aberta recebe a confirmação, e diferenças só geram um aviso para a equipe.' },
       { k: 'avaliacao_ativa', tipo: 'sim', rot: 'Convite para avaliar o atendimento', dica: 'Ligado: abaixo da despedida o paciente vê o botão “Avaliar o atendimento” (duas notas e por onde conheceu a clínica). Ligue só depois de o jurídico revisar a página de privacidade.' },
       { k: 'encerramento_valida_agendado', tipo: 'sim', rot: 'Conferir a agenda depois de encerrar como Agendado', dica: 'Ligado: Agendado sempre encerra. O sistema confere o agendamento no Klingo em segundo plano e, se não achar, se o Klingo falhar ou se o exame mudar, põe um aviso na conversa e avisa a equipe. Exame ainda futuro deixa de bloquear o encerramento. Ligue depois de “Exigir motivo”.' },
     ] },
@@ -4065,7 +4065,7 @@ h1.longo { font-size: 14mm; }
     };
     filtro.addEventListener('change', pintar); pintar();
     c.replaceChildren(h('div', {},
-      h('p', { class: 'sub' }, 'O que a IA sabe hoje, o que vale limpar no cadastro do Klingo e o que mudou. Atualizado toda noite, às 03:00.'),
+      h('p', { class: 'sub' }, 'O que a IA sabe hoje, o que vale limpar no cadastro do Klingo e o que mudou. Atualizado toda noite, às 3h.'),
       h('div', { class: 'numeros' },
         h('div', { class: 'num' }, h('b', {}, L.ativos ?? 0), h('span', {}, 'procedimentos ativos')),
         h('div', { class: 'num' }, h('b', {}, L.removidos ?? 0), h('span', {}, 'removidos do Klingo')),
@@ -4106,7 +4106,7 @@ h1.longo { font-size: 14mm; }
     if (S.aba !== 'medicos' || MD.vista !== 'mapa') return;
     if (r.error) { alvoMapa.replaceChildren(h('p', { class: 'erro' }, msgErro(r.error)), h('p', { class: 'dica' }, 'Se a mensagem fala de função inexistente, falta rodar o SQL supabase/medicos-regras.sql (seção 6).')); return; }
     const linhas = r.data || [];
-    // A unidade vem do seletor do topo da tela (vale para todas as abas); "Todas unidades" mostra uma tabela por unidade.
+    // A unidade vem do seletor do topo da tela (vale para todas as abas); "Todas as unidades" mostra uma tabela por unidade.
     const unidades = [...new Set(linhas.map((l) => l.unidade))].filter((u) => !UN.sel || chaveUnidade(u) === UN.sel).sort();
     const curto = (n) => nomeMedico(n).split(' ').slice(0, 2).join(' ');
     const chip = (l) => {
@@ -4148,7 +4148,7 @@ h1.longo { font-size: 14mm; }
     (P.proc_avisos || []).forEach((a) => { if (!grupos.has(a.profissional)) grupos.set(a.profissional, []); grupos.get(a.profissional).push(a); });
     const comPendencia = new Set(grupos.keys());
     const blocoProc = grupos.size ? h('div', { class: 'cat-bloco cv-ev', id: 'medicosPendencia' },
-      h('b', {}, `🔔 Pendência de Validação (${grupos.size})`),
+      h('b', {}, `🔔 Pendência de validação (${grupos.size})`),
       [...grupos].map(([prof, itens]) => {
         const nomes = itens.map((a) => nomeMedico(a.procedimento || 'exame'));
         const exames = nomes.length === 1 ? `o exame ${nomes[0]}` : `${nomes.length} exames (${nomes.slice(0, 5).join(', ')}${nomes.length > 5 ? ' e mais ' + (nomes.length - 5) : ''})`;
@@ -4156,13 +4156,13 @@ h1.longo { font-size: 14mm; }
         return h('div', { style: 'margin-top:8px;padding-top:8px;border-top:1px solid var(--csi-border-strong,#ddd)' },
           h('div', {}, `O médico ${nomeMedico(prof)} aceitou realizar ${exames} via Klingo. Deseja validar esta regra para os próximos agendamentos?`),
           h('div', { class: 'ex-acoes' },
-            h('button', { type: 'button', class: 'btn prim', onclick: async () => { const x = await db.rpc('medico_proc_resolver', { p_ids: ids }); if (x.error) { toast(msgErro(x.error)); return; } toast('Validado e ativo.'); recarregar(); } }, 'Confirmar e Ativar'),
+            h('button', { type: 'button', class: 'btn prim', onclick: async () => { const x = await db.rpc('medico_proc_resolver', { p_ids: ids }); if (x.error) { toast(msgErro(x.error)); return; } toast('Validado e ativo.'); recarregar(); } }, 'Confirmar e ativar'),
             h('button', { type: 'button', class: 'btn', onclick: () => {
               const alvoM = lista.find((m) => m.profissional === prof);
               if (!alvoM) { toast('Médico não encontrado na lista.'); return; }
               MD.busca = ''; MD.filtro = 'todos'; busca.value = ''; filtro.value = 'todos'; MD.aberto = alvoM.profissional + '|' + alvoM.unidade; pintar();
-              toast('Ajuste as regras do médico e depois volte aqui para Confirmar e Ativar.'); alvo.scrollIntoView({ behavior: 'smooth' });
-            } }, 'Ajustar Regras Antes de Ativar')));
+              toast('Ajuste as regras do médico e depois volte aqui para Confirmar e ativar.'); alvo.scrollIntoView({ behavior: 'smooth' });
+            } }, 'Ajustar regras antes de ativar')));
       })) : null;
 
     const blocoAvisos = avisos.length ? h('div', { class: 'cat-bloco cv-ev' },
@@ -4638,7 +4638,7 @@ h1.longo { font-size: 14mm; }
     const nFA = (KA.atendidos || 0) + (KA.faltaram || 0), nFB = (KB.atendidos || 0) + (KB.faltaram || 0), tFA = taxa(KA.faltaram, nFA), tFB = taxa(KB.faltaram, nFB);
     const cartoes = h('div', { class: 'ind-kpis' },
       kpi('Pessoas que procuraram o chat', nf(entA), 'abriram conversa no período', delta(entA, entB, { cont: true, base: entB }), 'Cada pessoa conta uma vez, mesmo que tenha aberto mais de uma conversa.'),
-      kpi('Agendaram pelo chat', pTxt(tAgA), `${nf(agA)} de ${nf(entA)} pessoas`, delta(tAgA, tAgB, { base: Math.min(entA, entB) }), 'Das pessoas que procuraram o chat, quantas terminaram com exame agendado (pelo sistema ou pela atendente).'),
+      kpi('Agendaram pelo chat', pTxt(tAgA), `${nf(agA)} de ${nf(entA)} pessoas`, delta(tAgA, tAgB, { base: Math.min(entA, entB) }), 'Das pessoas que procuraram o chat, quantas terminaram com exame agendado (pelo sistema ou pela equipe).'),
       kpi('Marcações novas na clínica', nf(KA.novas_marcacoes), `${nf(KA.novas_pelo_chat)} vieram do chat · todos os canais (Klingo)`, delta(KA.novas_marcacoes, KB.novas_marcacoes, { cont: true, base: KB.novas_marcacoes || 0 }), 'Exames marcados no Klingo no período, por qualquer canal (recepção, telefone, WhatsApp, chat), sem contar remarcações.'),
       kpi('Faltas', pTxt(tFA), `${nf(KA.faltaram)} faltaram de ${nf(nFA)} exames que já aconteceram`, delta(tFA, tFB, { bomSobe: false, base: Math.min(nFA, nFB) }), 'Faltou ÷ (atendidos + faltaram), pela data do exame.'));
 
@@ -4701,10 +4701,10 @@ h1.longo { font-size: 14mm; }
       h('details', { class: 'ind-como' }, h('summary', {}, 'Como ler estes números'),
         h('ul', {},
           h('li', {}, 'Cada pessoa conta uma vez, mesmo que tenha aberto mais de uma conversa. Conversas de teste da TI ficam de fora.'),
-          h('li', {}, '"Agendaram" inclui o agendamento feito pelo sistema e o marcado pela atendente (ou conversa encerrada como "agendado").'),
+          h('li', {}, '"Agendaram" inclui o agendamento feito pelo sistema e o marcado pela equipe (ou conversa encerrada como "agendado").'),
           h('li', {}, 'As setas comparam com o período anterior de mesmo tamanho. Com poucos casos (menos de 8) o painel avisa em vez de comparar.'),
           h('li', {}, 'Faltas e cancelamentos vêm do Klingo e valem para toda a clínica, não só para quem veio do chat. O histórico do Klingo aqui começa em 30/08/2026.'),
-          h('li', {}, 'Dia de hoje ainda está em andamento: faltas só aparecem depois que o exame passa.')))));
+          h('li', {}, 'O dia de hoje ainda está em andamento: faltas só aparecem depois que o exame passa.')))));
     // Avaliações (só administrador) saíram desta tela de decisão; ficam no resumo da conversa.
     clearTimeout(IND.t);
     IND.t = setTimeout(() => { if (S.aba === 'indicadores' && !document.hidden) viewIndicadores(c, true); }, 120000);
@@ -4753,7 +4753,7 @@ h1.longo { font-size: 14mm; }
         ['Desfizeram um agendamento', A.desfez_agendado ?? 0], ['Conversas assumidas por atendente', (V.assumidas_por_atendente ?? 0) + ' de ' + (V.total ?? 0)]], ''),
       h('h3', {}, 'Por semana'),
       tabela(['Semana de', 'Criados', 'Agendados', 'Com alerta', 'Cancelados'], (R.semanas || []).map((s) => [semana(s.semana), s.criados, s.agendados, s.com_alerta, s.cancelados]), 'Sem dados ainda.'),
-      h('h3', {}, 'Preço do catálogo x preço lançado no Klingo'),
+      h('h3', {}, 'Preço do catálogo × preço lançado no Klingo'),
       h('p', { class: 'dica' }, P.atualizado_em ? `${P.comparados ?? 0} combinações de exame e operadora comparadas${P.com_varias_linhas ? ` (${P.com_varias_linhas} têm mais de uma linha no catálogo: a comparação usa a mais próxima do Klingo)` : ''}, ${P.sem_referencia ?? 0} sem referência no catálogo, ${P.divergentes_total ?? 0} com diferença de 10% ou mais (mostrando até 30). Atualizado em ${fmtDataHora(P.atualizado_em)}. A IA continua usando o preço do catálogo: corrija no Klingo ou no catálogo e confirme com a recepção.`
         : 'Ainda não há preços lidos do Klingo: o primeiro cálculo acontece na próxima atualização da agenda (a cada 10 minutos).'),
       tabela(['Exame', 'Operadora', 'Catálogo', 'Klingo', 'Diferença', 'Amostras'], (P.divergentes || []).map((x) => [x.exame, x.operadora, brl(x.catalogo), brl(x.klingo), (x.dif_pct > 0 ? '+' : '') + x.dif_pct + '%', x.amostras]), 'Nenhuma diferença relevante.'),
