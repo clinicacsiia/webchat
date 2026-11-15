@@ -237,7 +237,7 @@ await caso('clicar na Indi (fila): vai à hora do maior pico de fila, e "Encerra
   return { ok: v.exata === true && /esperando/.test(bolha) && depois === null && oculta && escondida, detalhe: JSON.stringify({ v, bolha: bolha.slice(0, 90) }) };
 });
 await caso('3D: cena aberta, pontos de atenção em destaque e o resto como contorno', async () => {
-  await P.waitForFunction(() => window.__simulacao.estado3d() === 'ready', null, { timeout: 30000 });
+  await P.waitForFunction(() => window.__simulacao?.estado3d?.() === 'ready', null, { timeout: 30000 });
   await espera(600);
   const c = await P.evaluate(() => window.__simulacao.cena());
   const a = await P.evaluate(() => window.__simulacao.analise().pontos.length);
@@ -349,7 +349,7 @@ await caso('sem WebGL: a página avisa, mantém os assuntos da Indi e não dá e
   const semGl = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH, args: ['--no-sandbox', '--disable-3d-apis', '--disable-gpu', '--disable-webgl', '--disable-webgl2'] } : {});
   const { p, ctx, erros } = await pagina(semGl, { logado: true });
   await p.goto(URL_BASE);
-  await p.waitForFunction(() => ['off', 'ready'].includes(window.__simulacao.estado3d()), null, { timeout: 30000 });
+  await p.waitForFunction(() => ['off', 'ready'].includes(window.__simulacao?.estado3d?.()), null, { timeout: 30000 });
   const estado = await p.evaluate(() => window.__simulacao.estado3d());
   const msg = estado === 'off' ? await p.locator('#scene3dMsg').innerText() : '';
   const itens = await p.locator('#indiAssuntos [data-assunto]').count();
