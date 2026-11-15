@@ -1,6 +1,6 @@
 # Acompanhe seus pedidos (check-in com login automático)
 
-Versão 1.0 — 15/11/2026 / Mudança: Implementação inicial. **Banco aplicado na produção em 15/11/2026; telas só na branch `claude/order-exam-tracking-psehjh` (publicam quando entrarem na `main`).**
+Versão 1.1 — 15/11/2026 / Mudança: **pedidos encerrados pelo painel** (motivo, avaliar, reabrir), **cancelar e apagar**, apagar sozinho em 30 dias e nova ordem da lista; banco aplicado na produção (`acompanhar_encerrados_parte1..3`), tela na branch. Versão 1.0 — 15/11/2026 / Mudança: Implementação inicial. **Banco aplicado na produção em 15/11/2026; telas só na branch `claude/order-exam-tracking-psehjh` (publicam quando entrarem na `main`).**
 
 **Banco:** `supabase/acompanhar-pedidos.sql` (6 partes aplicadas). **Telas:** `index.html` (botão grande e balão), `minha-vez/index.html` (o check-in, agora com os pedidos), `acesso/index.html` (volta para o check-in). **Edge Function:** `app-resultados-vigiar` (no ar, **desligada**). **Testes:** `npm run test:acompanhar-sql` (35), `npm run test:acompanhar` (20, páginas reais num Chromium), `npm run test:edge` (inclui a vigia).
 
@@ -11,6 +11,18 @@ Versão 1.0 — 15/11/2026 / Mudança: Implementação inicial. **Banco aplicado
 4. **Tocar no pedido oferece levar até a conversa** ("Sim, abrir a conversa"). No mesmo cartão: **Remarcar** e **Cancelar** (só exame marcado/confirmado; o cancelamento pede confirmação) e, em exame feito, **Pedir meu resultado**.
 5. A tela **atualiza sozinha** a cada 20 s (e ao voltar para a aba), a partir do que o Klingo já traz para a Jornada a cada 30 s.
 6. **Resultados guardados:** seção à parte com tudo que a equipe já entregou; "Ver o resultado" baixa o arquivo.
+
+## Encerrado no painel, avaliar, reabrir, apagar (v1.1)
+Arquivo: `supabase/acompanhar-encerrados.sql` · testes: `npm run test:acompanhar-encerrados` (26 casos de banco) e `npm run test:acompanhar` (36, tela).
+- **Sincronia com o painel.** A lista lê o estado real da conversa. Quando a equipe (ou o sistema) encerra, em até 20 s o cartão passa a **"Encerrado"**, com o **motivo** em palavras simples (Agendado → "Seu horário foi agendado"; Apenas informações → "Você pediu só informações"; Paciente desistiu → "Pedido cancelado"; Não respondido → "Ficamos sem resposta"; Outro → "Atendimento concluído") e a data. Encerrar conta como **novidade** (balão). Pedido cancelado no painel também aparece como cancelado.
+- **Avaliar:** botão no próprio cartão. Usa a mesma avaliação do chat (`chat_avaliar`: duas notas de 0 a 10 e o canal), uma vez por encerramento, e só se o atendimento tem convite de avaliação (não aparece para "não respondido").
+- **Reabrir:** botão no cartão. A conversa volta para a **fila da equipe** (o assistente fica desligado, a conversa marca "paciente aguardando") com a mensagem "Quero reabrir este pedido." Vale até **30 dias** depois do encerramento (no chat comum são 2 dias). Não reabre pedido que o paciente já substituiu por uma conversa nova.
+- **Apagar:** tira o pedido da **lista do paciente**. Encerrado: só tira. Aberto **sem exame marcado**: *cancela e apaga* (cancela o pré-agendamento, avisa a equipe dentro da conversa, encerra como "Paciente desistiu" e tira da lista). Aberto **com exame marcado**: não deixa; primeiro "Cancelar" o exame (a conversa confirma no Klingo). Apagar **nunca** cancela marcação no Klingo; se o exame ainda está marcado, a tela avisa antes.
+- **Apagar sozinho:** 30 dias depois do encerramento. Se ainda houver exame marcado por vir, conta 30 dias depois da data do último exame (para o exame marcado não sumir antes de acontecer). Apagada e depois reaberta, a conversa volta a aparecer.
+- **O que "apagar" não faz:** não apaga a conversa, as mensagens, a avaliação nem os indicadores da clínica (só o paciente deixa de ver). Apagar de verdade levaria junto avaliações, encerramentos e histórico dos indicadores (tudo em cascata) e o prazo de guarda ainda não foi definido pelo jurídico (item 2.5). Decisão do dono: ver `pendencias-do-dono.md`, item 2.15.
+- **Conversas sem exame** também aparecem quando a equipe já atendeu ou encerrou de verdade (para o paciente poder avaliar ou reabrir). Ficam de fora: "não respondido", "nova conversa" e conversa aberta que ninguém da equipe tocou.
+- **Ordem da lista:** conversas abertas primeiro, com o **dia mais perto** em cima e, no empate (ou sem dia), a **atualizada por último** primeiro; as encerradas vão para o fim, a mais recente primeiro. Dentro do cartão: o que ainda vai acontecer (do mais perto) e depois o que já passou.
+- **Voltar atrás:** comandos no cabeçalho do arquivo. A coluna `app_conversa.removido_em` guarda o que cada paciente apagou (dá para desfazer com `update ... set removido_em = null`).
 
 ## Balão de novidades
 Cada conversa guarda uma "assinatura" do que a pessoa já viu (passos, datas, resultado). Mudou o Klingo → assinatura diferente → conta 1 no balão. Ao abrir o portal por 3,5 s tudo é marcado como visto e o balão some. O que já existia quando a conversa foi ligada ao cadastro **não** conta. O balão e a recarga automática **não estendem** o PIN dos 30 minutos (`p_renova = false`).

@@ -1,5 +1,5 @@
 -- RETRATO DA ESTRUTURA DO BANCO DE PRODUÇÃO (projeto webchat-atendimento). GERADO: não editar à mão.
--- Atualização parcial em 2026-11-15T08:00:00Z (funções app_* e painel_app_*, tabelas app_*). Retrato inteiro tirado em 2026-11-14T20:32:54.165875+00:00 · Postgres 17.11. Só estrutura: nenhuma linha de tabela, nenhum valor de configuração.
+-- Atualização parcial em 2026-11-15T15:52:45.081472+00:00 (funções app_* e painel_app_*, tabelas app_*). Retrato inteiro tirado em 2026-11-14T20:32:54.165875+00:00 · Postgres 17.11. Só estrutura: nenhuma linha de tabela, nenhum valor de configuração.
 -- Serve de referência e para os testes. NÃO rodar inteiro sobre a produção. Como refazer: supabase/producao/LEIAME.md.
 
 -- ===== Extensões =====
@@ -2502,20 +2502,6 @@ alter table public.app_paciente enable row level security;
 
 
 
-create table public.app_conversa (
-  paciente_id uuid not null,
-  conversa_id uuid not null,
-  pessoa_nome text,
-  eu boolean default true not null,
-  visto_sig text,
-  visto_em timestamp with time zone,
-  criado_em timestamp with time zone default now() not null,
-  constraint app_conversa_pkey PRIMARY KEY (paciente_id, conversa_id)
-);
-comment on table public.app_conversa is 'Conversas que o aparelho provou ter (id + token + celular do cadastro). Só as funções app_* leem. Guarda a assinatura do que o paciente já viu (balão de novidades).';
-CREATE INDEX app_conversa_conversa_idx ON public.app_conversa USING btree (conversa_id);
-alter table public.app_conversa enable row level security;
-
 create table public.app_resultado (
   id uuid default gen_random_uuid() not null,
   paciente_id uuid not null,
@@ -2639,6 +2625,24 @@ create table public.atendimento_hora (
 CREATE INDEX atendimento_hora_fim ON public.atendimento_hora USING btree (fim_em);
 alter table public.atendimento_hora enable row level security;
 
+
+create table public.app_conversa (
+  paciente_id uuid not null,
+  conversa_id uuid not null,
+  pessoa_nome text,
+  eu boolean default true not null,
+  visto_sig text,
+  visto_em timestamp with time zone,
+  criado_em timestamp with time zone default now() not null,
+  removido_em timestamp with time zone,
+  removido_por text,
+  constraint app_conversa_removido_por_ck CHECK (((removido_por IS NULL) OR (removido_por = ANY (ARRAY['paciente'::text, 'cancelou'::text])))),
+  constraint app_conversa_pkey PRIMARY KEY (paciente_id, conversa_id)
+);
+comment on table public.app_conversa is 'Conversas que o aparelho provou ter (id + token + celular do cadastro). Só as funções app_* leem. Guarda a assinatura do que o paciente já viu (balão de novidades).';
+CREATE INDEX app_conversa_conversa_idx ON public.app_conversa USING btree (conversa_id);
+alter table public.app_conversa enable row level security;
+
 -- ===== Chaves estrangeiras (depois de todas as tabelas) =====
 alter table public.agendamento_fechamento add constraint agendamento_fechamento_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE CASCADE;
 alter table public.agendamento_fechamento add constraint agendamento_fechamento_por_fkey FOREIGN KEY (por) REFERENCES agentes(id) ON DELETE SET NULL;
@@ -2734,8 +2738,6 @@ alter table public.app_marcacao add constraint app_marcacao_filho_id_fkey FOREIG
 alter table public.app_marcacao add constraint app_marcacao_responsavel_id_fkey FOREIGN KEY (responsavel_id) REFERENCES public.app_paciente(id) ON DELETE CASCADE;
 alter table public.app_paciente add constraint app_paciente_conta_antiga_id_fkey FOREIGN KEY (conta_antiga_id) REFERENCES public.contas_paciente(id) ON DELETE SET NULL;
 alter table public.app_paciente add constraint app_paciente_paciente_sugerido_id_fkey FOREIGN KEY (paciente_sugerido_id) REFERENCES public.pacientes(id) ON DELETE SET NULL;
-alter table public.app_conversa add constraint app_conversa_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES public.conversas(id) ON DELETE CASCADE;
-alter table public.app_conversa add constraint app_conversa_paciente_id_fkey FOREIGN KEY (paciente_id) REFERENCES public.app_paciente(id) ON DELETE CASCADE;
 alter table public.app_resultado add constraint app_resultado_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES public.conversas(id) ON DELETE CASCADE;
 alter table public.app_resultado add constraint app_resultado_conversa_resultado_id_fkey FOREIGN KEY (conversa_resultado_id) REFERENCES public.conversas(id) ON DELETE SET NULL;
 alter table public.app_resultado add constraint app_resultado_paciente_id_fkey FOREIGN KEY (paciente_id) REFERENCES public.app_paciente(id) ON DELETE CASCADE;
@@ -2745,6 +2747,8 @@ alter table public.mensagens add constraint mensagens_agente_id_fkey FOREIGN KEY
 alter table public.mensagens add constraint mensagens_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES public.conversas(id) ON DELETE CASCADE;
 alter table public.app_acesso_log add constraint app_acesso_log_aparelho_id_fkey FOREIGN KEY (aparelho_id) REFERENCES app_aparelho(id) ON DELETE SET NULL;
 alter table public.app_acesso_log add constraint app_acesso_log_paciente_id_fkey FOREIGN KEY (paciente_id) REFERENCES app_paciente(id) ON DELETE CASCADE;
+alter table public.app_conversa add constraint app_conversa_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE CASCADE;
+alter table public.app_conversa add constraint app_conversa_paciente_id_fkey FOREIGN KEY (paciente_id) REFERENCES app_paciente(id) ON DELETE CASCADE;
 
 -- ===== Visões (5) =====
 

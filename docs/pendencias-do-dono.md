@@ -140,6 +140,7 @@ Detalhes em [`acesso-rapido-paciente.md`](acesso-rapido-paciente.md). O que só 
 
 ### 2.15 Acompanhe seus pedidos (15/11/2026): banco e telas no ar
 Detalhes em [`acompanhar-pedidos.md`](acompanhar-pedidos.md). O que só você faz ou decide:
+0. **Decisão (15/11/2026): o que "apagar" significa.** Por segurança, apagar **tira o pedido da lista do paciente** (e some sozinho 30 dias depois do encerramento); a conversa, as mensagens, a avaliação e os indicadores **continuam no painel**. Apagar de verdade a conversa levaria junto avaliações, encerramentos e histórico dos indicadores, e o prazo de guarda ainda não foi definido (item 2.5). Se quiser a eliminação real depois do prazo, é só dizer: faço uma rotina que apaga a conversa inteira (ou só o texto das mensagens) depois do prazo que o jurídico definir.
 1. ~~**Publicar as telas**~~ (feito: PR #187 juntado na `main` em 15/11/2026).
 2. **Testar no seu celular** (com o acesso rápido): fazer um pedido, ver o botão grande, o balão, o portal e o check-in de um toque.
 3. **Resultado automático ("disponível"):** a vigia está no ar mas **desligada**. Ligar só depois de um teste com um paciente real que autorize (um exame feito com laudo pronto): `update public.config set valor = 'sim' where chave = 'app_resultado_vigia';`. Sem isso o paciente ainda pode **pedir** o resultado (botão "Perguntar pelo resultado"), e a equipe entrega na conversa.

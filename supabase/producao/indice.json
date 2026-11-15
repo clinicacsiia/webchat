@@ -2100,20 +2100,6 @@
    "politicas": 0
   },
   {
-   "nome": "app_conversa",
-   "colunas": [
-    "paciente_id",
-    "conversa_id",
-    "pessoa_nome",
-    "eu",
-    "visto_sig",
-    "visto_em",
-    "criado_em"
-   ],
-   "rls": true,
-   "politicas": 0
-  },
-  {
    "nome": "app_resultado",
    "colunas": [
     "id",
@@ -2214,6 +2200,22 @@
     "fim_em",
     "fonte",
     "lido_em"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "app_conversa",
+   "colunas": [
+    "paciente_id",
+    "conversa_id",
+    "pessoa_nome",
+    "eu",
+    "visto_sig",
+    "visto_em",
+    "criado_em",
+    "removido_em",
+    "removido_por"
    ],
    "rls": true,
    "politicas": 0
@@ -4229,7 +4231,76 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "11795deb92a87a6a82d9c744dcea013a"
+   "md5": "e53957ee721271d34a7f99f1ed5ae09c"
+  },
+  {
+   "nome": "app_pedido_apagar",
+   "args": [
+    {
+     "nome": "p_token",
+     "padrao": false
+    },
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "cc582843af6caf142a350d384cbe8a13"
+  },
+  {
+   "nome": "app_pedido_avaliar",
+   "args": [
+    {
+     "nome": "p_token",
+     "padrao": false
+    },
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_nota_atendimento",
+     "padrao": false
+    },
+    {
+     "nome": "p_nota_site",
+     "padrao": false
+    },
+    {
+     "nome": "p_canal",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "87d08cb7fed3964b65afa91a7ce41f99"
+  },
+  {
+   "nome": "app_pedido_reabrir",
+   "args": [
+    {
+     "nome": "p_token",
+     "padrao": false
+    },
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "a987fc6ca175355507d20dfe1f101775"
   },
   {
    "nome": "app_pedido_visto",

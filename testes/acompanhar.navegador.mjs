@@ -125,6 +125,9 @@ async function abrirPortal({ dev = true, dados = dadosPadrao(), bloqueado = fals
         case 'app_perfil': return j(perfilResp);
         case 'app_pedido_visto': return j({ ok: true });
         case 'app_pedido_acao': return j(estado.acao ? estado.acao(c) : { ok: true, conversa: c.p_conversa, token: 'tok-' + c.p_conversa, tipo: 'proprio', paciente_nome: null, aberta: true });
+        case 'app_pedido_apagar': return j(estado.apagar ? estado.apagar(c) : { ok: true, cancelado: false });
+        case 'app_pedido_reabrir': return j(estado.reabrir ? estado.reabrir(c) : { ok: true, conversa: c.p_conversa, token: 'tok-reaberto', aberta: true, reaberta: true, tipo: 'proprio', paciente_nome: null });
+        case 'app_pedido_avaliar': return j(estado.avaliar ? estado.avaliar(c) : { ok: true, nova: true });
         case 'app_resultado_arquivo': return j({ ok: true, mime: 'application/pdf', nome: 'laudo.pdf', base64: Buffer.from('%PDF-1.4 teste').toString('base64') });
         case 'checkin_publico': estado.checkin = c; return j({ situacao: 'aguardando', ticket: 'tk-9', senha: 7, posicao: 3, a_frente: 2 });
         case 'fila_minha_vez_ticket': return j({ situacao: 'aguardando', senha: 7, posicao: 3, a_frente: 2, total: 5, pode_chegar: true });
@@ -274,6 +277,179 @@ await caso('código do aparelho desconhecido pelo servidor: some do aparelho e c
   const t = await textoDe(page);
   await ctx.close();
   return { ok: guardado === null && /Chegou na clínica/.test(t) };
+});
+
+// ======================================================= 3) pedidos encerrados pelo painel: motivo, avaliar, reabrir, apagar
+const enc = (extra = {}) => ({ conversa: C1, pessoa: 'Ana Souza Teste', eu: true, aberta: false, status: 'encerrada', tipo: 'exame', exames: [{ id: 11, nome: 'RM JOELHO DIREITO', unidade: 'Centro', data: dia(6), hora: '08:40', ok: 2, excecao: null, resultado: null }],
+  sig: 'a', novo: false, encerrada_em: new Date(Date.now() - 2 * 86400000).toISOString(), motivo: 'agendado', origem: 'equipe', apaga_em: new Date(Date.now() + 28 * 86400000).toISOString(), proxima: dia(6),
+  pode_reabrir: true, pode_avaliar: true, avaliou: false, pode_apagar: true, cancela_ao_apagar: false, reservado: true, ...extra });
+const aberto = (extra = {}) => ({ ...enc({ conversa: C2, pessoa: 'Leo Souza Teste', eu: false, aberta: true, status: 'em_atendimento', encerrada_em: null, motivo: null, origem: null, apaga_em: null, pode_reabrir: false, pode_avaliar: false, pode_apagar: false, reservado: true }), ...extra });
+const dadosEnc = (pedidos) => ({ ...dadosPadrao(), pedidos, novidades: 0, resultados: [] });
+
+await caso('encerrada no painel: o cartão mostra "Encerrado", o MOTIVO, o dia e quando some sozinha; avisos e botões à vista (avaliar, reabrir, apagar)', async () => {
+  const { page, ctx, erros } = await abrirPortal({ dados: dadosEnc([enc()]) });
+  const t = await page.locator('.cartao.pedido').innerText();
+  const botoes = await page.$$eval('.cartao.pedido .enc-acoes button', (bs) => bs.map((b) => b.textContent.trim()));
+  await ctx.close();
+  return { ok: /Encerrado/.test(t) && /Atendimento encerrado em \d\d\/\d\d\./.test(t) && /Motivo: Seu horário foi agendado\./.test(t) && /some da sua lista em \d\d\/\d\d/.test(t)
+    && botoes.length === 3 && /Avaliar/.test(botoes[0]) && /Reabrir/.test(botoes[1]) && /Apagar/.test(botoes[2]) && erros.length === 0, detalhe: JSON.stringify({ botoes, t: t.slice(0, 260).replace(/\n+/g, ' | ') }) };
+});
+await caso('cada motivo vira uma frase simples; encerrado automaticamente avisa; "já avaliou" some o botão Avaliar', async () => {
+  const motivos = { apenas_informacoes: /Você pediu só informações/, desistiu: /Pedido cancelado/, nao_respondido: /Ficamos sem resposta \(encerrado automaticamente\)/, outro: /Atendimento concluído/ };
+  const lista = [enc({ motivo: 'apenas_informacoes' }), enc({ conversa: C2, motivo: 'desistiu' }), enc({ conversa: C3, motivo: 'nao_respondido', origem: 'inatividade' }), enc({ conversa: C9, motivo: 'outro', pode_avaliar: false, avaliou: true })];
+  const { page, ctx } = await abrirPortal({ dados: dadosEnc(lista) });
+  const ts = await page.$$eval('.cartao.pedido', (ns) => ns.map((n) => n.innerText));
+  await ctx.close();
+  const ok = Object.values(motivos).every((re, i) => re.test(ts[i])) && /Você já avaliou/.test(ts[3]) && !/Avaliar o atendimento/.test(ts[3]);
+  return { ok, detalhe: ts.map((x) => x.replace(/\n+/g, ' ').slice(40, 130)).join(' || ') };
+});
+await caso('conversa encerrada sem horário marcado não diz "estamos organizando o horário"', async () => {
+  const lista = [enc({ exames: [{ id: null, nome: 'RM COLUNA', unidade: null, data: null, hora: null, ok: 1, excecao: null, resultado: null }], pode_apagar: true, reservado: false })];
+  const { page, ctx } = await abrirPortal({ dados: dadosEnc(lista) });
+  const t = await page.locator('.cartao.pedido').innerText();
+  await ctx.close();
+  return { ok: /Sem horário marcado/.test(t) && !/organizando o horário/.test(t) && !/em andamento/.test(t), detalhe: t.slice(0, 160).replace(/\n+/g, ' | ') };
+});
+await caso('conversa aberta (equipe atendendo) não mostra encerramento, avaliar nem reabrir', async () => {
+  const { page, ctx } = await abrirPortal({ dados: dadosEnc([aberto()]) });
+  const t = await page.locator('.cartao.pedido').innerText();
+  await ctx.close();
+  return { ok: !/Encerrado|encerrado|Avaliar|Reabrir|Apagar/.test(t) && /Exame marcado/.test(t), detalhe: t.replace(/\n+/g, ' | ').slice(0, 200) };
+});
+await caso('conversa sem exame, aberta com a equipe: aparece como "Conversa com a clínica"', async () => {
+  const { page, ctx } = await abrirPortal({ dados: dadosEnc([aberto({ exames: [], tipo: null })]) });
+  const t = await page.locator('.cartao.pedido').innerText();
+  await ctx.close();
+  return { ok: /Conversa com a clínica|Leo/.test(t) && /A equipe está atendendo você/.test(t), detalhe: t.replace(/\n+/g, ' | ').slice(0, 200) };
+});
+await caso('Avaliar: abre o formulário (duas notas de 0 a 10 e o canal), exige tudo, envia ao banco e agradece; o botão some depois', async () => {
+  const { page, ctx, estado } = await abrirPortal({ dados: dadosEnc([enc()]) });
+  await page.click('.cartao.pedido [data-acao="avaliar"]');
+  const abriu = await page.$$eval('.folha .aval-nota', (ns) => ns.length);
+  const abriuFolhaDoPedido = await page.$$eval('#acaoConversa', (ns) => ns.length);   // o clique do botão não abre também a folha do pedido
+  await page.click('.folha button[type="submit"]');
+  const faltou = await page.$eval('.folha .erro', (n) => n.textContent);
+  await page.locator('.folha fieldset', { hasText: 'seu atendimento' }).locator('label', { hasText: /^9$/ }).click();
+  await page.locator('.folha fieldset', { hasText: 'nosso site' }).locator('label', { hasText: /^10$/ }).click();
+  await page.locator('.folha label', { hasText: 'Instagram' }).click();
+  estado.dados = dadosEnc([enc({ pode_avaliar: false, avaliou: true })]);   // o banco passa a dizer que já avaliou
+  await page.click('.folha button[type="submit"]');
+  await espera(900);
+  const msg = await page.$eval('#avisoTela', (n) => n.textContent).catch(() => '');
+  const t = await page.locator('.cartao.pedido').innerText();
+  const c = (estado.corpos.app_pedido_avaliar || [])[0];
+  await ctx.close();
+  return { ok: abriu === 22 && abriuFolhaDoPedido === 0 && /Escolha uma nota/.test(faltou) && c.p_conversa === C1 && c.p_nota_atendimento === 9 && c.p_nota_site === 10 && c.p_canal === 'Instagram' && c.p_token === DEV
+    && /Obrigado pela sua avaliação/.test(msg) && /Você já avaliou/.test(t) && !/Avaliar o atendimento/.test(t), detalhe: JSON.stringify({ abriu, faltou, c, msg }) };
+});
+await caso('Avaliar: se o banco recusar, a mensagem aparece e as notas continuam na tela', async () => {
+  const { page, ctx, estado } = await abrirPortal({ dados: dadosEnc([enc()]) });
+  estado.avaliar = () => ({ ok: false, erro: 'avaliar', mensagem: 'Só é possível avaliar depois do encerramento do atendimento.' });
+  await page.click('.cartao.pedido [data-acao="avaliar"]');
+  await page.locator('.folha fieldset', { hasText: 'seu atendimento' }).locator('label', { hasText: /^7$/ }).click();
+  await page.locator('.folha fieldset', { hasText: 'nosso site' }).locator('label', { hasText: /^8$/ }).click();
+  await page.locator('.folha label', { hasText: 'Google' }).click();
+  await page.click('.folha button[type="submit"]');
+  await espera(600);
+  const msg = await page.$eval('.folha .erro', (n) => n.textContent);
+  const marcada = await page.$$eval('.folha input:checked', (ns) => ns.length);
+  await ctx.close();
+  return { ok: /depois do encerramento/.test(msg) && marcada === 3, detalhe: `${msg} ${marcada}` };
+});
+await caso('Reabrir: chama o banco, grava o código da conversa no aparelho e abre o chat nela', async () => {
+  const { page, ctx, estado } = await abrirPortal({ dados: dadosEnc([enc()]) });
+  await page.click('.cartao.pedido [data-acao="reabrir"]');
+  await page.waitForURL(`${base}/`, { timeout: 8000 }).catch(() => {});
+  const conv = await page.evaluate(() => JSON.parse(localStorage.getItem('webchat.conversa.v1') || 'null'));
+  const c = (estado.corpos.app_pedido_reabrir || [])[0];
+  await ctx.close();
+  return { ok: c && c.p_conversa === C1 && c.p_token === DEV && conv && conv.id === C1 && conv.token === 'tok-reaberto', detalhe: JSON.stringify({ c, conv }) };
+});
+await caso('Reabrir recusado (prazo): fica na tela, mostra o motivo e não troca de página', async () => {
+  const { page, ctx, estado } = await abrirPortal({ dados: dadosEnc([enc()]) });
+  estado.reabrir = () => ({ ok: false, erro: 'prazo', mensagem: 'Já passou o prazo para reabrir. Abra uma conversa nova pelo chat.' });
+  await page.click('.cartao.pedido [data-acao="reabrir"]');
+  await espera(600);
+  const msg = await page.$eval('#avisoTela', (n) => n.textContent).catch(() => '');
+  const url = page.url();
+  await ctx.close();
+  return { ok: /prazo/.test(msg) && /minha-vez/.test(url), detalhe: `${msg} ${url}` };
+});
+await caso('Apagar (encerrada): confirma, chama o banco, a lista recarrega sem o pedido e a conversa sai da memória do chat neste aparelho', async () => {
+  const { page, ctx, estado } = await abrirPortal({ dados: dadosEnc([enc(), enc({ conversa: C3, motivo: 'outro', pode_avaliar: false })]) });
+  await page.evaluate((c) => { localStorage.setItem('webchat.historico.v1', JSON.stringify([{ id: c, token: 'x', tipo: 'proprio' }, { id: 'outra', token: 'y', tipo: 'proprio' }])); localStorage.setItem('webchat.conversa.v1', JSON.stringify({ id: c, token: 'x', tipo: 'proprio' })); }, C1);
+  let pergunta = ''; page.removeAllListeners('dialog'); page.on('dialog', (d) => { pergunta = d.message(); d.accept(); });
+  estado.apagar = () => { estado.dados = dadosEnc([enc({ conversa: C3, motivo: 'outro', pode_avaliar: false })]); return { ok: true, cancelado: false }; };
+  await page.locator('.cartao.pedido').first().locator('[data-acao="apagar"]').click();
+  await espera(900);
+  const n = await page.$$eval('.cartao.pedido', (ns) => ns.length);
+  const msg = await page.$eval('#avisoTela', (x) => x.textContent).catch(() => '');
+  const mem = await page.evaluate(() => ({ h: JSON.parse(localStorage.getItem('webchat.historico.v1') || '[]').map((x) => x.id), c: localStorage.getItem('webchat.conversa.v1') }));
+  const c = (estado.corpos.app_pedido_apagar || [])[0];
+  await ctx.close();
+  return { ok: /ainda tem exame marcado|continua marcado/.test(pergunta) && c.p_conversa === C1 && n === 1 && /apagado da sua lista/i.test(msg) && mem.h.join() === 'outra' && mem.c === null, detalhe: JSON.stringify({ pergunta, n, msg, mem }) };
+});
+await caso('Apagar: "Não" na confirmação não chama o banco', async () => {
+  const { page, ctx, estado } = await abrirPortal({ dados: dadosEnc([enc()]) });
+  page.removeAllListeners('dialog'); page.on('dialog', (d) => d.dismiss());
+  await page.click('.cartao.pedido [data-acao="apagar"]');
+  await espera(400);
+  await ctx.close();
+  return { ok: !(estado.corpos.app_pedido_apagar || []).length };
+});
+await caso('Pedido aberto SEM exame marcado: pela folha, "Cancelar e apagar este pedido" avisa que a clínica será avisada; com exame marcado a opção não existe e o texto explica', async () => {
+  const semExame = aberto({ conversa: C2, exames: [{ id: null, nome: 'RM COLUNA', unidade: null, data: null, hora: null, ok: 1, excecao: null, resultado: null }], pode_apagar: true, cancela_ao_apagar: true, reservado: false });
+  const { page, ctx, estado } = await abrirPortal({ dados: dadosEnc([semExame, aberto({ conversa: C3 })]) });
+  await page.locator('.cartao.pedido').first().click();
+  const textoBotao = await page.$eval('#acaoApagar', (b) => b.textContent.trim());
+  let pergunta = ''; page.removeAllListeners('dialog'); page.on('dialog', (d) => { pergunta = d.message(); d.accept(); });
+  estado.apagar = () => { estado.dados = dadosEnc([aberto({ conversa: C3 })]); return { ok: true, cancelado: true }; };
+  await page.click('#acaoApagar');
+  await espera(900);
+  const msg = await page.$eval('#avisoTela', (x) => x.textContent).catch(() => '');
+  await page.locator('.cartao.pedido').first().click();
+  const sem = await page.$$eval('#acaoApagar', (ns) => ns.length);
+  const dica = await page.$eval('.folha', (n) => n.innerText);
+  await ctx.close();
+  return { ok: /Cancelar e apagar/.test(textoBotao) && /A clínica será avisada/.test(pergunta) && /cancelado e apagado/i.test(msg) && sem === 0 && /cancele primeiro o exame marcado/i.test(dica), detalhe: JSON.stringify({ textoBotao, pergunta, msg, sem }) };
+});
+await caso('Apagar recusado pelo banco (exame marcado): mostra a explicação do banco e o pedido continua na lista', async () => {
+  const { page, ctx, estado } = await abrirPortal({ dados: dadosEnc([enc()]) });
+  estado.apagar = () => ({ ok: false, erro: 'ativo', mensagem: 'Este pedido tem exame marcado. Cancele o exame primeiro.' });
+  await page.click('.cartao.pedido [data-acao="apagar"]');
+  await espera(600);
+  const msg = await page.$eval('#avisoTela', (x) => x.textContent).catch(() => '');
+  const n = await page.$$eval('.cartao.pedido', (ns) => ns.length);
+  await ctx.close();
+  return { ok: /Cancele o exame primeiro/.test(msg) && n === 1, detalhe: `${msg} ${n}` };
+});
+await caso('PIN vencido durante apagar/reabrir/avaliar: volta para a tela do PIN, sem mostrar dados', async () => {
+  const { page, ctx, estado } = await abrirPortal({ dados: dadosEnc([enc()]) });
+  estado.apagar = () => ({ ok: false, erro: 'bloqueado' });
+  await page.click('.cartao.pedido [data-acao="apagar"]');
+  await espera(700);
+  const pedeu = await page.$$eval('.pin-teclas button[data-tecla]', (bs) => bs.length);
+  await ctx.close();
+  return { ok: pedeu === 10 };
+});
+await caso('a ordem que o banco manda é a que a tela mostra (o dia mais perto primeiro, encerradas no fim)', async () => {
+  const lista = [aberto({ conversa: C2, exames: [{ id: 1, nome: 'EX PERTO', unidade: 'Centro', data: dia(1), hora: '08:00', ok: 2, excecao: null, resultado: null }] }),
+                 aberto({ conversa: C3, exames: [{ id: 2, nome: 'EX LONGE', unidade: 'Centro', data: dia(9), hora: '08:00', ok: 2, excecao: null, resultado: null }] }),
+                 enc({ exames: [{ id: 3, nome: 'EX ENCERRADO', unidade: 'Centro', data: dia(4), hora: '08:00', ok: 2, excecao: null, resultado: null }] })];
+  const { page, ctx } = await abrirPortal({ dados: dadosEnc(lista) });
+  const ts = await page.$$eval('.cartao.pedido', (ns) => ns.map((n) => /EX (PERTO|LONGE|ENCERRADO)/i.exec(n.innerText)?.[0].toUpperCase()));
+  await ctx.close();
+  return { ok: ts.join() === 'EX PERTO,EX LONGE,EX ENCERRADO', detalhe: ts.join() };
+});
+await caso('o painel encerra enquanto a tela está aberta: na próxima atualização o cartão passa a "Encerrado" com o motivo', async () => {
+  const { page, ctx, estado } = await abrirPortal({ dados: dadosEnc([aberto({ conversa: C1 })]) });
+  const antes = await page.locator('.cartao.pedido').innerText();
+  estado.dados = dadosEnc([enc({ motivo: 'apenas_informacoes', novo: true })]);
+  await page.evaluate(() => { Object.defineProperty(document, 'hidden', { configurable: true, get: () => false }); document.dispatchEvent(new Event('visibilitychange')); });
+  await espera(900);
+  const depois = await page.locator('.cartao.pedido').innerText();
+  await ctx.close();
+  return { ok: !/Encerrado/.test(antes) && /Encerrado/.test(depois) && /Você pediu só informações/.test(depois) && /Novidade/.test(depois) && /Avaliar/.test(depois), detalhe: depois.replace(/\n+/g, ' | ').slice(0, 200) };
 });
 
 await browser.close(); srv.close();
