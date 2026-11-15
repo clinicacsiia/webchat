@@ -1,5 +1,7 @@
 # A API do Klingo em todo o processo do chat (13/11/2026)
 
+Versão 1.1 — 15/11/2026 / Mudança: exames só com o que o Klingo oferece (varredura de 45 dias a cada 5 minutos, interruptor `klingo_exames_so_api`) e etiqueta "Sem horário no Klingo" na lista do painel. **Correção:** a versão 1.0 deste documento dizia que o exame sumia quando a API não tinha horário; o código não fazia isso (`klingo_automatizavel` devolvia sempre verdadeiro para exame).
+
 **Pedido do dono:** a API consulta em todo o processo, para carregar dados fiéis de todos os questionários e só mostrar o que ela disponibiliza.
 
 ## De onde vem cada pergunta hoje
@@ -7,7 +9,7 @@
 | Passo | Fonte hoje | É a API? |
 |---|---|---|
 | Tipo de consulta | `klingo_especialidade`, preenchida **toda madrugada** pela API (`/agenda/especialidades` + `/agenda/consultas`); filtro `klingo_so_liberados = sim` (**ligado em 13/11/2026**) | **Sim** (cópia de até 24 h) |
-| Exame | Catálogo local; some só se a API já foi consultada e **não tinha horário** nos últimos 7 dias (`klingo_proc_api`) | Parcial (aprende com o uso) |
+| Exame | Catálogo local **filtrado pela API** (desde 15/11/2026, ver a seção "Exames só com o que o Klingo oferece" no fim): aparece só o exame que a API lista **e** tem horário nos próximos 45 dias; a varredura refaz a conferência sozinha | **Sim** (cópia de até 1 h; interruptor `klingo_exames_so_api`) |
 | Médico | Grade local (`catalogo_agenda`) | **Não** |
 | CPF e nascimento | `/paciente/cpf` (cadastro do Klingo) | **Sim**, ao vivo |
 | Plano / convênio | Catálogo de planos, **com o que o Klingo não atende marcado como inativo** (`/convenios`, toda madrugada) | **Sim** (cópia de até 24 h) |
@@ -66,3 +68,28 @@ Hoje `GET /paciente/cpf` só devolve ao banco: **novo ou já cadastrado**, o id 
 | Atendimentos e vouchers futuros (precisa de sessão do paciente) | "Você já tem uma consulta marcada para…", "repetir o último médico" | Mesma prova de identidade; mais chamadas à API |
 
 Recomendação: ligar **idade** e **plano cadastrado** primeiro (sem mostrar dado pessoal) e deixar o preenchimento automático de nome, telefone e e-mail para depois de uma segunda confirmação.
+
+
+---
+
+## Exames só com o que o Klingo oferece (15/11/2026)
+
+**Pedido do dono:** o Klingo manda em tudo. Exame, data, hora e convênio que ele oferece aparecem no chat; o que ele deixar de oferecer some; quando voltar a oferecer, volta, **sem ninguém mexer fora do Klingo**.
+
+**Caso que motivou:** a paciente escolheu "RM ENDOVAGINAL", exame que o Klingo lista mas nunca teve horário; chegou ao calendário vazio e a conversa ficou parada.
+
+### Como funciona
+1. **Varredura** (`klingo-sincronizar`, ação `exames`, rotina nº 31 do banco, de 5 em 5 minutos): para cada exame do chat que a API lista (`klingo_exame_api`), pergunta `/agenda/horarios` em 3 janelas de 15 dias (45 dias, o mesmo alcance do calendário), nos dois sexos, com paciente de mentira. 25 exames por rodada, com pausa de 1,5 s entre eles para deixar cota para quem está no chat. Quem nunca foi conferido vai primeiro; depois o mais antigo. **"Sem horário" é perguntado de novo a cada 60 min** (volta logo depois de abrir agenda no Klingo) e "com horário" a cada 120 min (`config`: `klingo_exames_vazio_min`, `klingo_exames_tem_min`).
+2. **Regra** (`klingo_exame_oferecido`, usada por `klingo_automatizavel` → `klingo_liberado` → `chat_exames`, `chat_exames_buscar`, leitura de pedido): com `klingo_exames_so_api = sim`, o exame aparece se a API o lista **e** a última conferência achou horário. Some se a API não o lista, se ainda não foi conferido ou se a última conferência não achou horário. **Segurança:** se a lista da API estiver vazia (falha de sincronização) nada é escondido; se a varredura parar por mais de `klingo_exames_vencimento_h` (6) horas, os "sem horário" voltam a aparecer (melhor mostrar do que perder o exame).
+3. **Erro nunca vira "sem horário":** timeout, 500, página HTML ou só um dos sexos respondendo = exame pulado, fica como estava.
+4. **Sem horário na conversa** (`klingo_horarios_motivo`): a lista do painel mostra a etiqueta **"Sem horário no Klingo"** para a equipe chamar a paciente; a etiqueta sai sozinha se depois aparecer horário e não atropela outro alerta.
+5. **Cobertura:** `select public.klingo_exames_cobertura()` mostra quantos exames o chat tem, quantos a API lista, quantos já foram conferidos, com e sem horário.
+
+### Limites conhecidos
+- O exame precisa existir no catálogo local (`fluxo_exames`, atualizado às 06:40 a partir do catálogo do Klingo): exame **novo** no Klingo aparece depois da próxima sincronização do catálogo (madrugada) + a primeira conferência.
+- **Plano (convênio) por exame** ainda não é conferido na API: hoje o plano que o Klingo marca como inativo some (toda madrugada) e o horário é consultado com o plano escolhido. Próximo passo.
+- **Consultas** já só aparecem se a especialidade está liberada na API (`klingo_especialidade.liberada_api`, atualizada toda madrugada); a conferência de horário por consulta/médico ainda não foi feita.
+
+### Desligar
+`update public.config set valor = 'nao' where chave = 'klingo_exames_so_api';` (volta a lista completa na hora).
+Testes: `npm run test:exames-so-api` (22 casos no clone da produção) e `sondagem.test.ts` (10 casos, no `npm run test:edge`).
