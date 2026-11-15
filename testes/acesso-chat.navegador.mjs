@@ -126,6 +126,14 @@ await caso('cadastro com informação pendente: a faixa NÃO mostra aviso nem ca
   return { ok: !/Falta(m)? \d+ informaç/.test(txt) && !pend && link === 'Meus dados|acesso/', detalhe: link };
 });
 
+await caso('faixa do acesso rápido (fora da clínica): não escreve a palavra "null" na tela', async () => {
+  const { page, ctx } = await abrir();
+  await aguardaTexto(page, /Acesso rápido: Ana/);
+  const faixa = await page.$eval('#blocoAcesso', (e) => e.textContent);
+  await ctx.close();
+  return { ok: !/null|undefined/.test(faixa), detalhe: faixa.replace(/\s+/g, ' ').trim() };
+});
+
 // ================================================================= 1ª conversa: pergunta uma vez
 let sessaoAna;
 await caso('1ª conversa "Para mim": nome e celular vêm do cadastro (travados); o chat pergunta CPF e nascimento (ainda não há CPF salvo)', async () => {
