@@ -114,6 +114,8 @@ registrar('a instalação busca os arquivos na rede de verdade (cache: reload), 
 // Nada da fila pode ter sido gravado no cache, nem a URL com o token.
 await new Promise((ok) => setTimeout(ok, 50));
 registrar('nenhuma URL da fila foi gravada no cache', !gravados.some((u) => u.includes('/fila/') || u.includes('token=')), gravados.join(' | '));
+// A cópia do chat ('./') nunca pode ser sobrescrita por outra página (/acesso/, painel, caminho desconhecido): foi isso que fez a política de privacidade e o chat mostrarem a tela do PIN.
+registrar('nenhuma página fora da lista (/acesso/, /painel/, desconhecida) foi gravada no cache', !gravados.some((u) => /\/(acesso|painel|qualquer-coisa)\//.test(u)), gravados.join(' | '));
 
 const falhas = resultados.filter((r) => !r).length;
 console.log(`\n${resultados.length - falhas}/${resultados.length} verificações passaram`);

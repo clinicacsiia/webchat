@@ -22,8 +22,13 @@ const modo = (v) => db.query(`update public.config set valor = $1 where chave = 
 let fila = Promise.resolve();
 const infos = new Map();
 const mundo = {
-  chamadas: [], quedas: {},
-  tratar: (nome, corpo) => { const r = fila.then(() => chamar(nome, corpo)); fila = r.catch(() => {}); return r; },
+  chamadas: [], quedas: {}, cab: [], recusar: {},
+  // cab = cabeçalhos da requisição (o chat manda o aparelho em x-acesso); recusar = { nome: n } faz as próximas n chamadas devolverem "pin_obrigatorio", como o servidor faz com a trava ligada
+  tratar: (nome, corpo, cab) => {
+    mundo.cab.push({ nome, x: (cab || {})['x-acesso'] || null });
+    if (mundo.recusar[nome] > 0) { mundo.recusar[nome]--; return Promise.resolve({ status: 400, body: { code: 'P0001', message: 'pin_obrigatorio', hint: 'Digite o seu PIN para continuar.' } }); }
+    const r = fila.then(() => chamar(nome, corpo)); fila = r.catch(() => {}); return r;
+  },
 };
 async function chamar(nome, corpo) {
   let info = infos.get(nome);
@@ -200,6 +205,33 @@ await caso('pergunta ao servidor falhou e o PIN era obrigatório neste aparelho:
   await b.page.waitForSelector('#formInicio', { state: 'visible', timeout: 10000 }).catch(() => {}); await espera(500);
   const abriu = noChat(b.page) && await b.page.locator('#formInicio').isVisible().catch(() => false);
   await b.ctx.close(); mundo.quedas = {}; return { ok: foiParaPorta && abriu, detalhe: `lembrava=${foiParaPorta} semHistorico=${abriu}` };
+});
+await caso('cadastro ANTIGO (entrou com e-mail e senha, sem PIN neste aparelho): também passa pela porta e tem de criar o PIN', async () => {
+  const sessao = { access_token: 'x.y.z', refresh_token: 'r', token_type: 'bearer', expires_in: 86400, expires_at: Math.floor(Date.now() / 1000) + 86400, user: { id: '33333333-3333-4333-8333-333333333333', aud: 'authenticated', role: 'authenticated', email: 'antigo@exemplo.invalid', app_metadata: {}, user_metadata: {} } };
+  const { page, ctx } = await abrir({ token: null, init: [[(v) => { try { localStorage.setItem('csi-paciente-auth', JSON.stringify(v)); } catch { /* sem armazenamento */ } }, sessao]] });
+  await page.waitForURL(/\/acesso\//, { timeout: 8000 }).catch(() => {});
+  await aguardaTexto(page, /Tenho conta com e-mail/).catch(() => {});
+  const url = page.url(), t = (await texto(page)).replace(/\s+/g, ' '), tem = /Tenho conta com e-mail/.test(t) && /uma última vez/.test(t) ? 1 : 0;   // a página abre direto no passo das contas antigas (entra uma última vez e cria o PIN)
+  await ctx.close();
+  return { ok: /\/acesso\/\?voltar=chat/.test(url) && tem > 0, detalhe: `${url} opcaoContaAntiga=${tem} texto=${t.slice(0, 110)}` };
+});
+await caso('o chat manda o código do aparelho (x-acesso) em toda chamada ao banco; quem não tem aparelho não manda nada', async () => {
+  await completa(); await destrava(); mundo.cab.length = 0;
+  const a = await abrir(); await a.page.waitForSelector('#formInicio', { state: 'visible', timeout: 10000 }); await espera(800);
+  const com = mundo.cab.filter((x) => x.nome === 'chat_config' || x.nome === 'app_perfil'); const todasCom = com.length > 0 && com.every((x) => x.x === ana.token);
+  await a.ctx.close();
+  mundo.cab.length = 0;
+  const b = await abrir({ token: null }); await b.page.waitForURL(/\/acesso\//, { timeout: 8000 }); await espera(500);
+  const semAparelho = mundo.cab.filter((x) => x.nome === 'app_porta').every((x) => x.x === null);
+  await b.ctx.close();
+  return { ok: todasCom && semAparelho, detalhe: `comAparelho=${com.length}/${todasCom} semAparelho=${semAparelho}` };
+});
+await caso('o servidor recusa com "pin_obrigatorio" (PIN vencido ou aparelho desconhecido): o chat volta à porta do PIN em vez de continuar', async () => {
+  await completa(); await destrava(); mundo.recusar = { chat_config: 1 };
+  const { page, ctx } = await abrir();
+  await page.waitForURL(/\/acesso\//, { timeout: 8000 }).catch(() => {});
+  const url = page.url(); await ctx.close(); mundo.recusar = {};
+  return { ok: /\/acesso\/\?voltar=chat/.test(url), detalhe: url };
 });
 await caso('nenhum erro de script durante o roteiro', async () => ({ ok: true }));
 

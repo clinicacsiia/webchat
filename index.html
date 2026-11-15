@@ -391,11 +391,13 @@
   .volta .link-add { margin: 0; padding: 4px 0; }
   .unidades.dois .unidade { min-height: 66px; }
   /* porta do PIN obrigatório: cobre o chat enquanto o servidor confere o PIN e o cadastro */
-  #porta { position: fixed; inset: 0; z-index: 9999; background: var(--papel, #fff); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; font-weight: 700; }
+  #porta { position: fixed; inset: 0; z-index: 9999; background: var(--papel, #fff); color: var(--csi-sidebar-bg); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; font-weight: 700; border-top: 3px solid var(--csi-primary); }
+  #porta img { height: 44px; width: auto; }
   #porta[hidden] { display: none; }
   #porta p { margin: 0; padding: 0 28px; text-align: center; }
-  #porta .porta-dica { font-weight: 400; font-size: 14px; color: #5b6b66; }
-  #porta .porta-btn { display: inline-block; min-height: 48px; padding: 13px 26px; border-radius: 14px; background: #0c7a6e; color: #fff; text-decoration: none; font-weight: 700; }
+  #porta .porta-dica { font-weight: 400; font-size: 14px; color: var(--csi-text-secondary); }
+  #porta .porta-btn { display: inline-block; min-height: 48px; padding: 13px 26px; border-radius: 14px; background: var(--csi-primary-strong); color: #fff; text-decoration: none; font-weight: 700; }
+  #porta .porta-btn:hover { background: var(--csi-primary-strong-hover); }
   /* acesso rápido (celular + PIN) */
   #blocoAcesso { flex-wrap: wrap; }
   #blocoAcesso .acoes-acesso { display: flex; gap: 14px; flex-wrap: wrap; }
@@ -692,7 +694,7 @@
   const CHAVE_HIST = 'webchat.historico.v1';   // as últimas conversas deste aparelho (cada uma com o seu token): dá para voltar a elas
   const MAX_HIST = 5;                          // mínimo pedido: 3
   // Muda a cada alteração do chat. Cópia de mensagens guardada por outra versão é descartada (era isso que mostrava conversa velha e travada).
-  const VERSAO_APP = '2026.11.15-7';
+  const VERSAO_APP = '2026.11.15-8';
   // Mesmas regras do banco (fluxo_nome_ok, fluxo_telefone_ok, fluxo_email_ok): o banco confere de novo, aqui é só para avisar logo.
   const LET = 'A-Za-zÀ-ÖØ-öø-ÿ';
   const nomeCompletoOk = (v) => { const t = String(v || '').trim(); return t.length >= 5 && t.length <= 120 && new RegExp(`^[${LET}][${LET}'’.-]*( +[${LET}][${LET}'’.-]*)+$`).test(t) && t.split(/ +/).filter((w) => w.replace(new RegExp(`[^${LET}]`, 'g'), '').length >= 2).length >= 2; };
@@ -703,7 +705,19 @@
   // Chegou pelo link "esqueci a senha"? O supabase-js limpa o endereço ao ler o link, então a pergunta é feita antes de criá-lo.
   let veioDoLinkDeSenha = /[#&?]type=recovery(&|$)/.test(location.hash + location.search);
   // Login do paciente (opcional): a sessão fica numa chave própria, separada da do painel da equipe (mesmo endereço, mesmo projeto).
-  const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, storageKey: 'csi-paciente-auth' } });
+  // O aparelho (código do acesso rápido) vai no cabeçalho x-acesso de TODA chamada ao banco: é com ele que o SERVIDOR confere o PIN (config.app_pin_servidor).
+  // Se o servidor recusar com "pin_obrigatorio" (PIN vencido, aparelho desconhecido), a pessoa volta à porta do PIN. Lê direto do armazenamento: não depende da ordem do código.
+  const aparelhoSalvo = () => { try { const j = JSON.parse(localStorage.getItem('csi_acesso_v2') || 'null'); return j && typeof j.dev === 'string' ? j.dev : ''; } catch { return ''; } };
+  const fetchComAparelho = async (url, opcoes) => {
+    if (!/\/rest\/v1\/rpc\//.test(String(url))) return fetch(url, opcoes);
+    const dev = aparelhoSalvo();
+    let o = opcoes || {};
+    if (dev) { const hs = new Headers(o.headers || {}); hs.set('x-acesso', dev); o = { ...o, headers: hs }; }
+    const r = await fetch(url, o);
+    if (!r.ok && r.status < 500) { try { if ((await r.clone().text()).includes('pin_obrigatorio')) setTimeout(() => { try { irParaPorta(); } catch { /* ignora */ } }, 0); } catch { /* ignora */ } }
+    return r;
+  };
+  const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { global: { fetch: fetchComAparelho }, auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, storageKey: 'csi-paciente-auth' } });
   const $ = (s) => document.querySelector(s);
   const el = {
     empresa: $('#empresa'), ponto: $('#ponto'), status: $('#status'),

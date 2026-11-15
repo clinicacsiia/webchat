@@ -11,6 +11,7 @@ declare
   v_motivo text := nullif(btrim(coalesce(p_motivo, '')), ''); v_texto text := nullif(left(btrim(coalesce(p_motivo_texto, '')), 1000), '');
   v_mesmo_dia boolean := false; v_auto text; v_res jsonb; v_nova uuid; v_rep record;
 begin
+  perform public.app_pin_exigir();   -- PIN obrigatório também no servidor (nasce desligado: config.app_pin_servidor)
   if v_motivo is not null and v_motivo not in ('sem_retorno', 'outro_assunto') then raise exception 'Motivo inválido.' using errcode = '22023'; end if;
   if p_conversa_anterior is not null then
     select c2.* into a from public.conversas c2 join public.conversa_segredo s on s.conversa_id = c2.id
