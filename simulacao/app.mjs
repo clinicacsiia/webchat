@@ -1,5 +1,5 @@
 // Fluxo: agenda agregada → simulação e busca → mapa, jornadas e registro local.
-// Versão 2.1 — 15/11/2026 / Mudança: ligada ao banco do webchat (Klingo #14359 + indicadores), premissas editáveis, capacidade salva, teste de encaixes e painel de decisão.
+// Versão 2.2 — 15/11/2026 / Mudança: a personagem Indi explica cada indicador e, ao ser clicada, vai até o local na miniatura e simula a hora exata do problema (os cartões e a lista de indicadores saíram da tela). Versão 2.1 — 15/11/2026 / Mudança: ligada ao banco do webchat (Klingo #14359 + indicadores), premissas editáveis, capacidade salva, teste de encaixes e painel de decisão.
 import * as E from './engine.mjs';
 import {createScenes} from './scene.mjs';
 import {config} from './config.mjs';
@@ -7,6 +7,7 @@ import {fetchSnapshot,fetchIndicators,fetchExterna,fetchDecisao,fetchLacunas,nor
 import * as D from './decisao.mjs';
 import * as G from './grafico.mjs';
 import * as A from './analise.mjs';
+import * as I from './indi.mjs';
 const $=id=>document.getElementById(id);
 const key=config.storageNamespace+'-ui';
 const snapshots=new Map();
@@ -40,7 +41,7 @@ state.focus??='all';
 $('sceneUnit').value=state.focus;scenes.focus(state.focus);
 $('absence').value=state.absence;$('rate').value=state.speed;
 let selectedRoom='',selectedPerson=null,selectedAppointment=null,model,baseline,roster,baseRoster,current,prepared=null,activeDay;
-let decisionKey='',decisionTimer=0,liveForToday=false,analysisKey='',scene3d=null,scene3dState='idle',lastAnalysis=null,lastDecision=null;
+let decisionKey='',decisionTimer=0,liveForToday=false,analysisKey='',scene3d=null,scene3dState='idle',lastAnalysis=null,lastDecision=null,indiTopics=[],indiTopic=null,indiVisit=null,indiScene=null;
 const observed=()=>state.mode==='observed';
 const labels={reception:'Guichê',prep:'Preparo',consulta:'Consultório',us:'Ultrassom',rm:'Ressonância',tc:'Tomografia',eco:'Ecocardiografia',rx:'Radiologia',dmo:'Densitometria',mamo:'Mamografia',histero:'Histeroscopia'};
 const escapeHTML=value=>String(value).replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[char]);
@@ -568,7 +569,7 @@ function clinicStage(){
  return {waiting,waitingByUnit,level,units:waitingByUnit,text:'Espera P90 simulada de '+p90+' min; '+above+' atendimento(s) acima de 30 min; '+waiting+' pessoa(s) em fila às '+E.clock(time)+'.'};
 }
 function renderAnalysis(force=false){
- if(!current||!$('kpis'))return;
+ if(!current||!$('indiAssuntos'))return;
  const demo=state.mode==='demo';
  const ext=demo?demoExterna:externa,dec=demo?demoDecisao:decisaoPainel;
  const sim=observed()?null:clinicStage();
@@ -578,12 +579,10 @@ function renderAnalysis(force=false){
  const stages=A.buildStages(ext,sim);
  const pontos=A.pontosDeAtencao({stages,decisao:dec,recs:lastDecision?.recs??[]});
  lastAnalysis={stages,pontos,sim,ext,dec};
- $('kpis').innerHTML=dec?G.kpiTiles(A.cartoesDoPainel(dec)):'<p class="muted">'+(state.mode==='demo'?'Sem dados de demonstração.':'Os indicadores do painel ainda não carregaram.')+'</p>';
- $('indPeriod').textContent=dec?.periodo?'Período dos indicadores: '+dec.periodo.de+' a '+dec.periodo.ate+(demo?' (dados fictícios)':'')+'.':'';
- $('attention').innerHTML=G.attentionList(pontos);
+ indiTopics=I.assuntos({pontos,cartoes:dec?A.cartoesDoPainel(dec):[]});
+ renderIndiAssuntos(dec,demo);
  const gapList=D.worstGaps(demo?demoLacunas:lacunas,3);
  $('gapsLine').innerHTML=gapList.length?'<strong>Dados que faltam</strong> (só porcentagem, sem revelar ninguém): '+gapList.map(w=>D.esc(w.label)+' em "'+D.esc(w.statusLabel)+'" '+D.pct(w.pct)).join(' · ')+'. <a href="#decisionCard" data-open-gaps>Ver o mapa completo</a>':'';
- $('strip').innerHTML=G.stageStrip(stages,ext?.base);
  update3D();
 }
 async function update3D(){
@@ -593,9 +592,9 @@ async function update3D(){
   try{
    const module=await import('./cena3d.mjs');
    scene3d=module.createScene($('scene3d'),{onSelect:selectPoint});
-   if(!scene3d){scene3dState='off';$('scene3dMsg').textContent='Este navegador não abriu o 3D (WebGL indisponível). A lista de pontos de atenção acima traz as mesmas informações.';$('d3Status').textContent='3D indisponível';return;}
+   if(!scene3d){scene3dState='off';$('scene3dMsg').textContent='Este navegador não abriu o 3D (WebGL indisponível). Os assuntos da Indi, acima, trazem as mesmas informações.';$('d3Status').textContent='3D indisponível';return;}
    scene3dState='ready';$('scene3dMsg').remove();
-  }catch(error){scene3dState='off';$('scene3dMsg').textContent='Não foi possível carregar o 3D ('+error.message+'). A lista de pontos de atenção acima traz as mesmas informações.';$('d3Status').textContent='3D indisponível';return;}
+  }catch(error){scene3dState='off';$('scene3dMsg').textContent='Não foi possível carregar o 3D ('+error.message+'). Os assuntos da Indi, acima, trazem as mesmas informações.';$('d3Status').textContent='3D indisponível';return;}
  }
  if(scene3dState!=='ready')return;
  scene3d.setData({stages:lastAnalysis.stages,pontos:lastAnalysis.pontos,sim:lastAnalysis.sim});
@@ -603,22 +602,74 @@ async function update3D(){
  $('d3Status').textContent=s.attention.length+' ponto(s) de atenção em destaque · '+s.ghost.length+' em ordem (contorno)';
 }
 function selectPoint(id){
- const point=lastAnalysis?.pontos.find(p=>p.id===id);
- if(!point)return;
- for(const li of document.querySelectorAll('#attention li'))li.removeAttribute('aria-current');
- const button=document.querySelector('#attention [data-point="'+id+'"]');
- button?.closest('li')?.setAttribute('aria-current','true');
- button?.scrollIntoView({block:'nearest',behavior:'smooth'});
+ if(!indiTopics.some(a=>a.id===id))return;
+ indiFalar(id);
+ $('indiFala').scrollIntoView({block:'center',behavior:'smooth'});
 }
-$('attention').onclick=event=>{
- const button=event.target.closest('[data-point]');
- if(!button)return;
- const stage=button.dataset.stage;
- selectPoint(button.dataset.point);
- if(scene3d&&stage)scene3d.focusOn(stage);
- $('sec-3d').scrollIntoView({behavior:'smooth',block:'start'});
-};
-$('strip').onclick=event=>{const space=event.target.closest('[data-stage]');if(space&&scene3d){scene3d.focusOn(space.dataset.stage);$('sec-3d').scrollIntoView({behavior:'smooth',block:'start'});}};
+// ---------- A Indi: explica cada indicador; ao ser clicada, vai ao local e simula a hora do problema ----------
+function renderIndiAssuntos(dec,demo){
+ $('indPeriod').textContent=dec?.periodo?'Período dos indicadores: '+dec.periodo.de+' a '+dec.periodo.ate+(demo?' (dados fictícios)':'')+'.':'';
+ const mesmo=indiTopic&&indiTopics.find(a=>a.id===indiTopic.id);
+ if(mesmo){indiTopic=mesmo;$('indiFala').innerHTML=I.falaHtml(mesmo);}
+ else if(indiTopic){indiTopic=null;$('indiFala').innerHTML='<p>Os números mudaram. Escolha um assunto e eu explico de novo.</p>';}
+ $('indiAssuntos').innerHTML=I.chipsHtml(indiTopics,indiTopic?.id??null);
+ $('indiIr').disabled=!indiTopics.length;
+}
+function indiFalar(id){
+ const topic=indiTopics.find(a=>a.id===id);
+ if(!topic)return;
+ indiTopic=topic;
+ $('indiFala').innerHTML=I.falaHtml(topic);
+ for(const button of $('indiAssuntos').querySelectorAll('[data-assunto]'))button.setAttribute('aria-pressed',String(button.dataset.assunto===id));
+ $('indiIr').disabled=false;
+}
+function indiLegenda(){
+ const box=$('indiLegenda');
+ box.hidden=!indiVisit;
+ if(!indiVisit)return;
+ const {alvo}=indiVisit;
+ box.textContent='Indi está em '+alvo.local+(alvo.minuto!==null?' às '+E.clock(alvo.minuto):'')+'. '+(alvo.exata?indiVisit.chegouNaHora?alvo.legenda:'Acompanhe a simulação até esse horário…':alvo.aviso);
+}
+function indiIr(){
+ if(!model||!current?.best)return;
+ const topic=indiTopic??indiTopics.find(a=>a.grupo==='problema')??indiTopics[0];
+ if(!topic)return;
+ if(!indiTopic)indiFalar(topic.id);
+ const alvo=I.alvoDoProblema(topic,model,current.best.plan);
+ state.focus=alvo.unidade;$('sceneUnit').value=state.focus;scenes.focus(state.focus);
+ indiVisit={topic,alvo,chave:state.mode+'|'+state.date,parar:null,chegouNaHora:!alvo.exata};
+ indiScene={unit:alvo.unidade,room:alvo.setor,area:alvo.area,local:alvo.local,exata:alvo.exata,t0:null,chegou:false,
+  texto:alvo.exata?'Cheguei. Acompanhe a simulação até às '+E.clock(alvo.minuto)+'…':alvo.aviso};
+ if(alvo.minuto!==null){
+  if(observed())selectTime(alvo.minuto);
+  else{
+   selectTime(alvo.inicio);
+   indiVisit.parar=alvo.minuto;
+   state.play=true;state.speed=3;$('rate').value='3';save();render();
+  }
+  if(observed())indiVisit.chegouNaHora=true;
+ }
+ if(indiVisit.chegouNaHora&&alvo.exata)indiScene.texto=alvo.legenda;
+ $('indiVoltar').hidden=false;$('indiAvatar').dataset.busy='true';
+ indiLegenda();
+ $('scenes').scrollIntoView({behavior:'smooth',block:'center'});
+}
+function indiEncerrar(){
+ indiVisit=null;indiScene=null;
+ $('indiVoltar').hidden=true;delete $('indiAvatar').dataset.busy;
+ indiLegenda();
+ $('indiFala').focus({preventScroll:true});
+}
+function indiAcompanha(){
+ if(!indiVisit)return;
+ if(indiVisit.chave!==state.mode+'|'+state.date){indiEncerrar();return;}
+ if(indiVisit.parar!==null&&!observed()&&current.time>=indiVisit.parar){
+  current.time=indiVisit.parar;state.play=false;indiVisit.parar=null;indiVisit.chegouNaHora=true;
+  indiScene.texto=indiVisit.alvo.legenda;save();render();indiLegenda();
+ }
+}
+$('indiAssuntos').onclick=event=>{const button=event.target.closest('[data-assunto]');if(button)indiFalar(button.dataset.assunto);};
+$('indiAvatar').onclick=indiIr;$('indiIr').onclick=indiIr;$('indiVoltar').onclick=indiEncerrar;
 $('gapsLine').onclick=event=>{if(event.target.closest('[data-open-gaps]')){state.panel='gaps';save();renderPanels();}};
 $('d3Rotate').onclick=()=>{if(!scene3d)return;$('d3Rotate').setAttribute('aria-pressed',String(scene3d.toggleRotate()));};
 $('d3Reset').onclick=()=>{if(!scene3d)return;scene3d.resetView();$('d3Rotate').setAttribute('aria-pressed','true');};
@@ -731,10 +782,11 @@ function frame(timestamp){
   current.time=Math.min(maxMinute(),current.time+delta*state.speed);
   if(current.time>=maxMinute()){state.play=false;save();render();}
  }
+ indiAcompanha();
  if(timestamp-lastDraw>=32&&!document.hidden){
   const time=minute();
   updatePatrol(time);
-  scenes.draw(model,current.best.plan,time,selectedPerson,state.play&&!current.live,patrolAlerts,inspection,timestamp);
+  scenes.draw(model,current.best.plan,time,selectedPerson,state.play&&!current.live,patrolAlerts,inspection,timestamp,indiScene);
   lastDraw=timestamp;
  }
  if(timestamp-lastUi>=700&&!observed()&&(state.play||current.live)&&!document.hidden){lastUi=timestamp;render();}
@@ -745,7 +797,7 @@ setInterval(()=>{if(!observed()&&state.active&&!document.hidden)step();},1500);
 setInterval(()=>{if(state.play&&!document.hidden)save();},5000);
 document.addEventListener('visibilitychange',()=>{if(document.hidden)save();});
 window.addEventListener('pagehide',save);
-window.__simulacao={lacunas:()=>lacunas,analise:()=>lastAnalysis,cena:()=>scene3d?.state?.()??null,estado3d:()=>scene3dState};
+window.__simulacao={indi:()=>indiVisit?{topico:indiVisit.topic.id,unidade:indiVisit.alvo.unidade,sala:indiVisit.alvo.setor,area:indiVisit.alvo.area,minuto:indiVisit.alvo.minuto,inicio:indiVisit.alvo.inicio,exata:indiVisit.alvo.exata,chegou:Boolean(indiScene?.chegou),naHora:indiVisit.chegouNaHora,tempo:Math.floor(minute())}:null,assuntos:()=>indiTopics.map(a=>a.id),lacunas:()=>lacunas,analise:()=>lastAnalysis,cena:()=>scene3d?.state?.()??null,estado3d:()=>scene3dState};
 // Início: só depois de tudo definido (o await abaixo deixa os temporizadores rodarem).
 try{[demoExterna,demoDecisao,demoLacunas]=await Promise.all([fetch('./examples/externa.json').then(r=>r.json()),fetch('./examples/decisao.json').then(r=>r.json()),fetch('./examples/lacunas.json').then(r=>r.json())]);}catch{}
 renderAnalysis(true);

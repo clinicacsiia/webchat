@@ -1,6 +1,6 @@
 # Simulação da clínica (15/11/2026)
 
-Versão 1.3 — 15/11/2026 / Mudança: registradas no repositório as funções `painel_simulacao_acerto` e `sim_causa`, que já estavam na produção sem arquivo (`supabase/simulacao-acerto.sql`, conferidas por hash); conferido que as funções `sim_*` abertas ao `anon` são puras e não leem tabela. Versão 1.2 — 15/11/2026 / Mudança: **mapa do que falta nos dados** (só porcentagens) e **hora real gravada no banco** (tabela `atendimento_hora`, `atendimento_hora_gravar`, simulação usa chegada, início e fim reais quando existirem; modo "Hora real registrada"); falta apenas ajustar o relatório do Klingo e ligar a leitura. Versão 1.1 — 15/11/2026 / Mudança: **indicadores primeiro**, **área externa** (do pedido ao resultado, com os atendimentos antigos como régua), **3D só com os pontos de atenção**, gráficos refeitos e visual novo; função `painel_simulacao_externa`. Versão 1.0 — 15/11/2026 / Mudança: criação. A simulação "Clínica CSI portátil 2.0" (pacote enviado pelo dono) foi trazida para `simulacao/`, ligada ao banco do webchat e ao relatório #14359 do Klingo, e ganhou o painel **Decisão**.
+Versão 1.4 — 15/11/2026 / Mudança: **a personagem Indi** no lugar dos cartões de indicadores e da faixa da área externa (seção 1 "Fale com a Indi"; `simulacao/indi.mjs`, `scene.mjs`; teste `npm run test:indi`). Versão 1.3 — 15/11/2026 / Mudança: registradas no repositório as funções `painel_simulacao_acerto` e `sim_causa`, que já estavam na produção sem arquivo (`supabase/simulacao-acerto.sql`, conferidas por hash); conferido que as funções `sim_*` abertas ao `anon` são puras e não leem tabela. Versão 1.2 — 15/11/2026 / Mudança: **mapa do que falta nos dados** (só porcentagens) e **hora real gravada no banco** (tabela `atendimento_hora`, `atendimento_hora_gravar`, simulação usa chegada, início e fim reais quando existirem; modo "Hora real registrada"); falta apenas ajustar o relatório do Klingo e ligar a leitura. Versão 1.1 — 15/11/2026 / Mudança: **indicadores primeiro**, **área externa** (do pedido ao resultado, com os atendimentos antigos como régua), **3D só com os pontos de atenção**, gráficos refeitos e visual novo; função `painel_simulacao_externa`. Versão 1.0 — 15/11/2026 / Mudança: criação. A simulação "Clínica CSI portátil 2.0" (pacote enviado pelo dono) foi trazida para `simulacao/`, ligada ao banco do webchat e ao relatório #14359 do Klingo, e ganhou o painel **Decisão**.
 
 **Endereço:** https://clinicacsiia.github.io/webchat/simulacao/ (também pelo botão **Simulação** no alto do painel de atendimento). Só funciona com login do painel (administrador ou atendente). Sem login, abre a **Demonstração** com dados fictícios.
 
@@ -27,19 +27,34 @@ Aba **"O que falta nos dados"** no painel Decisão, com um resumo na seção 1. 
 
 Leitura de 15/11/2026 (marcações de 18/10 a 30/11): entre os **atendidos**, hora de chegada 89%, **início e fim 0%**, **resultado entregue 0%**, telefone 100%, nº do atendimento 100%, cadastro sem campo vazio 98% e origem da marcação 48% (só existe para marcações conferidas pelo relatório #14554). Entre as marcações ainda por vir, **só 22% a 27% têm cadastro completo** (falta e-mail ou celular) e 91 a 93% têm origem. Cancelados e remarcados: 99% a 100% com motivo.
 
-## Ordem da página (indicadores primeiro)
+## Ordem da página (a Indi primeiro)
 
-1. **Indicadores:** os 4 cartões do painel (procuraram o chat, agendaram, marcações novas, faltas, com a variação contra o período anterior) e a lista de **pontos de atenção**, do mais grave ao menos grave. Cada ponto traz o número, a fonte (indicadores do painel, área externa ou simulação) e leva ao 3D.
-2. **Área externa:** o caminho antes e depois da clínica (ver abaixo).
-3. **Pontos de atenção em 3D.**
-4. **Clínica por dentro:** a simulação (linha do tempo por unidade, espera por hora, miniatura, ronda).
-5. **Decisão:** recomendações, uso das estações, encaixes e indicadores em abas.
+1. **Fale com a Indi:** não há mais cartões nem lista de indicadores na tela. A **Indi** (personagem com o retrato e o desenho da própria clínica) explica **cada indicador** em 4 partes curtas (*O que é · Como está agora · Por que importa · O que eu faria*). Os assuntos são os 4 números do painel (procuraram o chat, agendaram, marcações novas, faltas) e os **problemas** encontrados, do mais grave ao menos grave. Ao **clicar na Indi** (ou em "Ir até o local"), ela entra pela porta da miniatura da clínica, anda até o local do problema e a **simulação volta 20 minutos e anda até a hora exata**, onde para; o balão e a legenda dizem o que aparece ali.
+2. **Pontos de atenção em 3D** (clicar num rótulo faz a Indi falar sobre aquele ponto).
+3. **Clínica por dentro:** a simulação (linha do tempo por unidade, espera por hora, miniatura com a Indi, ronda).
+4. **Decisão:** recomendações, uso das estações, encaixes e indicadores em abas.
 
 O programa roda a análise **antes** de desenhar: lê `painel_indicadores_decisao` (a mesma função que alimenta a aba Indicadores do painel, últimos 28 dias contra os 28 anteriores, com as mesmas regras de frases), `painel_simulacao_externa` e o resultado da simulação do dia, e só então monta a lista, o desenho da área externa e o 3D.
 
+## A Indi: onde ela vai e a que horas
+
+A hora só é **exata** quando sai do dia simulado. A conta é feita em `simulacao/indi.mjs` (funções puras, testadas por contagem independente em `testes/indi.test.mjs`):
+
+| Tipo de assunto | Onde a Indi vai | Hora |
+|---|---|---|
+| Fila (Na clínica, recomendações da simulação) | Setor com a fila mais longa, na unidade do assunto (ou na pior) | Minuto com **mais gente esperando** |
+| Falta (Faltas, Sem confirmação, Taxa de falta, Falta concentrada) | Sala do exame de quem faltou | Horário de uma das pessoas da **hora do dia com mais faltas**; diz quantas estações ficaram livres |
+| A caminho hoje (atrasos) | Entrada da unidade | Minuto com mais gente que passou 30 min do horário (15 min se ninguém passa de 30) e não chegou |
+| Pedido pronto, falta marcar | Sala com mais estações da unidade | Hora (8h a 17h) em que a unidade está **mais vazia**: é onde cabem os pedidos |
+| Chat, resultado, cartões do chat e do painel | Balcão da recepção | **Sem hora.** O chat e o Klingo não guardam a hora em que o problema acontece; a Indi **não inventa horário**, não mexe no relógio da simulação e diz isso na fala |
+
+Se o dia simulado não tem o problema (ninguém faltou, ninguém esperou), ela avisa em vez de mostrar uma cena vazia. No modo "Klingo + banco" **só o que já aconteceu** (modo observado), a Indi vai à hora, mas a simulação não anda (ela só mostra o que o Klingo registrou). Mudar de dia ou de modo encerra a visita. Para tirá-la da cena: **Encerrar visita**.
+
+**Não mudou:** a "Área externa" (faixa de espaços com números) e os cartões saíram da tela; as mesmas contas continuam em `analise.mjs` e alimentam a Indi e o 3D. As abas "Indicadores reais da clínica" da seção Decisão continuam na página.
+
 ## Área externa (do pedido ao resultado)
 
-Os "espaços" são as etapas fora da clínica. **A régua é o total de atendimentos antigos**: média de atendidos por dia nos dias fechados dos últimos 28 dias (15/11/2026: 161 por dia, 2.420 atendimentos em 15 dias). Cada etapa mostra pessoas e **dias de atendimento** = pessoas ÷ média por dia; a largura do espaço cresce com a raiz desse número.
+Os "espaços" (agora só dados para a Indi e para o 3D; a faixa saiu da tela) são as etapas fora da clínica. **A régua é o total de atendimentos antigos**: média de atendidos por dia nos dias fechados dos últimos 28 dias (15/11/2026: 161 por dia, 2.420 atendimentos em 15 dias). Cada etapa mostra pessoas e **dias de atendimento** = pessoas ÷ média por dia; a largura do espaço cresce com a raiz desse número.
 
 | Espaço | O que conta | Nível de atenção |
 |---|---|---|
@@ -150,9 +165,10 @@ Aplicado na produção em 15/11/2026 em 4 partes (`simulacao_dados_parte1..4`, s
 | `simulacao/integration.mjs` | Valida o retorno do banco, calibra e monta o dia. Guarda só a última leitura de cada dia (IndexedDB `clinica-csi-simulacao`) |
 | `simulacao/decisao.mjs` | Recomendações e painéis (funções puras, testadas) |
 | `simulacao/analise.mjs` | Etapas da área externa, pontos de atenção e cartões do painel (funções puras, testadas) |
-| `simulacao/grafico.mjs` | Gráficos SVG, cartões, espaços da área externa e lista de atenção |
+| `simulacao/grafico.mjs` | Gráficos SVG (linha do tempo e espera por hora) |
+| `simulacao/indi.mjs` | A Indi: assuntos, fala em 4 partes e cálculo do local e da hora exata de cada problema (funções puras, testadas) |
 | `simulacao/cena3d.mjs` | Cena 3D (three.js), carregada só depois da análise |
-| `simulacao/scene.mjs`, `assets/` | Desenho isométrico e imagens (do pacote original, sem mudança) |
+| `simulacao/scene.mjs`, `assets/` | Desenho isométrico e imagens. `scene.mjs` v1.4 desenha a Indi andando e o balão dela; o retrato dela é o 5º de `resident-portraits.webp` |
 | `simulacao/agenda.json`, `examples/snapshot.json` | Dados da demonstração e exemplo do formato |
 | `simulacao/config.mjs` | URL e chave pública do Supabase (as mesmas das outras telas), intervalo de leitura |
 
@@ -160,7 +176,7 @@ O service worker do chat **não guarda** `/simulacao/` (mudou `webchat-cliente-v
 
 ## Testes
 
-`cd testes && npm run test:simulacao` (24: motor, formato do banco, calibragem, recomendações, painéis, análise, gráficos, hora real, mapa do que falta), `npm run test:simulacao-sql` (13) e `npm run test:simulacao-externa-sql` (8), `npm run test:simulacao-hora-real-sql` (10: tabela fechada, gravação e recusas, prioridade da hora real, durações no histórico, mapa do que falta), no clone da produção (modalidades, privacidade, permissão, só leitura, base, horizontes) e `CHROMIUM_PATH=/opt/pw-browsers/chromium npm run test:simulacao-nav` (22, no navegador com Supabase simulado e WebGL por software: demonstração, login, dia real, indicadores primeiro, área externa, 3D com pontos em destaque e o resto em contorno, clique no ponto, sem WebGL, encaixe, premissas, capacidade, troca de dia, celular). Entram no `npm test`.
+`cd testes && npm run test:indi` (12: assuntos, fala, local e hora exata conferidos por contagem independente, "sem hora" sem inventar) e `npm run test:simulacao` (24: motor, formato do banco, calibragem, recomendações, painéis, análise, gráficos, hora real, mapa do que falta), `npm run test:simulacao-sql` (13) e `npm run test:simulacao-externa-sql` (8), `npm run test:simulacao-hora-real-sql` (10: tabela fechada, gravação e recusas, prioridade da hora real, durações no histórico, mapa do que falta), no clone da produção (modalidades, privacidade, permissão, só leitura, base, horizontes) e `CHROMIUM_PATH=/opt/pw-browsers/chromium npm run test:simulacao-nav` (22, no navegador com Supabase simulado e WebGL por software: demonstração, login, dia real, indicadores primeiro, área externa, 3D com pontos em destaque e o resto em contorno, clique no ponto, sem WebGL, encaixe, premissas, capacidade, troca de dia, celular). Entram no `npm test`.
 
 **Ainda não provado:** abrir a página na produção com a sua conta logada (o teste usa Supabase simulado; as funções do banco foram conferidas por chamada real, sem ler dado de paciente).
 

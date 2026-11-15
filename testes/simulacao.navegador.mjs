@@ -173,18 +173,68 @@ await caso('hoje: segue a hora atual e a linha do tempo tem dados', async () => 
   const occ = await texto(P, '#occupancy');
   return { ok: pressed === 'true' && occ.length > 0, detalhe: `live ${pressed}; ${occ}` };
 });
-await caso('indicadores primeiro: 4 cartões do painel e pontos de atenção ordenados do mais grave ao menos grave', async () => {
-  const tiles = await P.locator('#kpis .kpi').count();
-  const niveis = await P.locator('#attention li').evaluateAll((els) => els.map((e) => e.dataset.level));
+await caso('Indi no lugar dos cartões: não há cartões nem lista de indicadores na tela; a Indi oferece os 4 indicadores do painel e os problemas, do mais grave ao menos grave', async () => {
+  const antigos = await P.locator('#kpis, #attention, #strip, .kpi, .space').count();
+  const grupos = await P.locator('#indiAssuntos h4').allInnerTexts();
+  const niveis = await P.locator('#indiAssuntos [data-assunto][data-level]').evaluateAll((els) => els.map((e) => e.dataset.level));
+  const ids = await P.evaluate(() => window.__simulacao.assuntos());
   const rank = { critical: 0, serious: 1, warning: 2 };
-  const ordenado = niveis.every((n, i) => i === 0 || rank[niveis[i - 1]] <= rank[n]);
-  const texto = await texto_(P, '#attention');
-  return { ok: tiles === 4 && niveis.length >= 3 && ordenado && /Fonte: /.test(texto), detalhe: `${tiles} cartões; níveis ${niveis.join(',')}` };
+  const problemas = niveis.slice(4);
+  const ordenado = problemas.every((n, i) => i === 0 || rank[problemas[i - 1]] <= rank[n]);
+  const foto = await P.evaluate(() => getComputedStyle(document.querySelector('.indi-foto')).backgroundImage);
+  return { ok: antigos === 0 && grupos.length === 2 && ids.slice(0, 4).join() === 'cartao-entraram,cartao-agendaram,cartao-novas,cartao-faltas' && problemas.length >= 3 && ordenado && /resident-portraits/.test(foto), detalhe: `${antigos} cartões antigos; grupos ${grupos.join(' | ')}; níveis ${niveis.join(',')}` };
 });
-await caso('área externa: espaços do chat ao resultado, com dias de atendimento como régua e símbolo + palavra de nível', async () => {
-  const nomes = await P.locator('#strip .space-name').allInnerTexts();
-  const t = await texto_(P, '#strip');
-  return { ok: nomes.length >= 6 && /Esperando resposta no chat/.test(t) && /Exame feito, resultado/.test(t) && /dia\(s\) de atendimento/.test(t) && /(Crítico|Alto|Atenção)/i.test(t), detalhe: nomes.join(' | ') };
+await caso('clicar num assunto: a Indi explica em 4 partes e marca só aquele assunto', async () => {
+  await P.locator('#indiAssuntos [data-assunto="etapa-confirmar"]').click();
+  const partes = await P.locator('#indiFala dt').allInnerTexts();
+  const marcados = await P.locator('#indiAssuntos [aria-pressed="true"]').count();
+  const fala = await texto(P, '#indiFala');
+  return { ok: partes.join().toLowerCase() === 'o que é,como está agora,por que importa,o que eu faria' && marcados === 1 && /confirm/i.test(fala) && !/undefined|NaN/.test(fala), detalhe: `${partes.join('|')}; ${marcados} marcado(s)` };
+});
+await caso('clicar na Indi (faltas): ela vai ao local, a simulação volta 20 min antes e para na hora exata da falta, e o balão e a legenda mostram o problema', async () => {
+  await P.locator('#indiAssuntos [data-assunto="cartao-faltas"]').click();
+  await P.locator('#indiAvatar').click();
+  const v = await P.evaluate(() => window.__simulacao.indi());
+  const unidadeNaTela = await P.inputValue('#sceneUnit');
+  const legenda = await texto(P, '#indiLegenda');
+  const relogioIni = await texto(P, '#clock');
+  await P.waitForFunction(() => window.__simulacao.indi()?.naHora === true, null, { timeout: 30000 });
+  await espera(900);
+  const fim = await P.evaluate(() => window.__simulacao.indi());
+  const relogioFim = await texto(P, '#clock');
+  const bolha = await P.locator('#scenes [data-unit="' + v.unidade + '"] .indi-bubble').innerText();
+  const legendaFim = await texto(P, '#indiLegenda');
+  const horaTxt = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
+  return { ok: v.exata === true && v.minuto - v.inicio <= 20 && v.minuto > v.inicio && unidadeNaTela === v.unidade && /Indi está em/.test(legenda) && relogioIni.startsWith(horaTxt(v.inicio).slice(0, 4)) && fim.chegou && fim.tempo === v.minuto && relogioFim.startsWith(horaTxt(v.minuto)) && /não vieram/.test(bolha) && /não vieram/.test(legendaFim),
+    detalhe: JSON.stringify({ v, relogioIni, relogioFim, bolha: bolha.slice(0, 90) }) };
+});
+await caso('clicar na Indi (chat): sem hora registrada ela NÃO inventa horário: vai à recepção, não mexe no relógio e explica por quê', async () => {
+  await P.locator('#indiVoltar').click();
+  await P.locator('#indiAssuntos [data-assunto="etapa-chat"]').click();
+  const antes = await texto(P, '#clock');
+  await P.locator('#indiAvatar').click();
+  await espera(300);
+  const v = await P.evaluate(() => window.__simulacao.indi());
+  const depois = await texto(P, '#clock');
+  await P.waitForFunction(() => window.__simulacao.indi()?.chegou === true, null, { timeout: 15000 });
+  const bolha = await P.locator('#scenes [data-unit="' + v.unidade + '"] .indi-bubble').innerText();
+  const legenda = await texto(P, '#indiLegenda');
+  return { ok: v.exata === false && v.minuto === null && v.sala === 'reception' && antes === depois && /não invento um horário/.test(bolha) && /não invento um horário/.test(legenda), detalhe: JSON.stringify({ v, antes, depois, bolha: bolha.slice(0, 80) }) };
+});
+await caso('clicar na Indi (fila): vai à hora do maior pico de fila, e "Encerrar visita" limpa tudo', async () => {
+  await P.locator('#indiAssuntos [data-assunto="etapa-clinica"]').click().catch(() => {});
+  const existe = await P.locator('#indiAssuntos [data-assunto="etapa-clinica"]').count();
+  if (!existe) await P.locator('#indiAssuntos [data-assunto^="sim-"]').first().click();
+  await P.locator('#indiIr').click();
+  const v = await P.evaluate(() => window.__simulacao.indi());
+  await P.waitForFunction(() => window.__simulacao.indi()?.naHora === true, null, { timeout: 30000 });
+  const bolha = await P.locator('#scenes [data-unit="' + v.unidade + '"] .indi-bubble').innerText();
+  await P.locator('#indiVoltar').click();
+  await espera(400);
+  const depois = await P.evaluate(() => window.__simulacao.indi());
+  const oculta = await P.locator('#indiLegenda').isHidden();
+  const escondida = await P.locator('#scenes [data-unit="' + v.unidade + '"] .indi-bubble').isHidden();
+  return { ok: v.exata === true && /esperando/.test(bolha) && depois === null && oculta && escondida, detalhe: JSON.stringify({ v, bolha: bolha.slice(0, 90) }) };
 });
 await caso('3D: cena aberta, pontos de atenção em destaque e o resto como contorno', async () => {
   await P.waitForFunction(() => window.__simulacao.estado3d() === 'ready', null, { timeout: 30000 });
@@ -195,11 +245,16 @@ await caso('3D: cena aberta, pontos de atenção em destaque e o resto como cont
   const canvasPx = await P.evaluate(() => document.querySelector('#scene3d canvas').toDataURL('image/png').length);
   return { ok: c.attention.length >= 1 && c.ghost.length >= 1 && c.people >= 3 && canvasPx > 4000 && /em destaque/.test(status) && a >= 3, detalhe: JSON.stringify({ att: c.attention, ghost: c.ghost, gente: c.people, canvasPx, status }) };
 });
-await caso('clicar num ponto de atenção marca o item e leva ao 3D', async () => {
-  await P.locator('#attention [data-point]').first().click();
-  await espera(500);
-  const marcado = await P.locator('#attention li[aria-current="true"]').count();
-  return { ok: marcado === 1, detalhe: `${marcado} item marcado` };
+await caso('clicar num rótulo do 3D faz a Indi falar sobre aquele ponto', async () => {
+  await P.evaluate(() => document.getElementById('sec-3d').scrollIntoView());
+  if ((await P.getAttribute('#d3Rotate', 'aria-pressed')) === 'true') await P.click('#d3Rotate'); // a cena parada: o rótulo deixa de se mexer e dá para clicar
+  await espera(300);
+  const rotulo = P.locator('.label3d:not([data-level=good])').first();
+  await rotulo.click({ timeout: 8000 });
+  await espera(600);
+  const marcados = await P.locator('#indiAssuntos [aria-pressed="true"]').count();
+  const fala = await texto(P, '#indiFala dd');
+  return { ok: marcados === 1 && fala.length > 10, detalhe: `${marcados} assunto marcado; fala "${fala.slice(0, 80)}"` };
 });
 await caso('recomendações trazem título, texto e número; indicadores reais aparecem no painel Resumo', async () => {
   const recs = await P.locator('#recommendations li').count();
@@ -290,14 +345,14 @@ await caso('hora real registrada: a opção aparece quando há início e fim e o
 await caso('sem erro de JavaScript durante todo o uso', async () => ({ ok: logada.erros.length === 0, detalhe: logada.erros.join(' | ') }));
 await logada.ctx.close();
 
-await caso('sem WebGL: a página avisa, mantém a lista de pontos de atenção e não dá erro', async () => {
+await caso('sem WebGL: a página avisa, mantém os assuntos da Indi e não dá erro', async () => {
   const semGl = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH, args: ['--no-sandbox', '--disable-3d-apis', '--disable-gpu', '--disable-webgl', '--disable-webgl2'] } : {});
   const { p, ctx, erros } = await pagina(semGl, { logado: true });
   await p.goto(URL_BASE);
   await p.waitForFunction(() => ['off', 'ready'].includes(window.__simulacao.estado3d()), null, { timeout: 30000 });
   const estado = await p.evaluate(() => window.__simulacao.estado3d());
   const msg = estado === 'off' ? await p.locator('#scene3dMsg').innerText() : '';
-  const itens = await p.locator('#attention li').count();
+  const itens = await p.locator('#indiAssuntos [data-assunto]').count();
   await ctx.close(); await semGl.close();
   return { ok: estado === 'off' && /WebGL/.test(msg) && itens >= 3 && !erros.length, detalhe: `estado ${estado}; ${itens} pontos; erros ${erros.join('|')}` };
 });

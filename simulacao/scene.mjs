@@ -1,6 +1,7 @@
 // Fluxo: tempos do motor → posições no mapa → desenho isométrico → seleção de paciente.
-// Versão 1.3 — 15/11/2026 / Mudança: destaque do local e explicação no balão da ronda.
+// Versão 1.4 — 15/11/2026 / Mudança: a Indi aparece na miniatura, entra pela porta, anda até o local do problema e fala num balão (parâmetro `indi` de draw). Versão 1.3 — 15/11/2026 / Mudança: destaque do local e explicação no balão da ronda.
 import {patientStatus,patientEmotions,team,types,units,patrols,patrolMessage} from './engine.mjs';
+import {INDI} from './indi.mjs';
 
 const atlas=new Image();
 atlas.src='./assets/residents.png';
@@ -29,8 +30,11 @@ export function createScenes(root,selectPerson){
   const bubble=document.createElement('span');
   bubble.className='patrol-bubble';
   bubble.setAttribute('aria-hidden','true');
-  map.append(canvas,bubble);block.append(title,caption,map);root.append(block);
-  const scene=scenes[unit]={block,canvas,caption,bubble,targets:[],g:canvas.getContext('2d')};
+  const indiBubble=document.createElement('span');
+  indiBubble.className='patrol-bubble indi-bubble';indiBubble.hidden=true;
+  indiBubble.setAttribute('aria-hidden','true');
+  map.append(canvas,bubble,indiBubble);block.append(title,caption,map);root.append(block);
+  const scene=scenes[unit]={block,canvas,caption,bubble,indiBubble,targets:[],g:canvas.getContext('2d')};
   canvas.addEventListener('click',event=>{
    const rect=canvas.getBoundingClientRect();
    const x=(event.clientX-rect.left)*canvas.width/rect.width;
@@ -46,17 +50,18 @@ export function createScenes(root,selectPerson){
   root.dataset.focus=unit;
   for(const [id,scene] of Object.entries(scenes))scene.block.hidden=unit!=='all'&&unit!==id;
  }
- function draw(model,plan,time,selected,animate,patrolAlerts,inspection,timestamp){
+ function draw(model,plan,time,selected,animate,patrolAlerts,inspection,timestamp,indi=null){
   for(const [unit,scene] of Object.entries(scenes)){
    if(scene.block.hidden)continue;
-   drawUnit(scene,unit,model,plan,time,selected,animate,patrolAlerts[unit],inspection?.unit===unit?inspection:null,timestamp);
+   drawUnit(scene,unit,model,plan,time,selected,animate,patrolAlerts[unit],inspection?.unit===unit?inspection:null,timestamp,indi?.unit===unit?indi:null);
   }
  }
  return {focus,draw};
 }
 
-function drawUnit(scene,unit,model,plan,time,selected,animate,alerts,inspection,timestamp){
+function drawUnit(scene,unit,model,plan,time,selected,animate,alerts,inspection,timestamp,indi){
  const {g,canvas}=scene;
+ const foco=indi??inspection;
  const jobs=model.jobs.filter(j=>j.unit===unit);
  const people=jobs.map(j=>({job:j,...patientStatus(j,time)})).filter(({job,status})=>
   !job.absent&&status!=='future'&&(status!=='finished'||time-job.end<2));
@@ -88,7 +93,7 @@ function drawUnit(scene,unit,model,plan,time,selected,animate,alerts,inspection,
  for(let x=0;x<w;x++)for(let y=0;y<endY;y++)rect(x,y,1,1,(x+y)%2?'#22394a':'#294052','#2e4855');
  wall(0,0,w,0,24,'#395665');wall(0,0,0,endY,20,'#2d4d5b');
  rect(0,5.8,w,2,'#425d65');rect(0,13.7,w,2,'#425d65');
- rect(0,8.1,w,5.4,inspection?.area==='waiting'?'#62553b':'#40525b',inspection?.area==='waiting'?'#ffd07b':'#7c938e');
+ rect(0,8.1,w,5.4,foco?.area==='waiting'?'#62553b':'#40525b',foco?.area==='waiting'?'#ffd07b':'#7c938e');
  prop('plant',.6,8.6,36);prop('plant',.6,13.5,36);
  for(let x=2;x<w-1;x+=2)prop('pouf',x,12.9,28);
  const [wx,wy]=iso(1,11);
@@ -102,7 +107,7 @@ function drawUnit(scene,unit,model,plan,time,selected,animate,alerts,inspection,
   const top=i<roomCols, x=(i%roomCols)*4+.2, y=top?.25:14.9, dy=top?5.3:1.9;
   const color=colors[type]??'#84a6b2';
   const count=plan[unit+':'+type];
-  if(inspection?.room===type&&inspection.area!=='waiting')g.lineWidth=4;
+  if(foco?.room===type&&foco.area!=='waiting')g.lineWidth=4;
   rect(x,y,3.8,dy,color,g.lineWidth===4?'#ffd07b':'#93a8ad');
   g.lineWidth=1;
   if(top)wall(x,y,0,dy,16,'#355261');
@@ -139,8 +144,35 @@ function drawUnit(scene,unit,model,plan,time,selected,animate,alerts,inspection,
  const speech=patrol.name+' · '+message;
  if(scene.bubble.textContent!==speech)scene.bubble.textContent=speech;
  scene.bubble.dataset.alert=Boolean(inspection||alert);
+ scene.bubble.hidden=Boolean(indi);
  scene.bubble.style.left=Math.max(29,Math.min(71,100*px/canvas.width))+'%';
  scene.bubble.style.top=(py-49)/canvas.height*100+'%';
+ scene.indiBubble.hidden=!indi;
+ if(indi){
+  if(indi.t0===null||indi.t0===undefined)indi.t0=timestamp;
+  const door=[.9,15];
+  const sala=indi.room?dest[indi.room]:null;
+  let alvo,corredor;
+  if(indi.area==='door'){alvo=[2.6,14.7];}
+  else if(sala?.points?.length){alvo=[sala.points[0][0]-.55,sala.points[0][1]+.35];corredor=sala.aisle;}
+  else alvo=[3,10.4];
+  const caminho=corredor===undefined?[door,alvo]:[door,[door[0],corredor],[alvo[0],corredor],alvo];
+  const trechos=caminho.slice(1).map((q,k)=>Math.abs(q[0]-caminho[k][0])+Math.abs(q[1]-caminho[k][1]));
+  const total=trechos.reduce((s,v)=>s+v,0);
+  const progresso=clamp((timestamp-indi.t0)/1000/Math.max(2.5,total/5));
+  let resta=progresso*total,k=0;
+  while(k<trechos.length-1&&resta>=trechos[k])resta-=trechos[k++];
+  const ini=caminho[k],fim=caminho[k+1],f=trechos[k]?resta/trechos[k]:1;
+  const ix=lerp(ini[0],fim[0],f),iy=lerp(ini[1],fim[1],f);
+  indi.chegou=progresso>=1;
+  staff.push({id:100,name:INDI.nome,x:ix,y:iy,face:progresso>=1?Math.PI/2:Math.atan2(fim[1]-ini[1],fim[0]-ini[0]),row:INDI.linhaSprite,staff:true,indi:true,walk:progresso<1});
+  const [bx,by]=iso(ix,iy);
+  const fala=INDI.nome+' · '+(indi.chegou?indi.texto:'A caminho: '+indi.local+'…');
+  if(scene.indiBubble.textContent!==fala)scene.indiBubble.textContent=fala;
+  scene.indiBubble.dataset.alert=String(indi.exata!==false);
+  scene.indiBubble.style.left=Math.max(34,Math.min(66,100*bx/canvas.width))+'%';
+  scene.indiBubble.style.top=(by-52)/canvas.height*100+'%';
+ }
  const stableQueue=people.filter(p=>queue.includes(p.status)).sort((a,b)=>a.job.id-b.job.id);
  const waiters=new Map(stableQueue.map(({job},i)=>[job.id,i]));
  const width=Math.max(7,Math.floor((w-1.5)*1.5));
@@ -180,13 +212,14 @@ function drawUnit(scene,unit,model,plan,time,selected,animate,alerts,inspection,
   const [px,py]=iso(o.x,o.y);
   g.fillStyle='#0b15228c';g.beginPath();g.ellipse(px,py,10,3,0,0,Math.PI*2);g.fill();
   if(o.selected){g.strokeStyle='#fed775';g.beginPath();g.ellipse(px,py,15,6,0,0,Math.PI*2);g.stroke();}
+  if(o.indi){g.save();g.strokeStyle='#9be8d6';g.lineWidth=2.5;g.globalAlpha=.6+.4*Math.sin(timestamp/260);g.beginPath();g.ellipse(px,py,19,8,0,0,Math.PI*2);g.stroke();g.restore();}
   if(atlas.complete&&atlas.naturalWidth){
    const direction=(Math.round((Math.PI/4-(o.face??0))/(Math.PI/4))+8)%8;
-   const frame=o.walk&&(animate||o.patrol)?Math.floor(timestamp/85+o.id)%6:0;
+   const frame=o.walk&&(animate||o.patrol||o.indi)?Math.floor(timestamp/85+o.id)%6:0;
    g.imageSmoothingEnabled=false;
    g.drawImage(atlas,(direction*6+frame)*24,o.row*32,24,32,px-15,py-38,30,40);
   }else text('●',px-6,py-10,'#e3ab78');
-  if(o.staff||o.selected)text(o.staff?o.name:'P'+String(o.person).padStart(3,'0'),px-20,py-31,o.patrol?'#ffcc71':o.staff?'#d7f0d5':'#fff0b0',12);
+  if(o.staff||o.selected)text(o.staff?o.name:'P'+String(o.person).padStart(3,'0'),px-20,py-31,o.indi?'#9be8d6':o.patrol?'#ffcc71':o.staff?'#d7f0d5':'#fff0b0',12);
   if(o.person)scene.targets.push({x:px,y:py,person:o.person,id:o.id,mood:o.mood,selected:o.selected,depth:o.x+o.y});
  }
  for(const [name,x,y,offline] of roomFaces)text(name+(offline?' · parada':''),x,y,offline?'#ffe2c7':'#1b2935',13);

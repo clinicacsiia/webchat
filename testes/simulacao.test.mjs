@@ -308,9 +308,8 @@ test('cartões do painel: delta e sentido (falta subir é ruim)', () => {
     anterior: { chat: { funil: { entraram: 50, agendaram: 20 } }, clinica: { atendidos: 90, faltaram: 10, novas_marcacoes: 50 } } });
   assert.equal(c.length, 4);
   assert.equal(c[0].delta, 100);
-  const html = G.kpiTiles(c);
-  assert.match(html, /delta good/);   // procuraram o chat subiu
-  assert.match(html, /delta bad/);    // faltas subiram
+  assert.equal(c[0].bomSobe, true); assert.ok(c[0].delta > 0);        // procuraram o chat subiu: bom
+  assert.equal(c[3].bomSobe, false); assert.ok(c[3].delta > 0);       // faltas subiram: ruim
 });
 
 test('gráfico da linha do tempo: 3 unidades, espera tracejada, tabela equivalente e tooltip', () => {
@@ -335,16 +334,8 @@ test('gráfico de espera: cor por nível e rótulo só nas barras acima da meta'
   assert.match(G.waitChart([]), /Sem atendimentos/);
 });
 
-test('área externa e lista de atenção escapam texto e sempre trazem símbolo + palavra do nível', () => {
-  const stages = A.buildStages(externaEx);
-  stages[0].rotulo = '<img src=x onerror=alert(1)>';
-  const strip = G.stageStrip(stages, externaEx.base);
-  assert(!/<img src=x/.test(strip));
-  assert.match(strip, /dia\(s\) de conversas/); assert.match(strip, /160,0? por dia|160 por dia/);
+test('os níveis têm símbolo + palavra (nunca só cor)', () => {
   for (const lv of ['critical', 'serious', 'warning']) assert(A.LEVELS[lv].symbol && A.LEVELS[lv].label);
-  const list = G.attentionList([{ id: 'a', nivel: 'critical', titulo: '<b>x</b>', texto: 't', stage: 'chat', fonte: 'f' }]);
-  assert(!/<b>x/.test(list)); assert.match(list, /▲/); assert.match(list, /Crítico/);
-  assert.match(G.attentionList([]), /Nenhum ponto de atenção/);
 });
 
 // ---------------- hora real e mapa do que falta ----------------

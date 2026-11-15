@@ -23,26 +23,7 @@ body{scroll-behavior:smooth;line-height:1.45}
 .num{display:inline-grid;place-items:center;width:1.7em;height:1.7em;border-radius:50%;background:#284d51;color:var(--accent);font-size:.8em;font-weight:700}
 .small{font-size:.8rem}
 table.gaps th{white-space:nowrap}table.gaps td{text-align:center;min-width:92px}
-.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin:12px 0}
-.kpi{background:#182b3c;border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:grid;gap:2px}
-.kpi-label{color:var(--ink2);font-size:.82rem}.kpi-value{font-size:1.9rem;color:var(--ink);letter-spacing:-.02em;line-height:1.1}.kpi-sub{color:var(--ink3);font-size:.8rem;min-height:1.1em}
-.delta{font-size:.8rem;font-weight:600}.delta small{font-weight:400;color:var(--ink3)}.delta.good{color:#7fd67f}.delta.bad{color:#ff9d7a}
 .badge{display:inline-flex;align-items:center;gap:5px;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#0b0b0b;background:var(--lv,#7f98a6);border-radius:5px;padding:.12em .5em}
-.attention{list-style:none;margin:0;padding:0;display:grid;gap:8px}
-.attention li{border:1px solid var(--line);border-left:5px solid var(--lv);border-radius:8px;background:#182b3c}
-.attention button{all:unset;box-sizing:border-box;display:grid;gap:3px;width:100%;padding:.6em .8em;cursor:pointer}
-.attention .badge{justify-self:start}
-.attention button:hover,.attention button:focus-visible{background:#1d3347;outline:2px solid var(--accent);outline-offset:-2px;border-radius:7px}
-.att-text{color:var(--ink2);font-size:.9rem}
-.ok-note{padding:.7em;border:1px solid var(--line);border-radius:8px}
-.strip{list-style:none;margin:12px 0 6px;padding:0;display:flex;gap:10px;align-items:stretch;overflow-x:auto;padding-bottom:6px}
-.space{position:relative;min-width:150px;background:linear-gradient(#1a2e40,#16293a);border:1px solid var(--line);border-top:4px solid var(--lv,#7f98a6);border-radius:12px;padding:10px 12px;display:grid;gap:4px;align-content:start}
-.space[data-level=good],.space[data-level=info]{opacity:.78}
-.space+.space:before{content:'›';position:absolute;left:-9px;top:46%;color:var(--ink3);font-size:1.4rem;line-height:0}
-.space .badge{justify-self:start}
-.space-name{font-weight:600;font-size:.88rem}.space-n{font-size:1.8rem;letter-spacing:-.02em;line-height:1}.space-days{color:var(--accent);font-size:.78rem;min-height:1.1em}
-.space-text{color:var(--ink2);font-size:.78rem}
-.dots{display:flex;flex-wrap:wrap;gap:3px;min-height:6px}.dots i{width:7px;height:7px;border-radius:50%;background:var(--lv)}
 .scene3d{position:relative;height:460px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#101c27}
 .scene3d canvas{display:block}
 .labels3d{position:absolute;inset:0;pointer-events:none}
@@ -58,23 +39,53 @@ table.gaps th{white-space:nowrap}table.gaps td{text-align:center;min-width:92px}
 .rowflex{display:grid;grid-template-columns:1fr 1fr;gap:14px}@media(max-width:850px){.rowflex{display:block}.scene3d{height:380px}.secnav{position:static}}
 details.tbl summary{cursor:pointer;color:var(--ink2);font-size:.85rem}
 .card{box-shadow:0 1px 0 #ffffff08 inset}
+
+/* ===== Versão 2.3: a personagem Indi ===== */
+:root{--lv-critical:#d03b3b;--lv-serious:#ec835a;--lv-warning:#fab219;--lv-info:#7fbcd2;--lv-good:#0ca30c}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.indi-box{display:grid;grid-template-columns:128px minmax(0,1fr);gap:16px;align-items:start;margin:12px 0 4px}
+.indi-avatar{all:unset;cursor:pointer;display:grid;gap:6px;justify-items:center;border-radius:16px;padding:6px}
+.indi-foto{width:112px;height:112px;border-radius:50%;background:#20384b url(./assets/resident-portraits.webp) -448px 0/1008px 112px no-repeat;border:3px solid var(--accent);box-shadow:0 0 0 0 #9be8d655}
+.indi-avatar:hover .indi-foto,.indi-avatar:focus-visible .indi-foto{box-shadow:0 0 0 7px #9be8d655}
+.indi-avatar:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.indi-avatar[data-busy="true"] .indi-foto{box-shadow:0 0 0 7px #fed77566}
+@media (prefers-reduced-motion:no-preference){.indi-foto{animation:indi-pulso 2.6s ease-in-out infinite}@keyframes indi-pulso{50%{box-shadow:0 0 0 6px #9be8d633}}}
+.indi-nome{font-weight:700;color:var(--accent)}
+.indi-fala{position:relative;background:#182b3c;border:1px solid var(--line);border-radius:14px;padding:12px 16px;min-height:112px}
+.indi-fala:before{content:'';position:absolute;left:-9px;top:38px;border:9px solid transparent;border-left:0;border-right-color:var(--line)}
+.indi-fala:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.indi-fala h3{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 .2em}
+.indi-fala dl{margin:0}.indi-fala dt{color:var(--accent);font-weight:700;font-size:.78rem;text-transform:uppercase;letter-spacing:.04em;margin-top:.7em}.indi-fala dd{margin:.1em 0 0;color:var(--ink)}
+.indi-chips{list-style:none;margin:0 0 10px;padding:0;display:flex;flex-wrap:wrap;gap:8px}
+.indi-chips button{all:unset;box-sizing:border-box;cursor:pointer;display:inline-flex;gap:6px;align-items:center;max-width:100%;border:1px solid var(--line);border-left:5px solid var(--lv,#7f98a6);border-radius:10px;padding:.45em .8em;background:#182b3c;color:var(--ink);font-size:.88rem}
+.indi-chips button[data-level=critical]{--lv:var(--lv-critical)}.indi-chips button[data-level=serious]{--lv:var(--lv-serious)}.indi-chips button[data-level=warning]{--lv:var(--lv-warning)}.indi-chips button[data-level=info]{--lv:var(--lv-info)}.indi-chips button[data-level=good]{--lv:var(--lv-good)}
+.indi-chips button:hover{background:#1d3347}.indi-chips button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.indi-chips button[aria-pressed=true]{background:#244c52;border-color:var(--accent);border-left-color:var(--lv)}
+.indi-chips .sym{color:var(--lv)}
+.indi-bubble{border-color:#9be8d6;background:#12312f;color:#e2fbf3;max-width:66%}.indi-bubble:after{border-top-color:#9be8d6}
+.indi-bubble[data-alert="false"]{border-color:#fed775;background:#33290f;color:#ffeab0}.indi-bubble[data-alert="false"]:after{border-top-color:#fed775}
+.indi-legenda{margin:0 0 10px;padding:.6em .8em;border:1px solid var(--accent);border-left-width:5px;border-radius:8px;background:#12312f}
+@media(max-width:600px){.indi-box{grid-template-columns:1fr;justify-items:center}.indi-fala{width:100%}.indi-fala:before{display:none}}
 </style>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
 <header class="hero"><div><h1>Simulação da clínica</h1><p class="muted">Dados reais do Klingo e do webchat, indicadores e testes de capacidade · horário de Salvador · <a href="../painel/">voltar ao painel</a></p></div></header>
 <section class="card" aria-labelledby="integrationTitle"><h2 id="integrationTitle">Fonte dos dados</h2><div class="controls"><label>Modo <select id="dataMode"><option value="demo">Demonstração (dados fictícios)</option><option value="forecast">Klingo + banco (dia real e previsão)</option></select></label><button id="dayBack" aria-label="Dia anterior">‹</button><label>Dia <input id="sourceDate" type="date"></label><button id="dayNext" aria-label="Próximo dia">›</button><button id="dayToday">Hoje</button><button id="sync">Carregar / atualizar</button><button id="backup">Exportar backup</button><label>Restaurar backup <input id="restore" type="file" accept=".json,application/json"></label></div><small id="sourceStatus" role="status"></small>
 <div id="loginCard" class="card" hidden style="margin-top:12px"><h3>Entrar com a conta do painel</h3><form id="loginForm"><label>E-mail <input id="loginEmail" type="email" autocomplete="username" required></label><label>Senha <input id="loginPassword" type="password" autocomplete="current-password" required></label><button type="submit">Entrar</button></form><small id="loginMessage" role="status"></small></div></section>
-<nav class="secnav" aria-label="Seções da página"><a href="#sec-indicadores">1 · Indicadores</a><a href="#sec-externa">2 · Área externa</a><a href="#sec-3d">3 · Pontos de atenção em 3D</a><a href="#sec-clinica">4 · Clínica por dentro</a><a href="#decisionCard">5 · Decisão</a></nav>
-<section class="card" id="sec-indicadores" aria-labelledby="indTitle"><h2 id="indTitle"><span class="num">1</span>Indicadores primeiro</h2>
-<p class="muted">O programa lê primeiro os indicadores que o painel já calcula, a área externa e a simulação do dia, e só então decide o que mostrar. <span id="indPeriod"></span></p>
-<div id="kpis"></div><p id="gapsLine" class="muted small"></p><h3>Pontos de atenção, do mais grave ao menos grave</h3><div id="attention"></div></section>
-<section class="card" id="sec-externa" aria-labelledby="extTitle"><h2 id="extTitle"><span class="num">2</span>Área externa: do pedido ao resultado</h2>
-<p class="muted">Quem está esperando fora da clínica. O tamanho de cada espaço usa o total de atendimentos antigos como régua: pessoas ÷ média de atendidos por dia.</p>
-<div id="strip"></div></section>
-<section class="card" id="sec-3d" aria-labelledby="d3Title"><h2 id="d3Title"><span class="num">3</span>Pontos de atenção em 3D</h2>
+<nav class="secnav" aria-label="Seções da página"><a href="#sec-indicadores">1 · Fale com a Indi</a><a href="#sec-3d">2 · Pontos de atenção em 3D</a><a href="#sec-clinica">3 · Clínica por dentro</a><a href="#decisionCard">4 · Decisão</a></nav>
+<section class="card" id="sec-indicadores" aria-labelledby="indTitle"><h2 id="indTitle"><span class="num">1</span>Fale com a Indi</h2>
+<p class="muted">A Indi explica cada indicador em palavras simples. Escolha um assunto e <strong>clique nela</strong>: ela vai até o local na clínica e mostra o problema na hora exata. <span id="indPeriod"></span></p>
+<div class="indi-box">
+<button type="button" id="indiAvatar" class="indi-avatar" aria-describedby="indiDica"><span class="indi-foto" aria-hidden="true"></span><span class="indi-nome">Indi</span></button>
+<div class="indi-fala" id="indiFala" role="status" aria-live="polite" tabindex="-1"><p>Oi, eu sou a Indi. Escolha um assunto aqui embaixo e eu explico.</p></div>
+</div>
+<p id="indiDica" class="muted small">Clique na Indi para ela ir até o local do assunto escolhido e simular a hora do problema.</p>
+<div class="controls"><button type="button" id="indiIr" disabled>Ir até o local</button><button type="button" id="indiVoltar" hidden>Encerrar visita</button></div>
+<div id="indiAssuntos"></div><p id="gapsLine" class="muted small"></p></section>
+<section class="card" id="sec-3d" aria-labelledby="d3Title"><h2 id="d3Title"><span class="num">2</span>Pontos de atenção em 3D</h2>
 <p class="muted">Só os pontos de atenção ganham cor, gente e luz. O que está em ordem fica como contorno. Arraste para girar, role para aproximar, toque num rótulo para ver o indicador.</p>
 <div class="controls"><button id="d3Rotate" aria-pressed="true">Girar sozinho</button><button id="d3Reset">Voltar à vista inicial</button><small id="d3Status" class="muted" role="status"></small></div>
 <div class="scene3d" id="scene3d"><div class="scene-msg" id="scene3dMsg">Preparando a cena 3D…</div></div></section>
-<h2 id="sec-clinica" style="margin:22px 0 6px"><span class="num">4</span> Clínica por dentro (simulação)</h2>
+<h2 id="sec-clinica" style="margin:22px 0 6px"><span class="num">3</span> Clínica por dentro (simulação)</h2>
 <div class="controls"><label>Dia <select id="day"></select></label><button id="auto">Iniciar tentativas</button><button id="step">Testar 1 ajuste</button><button id="reset">Reiniciar simulação</button><small id="save" role="status"></small></div>
 <section class="card" aria-labelledby="timelineTitle">
 <div class="timeline-head"><h2 id="timelineTitle">Linha do tempo da clínica</h2><output id="occupancy"></output></div>
@@ -100,7 +111,7 @@ details.tbl summary{cursor:pointer;color:var(--ink2);font-size:.85rem}
 <div class="tabs" role="group" aria-label="Indicadores"><button data-panel="summary">Resumo</button><button data-panel="absence">Faltas</button><button data-panel="arrival">Chegadas</button><button data-panel="demand">Demanda</button><button data-panel="upcoming">Próximos dias</button><button data-panel="process">Processo chat → clínica</button><button data-panel="gaps">O que falta nos dados</button></div>
 <div id="panelBody"></div></section>
 <section class="card"><div class="hero"><div><h2>Clínica em miniatura</h2><p class="muted">Toque no paciente ou no emoji para ver a jornada.</p></div><div class="controls"><label>Vista <select id="sceneUnit"><option value="all">Todas as unidades</option><option value="csi1">CSI 1</option><option value="csi2">CSI 2</option><option value="ped">Pediatria</option></select></label><label id="absenceControl">Faltas sem histórico <select id="absence"><option value="0">0%</option><option value="5">5%</option><option value="10">10%</option><option value="15">15%</option><option value="20">20%</option><option value="25">25%</option><option value="30">30%</option><option value="40">40%</option><option value="50">50%</option></select></label></div></div>
-<div id="scenes" class="miniatures" data-focus="all"></div><p class="legend"><span>😐 Aguardando</span><span>😟 Mais de 30 min</span><span>😠 Mais de 1 hora</span><span>🙂 Em atendimento</span><span>😊 Concluído</span><span>✚ Equipe</span><span>Nome em amarelo · funcionário de ronda</span><span id="absenceStatus"></span></p><div id="journey" class="card" role="region" aria-label="Dados do paciente selecionado" tabindex="-1" hidden></div></section>
+<p id="indiLegenda" class="indi-legenda" role="status" aria-live="polite" hidden></p><div id="scenes" class="miniatures" data-focus="all"></div><p class="legend"><span>😐 Aguardando</span><span>😟 Mais de 30 min</span><span>😠 Mais de 1 hora</span><span>🙂 Em atendimento</span><span>😊 Concluído</span><span>✚ Equipe</span><span>Nome em amarelo · funcionário de ronda</span><span id="absenceStatus"></span></p><div id="journey" class="card" role="region" aria-label="Dados do paciente selecionado" tabindex="-1" hidden></div></section>
 <div class="body"><main>
 <section class="card"><h2>Mapa operacional</h2><p class="muted">Planta conceitual. A posição física da Pediatria não consta na agenda. Cada estação disponível representa espaço, material e equipe operacional.</p><div class="map" id="map"></div><p id="room" class="rows"></p><div class="controls"><button id="less">− Estação</button><button id="more">+ Estação</button><small id="change"></small></div><div class="controls"><button id="capacitySave">Definir como capacidade atual da clínica</button><button id="capacityClear">Voltar à estimativa</button></div><small id="capacityStatus" class="muted"></small></section>
 <section class="card"><h2>Equipe da simulação</h2><div id="staff" class="staff"></div><p id="staffDetail" class="rows"></p></section>
