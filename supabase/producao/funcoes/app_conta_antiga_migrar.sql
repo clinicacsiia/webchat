@@ -61,6 +61,7 @@ begin
     select h.cpf into v_fcpf from public.app_conta_antiga_historico_filhos(cp.id) h where h.chave = public.app_norm(v_fn) and (h.nasc is null or h.nasc = v_fd) and h.cpf is not null limit 1;
     insert into public.app_filho (responsavel_id, nome, nascimento, cpf, criado_em) values (v_id, v_fn, v_fd, v_fcpf, clock_timestamp());
   end loop;
+  perform public.app_conta_antiga_importar(cp.id, v_id);   -- NOVO (única linha a mais): as conversas da conta antiga passam a aparecer em "Acompanhe seus pedidos"
   v_token := public.app_aparelho_abrir(v_id, p_aparelho);
   perform public.app_evento_gravar(v_id, 'conta_antiga_herdada');
   return jsonb_build_object('ok', true, 'token', v_token, 'perfil', public.app_perfil_json(v_id));

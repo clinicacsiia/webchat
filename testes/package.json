@@ -67,6 +67,7 @@
     "test:acesso-pin-servidor": "node sql-acesso-pin-servidor.test.mjs",
     "test:acesso-pin-total": "node sql-acesso-pin-total.test.mjs",
     "test:acesso-pin-fraco": "node sql-acesso-pin-fraco.test.mjs",
+    "test:acesso-antiga-unir": "node sql-acesso-conta-antiga-unir.test.mjs",
     "test:acesso-checkin-pin": "node sql-acesso-checkin-pin.test.mjs",
     "test:minha-vez-pin": "node minha-vez-pin.navegador.mjs",
     "test:acesso-sw": "node acesso-sw.navegador.mjs",

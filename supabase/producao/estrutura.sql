@@ -1,5 +1,5 @@
 -- RETRATO DA ESTRUTURA DO BANCO DE PRODUÇÃO (projeto webchat-atendimento). GERADO: não editar à mão.
--- Atualização parcial em 2026-11-15T17:25:00.430994+00:00 (funções app_* e painel_app_*, tabelas app_*). Retrato inteiro tirado em 2026-11-14T20:32:54.165875+00:00 · Postgres 17.11. Só estrutura: nenhuma linha de tabela, nenhum valor de configuração.
+-- Atualização parcial em 2026-11-15T17:55:00+00:00 (funções app_* e painel_app_*, tabelas app_*). Retrato inteiro tirado em 2026-11-14T20:32:54.165875+00:00 · Postgres 17.11. Só estrutura: nenhuma linha de tabela, nenhum valor de configuração.
 -- Serve de referência e para os testes. NÃO rodar inteiro sobre a produção. Como refazer: supabase/producao/LEIAME.md.
 
 -- ===== Extensões =====
@@ -2642,6 +2642,8 @@ create table public.app_conversa (
 comment on table public.app_conversa is 'Conversas que o aparelho provou ter (id + token + celular do cadastro). Só as funções app_* leem. Guarda a assinatura do que o paciente já viu (balão de novidades).';
 CREATE INDEX app_conversa_conversa_idx ON public.app_conversa USING btree (conversa_id);
 alter table public.app_conversa enable row level security;
+
+
 
 
 -- ===== Chaves estrangeiras (depois de todas as tabelas) =====

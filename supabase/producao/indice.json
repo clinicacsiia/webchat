@@ -3724,7 +3724,26 @@
    "anon": false,
    "authenticated": true,
    "publico": false,
-   "md5": "9548fca6c98d505d6d9a46c71b949e4a"
+   "md5": "ae5fed2d11083efc0d9bca72b9f2ade5"
+  },
+  {
+   "nome": "app_conta_antiga_importar",
+   "args": [
+    {
+     "nome": "p_conta",
+     "padrao": false
+    },
+    {
+     "nome": "p_pac",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "3c01b9712b5c41e4025876bde43ade22"
   },
   {
    "nome": "app_conta_antiga_resumo",
@@ -3735,6 +3754,21 @@
    "authenticated": true,
    "publico": false,
    "md5": "e636fcc53f1fe113ef8cb0aaf6db952d"
+  },
+  {
+   "nome": "app_conta_antiga_unir",
+   "args": [
+    {
+     "nome": "p_token",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "9e9dd1e99331d7ab49c7cfa01827a399"
   },
   {
    "nome": "app_conversa_vincular",
