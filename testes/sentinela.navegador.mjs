@@ -104,11 +104,11 @@ await caso('privacidade: o incidente enviado não leva o texto das mensagens nem
   return { ok: mundo.incidentes.length > 0 && vazou.length === 0, detalhe: vazou.length ? `vazou: ${vazou.join(', ')}` : `${bruto.length} caracteres, sem dados pessoais nem token` };
 });
 
-await caso('aviso de IA: o assistente se apresenta como IA, diz que uma pessoa acompanha, que quem confirma é um atendente, e o botão de atendente fica à vista', async () => {
+await caso('aviso de IA: o assistente se apresenta (curto, sem repetir a missão), que a marcação é automática e o atendente só entra se houver problema, e o botão de atendente fica à vista', async () => {
   const mundo = criarMundo(); const { page, ctx } = await abrir(mundo);
   const aviso = await page.$eval('#avisoIA', (n) => n.textContent), status = await page.$eval('#status', (n) => n.textContent), barra = await page.$eval('#barraHumano', (n) => !n.hidden);
   await ctx.close();
-  return { ok: /assistente autom[aá]tico/.test(aviso) && /equidade/.test(aviso) && !/previsão/i.test(aviso) && /Quem confirma o agendamento é um atendente/.test(aviso) && /autom[aá]tico/.test(status) && barra,
+  return { ok: /assistente autom[aá]tico/.test(aviso) && aviso.length < 140 && !/previsão/i.test(aviso) && /marco o seu agendamento/.test(aviso) && /só entra se houver algum problema/.test(aviso) && /autom[aá]tico/.test(status) && barra,
     detalhe: `status="${status}", botão de atendente visível=${barra}` };
 });
 
