@@ -105,8 +105,10 @@ const store={
   clear(){mem=null;try{localStorage.removeItem(KEY)}catch(e){}}
 };
 /* Veio do chat (?voltar=chat): depois do PIN, volta para lá. */
-const VOLTAR_CHAT=new URLSearchParams(location.search).get('voltar')==='chat';
-function aposEntrar(){if(VOLTAR_CHAT){location.replace('../');return}go('home')}
+const VOLTAR_PARAM=new URLSearchParams(location.search).get('voltar');
+const VOLTAR_CHAT=VOLTAR_PARAM==='chat'||VOLTAR_PARAM==='acompanhar';
+/* voltar=chat leva ao chat; voltar=acompanhar leva ao "Acompanhe seus pedidos" (check-in), já logado */
+function aposEntrar(){if(VOLTAR_PARAM==='acompanhar'){location.replace('../minha-vez/?acompanhar=1');return}if(VOLTAR_CHAT){location.replace('../');return}go('home')}
 const aparelho=()=>(navigator.userAgentData&&navigator.userAgentData.platform)||(/iPhone|iPad/.test(navigator.userAgent)?'iPhone/iPad':/Android/.test(navigator.userAgent)?'Android':'Navegador');
 
 /* ===== Estado ===== */

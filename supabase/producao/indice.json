@@ -565,37 +565,6 @@
    "politicas": 1
   },
   {
-   "nome": "conversa_anexo",
-   "colunas": [
-    "id",
-    "conversa_id",
-    "tipo",
-    "mime",
-    "dados",
-    "ocr_texto",
-    "criado_em",
-    "largura",
-    "altura",
-    "ocr_motor",
-    "ocr_linhas",
-    "ia_leitura",
-    "ia_modelo",
-    "ia_ms",
-    "ia_erro",
-    "ia_em",
-    "escolha",
-    "escolha_em",
-    "gabarito",
-    "gabarito_por",
-    "gabarito_em",
-    "klingo_conferido_em",
-    "klingo_conferido_por",
-    "nome"
-   ],
-   "rls": true,
-   "politicas": 0
-  },
-  {
    "nome": "conversa_encerramento",
    "colunas": [
     "id",
@@ -1660,22 +1629,6 @@
    "politicas": 0
   },
   {
-   "nome": "mensagens",
-   "colunas": [
-    "id",
-    "conversa_id",
-    "autor",
-    "agente_id",
-    "texto",
-    "criado_em",
-    "opcoes",
-    "editada_em",
-    "excluida_em"
-   ],
-   "rls": true,
-   "politicas": 2
-  },
-  {
    "nome": "ocr_aprendido",
    "colunas": [
     "texto_norm",
@@ -2145,6 +2098,87 @@
    ],
    "rls": true,
    "politicas": 0
+  },
+  {
+   "nome": "app_conversa",
+   "colunas": [
+    "paciente_id",
+    "conversa_id",
+    "pessoa_nome",
+    "eu",
+    "visto_sig",
+    "visto_em",
+    "criado_em"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "app_resultado",
+   "colunas": [
+    "id",
+    "paciente_id",
+    "conversa_id",
+    "exame_id",
+    "estado",
+    "conversa_resultado_id",
+    "conferido_em",
+    "disponivel_em",
+    "solicitado_em",
+    "entregue_em",
+    "anexo_id",
+    "mensagem_id",
+    "criado_em"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "conversa_anexo",
+   "colunas": [
+    "id",
+    "conversa_id",
+    "tipo",
+    "mime",
+    "dados",
+    "ocr_texto",
+    "criado_em",
+    "largura",
+    "altura",
+    "ocr_motor",
+    "ocr_linhas",
+    "ia_leitura",
+    "ia_modelo",
+    "ia_ms",
+    "ia_erro",
+    "ia_em",
+    "escolha",
+    "escolha_em",
+    "gabarito",
+    "gabarito_por",
+    "gabarito_em",
+    "klingo_conferido_em",
+    "klingo_conferido_por",
+    "nome"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "mensagens",
+   "colunas": [
+    "id",
+    "conversa_id",
+    "autor",
+    "agente_id",
+    "texto",
+    "criado_em",
+    "opcoes",
+    "editada_em",
+    "excluida_em"
+   ],
+   "rls": true,
+   "politicas": 2
   }
  ],
  "visoes": [
@@ -2198,6 +2232,12 @@
    "quando": "30 seconds",
    "ativa": true,
    "comando": "select public.agendamento_reconhecer_disparar()"
+  },
+  {
+   "nome": "app-resultados-vigia",
+   "quando": "*/10 * * * *",
+   "ativa": true,
+   "comando": "select public.app_resultados_disparar()"
   },
   {
    "nome": "autoencerrar-vigia",
@@ -2352,6 +2392,8 @@
  ],
  "gatilhos": [
   "CREATE TRIGGER agendamento_remarcacao_feita AFTER UPDATE OF status ON public.pre_agendamentos FOR EACH ROW EXECUTE FUNCTION agendamento_remarcacao_feita_trg()",
+  "CREATE TRIGGER app_resultado_arquivo_trg AFTER INSERT ON public.conversa_anexo FOR EACH ROW EXECUTE FUNCTION public.app_resultado_entregar_trg()",
+  "CREATE TRIGGER app_resultado_mensagem_trg AFTER INSERT ON public.mensagens FOR EACH ROW EXECUTE FUNCTION public.app_resultado_entregar_trg()",
   "CREATE TRIGGER assinatura_tentativas_imutavel BEFORE DELETE OR UPDATE ON public.assinatura_tentativas FOR EACH ROW EXECUTE FUNCTION registro_imutavel_trg()",
   "CREATE TRIGGER assinatura_tentativas_sem_truncate BEFORE TRUNCATE ON public.assinatura_tentativas FOR EACH STATEMENT EXECUTE FUNCTION registro_imutavel_trg()",
   "CREATE TRIGGER atendimentos_fila_avisar AFTER INSERT OR DELETE OR UPDATE OF status, bloqueado_em ON public.atendimentos FOR EACH ROW EXECUTE FUNCTION fila_avisar_trg()",
@@ -2395,11 +2437,17 @@
   "CREATE TRIGGER jornada_mensagem_imutavel BEFORE UPDATE ON public.jornada_mensagem FOR EACH ROW EXECUTE FUNCTION jornada_imutavel()",
   "CREATE TRIGGER medico_detectar_meta AFTER INSERT OR UPDATE ON public.catalogo_meta FOR EACH ROW EXECUTE FUNCTION medico_detectar_trg()",
   "CREATE TRIGGER mensagem_aguarda_paciente AFTER INSERT ON public.mensagens FOR EACH ROW EXECUTE FUNCTION mensagem_aguarda_paciente_trg()",
+  "CREATE TRIGGER mensagem_aguarda_paciente AFTER INSERT ON public.mensagens FOR EACH ROW EXECUTE FUNCTION public.mensagem_aguarda_paciente_trg()",
   "CREATE TRIGGER mensagens_apos_insert AFTER INSERT ON public.mensagens FOR EACH ROW EXECUTE FUNCTION mensagem_inserida()",
+  "CREATE TRIGGER mensagens_apos_insert AFTER INSERT ON public.mensagens FOR EACH ROW EXECUTE FUNCTION public.mensagem_inserida()",
   "CREATE TRIGGER mensagens_chat_push AFTER INSERT ON public.mensagens FOR EACH ROW EXECUTE FUNCTION chat_push_trg()",
+  "CREATE TRIGGER mensagens_chat_push AFTER INSERT ON public.mensagens FOR EACH ROW EXECUTE FUNCTION public.chat_push_trg()",
   "CREATE TRIGGER mensagens_conferir_preco AFTER INSERT ON public.mensagens FOR EACH ROW EXECUTE FUNCTION mensagens_conferir_preco_trg()",
+  "CREATE TRIGGER mensagens_conferir_preco AFTER INSERT ON public.mensagens FOR EACH ROW EXECUTE FUNCTION public.mensagens_conferir_preco_trg()",
   "CREATE TRIGGER mensagens_motor_fluxo AFTER INSERT ON public.mensagens FOR EACH ROW EXECUTE FUNCTION fluxo_mensagem_trg()",
+  "CREATE TRIGGER mensagens_motor_fluxo AFTER INSERT ON public.mensagens FOR EACH ROW EXECUTE FUNCTION public.fluxo_mensagem_trg()",
   "CREATE TRIGGER mensagens_zz_teste AFTER INSERT ON public.mensagens FOR EACH ROW EXECUTE FUNCTION mensagens_teste_trg()",
+  "CREATE TRIGGER mensagens_zz_teste AFTER INSERT ON public.mensagens FOR EACH ROW EXECUTE FUNCTION public.mensagens_teste_trg()",
   "CREATE TRIGGER org_alteracao_log_imutavel BEFORE DELETE OR UPDATE ON public.org_alteracao_log FOR EACH ROW EXECUTE FUNCTION org_log_imutavel_trg()",
   "CREATE TRIGGER pessoa_agrupar_conversa AFTER INSERT OR UPDATE OF nome_informado, email_informado, paciente_nome, conta_id ON public.conversas FOR EACH ROW EXECUTE FUNCTION pessoa_agrupar_conversa_trg()",
   "CREATE TRIGGER pessoa_agrupar_pre AFTER INSERT OR UPDATE OF paciente ON public.pre_agendamentos FOR EACH ROW EXECUTE FUNCTION pessoa_agrupar_pre_trg()",
@@ -2438,6 +2486,7 @@
   "agendamento_reconhecer_msg_encerradas",
   "app_acesso_modo",
   "app_cadastros_max_hora",
+  "app_resultado_vigia",
   "autoencerrar_horas",
   "autoencerrar_modo",
   "avaliacao_ativa",
@@ -3507,6 +3556,29 @@
    "md5": "e636fcc53f1fe113ef8cb0aaf6db952d"
   },
   {
+   "nome": "app_conversa_vincular",
+   "args": [
+    {
+     "nome": "p_token",
+     "padrao": false
+    },
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_conv_token",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "e4b80a4eda0060ad6a5af237421115a9"
+  },
+  {
    "nome": "app_cpf_mascara",
    "args": [
     {
@@ -3877,6 +3949,105 @@
    "md5": "efbceda882057967818eb7b2e09677ab"
   },
   {
+   "nome": "app_pedido_acao",
+   "args": [
+    {
+     "nome": "p_token",
+     "padrao": false
+    },
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_acao",
+     "padrao": false
+    },
+    {
+     "nome": "p_exame",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "e6c62141dbed00df063a8698f0e89996"
+  },
+  {
+   "nome": "app_pedido_dados",
+   "args": [
+    {
+     "nome": "p_pac",
+     "padrao": false
+    },
+    {
+     "nome": "p_conversa",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "11795deb92a87a6a82d9c744dcea013a"
+  },
+  {
+   "nome": "app_pedido_visto",
+   "args": [
+    {
+     "nome": "p_token",
+     "padrao": false
+    },
+    {
+     "nome": "p_conversa",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "c4bb4cde48b16e7f8f7f474c326ece76"
+  },
+  {
+   "nome": "app_pedidos",
+   "args": [
+    {
+     "nome": "p_token",
+     "padrao": false
+    },
+    {
+     "nome": "p_renova",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "ae97daa71773cb20a91690fd7d952b18"
+  },
+  {
+   "nome": "app_pedidos_contagem",
+   "args": [
+    {
+     "nome": "p_token",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "51b57476f24eedb3f96f7da58e403c19"
+  },
+  {
    "nome": "app_pendencia_responder",
    "args": [
     {
@@ -4008,6 +4179,90 @@
    "authenticated": true,
    "publico": false,
    "md5": "46773ad59379e8a6a26be42022eef338"
+  },
+  {
+   "nome": "app_resultado_arquivo",
+   "args": [
+    {
+     "nome": "p_token",
+     "padrao": false
+    },
+    {
+     "nome": "p_id",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "b8c43d3590b5e1fe7285a2252d9e81b0"
+  },
+  {
+   "nome": "app_resultado_disponivel",
+   "args": [
+    {
+     "nome": "p_ids",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "f811ec1880e10ae5072085941a8f2283"
+  },
+  {
+   "nome": "app_resultado_entregar_trg",
+   "args": [],
+   "definer": true,
+   "gatilho": true,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "0064bc9221932fcc9a3ef784a1e61223"
+  },
+  {
+   "nome": "app_resultados_a_conferir",
+   "args": [
+    {
+     "nome": "p_limite",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "b042364662c769d65b8e0c65ebae490e"
+  },
+  {
+   "nome": "app_resultados_disparar",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "a39b17802d473ed6f2e2ad05bb49d67c"
+  },
+  {
+   "nome": "app_resultados_json",
+   "args": [
+    {
+     "nome": "p_pac",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "d4e4c1dea487b73b30f01c62f604ebda"
   },
   {
    "nome": "app_selecao_salvar",
@@ -12278,6 +12533,21 @@
    "authenticated": true,
    "publico": false,
    "md5": "69e3752a68c375f354b3bda502e7a9f6"
+  },
+  {
+   "nome": "painel_resultado_entregue",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "2dcac26ae11347c16dae6225c69d9a3b"
   },
   {
    "nome": "papel_atual",

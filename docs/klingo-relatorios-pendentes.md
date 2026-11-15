@@ -100,3 +100,7 @@ Em uso desde 09/11/2026: `config.jornada_relatorio_id = 14359` e `jornada_relato
 ## #14359 refeito (14/11/2026)
 Filtros: `periodo0` = Data Agendado Para (livre) e `parm1` = Unidade. Colunas: 0 Id Marcação, 1 Id Atendimento, 2 Nome, 3 Responsável, 4 Prontuário, 5 Agendado Em, 6 Agendado Para, 7 Procedimento, 8 Operadora, 9 Unidade, 10 Valor (nunca lido), 11 Observação, 12 Confirm Status, 13 Cancelamento-Motivo, 14 Telefone, 15 Status, 16 Atendido, 17 Celular.
 `sync-jornada-klingo` v1.2: filtro sempre `periodo0`, colunas por layout (`mapa.ts`), janela sempre a partir de hoje: rápido = 7 dias (a cada 30 s), completo = 1 ano. O `klingo-conferir-olho` (cron 38) roda a cada 30 s.
+
+
+## Acompanhe seus pedidos (15/11/2026): nenhum relatório novo, um novo uso do C
+Nenhum relatório precisa ser criado ou editado. A tela usa a Jornada (#14359, a cada 30 s) para o passo de cada exame. A vigia `app-resultados-vigiar` usa o **#14026 (C)** pelo **Id do atendimento** (col0) e o **#14024 (A)** para conferir o nascimento do prontuário, ambos só quando `app_resultado_vigia = sim`. **Ainda NÃO provado com laudo real.** O C continua sem link nem senha: a entrega do resultado é da equipe, dentro da conversa.

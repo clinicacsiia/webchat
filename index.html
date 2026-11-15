@@ -394,6 +394,15 @@
   #blocoAcesso { flex-wrap: wrap; }
   #blocoAcesso .acoes-acesso { display: flex; gap: 14px; flex-wrap: wrap; }
   #blocoAcesso a.link-add { text-decoration: none; }
+  /* Acompanhe seus pedidos: o botão grande da tela principal (só com acesso rápido) e o balão de novidades */
+  .acompanhar-grande { display: flex; align-items: center; justify-content: center; gap: 12px; position: relative; margin: 0 0 14px; padding: 20px 16px; border-radius: var(--radius-lg); background: linear-gradient(135deg, var(--verde), #0b5f8f); color: #fff; text-decoration: none; font-weight: 800; font-size: calc(20px * var(--esc)); text-align: center; box-shadow: 0 6px 16px rgba(0,100,160,.28); }
+  .acompanhar-grande[hidden] { display: none; }
+  .acompanhar-grande:active { transform: translateY(1px); }
+  .acompanhar-grande small { display: block; font-weight: 600; font-size: calc(14px * var(--esc)); opacity: .92; }
+  .balao { display: inline-flex; align-items: center; justify-content: center; min-width: 26px; height: 26px; padding: 0 7px; border-radius: 999px; background: #e5484d; color: #fff; font-size: 15px; font-weight: 800; line-height: 1; box-shadow: 0 0 0 3px rgba(255,255,255,.9); }
+  .acompanhar-grande .balao { position: absolute; top: -9px; right: 10px; }
+  .balao[hidden] { display: none; }
+  #btnAcompanhar .balao { margin-left: 8px; height: 22px; min-width: 22px; font-size: 13px; box-shadow: none; }
   #formInicio.com-acesso #btnAddIrmao, #formInicio.com-acesso #listaIrmaos, #formInicio.com-acesso #fFilho, #formInicio.com-acesso label[for="fFilho"] { display: none; }   /* os nomes vêm do cadastro */
   .pin-pontos { display: flex; justify-content: center; gap: 16px; margin: 14px 0 4px; }
   .pin-pontos i { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--verde); }
@@ -540,6 +549,7 @@
   </header>
   <div class="menu" id="menu" hidden>
     <button type="button" id="btnAtendente" hidden>Falar com um atendente</button>
+    <button type="button" id="btnAcompanhar" hidden>Acompanhe seus pedidos<span class="balao" id="balaoMenu" hidden></span></button>
     <button type="button" id="btnSino" hidden></button>
     <button type="button" id="btnOutroFilho" hidden>Agendar para outro filho(a)</button>
     <button type="button" id="btnDisponibilidade">Minha disponibilidade</button>
@@ -569,6 +579,7 @@
         <button type="button" class="link-add" id="btnContaSair" hidden>Sair da conta</button>
       </span>
     </div>
+    <a class="acompanhar-grande" id="linkAcompanhar" href="minha-vez/?acompanhar=1" hidden><span>📋 Acompanhe seus pedidos<small>Status, remarcar, cancelar e resultados</small></span><span class="balao" id="balaoAcompanhar" hidden role="status"></span></a>
     <form id="formInicio" novalidate>
       <div class="volta" id="blocoVolta" hidden>
         <p class="volta-dados" id="voltaDados"></p>
@@ -673,7 +684,7 @@
   const CHAVE_HIST = 'webchat.historico.v1';   // as últimas conversas deste aparelho (cada uma com o seu token): dá para voltar a elas
   const MAX_HIST = 5;                          // mínimo pedido: 3
   // Muda a cada alteração do chat. Cópia de mensagens guardada por outra versão é descartada (era isso que mostrava conversa velha e travada).
-  const VERSAO_APP = '2026.11.15-3';
+  const VERSAO_APP = '2026.11.15-4';
   // Mesmas regras do banco (fluxo_nome_ok, fluxo_telefone_ok, fluxo_email_ok): o banco confere de novo, aqui é só para avisar logo.
   const LET = 'A-Za-zÀ-ÖØ-öø-ÿ';
   const nomeCompletoOk = (v) => { const t = String(v || '').trim(); return t.length >= 5 && t.length <= 120 && new RegExp(`^[${LET}][${LET}'’.-]*( +[${LET}][${LET}'’.-]*)+$`).test(t) && t.split(/ +/).filter((w) => w.replace(new RegExp(`[^${LET}]`, 'g'), '').length >= 2).length >= 2; };
@@ -807,6 +818,7 @@
     fecharCanal(); pararAcompanhar();
     el.telaChat.hidden = true; el.telaChat.style.display = 'none';
     el.telaInicio.hidden = false; el.btnMenu.hidden = true; el.btnVoltarInicio.hidden = true; el.menu.hidden = true;
+    acessoDesenharBalao(); acessoContar();   // botão grande "Acompanhe seus pedidos" e o balão de novidades
     aplicarSaude(); atualizarSaude();
     const p = lerLocal(CHAVE_PERFIL) || {}, salvo = perfilSalvo();
     el.fNome.value = p.nome || ''; el.fTel.value = p.telefone || ''; el.fEmail.value = p.email || '';
@@ -848,6 +860,7 @@
       irmaos: c.irmaos || [], irmaosModo: c.irmaosModo || '', criado_em: antigo.criado_em || Date.now(), ...extra
     };
     gravarLocal(CHAVE_HIST, [item, ...lista.filter((x) => x.id !== c.id)].sort((a, b) => b.criado_em - a.criado_em).slice(0, MAX_HIST));
+    try { acessoVincular(item).then(() => acessoContar(), () => {}); } catch { /* acesso rápido desligado ou ainda carregando: o vínculo é refeito depois */ }
   }
   function esquecerHistorico(id) { gravarLocal(CHAVE_HIST, lerHist().filter((x) => x.id !== id)); }
   function abrirHistorico() {
@@ -980,6 +993,7 @@
     atualizarProximo();
     el.telaInicio.hidden = true;
     el.telaChat.hidden = false; el.telaChat.style.display = 'contents';
+    acessoDesenharBalao();   // no chat aberto o acesso aos pedidos é pelo menu
     el.btnMenu.hidden = false; el.btnVoltarInicio.hidden = false;
   }
 
@@ -3080,6 +3094,7 @@
     el.menu.hidden = !el.menu.hidden; el.btnMenu.setAttribute('aria-expanded', String(!el.menu.hidden));
     if (!el.menu.hidden) atualizarSino();
   });
+  $('#btnAcompanhar').addEventListener('click', () => { fecharMenu(); location.href = 'minha-vez/?acompanhar=1'; });
   el.btnHistorico.addEventListener('click', abrirHistorico);
   el.btnHistoricoForm.addEventListener('click', abrirHistorico);
   document.addEventListener('click', (e) => { if (!el.menu.hidden && !el.menu.contains(e.target) && !el.btnMenu.contains(e.target)) fecharMenu(); });
@@ -3294,11 +3309,54 @@
           h('span', { class: 'acoes-acesso' }, h('a', { class: 'link-add', id: 'acessoCriar', href: 'acesso/?voltar=chat' }, 'Criar ou entrar')));
       }
     }
+    acessoDesenharBalao();
     if (!semForm && !el.telaInicio.hidden) mostrarForm(!!escolha);
+  }
+  /* Acompanhe seus pedidos: o aparelho prova ao banco quais conversas são dele (id + código) e o banco liga cada uma ao cadastro.
+     Só com o PIN dos últimos 30 minutos. O balão mostra quantos pedidos mudaram desde a última vez que a pessoa olhou. */
+  const acessoVinculadas = new Set();
+  let acessoNovidades = 0, tContar = null;
+  async function acessoVincular(extra) {
+    const dev = acessoDev();
+    if (!acessoAtivo || !acessoPerfil || !dev) return;
+    const lista = [...lerHist(), ...(conv && conv.id && conv.token ? [conv] : []), ...(extra ? [extra] : [])];
+    for (const c of lista) {
+      if (!c || !c.id || !c.token || acessoVinculadas.has(c.id)) continue;
+      try {
+        const { data } = await db.rpc('app_conversa_vincular', { p_token: dev, p_conversa: c.id, p_conv_token: c.token });
+        if (data && (data.ok || data.erro === 'celular' || data.erro === 'conversa')) acessoVinculadas.add(c.id);   // celular diferente ou código vencido: não adianta tentar de novo
+        if (data && (data.erro === 'bloqueado' || data.erro === 'sessao')) return;
+      } catch { /* sem rede: tenta na próxima */ }
+    }
+  }
+  function acessoDesenharBalao() {
+    const dev = acessoDev(), mostrar = acessoAtivo && !!dev && (!!acessoPerfil || acessoTrava);
+    const a = $('#linkAcompanhar'), m = $('#btnAcompanhar'); if (!a || !m) return;
+    a.hidden = !mostrar || !!conv; m.hidden = !mostrar;   // no chat aberto o acesso é pelo menu; na tela principal, o botão grande
+    for (const [id] of [['balaoAcompanhar'], ['balaoMenu']]) {
+      const b = $('#' + id); if (!b) continue;
+      b.hidden = !(mostrar && acessoNovidades > 0); b.textContent = acessoNovidades > 99 ? '99+' : String(acessoNovidades);
+      b.setAttribute('aria-label', acessoNovidades === 1 ? '1 novidade' : acessoNovidades + ' novidades');
+    }
+  }
+  async function acessoContar() {
+    const dev = acessoDev();
+    if (!acessoAtivo || !dev || !acessoPerfil) { acessoNovidades = 0; acessoDesenharBalao(); return; }
+    try {
+      const { data, error } = await db.rpc('app_pedidos_contagem', { p_token: dev });
+      if (!error && data && data.ok) acessoNovidades = Number(data.novidades) || 0;
+      else if (data && data.erro === 'bloqueado') acessoNovidades = 0;   // sem PIN ativo o balão some; a pessoa digita o PIN ao tocar
+    } catch { /* sem rede: mantém o número de antes */ }
+    acessoDesenharBalao();
+  }
+  function acessoContarSempre() {
+    clearInterval(tContar);
+    tContar = setInterval(() => { if (!document.hidden) acessoContar(); }, 60000);   // não estende o PIN: só quem usa a tela mantém o acesso
+    if (!acessoContarSempre.vis) { acessoContarSempre.vis = true; document.addEventListener('visibilitychange', () => { if (!document.hidden) acessoContar(); }); }
   }
   async function acessoIniciar() {
     try { const { data, error } = await db.rpc('app_ativo'); acessoAtivo = !error && data === true; } catch { acessoAtivo = false; }
-    if (acessoAtivo) { try { await acessoCarregar(); } catch { /* sem rede: segue como convidado */ } }
+    if (acessoAtivo) { try { await acessoCarregar(); await acessoVincular(); await acessoContar(); acessoContarSempre(); } catch { /* sem rede: segue como convidado */ } }
     atualizarContaUI(true);   // com o acesso rápido ligado a faixa de e-mail e senha some para quem não tem conta antiga
     atualizarAcessoUI();
   }
@@ -3321,7 +3379,7 @@
       try {
         const { data, error } = await db.rpc('app_desbloquear', { p_token: dev, p_pin: buf });
         if (error || !data) { msg.textContent = 'Não foi possível conferir agora. Tente de novo.'; return; }
-        if (data.ok) { acessoPerfil = data.perfil; acessoTrava = false; fecharFolha(); atualizarAcessoUI(); return; }
+        if (data.ok) { acessoPerfil = data.perfil; acessoTrava = false; fecharFolha(); atualizarAcessoUI(); acessoVincular().then(() => acessoContar(), () => {}); return; }
         if (data.erro === 'sessao') { apagarLocal(ACESSO_CHAVE); fecharFolha(); atualizarAcessoUI(); return; }
         msg.textContent = data.mensagem || 'PIN incorreto.';
       } catch { msg.textContent = 'Sem conexão. Tente de novo.'; }
