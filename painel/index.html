@@ -1835,7 +1835,12 @@
     cpf_nao_bate_com_o_celular: 'O celular já existe na clínica, mas o CPF informado não bate.',
     celular_na_base_sem_vinculo: 'O celular já existe na clínica; falta conferir se é a mesma pessoa.' };
   const PEND_STATUS = { solicitada: 'Aguardando confirmação', confirmada: 'Confirmada', concluida: 'Concluída', cancelada: 'Cancelada' };
-  const PEND = { aba: 'solic', status: 'solicitada', resumo: null, dados: null, erro: null };
+  const PEND_EVENTO = { cadastro: 'Criou o cadastro e o PIN', login: 'Entrou com o PIN', desbloqueio: 'Digitou o PIN de novo', conta_antiga: 'Entrou com conta antiga', pin_esqueci: 'Recuperou o PIN', abertura: 'Abriu o chat' };
+  const PEND = { aba: 'solic', status: 'solicitada', resumo: null, dados: null, erro: null, soDiv: false };
+  // Onde o paciente estava ao entrar. Só existe se ele permitiu a localização; a distância vem de clinica_lat/clinica_lng (config).
+  const pendOnde = (l) => l.na_clinica === true ? 'Na clínica' + (l.distancia_m != null ? ` (a ${l.distancia_m} m)` : '')
+    : l.na_clinica === false ? 'Fora da clínica' + (l.distancia_m != null ? ` (a ${l.distancia_m} m)` : '')
+    : l.local_negado ? 'Não permitiu a localização' : 'Sem localização';
   const pendNum = (v) => Number(v) || 0;
   const pendTotal = (r) => (r ? pendNum(r.solicitacoes) + pendNum(r.revisoes) + pendNum(r.contas_antigas) : 0);
   const pendWhats = (tel) => { const d = String(tel || '').replace(/\D/g, ''); return d.length >= 10 ? 'https://wa.me/' + (d.startsWith('55') ? d : '55' + d) : null; };
@@ -1852,7 +1857,7 @@
   function renderPendencias() {
     if (!dlg.open || dlg.dataset.pendencias !== '1') return;
     const r = PEND.resumo || {}, d = PEND.dados;
-    const abas = [['solic', 'Solicitações', r.solicitacoes], ['rev', 'Cadastros para conferir', r.revisoes], ['contas', 'Contas antigas sem PIN', r.contas_antigas]];
+    const abas = [['solic', 'Solicitações', r.solicitacoes], ['rev', 'Cadastros para conferir', r.revisoes], ['contas', 'Contas antigas sem PIN', r.contas_antigas], ['acessos', 'Acessos']];
     const nomes = (pp) => h('div', {}, (pp || []).map((x) => h('div', {}, x.nome, x.filho ? h('span', { class: 'dica' }, ' (filho/a)') : null, h('span', { class: 'dica' }, ' · ' + dataPrev(x.nascimento)))));
     const acao = async (ev, rpc, args, texto) => {
       const b = ev.currentTarget; b.disabled = true;
@@ -1880,6 +1885,22 @@
                 l.status === 'solicitada' ? h('button', { class: 'btn', type: 'button', onclick: (ev) => acao(ev, 'painel_app_solicitacao_status', { p_grupo: l.grupo, p_status: 'confirmada' }, 'Solicitação confirmada. O paciente já vê.') }, 'Confirmar') : null,
                 l.status === 'confirmada' ? h('button', { class: 'btn', type: 'button', onclick: (ev) => acao(ev, 'painel_app_solicitacao_status', { p_grupo: l.grupo, p_status: 'concluida' }, 'Solicitação concluída.') }, 'Concluir') : null,
                 h('button', { class: 'btn sec', type: 'button', onclick: (ev) => { if (confirm('Cancelar esta solicitação? O paciente verá que foi cancelada.')) acao(ev, 'painel_app_solicitacao_status', { p_grupo: l.grupo, p_status: 'cancelada' }, 'Solicitação cancelada.'); } }, 'Cancelar'))))))));
+    } else if (PEND.aba === 'acessos') {
+      const lista = PEND.soDiv ? d.filter((x) => x.divergente) : d;
+      conteudo = h('div', {},
+        h('p', { class: 'dica' }, 'Entradas recentes no acesso rápido (guardadas por 180 dias). "Divergente" = tem exame hoje mas não estava na clínica ao entrar: confira com a pessoa antes de concluir qualquer coisa.'),
+        h('div', { class: 'chips', role: 'group', 'aria-label': 'Filtro dos acessos' }, [[false, 'Todos'], [true, 'Só divergentes']].map(([v, rot]) => h('button', { class: 'chip', type: 'button', 'data-acesso-filtro': String(v), 'aria-pressed': String(PEND.soDiv === v),
+          onclick: () => { PEND.soDiv = v; renderPendencias(); } }, rot))),
+        lista.length === 0 ? h('p', { class: 'dica' }, PEND.soDiv ? 'Nenhum acesso divergente.' : 'Nenhum acesso registrado ainda.')
+          : h('div', { class: 'eq-rolagem' }, h('table', { class: 'tab eq-tab', id: 'tabPendAcessos' },
+            h('thead', {}, h('tr', {}, ['Quando', 'Paciente', 'O que fez', 'Onde estava', 'Exames hoje', 'Aparelho'].map((t) => h('th', { scope: 'col' }, t)))),
+            h('tbody', {}, lista.map((l) => h('tr', { class: l.divergente ? 'eq-livre' : '' },
+              h('th', { scope: 'row' }, dispQuando(l.em)),
+              h('td', {}, l.nome || '—'),
+              h('td', {}, PEND_EVENTO[l.evento] || l.evento),
+              h('td', {}, pendOnde(l), l.divergente ? h('div', {}, h('b', {}, 'Divergente')) : null, l.precisao_m != null ? h('div', { class: 'dica' }, `precisão de ${l.precisao_m} m`) : null),
+              h('td', {}, String(pendNum(l.exames_hoje))),
+              h('td', {}, l.aparelho || '—', h('div', { class: 'dica' }, l.ip ? 'IP ' + l.ip : ''))))))));
     } else if (PEND.aba === 'rev') {
       conteudo = d.length === 0 ? h('p', { class: 'dica' }, 'Nenhum cadastro para conferir.')
         : h('div', { class: 'eq-rolagem' }, h('table', { class: 'tab eq-tab', id: 'tabPendRev' },
@@ -1904,14 +1925,14 @@
     dlg.replaceChildren(h('h3', {}, 'Pendências'),
       h('p', { class: 'dica', style: 'margin:-8px 0 10px' }, 'O que está esperando a equipe no acesso rápido do paciente (celular + PIN).'),
       h('div', { class: 'chips', role: 'group', 'aria-label': 'Tipo de pendência' }, abas.map(([id, rot, n]) => h('button', { class: 'chip', type: 'button', 'data-pend': id, 'aria-pressed': String(PEND.aba === id),
-        onclick: () => { PEND.aba = id; carregarPendencias(); } }, `${rot} (${pendNum(n)})`))),
+        onclick: () => { PEND.aba = id; carregarPendencias(); } }, n === undefined ? rot : `${rot} (${pendNum(n)})`))),
       conteudo,
       h('div', { class: 'rodape' }, h('button', { class: 'btn', type: 'button', onclick: () => dlg.close() }, 'Fechar')));
   }
   async function carregarPendencias() {
     PEND.dados = null; PEND.erro = null; renderPendencias();
     try {
-      const chamada = PEND.aba === 'solic' ? db.rpc('painel_app_solicitacoes', { p_status: PEND.status }) : PEND.aba === 'rev' ? db.rpc('painel_app_revisoes') : db.rpc('painel_app_contas_antigas');
+      const chamada = PEND.aba === 'solic' ? db.rpc('painel_app_solicitacoes', { p_status: PEND.status }) : PEND.aba === 'acessos' ? db.rpc('painel_app_acessos', { p_limite: 100 }) : PEND.aba === 'rev' ? db.rpc('painel_app_revisoes') : db.rpc('painel_app_contas_antigas');
       const [lista, resumo] = await Promise.all([chamada, db.rpc('painel_app_pendencias_resumo')]);
       if (lista.error) throw lista.error;
       PEND.dados = Array.isArray(lista.data) ? lista.data : [];
@@ -1922,7 +1943,7 @@
   async function abrirPendencias() {
     if (!podeAtender()) return;
     dlg.className = 'equipe'; dlg.dataset.pendencias = '1';
-    PEND.aba = 'solic'; PEND.status = 'solicitada'; PEND.dados = null; PEND.erro = null;
+    PEND.aba = 'solic'; PEND.status = 'solicitada'; PEND.soDiv = false; PEND.dados = null; PEND.erro = null;
     renderPendencias(); if (!dlg.open) dlg.showModal();
     await carregarPendencias();
     dlg.addEventListener('close', () => { delete dlg.dataset.pendencias; carregarSeloPendencias(); }, { once: true });
