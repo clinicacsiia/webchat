@@ -8,6 +8,7 @@ CREATE OR REPLACE FUNCTION public.chat_consultas(p_conversa uuid, p_token text)
 AS $function$
 declare v_cat text; v_med text;
 begin
+  perform public.app_pin_exigir_leitura();   -- PIN também no servidor (config.app_pin_servidor)
   perform public.chat_valida(p_conversa, p_token);
   select u.catalogo, c.medico_preferido into v_cat, v_med
   from public.conversas c left join public.unidade_config u on u.chave = c.unidade_inicial where c.id = p_conversa;

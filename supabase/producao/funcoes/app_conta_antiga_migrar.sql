@@ -17,6 +17,7 @@ begin
     return jsonb_build_object('ok', false, 'erro', 'ja_migrada', 'mensagem', 'Você já criou o seu PIN. Entre com o celular e o PIN.');
   end if;
   if coalesce(p_pin, '') !~ '^[0-9]{4}$' then return jsonb_build_object('ok', false, 'erro', 'pin', 'mensagem', 'O PIN precisa ter 4 números.'); end if;
+  if public.app_pin_fraco(p_pin) then return jsonb_build_object('ok', false, 'erro', 'pin_fraco', 'mensagem', 'Escolha um PIN menos óbvio: não use números repetidos (1111), em sequência (1234) nem pares repetidos (1212).'); end if;
   if cp.paciente_id is not null then select * into p from public.pacientes where id = cp.paciente_id; end if;
 
   v_tel := coalesce(public.app_tel_br(p_telefone), public.app_tel_br(cp.telefone), (select public.app_tel_br(x) from unnest(coalesce(p.telefones, '{}'::text[])) x where public.app_tel_br(x) is not null limit 1));

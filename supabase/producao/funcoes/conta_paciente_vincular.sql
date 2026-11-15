@@ -11,6 +11,7 @@ declare
   v_cp record; v_u record; v_meta jsonb; v_dt date; v_nome text; v_tel text; v_res text;
   v_n int; v_pid uuid; v_t boolean; v_e boolean; v_batem text[]; v_diferem text[];
 begin
+  perform public.app_pin_exigir_leitura();   -- PIN também no servidor (config.app_pin_servidor)
   select * into v_cp from public.contas_paciente where id = v_uid for update;
   if v_uid is null or not found then raise exception 'Entre na sua conta para ligar o cadastro.' using errcode = '42501'; end if;
   if v_cp.paciente_id is not null then return jsonb_build_object('resultado', 'ja_vinculado'); end if;

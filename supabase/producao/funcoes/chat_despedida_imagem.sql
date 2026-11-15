@@ -8,6 +8,7 @@ CREATE OR REPLACE FUNCTION public.chat_despedida_imagem(p_conversa uuid, p_token
 AS $function$
 declare r record;
 begin
+  perform public.app_pin_exigir_leitura();   -- PIN também no servidor (config.app_pin_servidor)
   perform public.chat_valida(p_conversa, p_token);
   if not exists (select 1 from public.mensagens m where m.conversa_id = p_conversa and (m.opcoes ->> 'tipo') = 'despedida' and (m.opcoes ->> 'versao') = p_versao::text) then return null; end if;
   select mime, dados into r from public.despedida_versao where id = p_versao and dados is not null;

@@ -8,6 +8,7 @@ CREATE OR REPLACE FUNCTION public.chat_reentrada_estado(p_conversa uuid, p_token
 AS $function$
 declare c public.conversas; v_dias integer; v_ult timestamptz; v_hoje date := (now() at time zone 'America/Sao_Paulo')::date;
 begin
+  perform public.app_pin_exigir_leitura();   -- PIN também no servidor (config.app_pin_servidor)
   select c2.* into c from public.conversas c2 join public.conversa_segredo s on s.conversa_id = c2.id where c2.id = p_conversa and s.token = p_token;
   if not found then raise exception 'Conversa não encontrada.' using errcode = '28000'; end if;
   v_dias := coalesce((select case when valor ~ '^[0-9]+$' then valor::int end from public.config where chave = 'reabrir_dias'), 2);

@@ -8,6 +8,7 @@ CREATE OR REPLACE FUNCTION public.chat_disponibilidade_registrar(p_conversa uuid
 AS $function$
 declare v_r jsonb; v_texto text; v_prox text;
 begin
+  perform public.app_pin_exigir_leitura();   -- PIN também no servidor (config.app_pin_servidor)
   perform public.chat_valida(p_conversa, p_token);
   perform set_config('app.conversa', p_conversa::text, true);
   if not public.klingo_ativo(p_conversa, 'previsao_modo') then raise exception 'Este recurso ainda não está disponível para você. A equipe pode ajudar.' using errcode = 'P0001'; end if;

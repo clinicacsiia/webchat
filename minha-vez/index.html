@@ -110,7 +110,44 @@
   const AVISAR_PERTO = 2;   // só para o aviso local de reserva; o servidor decide o aviso real (config.fila_aviso_antes)
   const raiz = document.getElementById('raiz'), btnSair = document.getElementById('btnSair');
   // Mesma chave de sessão do chat: quem já entrou no chat já está logado aqui.
-  const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false, storageKey: 'csi-paciente-auth' } });
+  // O aparelho (código do acesso rápido) vai no cabeçalho x-acesso de TODA chamada ao banco: é com ele que o SERVIDOR confere o PIN (config.app_pin_servidor).
+  // Se o servidor recusar com "pin_obrigatorio" (PIN vencido ou aparelho desconhecido), a pessoa volta à porta do PIN. Mesma regra do chat.
+  const aparelhoSalvo = () => { try { const j = JSON.parse(localStorage.getItem('csi_acesso_v2') || 'null'); return j && typeof j.dev === 'string' ? j.dev : ''; } catch { return ''; } };
+  const fetchComAparelho = async (url, opcoes) => {
+    if (!/\/rest\/v1\/rpc\//.test(String(url))) return fetch(url, opcoes);
+    const dev = aparelhoSalvo();
+    let o = opcoes || {};
+    if (dev) { const hs = new Headers(o.headers || {}); hs.set('x-acesso', dev); o = { ...o, headers: hs }; }
+    const r = await fetch(url, o);
+    if (!r.ok && r.status < 500) { try { if ((await r.clone().text()).includes('pin_obrigatorio')) setTimeout(() => { try { irParaPorta(); } catch { /* ignora */ } }, 0); } catch { /* ignora */ } }
+    return r;
+  };
+  // Mesma chave de sessão do chat: quem já entrou no chat já está logado aqui.
+  const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { global: { fetch: fetchComAparelho }, auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false, storageKey: 'csi-paciente-auth' } });
+
+  /* ---------- Porta do PIN (mesma regra do chat) ----------
+     Com o PIN obrigatório não existe check-in nem entrada por e-mail e senha fora do PIN: quem não tem o aparelho com PIN vai à página /acesso/ (cria o PIN; os cadastros antigos entram uma última vez e criam o PIN)
+     e volta aqui. Só o link da fila que a clínica emitiu (ticket) continua mostrando a fila. Se a porta não conseguir terminar, mostra um aviso: NUNCA abre sem PIN. */
+  let portaObrig = false;
+  function portaRaiz() { return location.pathname.replace(/[^/]*$/, '').replace(/minha-vez\/.*$/, ''); }
+  function telaPortaFalhou() {
+    btnSair.hidden = true; modo = null;
+    mostrar(h('div', { class: 'cartao' }, h('h1', {}, 'Não conseguimos abrir o seu acesso agora.'),
+      h('a', { class: 'principal', id: 'portaTentar', href: portaRaiz() + 'acesso/?voltar=acompanhar', onclick: () => { try { sessionStorage.removeItem('csi_mv_tent'); } catch { /* ignora */ } }, style: 'display:block;text-align:center;text-decoration:none' }, 'Tentar de novo'),
+      h('p', { class: 'suave' }, 'Se continuar, ligue para (71) 3181-7666 ou chame no WhatsApp (71) 99980-3806.')));
+  }
+  function irParaPorta() {
+    let t = null; try { t = JSON.parse(sessionStorage.getItem('csi_mv_tent') || 'null'); } catch { t = null; }
+    t = t && Date.now() - t.t < 60000 ? { n: t.n + 1, t: t.t } : { n: 1, t: Date.now() };
+    try { sessionStorage.setItem('csi_mv_tent', JSON.stringify(t)); } catch { /* sem armazenamento: segue */ }
+    if (t.n > 3) { telaPortaFalhou(); return false; }   // trava contra laço: não abre sem PIN, mostra o aviso
+    location.replace(portaRaiz() + 'acesso/?voltar=acompanhar');
+    return true;
+  }
+  async function lerPorta() {
+    try { const { data, error } = await db.rpc('app_porta'); if (!error && data && data.ativo !== undefined) { portaObrig = data.ativo === true && data.obrigatorio === true; return; } } catch { /* sem rede: usa o que o aparelho lembra */ }
+    try { portaObrig = localStorage.getItem('csi_porta_v1') === '1'; } catch { portaObrig = false; }   // a pergunta falhou: se o PIN era obrigatório neste aparelho, continua sendo
+  }
 
   function h(tag, props, ...filhos) {
     const e = document.createElement(tag);
@@ -340,6 +377,11 @@
   // Sem login: se a recepção criou/redefiniu a conta, a pessoa entra aqui mesmo; senão, só aguarda e é chamada.
   function cartoesTicket(f) {
     const nos = [];
+    if (portaObrig && (f.conta_pronta || f.pede_senha)) {   // PIN obrigatório: a senha provisória das contas antigas não é mais caminho; a pessoa cria o PIN
+      nos.push(h('div', { class: 'cartao' }, h('h1', {}, 'Crie o seu acesso rápido'), h('p', {}, 'Para ver os seus pedidos e receber avisos, use o celular e um PIN de 4 números. Leva um minuto.'),
+        h('a', { class: 'principal', id: 'criarPin', href: portaRaiz() + 'acesso/?voltar=acompanhar', style: 'display:block;text-align:center;text-decoration:none' }, 'Criar meu PIN')));
+      return nos;
+    }
     if (f.conta_pronta) {
       const senha = h('input', { id: 'sp', type: 'password', autocomplete: 'current-password', maxlength: 72 });
       const erro = h('p', { class: 'erro', role: 'alert' });
@@ -636,13 +678,27 @@
 
   btnSair.addEventListener('click', async () => {
     try { if (reg) { const x = await reg.pushManager.getSubscription(); if (x) { await db.rpc('fila_push_remover', { p_endpoint: x.endpoint }); await x.unsubscribe(); } } } catch { /* ignora */ }
-    desligar(); sessao = null; guardarTicket(null); await db.auth.signOut({ scope: 'local' }); telaInicio();
+    desligar(); sessao = null; guardarTicket(null); await db.auth.signOut({ scope: 'local' });
+    if (portaObrig) { irParaPorta(); return; }   // PIN obrigatório: sair leva à porta, nunca ao check-in sem cadastro
+    telaInicio();
   });
 
   async function iniciar() {
     // Sem exigir nada antes: quem chega faz o check-in. Avisos e login são opcionais.
     desligar();
     if ('serviceWorker' in navigator && !reg) { try { reg = await navigator.serviceWorker.register('sw.js', { scope: './' }); await navigator.serviceWorker.ready; } catch { /* sem aviso no celular; o resto funciona */ } }
+    await lerPorta();
+    if (portaObrig) {
+      // PIN obrigatório: nada de check-in sem cadastro nem de entrada por e-mail e senha (mesmo com sessão antiga). Aparelho com PIN entra sozinho; sem ele, vai à porta.
+      if (acessoDev()) {
+        const abriu = await appIniciar();
+        if (abriu && lerTicket()) { modo = 'ticket'; sessao = null; desenhar(null); ligarTempoReal(); atualizarTicket(); return; }
+        if (abriu) return;
+      }
+      if (lerTicket()) { modo = 'ticket'; sessao = null; desenhar(null); ligarTempoReal(); atualizarTicket(); return; }   // link da fila que a clínica emitiu: só mostra a fila
+      irParaPorta();
+      return;
+    }
     const { data: { session } } = await db.auth.getSession();
     if (!session) {
       if (acessoDev()) {   // acesso rápido: entra sozinho (celular + PIN); o check-in é de um toque e os pedidos aparecem na hora

@@ -3425,7 +3425,7 @@
    "anon": true,
    "authenticated": true,
    "publico": false,
-   "md5": "23e051ff30463963f690c7c4d1a738e8"
+   "md5": "c032bb0e4a5586568e1aa3ca410cec8a"
   },
   {
    "nome": "app_chat_dados",
@@ -3690,7 +3690,7 @@
    "anon": false,
    "authenticated": true,
    "publico": false,
-   "md5": "9ce53072846698345d767d41bb967aa7"
+   "md5": "9548fca6c98d505d6d9a46c71b949e4a"
   },
   {
    "nome": "app_conta_antiga_resumo",
@@ -4436,7 +4436,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "aa74628898249089a2b8062fb4b31b86"
+   "md5": "f16ed5c6734e6e22bba4de48ecc168e8"
   },
   {
    "nome": "app_pin_trocar",
@@ -4459,7 +4459,73 @@
    "anon": true,
    "authenticated": true,
    "publico": false,
-   "md5": "46773ad59379e8a6a26be42022eef338"
+   "md5": "f8f38f68845853e8b366250e72c05b4b"
+  },
+  {
+   "nome": "app_pin_esqueci",
+   "args": [
+    {
+     "nome": "p_telefone",
+     "padrao": false
+    },
+    {
+     "nome": "p_nome",
+     "padrao": false
+    },
+    {
+     "nome": "p_nascimento",
+     "padrao": false
+    },
+    {
+     "nome": "p_pin_novo",
+     "padrao": false
+    },
+    {
+     "nome": "p_aparelho",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "87035dc82870d729ea04769641a6bd34"
+  },
+  {
+   "nome": "app_pin_exigir_leitura",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "57aa7a27def5e2d3039aff02877c87d3"
+  },
+  {
+   "nome": "app_pin_fraco",
+   "args": [
+    {
+     "nome": "p_pin",
+     "padrao": false
+    }
+   ],
+   "definer": false,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "1203b3966e3f0b7fa0d3d86a5ffc3b48"
+  },
+  {
+   "nome": "app_pin_token",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "00a42280d5db1880f319ad5501cbc3ba"
   },
   {
    "nome": "app_porta",
@@ -4649,37 +4715,6 @@
    "authenticated": false,
    "publico": false,
    "md5": "85b1238fd9a4e76545536724a61aa277"
-  },
-  {
-   "nome": "app_pin_esqueci",
-   "args": [
-    {
-     "nome": "p_telefone",
-     "padrao": false
-    },
-    {
-     "nome": "p_nome",
-     "padrao": false
-    },
-    {
-     "nome": "p_nascimento",
-     "padrao": false
-    },
-    {
-     "nome": "p_pin_novo",
-     "padrao": false
-    },
-    {
-     "nome": "p_aparelho",
-     "padrao": true
-    }
-   ],
-   "definer": true,
-   "gatilho": false,
-   "anon": true,
-   "authenticated": true,
-   "publico": false,
-   "md5": "96c6984f4f897d45a370680eed50ccb9"
   },
   {
    "nome": "app_sair",
@@ -5184,7 +5219,7 @@
    "anon": true,
    "authenticated": true,
    "publico": true,
-   "md5": "658c345cce6e0764711f9d16369c5ab8"
+   "md5": "02373b1d25421b75bd9bd800e2de288f"
   },
   {
    "nome": "chat_anexo_enviar",
@@ -5215,7 +5250,7 @@
    "anon": true,
    "authenticated": true,
    "publico": true,
-   "md5": "00827fe964dec997ebc53d3dee69ed1f"
+   "md5": "83911773072524918faa05bdfbb6e5af"
   },
   {
    "nome": "chat_ao_vivo_validar",
@@ -5265,7 +5300,7 @@
    "anon": true,
    "authenticated": true,
    "publico": false,
-   "md5": "797b26615fd65aace19c2b31106b7a70"
+   "md5": "7eb82ba77aacf1d04d9cfa504d1d2f29"
   },
   {
    "nome": "chat_avaliacao_estado",
@@ -5288,7 +5323,7 @@
    "anon": true,
    "authenticated": true,
    "publico": false,
-   "md5": "866833b6d24a50b668dcb59df96e49c4"
+   "md5": "4baef558da9202bd82d6c56262b8761a"
   },
   {
    "nome": "chat_avaliar",
@@ -5319,7 +5354,7 @@
    "anon": true,
    "authenticated": true,
    "publico": false,
-   "md5": "25c2691f0e5ba42f70580c4e7e68d7e8"
+   "md5": "abd4b0a272eea5d3d58253a0c2185c5d"
   },
   {
    "nome": "chat_config",
@@ -5352,7 +5387,7 @@
    "anon": true,
    "authenticated": true,
    "publico": true,
-   "md5": "cdd7a195dc37c7480f50d0052b544e07"
+   "md5": "42b3a98d207cc1fbd91721011313ed69"
   },
   {
    "nome": "chat_consultas",
@@ -5371,7 +5406,7 @@
    "anon": true,
    "authenticated": true,
    "publico": true,
-   "md5": "5873a5540e73a6d693180675bd24b713"
+   "md5": "68d6905152f799d3648f4727037e5851"
   },
   {
    "nome": "chat_corpo",
@@ -5390,7 +5425,7 @@
    "anon": true,
    "authenticated": true,
    "publico": false,
-   "md5": "d31972d5cca48fe74f678341d49ff6f9"
+   "md5": "01f0f5650cdf4efae1702d89a1b321ff"
   },
   {
    "nome": "chat_corpo_atualizar",
@@ -5433,7 +5468,7 @@
    "anon": true,
    "authenticated": true,
    "publico": false,
-   "md5": "7512b1a37a61af8ebf3af07f0e472064"
+   "md5": "17c92379bab19db41de1759902e63344"
   },
   {
    "nome": "chat_disponibilidade_alterar",
@@ -5460,7 +5495,7 @@
    "anon": true,
    "authenticated": true,
    "publico": false,
-   "md5": "d5bf8dd2ac9ca3a2e2c0fb0eb8cf0d8f"
+   "md5": "425b5f5df341b59f936486842711e66b"
   },
   {
    "nome": "chat_disponibilidade_cancelar",
@@ -5483,7 +5518,7 @@
    "anon": true,
    "authenticated": true,
    "publico": false,
-   "md5": "56569ee3c2c3c91091d1516fa4ff2855"
+   "md5": "36f5bb984695c476ee582f1ef5b33bf6"
   },
   {
    "nome": "chat_disponibilidade_registrar",
@@ -5506,7 +5541,7 @@
    "anon": true,
    "authenticated": true,
    "publico": false,
-   "md5": "95fbcee91194f4f96a9caf09e9b0130d"
+   "md5": "3b97433c8538f59d8efcfb1e66a7b13d"
   },
   {
    "nome": "chat_disponibilidade_responder",
@@ -5533,7 +5568,7 @@
    "anon": true,
    "authenticated": true,
    "publico": false,
-   "md5": "c1f6fbe8acbade46058f404a07da45b0"
+   "md5": "23925a259908934eb0172bd4529348f6"
   },
   {
    "nome": "chat_disponibilidade_ver",
@@ -5552,7 +5587,7 @@
    "anon": true,
    "authenticated": true,
    "publico": false,
-   "md5": "84496634e341b9aad432d38cdaf37720"
+   "md5": "abfdda0afe78daacf5a9baec9bcfa52d"
   },
   {
    "nome": "chat_enviar",
@@ -5602,7 +5637,7 @@
    "anon": true,
    "authenticated": true,
    "publico": false,
-   "md5": "a39f347afb471778bf3e851ec2d99210"
+   "md5": "ce134ebd8dcc4aae44615fb374f9dd85"
   },
   {
    "nome": "chat_exames_buscar",
@@ -5629,7 +5664,7 @@
    "anon": true,
    "authenticated": true,
    "publico": true,
-   "md5": "e004fee92169d4ddb7a5a41ac671333d"
+   "md5": "522b7dc887f5b721bc858840568271b3"
   },
   {
    "nome": "chat_exames_salvar",
@@ -5652,7 +5687,7 @@
    "anon": true,
    "authenticated": true,
    "publico": true,
-   "md5": "7d83fb257e5f0726f486c6635462b402"
+   "md5": "50affcd38c0f4eb57dc9a1763b34feb7"
   },
   {
    "nome": "chat_foto_enviar",
@@ -5679,7 +5714,7 @@
    "anon": true,
    "authenticated": true,
    "publico": false,
-   "md5": "72e38cfc3280ffa5153c5ac977a1c059"
+   "md5": "b1e263c6969ba563c30431a5c355cc74"
   },
   {
    "nome": "chat_horario_escolher",
@@ -5714,7 +5749,7 @@
    "anon": true,
    "authenticated": true,
    "publico": false,
-   "md5": "abe9dd5134b5c0e46d0ba2a50225ea2a"
+   "md5": "fd714f40d07552f583f87cfde6d56e82"
   },
   {
    "nome": "chat_horarios",
@@ -5757,7 +5792,7 @@
    "anon": true,
    "authenticated": true,
    "publico": false,
-   "md5": "276634362408c1f3738f4ee69e236e84"
+   "md5": "152d4765901f6308c6dec8508913c0ec"
   },
   {
    "nome": "chat_incidente",
@@ -5889,7 +5924,7 @@
    "anon": true,
    "authenticated": true,
    "publico": false,
-   "md5": "2def79776398fe81bb18ab6fbb814b32"
+   "md5": "f85806c7e98f5b8de6ed438795779542"
   },
   {
    "nome": "chat_medico_limpar",
@@ -5908,7 +5943,7 @@
    "anon": true,
    "authenticated": true,
    "publico": true,
-   "md5": "ef484d21d0eec51716cf274083471ea5"
+   "md5": "6d33a9a14517d9f95e10b98b3c7175e3"
   },
   {
    "nome": "chat_medicos_disponiveis",
@@ -5927,7 +5962,7 @@
    "anon": true,
    "authenticated": true,
    "publico": false,
-   "md5": "6156d6c7f311017ecdd2a8cde4c04622"
+   "md5": "45f9b0adfeba2c69b1290945e4b814ae"
   },
   {
    "nome": "chat_nova_conversa",
@@ -6035,7 +6070,7 @@
    "anon": true,
    "authenticated": true,
    "publico": false,
-   "md5": "87bf951b27e7e4e87e10529736b69e93"
+   "md5": "98dd34002af31a059e287f3d1a6f5f92"
   },
   {
    "nome": "chat_pedido_escolha",
@@ -6062,7 +6097,7 @@
    "anon": true,
    "authenticated": true,
    "publico": true,
-   "md5": "c1c0beb58962a424b7b08eba625e8de9"
+   "md5": "1f9c6c5d52b1b40d4fb443c69056548e"
   },
   {
    "nome": "chat_pedido_ler",
@@ -6101,7 +6136,7 @@
    "anon": true,
    "authenticated": true,
    "publico": true,
-   "md5": "ed11c54b6a30532e4bb860285513bd21"
+   "md5": "3a25caa1be1ca6a4f0c737f0cd4e0292"
   },
   {
    "nome": "chat_pedido_salvar",
@@ -6124,7 +6159,7 @@
    "anon": true,
    "authenticated": true,
    "publico": false,
-   "md5": "e9fe612adb9605443125cff2f2d19435"
+   "md5": "9d27d608e0fd3f554276ce7ea4410dff"
   },
   {
    "nome": "chat_previsao_aceitar",
@@ -6143,7 +6178,7 @@
    "anon": true,
    "authenticated": true,
    "publico": false,
-   "md5": "4dba6494a822719a6e95265f48b86ca9"
+   "md5": "0b05877976dbbfb1088514bfac1a5ddf"
   },
   {
    "nome": "chat_push_config",
@@ -6172,7 +6207,7 @@
    "anon": true,
    "authenticated": true,
    "publico": false,
-   "md5": "f289f5ae6376a5c4b424dd2476679753"
+   "md5": "7f6c2266ae093087e7fd95361e184392"
   },
   {
    "nome": "chat_push_remover",
@@ -6226,7 +6261,7 @@
    "anon": true,
    "authenticated": true,
    "publico": true,
-   "md5": "683761ff77127d47ca593a2f3b1c4791"
+   "md5": "271191553539200d613336503a8d865a"
   },
   {
    "nome": "chat_push_silenciar",
@@ -6249,7 +6284,7 @@
    "anon": true,
    "authenticated": true,
    "publico": false,
-   "md5": "af93b3763165eb4b8fa35b8e0e3293ac"
+   "md5": "d5b544eef29e989b4a32ee34a2c05bc0"
   },
   {
    "nome": "chat_push_trg",
@@ -6278,7 +6313,7 @@
    "anon": true,
    "authenticated": true,
    "publico": false,
-   "md5": "2d50afd929123f1825c21bea662dad4b"
+   "md5": "d26a4a17ba8ec81403a96d3d9a79ff87"
   },
   {
    "nome": "chat_responder",
@@ -6380,7 +6415,7 @@
    "anon": true,
    "authenticated": true,
    "publico": false,
-   "md5": "58bf533c53d122ed442304c544f2f42f"
+   "md5": "e8f29d435bfec34f0a05d8636f922cca"
   },
   {
    "nome": "checkin_publico",
@@ -6480,7 +6515,7 @@
    "anon": false,
    "authenticated": true,
    "publico": false,
-   "md5": "d471c4de73238550d900d2296df34083"
+   "md5": "608de627ca0d35f92f530fc58ea6db22"
   },
   {
    "nome": "conta_paciente_confirmar_cpf",
@@ -6495,7 +6530,7 @@
    "anon": false,
    "authenticated": true,
    "publico": false,
-   "md5": "625c878c54ad206245fe6d866a9c7d9f"
+   "md5": "3952169ff6baa4cc7e0e971c6cb38edf"
   },
   {
    "nome": "conta_paciente_conversas",
@@ -6505,7 +6540,7 @@
    "anon": false,
    "authenticated": true,
    "publico": false,
-   "md5": "d5697068ede4d773eba0a31bf39de149"
+   "md5": "7aa021d3e8143de81f31c2d3034fc189"
   },
   {
    "nome": "conta_paciente_excluir",
@@ -6520,7 +6555,7 @@
    "anon": false,
    "authenticated": true,
    "publico": false,
-   "md5": "a90e789c36050d1de92d71237fcb9495"
+   "md5": "4568ec22a6f193eeaa326b5cae8ce022"
   },
   {
    "nome": "conta_paciente_meus_dados",
@@ -6530,7 +6565,7 @@
    "anon": false,
    "authenticated": true,
    "publico": false,
-   "md5": "8698b0016c31c71a142f3221f403d1e5"
+   "md5": "85cfc7ab6e7296fc7e5fbe5e09391a8e"
   },
   {
    "nome": "conta_paciente_pedir_alteracao",
@@ -6553,7 +6588,7 @@
    "anon": false,
    "authenticated": true,
    "publico": false,
-   "md5": "71114a6a8744643b6bf9e12bcd44116b"
+   "md5": "4652a396d46246e00dc8e197380fcf04"
   },
   {
    "nome": "conta_paciente_perfil",
@@ -6576,7 +6611,7 @@
    "anon": false,
    "authenticated": true,
    "publico": false,
-   "md5": "d95e9bef9529791872042fd752c87e05"
+   "md5": "e2b507efac38072967b011d54c914d92"
   },
   {
    "nome": "conta_paciente_resumo",
@@ -6586,7 +6621,7 @@
    "anon": false,
    "authenticated": true,
    "publico": false,
-   "md5": "5258071c45023f37c34e50e0ab189cb2"
+   "md5": "d3192c735ad8a2305a675f72306bc253"
   },
   {
    "nome": "conta_paciente_vincular",
@@ -6596,7 +6631,7 @@
    "anon": false,
    "authenticated": true,
    "publico": false,
-   "md5": "b149fa1cfe9f3361b9fb68f4aeaa8007"
+   "md5": "eef97f803404624558de41fc55abdee6"
   },
   {
    "nome": "conta_paciente_vinculo_estado",
@@ -6606,7 +6641,7 @@
    "anon": false,
    "authenticated": true,
    "publico": false,
-   "md5": "a225ad098db1915649c51c48cb9bc434"
+   "md5": "0a435142068a0ee1812f40eeb077f0f8"
   },
   {
    "nome": "conta_precisa_trocar_senha",
@@ -6616,7 +6651,7 @@
    "anon": false,
    "authenticated": true,
    "publico": false,
-   "md5": "5d566be424a0bcea1b91533919d07944"
+   "md5": "8f76924e9364386918347d00c2d56f43"
   },
   {
    "nome": "conta_senha_trocada",

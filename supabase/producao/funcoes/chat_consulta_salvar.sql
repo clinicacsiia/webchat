@@ -8,6 +8,7 @@ CREATE OR REPLACE FUNCTION public.chat_consulta_salvar(p_conversa uuid, p_token 
 AS $function$
 declare v_cat text; v_med text; v_c record; v_proc text; v_msg bigint; v_txt text;
 begin
+  perform public.app_pin_exigir_leitura();   -- PIN também no servidor (config.app_pin_servidor)
   perform public.chat_valida(p_conversa, p_token);
   if (select count(*) from public.mensagens where conversa_id = p_conversa and autor = 'cliente' and criado_em > now() - interval '1 minute') >= 20 then
     raise exception 'Muitas mensagens em pouco tempo. Aguarde um instante.' using errcode = '54000';

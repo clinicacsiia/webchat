@@ -8,6 +8,7 @@ CREATE OR REPLACE FUNCTION public.chat_disponibilidade_responder(p_conversa uuid
 AS $function$
 declare r public.disponibilidade_pedido; o public.disponibilidade_oportunidade; pa public.pre_agendamentos;
 begin
+  perform public.app_pin_exigir_leitura();   -- PIN também no servidor (config.app_pin_servidor)
   perform public.chat_valida(p_conversa, p_token);
   perform set_config('app.conversa', p_conversa::text, true);
   r := public.disponibilidade_do_paciente(p_conversa, p_id);

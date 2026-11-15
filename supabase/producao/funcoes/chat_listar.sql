@@ -8,6 +8,7 @@ CREATE OR REPLACE FUNCTION public.chat_listar(p_conversa uuid, p_token text, p_a
 AS $function$
 declare v_status text; v_agente text; v_motor boolean; v_passo text;
 begin
+  perform public.app_pin_exigir_leitura();   -- PIN também no servidor (config.app_pin_servidor)
   select c.status, a.nome, (c.motor = 'fluxo' and c.ia_ativa and c.status = 'aguardando'), f.passo into v_status, v_agente, v_motor, v_passo
   from public.conversas c
   join public.conversa_segredo s on s.conversa_id = c.id
