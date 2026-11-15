@@ -1,7 +1,7 @@
 // FLUXOGRAMA: entrada (POST do pg_cron com x-sync-key e {"modo":"rapido"|"completo"}) -> validação (chave = config.ia_segredo; token KLINGO_APP_TOKEN; relatório e filtro vindos da config) -> lógica (lê o relatório do Klingo na janela do modo, mapeia, manda em lotes para jornada_klingo_lote e fecha com jornada_klingo_fechar) -> saída (resumo SEM dado de paciente; em erro, jornada_klingo_falha)
-// Versão 1.4 — 15/11/2026 / Mudança: no #14359 as colunas são achadas pelo TÍTULO (a ordem pode mudar); título obrigatório sumido para a leitura; trava de valores mantida
+// Versão 1.5 — 15/11/2026 / Mudança: manda o check-in (col18) como 'k'; v1.4: no #14359 as colunas são achadas pelo TÍTULO (a ordem pode mudar); título obrigatório sumido para a leitura; trava de valores mantida
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { emLotes, filtroValido, hojeBrasilia, janelaLeitura, layoutDe, layoutPorTitulos, layoutSuspeito, modoValido, prepararLinhas, relatorioValido, somaDias, CARTOES_ATRAS, CARTOES_FRENTE, type Coluna, type Row } from "./mapa.ts";
+import { emLotes, filtroValido, hojeBrasilia, janelaLeitura, layoutDe, layoutPorTitulos, checkinSuspeito, layoutSuspeito, modoValido, prepararLinhas, relatorioValido, somaDias, CARTOES_ATRAS, CARTOES_FRENTE, type Coluna, type Row } from "./mapa.ts";
 
 // Lê as marcações do Klingo e alimenta o quadro "Jornada" do painel. Quem chama é o pg_cron (todo minuto, mas o banco só dispara quando é a hora: jornada_klingo_agendar).
 // As linhas do relatório têm nome e telefone de pacientes: ficam só na memória desta função; o telefone vira uma marca (hash) e o valor em R$ nunca é lido.
@@ -74,7 +74,9 @@ Deno.serve(async (req: Request) => {
     }
     const suspeito = layoutSuspeito(brutas, layout);
     if (suspeito) throw new Error(suspeito);
-    const { linhas, descartadas, descartes, fora, semProntuario } = await prepararLinhas(brutas, config.ia_segredo, hoje, layout);
+    const { linhas, descartadas, descartes, fora, semProntuario, checkinLidos, checkinInvalidos } = await prepararLinhas(brutas, config.ia_segredo, hoje, layout);
+    const checkinIgnorado = checkinSuspeito(checkinLidos, checkinInvalidos);
+    if (checkinIgnorado) for (const l of linhas) delete l.k;   // coluna do check-in estranha: não grava (o banco mantém o que já tinha)
 
     let lidas = 0, alteradas = 0, cartoesCriados = 0;
     for (const lote of emLotes(linhas, TAMANHO_LOTE)) {
@@ -84,7 +86,7 @@ Deno.serve(async (req: Request) => {
       lidas += r?.lidas ?? 0; alteradas += r?.alteradas ?? 0; cartoesCriados += r?.cartoes_criados ?? 0;
     }
 
-    const resumo = { modo, relatorio, filtro, colunas_por: colunasPor, colunas_fora_da_ordem_fixa: diferentes, janela: `${de}..${ate}`, linhas_klingo: brutas.length, descartadas, descartes, chave_por_nome: semProntuario, fora_da_janela: fora, lidas, alteradas, cartoes_criados: cartoesCriados, leitura_ms: Date.now() - inicio };
+    const resumo = { modo, relatorio, filtro, colunas_por: colunasPor, colunas_fora_da_ordem_fixa: diferentes, janela: `${de}..${ate}`, linhas_klingo: brutas.length, descartadas, descartes, chave_por_nome: semProntuario, checkin_lidos: checkinLidos, checkin_invalidos: checkinInvalidos, checkin_ignorado: checkinIgnorado, fora_da_janela: fora, lidas, alteradas, cartoes_criados: cartoesCriados, leitura_ms: Date.now() - inicio };
     const { data: fechado, error: e2 } = await supabase.rpc("jornada_klingo_fechar", { p_atras: CARTOES_ATRAS, p_frente: CARTOES_FRENTE, p_resumo: resumo });
     if (e2) throw new Error(`O banco recusou o fechamento (${e2.code ?? "sem código"}): ${e2.message.slice(0, 120)}`);
     return json({ ok: true, ...(fechado as Record<string, unknown>) });

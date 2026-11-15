@@ -1,4 +1,4 @@
--- public.app_pedido_dados(p_pac uuid, p_conversa uuid)
+-- public.app_pedido_dados(p_pac uuid, p_conversa uuid DEFAULT NULL::uuid)
 -- Pode executar: service_role
 CREATE OR REPLACE FUNCTION public.app_pedido_dados(p_pac uuid, p_conversa uuid DEFAULT NULL::uuid)
  RETURNS jsonb
@@ -19,11 +19,14 @@ AS $function$
        and (ac.removido_em is null or c.status <> 'encerrada' or c.encerrada_em > ac.removido_em)
   ), jor as (
     select b.conversa_id, e.id as exame_id, e.procedimento as nome, e.unidade,
+           case when e.marcacao_id ~ '^m\d+$' then substr(e.marcacao_id, 2) end as voucher,
+           case when (e.checkin_em at time zone 'America/Bahia')::date = (e.agendado_para at time zone 'America/Bahia')::date then to_char(e.checkin_em at time zone 'America/Bahia', 'HH24:MI') end as chegada,
            to_char(e.agendado_para at time zone 'America/Bahia', 'YYYY-MM-DD') as data, to_char(e.agendado_para at time zone 'America/Bahia', 'HH24:MI') as hora,
            case when e.status in ('cancelado', 'faltou') or (e.status = 'pedido' and b.pre_status = 'cancelado') then null
                 when e.status = 'atendido' then 5
                 when e.status = 'pedido' then 1
                 when jc.coluna in ('chegou', 'em_atendimento') then 4
+                when (e.checkin_em at time zone 'America/Bahia')::date = (e.agendado_para at time zone 'America/Bahia')::date then 4
                 when e.status = 'confirmado' or lower(coalesce(e.confirm_status, '')) = 'confirmado' then 3
                 else 2 end as ok,
            case when e.status in ('cancelado', 'faltou') then e.status when e.status = 'pedido' and b.pre_status = 'cancelado' then 'cancelado' end as excecao
@@ -33,6 +36,7 @@ AS $function$
      where e.status <> 'remarcado'
   ), pre as (
     select b.conversa_id, null::bigint as exame_id, coalesce(nullif(i.procedimento, ''), nullif(b.pre_proc, ''), 'Atendimento') as nome, b.pre_unidade as unidade,
+           null::text as voucher, null::text as chegada,
            b.pre_hor -> 0 ->> 'data' as data, b.pre_hor -> 0 ->> 'hora' as hora,
            case b.pre_status when 'agendado' then 2 when 'pronto' then 1 else 0 end as ok,
            case when b.pre_status = 'cancelado' then 'cancelado' end as excecao
@@ -51,7 +55,7 @@ AS $function$
   ), por_conversa as (
     select b.*,
 
-           coalesce(jsonb_agg(jsonb_build_object('id', x.exame_id, 'nome', x.nome, 'unidade', x.unidade, 'data', x.data, 'hora', x.hora, 'ok', x.ok, 'excecao', x.excecao,
+           coalesce(jsonb_agg(jsonb_build_object('id', x.exame_id, 'nome', x.nome, 'unidade', x.unidade, 'data', x.data, 'hora', x.hora, 'ok', x.ok, 'excecao', x.excecao, 'voucher', x.voucher, 'chegada', x.chegada,
                                                  'resultado', x.res, 'resultado_id', x.res_id, 'resultado_conversa', x.res_conv)
                              order by (x.data is not null and x.data < (select d from hoje)), case when x.data >= (select d from hoje) then x.data end, x.data desc nulls last, x.hora, x.nome)
                     filter (where x.nome is not null), '[]'::jsonb) as exames,

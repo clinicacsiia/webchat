@@ -14,6 +14,7 @@ declare
   v_dia     date;
   v_unid    text;
   v_status  text;
+  v_checkin timestamptz;
   v_id      bigint;
   n_ok      integer := 0;
   n_pula    integer := 0;
@@ -34,6 +35,8 @@ begin
     v_dia := (r ->> 'd')::timestamp::date;
     v_unid := public.jornada_unidade_curta(r ->> 'u');
     v_status := public.jornada_status_exame(r ->> 's', r ->> 't', r ->> 'r', r ->> 'c', v_dia, v_hoje);
+    -- Check-in do Klingo (col18 do #14359), hora de Brasília. Chave 'k' ausente = leitura antiga: não mexe; 'k' vazio = sem check-in (limpa).
+    v_checkin := case when coalesce(r ->> 'k', '') ~ '^\d{4}-\d{2}-\d{2}' then (r ->> 'k')::timestamp at time zone 'America/Sao_Paulo' end;
 
     insert into public.jornada_paciente as p (prontuario, nome, fone_chave)
     values (r ->> 'p', case when v_ident then nullif(trim(r ->> 'n'), '') end, nullif(r ->> 'f', ''))
@@ -55,17 +58,17 @@ begin
       end if;
     end if;
 
-    insert into public.jornada_exame as e (card_id, marcacao_id, atendimento_id, procedimento, operadora, unidade, agendado_em, agendado_para, status, confirm_status, cancelamento_motivo)
+    insert into public.jornada_exame as e (card_id, marcacao_id, atendimento_id, procedimento, operadora, unidade, agendado_em, agendado_para, status, confirm_status, cancelamento_motivo, checkin_em)
     values (v_id, 'm' || (r ->> 'm'), nullif(r ->> 'a', ''), coalesce(nullif(trim(r ->> 'x'), ''), 'Procedimento não informado'), nullif(trim(r ->> 'o'), ''), v_unid,
             case when coalesce(r ->> 'e', '') ~ '^\d{4}-\d{2}-\d{2}' then (r ->> 'e')::timestamp at time zone 'America/Sao_Paulo' end, v_para,
-            v_status, nullif(trim(r ->> 'c'), ''), nullif(trim(r ->> 'r'), ''))
+            v_status, nullif(trim(r ->> 'c'), ''), nullif(trim(r ->> 'r'), ''), v_checkin)
     on conflict (marcacao_id) do update
       set card_id = excluded.card_id, atendimento_id = excluded.atendimento_id, procedimento = excluded.procedimento, operadora = excluded.operadora, unidade = excluded.unidade,
           agendado_em = excluded.agendado_em, agendado_para = excluded.agendado_para, status = excluded.status, confirm_status = excluded.confirm_status,
-          cancelamento_motivo = excluded.cancelamento_motivo, atualizado_em = now()
-      where (e.card_id, e.atendimento_id, e.procedimento, e.operadora, e.unidade, e.agendado_em, e.agendado_para, e.status, e.confirm_status, e.cancelamento_motivo)
+          cancelamento_motivo = excluded.cancelamento_motivo, checkin_em = case when r ? 'k' then excluded.checkin_em else e.checkin_em end, atualizado_em = now()
+      where (e.card_id, e.atendimento_id, e.procedimento, e.operadora, e.unidade, e.agendado_em, e.agendado_para, e.status, e.confirm_status, e.cancelamento_motivo, e.checkin_em)
             is distinct from (excluded.card_id, excluded.atendimento_id, excluded.procedimento, excluded.operadora, excluded.unidade, excluded.agendado_em, excluded.agendado_para,
-                              excluded.status, excluded.confirm_status, excluded.cancelamento_motivo);
+                              excluded.status, excluded.confirm_status, excluded.cancelamento_motivo, case when r ? 'k' then excluded.checkin_em else e.checkin_em end);
     get diagnostics n_linha = row_count;
     n_mudou := n_mudou + n_linha;
     n_ok := n_ok + 1;

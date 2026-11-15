@@ -74,3 +74,6 @@ O cliente que abriu uma conversa no chat (`index.html`) recebe uma notificação
 - A inscrição fica presa à conversa (id + token). Aparelho que desinstalou é apagado no primeiro envio que falhar.
 - iPhone: só funciona com o site instalado na Tela de Início (iOS 16.4+). Quem abre o chat e já tinha permitido é inscrito sozinho.
 - **Não testado com celular real.** Testado: banco (token errado recusado), função (401 sem segredo, 200 com segredo). Para testar: abrir o chat no celular, permitir os avisos, iniciar a conversa, bloquear a tela e responder pelo painel.
+
+## Etapa e número da marcação no lugar do lugar na fila (15/11/2026)
+Quem tem exame **hoje** no Klingo vê, em vez de "Nº lugar", o cartão **"Você está na clínica"** com a senha e, por exame, o **número da marcação**, a hora e a etapa (Aguardando a recepção / Chegada registrada às HH:MM / Em atendimento). A recepção acha a pessoa no Klingo pelo número. Sem exame de hoje continua o lugar; "É a sua vez!" não muda. Detalhes, fonte dos dados e o que conferir na segunda-feira em `docs/checkin-klingo-minha-vez.md`.

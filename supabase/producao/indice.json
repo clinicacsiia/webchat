@@ -1059,26 +1059,6 @@
    "politicas": 1
   },
   {
-   "nome": "jornada_exame",
-   "colunas": [
-    "id",
-    "card_id",
-    "marcacao_id",
-    "atendimento_id",
-    "procedimento",
-    "operadora",
-    "unidade",
-    "agendado_em",
-    "agendado_para",
-    "status",
-    "confirm_status",
-    "cancelamento_motivo",
-    "atualizado_em"
-   ],
-   "rls": true,
-   "politicas": 1
-  },
-  {
    "nome": "jornada_mensagem",
    "colunas": [
     "id",
@@ -2219,6 +2199,27 @@
    ],
    "rls": true,
    "politicas": 0
+  },
+  {
+   "nome": "jornada_exame",
+   "colunas": [
+    "id",
+    "card_id",
+    "marcacao_id",
+    "atendimento_id",
+    "procedimento",
+    "operadora",
+    "unidade",
+    "agendado_em",
+    "agendado_para",
+    "status",
+    "confirm_status",
+    "cancelamento_motivo",
+    "atualizado_em",
+    "checkin_em"
+   ],
+   "rls": true,
+   "politicas": 1
   }
  ],
  "visoes": [
@@ -4284,7 +4285,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "e53957ee721271d34a7f99f1ed5ae09c"
+   "md5": "4579aaef5b3e0e62a0cce5f987b0b3ca"
   },
   {
    "nome": "app_pedido_apagar",
@@ -9964,7 +9965,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "664a1914594f5d71509ac224f1f09319"
+   "md5": "9cc946a84e358d3f7c839bf8393931c9"
   },
   {
    "nome": "jornada_klingo_pode_mover",
@@ -12397,7 +12398,7 @@
    "anon": false,
    "authenticated": true,
    "publico": false,
-   "md5": "d43357a7f6b8f86ef7f11cb398801643"
+   "md5": "e776235a8431bbbc48a33693e6b9c275"
   },
   {
    "nome": "paciente_klingo",

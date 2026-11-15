@@ -26,11 +26,14 @@ begin
                 and exists (select 1 from public.jornada_paciente jp where jp.prontuario = jc.paciente_chave and jp.fone_chave = v_fh and public.nome_confere(jp.nome, c.nome))))
   ), ex as (
     select ca.id as card_id, ca.data_ref, ca.unidade, ca.coluna, e.id as exame_id, e.procedimento, e.status, e.confirm_status,
+           case when e.marcacao_id ~ '^m\d+$' then substr(e.marcacao_id, 2) end as voucher,
+           case when (e.checkin_em at time zone 'America/Sao_Paulo')::date = ca.data_ref then to_char(e.checkin_em at time zone 'America/Sao_Paulo', 'HH24:MI') end as chegada,
            case
              when e.status in ('cancelado', 'remarcado', 'faltou') then null
              when e.status = 'atendido' then case when ca.coluna in ('laudo_entregue', 'faturamento', 'nps_retorno', 'concluido') then 6 else 5 end
              when e.status = 'pedido' then 1
              when ca.coluna in ('chegou', 'em_atendimento') then 4
+             when (e.checkin_em at time zone 'America/Sao_Paulo')::date = ca.data_ref then 4
              when e.status = 'confirmado' or lower(coalesce(e.confirm_status, '')) = 'confirmado' then 3
              else 2
            end as ok,
@@ -39,7 +42,7 @@ begin
       from cartoes ca join public.jornada_exame e on e.card_id = ca.id
   ), vis as (
     select data_ref, coalesce(unidade, '') as unidade,
-           jsonb_agg(jsonb_build_object('nome', procedimento, 'ok', ok, 'em_atendimento', em_atendimento, 'excecao', excecao) order by exame_id) as exames
+           jsonb_agg(jsonb_build_object('nome', procedimento, 'ok', ok, 'em_atendimento', em_atendimento, 'excecao', excecao, 'voucher', voucher, 'chegada', chegada) order by exame_id) as exames
       from ex group by data_ref, coalesce(unidade, '')
   )
   select coalesce(jsonb_agg(jsonb_build_object('data', data_ref, 'unidade', unidade, 'exames', exames) order by data_ref), '[]'::jsonb) into v_vis from vis;
