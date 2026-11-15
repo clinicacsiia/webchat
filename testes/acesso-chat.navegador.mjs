@@ -14,6 +14,7 @@ const { db } = await criarBancoProducao();
 const { q, anonimo } = ajudantes(db);
 await db.exec(readFileSync(`${REPO}/supabase/acesso-rapido-paciente.sql`, 'utf8'));
 await db.exec(readFileSync(`${REPO}/supabase/acesso-rapido-chat.sql`, 'utf8'));
+await db.exec(readFileSync(`${REPO}/supabase/acesso-rapido-pendencias.sql`, 'utf8'));
 const modo = (v) => db.query(`update public.config set valor = $1 where chave = 'app_acesso_modo'`, [v]);
 
 // O "Supabase" do chat: cada chamada rpc vai para a função de mesmo nome no banco de teste, como anon, com parâmetros nomeados.
@@ -114,6 +115,14 @@ await caso('PIN vencido (30 min): o chat mostra "Digitar PIN"; PIN errado avisa;
   const cartoes = await page.$$eval('#fQuem .unidade strong', (n) => n.map((x) => x.textContent));
   await ctx.close();
   return { ok: /Digite seu PIN/.test(antes) && cartoes.join('|') === 'Para mim|Para Leo|Para Lia|Todos os filhos', detalhe: cartoes.join('|') };
+});
+
+await caso('cadastro com informação pendente: a faixa do acesso rápido diz "Faltam 3 informações" (CPF dela e dos 2 filhos) e o link vira "Completar"', async () => {
+  const { page, ctx } = await abrir();
+  await page.waitForSelector('#acessoPend', { timeout: 8000 });
+  const txt = await texto(page), link = await page.$eval('#acessoMeusDados', (e) => e.textContent + '|' + e.getAttribute('href'));
+  await ctx.close();
+  return { ok: /Faltam 3 informações/.test(txt) && link === 'Completar|acesso/', detalhe: link };
 });
 
 // ================================================================= 1ª conversa: pergunta uma vez

@@ -14,6 +14,8 @@ const { q } = ajudantes(db);
 await db.exec(readFileSync(`${REPO}/supabase/acesso-rapido-paciente.sql`, 'utf8'));
 await db.exec(readFileSync(`${REPO}/supabase/acesso-rapido-chat.sql`, 'utf8'));
 await db.exec(readFileSync(`${REPO}/supabase/acesso-rapido-conta-antiga.sql`, 'utf8'));
+await db.exec(readFileSync(`${REPO}/supabase/acesso-rapido-pendencias.sql`, 'utf8'));
+await db.exec(readFileSync(`${REPO}/supabase/acesso-rapido-filhos.sql`, 'utf8'));
 await db.exec(`update public.config set valor = 'sim' where chave = 'app_acesso_modo'`);
 
 const HTML = readFileSync(`${REPO}/acesso/index.html`, 'utf8');
@@ -53,13 +55,25 @@ async function chamarFuncao(nome, corpo, uid) {
 const CPF = '52998224725';
 const pac = (await q(`insert into public.pacientes (nome, nome_norm, telefones, dt_nasc, cpf) values ('Ana Souza Teste', 'ana souza teste', array['71991230001'], '1988-04-12', '${CPF}') returning id`))[0].id;
 const ids = {};
-for (const [k, email] of [['ana', 'ana@exemplo.invalid'], ['bia', 'bia@exemplo.invalid'], ['chat', 'chat@exemplo.invalid']]) ids[k] = (await q(`insert into auth.users (id, email) values (gen_random_uuid(), '${email}') returning id`))[0].id;
+for (const [k, email] of [['ana', 'ana@exemplo.invalid'], ['bia', 'bia@exemplo.invalid'], ['chat', 'chat@exemplo.invalid'], ['dani', 'dani@exemplo.invalid']]) ids[k] = (await q(`insert into auth.users (id, email) values (gen_random_uuid(), '${email}') returning id`))[0].id;
 await db.exec(`
   insert into public.contas_paciente (id, email, nome, telefone, paciente_id) values ('${ids.ana}', 'ana@exemplo.invalid', 'Ana Souza Teste', '71991230001', '${pac}');
   insert into public.contas_paciente (id, email) values ('${ids.bia}', 'bia@exemplo.invalid');
   insert into public.contas_paciente (id, email, nome, telefone) values ('${ids.chat}', 'chat@exemplo.invalid', 'Carla Chat Teste', '71991230005');
+  insert into public.contas_paciente (id, email, nome, telefone) values ('${ids.dani}', 'dani@exemplo.invalid', 'Dani Teste Costa', '71991230007');
 `);
 const tokenDe = (uid) => `tok-${uid}`;
+const hist = async (nomeContato, tel, conta, filhos) => {
+  const ct = (await q(`insert into public.contatos (nome, telefone) values ($1, $2) returning id`, [nomeContato, tel]))[0].id;
+  for (const f of filhos) {
+    const c = (await q(`insert into public.conversas (contato_id, paciente_tipo, paciente_nome) values ($1, 'filho', $2) returning id`, [ct, f.nome]))[0].id;
+    await q(`update public.conversas set conta_id = $2 where id = $1`, [c, conta]);
+    await q(`insert into public.pre_agendamentos (conversa_id, paciente) values ($1, $2::jsonb)`, [c, JSON.stringify({ nome: f.nome, ...(f.nasc ? { dt_nasc: f.nasc } : {}), ...(f.cpf ? { cpf: f.cpf } : {}) })]);
+  }
+};
+await hist('Ana Souza Teste', '71991230001', ids.ana, [{ nome: 'Leo Souza Teste', nasc: '30/08/2019', cpf: '529.982.247-25' }, { nome: 'Lia Souza Teste' }, { nome: 'Ana Souza Teste', nasc: '12/04/1988' }]);
+await hist('Dani Teste Costa', '71991230007', ids.dani, [{ nome: 'Dani Teste Costa', nasc: '03/03/2013' }]);
+await hist('Carla Chat Teste', '71991230005', ids.chat, [{ nome: 'Carla Chat Teste' }]);
 
 const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH, args: ['--no-sandbox'] } : {});
 const erros = [];
@@ -122,6 +136,16 @@ await caso('senha certa: mostra o que já temos (e-mail, CPF mascarado) e deixa 
   const v = await a.page.evaluate(() => ({ tel: document.getElementById('tel').value, nome: document.getElementById('nome').value, nasc: document.getElementById('nasc').value }));
   return { ok: /ana@exemplo\.invalid/.test(t) && /\*\*\*\.\*\*\*\.\*\*\*-25/.test(t) && !t.includes(CPF) && v.tel === '(71) 99123-0001' && v.nome === 'Ana Souza Teste' && v.nasc === '1988-04-12', detalhe: JSON.stringify(v) };
 });
+await caso('"Seus filhos": Leo (com CPF já salvo, mascarado), Lia (nascimento faltando) e a própria Ana marcada como "Você", sem checkbox', async () => {
+  const t = await texto(a.page);
+  const marcado = await a.page.locator('[data-fc]').evaluateAll((e) => e.map((x) => x.checked));
+  return { ok: /Seus filhos/.test(t) && /Leo Souza Teste/.test(t) && /\*\*\*\.\*\*\*\.\*\*\*-25/.test(t) && /Lia Souza Teste/.test(t) && /faltando/.test(t) && /É você: já está no seu cadastro/.test(t) && marcado.length === 2 && marcado.every(Boolean) && !t.includes(CPF), detalhe: String(marcado) };
+});
+await caso('sem o nascimento da Lia o servidor/página não deixam seguir; com ele segue', async () => {
+  await a.page.click('[data-act="antiga2"]'); const e1 = /Informe a data de nascimento de Lia/.test(await texto(a.page));
+  await a.page.fill('#fn2', '2021-02-02');
+  return { ok: e1 };
+});
 await caso('Continuar leva ao PIN; PINs diferentes são recusados; PINs iguais criam o acesso rápido e abrem "Olá, Ana"', async () => {
   await a.page.click('[data-act="antiga2"]');
   await esperaTexto(a.page, /Crie seu PIN/);
@@ -130,7 +154,8 @@ await caso('Continuar leva ao PIN; PINs diferentes são recusados; PINs iguais c
   await pin(a.page, '1357'); await pin(a.page, '1357');
   await esperaTexto(a.page, /Olá, Ana/);
   const r = (await q(`select cpf, email, telefone, conta_antiga_id from public.app_paciente`))[0];
-  return { ok: r.cpf === CPF && r.email === 'ana@exemplo.invalid' && r.telefone === '71991230001' && r.conta_antiga_id === ids.ana, detalhe: JSON.stringify({ ...r, cpf: '***' }) };
+  const fs = await q(`select nome, cpf from public.app_filho order by nome`);
+  return { ok: r.cpf === CPF && r.email === 'ana@exemplo.invalid' && r.telefone === '71991230001' && r.conta_antiga_id === ids.ana && fs.length === 2 && fs[0].nome === 'Leo Souza Teste' && fs[0].cpf === CPF && fs[1].nome === 'Lia Souza Teste' && fs[1].cpf === null, detalhe: JSON.stringify({ ...r, cpf: '***' }) + fs.map((x) => x.nome).join('|') };
 });
 await caso('a conta antiga sai do aparelho (logout no Auth) e o aparelho guarda só o código do acesso rápido', async () => {
   const st = await a.page.evaluate(() => ({ acesso: localStorage.getItem('csi_acesso_v2'), antiga: localStorage.getItem('csi-paciente-auth') }));
@@ -172,12 +197,27 @@ await caso('vindo do chat (?antiga=1) com a conta logada: pula a senha, mostra o
   const v = await c.page.evaluate(() => ({ tel: document.getElementById('tel').value, nome: document.getElementById('nome').value }));
   return { ok: v.tel === '(71) 99123-0005' && v.nome === 'Carla Chat Teste', detalhe: JSON.stringify(v) };
 });
+await caso('homônimo sem nascimento (Carla): o servidor pergunta "Quem é?"; a escolha padrão é "Sou eu" e nenhum filho é criado', async () => {
+  const t = await texto(c.page);
+  const sou = await c.page.locator('[data-act="fq"][data-v="0"]').getAttribute('class');
+  return { ok: /O nome é igual ao seu\. Quem é\?/.test(t) && /Sou eu/.test(t) && /on/.test(sou) && (await c.page.locator('#fn0').count()) === 0 };
+});
 await caso('terminando o PIN a página devolve para o chat, e a sessão da conta antiga foi apagada deste aparelho', async () => {
   await c.page.fill('#nasc', '1985-05-05'); await c.page.click('[data-act="antiga2"]');
   await pin(c.page, '1357'); await pin(c.page, '1357');
   await c.page.waitForURL(`${ORIGEM}/`, { timeout: 4000 });
   const st = await c.page.evaluate(() => ({ antiga: localStorage.getItem('csi-paciente-auth'), acesso: !!localStorage.getItem('csi_acesso_v2') }));
-  return { ok: st.antiga === null && st.acesso === true, detalhe: JSON.stringify(st) };
+  return { ok: st.antiga === null && st.acesso === true && (await n(`select count(*)::int n from public.app_filho f join public.app_paciente p on p.id = f.responsavel_id where p.conta_antiga_id = '${ids.chat}'`)) === 0, detalhe: JSON.stringify(st) };
+});
+const dn = await novaPagina(); await dn.page.click('[data-act="go"][data-v="antiga"]'); await entrarComEmail(dn.page, 'dani@exemplo.invalid', SENHA);
+await esperaTexto(dn.page, /Confira os seus dados/);
+await caso('homônimo de criança (Dani, nascimento de menor): já vem como "É outra pessoa" com o nascimento; ao continuar entra como filha confirmada', async () => {
+  const antes = await texto(dn.page);
+  const v = await dn.page.inputValue('#fn0');
+  await dn.page.fill('#nasc', '1980-01-01'); await dn.page.click('[data-act="antiga2"]');
+  await pin(dn.page, '1357'); await pin(dn.page, '1357'); await esperaTexto(dn.page, /Olá, Dani/);
+  const f = await q(`select f.nome, f.nascimento::text n from public.app_filho f join public.app_paciente p on p.id = f.responsavel_id where p.conta_antiga_id = '${ids.dani}'`);
+  return { ok: /Quem é\?/.test(antes) && v === '2013-03-03' && f.length === 1 && f[0].nome === 'Dani Teste Costa' && f[0].n === '2013-03-03', detalhe: JSON.stringify(f) };
 });
 
 // ================================================================= Quem já migrou e tenta de novo

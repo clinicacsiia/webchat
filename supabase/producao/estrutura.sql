@@ -1,5 +1,5 @@
 -- RETRATO DA ESTRUTURA DO BANCO DE PRODUÇÃO (projeto webchat-atendimento). GERADO: não editar à mão.
--- Atualização parcial em 2026-11-15T00:42:30+00:00 (funções app_* e painel_app_*, tabelas app_*). Retrato inteiro tirado em 2026-11-14T20:32:54.165875+00:00 · Postgres 17.11. Só estrutura: nenhuma linha de tabela, nenhum valor de configuração.
+-- Atualização parcial em 2026-11-15T02:10:00+00:00 (funções app_* e painel_app_*, tabelas app_*). Retrato inteiro tirado em 2026-11-14T20:32:54.165875+00:00 · Postgres 17.11. Só estrutura: nenhuma linha de tabela, nenhum valor de configuração.
 -- Serve de referência e para os testes. NÃO rodar inteiro sobre a produção. Como refazer: supabase/producao/LEIAME.md.
 
 -- ===== Extensões =====
@@ -2518,6 +2518,8 @@ CREATE INDEX app_marcacao_grupo ON public.app_marcacao USING btree (grupo);
 CREATE INDEX app_marcacao_responsavel ON public.app_marcacao USING btree (responsavel_id, status);
 alter table public.app_marcacao enable row level security;
 
+
+
 create table public.app_paciente (
   id uuid default gen_random_uuid() not null,
   telefone text not null,
@@ -2535,10 +2537,14 @@ create table public.app_paciente (
   cpf text,
   email text,
   conta_antiga_id uuid,
+  revisar_motivo text,
+  revisao_resolvida_em timestamp with time zone,
+  cadastro_conferido_em timestamp with time zone,
   constraint app_paciente_cpf_check CHECK (((cpf IS NULL) OR (cpf ~ '^[0-9]{11}$'::text))),
   constraint app_paciente_email_check CHECK (((email IS NULL) OR (email ~ '^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$'::text))),
   constraint app_paciente_nascimento_check CHECK ((nascimento >= '1900-01-01'::date)),
   constraint app_paciente_nome_check CHECK (((length(btrim(nome)) >= 5) AND (length(btrim(nome)) <= 120))),
+  constraint app_paciente_revisar_motivo_check CHECK (((revisar_motivo IS NULL) OR (revisar_motivo = ANY (ARRAY['cpf_com_outro_celular'::text, 'cpf_repetido_na_clinica'::text, 'cpf_nao_bate_com_o_celular'::text])))),
   constraint app_paciente_telefone_check CHECK ((telefone ~ '^[1-9]{2}9[0-9]{8}$'::text)),
   constraint app_paciente_pkey PRIMARY KEY (id),
   constraint app_paciente_telefone_key UNIQUE (telefone)
@@ -2547,6 +2553,7 @@ comment on table public.app_paciente is 'Titular do acesso rápido (celular + PI
 CREATE UNIQUE INDEX app_paciente_conta_antiga ON public.app_paciente USING btree (conta_antiga_id) WHERE (conta_antiga_id IS NOT NULL);
 CREATE INDEX app_paciente_sugerido ON public.app_paciente USING btree (paciente_sugerido_id) WHERE (paciente_sugerido_id IS NOT NULL);
 alter table public.app_paciente enable row level security;
+
 
 -- ===== Chaves estrangeiras (depois de todas as tabelas) =====
 alter table public.agendamento_fechamento add constraint agendamento_fechamento_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE CASCADE;

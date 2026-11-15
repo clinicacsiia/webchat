@@ -13,6 +13,8 @@ const { db } = await criarBancoProducao();
 const { q } = ajudantes(db);
 await db.exec(readFileSync(`${REPO}/supabase/acesso-rapido-paciente.sql`, 'utf8'));
 await db.exec(readFileSync(`${REPO}/supabase/acesso-rapido-chat.sql`, 'utf8'));
+await db.exec(readFileSync(`${REPO}/supabase/acesso-rapido-pendencias.sql`, 'utf8'));
+await db.exec(readFileSync(`${REPO}/supabase/acesso-rapido-filhos.sql`, 'utf8'));
 await db.exec(`update public.config set valor = 'sim' where chave = 'app_acesso_modo'`);
 
 const HTML = readFileSync(`${REPO}/acesso/index.html`, 'utf8');
@@ -36,7 +38,7 @@ async function chamarFuncao(nome, corpo) {
   Object.entries(corpo || {}).forEach(([k, v]) => {
     const i = info.nomes.indexOf(k);
     if (i < 0) throw new Error(`parâmetro desconhecido em ${nome}: ${k}`);
-    valores.push(info.tipos[i] === 'jsonb' ? (v === null ? null : JSON.stringify(v)) : v === null ? null : String(v));
+    valores.push(info.tipos[i] === 'jsonb' ? (v === null ? null : JSON.stringify(v)) : info.tipos[i] === 'boolean' ? v === true : v === null ? null : String(v));
     partes.push(`${k} => $${valores.length}::${info.tipos[i]}`);
   });
   await db.exec('reset role; set role anon');

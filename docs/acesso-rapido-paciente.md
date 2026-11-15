@@ -1,6 +1,6 @@
 # Acesso rápido do paciente (celular + PIN de 4 dígitos)
 
-Versão 1.2 — 15/11/2026 / Mudança: contas antigas (e-mail e senha) viram acesso rápido, uma forma de login só. Versão 1.1 — 15/11/2026 / Mudança: acesso rápido dentro do chat real (CPF e nascimento perguntados uma vez só). Versão 1.0 — 14/11/2026 / Mudança: Implementação inicial (primeira versão guardava tudo só no celular; esta liga ao Supabase)
+Versão 1.4 — 15/11/2026 / Mudança: filhos dos contatos antigos; nada de SMS. Versão 1.3 — 15/11/2026 / Mudança: pendências para TODO paciente (CPF, e-mail) e dúvidas para a equipe. Versão 1.2 — 15/11/2026 / Mudança: contas antigas (e-mail e senha) viram acesso rápido, uma forma de login só. Versão 1.1 — 15/11/2026 / Mudança: acesso rápido dentro do chat real (CPF e nascimento perguntados uma vez só). Versão 1.0 — 14/11/2026 / Mudança: Implementação inicial (primeira versão guardava tudo só no celular; esta liga ao Supabase)
 
 **Página:** `acesso/index.html` (`https://clinicacsiia.github.io/webchat/acesso/`, ainda sem link em nenhuma outra tela). **Banco:** `supabase/acesso-rapido-paciente.sql`. **Testes:** `npm run test:acesso-sql` (57), `npm run test:acesso` (36, a página `/acesso/` num Chromium falando com o banco de teste), `npm run test:acesso-chat-sql` (20, motor real do chat) e `npm run test:acesso-chat` (12, o `index.html` real do chat num Chromium falando com o motor real).
 
@@ -26,8 +26,8 @@ Todas as tabelas têm RLS ligada **sem nenhuma regra** e o público não tem per
 ## Decisões de segurança (e por quê)
 - **PIN conferido no servidor.** Quatro dígitos são 10 mil combinações: o bloqueio **cresce** (1 min nos primeiros 5 erros, 15 min nos 5 seguintes, depois 1 h a cada 5) e só um acerto zera. Vale para entrar, desbloquear, trocar o PIN e "esqueci". *(Pedido original: 1 minuto fixo. Subi porque 1 minuto fixo permite testar os 10 mil PINs em cerca de 33 horas.)*
 - **O servidor também cobra o PIN:** depois de 30 minutos sem uso, qualquer função devolve "bloqueado" e a página mostra o teclado. A trava de 5 minutos em segundo plano continua, na tela.
-- **Número de confiança com código.** O celular **não é confirmado por SMS**. Se bastasse cadastrar o mesmo celular, qualquer pessoa que se cadastrasse antes com o número de outra veria os filhos de quem a listou. Por isso o titular recebe um código de 6 dígitos por contato e o passa à pessoa (WhatsApp ou voz); ela digita em *Meus dados > Tenho um código*. 5 erros invalidam o código; o titular gera outro. Quem acompanha só **lê**.
-- **"Esqueci o PIN" (celular + nome + nascimento) é o elo mais fraco:** família e dados vazados conhecem os três. Por isso conta nas mesmas tentativas, derruba os outros aparelhos e grava `pin_redefinido` em `app_evento`. O ideal é trocar por código SMS (pendência já existente: segundo fator).
+- **Número de confiança com código.** O celular **não é confirmado** (decisão do dono de 15/11/2026: **nada de SMS**). Se bastasse cadastrar o mesmo celular, qualquer pessoa que se cadastrasse antes com o número de outra veria os filhos de quem a listou. Por isso o titular recebe um código de 6 dígitos por contato e o passa à pessoa (WhatsApp ou voz); ela digita em *Meus dados > Tenho um código*. 5 erros invalidam o código; o titular gera outro. Quem acompanha só **lê**.
+- **"Esqueci o PIN" (celular + nome + nascimento) é o elo mais fraco:** família e dados vazados conhecem os três. Por isso conta nas mesmas tentativas, derruba os outros aparelhos e grava `pin_redefinido` em `app_evento`. A forma segura sem SMS é a que já está: conta nas mesmas tentativas, derruba os outros aparelhos e fica registrado.
 - **Cadastro em massa:** limite por hora (`config.app_cadastros_max_hora`, 100). Celular já cadastrado responde "entre com o seu PIN" (isso revela que o número tem cadastro; aceito para este fluxo).
 
 ## Ligação com a base da clínica (o antigo `validarNaBase`)
@@ -61,10 +61,43 @@ Feita **só dentro do banco**, só como **sugestão**: se existir um único paci
 4. Ela cria o PIN (duas vezes). O banco (`app_conta_antiga_herdar`) junta **conta + cadastro da clínica** e grava em `app_paciente`: nome, celular (login), e-mail, **CPF** e nascimento; `conta_antiga_id` guarda de qual conta veio e `paciente_sugerido_id` repete o cadastro da clínica já ligado à conta.
 5. A conta antiga **não é apagada**: só sai deste aparelho (logout + sessão apagada). Daí em diante: celular + PIN, o chat não pergunta CPF e nascimento de novo, e *Meus dados* mostra nome, nascimento, celular, e-mail e CPF mascarado.
 
-**Regras:** nada nasce sozinho (sem PIN digitado, nenhuma linha em `app_paciente`); só o papel `authenticated` executa as duas funções e elas usam a sessão (`auth.uid()`), então ninguém herda a conta de outra pessoa; celular já usado por outro acesso é recusado; menor de 18 é recusado; mesma trava de cadastros por hora. O celular continua **sem confirmação por SMS** (limite já conhecido do acesso rápido).
+**Regras:** nada nasce sozinho (sem PIN digitado, nenhuma linha em `app_paciente`); só o papel `authenticated` executa as duas funções e elas usam a sessão (`auth.uid()`), então ninguém herda a conta de outra pessoa; celular já usado por outro acesso é recusado; menor de 18 é recusado; mesma trava de cadastros por hora. O celular continua **sem confirmação** (decisão do dono: nada de SMS).
 **Com o acesso rápido ligado**, a faixa "Entrar / Criar conta" de e-mail some do chat para quem não tem conta antiga (e quem se cadastrar passa a ser só celular + PIN).
 **Voltar atrás:** comandos no cabeçalho do SQL (apagam as 3 funções e a coluna `conta_antiga_id`; as contas antigas continuam funcionando).
-**Ainda não existe:** filhos nas contas antigas (as contas antigas nunca tiveram filhos); código por SMS para provar o celular.
+**Filhos das contas antigas:** ver a seção "Filhos dos contatos antigos" abaixo.
+
+## Pendências para todo paciente: o sistema pergunta o que falta (15/11/2026)
+**Banco:** `supabase/acesso-rapido-pendencias.sql` (`npm run test:acesso-pendencias-sql`, 21 casos). **Telas:** cartão "Falta pouco" em `/acesso/` (início e Meus dados) e aviso "Faltam N informações" na faixa do chat (`npm run test:acesso-pendencias`, 10 casos; o teste do chat ganhou 1 caso).
+
+**O que é perguntado, a qualquer paciente que entra por celular + PIN (não só contas antigas):** o CPF dele, o CPF de cada filho e o e-mail (opcional). Cada resposta é gravada uma vez e o chat deixa de perguntar. Quem já respondeu no chat não é perguntado de novo. "Agora não" esconde o cartão naquela visita.
+
+**Dúvida com a base da clínica vai para a EQUIPE, não para o paciente.** Como o celular não é confirmado, nada que a clínica tem guardado é copiado ou mostrado a quem só digitou o celular (senão bastaria saber o celular, o nome e o nascimento de alguém para ver ou usar o CPF dessa pessoa). Quando o paciente informa o CPF, o banco compara em silêncio e **nunca devolve o resultado** (senão seria um jeito de testar CPFs):
+| Situação | O que acontece |
+|---|---|
+| CPF bate com 1 cadastro da clínica **do mesmo celular** | grava só a *sugestão* (`paciente_sugerido_id`), sem marca |
+| CPF bate com 1 cadastro, mas de **outro celular** | marca `cpf_com_outro_celular` |
+| CPF aparece em **mais de um** cadastro da clínica | marca `cpf_repetido_na_clinica` |
+| CPF não existe na clínica, mas o **celular existe** lá | marca `cpf_nao_bate_com_o_celular` |
+| Nada na clínica (paciente novo) | sem marca |
+
+**Equipe:** `select public.painel_app_revisoes();` lista os cadastros com dúvida e também os que têm celular já existente na clínica **sem vínculo** (admin e atendente; CPF só mascarado). `select public.painel_app_revisao_resolver('<id>');` dá a dúvida por resolvida. **Ainda não há botão no painel.**
+**Voltar atrás:** comandos no cabeçalho do SQL. **Ainda não existe:** avisar o paciente por mensagem (WhatsApp) para completar. Sem confirmar o celular, os dados da clínica **não** são trazidos automaticamente: o paciente digita e o sistema confere em silêncio.
+
+## Filhos dos contatos antigos (15/11/2026)
+**Banco:** `supabase/acesso-rapido-filhos.sql` (`npm run test:acesso-filhos-sql`, 19 casos). **Telas:** `/acesso/` (lista de filhos na conta antiga, confirmação de homônimo; `npm run test:acesso-antiga` 17 casos, `test:acesso-pendencias` 14) e formulário do chat (`test:login`).
+
+**O que os dados reais mostraram (15/11/2026, só contagens):** 333 atendimentos "para filho" de 262 contatos (22 com mais de um filho, no máximo 3). **14 contatos têm um "filho" com o mesmo nome do próprio contato** (3 com nascimento de adulto = a própria pessoa marcada como filho; 4 com nascimento de criança; 7 sem nascimento); em 4 deles há também outros filhos de verdade. Só 154 dos 333 atendimentos têm nascimento e CPF. A planilha com os nomes (só para o dono) foi entregue fora do repositório.
+
+**Regras novas, para qualquer paciente (cadastro, "Adicionar filho" e migração da conta antiga):**
+| Situação | O que acontece |
+|---|---|
+| Filho com o **mesmo nome e o mesmo nascimento** do titular | recusado: "Esse é o seu próprio cadastro" |
+| Mesmo nome, **nascimento diferente** (ex.: filha com o nome da mãe) | pergunta "É outra pessoa?"; só entra depois de confirmar |
+| O mesmo filho digitado duas vezes | vale uma vez só |
+| Nome diferente | entra normal |
+
+**Conta antiga (e-mail e senha): os filhos vêm do histórico, mas só da PRÓPRIA conta.** Depois de entrar, a página lista os filhos dos atendimentos ligados àquela conta (`conversas.conta_id`, que só existe quando a conversa foi feita logado ou adotada com o token dela). A pessoa confere, corrige ou preenche o nascimento e desmarca quem não é filho. Quem tem o mesmo nome dela vê "Quem é? Sou eu / É outra pessoa". O CPF do filho vem do histórico **só** se o nome bate e o nascimento não contradiz; o que faltar cai no cartão "Falta pouco". Hoje, 4 das 5 contas com histórico têm filhos.
+**Contatos que só têm celular (sem conta) NÃO têm filhos trazidos do histórico:** sem confirmar o celular, isso mostraria nomes e dados de crianças a quem só digitou um número. Eles digitam os filhos e o CPF uma vez, com as regras acima. No chat sem acesso rápido, nome da criança igual ao do responsável avisa antes de iniciar (tocar de novo confirma).
 
 ## Equipe
 - `select public.painel_app_solicitacoes('solicitada');` lista as solicitações (responsável, celular, pessoas com nascimento, exame, data, turno, observação). Só administrador e atendente.
@@ -78,7 +111,6 @@ Nasce **desligado**. Ligar: `update public.config set valor = 'sim' where chave 
 Comandos no cabeçalho de `supabase/acesso-rapido-paciente.sql` (apagam só objetos `app_*` e as duas chaves de config).
 
 ## Ainda não existe
-- Código por SMS (confirmar o celular de verdade, número de confiança sem passar código, "esqueci" mais forte).
 - Tela da equipe para as solicitações (hoje só as duas funções acima).
 - Agendar de verdade (a solicitação não cria marcação no Klingo).
 - Aviso (push) ao paciente quando a clínica confirma.
