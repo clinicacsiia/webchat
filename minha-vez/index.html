@@ -84,6 +84,18 @@
   .res-box.disp { background:var(--ok-claro); border:1px solid var(--ok); }
   button.sec { width:100%; background:var(--azul-claro); color:var(--azul); border:0; border-radius:12px; padding:14px; font-size:1rem; font-weight:700; cursor:pointer; margin-top:8px; }
   button.perigo { width:100%; background:var(--csi-danger-bg); color:var(--erro); border:0; border-radius:12px; padding:14px; font-size:1rem; font-weight:700; cursor:pointer; margin-top:8px; }
+  .selo.enc { background:var(--csi-border); color:var(--suave); }
+  .enc-box { background:var(--csi-background); border:1px solid var(--linha); border-radius:var(--radius-md); padding:12px; margin:10px 0 4px; font-size:.95rem; }
+  .enc-box p { margin:0; } .enc-box .suave { margin-top:4px; font-size:.88rem; }
+  .enc-acoes { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; } .enc-acoes button { flex:1 1 140px; margin-top:0; }
+  .enc-acoes button.link { flex:1 1 100%; text-align:center; }
+  .bom { color:var(--ok); font-weight:600; }
+  .aval-grupo { border:0; padding:0; margin:0 0 16px; min-width:0; } .aval-grupo legend { font-weight:700; margin-bottom:8px; padding:0; }
+  .aval-notas, .aval-canais { display:flex; flex-wrap:wrap; gap:6px; } .aval-nota, .aval-canal { position:relative; }
+  .aval-nota input, .aval-canal input { position:absolute; opacity:0; inset:0; margin:0; width:100%; height:100%; cursor:pointer; }
+  .aval-nota span, .aval-canal span { display:inline-flex; align-items:center; justify-content:center; min-width:42px; height:42px; padding:0 14px; border:1.5px solid var(--csi-border-strong); border-radius:10px; font-weight:700; background:var(--papel); }
+  .aval-nota input:checked + span, .aval-canal input:checked + span { background:var(--azul); border-color:var(--azul); color:#fff; }
+  .aval-nota input:focus-visible + span, .aval-canal input:focus-visible + span { outline:3px solid var(--csi-primary); outline-offset:2px; }
   .folha { position:fixed; inset:0; background:rgba(10,25,40,.55); display:flex; align-items:flex-end; justify-content:center; z-index:30; }
   .folha > div { background:var(--papel); width:100%; max-width:520px; border-radius:20px 20px 0 0; padding:18px 16px max(20px,env(safe-area-inset-bottom)); max-height:90vh; overflow:auto; }
   .pin-pontos { display:flex; justify-content:center; gap:16px; margin:18px 0 6px; } .pin-pontos i { width:16px; height:16px; border-radius:50%; border:2px solid var(--azul); } .pin-pontos i.on { background:var(--azul); }
@@ -472,10 +484,14 @@
   const lerLocal = (k) => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } };
   const gravarLocal = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* sem armazenamento: o chat pergunta de novo */ } };
   const acessoDev = () => { const st = lerLocal(ACESSO_CHAVE); return st && typeof st.dev === 'string' && st.dev ? st.dev : ''; };
-  const app = { dev: '', dados: null, pessoa: 'todos', novosSessao: new Set(), tVisto: null, tPoll: null, ocupado: false, aviso: '' };
+  const app = { dev: '', dados: null, pessoa: 'todos', novosSessao: new Set(), tVisto: null, tPoll: null, ocupado: false, aviso: '', avisoBom: false };
+  const diaBR = (iso) => { try { return new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Bahia', day: '2-digit', month: '2-digit' }).format(new Date(iso)); } catch { return ''; } };   // dia/mês no horário da clínica
   const primeiroNome = (n) => String(n || '').trim().split(/\s+/)[0] || '';
   const dataBR = (iso) => { if (!iso) return ''; const [a, m, d] = String(iso).slice(0, 10).split('-'); const dt = new Date(Date.UTC(+a, +m - 1, +d)); const dia = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'][dt.getUTCDay()]; return `${dia}, ${d}/${m}`; };
   const MSG_PASSO = { 0: 'Pedido ainda não concluído. Abra a conversa para continuar.', 1: 'Recebemos o seu pedido. A equipe está organizando o horário.', 2: 'Exame marcado. Estamos confirmando o seu horário.', 3: 'Tudo certo! Falta só você chegar à clínica.', 4: 'Você está na clínica. Logo chamamos você.', 5: 'Exame realizado.' };
+  // O que o paciente lê quando a equipe (ou o sistema) encerra a conversa: o motivo, em palavras simples
+  const MOTIVO_ENC = { agendado: 'Seu horário foi agendado', apenas_informacoes: 'Você pediu só informações', desistiu: 'Pedido cancelado', nao_respondido: 'Ficamos sem resposta', outro: 'Atendimento concluído', nova_conversa: 'O pedido continuou em uma conversa nova' };
+  const motivoEnc = (p) => (MOTIVO_ENC[p.motivo] || 'Atendimento concluído') + (p.origem === 'inatividade' ? ' (encerrado automaticamente)' : '');
   const EXC_MSG = { cancelado: 'Este exame foi cancelado. Se foi engano, abra a conversa.', faltou: 'Não vimos você neste exame. Dá para remarcar pela conversa.' };
 
   function telaPin(msg) {
@@ -561,7 +577,7 @@
     if (!data.ok && !data.conversa) { botoes.forEach((b) => { b.disabled = false; }); return fecharFolha(), avisoTela(data.mensagem || 'Não foi possível concluir.'); }
     irParaChat(data);
   }
-  function avisoTela(msg) { app.aviso = msg; if (modo === 'ticket') desenhar(ultimo); else desenharApp(); setTimeout(() => { app.aviso = ''; }, 6000); }
+  function avisoTela(msg) { app.aviso = msg; app.avisoBom = false; if (modo === 'ticket') desenhar(ultimo); else desenharApp(); setTimeout(() => { app.aviso = ''; }, 6000); }
   function fecharFolha() { document.querySelectorAll('.folha').forEach((f) => f.remove()); }
 
   const fonePessoa = (p) => (p.eu ? 'Você' : primeiroNome(p.pessoa));
@@ -570,6 +586,7 @@
     if (e.data) filhos.push(h('p', { class: 'quando' }, dataBR(e.data) + (e.hora && e.hora !== '00:00' ? ' às ' + e.hora : '') + (e.unidade ? ' · ' + e.unidade : '')));
     if (e.excecao) { filhos.push(h('div', { class: 'excecao' }, EXC_MSG[e.excecao] || 'Fale com a clínica pela conversa.')); return h('div', { class: 'exame' }, filhos); }
     const ok = Math.max(0, Math.min(6, e.ok || 0));
+    if (!p.aberta && ok <= 1) { filhos.push(h('p', { class: 'msg' }, 'Sem horário marcado.')); return h('div', { class: 'exame' }, filhos); }   // encerrado sem marcar: nada de "estamos organizando"
     if (ok >= 1) filhos.push(h('ol', { class: 'passos', 'aria-label': 'Andamento do exame' }, PASSOS.map((nome, i) => {
       const n = i + 1, feito = e.resultado === 'entregue' ? n <= 6 : n <= ok, agora = !feito && n === (e.resultado === 'entregue' ? 7 : ok + 1);
       return h('li', { class: feito ? 'feito' : agora ? 'agora' : '' }, h('div', { class: 'bolha' }, feito ? '✓' : ''), nome, agora ? h('div', {}, 'em andamento') : null);
@@ -597,6 +614,10 @@
         else corpo.push(dono('resultado', (e.resultado === 'disponivel' ? '📄 Pedir meu resultado: ' : '📄 Perguntar pelo resultado: ') + nome, e.resultado === 'disponivel' ? 'principal' : 'sec'));
       }
     }
+    if (!p.aberta && p.pode_avaliar) corpo.push(h('button', { class: 'sec', type: 'button', id: 'acaoAvaliar', onclick: () => abrirAvaliacao(p) }, '⭐ Avaliar o atendimento'));
+    if (!p.aberta && p.pode_reabrir) corpo.push(h('button', { class: 'sec', type: 'button', id: 'acaoReabrir', onclick: (ev) => appReabrir(p, ev.currentTarget.closest('.folha')) }, '↩ Reabrir este pedido'));
+    if (p.pode_apagar) corpo.push(h('button', { class: p.aberta ? 'perigo' : 'sec', type: 'button', id: 'acaoApagar', onclick: (ev) => appApagar(p, ev.currentTarget.closest('.folha')) }, p.aberta ? '🗑 Cancelar e apagar este pedido' : '🗑 Apagar da minha lista'));
+    else if (p.aberta) corpo.push(h('p', { class: 'suave', style: 'margin:8px 0 0' }, 'Para apagar este pedido, cancele primeiro o exame marcado.'));
     corpo.push(h('button', { class: 'link', type: 'button', style: 'width:100%;text-align:center', onclick: fecharFolha }, 'Agora não'));
     const f = h('div', { class: 'folha', role: 'dialog', 'aria-modal': 'true', onclick: (ev) => { if (ev.target === ev.currentTarget) fecharFolha(); } }, h('div', {}, corpo));
     document.body.append(f);
@@ -604,11 +625,85 @@
   }
   function pedidoNo(p, varias) {
     const novo = app.novosSessao.has(p.conversa) || p.novo;
-    const no = h('div', { class: 'cartao pedido', tabindex: '0', role: 'button', 'aria-label': 'Abrir o pedido de ' + fonePessoa(p), onclick: () => abrirPedido(p), onkeydown: (ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); abrirPedido(p); } } },
-      h('div', { class: 'topo' }, h('span', { class: 'pessoa' }, varias ? '👤 ' + fonePessoa(p) : (p.tipo === 'consulta' ? 'Consulta' : 'Seu pedido')), novo ? h('span', { class: 'novo' }, 'Novidade') : null),
-      p.exames.map((e) => exameApp(p, e)),
-      h('p', { class: 'dica' }, 'Toque para abrir a conversa, remarcar ou cancelar.'));
-    return no;
+    const titulo = varias ? '👤 ' + fonePessoa(p) : (!p.exames.length ? 'Conversa com a clínica' : p.tipo === 'consulta' ? 'Consulta' : 'Seu pedido');
+    const parar = (fn) => (ev) => { ev.stopPropagation(); fn(ev); };   // o botão do cartão não abre também a folha do pedido
+    const filhos = [h('div', { class: 'topo' }, h('span', { class: 'pessoa' }, titulo), h('span', {}, !p.aberta ? h('span', { class: 'selo enc' }, 'Encerrado') : null, novo ? h('span', { class: 'novo', style: 'margin-left:6px' }, 'Novidade') : null)),
+      ...p.exames.map((e) => exameApp(p, e))];
+    if (p.aberta && !p.exames.length) filhos.push(h('p', { class: 'msg' }, 'A equipe está atendendo você. Toque para abrir a conversa.'));
+    if (!p.aberta) {
+      const acoes = [];
+      if (p.pode_avaliar) acoes.push(h('button', { class: 'sec', type: 'button', 'data-acao': 'avaliar', onclick: parar(() => abrirAvaliacao(p)) }, '⭐ Avaliar o atendimento'));
+      if (p.pode_reabrir) acoes.push(h('button', { class: 'sec', type: 'button', 'data-acao': 'reabrir', onclick: parar((ev) => appReabrir(p, null, ev.currentTarget)) }, '↩ Reabrir o pedido'));
+      if (p.pode_apagar) acoes.push(h('button', { class: 'link', type: 'button', 'data-acao': 'apagar', onclick: parar((ev) => appApagar(p, null, ev.currentTarget)) }, 'Apagar da minha lista'));
+      filhos.push(h('div', { class: 'enc-box', role: 'status' },
+        h('p', {}, h('b', {}, 'Atendimento encerrado' + (p.encerrada_em ? ' em ' + diaBR(p.encerrada_em) : '') + '.')),
+        h('p', {}, 'Motivo: ' + motivoEnc(p) + '.'),
+        p.avaliou ? h('p', { class: 'suave' }, 'Você já avaliou este atendimento. Obrigado!') : null,
+        p.apaga_em ? h('p', { class: 'suave' }, 'Esta conversa some da sua lista em ' + diaBR(p.apaga_em) + '.') : null,
+        acoes.length ? h('div', { class: 'enc-acoes' }, acoes) : null));
+    }
+    filhos.push(h('p', { class: 'dica' }, 'Toque para abrir a conversa, remarcar ou cancelar.'));
+    return h('div', { class: 'cartao pedido', tabindex: '0', role: 'button', 'data-conversa': p.conversa, 'aria-label': 'Abrir o pedido de ' + fonePessoa(p), onclick: () => abrirPedido(p), onkeydown: (ev) => { if (ev.target === ev.currentTarget && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); abrirPedido(p); } } }, filhos);
+  }
+
+  /* ---------- Apagar, reabrir e avaliar (o que o painel encerrou) ---------- */
+  const redesenhar = () => { if (modo === 'ticket') desenhar(ultimo); else desenharApp(); };
+  async function appRecarregar(aviso, bom) {
+    try {
+      const { data } = await db.rpc('app_pedidos', { p_token: app.dev, p_renova: true });
+      if (data && data.ok) appAplicar(data, false);
+      else if (data && data.erro === 'bloqueado') { appDesligar(); return telaPin(); }
+    } catch { /* mostra o que já tinha */ }
+    app.aviso = aviso || ''; app.avisoBom = !!bom; redesenhar(); window.scrollTo({ top: 0 }); setTimeout(() => { app.aviso = ''; }, 6000);
+  }
+  // Tira do aparelho a referência da conversa apagada (o chat guarda as últimas conversas aqui)
+  function esquecerNoChat(conversa) {
+    try {
+      const h5 = (lerLocal(CHAVE_HIST) || []).filter((x) => x && x.id !== conversa); gravarLocal(CHAVE_HIST, h5);
+      const atual = lerLocal(CHAVE_CONVERSA); if (atual && atual.id === conversa) { localStorage.removeItem(CHAVE_CONVERSA); localStorage.removeItem(CHAVE_MSGS); }
+    } catch { /* o chat confere no servidor */ }
+  }
+  async function appApagar(p, folha, botao) {
+    const reservado = p.reservado ? 'Este pedido ainda tem exame marcado. Apagar só tira da sua lista: o horário continua marcado na clínica. Para cancelar o exame, use Cancelar. Apagar mesmo assim?' : 'Apagar este pedido da sua lista? A clínica continua com o histórico do atendimento.';
+    if (!confirm(p.aberta ? 'Cancelar e apagar este pedido? A clínica será avisada do cancelamento e ele sai da sua lista.' : reservado)) return;
+    const botoes = [...(folha ? folha.querySelectorAll('button') : []), ...(botao ? [botao] : [])]; botoes.forEach((b) => { b.disabled = true; });
+    const { data, error } = await db.rpc('app_pedido_apagar', { p_token: app.dev, p_conversa: p.conversa });
+    if (data && data.erro === 'bloqueado') { fecharFolha(); appDesligar(); return telaPin(); }
+    if (error || !data || !data.ok) { botoes.forEach((b) => { b.disabled = false; }); fecharFolha(); return avisoTela((data && data.mensagem) || 'Não foi possível apagar agora. Tente de novo.'); }
+    esquecerNoChat(p.conversa); fecharFolha();
+    return appRecarregar(data.cancelado ? 'Pedido cancelado e apagado. A clínica foi avisada.' : 'Pedido apagado da sua lista.', true);
+  }
+  async function appReabrir(p, folha, botao) {
+    const botoes = [...(folha ? folha.querySelectorAll('button') : []), ...(botao ? [botao] : [])]; botoes.forEach((b) => { b.disabled = true; });
+    const { data, error } = await db.rpc('app_pedido_reabrir', { p_token: app.dev, p_conversa: p.conversa });
+    if (data && data.erro === 'bloqueado') { fecharFolha(); appDesligar(); return telaPin(); }
+    if (error || !data || !data.ok) { botoes.forEach((b) => { b.disabled = false; }); fecharFolha(); return avisoTela((data && data.mensagem) || 'Não foi possível reabrir agora. Tente de novo.'); }
+    irParaChat(data);   // a conversa voltou para a fila da equipe: o chat abre nela
+  }
+  function abrirAvaliacao(p) {
+    fecharFolha();
+    const grupo = (nome, legenda) => h('fieldset', { class: 'aval-grupo' }, h('legend', {}, legenda),
+      h('div', { class: 'aval-notas' }, Array.from({ length: 11 }, (_, n) => h('label', { class: 'aval-nota' }, h('input', { type: 'radio', name: nome, value: String(n) }), h('span', {}, String(n))))),
+      h('p', { class: 'suave', style: 'margin:6px 0 0;font-size:.85rem' }, '0 = muito ruim · 10 = excelente'));
+    const canais = h('fieldset', { class: 'aval-grupo' }, h('legend', {}, 'Por onde você nos conheceu?'),
+      h('div', { class: 'aval-canais' }, ['WhatsApp', 'Instagram', 'Google'].map((c) => h('label', { class: 'aval-canal' }, h('input', { type: 'radio', name: 'canal', value: c }), h('span', {}, c)))));
+    const estado = h('p', { class: 'erro', role: 'alert', style: 'min-height:1.3em;margin:0 0 8px' });
+    const enviar = h('button', { class: 'principal', type: 'submit' }, 'Enviar avaliação');
+    const form = h('form', { novalidate: true, onsubmit: async (ev) => {
+      ev.preventDefault();
+      const v = (n) => { const x = form.querySelector(`input[name="${n}"]:checked`); return x ? x.value : null; };
+      const a = v('atendimento'), si = v('site'), c = v('canal');
+      if (a === null || si === null || !c) { estado.textContent = 'Escolha uma nota nas duas perguntas e por onde nos conheceu.'; return; }
+      enviar.disabled = true; estado.textContent = '';
+      const { data, error } = await db.rpc('app_pedido_avaliar', { p_token: app.dev, p_conversa: p.conversa, p_nota_atendimento: Number(a), p_nota_site: Number(si), p_canal: c });
+      if (data && data.erro === 'bloqueado') { fecharFolha(); appDesligar(); return telaPin(); }
+      if (error || !data || !data.ok) { enviar.disabled = false; estado.textContent = (data && data.mensagem) || 'Não foi possível enviar agora. Suas respostas continuam aqui; toque em Enviar para tentar de novo.'; return; }
+      fecharFolha(); appRecarregar('Obrigado pela sua avaliação!', true);
+    } },
+      h('h2', {}, 'Avaliar o atendimento'), h('p', { class: 'suave' }, 'É rápido e opcional. Não pedimos seu nome nem seu telefone.'),
+      grupo('atendimento', 'De 0 a 10, como foi o seu atendimento?'), grupo('site', 'De 0 a 10, como você avalia o nosso site?'), canais, estado, enviar,
+      h('button', { class: 'link', type: 'button', style: 'width:100%;text-align:center', onclick: fecharFolha }, 'Agora não'));
+    document.body.append(h('div', { class: 'folha', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Avaliar o atendimento', onclick: (ev) => { if (ev.target === ev.currentTarget) fecharFolha(); } }, h('div', {}, form)));
   }
   function resultadosNos() {
     const lista = (app.dados && app.dados.resultados) || []; if (!lista.length) return [];
@@ -639,7 +734,7 @@
       h('p', { class: 'suave', style: 'margin:0' }, d.novidades > 0 ? (d.novidades === 1 ? '1 novidade desde a última vez.' : d.novidades + ' novidades desde a última vez.') : 'Tudo em dia. Atualizamos sozinho.'),
       varias ? h('div', { class: 'quem', role: 'group', 'aria-label': 'Quem' }, [h('button', { class: 'chip' + (!filtro ? ' on' : ''), type: 'button', onclick: () => { app.pessoa = 'todos'; desenharApp.atual(); } }, 'Todos'),
         ...d.pessoas.map((p) => { const k = p.eu ? 'eu' : primeiroNome(p.nome); return h('button', { class: 'chip' + (filtro === k ? ' on' : ''), type: 'button', onclick: () => { app.pessoa = k; desenharApp.atual(); } }, p.eu ? 'Eu' : primeiroNome(p.nome)); })]) : null)];
-    if (app.aviso) nos.unshift(h('div', { class: 'cartao' }, h('p', { class: 'erro', role: 'alert', style: 'margin:0' }, app.aviso)));
+    if (app.aviso) nos.unshift(h('div', { class: 'cartao' }, h('p', { class: app.avisoBom ? 'bom' : 'erro', role: app.avisoBom ? 'status' : 'alert', id: 'avisoTela', style: 'margin:0' }, app.aviso)));
     if (!lista.length) nos.push(h('div', { class: 'cartao' }, h('p', { style: 'margin:0' }, 'Nenhum pedido por aqui ainda. Os pedidos feitos neste aparelho aparecem sozinhos.'), h('a', { href: '../', style: 'display:inline-block;margin-top:10px' }, 'Fazer um pedido no chat')));
     for (const p of lista) nos.push(pedidoNo(p, varias));
     nos.push(...resultadosNos());
