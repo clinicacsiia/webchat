@@ -2519,6 +2519,7 @@
   "app_cadastros_max_hora",
   "app_local_ativo",
   "app_pin_obrigatorio",
+  "app_pin_servidor",
   "app_resultado_vigia",
   "autoencerrar_horas",
   "autoencerrar_modo",
@@ -4428,6 +4429,16 @@
    "md5": "f828ae9fab74fc39cc91a97e4d924958"
   },
   {
+   "nome": "app_pin_exigir",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "aa74628898249089a2b8062fb4b31b86"
+  },
+  {
    "nome": "app_pin_trocar",
    "args": [
     {
@@ -5564,7 +5575,7 @@
    "anon": true,
    "authenticated": true,
    "publico": false,
-   "md5": "b95373b522b5527a78eab718bf910004"
+   "md5": "4fe20482ecc4e0de0b4771be83b9d266"
   },
   {
    "nome": "chat_exames",
@@ -5836,7 +5847,7 @@
    "anon": true,
    "authenticated": true,
    "publico": true,
-   "md5": "cceb516f06024159a36f567012687c9e"
+   "md5": "0d96b2f054447d85ea88ba99781f021f"
   },
   {
    "nome": "chat_irmao_iniciar",
@@ -5855,7 +5866,7 @@
    "anon": true,
    "authenticated": true,
    "publico": true,
-   "md5": "33cec8d17193dfb8e36f965ab8add6a7"
+   "md5": "4f5f33e499fa715b0fb60dd54c5a56f7"
   },
   {
    "nome": "chat_listar",
@@ -5991,7 +6002,7 @@
    "anon": true,
    "authenticated": true,
    "publico": false,
-   "md5": "23dae67a5d372c76359695f4c063dc33"
+   "md5": "519849abbed1f58749b13204a5eba976"
   },
   {
    "nome": "chat_opcoes_inicio",
@@ -6302,7 +6313,7 @@
    "anon": true,
    "authenticated": true,
    "publico": true,
-   "md5": "683524f3f79547027b550a7d24ecd0aa"
+   "md5": "c741118bb1e422e73c04c96fb86c35ec"
   },
   {
    "nome": "chat_respostas",

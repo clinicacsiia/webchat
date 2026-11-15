@@ -1,10 +1,11 @@
 // Service worker do chat do cliente: abre na hora com a cópia guardada e busca a versão nova por trás (vale na próxima abertura).
 // O link pode vir do WhatsApp, do e-mail ou da bio com ?origem=...: a cópia é a mesma para todos.
-const VERSAO = 'webchat-cliente-v51';
+const VERSAO = 'webchat-cliente-v53';
 const BASE = ['./', 'index.html', 'privacidade.html', 'termos.html', 'sentinela.js', 'nomes-exame.js', 'icon-192.png', 'img/logo-csi.svg', 'img/logo-csi-sem-anel.svg', 'img/logo-csi-anel.svg', 'img/logo-csi-simbolo.svg', 'manifest.webmanifest'];
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(VERSAO).then((c) => c.addAll(BASE)));
+  // cache: 'reload' = busca na rede de verdade (o GitHub Pages guarda 10 minutos e a instalação podia gravar uma cópia velha)
+  e.waitUntil(caches.open(VERSAO).then((c) => c.addAll(BASE.map((u) => new Request(u, { cache: 'reload' })))));
   self.skipWaiting();
 });
 
@@ -21,9 +22,14 @@ self.addEventListener('fetch', (e) => {
   const url = new URL(r.url);
   // /painel/, /fila/, /minha-vez/, /agendamento/ e /simulacao/ (módulos e dados que mudam) ficam fora do cache. A URL da fila leva o token de assinatura (não pode ser guardada no dispositivo)
   // e a chave única './' abaixo serviria a página do chat no lugar da fila.
-  if (r.method !== 'GET' || url.origin !== location.origin || url.pathname.includes('/painel/') || url.pathname.includes('/fila/') || url.pathname.includes('/minha-vez/') || url.pathname.includes('/agendamento/') || url.pathname.includes('/simulacao/')) return;
+  // /acesso/ (PIN e cadastro) também fica de fora: a página tem de ser sempre a da rede. Antes ela era respondida com a cópia do chat e o PIN não aparecia.
+  if (r.method !== 'GET' || url.origin !== location.origin || url.pathname.includes('/painel/') || url.pathname.includes('/fila/') || url.pathname.includes('/minha-vez/') || url.pathname.includes('/agendamento/') || url.pathname.includes('/acesso/') || url.pathname.includes('/simulacao/')) return;
   const pagina = r.mode === 'navigate';
-  const chave = pagina ? new Request(new URL('./', self.registration.scope)) : r;
+  // Navegação: só as páginas guardadas, cada uma com a sua cópia. Qualquer outra vai direto para a rede (antes todas recebiam a cópia do chat).
+  const raiz = new URL('./', self.registration.scope).pathname;
+  const PAGINAS = { [raiz]: './', [raiz + 'index.html']: './', [raiz + 'privacidade.html']: 'privacidade.html', [raiz + 'termos.html']: 'termos.html' };
+  if (pagina && !(url.pathname in PAGINAS)) return;
+  const chave = pagina ? new Request(new URL(PAGINAS[url.pathname], self.registration.scope)) : r;
   e.respondWith(caches.open(VERSAO).then(async (c) => {
     const guardada = await c.match(chave, { ignoreSearch: true });
     const daRede = fetch(r).then((res) => {

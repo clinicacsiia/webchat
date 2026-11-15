@@ -9,6 +9,7 @@ AS $function$
 declare v_id bigint; c public.conversas; v_passo text; v_txt text; o jsonb; k text; x text; v_partes text[] := '{}';
   rotulos jsonb := '{"nome":"Nome","sexo":"Sexo","dt_nasc":"Nascimento","mae":"Mãe","cpf":"CPF","rg":"RG","celular":"Celular","telefone":"Telefone","cep":"CEP","endereco":"Rua","numero":"Nº","complemento":"Compl.","bairro":"Bairro","cidade":"Cidade","uf":"UF","matricula":"Carteirinha","validade":"Validade"}';
 begin
+  perform public.app_pin_exigir();   -- PIN obrigatório também no servidor (nasce desligado: config.app_pin_servidor)
   perform public.chat_valida(p_conversa, p_token);
   if (select count(*) from public.mensagens where conversa_id = p_conversa and autor = 'cliente' and criado_em > now() - interval '1 minute') >= 20 then
     raise exception 'Muitas mensagens em pouco tempo. Aguarde um instante.' using errcode = '54000';

@@ -8,6 +8,7 @@ CREATE OR REPLACE FUNCTION public.chat_enviar(p_conversa uuid, p_token text, p_t
 AS $function$
 declare v_txt text; v_id bigint; c public.conversas; v_dias integer;
 begin
+  perform public.app_pin_exigir();   -- PIN obrigatório também no servidor (nasce desligado: config.app_pin_servidor)
   v_txt := btrim(coalesce(p_texto, ''));
   if v_txt = '' or char_length(v_txt) > 4000 then raise exception 'Mensagem inválida.' using errcode = '22023'; end if;
   perform 1 from public.conversa_segredo where conversa_id = p_conversa and token = p_token;

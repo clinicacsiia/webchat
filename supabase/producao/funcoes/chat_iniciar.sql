@@ -10,6 +10,7 @@ declare
   v_tel text; v_contato uuid; v_conv uuid; v_token text; v_url text;
   v_nome text; v_msg text; v_recentes int; v_uni text; v_med text; v_tipo text; v_pnome text; v_irm jsonb := '[]'::jsonb; v_modo text; v_motor text; v_ant record; v_antigas uuid[] := '{}';
 begin
+  perform public.app_pin_exigir();   -- PIN obrigatório também no servidor (nasce desligado: config.app_pin_servidor)
   v_tipo := coalesce(nullif(btrim(p_paciente_tipo), ''), 'proprio');
   if v_tipo not in ('proprio', 'filho') then raise exception 'Tipo de paciente inválido.' using errcode = '22023'; end if;
   v_pnome := case when v_tipo = 'filho' then nullif(left(btrim(coalesce(p_paciente_nome, '')), 120), '') end;
