@@ -39,8 +39,8 @@ function criarAuth({ senhaCerta = 'Senha1234', email = 'ana@teste.local', meta =
 }
 const conta = (extra = {}) => ({ conta: true, email: 'ana@teste.local', nome: 'Ana Souza', telefone: '71999998888', cadastro_salvo: false, aceitou_lgpd: true, ...extra });
 
-async function abrir({ ativo = true, contaDoBanco = null, auth = criarAuth(), sessaoGuardada = false, hash = '' } = {}) {
-  const mundo = criarMundo({ loginAtivo: ativo, conta: contaDoBanco });
+async function abrir({ ativo = true, contaDoBanco = null, auth = criarAuth(), sessaoGuardada = false, hash = '', acessoAtivo = false } = {}) {
+  const mundo = criarMundo({ loginAtivo: ativo, conta: contaDoBanco, acessoAtivo });
   const init = sessaoGuardada ? [[(s) => localStorage.setItem('csi-paciente-auth', s), JSON.stringify(sessao('ana@teste.local', {}))]] : [];
   const p = await novaPaginaChat(browser, mundo, { init, auth: auth.tratar });
   await p.page.goto(`${base}/index.html${hash}`);
@@ -272,6 +272,26 @@ await caso('Apagar a conta: se o banco falha, a conta continua, a janela fica ab
   const r = { erro: await texto(x.page, '#folhaCorpo .erro-form'), aberta: await x.page.evaluate(() => !document.querySelector('#folha').hidden), conta: await visivel(x.page, '#btnContaSair'), botao: await texto(x.page, '#btnApagarSim') };
   await x.ctx.close();
   return { ok: /Sem conexão/.test(r.erro) && r.aberta && r.conta && /Sim, apagar/.test(r.botao), detalhe: JSON.stringify(r) };
+});
+
+// ---------------------------------------------------------------- acesso rápido ligado: uma forma de login só (celular + PIN)
+await caso('acesso rápido LIGADO e sem conta antiga: a faixa de e-mail e senha some (uma forma de login só) e o acesso rápido aparece', async () => {
+  const x = await abrir({ acessoAtivo: true });
+  const r = { faixa: await visivel(x.page, '#faixaConta'), bloco: await visivel(x.page, '#blocoAcesso'), criar: await visivel(x.page, '#acessoCriar') };
+  await x.ctx.close();
+  return { ok: !r.faixa && r.bloco && r.criar, detalhe: JSON.stringify(r) };
+});
+await caso('acesso rápido LIGADO e conta antiga logada: convida a criar o PIN (link para /acesso/ com ?antiga=1) e mantém a faixa da conta', async () => {
+  const x = await abrir({ acessoAtivo: true, contaDoBanco: conta(), sessaoGuardada: true });
+  const r = { faixa: await visivel(x.page, '#faixaConta'), herdar: await visivel(x.page, '#acessoHerdar'), href: await x.page.$eval('#acessoHerdar', (e) => e.getAttribute('href')).catch(() => null), txt: await texto(x.page, '#blocoAcesso') };
+  await x.ctx.close();
+  return { ok: r.faixa && r.herdar && /antiga=1/.test(r.href || '') && /voltar=chat/.test(r.href || '') && /Crie seu PIN/.test(r.txt || ''), detalhe: JSON.stringify(r) };
+});
+await caso('acesso rápido DESLIGADO: nada muda para quem tem conta antiga (sem convite de PIN)', async () => {
+  const x = await abrir({ acessoAtivo: false, contaDoBanco: conta(), sessaoGuardada: true });
+  const r = { faixa: await visivel(x.page, '#faixaConta'), bloco: await visivel(x.page, '#blocoAcesso') };
+  await x.ctx.close();
+  return { ok: r.faixa && !r.bloco, detalhe: JSON.stringify(r) };
 });
 
 await caso('nenhuma exceção de JavaScript em toda a tela de login (ligada e desligada)', async () => {

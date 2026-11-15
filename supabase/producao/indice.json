@@ -2042,6 +2042,106 @@
    ],
    "rls": true,
    "politicas": 0
+  },
+  {
+   "nome": "app_aparelho",
+   "colunas": [
+    "id",
+    "paciente_id",
+    "token_hash",
+    "aparelho",
+    "criado_em",
+    "ultimo_uso_em",
+    "desbloqueada_ate"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "app_contato_confianca",
+   "colunas": [
+    "id",
+    "responsavel_id",
+    "nome",
+    "telefone",
+    "relacao",
+    "codigo",
+    "codigo_falhas",
+    "vinculado_a",
+    "vinculado_em",
+    "criado_em",
+    "removido_em"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "app_evento",
+   "colunas": [
+    "id",
+    "paciente_id",
+    "tipo",
+    "criado_em"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "app_filho",
+   "colunas": [
+    "id",
+    "responsavel_id",
+    "nome",
+    "nascimento",
+    "criado_em",
+    "removido_em",
+    "cpf"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "app_marcacao",
+   "colunas": [
+    "id",
+    "grupo",
+    "responsavel_id",
+    "filho_id",
+    "pessoa_nome",
+    "pessoa_nascimento",
+    "exame",
+    "data_preferida",
+    "turno",
+    "obs",
+    "status",
+    "criado_em",
+    "atualizado_em"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "app_paciente",
+   "colunas": [
+    "id",
+    "telefone",
+    "nome",
+    "nascimento",
+    "pin_hash",
+    "pin_falhas",
+    "pin_bloqueado_ate",
+    "ultima_selecao",
+    "paciente_sugerido_id",
+    "telefone_verificado_em",
+    "criado_em",
+    "atualizado_em",
+    "ultimo_acesso_em",
+    "cpf",
+    "email",
+    "conta_antiga_id"
+   ],
+   "rls": true,
+   "politicas": 0
   }
  ],
  "visoes": [
@@ -2331,6 +2431,8 @@
   "agendamento_ip_por_minuto",
   "agendamento_reconhecer",
   "agendamento_reconhecer_msg_encerradas",
+  "app_acesso_modo",
+  "app_cadastros_max_hora",
   "autoencerrar_horas",
   "autoencerrar_modo",
   "avaliacao_ativa",
@@ -3067,6 +3169,684 @@
    "authenticated": true,
    "publico": false,
    "md5": "dbcbb6d1bc838d6c6789c6cc39cbf61d"
+  },
+  {
+   "nome": "app_acerto",
+   "args": [
+    {
+     "nome": "p_id",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "6cfc35584f8f5239f37de0def06e0611"
+  },
+  {
+   "nome": "app_aparelho_validar",
+   "args": [
+    {
+     "nome": "p_token",
+     "padrao": false
+    },
+    {
+     "nome": "p_exige",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "dcef98d7911cbe3eff0e331ec7b7847f"
+  },
+  {
+   "nome": "app_ativo",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "2a8822a6d6be543458b84c547252e8ac"
+  },
+  {
+   "nome": "app_bloqueado_json",
+   "args": [
+    {
+     "nome": "p_seg",
+     "padrao": false
+    }
+   ],
+   "definer": false,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "97910c000ea4994f2c81c8485fe23b1c"
+  },
+  {
+   "nome": "app_cadastrar",
+   "args": [
+    {
+     "nome": "p_telefone",
+     "padrao": false
+    },
+    {
+     "nome": "p_nome",
+     "padrao": false
+    },
+    {
+     "nome": "p_nascimento",
+     "padrao": false
+    },
+    {
+     "nome": "p_pin",
+     "padrao": false
+    },
+    {
+     "nome": "p_filhos",
+     "padrao": true
+    },
+    {
+     "nome": "p_confianca",
+     "padrao": true
+    },
+    {
+     "nome": "p_aparelho",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "9220e750472126ff0b5198f7d84d8f6e"
+  },
+  {
+   "nome": "app_chat_dados",
+   "args": [
+    {
+     "nome": "p_token",
+     "padrao": false
+    },
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_conv_token",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "57c269411a837c4a670a10983ab77b32"
+  },
+  {
+   "nome": "app_confianca_aceitar",
+   "args": [
+    {
+     "nome": "p_token",
+     "padrao": false
+    },
+    {
+     "nome": "p_codigo",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "21426747fb97047497e0358ea0b0c114"
+  },
+  {
+   "nome": "app_confianca_gerar_codigo",
+   "args": [],
+   "definer": false,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "05c8369956ff0e4edc5ff08807d6c3a5"
+  },
+  {
+   "nome": "app_confianca_novo_codigo",
+   "args": [
+    {
+     "nome": "p_token",
+     "padrao": false
+    },
+    {
+     "nome": "p_id",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "f9eb138df57cf920b37717f7d1888851"
+  },
+  {
+   "nome": "app_confianca_remover",
+   "args": [
+    {
+     "nome": "p_token",
+     "padrao": false
+    },
+    {
+     "nome": "p_id",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "89ce4951e0228ed80c5c7033d4386569"
+  },
+  {
+   "nome": "app_confianca_salvar",
+   "args": [
+    {
+     "nome": "p_token",
+     "padrao": false
+    },
+    {
+     "nome": "p_nome",
+     "padrao": false
+    },
+    {
+     "nome": "p_telefone",
+     "padrao": false
+    },
+    {
+     "nome": "p_relacao",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "8719e388de498e01b3bc6bf5a80a9f66"
+  },
+  {
+   "nome": "app_conta_antiga_herdar",
+   "args": [
+    {
+     "nome": "p_pin",
+     "padrao": false
+    },
+    {
+     "nome": "p_telefone",
+     "padrao": true
+    },
+    {
+     "nome": "p_nome",
+     "padrao": true
+    },
+    {
+     "nome": "p_nascimento",
+     "padrao": true
+    },
+    {
+     "nome": "p_aparelho",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "4e790f5b1abfe40c80473a3a2bd5754c"
+  },
+  {
+   "nome": "app_conta_antiga_resumo",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "e636fcc53f1fe113ef8cb0aaf6db952d"
+  },
+  {
+   "nome": "app_cpf_mascara",
+   "args": [
+    {
+     "nome": "p",
+     "padrao": false
+    }
+   ],
+   "definer": false,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "7a911fbbb9cbf271402afae3ae2d2216"
+  },
+  {
+   "nome": "app_data",
+   "args": [
+    {
+     "nome": "t",
+     "padrao": false
+    }
+   ],
+   "definer": false,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "28698aeb9049c42a6bf7a14d41290ea8"
+  },
+  {
+   "nome": "app_desbloquear",
+   "args": [
+    {
+     "nome": "p_token",
+     "padrao": false
+    },
+    {
+     "nome": "p_pin",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "ba03e20730a9bafdda1c5603e2601c11"
+  },
+  {
+   "nome": "app_erro_json",
+   "args": [
+    {
+     "nome": "p_erro",
+     "padrao": false
+    }
+   ],
+   "definer": false,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "9ebeb266d93d79bbbd1ad35d49347ff5"
+  },
+  {
+   "nome": "app_evento_gravar",
+   "args": [
+    {
+     "nome": "p_pac",
+     "padrao": false
+    },
+    {
+     "nome": "p_tipo",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "eea0c86214f39b2b1e22dd0a36d131cb"
+  },
+  {
+   "nome": "app_falha",
+   "args": [
+    {
+     "nome": "p_id",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "4185408901f6caaeedadd7638bb7f970"
+  },
+  {
+   "nome": "app_filho_remover",
+   "args": [
+    {
+     "nome": "p_token",
+     "padrao": false
+    },
+    {
+     "nome": "p_id",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "b26709654f32aed5c50d3a7dcce3f55f"
+  },
+  {
+   "nome": "app_filho_salvar",
+   "args": [
+    {
+     "nome": "p_token",
+     "padrao": false
+    },
+    {
+     "nome": "p_nome",
+     "padrao": false
+    },
+    {
+     "nome": "p_nascimento",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "69962a3a678d32601784477bbd506edd"
+  },
+  {
+   "nome": "app_hoje",
+   "args": [],
+   "definer": false,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "2c3c7435049c13600f35facbe409a805"
+  },
+  {
+   "nome": "app_idade",
+   "args": [
+    {
+     "nome": "d",
+     "padrao": false
+    }
+   ],
+   "definer": false,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "b748a1a14fcc6ac8decd380b33aa0454"
+  },
+  {
+   "nome": "app_login",
+   "args": [
+    {
+     "nome": "p_telefone",
+     "padrao": false
+    },
+    {
+     "nome": "p_pin",
+     "padrao": false
+    },
+    {
+     "nome": "p_aparelho",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "a5c1877f98e58d129f62cde0edf34f04"
+  },
+  {
+   "nome": "app_marcacao_cancelar",
+   "args": [
+    {
+     "nome": "p_token",
+     "padrao": false
+    },
+    {
+     "nome": "p_grupo",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "9907946e26942fac2237dae73fd03795"
+  },
+  {
+   "nome": "app_marcacoes_json",
+   "args": [
+    {
+     "nome": "p_pac",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "77a904d2d08a071250e8bfe55839a70c"
+  },
+  {
+   "nome": "app_marcar",
+   "args": [
+    {
+     "nome": "p_token",
+     "padrao": false
+    },
+    {
+     "nome": "p_pessoas",
+     "padrao": false
+    },
+    {
+     "nome": "p_exame",
+     "padrao": false
+    },
+    {
+     "nome": "p_data",
+     "padrao": false
+    },
+    {
+     "nome": "p_turno",
+     "padrao": false
+    },
+    {
+     "nome": "p_obs",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "a9eba5c23f46da84e93a7b57364f803e"
+  },
+  {
+   "nome": "app_modo",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "53ebf76cb0c6f1b1e54b096726c62ae0"
+  },
+  {
+   "nome": "app_nome_ok",
+   "args": [
+    {
+     "nome": "t",
+     "padrao": false
+    }
+   ],
+   "definer": false,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "c935b8d5d1aa7361aa97a37df4b99ee1"
+  },
+  {
+   "nome": "app_norm",
+   "args": [
+    {
+     "nome": "t",
+     "padrao": false
+    }
+   ],
+   "definer": false,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "efbceda882057967818eb7b2e09677ab"
+  },
+  {
+   "nome": "app_perfil",
+   "args": [
+    {
+     "nome": "p_token",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "09ba93ccd5e3ff87fe128c2349b1a3d1"
+  },
+  {
+   "nome": "app_perfil_json",
+   "args": [
+    {
+     "nome": "p_pac",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "f4178fae3237285661d51bc8e33a698e"
+  },
+  {
+   "nome": "app_pessoa_cpf_salvar",
+   "args": [
+    {
+     "nome": "p_token",
+     "padrao": false
+    },
+    {
+     "nome": "p_pessoa",
+     "padrao": false
+    },
+    {
+     "nome": "p_cpf",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "8b3205cbb323bcb4081b5b4f483f6ccb"
+  },
+  {
+   "nome": "app_pin_trocar",
+   "args": [
+    {
+     "nome": "p_token",
+     "padrao": false
+    },
+    {
+     "nome": "p_atual",
+     "padrao": false
+    },
+    {
+     "nome": "p_novo",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "46773ad59379e8a6a26be42022eef338"
+  },
+  {
+   "nome": "app_selecao_salvar",
+   "args": [
+    {
+     "nome": "p_token",
+     "padrao": false
+    },
+    {
+     "nome": "p_selecao",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "97c0e8d16ca434d6f19acd38d7b8b936"
+  },
+  {
+   "nome": "app_tel_br",
+   "args": [
+    {
+     "nome": "t",
+     "padrao": false
+    }
+   ],
+   "definer": false,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "e9a5e1abca3f902a5e54c58e84a42485"
+  },
+  {
+   "nome": "app_trava",
+   "args": [
+    {
+     "nome": "p_id",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "09e9bd768788d0eaaac5cfe3efb22a5b"
   },
   {
    "nome": "assinatura_contexto",
@@ -10725,6 +11505,40 @@
    "authenticated": true,
    "publico": false,
    "md5": "30b5dc91f4dc8ccdf0573505c6af7508"
+  },
+  {
+   "nome": "painel_app_solicitacao_status",
+   "args": [
+    {
+     "nome": "p_grupo",
+     "padrao": false
+    },
+    {
+     "nome": "p_status",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "734e3460bd18d2e83d44d80a019b4d1b"
+  },
+  {
+   "nome": "painel_app_solicitacoes",
+   "args": [
+    {
+     "nome": "p_status",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "585a58d8edb884a9b60315d528059cf9"
   },
   {
    "nome": "painel_arquivo_enviar",

@@ -673,7 +673,7 @@
   const CHAVE_HIST = 'webchat.historico.v1';   // as últimas conversas deste aparelho (cada uma com o seu token): dá para voltar a elas
   const MAX_HIST = 5;                          // mínimo pedido: 3
   // Muda a cada alteração do chat. Cópia de mensagens guardada por outra versão é descartada (era isso que mostrava conversa velha e travada).
-  const VERSAO_APP = '2026.11.14-5';
+  const VERSAO_APP = '2026.11.15-1';
   // Mesmas regras do banco (fluxo_nome_ok, fluxo_telefone_ok, fluxo_email_ok): o banco confere de novo, aqui é só para avisar logo.
   const LET = 'A-Za-zÀ-ÖØ-öø-ÿ';
   const nomeCompletoOk = (v) => { const t = String(v || '').trim(); return t.length >= 5 && t.length <= 120 && new RegExp(`^[${LET}][${LET}'’.-]*( +[${LET}][${LET}'’.-]*)+$`).test(t) && t.split(/ +/).filter((w) => w.replace(new RegExp(`[^${LET}]`, 'g'), '').length >= 2).length >= 2; };
@@ -3192,10 +3192,11 @@
   const campoTxt = (id, rotulo, props) => { const inp = h('input', { id, maxlength: 200, ...props }); return { campo: h('div', { class: 'campo' }, h('label', { for: id }, rotulo), inp), inp }; };
 
   function atualizarContaUI(semForm) {
-    el.faixaConta.hidden = !loginAtivo;
+    el.faixaConta.hidden = !loginAtivo || (acessoAtivo && !conta);   // acesso rápido ligado: uma forma de login só (celular + PIN); a faixa fica só para quem ainda está numa conta antiga
     el.btnContaEntrar.hidden = el.btnContaCriar.hidden = !!conta; el.btnContaSair.hidden = el.btnContaDados.hidden = !conta;
     el.faixaContaTxt.textContent = conta ? 'Conta: ' + conta.email : '';
     el.btnSair.textContent = conta ? 'Sair da conta' : 'Sair (não sou eu)';
+    atualizarAcessoUI(true);   // o convite para criar o PIN depende de a conta existir
     if (!semForm && !el.telaInicio.hidden) mostrarForm(!!escolha);   // refaz o formulário já com (ou sem) os dados da conta
   }
   async function carregarConta() {
@@ -3264,10 +3265,13 @@
   function atualizarAcessoUI(semForm) {
     let b = $('#blocoAcesso');
     if (!b) { b = h('div', { id: 'blocoAcesso', class: 'volta' }); $('#formInicio').prepend(b); }
-    b.hidden = !acessoAtivo || !!conta;   // quem entrou com e-mail e senha segue pelo caminho de sempre
+    b.hidden = !acessoAtivo;
     if (!b.hidden) {
       const st = lerLocal(ACESSO_CHAVE) || {};
-      if (acessoPerfil) {
+      if (conta) {   // conta antiga (e-mail e senha): convida a criar o PIN, trazendo os dados que já temos
+        b.replaceChildren(h('p', { class: 'volta-dados' }, '⚡ Crie seu PIN: seus dados já estão salvos e, daqui para a frente, você entra só com o celular e o PIN.'),
+          h('span', { class: 'acoes-acesso' }, h('a', { class: 'link-add', id: 'acessoHerdar', href: 'acesso/?voltar=chat&antiga=1' }, 'Criar meu PIN')));
+      } else if (acessoPerfil) {
         b.replaceChildren(h('p', { class: 'volta-dados' }, `⚡ Acesso rápido: ${primeiroNome(acessoPerfil.nome)}`),
           h('span', { class: 'acoes-acesso' }, h('a', { class: 'link-add', id: 'acessoMeusDados', href: 'acesso/' }, 'Meus dados'), h('button', { type: 'button', class: 'link-add', id: 'acessoSair', onclick: acessoSair }, 'Sair')));
       } else if (acessoDev() && acessoTrava) {
@@ -3283,6 +3287,7 @@
   async function acessoIniciar() {
     try { const { data, error } = await db.rpc('app_ativo'); acessoAtivo = !error && data === true; } catch { acessoAtivo = false; }
     if (acessoAtivo) { try { await acessoCarregar(); } catch { /* sem rede: segue como convidado */ } }
+    atualizarContaUI(true);   // com o acesso rápido ligado a faixa de e-mail e senha some para quem não tem conta antiga
     atualizarAcessoUI();
   }
   async function acessoSair() {

@@ -1,6 +1,6 @@
 # Acesso rápido do paciente (celular + PIN de 4 dígitos)
 
-Versão 1.1 — 15/11/2026 / Mudança: acesso rápido dentro do chat real (CPF e nascimento perguntados uma vez só). Versão 1.0 — 14/11/2026 / Mudança: Implementação inicial (primeira versão guardava tudo só no celular; esta liga ao Supabase)
+Versão 1.2 — 15/11/2026 / Mudança: contas antigas (e-mail e senha) viram acesso rápido, uma forma de login só. Versão 1.1 — 15/11/2026 / Mudança: acesso rápido dentro do chat real (CPF e nascimento perguntados uma vez só). Versão 1.0 — 14/11/2026 / Mudança: Implementação inicial (primeira versão guardava tudo só no celular; esta liga ao Supabase)
 
 **Página:** `acesso/index.html` (`https://clinicacsiia.github.io/webchat/acesso/`, ainda sem link em nenhuma outra tela). **Banco:** `supabase/acesso-rapido-paciente.sql`. **Testes:** `npm run test:acesso-sql` (57), `npm run test:acesso` (36, a página `/acesso/` num Chromium falando com o banco de teste), `npm run test:acesso-chat-sql` (20, motor real do chat) e `npm run test:acesso-chat` (12, o `index.html` real do chat num Chromium falando com o motor real).
 
@@ -48,8 +48,23 @@ Feita **só dentro do banco**, só como **sugestão**: se existir um único paci
 **Limites conhecidos:**
 - "Todos os filhos" usa os irmãos do chat (só filhos). **Pai/mãe + filhos no mesmo pedido** não existe no motor (uma conversa é de uma pessoa); fica para outra etapa.
 - O **nome da mãe** e o **sexo** (`dados_ident`) ainda são perguntados nas conversas com a API do Klingo; só CPF e nascimento foram resolvidos.
-- Quem usa e-mail e senha (conta antiga) continua pelo caminho de antes; a faixa do acesso rápido some para ele.
+- ~~Quem usa e-mail e senha (conta antiga) continua pelo caminho de antes~~ — resolvido na seção abaixo (15/11/2026).
 - Se o CPF guardado estiver errado, a pessoa corrige em *Meus dados > Alterar* (o chat não sobrescreve um CPF já salvo).
+
+## Contas antigas viram acesso rápido: uma forma de login só (15/11/2026)
+**Banco:** `supabase/acesso-rapido-conta-antiga.sql` (`npm run test:acesso-antiga-sql`, 20 casos). **Telas:** `acesso/index.html` e `index.html` (`npm run test:acesso-antiga`, 13 casos; `test:login`, 26).
+
+**O que acontece com quem já tem conta de e-mail e senha** (hoje 8 contas; 5 com nome e celular, 1 ligada a cadastro da clínica com CPF e nascimento):
+1. Com o acesso rápido ligado, o chat mostra ao logado: "⚡ Crie seu PIN: seus dados já estão salvos…" → *Criar meu PIN* (abre `/acesso/?voltar=chat&antiga=1`). Quem entra por `/acesso/` usa *Tenho conta com e-mail e senha*.
+2. Vindo do chat, a página **reaproveita a sessão** (não pede a senha de novo). Senão pede e-mail e senha, **uma última vez** (a sessão fica só na memória da página).
+3. A tela mostra o que já temos (e-mail, CPF mascarado) e deixa celular, nome e nascimento **já preenchidos**; só o que estiver em branco a pessoa digita.
+4. Ela cria o PIN (duas vezes). O banco (`app_conta_antiga_herdar`) junta **conta + cadastro da clínica** e grava em `app_paciente`: nome, celular (login), e-mail, **CPF** e nascimento; `conta_antiga_id` guarda de qual conta veio e `paciente_sugerido_id` repete o cadastro da clínica já ligado à conta.
+5. A conta antiga **não é apagada**: só sai deste aparelho (logout + sessão apagada). Daí em diante: celular + PIN, o chat não pergunta CPF e nascimento de novo, e *Meus dados* mostra nome, nascimento, celular, e-mail e CPF mascarado.
+
+**Regras:** nada nasce sozinho (sem PIN digitado, nenhuma linha em `app_paciente`); só o papel `authenticated` executa as duas funções e elas usam a sessão (`auth.uid()`), então ninguém herda a conta de outra pessoa; celular já usado por outro acesso é recusado; menor de 18 é recusado; mesma trava de cadastros por hora. O celular continua **sem confirmação por SMS** (limite já conhecido do acesso rápido).
+**Com o acesso rápido ligado**, a faixa "Entrar / Criar conta" de e-mail some do chat para quem não tem conta antiga (e quem se cadastrar passa a ser só celular + PIN).
+**Voltar atrás:** comandos no cabeçalho do SQL (apagam as 3 funções e a coluna `conta_antiga_id`; as contas antigas continuam funcionando).
+**Ainda não existe:** filhos nas contas antigas (as contas antigas nunca tiveram filhos); código por SMS para provar o celular.
 
 ## Equipe
 - `select public.painel_app_solicitacoes('solicitada');` lista as solicitações (responsável, celular, pessoas com nascimento, exame, data, turno, observação). Só administrador e atendente.

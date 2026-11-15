@@ -1,5 +1,5 @@
 -- RETRATO DA ESTRUTURA DO BANCO DE PRODUÇÃO (projeto webchat-atendimento). GERADO: não editar à mão.
--- Tirado em 2026-11-14T20:32:54.165875+00:00 · Postgres 17.11. Só estrutura: nenhuma linha de tabela, nenhum valor de configuração.
+-- Atualização parcial em 2026-11-15T00:42:30+00:00 (funções app_* e painel_app_*, tabelas app_*). Retrato inteiro tirado em 2026-11-14T20:32:54.165875+00:00 · Postgres 17.11. Só estrutura: nenhuma linha de tabela, nenhum valor de configuração.
 -- Serve de referência e para os testes. NÃO rodar inteiro sobre a produção. Como refazer: supabase/producao/LEIAME.md.
 
 -- ===== Extensões =====
@@ -18,7 +18,7 @@
 -- authenticator: session_preload_libraries=supautils, safeupdate, statement_timeout=8s, lock_timeout=8s
 -- service_role: sem limite
 
--- ===== Tabelas (131) =====
+-- ===== Tabelas (137) =====
 
 create table public.agenda_ao_vivo (
   dia date not null,
@@ -2423,6 +2423,131 @@ CREATE INDEX vinculo_solicitacoes_conta ON public.vinculo_solicitacoes USING btr
 CREATE UNIQUE INDEX vinculo_solicitacoes_uma_aberta ON public.vinculo_solicitacoes USING btree (conta_id, tipo) WHERE (status = 'aberta'::text);
 alter table public.vinculo_solicitacoes enable row level security;
 
+
+create table public.app_aparelho (
+  id uuid default gen_random_uuid() not null,
+  paciente_id uuid not null,
+  token_hash text not null,
+  aparelho text,
+  criado_em timestamp with time zone default now() not null,
+  ultimo_uso_em timestamp with time zone default now() not null,
+  desbloqueada_ate timestamp with time zone,
+  constraint app_aparelho_pkey PRIMARY KEY (id),
+  constraint app_aparelho_token_hash_key UNIQUE (token_hash)
+);
+comment on table public.app_aparelho is 'Aparelhos que entraram no acesso rápido. Guarda só o sha256 do código do aparelho. desbloqueada_ate = até quando o PIN digitado vale (renova a cada uso). No máximo 5 por titular.';
+CREATE INDEX app_aparelho_paciente ON public.app_aparelho USING btree (paciente_id, ultimo_uso_em);
+alter table public.app_aparelho enable row level security;
+
+create table public.app_contato_confianca (
+  id uuid default gen_random_uuid() not null,
+  responsavel_id uuid not null,
+  nome text not null,
+  telefone text not null,
+  relacao text not null,
+  codigo text not null,
+  codigo_falhas integer default 0 not null,
+  vinculado_a uuid,
+  vinculado_em timestamp with time zone,
+  criado_em timestamp with time zone default now() not null,
+  removido_em timestamp with time zone,
+  constraint app_contato_confianca_codigo_check CHECK ((codigo ~ '^[0-9]{6}$'::text)),
+  constraint app_contato_confianca_nome_check CHECK (((length(btrim(nome)) >= 2) AND (length(btrim(nome)) <= 120))),
+  constraint app_contato_confianca_relacao_check CHECK ((relacao = ANY (ARRAY['Cônjuge'::text, 'Pai/Mãe'::text, 'Avó/Avô'::text, 'Irmão(ã)'::text, 'Outro'::text]))),
+  constraint app_contato_confianca_telefone_check CHECK ((telefone ~ '^[1-9]{2}9[0-9]{8}$'::text)),
+  constraint app_contato_confianca_pkey PRIMARY KEY (id)
+);
+comment on table public.app_contato_confianca is 'Número de confiança do titular. Só enxerga filhos e solicitações depois de digitar o codigo (6 dígitos que o titular passou) no app do próprio celular: vinculado_a é a conta dessa pessoa. 5 códigos errados invalidam o código (o titular gera outro).';
+CREATE INDEX app_contato_telefone ON public.app_contato_confianca USING btree (telefone) WHERE (removido_em IS NULL);
+CREATE UNIQUE INDEX app_contato_unico ON public.app_contato_confianca USING btree (responsavel_id, telefone) WHERE (removido_em IS NULL);
+CREATE INDEX app_contato_vinculado ON public.app_contato_confianca USING btree (vinculado_a) WHERE ((removido_em IS NULL) AND (vinculado_a IS NOT NULL));
+alter table public.app_contato_confianca enable row level security;
+
+create table public.app_evento (
+  id bigint generated always as identity not null,
+  paciente_id uuid,
+  tipo text not null,
+  criado_em timestamp with time zone default now() not null,
+  constraint app_evento_pkey PRIMARY KEY (id)
+);
+comment on table public.app_evento is 'Registro sem dado pessoal: cadastro, entrada em aparelho novo, PIN trocado ou redefinido, bloqueio, número de confiança vinculado. Serve para a equipe investigar abuso.';
+CREATE INDEX app_evento_recente ON public.app_evento USING btree (criado_em DESC);
+alter table public.app_evento enable row level security;
+
+create table public.app_filho (
+  id uuid default gen_random_uuid() not null,
+  responsavel_id uuid not null,
+  nome text not null,
+  nascimento date not null,
+  criado_em timestamp with time zone default now() not null,
+  removido_em timestamp with time zone,
+  cpf text,
+  constraint app_filho_cpf_check CHECK (((cpf IS NULL) OR (cpf ~ '^[0-9]{11}$'::text))),
+  constraint app_filho_nascimento_check CHECK ((nascimento >= '1900-01-01'::date)),
+  constraint app_filho_nome_check CHECK (((length(btrim(nome)) >= 5) AND (length(btrim(nome)) <= 120))),
+  constraint app_filho_pkey PRIMARY KEY (id)
+);
+comment on table public.app_filho is 'Filhos do titular. Remover só marca removido_em (as solicitações antigas continuam legíveis para a equipe). A qualquer momento o titular pode cadastrar outro.';
+CREATE INDEX app_filho_responsavel ON public.app_filho USING btree (responsavel_id) WHERE (removido_em IS NULL);
+alter table public.app_filho enable row level security;
+
+create table public.app_marcacao (
+  id uuid default gen_random_uuid() not null,
+  grupo uuid not null,
+  responsavel_id uuid not null,
+  filho_id uuid,
+  pessoa_nome text not null,
+  pessoa_nascimento date not null,
+  exame text not null,
+  data_preferida date not null,
+  turno text not null,
+  obs text,
+  status text default 'solicitada'::text not null,
+  criado_em timestamp with time zone default now() not null,
+  atualizado_em timestamp with time zone default now() not null,
+  constraint app_marcacao_exame_check CHECK (((length(btrim(exame)) >= 1) AND (length(btrim(exame)) <= 80))),
+  constraint app_marcacao_obs_check CHECK (((obs IS NULL) OR (length(obs) <= 500))),
+  constraint app_marcacao_status_check CHECK ((status = ANY (ARRAY['solicitada'::text, 'confirmada'::text, 'cancelada'::text, 'concluida'::text]))),
+  constraint app_marcacao_turno_check CHECK ((turno = ANY (ARRAY['Qualquer horário'::text, 'Manhã'::text, 'Tarde'::text]))),
+  constraint app_marcacao_pkey PRIMARY KEY (id)
+);
+comment on table public.app_marcacao is 'Solicitação de marcação (NÃO é agendamento: a equipe confirma). Uma linha por pessoa; as do mesmo pedido "Todos juntos" dividem o grupo. filho_id vazio = o próprio titular. Nome e nascimento ficam copiados para a equipe ler mesmo se o filho for removido.';
+CREATE INDEX app_marcacao_abertas ON public.app_marcacao USING btree (criado_em) WHERE (status = 'solicitada'::text);
+CREATE INDEX app_marcacao_filho ON public.app_marcacao USING btree (filho_id) WHERE (filho_id IS NOT NULL);
+CREATE INDEX app_marcacao_grupo ON public.app_marcacao USING btree (grupo);
+CREATE INDEX app_marcacao_responsavel ON public.app_marcacao USING btree (responsavel_id, status);
+alter table public.app_marcacao enable row level security;
+
+create table public.app_paciente (
+  id uuid default gen_random_uuid() not null,
+  telefone text not null,
+  nome text not null,
+  nascimento date not null,
+  pin_hash text not null,
+  pin_falhas integer default 0 not null,
+  pin_bloqueado_ate timestamp with time zone,
+  ultima_selecao jsonb default '["eu"]'::jsonb not null,
+  paciente_sugerido_id uuid,
+  telefone_verificado_em timestamp with time zone,
+  criado_em timestamp with time zone default now() not null,
+  atualizado_em timestamp with time zone default now() not null,
+  ultimo_acesso_em timestamp with time zone,
+  cpf text,
+  email text,
+  conta_antiga_id uuid,
+  constraint app_paciente_cpf_check CHECK (((cpf IS NULL) OR (cpf ~ '^[0-9]{11}$'::text))),
+  constraint app_paciente_email_check CHECK (((email IS NULL) OR (email ~ '^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$'::text))),
+  constraint app_paciente_nascimento_check CHECK ((nascimento >= '1900-01-01'::date)),
+  constraint app_paciente_nome_check CHECK (((length(btrim(nome)) >= 5) AND (length(btrim(nome)) <= 120))),
+  constraint app_paciente_telefone_check CHECK ((telefone ~ '^[1-9]{2}9[0-9]{8}$'::text)),
+  constraint app_paciente_pkey PRIMARY KEY (id),
+  constraint app_paciente_telefone_key UNIQUE (telefone)
+);
+comment on table public.app_paciente is 'Titular do acesso rápido (celular + PIN). telefone = login (só dígitos, DDD + 9). pin_hash = bcrypt; pin_falhas conta erros seguidos (bloqueio crescente). paciente_sugerido_id é só uma sugestão para a equipe conferir. telefone_verificado_em fica vazio enquanto não houver código por SMS. Sem acesso direto: só as funções app_* e painel_app_*.';
+CREATE UNIQUE INDEX app_paciente_conta_antiga ON public.app_paciente USING btree (conta_antiga_id) WHERE (conta_antiga_id IS NOT NULL);
+CREATE INDEX app_paciente_sugerido ON public.app_paciente USING btree (paciente_sugerido_id) WHERE (paciente_sugerido_id IS NOT NULL);
+alter table public.app_paciente enable row level security;
+
 -- ===== Chaves estrangeiras (depois de todas as tabelas) =====
 alter table public.agendamento_fechamento add constraint agendamento_fechamento_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE CASCADE;
 alter table public.agendamento_fechamento add constraint agendamento_fechamento_por_fkey FOREIGN KEY (por) REFERENCES agentes(id) ON DELETE SET NULL;
@@ -2513,6 +2638,15 @@ alter table public.registro_assinaturas add constraint registro_assinaturas_aten
 alter table public.vinculo_solicitacoes add constraint vinculo_solicitacoes_conta_id_fkey FOREIGN KEY (conta_id) REFERENCES auth.users(id) ON DELETE CASCADE;
 alter table public.vinculo_solicitacoes add constraint vinculo_solicitacoes_decidido_por_fkey FOREIGN KEY (decidido_por) REFERENCES auth.users(id) ON DELETE SET NULL;
 alter table public.vinculo_solicitacoes add constraint vinculo_solicitacoes_paciente_id_fkey FOREIGN KEY (paciente_id) REFERENCES pacientes(id) ON DELETE CASCADE;
+alter table public.app_aparelho add constraint app_aparelho_paciente_id_fkey FOREIGN KEY (paciente_id) REFERENCES public.app_paciente(id) ON DELETE CASCADE;
+alter table public.app_contato_confianca add constraint app_contato_confianca_responsavel_id_fkey FOREIGN KEY (responsavel_id) REFERENCES public.app_paciente(id) ON DELETE CASCADE;
+alter table public.app_contato_confianca add constraint app_contato_confianca_vinculado_a_fkey FOREIGN KEY (vinculado_a) REFERENCES public.app_paciente(id) ON DELETE SET NULL;
+alter table public.app_evento add constraint app_evento_paciente_id_fkey FOREIGN KEY (paciente_id) REFERENCES public.app_paciente(id) ON DELETE SET NULL;
+alter table public.app_filho add constraint app_filho_responsavel_id_fkey FOREIGN KEY (responsavel_id) REFERENCES public.app_paciente(id) ON DELETE CASCADE;
+alter table public.app_marcacao add constraint app_marcacao_filho_id_fkey FOREIGN KEY (filho_id) REFERENCES public.app_filho(id) ON DELETE SET NULL;
+alter table public.app_marcacao add constraint app_marcacao_responsavel_id_fkey FOREIGN KEY (responsavel_id) REFERENCES public.app_paciente(id) ON DELETE CASCADE;
+alter table public.app_paciente add constraint app_paciente_conta_antiga_id_fkey FOREIGN KEY (conta_antiga_id) REFERENCES public.contas_paciente(id) ON DELETE SET NULL;
+alter table public.app_paciente add constraint app_paciente_paciente_sugerido_id_fkey FOREIGN KEY (paciente_sugerido_id) REFERENCES public.pacientes(id) ON DELETE SET NULL;
 
 -- ===== Visões (5) =====
 
@@ -2802,4 +2936,4 @@ CREATE TRIGGER vinculo_log_imutavel BEFORE DELETE OR UPDATE ON public.vinculo_lo
 --   select net.http_post( url := 'https://nrvuynjwcgwpjdptkiay.supabase.co/functions/v1/sync-catalogo-klingo', headers := jsonb_build_object('Content-Type', 'application/json', 'x-sync-key', (select valor from public.config where chave = 'ia_segredo')), body := '{}'::jsonb, timeout_milliseconds := 120000);
 
 -- ===== Chaves existentes em public.config (só os nomes; os valores não são copiados) =====
--- agenda_ao_vivo, agenda_ao_vivo_max_dias, agenda_ao_vivo_trava_s, agenda_ao_vivo_validade_s, agendado_conferir_prazo_min, agendamento_cpf_divergentes_dia, agendamento_cpf_escritas_hora, agendamento_externo_modo, agendamento_ip_divergentes_hora, agendamento_ip_escritas_hora, agendamento_ip_por_minuto, agendamento_reconhecer, agendamento_reconhecer_msg_encerradas, autoencerrar_horas, autoencerrar_modo, avaliacao_ativa, boas_vindas, cadastro_equipe_sem_convite, catalogo_csi, catalogo_desenvoar, catalogo_rmtc, chat_push_url, checkin_sem_login_max_dia, convenio_seguir_klingo, convenio_suspenso_texto, despedida_configurada, despedida_inatividade_ativa, despedida_inatividade_texto, despedida_versao_atual, disponibilidade_encerra_conversa, disponibilidade_max_avisos_dia, disponibilidade_max_avisos_total, encerramento_exige_motivo, encerramento_valida_agendado, equipe_push_url, fila_autochegada, fila_aviso_antes, fila_push_url, fila_vapid_publica, horario_trabalho, ia_ativa, ia_segredo, indicadores_fechar, jornada_identidade_klingo, jornada_relatorio_filtro, jornada_relatorio_id, klingo_api_cancelar, klingo_api_consultar, klingo_api_horarios, klingo_api_marcar, klingo_api_percentual, klingo_api_pos, klingo_api_pre_cadastro, klingo_api_remarcar, klingo_api_resultado, klingo_api_telefones_teste, klingo_auto, klingo_autogestao, klingo_conferir_ativo, klingo_funcoes_base, klingo_paciente_url, klingo_reconfirmar_dias, klingo_so_liberados, klingo_webhook, login_paciente, motor, motor_telefones_teste, nome_empresa, notificacao_modo, pedido_escolha_texto, pedido_horario_modo, pedido_oferta2_texto, pedido_parado_horas, pedido_sem_horario_texto, permissao_modo, previsao_decide_texto, previsao_final_texto, previsao_modo, previsao_monitor_modo, previsao_oferta_texto, previsao_texto, reabrir_dias, reaproveitar_cadastro_convidado, teste_agentes, teste_marcadores, vinculo_manual_quem
+-- agenda_ao_vivo, agenda_ao_vivo_max_dias, agenda_ao_vivo_trava_s, agenda_ao_vivo_validade_s, agendado_conferir_prazo_min, agendamento_cpf_divergentes_dia, agendamento_cpf_escritas_hora, agendamento_externo_modo, agendamento_ip_divergentes_hora, agendamento_ip_escritas_hora, agendamento_ip_por_minuto, agendamento_reconhecer, agendamento_reconhecer_msg_encerradas, app_acesso_modo, app_cadastros_max_hora, autoencerrar_horas, autoencerrar_modo, avaliacao_ativa, boas_vindas, cadastro_equipe_sem_convite, catalogo_csi, catalogo_desenvoar, catalogo_rmtc, chat_push_url, checkin_sem_login_max_dia, convenio_seguir_klingo, convenio_suspenso_texto, despedida_configurada, despedida_inatividade_ativa, despedida_inatividade_texto, despedida_versao_atual, disponibilidade_encerra_conversa, disponibilidade_max_avisos_dia, disponibilidade_max_avisos_total, encerramento_exige_motivo, encerramento_valida_agendado, equipe_push_url, fila_autochegada, fila_aviso_antes, fila_push_url, fila_vapid_publica, horario_trabalho, ia_ativa, ia_segredo, indicadores_fechar, jornada_identidade_klingo, jornada_relatorio_filtro, jornada_relatorio_id, klingo_api_cancelar, klingo_api_consultar, klingo_api_horarios, klingo_api_marcar, klingo_api_percentual, klingo_api_pos, klingo_api_pre_cadastro, klingo_api_remarcar, klingo_api_resultado, klingo_api_telefones_teste, klingo_auto, klingo_autogestao, klingo_conferir_ativo, klingo_funcoes_base, klingo_paciente_url, klingo_reconfirmar_dias, klingo_so_liberados, klingo_webhook, login_paciente, motor, motor_telefones_teste, nome_empresa, notificacao_modo, pedido_escolha_texto, pedido_horario_modo, pedido_oferta2_texto, pedido_parado_horas, pedido_sem_horario_texto, permissao_modo, previsao_decide_texto, previsao_final_texto, previsao_modo, previsao_monitor_modo, previsao_oferta_texto, previsao_texto, reabrir_dias, reaproveitar_cadastro_convidado, teste_agentes, teste_marcadores, vinculo_manual_quem
