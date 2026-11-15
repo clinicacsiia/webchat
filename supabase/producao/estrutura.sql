@@ -1,5 +1,5 @@
 -- RETRATO DA ESTRUTURA DO BANCO DE PRODUÇÃO (projeto webchat-atendimento). GERADO: não editar à mão.
--- Atualização parcial em 2026-11-15T06:25:03+00:00 (funções app_* e painel_app_*, tabelas app_*). Retrato inteiro tirado em 2026-11-14T20:32:54.165875+00:00 · Postgres 17.11. Só estrutura: nenhuma linha de tabela, nenhum valor de configuração.
+-- Atualização parcial em 2026-11-15T08:00:00Z (funções app_* e painel_app_*, tabelas app_*). Retrato inteiro tirado em 2026-11-14T20:32:54.165875+00:00 · Postgres 17.11. Só estrutura: nenhuma linha de tabela, nenhum valor de configuração.
 -- Serve de referência e para os testes. NÃO rodar inteiro sobre a produção. Como refazer: supabase/producao/LEIAME.md.
 
 -- ===== Extensões =====
@@ -18,7 +18,7 @@
 -- authenticator: session_preload_libraries=supautils, safeupdate, statement_timeout=8s, lock_timeout=8s
 -- service_role: sem limite
 
--- ===== Tabelas (140) =====
+-- ===== Tabelas (141) =====
 
 create table public.agenda_ao_vivo (
   dia date not null,
@@ -2625,6 +2625,19 @@ CREATE INDEX app_acesso_log_pac ON public.app_acesso_log USING btree (paciente_i
 alter table public.app_acesso_log enable row level security;
 
 
+
+create table public.atendimento_hora (
+  marcacao_id text not null,
+  chegada_em timestamp with time zone,
+  inicio_em timestamp with time zone,
+  fim_em timestamp with time zone,
+  fonte text default 'relatorio'::text not null,
+  lido_em timestamp with time zone default now() not null,
+  constraint atendimento_hora_pkey PRIMARY KEY (marcacao_id),
+  constraint atendimento_hora_ordem CHECK ((((inicio_em IS NULL) OR (chegada_em IS NULL) OR (inicio_em >= chegada_em)) AND ((fim_em IS NULL) OR (inicio_em IS NULL) OR (fim_em >= inicio_em)) AND ((fim_em IS NULL) OR (inicio_em IS NULL) OR ((fim_em - inicio_em) <= '08:00:00'::interval))))
+);
+CREATE INDEX atendimento_hora_fim ON public.atendimento_hora USING btree (fim_em);
+alter table public.atendimento_hora enable row level security;
 
 -- ===== Chaves estrangeiras (depois de todas as tabelas) =====
 alter table public.agendamento_fechamento add constraint agendamento_fechamento_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE CASCADE;

@@ -1,0 +1,279 @@
+{
+  "date": "2026-11-16",
+  "asOf": "2026-11-16T10:15:00-03:00",
+  "visits": [
+    {
+      "id": 101,
+      "person": 1,
+      "unit": "csi1",
+      "type": "us",
+      "slot": 500,
+      "arrive": 491,
+      "check": 498,
+      "registered": 502,
+      "prepare": 506,
+      "ready": 510
+    },
+    {
+      "id": 102,
+      "person": 2,
+      "unit": "csi1",
+      "type": "us",
+      "slot": 540,
+      "arrive": 531,
+      "check": 534,
+      "registered": 538,
+      "prepare": 541,
+      "ready": 546,
+      "start": 550,
+      "end": 578,
+      "room": 1
+    },
+    {
+      "id": 103,
+      "person": 3,
+      "unit": "csi1",
+      "type": "us",
+      "slot": 560,
+      "arrive": 551,
+      "check": 556,
+      "registered": 560,
+      "prepare": 564,
+      "ready": 568,
+      "start": 579,
+      "room": 1
+    },
+    {
+      "id": 104,
+      "person": 4,
+      "unit": "ped",
+      "type": "consulta",
+      "slot": 570,
+      "absentAt": 590
+    },
+    {
+      "id": 105,
+      "person": 5,
+      "unit": "csi2",
+      "type": "rm",
+      "slot": 670
+    },
+    {
+      "id": 106,
+      "person": 6,
+      "unit": "csi1",
+      "type": "us",
+      "slot": 689
+    }
+  ],
+  "history": [
+    {
+      "date": "2026-10-26",
+      "hour": 8,
+      "unit": "csi1",
+      "type": "us",
+      "booked": 4,
+      "arrivals": 3,
+      "durations": [
+        21,
+        25,
+        29
+      ]
+    },
+    {
+      "date": "2026-10-26",
+      "hour": 11,
+      "unit": "csi1",
+      "type": "us",
+      "booked": 6,
+      "arrivals": 5,
+      "durations": [
+        22,
+        24,
+        27,
+        32
+      ]
+    },
+    {
+      "date": "2026-10-26",
+      "hour": 11,
+      "unit": "csi2",
+      "type": "rm",
+      "booked": 3,
+      "arrivals": 2,
+      "durations": [
+        28,
+        31,
+        38
+      ]
+    },
+    {
+      "date": "2026-10-26",
+      "hour": 12,
+      "unit": "ped",
+      "type": "consulta",
+      "booked": 4,
+      "arrivals": 3,
+      "durations": [
+        17,
+        22,
+        25
+      ]
+    },
+    {
+      "date": "2026-10-26",
+      "hour": 14,
+      "unit": "csi1",
+      "type": "us",
+      "booked": 5,
+      "arrivals": 4,
+      "durations": [
+        20,
+        24,
+        25
+      ]
+    },
+    {
+      "date": "2026-11-02",
+      "hour": 8,
+      "unit": "csi1",
+      "type": "us",
+      "booked": 5,
+      "arrivals": 4,
+      "durations": [
+        21,
+        25,
+        29
+      ]
+    },
+    {
+      "date": "2026-11-02",
+      "hour": 11,
+      "unit": "csi1",
+      "type": "us",
+      "booked": 7,
+      "arrivals": 6,
+      "durations": [
+        22,
+        24,
+        27,
+        32
+      ]
+    },
+    {
+      "date": "2026-11-02",
+      "hour": 11,
+      "unit": "csi2",
+      "type": "rm",
+      "booked": 4,
+      "arrivals": 3,
+      "durations": [
+        28,
+        31,
+        38
+      ]
+    },
+    {
+      "date": "2026-11-02",
+      "hour": 12,
+      "unit": "ped",
+      "type": "consulta",
+      "booked": 5,
+      "arrivals": 4,
+      "durations": [
+        17,
+        22,
+        25
+      ]
+    },
+    {
+      "date": "2026-11-02",
+      "hour": 14,
+      "unit": "csi1",
+      "type": "us",
+      "booked": 6,
+      "arrivals": 5,
+      "durations": [
+        20,
+        24,
+        25
+      ]
+    },
+    {
+      "date": "2026-11-09",
+      "hour": 8,
+      "unit": "csi1",
+      "type": "us",
+      "booked": 6,
+      "arrivals": 5,
+      "durations": [
+        21,
+        25,
+        29
+      ]
+    },
+    {
+      "date": "2026-11-09",
+      "hour": 11,
+      "unit": "csi1",
+      "type": "us",
+      "booked": 8,
+      "arrivals": 7,
+      "durations": [
+        22,
+        24,
+        27,
+        32
+      ]
+    },
+    {
+      "date": "2026-11-09",
+      "hour": 11,
+      "unit": "csi2",
+      "type": "rm",
+      "booked": 5,
+      "arrivals": 4,
+      "durations": [
+        28,
+        31,
+        38
+      ]
+    },
+    {
+      "date": "2026-11-09",
+      "hour": 12,
+      "unit": "ped",
+      "type": "consulta",
+      "booked": 6,
+      "arrivals": 5,
+      "durations": [
+        17,
+        22,
+        25
+      ]
+    },
+    {
+      "date": "2026-11-09",
+      "hour": 14,
+      "unit": "csi1",
+      "type": "us",
+      "booked": 7,
+      "arrivals": 6,
+      "durations": [
+        20,
+        24,
+        25
+      ]
+    }
+  ],
+  "capacity": {
+    "csi1:us": 2,
+    "csi2:rm": 2,
+    "ped:consulta": 2
+  },
+  "outage": {
+    "key": "csi1:us",
+    "from": 570,
+    "to": null
+  }
+}

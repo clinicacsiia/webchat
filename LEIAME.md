@@ -7,6 +7,7 @@ Tudo em HTML/CSS/JS puro (PWA), com Supabase no servidor (banco, Edge Functions 
 index.html            chat do cliente        -> https://SEU-USUARIO.github.io/SEU-REPO/
 sentinela.js          monitor do chat: ajuda quem trava e gera o código de rastreio (CSI-...)
 painel/index.html     painel da equipe       -> https://SEU-USUARIO.github.io/SEU-REPO/painel/
+simulacao/index.html   simulação da clínica  -> https://SEU-USUARIO.github.io/SEU-REPO/simulacao/  (dados do Klingo + indicadores; docs/simulacao.md)
 ```
 
 ## Comece por aqui (estado em 12/11/2026)

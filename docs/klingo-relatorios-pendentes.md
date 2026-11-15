@@ -104,3 +104,10 @@ Filtros: `periodo0` = Data Agendado Para (livre) e `parm1` = Unidade. Colunas: 0
 
 ## Acompanhe seus pedidos (15/11/2026): nenhum relatório novo, um novo uso do C
 Nenhum relatório precisa ser criado ou editado. A tela usa a Jornada (#14359, a cada 30 s) para o passo de cada exame. A vigia `app-resultados-vigiar` usa o **#14026 (C)** pelo **Id do atendimento** (col0) e o **#14024 (A)** para conferir o nascimento do prontuário, ambos só quando `app_resultado_vigia = sim`. **Ainda NÃO provado com laudo real.** O C continua sem link nem senha: a entrega do resultado é da equipe, dentro da conversa.
+
+
+## Hora real de atendimento (15/11/2026): relatório a ajustar (pendência do dono)
+O banco já tem onde gravar a hora real de chegada, início e fim do atendimento (`atendimento_hora`) e a simulação já a usa (`docs/simulacao.md`). **Falta o relatório com a hora real aceitar consulta por data e hora (período), sem prontuário nem CPF.** Quando o dono ajustar o filtro, passar: número do relatório, ids dos filtros e as colunas (id da marcação, id do atendimento, chegada, início, fim; com data e hora ou só hora). A leitura (Edge Function) só é escrita depois disso: não se supõem colunas nem filtros.
+
+## Simulação da clínica (15/11/2026): nenhum relatório novo
+A simulação (`simulacao.md`) usa só o #14359 pela Jornada (marcações, situação, confirmação e o momento em que o Klingo marcou o atendimento). **Nenhum relatório precisa ser criado ou editado.** O que continua sem fonte no Klingo e limita a simulação: hora de início e de fim do exame, hora do guichê e do preparo, salas e profissionais por setor (pergunta 4 do suporte, acima, é a que destrava). O #14025 (B) tem "Check-In (chegada)", mas só por prontuário ou CPF.

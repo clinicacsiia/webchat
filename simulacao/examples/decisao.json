@@ -1,0 +1,4 @@
+{"periodo":{"de":"2026-10-19","ate":"2026-11-15"},"anterior_periodo":{"de":"2026-09-21","ate":"2026-10-18"},
+ "atual":{"chat":{"funil":{"entraram":330,"pedido":210,"data_hora":150,"horario":120,"completo":95,"agendaram":79},"sem_agendar_motivo":{"sem_equipe":9,"desistiu":40}},
+  "clinica":{"novas_marcacoes":1700,"novas_pelo_chat":79,"atendidos":2400,"faltaram":510,"falta_confirmacao":[{"nome":"Confirmado","atendidos":2068,"faltaram":276},{"nome":"Sem Resposta","atendidos":151,"faltaram":177}]}},
+ "anterior":{"chat":{"funil":{"entraram":0,"agendaram":0}},"clinica":{"novas_marcacoes":0,"atendidos":0,"faltaram":0}}}
