@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!--
 FLUXOGRAMA: entrada (celular + PIN de 4 dígitos; no primeiro acesso, cadastro único em 5 passos) -> validação (a página confere o formato; quem decide é o servidor: funções app_* do Supabase, supabase/acesso-rapido-paciente.sql) -> lógica (o aparelho guarda só um código de acesso e o primeiro nome; PIN, filhos, números de confiança e marcações ficam no banco; o PIN é pedido de novo depois de 5 minutos em segundo plano) -> saída (tela inicial com Eu / cada filho / Todos juntos; solicitações de marcação; quem confia em você)
-Versão 2.0 — 14/11/2026 / Mudança: ligado ao Supabase (versão 1 guardava tudo só no celular)
+Versão 2.1 — 15/11/2026 / Mudança: quem tem conta antiga (e-mail e senha) entra uma última vez, confere os dados que já temos e cria o PIN (supabase/acesso-rapido-conta-antiga.sql); "Meus dados" mais claro. Versão 2.0 — 14/11/2026 / Mudança: ligado ao Supabase (versão 1 guardava tudo só no celular)
 -->
 <html lang="pt-BR">
 <head>
@@ -72,10 +72,10 @@ pre{white-space:pre-wrap;background:#f2f6f6;border-radius:12px;padding:12px;font
    as tabelas são fechadas e o PIN é conferido lá, nunca aqui. */
 const SUPABASE_URL='https://nrvuynjwcgwpjdptkiay.supabase.co';
 const SUPABASE_KEY='sb_publishable_e2GK1YGEj06STa_ESCevow_nvtATB-y';
-async function rpc(nome,args){
+async function rpc(nome,args,bearer){
   const ctl=new AbortController(),t=setTimeout(()=>ctl.abort(),20000);
   try{
-    const r=await fetch(`${SUPABASE_URL}/rest/v1/rpc/${nome}`,{method:'POST',headers:{'Content-Type':'application/json',apikey:SUPABASE_KEY},body:JSON.stringify(args||{}),signal:ctl.signal});
+    const r=await fetch(`${SUPABASE_URL}/rest/v1/rpc/${nome}`,{method:'POST',headers:Object.assign({'Content-Type':'application/json',apikey:SUPABASE_KEY},bearer?{Authorization:'Bearer '+bearer}:{}),body:JSON.stringify(args||{}),signal:ctl.signal});
     if(!r.ok)return{ok:false,erro:'rede',mensagem:'Não foi possível falar com a clínica agora. Tente de novo em instantes.'};
     return await r.json();
   }catch(e){return{ok:false,erro:'rede',mensagem:'Sem conexão. Confira a internet e tente de novo.'}}
@@ -110,7 +110,7 @@ function aposEntrar(){if(VOLTAR_CHAT){location.replace('../');return}go('home')}
 const aparelho=()=>(navigator.userAgentData&&navigator.userAgentData.platform)||(/iPhone|iPad/.test(navigator.userAgent)?'iPhone/iPad':/Android/.test(navigator.userAgent)?'Android':'Navegador');
 
 /* ===== Estado ===== */
-const S={dev:null,perfil:null,view:'',d:{filhos:[],confiavel:null},buf:'',mode:'unlock',tmp:'',old:'',after:null,who:['eu'],unlocked:false,sheet:null,temFilhos:null,hiddenAt:0,busy:false,volta:'home',esq:null,tel:'',resumo:'',confirma:null};
+const S={dev:null,perfil:null,view:'',d:{filhos:[],confiavel:null},buf:'',mode:'unlock',tmp:'',old:'',after:null,who:['eu'],unlocked:false,sheet:null,temFilhos:null,hiddenAt:0,busy:false,volta:'home',esq:null,tel:'',resumo:'',confirma:null,conta:null,aem:''};
 const app=$('#app');
 function toast(t){const e=document.createElement('div');e.className='toast';e.textContent=t;document.body.appendChild(e);setTimeout(()=>e.remove(),2600)}
 function erro(m){const e=$('#err');if(e)e.textContent=m||''}
@@ -219,12 +219,32 @@ const V={
     <input id="tel" inputmode="numeric" autocomplete="tel-national" placeholder="(71) 99999-9999" value="${fmtTel(S.d.telefone)}">
     <div class="err" id="err" role="alert"></div></div>
     <button class="btn" data-act="c1">Continuar</button>
-    <button class="link" data-act="go" data-v="entrar" style="display:block;margin:12px auto 0">Já tenho cadastro</button>`,
+    <button class="link" data-act="go" data-v="entrar" style="display:block;margin:12px auto 0">Já tenho cadastro</button>
+    <button class="link" data-act="go" data-v="antiga" style="display:block;margin:0 auto">Tenho conta com e-mail e senha</button>`,
   entrar:()=>`${voltar('c1')}<h1>Entrar</h1><p class="sub">Use o celular do seu cadastro. Em seguida, o seu PIN.</p>
     <div class="card"><label for="tel">Seu celular com DDD</label>
     <input id="tel" inputmode="numeric" autocomplete="tel-national" placeholder="(71) 99999-9999" value="${fmtTel(S.tel)}">
     <div class="err" id="err" role="alert"></div></div>
-    <button class="btn" data-act="entrar">Continuar</button>`,
+    <button class="btn" data-act="entrar">Continuar</button>
+    <button class="link" data-act="go" data-v="antiga" style="display:block;margin:12px auto 0">Tenho conta com e-mail e senha</button>`,
+  antiga:()=>`${voltar('c1')}<h1>Tenho conta com e-mail</h1><p class="sub">Entre <b>uma última vez</b> com o e-mail e a senha. Trazemos os seus dados e, daqui para a frente, você entra só com o celular e um PIN.</p>
+    <div class="card"><label for="aem">E-mail da conta</label><input id="aem" type="email" inputmode="email" autocomplete="email" autocapitalize="off" value="${esc(S.aem)}">
+    <label for="asen">Senha</label><input id="asen" type="password" autocomplete="current-password" maxlength="72">
+    <div class="err" id="err" role="alert"></div></div>
+    <button class="btn" data-act="antiga">Entrar e trazer meus dados</button>
+    <button class="link" data-act="antigaesq" style="display:block;margin:12px auto 0">Esqueci a senha</button>`,
+  antiga2:()=>{
+    const r=(S.conta&&S.conta.resumo)||{},d=S.conta&&S.conta.dig||{};
+    const linha=(k,v)=>`<div class="item"><div><small>${k}</small><b>${v}</b></div><span class="tag ok">Já temos</span></div>`;
+    return`${voltar('antiga')}<h1>Confira os seus dados</h1><p class="sub">Já guardamos o que a clínica tem da sua conta. Falta só confirmar${(r.falta||[]).length?' o que está em branco':''} e criar um PIN.</p>
+    <div class="card"><div class="item"><div><small>E-mail da conta</small><b>${esc(r.email||'')}</b></div><span class="tag ok">Já temos</span></div>
+    ${r.cpf_mascara?linha('CPF',esc(r.cpf_mascara)):''}
+    <label for="tel">Celular com DDD (será o seu login)</label><input id="tel" inputmode="numeric" autocomplete="tel-national" placeholder="(71) 99999-9999" value="${fmtTel(d.tel||r.telefone||'')}">
+    <label for="nome">Nome completo</label><input id="nome" autocomplete="name" placeholder="Como no documento" value="${esc(d.nome||r.nome||'')}">
+    <label for="nasc">Data de nascimento</label><input id="nasc" type="date" max="${hoje()}" value="${esc(d.nasc||r.nascimento||'')}">
+    <div class="err" id="err" role="alert"></div></div>
+    <button class="btn" data-act="antiga2">Continuar e criar meu PIN</button>`;
+  },
   c2:()=>`${prog(2)}${voltar('c1')}<h1>Confirme quem é você</h1><p class="sub">Usamos esses dados para encontrar seu cadastro na clínica.</p>
     <div class="card"><label for="nome">Nome completo</label><input id="nome" autocomplete="name" placeholder="Como no documento" value="${esc(S.d.nome||'')}">
     <label for="nasc">Data de nascimento</label><input id="nasc" type="date" max="${hoje()}" value="${esc(S.d.nascimento||'')}">
@@ -287,7 +307,11 @@ const V={
   dados:()=>{
     const p=S.perfil;
     return`${voltar('home')}<h1>Meus dados</h1>
-    <div class="card"><div class="item"><div><b>${esc(p.nome)}</b><small>${fmtData(p.nascimento)} · login: ${fmtTel(p.telefone)}</small>${cpfLinha('eu',p)}</div></div></div>
+    <div class="card"><div class="item"><div><small>Nome</small><b>${esc(p.nome)}</b></div></div>
+    <div class="item"><div><small>Nascimento</small><b>${fmtData(p.nascimento)} · ${fmtIdade(p.nascimento)}</b></div></div>
+    <div class="item"><div><small>Celular (seu login)</small><b>${fmtTel(p.telefone)}</b></div></div>
+    <div class="item"><div><small>E-mail</small><b>${p.email?esc(p.email):'não informado'}</b></div></div>
+    <div class="item"><div><small>CPF</small><b>${p.cpf_salvo?esc(p.cpf_mascara||'salvo'):'ainda não salvo'}</b><small><button class="link" data-act="sheet" data-t="cpf" data-p="eu" style="padding:0">${p.cpf_salvo?'Alterar':'Informar'}</button> · o chat usa este CPF e não pergunta de novo</small></div></div></div>
     <h2>Filhos</h2><div class="card">${p.filhos.length?p.filhos.map(f=>`<div class="item"><div><b>${esc(f.nome)}</b><small>${fmtData(f.nascimento)} · ${fmtIdade(f.nascimento)}</small>${cpfLinha(f.id,f)}</div><button class="x" data-act="delf" data-id="${esc(f.id)}" aria-label="Remover">×</button></div>`).join(''):'<p class="sub">Nenhum filho cadastrado.</p>'}
     <button class="btn sec" data-act="sheet" data-t="filho">+ Adicionar filho</button></div>
     <h2>Números de confiança</h2><div class="card">${p.confiaveis.length?p.confiaveis.map(c=>`<div class="item"><div><b>${esc(c.nome)}</b><small>${fmtTel(c.telefone)} · ${esc(c.relacao)}</small>
@@ -314,7 +338,7 @@ function sheetHtml(){
   return`<div class="sheet" role="dialog" aria-modal="true"><div>${c}<button class="btn sec" data-act="closesheet">Cancelar</button></div></div>`;
 }
 function render(){
-  if(!S.dev&&!['c1','c2','c3','c4','c5','entrar','esqueci','pinnovo','indisp'].includes(S.view)&&!(S.view==='pin'&&['login','new1','new2'].includes(S.mode)))S.view='c1';
+  if(!S.dev&&!['c1','c2','c3','c4','c5','entrar','esqueci','pinnovo','indisp','antiga','antiga2'].includes(S.view)&&!(S.view==='pin'&&['login','new1','new2'].includes(S.mode)))S.view='c1';
   if(['home','nova','ok','dados'].includes(S.view)&&!S.perfil){S.view=S.dev?'pin':'c1';S.mode='unlock'}
   app.innerHTML=(V[S.view]?V[S.view]():'')+sheetHtml();
   const t=$('#tel');if(t)t.addEventListener('input',()=>{t.value=fmtTel(t.value)});
@@ -368,6 +392,29 @@ const A={
   c4:()=>{const r=lerContato();if(r.e)return erro(r.e);S.d.confiavel=r.c;iniciaPin()},
   c4skip:()=>{S.d.confiavel=null;iniciaPin()},
   esqueci:()=>{S.esq=null;go('esqueci')},
+  antiga:async()=>{
+    const em=$('#aem').value.trim(),se=$('#asen').value;S.aem=em;
+    if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em))return erro('Digite o e-mail da sua conta.');
+    if(!se)return erro('Digite a senha.');
+    ocupado(true);const r=await entrarContaAntiga(em,se);ocupado(false);
+    if(!r.ok)return erro(r.mensagem);
+    await abrirContaAntiga(r.token);
+  },
+  antigaesq:async()=>{
+    const em=($('#aem')?$('#aem').value:'').trim();S.aem=em;
+    if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em))return erro('Digite o e-mail da conta para receber o link.');
+    ocupado(true);await pedirNovaSenha(em);ocupado(false);
+    erro('');toast('Se este e-mail tiver conta, enviamos o link para criar uma nova senha.');
+  },
+  antiga2:()=>{
+    const tel=digits($('#tel').value),nome=$('#nome').value.trim().replace(/\s+/g,' '),nasc=$('#nasc').value;
+    S.conta.dig={tel,nome,nasc};
+    if(!telOk(tel))return erro('Celular inválido. Use DDD + 9 dígitos.');
+    if(!nomeOk(nome))return erro('Digite nome e sobrenome completos.');
+    if(!dataOk(nasc))return erro('Data de nascimento inválida.');
+    if(idade(nasc)<18)return erro('O cadastro principal precisa ser de um maior de 18 anos.');
+    iniciaPinAntiga();
+  },
   esqueci2:()=>{
     const tel=digits($('#tel').value),nome=$('#nome').value.trim(),nasc=$('#nasc').value;
     if(!telOk(tel))return erro('Celular inválido. Use DDD + 9 dígitos.');
@@ -426,6 +473,52 @@ const A={
     const x=await chamar('app_confianca_aceitar',{p_codigo:c});if(!x)return;if(!x.ok)return aviso(x);S.sheet=null;toast('Pronto! Você já acompanha essa pessoa.');go('home')},
   sair:async()=>{ocupado(false);await rpc('app_sair',{p_token:S.dev});store.clear();S.dev=null;S.perfil=null;S.unlocked=false;S.d={filhos:[],confiavel:null};S.temFilhos=null;S.who=['eu'];go('c1')}
 };
+/* ===== Conta antiga (e-mail e senha) -> acesso rápido =====
+   A pessoa entra uma última vez; a sessão fica só na memória desta página (nunca em localStorage). O servidor junta o que já tem
+   (conta + cadastro da clínica) em app_conta_antiga_herdar, que só aceita quem está logado numa conta antiga. */
+async function entrarContaAntiga(email,senha){
+  try{
+    const r=await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`,{method:'POST',headers:{'Content-Type':'application/json',apikey:SUPABASE_KEY},body:JSON.stringify({email,password:senha})});
+    const j=await r.json().catch(()=>({}));
+    if(r.ok&&j.access_token)return{ok:true,token:j.access_token};
+    const m=String(j.error_code||j.msg||j.error||'');
+    if(/email_not_confirmed|not confirmed/i.test(m))return{ok:false,mensagem:'Falta confirmar o e-mail: abra a mensagem que enviamos e toque no link.'};
+    if(r.status===429||/rate_limit|too many/i.test(m))return{ok:false,mensagem:'Muitas tentativas. Aguarde alguns minutos e tente de novo.'};
+    return{ok:false,mensagem:'E-mail ou senha incorretos.'};
+  }catch(e){return{ok:false,mensagem:'Sem conexão. Confira a internet e tente de novo.'}}
+}
+async function pedirNovaSenha(email){
+  try{await fetch(`${SUPABASE_URL}/auth/v1/recover?redirect_to=${encodeURIComponent(new URL('../',location.href).href)}`,{method:'POST',headers:{'Content-Type':'application/json',apikey:SUPABASE_KEY},body:JSON.stringify({email})})}catch(e){}
+}
+/* Vindo do chat, a conta já está logada lá (mesmo endereço): reaproveita a sessão em vez de pedir a senha de novo. */
+function sessaoDoChat(){
+  try{const j=JSON.parse(localStorage.getItem('csi-paciente-auth')||'null');if(j&&j.access_token&&Number(j.expires_at)*1000>Date.now()+60000)return j.access_token}catch(e){}
+  return null;
+}
+function sairContaAntiga(){
+  const t=S.conta&&S.conta.token;S.conta=null;
+  try{localStorage.removeItem('csi-paciente-auth')}catch(e){}   // o chat deixa de usar a conta e passa a usar o acesso rápido
+  if(t)fetch(`${SUPABASE_URL}/auth/v1/logout`,{method:'POST',headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+t}}).catch(()=>{});
+}
+async function abrirContaAntiga(token){
+  ocupado(true);const r=await rpc('app_conta_antiga_resumo',{},token);ocupado(false);
+  if(r.erro==='rede'||!r.ok){S.conta=null;go('antiga');setTimeout(()=>erro(r.mensagem||'Entre com o e-mail e a senha.'),0);return}
+  if(!r.conta){S.conta={token};sairContaAntiga();go('antiga');setTimeout(()=>erro('Esta conta não é de paciente.'),0);return}
+  if(r.migrada){sairContaAntiga();S.tel='';go('entrar');setTimeout(()=>erro('Você já criou o seu PIN. Entre com o celular e o PIN.'),0);return}
+  S.conta={token,resumo:r,dig:null};go('antiga2');
+}
+function iniciaPinAntiga(){
+  S.mode='new1';S.buf='';S.tmp='';
+  S.after=async pin=>{
+    const d=S.conta.dig,tok=S.conta.token;
+    ocupado(true);const r=await rpc('app_conta_antiga_herdar',{p_pin:pin,p_telefone:d.tel,p_nome:d.nome,p_nascimento:d.nasc,p_aparelho:aparelho()},tok);ocupado(false);
+    if(r.ok){entrou(r);sairContaAntiga();toast('Pronto! Seus dados foram trazidos');aposEntrar();return}
+    if(r.erro==='indisponivel')return go('indisp');
+    if(r.erro==='ja_migrada'){sairContaAntiga();S.tel=d.tel;S.mode='login';S.buf='';go('pin');setTimeout(()=>erro(r.mensagem),0);return}
+    S.mode='new1';S.buf='';S.tmp='';go('antiga2');setTimeout(()=>erro(r.mensagem||'Não foi possível concluir. Tente de novo.'),0);
+  };
+  go('pin');
+}
 function iniciaPin(){
   S.mode='new1';S.buf='';S.tmp='';
   S.after=async pin=>{
@@ -469,7 +562,11 @@ document.addEventListener('visibilitychange',()=>{
 /* ===== Início: se este aparelho já tem cadastro, abre direto no PIN ===== */
 const salvo=store.get();
 if(salvo&&salvo.dev){S.dev=salvo.dev;S.mode='unlock';S.view='pin'}else S.view='c1';
-render();
+const VEIO_ANTIGA=new URLSearchParams(location.search).get('antiga')==='1';
+if(VEIO_ANTIGA&&!S.dev){
+  const t=sessaoDoChat();
+  if(t){render();abrirContaAntiga(t)}else{S.view='antiga';render()}
+}else render();
 </script>
 </body>
 </html>

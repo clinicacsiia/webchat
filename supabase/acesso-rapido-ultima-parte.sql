@@ -2,6 +2,7 @@
 -- As partes 1, 2a, 3a, 4 e a migração acesso-rapido-chat.sql já estão aplicadas. Esta traz as 3 funções que têm `delete`
 -- (o conector do Supabase pede confirmação neles e expira em 60 s): app_aparelho_abrir, app_pin_esqueci e app_sair, mais as permissões finais.
 -- Colar no editor SQL: https://supabase.com/dashboard/project/nrvuynjwcgwpjdptkiay/sql/new  (pode rodar de novo sem problema)
+-- (15/11/2026) Pode ser colada ANTES ou DEPOIS de supabase/acesso-rapido-conta-antiga.sql: o bloco final devolve a permissão das funções da conta antiga.
 -- Depois: refazer o retrato (supabase/producao/LEIAME.md) e `npm run test:retrato`.
 
 -- Abre um aparelho novo: devolve o código (só aqui ele existe em texto; o banco guarda o hash). No máximo 5 aparelhos por titular.
@@ -64,3 +65,10 @@ grant execute on function public.painel_app_solicitacoes(text), public.painel_ap
 
 -- permissões das funções da migração do chat (repetidas aqui porque o bloco acima apaga e concede de novo)
 grant execute on function public.app_ativo(), public.app_pessoa_cpf_salvar(text, text, text), public.app_chat_dados(text, uuid, text) to anon, authenticated;
+
+-- As funções da conta antiga (supabase/acesso-rapido-conta-antiga.sql) perdem a permissão no bloco acima; devolve se já existirem.
+do $$ begin
+  if to_regprocedure('public.app_conta_antiga_resumo()') is not null then
+    grant execute on function public.app_conta_antiga_resumo(), public.app_conta_antiga_herdar(text, text, text, text, text) to authenticated;
+  end if;
+end $$;

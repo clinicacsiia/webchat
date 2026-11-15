@@ -166,6 +166,7 @@ export function criarMundo(opcoes = {}) {
       case 'chat_incidente': m.incidentes.push(corpo); return { body: { ok: true } };
       // login do paciente (opcional)
       case 'login_paciente_ativo': return { body: m.loginAtivo === true };
+      case 'app_ativo': return { body: m.acessoAtivo === true };   // acesso rápido (celular + PIN); desligado por padrão nos testes
       case 'conta_paciente_resumo': return { body: m.conta || { conta: false } };
       case 'conta_paciente_perfil': {
         if (!m.conta) return { status: 400, body: { code: '42501', message: 'Entre na sua conta para salvar os dados.' } };

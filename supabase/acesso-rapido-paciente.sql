@@ -620,3 +620,10 @@ grant execute on function
   public.app_selecao_salvar(text, jsonb), public.app_marcar(text, jsonb, text, text, text, text), public.app_marcacao_cancelar(text, uuid)
   to anon, authenticated;
 grant execute on function public.painel_app_solicitacoes(text), public.painel_app_solicitacao_status(uuid, text) to authenticated;
+
+-- As funções da conta antiga (supabase/acesso-rapido-conta-antiga.sql) perdem a permissão no bloco acima; devolve se já existirem.
+do $$ begin
+  if to_regprocedure('public.app_conta_antiga_resumo()') is not null then
+    grant execute on function public.app_conta_antiga_resumo(), public.app_conta_antiga_herdar(text, text, text, text, text) to authenticated;
+  end if;
+end $$;
