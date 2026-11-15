@@ -90,68 +90,20 @@ await a.page.click('[data-act="c3"]'); await a.page.click('[data-act="c4skip"]')
 await pin(a.page, '1357'); await pin(a.page, '1357');
 await esperaTexto(a.page, /Olá, Ana/);
 
-await caso('depois do cadastro o início mostra "Falta pouco" com o CPF dela, o e-mail (opcional) e o CPF do Leo', async () => {
-  await esperaTexto(a.page, /Falta pouco/);
+await caso('depois do cadastro o início NÃO mostra cartão pedindo informação (15/11/2026: o que falta só é pedido na entrada, com o PIN obrigatório)', async () => {
+  await espera(500);
   const t = await texto(a.page);
-  return { ok: /Qual é o seu CPF/.test(t) && /e-mail/.test(t) && /CPF de Leo/.test(t) && (await a.page.locator('#pend input').count()) === 3, detalhe: t.slice(0, 160).replace(/\n/g, ' | ') };
+  return { ok: !/Falta pouco/.test(t) && (await a.page.locator('#pend').count()) === 0, detalhe: t.slice(0, 100).replace(/\n/g, ' | ') };
 });
 await caso('nada da base da clínica aparece na tela (nem CPF, nem "cadastro encontrado")', async () => {
   const t = await a.page.content();
   return { ok: !t.includes('529.982.247-25') && !t.includes('52998224725') && !/encontramos|já temos seu cadastro/i.test(t) };
 });
-await caso('salvar sem preencher nada avisa; CPF curto e e-mail torto são recusados na tela, sem chamar o servidor', async () => {
-  const antes = chamadasRede.length;
-  await a.page.click('[data-act="pendsalvar"]'); const e1 = /pelo menos um campo/.test(await texto(a.page));
-  await a.page.fill('#pd0', '123'); await a.page.click('[data-act="pendsalvar"]'); const e2 = /11 números/.test(await texto(a.page));
-  await a.page.fill('#pd0', ''); await a.page.fill('#pd1', 'torto'); await a.page.click('[data-act="pendsalvar"]'); const e3 = /não parece certo/.test(await texto(a.page));
-  return { ok: e1 && e2 && e3 && chamadasRede.slice(antes).every((c) => c.nome !== 'app_pendencia_responder'), detalhe: [e1, e2, e3].join() };
-});
-await caso('CPF inválido (dígito errado) é recusado pelo servidor com a mensagem dele', async () => {
-  await a.page.fill('#pd0', '123.456.789-00'); await a.page.fill('#pd1', ''); await a.page.click('[data-act="pendsalvar"]');
-  await esperaTexto(a.page, /não conferem/);
-  return { ok: (await n(`select count(*)::int n from public.app_paciente where cpf is not null`)) === 0 };
-});
-await caso('o CPF digitado ganha pontos e traço; salvando CPF dela, do filho e e-mail o cartão some e fica tudo guardado', async () => {
-  await a.page.fill('#pd0', '52998224725'); const mascara = await a.page.inputValue('#pd0');
-  await a.page.fill('#pd1', 'ana@exemplo.invalid'); await a.page.fill('#pd2', '12345678909');
-  await a.page.click('[data-act="pendsalvar"]');
-  await a.page.waitForFunction(() => !document.getElementById('pend'), null, { timeout: 4000 });
-  const r = (await q(`select (select cpf from public.app_paciente) cpf, (select email from public.app_paciente) email, (select cpf from public.app_filho) f`))[0];
-  return { ok: mascara === '529.982.247-25' && r.cpf === '52998224725' && r.email === 'ana@exemplo.invalid' && r.f === '12345678909', detalhe: mascara };
-});
-await caso('o CPF dela bate com o cadastro da clínica de MESMO celular: vira sugestão e não aparece nenhum aviso para ela', async () => {
-  const r = (await q(`select paciente_sugerido_id is not null s, revisar_motivo m from public.app_paciente`))[0];
-  const t = await texto(a.page);
-  return { ok: r.s === true && r.m === null && !/cl[ií]nica (vai|confere)|revis|divergên/i.test(t) };
-});
-await caso('Meus dados também não mostra mais o cartão; "Agora não" esconde sem gravar', async () => {
+await caso('Meus dados também não mostra cartão pedindo informação', async () => {
   await a.page.click('[data-act="go"][data-v="dados"]'); await espera(300);
   return { ok: (await a.page.locator('#pend').count()) === 0 };
 });
 
-// outra pessoa, outro celular, CPF que não bate: a tela é a mesma e a equipe recebe a marca
-let b = await novaPagina();
-await b.page.fill('#tel', '71991230009'); await b.page.click('[data-act="c1"]');
-await b.page.fill('#nome', 'Carla Dias Teste'); await b.page.fill('#nasc', '1991-01-01'); await b.page.click('[data-act="c2"]');
-await b.page.click('[data-act="tf"][data-v="0"]'); await b.page.click('[data-act="c3"]'); await b.page.click('[data-act="c4skip"]');
-await pin(b.page, '2468'); await pin(b.page, '2468');
-await esperaTexto(b.page, /Falta pouco/);
-await caso('CPF de outra pessoa da clínica digitado em outro celular: tela igual ("Salvo"), marca só para a equipe', async () => {
-  await b.page.fill('#pd0', '529.982.247-25'); await b.page.click('[data-act="pendsalvar"]');
-  await b.page.waitForFunction(() => /Salvo/.test(document.body.innerText), null, { timeout: 4000 });
-  const t = await b.page.content();
-  const r = (await q(`select revisar_motivo m from public.app_paciente where telefone = '71991230009'`))[0];
-  return { ok: r.m === 'cpf_com_outro_celular' && !/cpf_com_outro_celular|cl[ií]nica vai/i.test(t), detalhe: r.m };
-});
-await caso('"Agora não" esconde o cartão nesta visita, sem chamar o servidor', async () => {
-  let c = await novaPagina();
-  await c.page.fill('#tel', '71991230010'); await c.page.click('[data-act="c1"]');
-  await c.page.fill('#nome', 'Duda Rocha Teste'); await c.page.fill('#nasc', '1990-01-01'); await c.page.click('[data-act="c2"]');
-  await c.page.click('[data-act="tf"][data-v="0"]'); await c.page.click('[data-act="c3"]'); await c.page.click('[data-act="c4skip"]');
-  await pin(c.page, '1357'); await pin(c.page, '1357'); await esperaTexto(c.page, /Falta pouco/);
-  const antes = chamadasRede.length; await c.page.click('[data-act="pendmais"]');
-  return { ok: (await c.page.locator('#pend').count()) === 0 && chamadasRede.length === antes };
-});
 // ---- filho com o nome da mãe (o caso real: uma mãe cadastrou um "filho" com o próprio nome)
 const h = await novaPagina();
 await h.page.fill('#tel', '71991230020'); await h.page.click('[data-act="c1"]');

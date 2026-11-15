@@ -689,7 +689,7 @@
   const CHAVE_HIST = 'webchat.historico.v1';   // as últimas conversas deste aparelho (cada uma com o seu token): dá para voltar a elas
   const MAX_HIST = 5;                          // mínimo pedido: 3
   // Muda a cada alteração do chat. Cópia de mensagens guardada por outra versão é descartada (era isso que mostrava conversa velha e travada).
-  const VERSAO_APP = '2026.11.15-5';
+  const VERSAO_APP = '2026.11.15-6';
   // Mesmas regras do banco (fluxo_nome_ok, fluxo_telefone_ok, fluxo_email_ok): o banco confere de novo, aqui é só para avisar logo.
   const LET = 'A-Za-zÀ-ÖØ-öø-ÿ';
   const nomeCompletoOk = (v) => { const t = String(v || '').trim(); return t.length >= 5 && t.length <= 120 && new RegExp(`^[${LET}][${LET}'’.-]*( +[${LET}][${LET}'’.-]*)+$`).test(t) && t.split(/ +/).filter((w) => w.replace(new RegExp(`[^${LET}]`, 'g'), '').length >= 2).length >= 2; };
@@ -1861,11 +1861,23 @@
       if (ins.numero) ins.numero.focus();
     } catch { /* sem o serviço do CEP o paciente digita o endereço */ }
   }
+  // "Seus dados continuam os mesmos?": um toque confirma e o banco responde sozinho; "Mudou algo" abre o formulário e o valor novo passa a valer no cadastro.
+  function widgetConfirmaDados(w, r, formulario) {
+    const nasc = String(r.nascimento || '').slice(0, 10).split('-').reverse().join('/');
+    const sim = h('button', { type: 'button', class: 'btn-primario' }, 'Sim, são os mesmos');
+    const mudou = h('button', { type: 'button', class: 'link-add' }, 'Mudou algo');
+    sim.onclick = () => { sim.disabled = mudou.disabled = true; sim.textContent = 'Aguarde…'; acessoDados().then((ok) => { if (!ok) formulario(); }, formulario); };
+    mudou.onclick = () => formulario();
+    w.append(h('p', {}, r.eu ? 'Seus dados continuam os mesmos?' : `Os dados de ${r.primeiro_nome} continuam os mesmos?`),
+      h('p', { class: 'w-nota' }, `CPF ${r.cpf_mascara || ''} · nascimento ${nasc}`), h('div', { class: 'acoes-acesso' }, sim, mudou));
+  }
   function widgetCampos(w, o) {
     if (acessoPerfil && conv && ACESSO_PASSOS.has(o.passo) && !acessoTentou.has(conv.id + ':' + o.passo)) {
       acessoTentou.add(conv.id + ':' + o.passo);
-      w.append(h('p', { class: 'w-nota', role: 'status' }, 'Usando os dados salvos no seu acesso rápido…'));
-      acessoDados().then((ok) => { if (!ok && w.isConnected) { w.replaceChildren(); widgetCampos(w, o); } }, () => { if (w.isConnected) { w.replaceChildren(); widgetCampos(w, o); } });
+      w.append(h('p', { class: 'w-nota', role: 'status' }, 'Conferindo os dados salvos no seu acesso rápido…'));
+      const formulario = () => { if (w.isConnected) { w.replaceChildren(); widgetCampos(w, o); } };
+      // Já tem CPF e nascimento salvos: não pergunta de novo, só se mudou algo. Não tem: pergunta (uma vez; fica salvo).
+      acessoResumo().then((r) => { if (!w.isConnected) return; if (r && r.tem) { w.replaceChildren(); widgetConfirmaDados(w, r, formulario); } else formulario(); }, formulario);
       return;
     }
     const campos = (Array.isArray(o.campos) ? o.campos : []).filter((c) => c && c.nome);
@@ -1922,7 +1934,7 @@
         if (v) saida[c.nome] = v;
       }
       if (primeiro) { if (primeiro.focus) primeiro.focus(); primeiro.scrollIntoView({ block: 'center' }); return; }
-      responder(o.passo, saida, null, btn).then((ok) => { if (ok && acessoPerfil && ACESSO_PASSOS.has(o.passo)) acessoDados(); });   // o banco aprende o CPF digitado
+      responder(o.passo, saida, null, btn).then((ok) => { if (ok && acessoPerfil && ACESSO_PASSOS.has(o.passo)) acessoDados().then(() => acessoAtualizar(), () => {}); });   // o banco aprende o CPF digitado e troca o que mudou
     });
     w.append(form);
   }
@@ -3311,8 +3323,7 @@
       } else if (acessoPerfil) {
         b.replaceChildren(h('p', { class: 'volta-dados' }, `⚡ Acesso rápido: ${primeiroNome(acessoPerfil.nome)}`),
           acessoPresenca(),
-          acessoPend > 0 ? h('p', { class: 'volta-dados', id: 'acessoPend' }, `${acessoPend > 1 ? 'Faltam' : 'Falta'} ${acessoPend} informaç${acessoPend > 1 ? 'ões' : 'ão'} no seu cadastro.`) : null,
-          h('span', { class: 'acoes-acesso' }, h('a', { class: 'link-add', id: 'acessoMeusDados', href: 'acesso/' }, acessoPend > 0 ? 'Completar' : 'Meus dados'), h('button', { type: 'button', class: 'link-add', id: 'acessoSair', onclick: acessoSair }, 'Sair')));
+          h('span', { class: 'acoes-acesso' }, h('a', { class: 'link-add', id: 'acessoMeusDados', href: 'acesso/' }, 'Meus dados'), h('button', { type: 'button', class: 'link-add', id: 'acessoSair', onclick: acessoSair }, 'Sair')));
       } else if (acessoDev() && acessoTrava) {
         b.replaceChildren(h('p', { class: 'volta-dados' }, `⚡ Olá${st.nome1 ? ', ' + st.nome1 : ''}! Digite seu PIN para usar seus dados salvos.`),
           h('span', { class: 'acoes-acesso' }, h('button', { type: 'button', class: 'link-add', id: 'acessoPin', onclick: acessoPedirPin }, 'Digitar PIN'), h('button', { type: 'button', class: 'link-add', id: 'acessoSair', onclick: acessoSair }, 'Não sou eu')));
@@ -3448,6 +3459,18 @@
       h('button', { type: 'button', 'aria-label': 'Apagar', onclick: () => { if (!ocupado) { buf = buf.slice(0, -1); marcar(); } } }, '⌫'));
     corpo.replaceChildren(h('p', { class: 'escolha-txt' }, 'Digite os 4 números do seu PIN.'), pontos, msg, teclas);
     rodape.replaceChildren(h('a', { class: 'link-add', href: 'acesso/?voltar=chat' }, 'Esqueci o PIN'));
+  }
+  // O que o cadastro já sabe desta conversa (CPF só mascarado): null se não conseguir (aí o chat pergunta como antes).
+  async function acessoResumo() {
+    const dev = acessoDev(), c = conv;
+    if (!acessoPerfil || !dev || !c || !c.id) return null;
+    try { const { data, error } = await db.rpc('app_chat_dados_resumo', { p_token: dev, p_conversa: c.id, p_conv_token: c.token }); return !error && data && data.ok ? data : null; } catch { return null; }
+  }
+  // A pessoa digitou outro CPF ou nascimento (disse "mudou algo"): o cadastro passa a valer o valor novo.
+  async function acessoAtualizar() {
+    const dev = acessoDev(), c = conv;
+    if (!acessoPerfil || !dev || !c || !c.id) return;
+    try { const { data } = await db.rpc('app_dados_atualizar', { p_token: dev, p_conversa: c.id, p_conv_token: c.token }); if (data && data.ok && data.atualizou) acessoCarregar().then(() => atualizarAcessoUI(true), () => {}); } catch { /* sem rede: fica para a próxima */ }
   }
   // O banco responde sozinho o que o cadastro já sabe (CPF e nascimento) e aprende o que a pessoa acabou de digitar. true = respondeu alguma pergunta.
   async function acessoDados() {

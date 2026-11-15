@@ -187,6 +187,48 @@ await caso('a tabela do histórico não pode ser lida pelo público', async () =
   try { await q(`select * from public.app_acesso_log limit 1`); return { ok: false }; } catch { return { ok: true }; } finally { await db.exec('reset role'); }
 });
 
+
+// ---- o chat não pergunta o que já sabe: "continua o mesmo?" e, se mudou, troca no cadastro
+const iniciar = async (nome, tel) => {
+  await db.exec(`update public.conversas set criado_em = criado_em - interval '2 hours'`);
+  const r = await rpc('chat_iniciar', { p_nome: nome, p_telefone: tel, p_email: 'dani@exemplo.invalid', p_aceite: true, p_paciente_tipo: 'proprio' });
+  return { c: r.conversa_id, t: r.token };
+};
+const resumo = (c, tok = dani.token) => rpc('app_chat_dados_resumo', { p_token: tok, p_conversa: c.c, p_conv_token: c.t });
+const atualizar = (c, tok = dani.token) => rpc('app_dados_atualizar', { p_token: tok, p_conversa: c.c, p_conv_token: c.t });
+await caso('conversa nova de quem já tem CPF e nascimento salvos: o resumo diz "tem" e mostra o CPF só mascarado', async () => {
+  const c = await iniciar('Dani Rocha Teste', '71991230030');
+  const r = await resumo(c);
+  return { ok: r.ok && r.tem === true && r.cpf_mascara === '***.***.***-25' && r.nascimento === '1992-02-02' && r.primeiro_nome === 'Dani' && r.eu === true && !JSON.stringify(r).includes(C1), detalhe: JSON.stringify(r) };
+});
+await caso('cadastro sem CPF (jeito antigo): o resumo diz que NÃO tem, então o chat pergunta uma vez', async () => {
+  const x = await rpc('app_cadastrar', { p_telefone: '71991230070', p_nome: 'Gui Prado Teste', p_nascimento: '1990-03-03', p_pin: '1357', p_filhos: [], p_aparelho: 'T' });
+  const c = await iniciar('Gui Prado Teste', '71991230070');
+  const r = await resumo(c, x.token);
+  return { ok: r.ok && r.tem === false, detalhe: JSON.stringify(r) };
+});
+await caso('o resumo e a atualização recusam conversa de outro celular, aparelho travado e código inválido', async () => {
+  const outra = await iniciar('Outra Pessoa Teste', '71991230071');
+  const a = await resumo(outra), b = await atualizar(outra);
+  const c = await iniciar('Dani Rocha Teste', '71991230030');
+  await db.exec(`update public.app_aparelho set desbloqueada_ate = now() - interval '1 minute' where id = (select id from public.app_aparelho where paciente_id = (select id from public.app_paciente where telefone = '71991230030') order by ultimo_uso_em desc limit 1)`);
+  const d = await resumo(c); const e = await resumo(c, 'nao-existe');
+  await db.exec(`update public.app_aparelho set desbloqueada_ate = now() + interval '30 minutes'`);
+  return { ok: a.erro === 'celular' && b.erro === 'celular' && d.erro === 'bloqueado' && e.erro === 'sessao', detalhe: [a.erro, b.erro, d.erro, e.erro].join(' ') };
+});
+await caso('"mudou algo": o CPF e o nascimento digitados na conversa passam a valer no cadastro; repetir não muda de novo', async () => {
+  const c = await iniciar('Dani Rocha Teste', '71991230030');
+  await rpc('chat_responder', { p_conversa: c.c, p_token: c.t, p_passo: 'cpf_nasc', p_valor: { cpf: C2, dt_nasc: '03/03/1991' }, p_texto: 'Enviado.' });
+  const a = await atualizar(c), b = await atualizar(c);
+  const l = await linha('71991230030'), nasc = (await um(`select nascimento::text n from public.app_paciente where telefone = '71991230030'`)).n;
+  return { ok: a.ok && a.atualizou === true && b.atualizou === false && l.cpf === C2 && nasc === '1991-03-03', detalhe: JSON.stringify([a.atualizou, b.atualizou, l.cpf]) };
+});
+await caso('sem nada digitado na conversa nada é trocado', async () => {
+  const c = await iniciar('Dani Rocha Teste', '71991230030');
+  const r = await atualizar(c);
+  return { ok: r.ok && r.atualizou === false };
+});
+
 // ---- equipe
 const ADM = '00000000-0000-4000-8000-0000000000b1', MKT = '00000000-0000-4000-8000-0000000000b2';
 await db.exec(`insert into auth.users (id, email) values ('${ADM}', 'adm2@exemplo.invalid'), ('${MKT}', 'mkt2@exemplo.invalid');

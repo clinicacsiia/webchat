@@ -1,5 +1,5 @@
 -- FLUXOGRAMA: entrada (o chat abre e pergunta a app_porta se o PIN é obrigatório; a página /acesso/ chama app_pre_cadastro e app_pin_criar no primeiro acesso e app_acesso_registrar a cada entrada) -> validação (interruptor config.app_pin_obrigatorio; celular, nome, nascimento (maior de 18), CPF com dígito verificador do titular e de cada filho; aparelho desbloqueado pelo PIN para registrar o acesso) -> lógica (o servidor procura em silêncio o que a clínica já sabe daquela pessoa — mesmo celular + nome + nascimento — e só diz "falta o CPF" ou "não falta nada"; cria o cadastro com CPF e o PIN na mesma chamada, tudo ou nada; cada entrada grava aparelho, horário, IP e, só com permissão, a posição, e confere se a pessoa está na clínica e se tem exame hoje) -> saída (a tela nunca recebe CPF nem dado da clínica; a equipe lê o histórico de acessos em painel_app_acessos)
--- Versão 1.0 — 15/11/2026 / Mudança: Implementação inicial (PIN obrigatório na porta do chat; pré-preenchimento pelo histórico; CPF obrigatório antes do PIN; registro de acessos com posição opcional)
+-- Versão 1.1 — 15/11/2026 / Mudança: o chat não pergunta mais CPF e nascimento a quem já tem os dados salvos: só pergunta "seus dados continuam os mesmos?" (app_chat_dados_resumo) e, se a pessoa disser que mudou, grava o novo valor no cadastro (app_dados_atualizar). Versão 1.0 — 15/11/2026 / Mudança: Implementação inicial (PIN obrigatório na porta do chat; pré-preenchimento pelo histórico; CPF obrigatório antes do PIN; registro de acessos com posição opcional)
 --
 -- POR QUE: o dono quer o PIN no começo de tudo. Quem é novo cria o PIN informando só o que falta; quem já preencheu antes (no chat, na clínica ou neste
 -- aparelho) não digita de novo; quem passou 30 minutos sem usar confirma o PIN; e cada entrada fica registrada (aparelho, horário, IP e, se a pessoa
@@ -19,7 +19,7 @@
 -- POSIÇÃO: clinica_lat e clinica_lng (graus decimais, ex.: -12.9714) e clinica_raio_m (metros); depois  app_local_ativo = 'sim'.
 --
 -- ROLLBACK (não mexe em nenhuma função existente):
---   drop function if exists public.painel_app_acessos(uuid, integer), public.app_acesso_registrar(text, text, jsonb, jsonb),
+--   drop function if exists public.app_chat_pessoa(uuid, uuid), public.app_dados_atualizar(text, uuid, text), public.app_chat_dados_resumo(text, uuid, text), public.painel_app_acessos(uuid, integer), public.app_acesso_registrar(text, text, jsonb, jsonb),
 --     public.app_pin_criar(text, text, text, text, text, jsonb, jsonb, text, text), public.app_pre_cadastro(text, text, text, jsonb),
 --     public.app_porta(), public.app_cpf_historico(text, text, date, text), public.app_distancia_m(numeric, numeric, numeric, numeric);
 --   drop table if exists public.app_acesso_log;
@@ -200,10 +200,71 @@ begin
     order by l.em desc limit least(greatest(coalesce(p_limite, 50), 1), 300)) x), '[]'::jsonb);
 end $$;
 
+
+-- Interno: de quem é a conversa (a própria pessoa ou um filho do cadastro). Mesma regra de app_chat_dados: a conversa precisa ser do celular do cadastro.
+create or replace function public.app_chat_pessoa(p_pac uuid, p_conversa uuid, out o_erro text, out o_eu boolean, out o_filho uuid, out o_nome text, out o_cpf text, out o_nasc date)
+  language plpgsql stable security definer set search_path to '' as $$
+declare a public.app_paciente%rowtype; c public.conversas; f public.app_filho%rowtype; v_tel text;
+begin
+  select * into a from public.app_paciente where id = p_pac;
+  select * into c from public.conversas where id = p_conversa;
+  select regexp_replace(coalesce(ct.telefone, ''), '\D', '', 'g') into v_tel from public.contatos ct where ct.id = c.contato_id;
+  if v_tel is distinct from a.telefone then o_erro := 'celular'; return; end if;
+  o_eu := coalesce(c.paciente_tipo, 'proprio') = 'proprio';
+  if o_eu then o_nome := a.nome; o_cpf := a.cpf; o_nasc := a.nascimento;
+  else
+    select * into f from public.app_filho where responsavel_id = a.id and removido_em is null and public.app_norm(nome) = public.app_norm(c.paciente_nome) limit 1;
+    if not found then o_erro := 'pessoa'; return; end if;
+    o_filho := f.id; o_nome := f.nome; o_cpf := f.cpf; o_nasc := f.nascimento;
+  end if;
+end $$;
+
+-- O chat pergunta isto quando o motor pede CPF e nascimento: se o cadastro já tem, o chat só pergunta "seus dados continuam os mesmos?" (CPF só mascarado).
+create or replace function public.app_chat_dados_resumo(p_token text, p_conversa uuid, p_conv_token text) returns jsonb language plpgsql security definer set search_path to '' as $$
+declare s record; r record;
+begin
+  select * into s from public.app_aparelho_validar(p_token);
+  if s.o_erro is not null then return public.app_erro_json(s.o_erro); end if;
+  begin perform public.chat_valida(p_conversa, p_conv_token);
+  exception when others then return jsonb_build_object('ok', false, 'erro', 'conversa'); end;
+  select * into r from public.app_chat_pessoa(s.o_pac, p_conversa);
+  if r.o_erro is not null then return jsonb_build_object('ok', false, 'erro', r.o_erro); end if;
+  return jsonb_build_object('ok', true, 'tem', r.o_cpf is not null and r.o_nasc is not null, 'cpf_mascara', public.app_cpf_mascara(r.o_cpf),
+    'nascimento', r.o_nasc, 'primeiro_nome', split_part(r.o_nome, ' ', 1), 'eu', r.o_eu);
+end $$;
+
+-- A pessoa disse "mudou algo" e digitou no chat: o valor novo passa a valer no cadastro (o PIN dela, digitado há menos de 30 minutos, é a prova).
+create or replace function public.app_dados_atualizar(p_token text, p_conversa uuid, p_conv_token text) returns jsonb language plpgsql security definer set search_path to '' as $$
+declare s record; r record; d jsonb; pa public.pre_agendamentos; v_cpf text; v_nasc date; v_mudou boolean := false;
+begin
+  select * into s from public.app_aparelho_validar(p_token);
+  if s.o_erro is not null then return public.app_erro_json(s.o_erro); end if;
+  begin perform public.chat_valida(p_conversa, p_conv_token);
+  exception when others then return jsonb_build_object('ok', false, 'erro', 'conversa'); end;
+  select * into r from public.app_chat_pessoa(s.o_pac, p_conversa);
+  if r.o_erro is not null then return jsonb_build_object('ok', false, 'erro', r.o_erro); end if;
+  select dados into d from public.conversa_fluxo where conversa_id = p_conversa;
+  select * into pa from public.pre_agendamentos where conversa_id = p_conversa;
+  v_cpf := regexp_replace(coalesce(d -> 'digitado' ->> 'cpf', pa.paciente ->> 'cpf', ''), '\D', '', 'g');
+  v_nasc := coalesce(public.app_data_flex(d -> 'digitado' ->> 'dt_nasc'), public.app_data_flex(pa.paciente ->> 'dt_nasc'));
+  if v_cpf ~ '^[0-9]{11}$' and public.fluxo_cpf_ok(v_cpf) and v_cpf is distinct from r.o_cpf then
+    if r.o_eu then update public.app_paciente set cpf = v_cpf, atualizado_em = now() where id = s.o_pac; perform public.app_conferir_cadastro(s.o_pac);
+    else update public.app_filho set cpf = v_cpf where id = r.o_filho; end if;
+    v_mudou := true;
+  end if;
+  if v_nasc is not null and v_nasc between date '1900-01-01' and public.app_hoje() and v_nasc is distinct from r.o_nasc then
+    if r.o_eu and public.app_idade(v_nasc) >= 18 then update public.app_paciente set nascimento = v_nasc, atualizado_em = now() where id = s.o_pac; v_mudou := true;
+    elsif not r.o_eu then update public.app_filho set nascimento = v_nasc where id = r.o_filho; v_mudou := true; end if;
+  end if;
+  if v_mudou then perform public.app_evento_gravar(s.o_pac, 'dados_atualizados_no_chat'); end if;
+  return jsonb_build_object('ok', true, 'atualizou', v_mudou, 'perfil', public.app_perfil_json(s.o_pac));
+end $$;
+
 revoke all on function public.app_distancia_m(numeric, numeric, numeric, numeric), public.app_cpf_historico(text, text, date, text), public.app_porta(),
   public.app_pre_cadastro(text, text, text, jsonb), public.app_acesso_gravar(uuid, uuid, text, jsonb, jsonb),
-  public.app_pin_criar(text, text, text, text, text, jsonb, jsonb, text, text), public.app_acesso_registrar(text, text, jsonb, jsonb), public.painel_app_acessos(uuid, integer)
+  public.app_pin_criar(text, text, text, text, text, jsonb, jsonb, text, text), public.app_acesso_registrar(text, text, jsonb, jsonb), public.painel_app_acessos(uuid, integer),
+  public.app_chat_pessoa(uuid, uuid), public.app_chat_dados_resumo(text, uuid, text), public.app_dados_atualizar(text, uuid, text)
   from public, anon, authenticated;
 grant execute on function public.app_porta(), public.app_pre_cadastro(text, text, text, jsonb), public.app_pin_criar(text, text, text, text, text, jsonb, jsonb, text, text),
-  public.app_acesso_registrar(text, text, jsonb, jsonb) to anon, authenticated;
+  public.app_acesso_registrar(text, text, jsonb, jsonb), public.app_chat_dados_resumo(text, uuid, text), public.app_dados_atualizar(text, uuid, text) to anon, authenticated;
 grant execute on function public.painel_app_acessos(uuid, integer) to authenticated;
