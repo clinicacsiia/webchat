@@ -1,7 +1,7 @@
 // Testes com dados INVENTADOS (nenhum paciente real). Colunas do #14359 achadas pelo título.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { LAYOUT_EXAME, TITULOS_EXAME, layoutPorTitulos, layoutSuspeito, mapearLinha, layoutDe } from "./mapa.ts";
+import { LAYOUT_EXAME, LAYOUT_CRIACAO, TITULOS_EXAME, checkinSuspeito, layoutPorTitulos, layoutSuspeito, lerCheckin, mapearLinha, layoutDe, prepararLinhas } from "./mapa.ts";
 
 const SAL = "segredo-de-teste";
 // Ordem real devolvida pelo Klingo em 15/11/2026 (21 colunas; "Prontuário" aparece duas vezes).
@@ -79,4 +79,56 @@ test("lista vazia ou sem nomes válidos: tudo que é obrigatório aparece como f
 test("o #13825 (criação) continua pela ordem fixa", () => {
   assert.equal(layoutDe("criacao").atend, "col13");
   assert.equal(layoutDe("exame").atend, "col17");
+});
+
+// ---------------------------------------------------------------- check-in (col18)
+test("lerCheckin: ISO, ISO com T, sem segundos e o formato da planilha viram AAAA-MM-DD HH:MM:SS", () => {
+  assert.deepEqual(lerCheckin("2026-11-16 07:50:00"), { iso: "2026-11-16 07:50:00", invalido: false });
+  assert.deepEqual(lerCheckin("2026-11-16T07:50"), { iso: "2026-11-16 07:50:00", invalido: false });
+  assert.deepEqual(lerCheckin("16/11/2026 07:50"), { iso: "2026-11-16 07:50:00", invalido: false });
+  assert.deepEqual(lerCheckin("  16/11/2026 07:50:09 "), { iso: "2026-11-16 07:50:09", invalido: false });
+});
+
+test("lerCheckin: vazio é sem check-in; texto que não é data é inválido e nunca vira data", () => {
+  assert.deepEqual(lerCheckin(""), { iso: "", invalido: false });
+  assert.deepEqual(lerCheckin(null), { iso: "", invalido: false });
+  assert.deepEqual(lerCheckin(undefined), { iso: "", invalido: false });
+  assert.deepEqual(lerCheckin("S"), { iso: "", invalido: true });
+  assert.deepEqual(lerCheckin("71999990001"), { iso: "", invalido: true });
+});
+
+test("mapearLinha: com a coluna do check-in no layout manda k; sem ela (#13825) não manda a chave", async () => {
+  const ordem = ORDEM_REAL;
+  const r = layoutPorTitulos(colunas(ordem), LAYOUT_EXAME).layout;
+  const l = (await mapearLinha(linha(ordem, { "Check-In - Data": "2026-11-16 07:50:00" }), SAL, r))!;
+  assert.equal(l.k, "2026-11-16 07:50:00");
+  const sem = (await mapearLinha(linha(ordem, { "Check-In - Data": "" }), SAL, r))!;
+  assert.equal(sem.k, "", "sem check-in manda vazio (o banco limpa)");
+  const antiga = (await mapearLinha({ col0: "9", col4: "2026-11-16 08:00:00", col2: "123", col15: "Fulana Teste", col16: "71999990001" }, SAL, LAYOUT_CRIACAO))!;
+  assert.equal("k" in antiga, false, "relatório sem a coluna: a chave k nem existe");
+});
+
+test("mapearLinha: o check-in no formato da planilha também chega certo", async () => {
+  const l = (await mapearLinha(linha(ORDEM_REAL, { "Check-In - Data": "16/11/2026 07:50" }), SAL, LAYOUT_EXAME))!;
+  assert.equal(l.k, "2026-11-16 07:50:00");
+});
+
+test("prepararLinhas: conta check-ins lidos e inválidos, sem expor o conteúdo", async () => {
+  const hoje = "2026-11-16";
+  const linhas = [
+    linha(ORDEM_REAL, { "Id da Marcação": "1", "Check-In - Data": "2026-11-16 07:50:00" }),
+    linha(ORDEM_REAL, { "Id da Marcação": "2", "Check-In - Data": "" }),
+    linha(ORDEM_REAL, { "Id da Marcação": "3", "Check-In - Data": "lixo" }),
+  ];
+  const r = await prepararLinhas(linhas, SAL, hoje, LAYOUT_EXAME);
+  assert.equal(r.checkinLidos, 1);
+  assert.equal(r.checkinInvalidos, 1);
+  assert.equal(r.linhas.length, 3);
+});
+
+test("checkinSuspeito: poucos inválidos passam; coluna cheia de lixo é suspeita", () => {
+  assert.equal(checkinSuspeito(500, 3), false);
+  assert.equal(checkinSuspeito(0, 19), false, "menos de 20 inválidos: não decide");
+  assert.equal(checkinSuspeito(10, 30), true);
+  assert.equal(checkinSuspeito(900, 100), false, "10% inválido: ainda aceitável");
 });

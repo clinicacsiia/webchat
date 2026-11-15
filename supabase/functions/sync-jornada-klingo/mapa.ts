@@ -1,5 +1,5 @@
 // FLUXOGRAMA: entrada (linhas do relatório de marcações do Klingo, #13825 ou o duplicado por data do exame) -> validação (id da marcação, data do exame e uma forma de identificar o paciente: prontuário, ou nome + telefone; textos cortados) -> lógica (janela de leitura por modo e filtro; telefone vira marca/hash; sem valor em R$) -> saída (linhas enxutas {m,a,p,n,f,x,o,u,e,d,s,t,r,c} em lotes para jornada_klingo_lote)
-// Versão 1.4 — 15/11/2026 / Mudança: #14359 ganhou colunas (Celular=col16, Atendido=col17, Check-In=col18, 2º Prontuário=col19, Primeira Vez=col20); trava que para a leitura se o layout mudar de novo; colunas achadas pelo título (layoutPorTitulos)
+// Versão 1.5 — 15/11/2026 / Mudança: lê o Check-In - Data (col18) e manda como 'k' para o banco (jornada_exame.checkin_em); v1.4: #14359 ganhou colunas (Celular=col16, Atendido=col17, Check-In=col18, 2º Prontuário=col19, Primeira Vez=col20); trava que para a leitura se o layout mudar de novo; colunas achadas pelo título (layoutPorTitulos)
 //
 // Tudo aqui é função pura (sem rede, sem banco), para testar sem Klingo. As linhas trazem nome e telefone de pacientes: ficam só na memória da Edge Function;
 // o telefone nunca sai daqui, vira só uma marca (SHA-256 dos 8 últimos dígitos + o segredo da clínica) que o banco usa para achar a conversa do chat.
@@ -9,7 +9,7 @@
 // col14 Unidade, col15 Nome, col16 Celular, col17 Telefone.
 
 export type Row = Record<string, unknown>;
-export type LinhaLote = { m: string; a: string; p: string; n: string; f: string; x: string; o: string; u: string; e: string; d: string; s: string; t: string; r: string; c: string };
+export type LinhaLote = { m: string; a: string; p: string; n: string; f: string; x: string; o: string; u: string; e: string; d: string; s: string; t: string; r: string; c: string; k?: string };
 export type Modo = "rapido" | "completo";
 export type Filtro = "criacao" | "exame";
 
@@ -17,7 +17,7 @@ export type Filtro = "criacao" | "exame";
 export type Layout = { m: string; a: string; pront: string; nome: string; resp: string; em: string; d: string; proc: string; oper: string; unid: string; conf: string; motivo: string; status: string; atend: string; cel: string; tel: string; checkin?: string; primeira?: string };
 export const LAYOUT_CRIACAO: Layout = { m: "col0", a: "col1", pront: "col2", em: "col3", d: "col4", proc: "col5", oper: "col6", unid: "col14", conf: "col10", motivo: "col11", status: "col12", atend: "col13", nome: "col15", cel: "col16", tel: "col17", resp: "col7" };
 // 15/11/2026: o dono acrescentou colunas ao #14359 e o Celular passou para col16 e o Atendido para col17 (antes era o contrário). col18 = Check-In - Data (ainda não lida), col19 = um 2º "Prontuário" (repetido; ignorar), col20 = Primeira Vez.
-export const LAYOUT_EXAME: Layout = { m: "col0", a: "col1", nome: "col2", resp: "col3", pront: "col4", em: "col5", d: "col6", proc: "col7", oper: "col8", unid: "col9", conf: "col12", motivo: "col13", tel: "col14", status: "col15", cel: "col16", atend: "col17" };
+export const LAYOUT_EXAME: Layout = { m: "col0", a: "col1", nome: "col2", resp: "col3", pront: "col4", em: "col5", d: "col6", proc: "col7", oper: "col8", unid: "col9", conf: "col12", motivo: "col13", tel: "col14", status: "col15", cel: "col16", atend: "col17", checkin: "col18" };
 export const layoutDe = (f: Filtro): Layout => (f === "exame" ? LAYOUT_EXAME : LAYOUT_CRIACAO);
 
 // Colunas pelo TÍTULO (15/11/2026). O Klingo manda, junto com as linhas, a lista de colunas {name: "col17", title: "Atendido"}. Achando cada campo pelo título,
@@ -46,7 +46,11 @@ export function layoutPorTitulos(colunas: Coluna[], reserva: Layout): { layout: 
   const L = layout as Record<string, string | undefined>, R = reserva as Record<string, string | undefined>;
   for (const campo of Object.keys(TITULOS_EXAME)) {
     const col = achada(TITULOS_EXAME[campo]);
-    if (!col) { if (!OPCIONAIS.has(campo)) faltando.push(TITULOS_EXAME[campo]); continue; }
+    if (!col) {
+      if (!OPCIONAIS.has(campo)) faltando.push(TITULOS_EXAME[campo]);
+      else if (campo === "checkin" || campo === "primeira") delete L[campo];   // sem o título, nada de herdar a posição da ordem fixa: não manda k
+      continue;
+    }
     if (campo !== "checkin" && campo !== "primeira" && R[campo] !== col) diferenteDoFixo.push(campo);
     L[campo] = col;
   }
@@ -90,6 +94,18 @@ export async function chavePaciente(r: Row, segredo: string, L: Layout = LAYOUT_
   return "n:" + (await sha256Hex(`${nome}|${fone}|${segredo}`)).slice(0, 24);
 }
 
+// Check-in do Klingo -> "AAAA-MM-DD HH:MM:SS" (hora de Brasília). Aceita ISO ("2026-11-16 07:50:00", com T ou sem segundos) e o formato da planilha ("16/11/2026 07:50").
+// Vazio = sem check-in. Texto que não é data = inválido (conta no resumo; nunca é gravado).
+export function lerCheckin(v: unknown): { iso: string; invalido: boolean } {
+  const t = String(v ?? "").trim();
+  if (!t) return { iso: "", invalido: false };
+  let m = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?/.exec(t);
+  if (m) return { iso: `${m[1]}-${m[2]}-${m[3]} ${m[4]}:${m[5]}:${m[6] ?? "00"}`, invalido: false };
+  m = /^(\d{2})\/(\d{2})\/(\d{4})[ T](\d{2}):(\d{2})(?::(\d{2}))?/.exec(t);
+  if (m) return { iso: `${m[3]}-${m[2]}-${m[1]} ${m[4]}:${m[5]}:${m[6] ?? "00"}`, invalido: false };
+  return { iso: "", invalido: true };
+}
+
 // Uma linha do relatório -> uma linha enxuta para o banco. null = linha sem id, sem como identificar o paciente ou sem data do exame (não serve).
 export async function mapearLinha(r: Row, segredo: string, L: Layout = LAYOUT_CRIACAO): Promise<LinhaLote | null> {
   const m = txt(r[L.m], 40), d = txt(r[L.d], 30);
@@ -97,13 +113,16 @@ export async function mapearLinha(r: Row, segredo: string, L: Layout = LAYOUT_CR
   const p = await chavePaciente(r, segredo, L);
   if (!p) return null;
   const e = txt(r[L.em], 30);
-  return {
+  const linha: LinhaLote = {
     m, a: txt(r[L.a], 40), p, n: txt(r[L.nome], 120),
     f: (await chaveFone(r[L.cel], segredo)) || (await chaveFone(r[L.tel], segredo)),
     x: txt(r[L.proc], 200), o: txt(r[L.oper], 80), u: txt(r[L.unid], 120),
     e: ISO.test(e) ? e : "", d,
     s: txt(r[L.status], 20), t: txt(r[L.atend], 3), r: txt(r[L.motivo], 120), c: txt(r[L.conf], 40),
   };
+  // Sem a coluna do check-in no layout (ex.: #13825), a chave 'k' nem é enviada: o banco não mexe no que já tinha.
+  if (L.checkin) linha.k = lerCheckin(r[L.checkin]).iso;
+  return linha;
 }
 
 // Faixa de datas que a leitura pede ao Klingo.
@@ -132,19 +151,20 @@ export function motivoDescarte(r: Row, L: Layout = LAYOUT_CRIACAO): keyof Descar
 
 // Mapeia, descarta o que não serve, tira repetidas (a mesma marcação duas vezes: vale a última) e mantém só a janela dos cartões.
 // "semProntuario" conta as linhas que ficaram com a chave por nome (n:...), só para o resumo.
-export async function prepararLinhas(linhas: Row[], segredo: string, hoje: string, L: Layout = LAYOUT_CRIACAO): Promise<{ linhas: LinhaLote[]; descartadas: number; descartes: Descartes; fora: number; semProntuario: number }> {
+export async function prepararLinhas(linhas: Row[], segredo: string, hoje: string, L: Layout = LAYOUT_CRIACAO): Promise<{ linhas: LinhaLote[]; descartadas: number; descartes: Descartes; fora: number; semProntuario: number; checkinLidos: number; checkinInvalidos: number }> {
   const porId = new Map<string, LinhaLote>();
   const descartes: Descartes = { sem_id: 0, sem_data: 0, sem_identificacao: 0 };
-  let descartadas = 0, fora = 0, semProntuario = 0;
+  let descartadas = 0, fora = 0, semProntuario = 0, checkinLidos = 0, checkinInvalidos = 0;
   for (const r of linhas) {
     const motivo = motivoDescarte(r, L);
     if (motivo) { descartes[motivo]++; descartadas++; continue; }
     const l = (await mapearLinha(r, segredo, L))!;
     if (!dentroDosCartoes(l.d, hoje)) { fora++; continue; }
     if (l.p.startsWith("n:")) semProntuario++;
+    if (L.checkin) { const c = lerCheckin(r[L.checkin]); if (c.iso) checkinLidos++; else if (c.invalido) checkinInvalidos++; }
     porId.set(l.m, l);
   }
-  return { linhas: [...porId.values()], descartadas, descartes, fora, semProntuario };
+  return { linhas: [...porId.values()], descartadas, descartes, fora, semProntuario, checkinLidos, checkinInvalidos };
 }
 
 
@@ -161,6 +181,11 @@ export function layoutSuspeito(linhas: Row[], L: Layout): string | null {
   if (atendRuim > limite) return `Layout do relatório mudou: ${atendRuim} de ${linhas.length} linhas com "Atendido" fora de S/N na ${L.atend}`;
   if (statusRuim > limite) return `Layout do relatório mudou: ${statusRuim} de ${linhas.length} linhas com "Status" inesperado na ${L.status}`;
   return null;
+}
+
+// Se a coluna "Check-In - Data" deixar de ter data (ordem trocada, título errado), não manda 'k' para o banco: o check-in fica como estava e o resto da Jornada segue.
+export function checkinSuspeito(lidos: number, invalidos: number): boolean {
+  return invalidos >= 20 && invalidos > (lidos + invalidos) * 0.2;
 }
 
 export function emLotes<T>(itens: T[], tamanho: number): T[][] {

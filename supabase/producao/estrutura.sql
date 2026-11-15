@@ -1,5 +1,5 @@
 -- RETRATO DA ESTRUTURA DO BANCO DE PRODUÇÃO (projeto webchat-atendimento). GERADO: não editar à mão.
--- Atualização parcial em 2026-11-15T17:55:00+00:00 (funções app_* e painel_app_*, tabelas app_*). Retrato inteiro tirado em 2026-11-14T20:32:54.165875+00:00 · Postgres 17.11. Só estrutura: nenhuma linha de tabela, nenhum valor de configuração.
+-- Atualização parcial em 2026-11-15T19:00:25.198956+00:00 (funções app_* e painel_app_*, tabelas app_*). Retrato inteiro tirado em 2026-11-14T20:32:54.165875+00:00 · Postgres 17.11. Só estrutura: nenhuma linha de tabela, nenhum valor de configuração.
 -- Serve de referência e para os testes. NÃO rodar inteiro sobre a produção. Como refazer: supabase/producao/LEIAME.md.
 
 -- ===== Extensões =====
@@ -1291,30 +1291,6 @@ create table public.jornada_evento (
 CREATE INDEX jornada_evento_card_idx ON public.jornada_evento USING btree (card_id, quando DESC);
 alter table public.jornada_evento enable row level security;
 create policy jornada_evento_select on public.jornada_evento as permissive for select to authenticated
-  using (( SELECT jornada_pode() AS jornada_pode));
--- concessão a authenticated: SELECT
-
-create table public.jornada_exame (
-  id bigint generated always as identity not null,
-  card_id bigint not null,
-  marcacao_id text not null,
-  atendimento_id text,
-  procedimento text not null,
-  operadora text,
-  unidade text,
-  agendado_em timestamp with time zone,
-  agendado_para timestamp with time zone,
-  status text default 'agendado'::text not null,
-  confirm_status text,
-  cancelamento_motivo text,
-  atualizado_em timestamp with time zone default now() not null,
-  constraint jornada_exame_status_check CHECK ((status = ANY (ARRAY['pedido'::text, 'agendado'::text, 'confirmado'::text, 'atendido'::text, 'cancelado'::text, 'remarcado'::text, 'faltou'::text]))),
-  constraint jornada_exame_pkey PRIMARY KEY (id),
-  constraint jornada_exame_marcacao_id_key UNIQUE (marcacao_id)
-);
-CREATE INDEX jornada_exame_card_idx ON public.jornada_exame USING btree (card_id);
-alter table public.jornada_exame enable row level security;
-create policy jornada_exame_select on public.jornada_exame as permissive for select to authenticated
   using (( SELECT jornada_pode() AS jornada_pode));
 -- concessão a authenticated: SELECT
 
@@ -2646,6 +2622,33 @@ alter table public.app_conversa enable row level security;
 
 
 
+
+create table public.jornada_exame (
+  id bigint generated always as identity not null,
+  card_id bigint not null,
+  marcacao_id text not null,
+  atendimento_id text,
+  procedimento text not null,
+  operadora text,
+  unidade text,
+  agendado_em timestamp with time zone,
+  agendado_para timestamp with time zone,
+  status text default 'agendado'::text not null,
+  confirm_status text,
+  cancelamento_motivo text,
+  atualizado_em timestamp with time zone default now() not null,
+  checkin_em timestamp with time zone,
+  constraint jornada_exame_status_check CHECK ((status = ANY (ARRAY['pedido'::text, 'agendado'::text, 'confirmado'::text, 'atendido'::text, 'cancelado'::text, 'remarcado'::text, 'faltou'::text]))),
+  constraint jornada_exame_pkey PRIMARY KEY (id),
+  constraint jornada_exame_marcacao_id_key UNIQUE (marcacao_id)
+);
+CREATE INDEX jornada_exame_card_idx ON public.jornada_exame USING btree (card_id);
+alter table public.jornada_exame enable row level security;
+create policy jornada_exame_select on public.jornada_exame as permissive for select to authenticated
+  using (( SELECT jornada_pode() AS jornada_pode));
+-- concessão a authenticated: SELECT
+-- concessão a service_role: DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+
 -- ===== Chaves estrangeiras (depois de todas as tabelas) =====
 alter table public.agendamento_fechamento add constraint agendamento_fechamento_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE CASCADE;
 alter table public.agendamento_fechamento add constraint agendamento_fechamento_por_fkey FOREIGN KEY (por) REFERENCES agentes(id) ON DELETE SET NULL;
@@ -2700,7 +2703,6 @@ alter table public.jornada_card add constraint jornada_card_coluna_fkey FOREIGN 
 alter table public.jornada_checklist_modelo add constraint jornada_checklist_modelo_coluna_fkey FOREIGN KEY (coluna) REFERENCES jornada_coluna(id);
 alter table public.jornada_escala add constraint jornada_escala_coluna_fkey FOREIGN KEY (coluna) REFERENCES jornada_coluna(id);
 alter table public.jornada_evento add constraint jornada_evento_card_id_fkey FOREIGN KEY (card_id) REFERENCES jornada_card(id);
-alter table public.jornada_exame add constraint jornada_exame_card_id_fkey FOREIGN KEY (card_id) REFERENCES jornada_card(id);
 alter table public.jornada_mensagem add constraint jornada_mensagem_card_id_fkey FOREIGN KEY (card_id) REFERENCES jornada_card(id);
 alter table public.jornada_tarefa add constraint jornada_tarefa_card_id_fkey FOREIGN KEY (card_id) REFERENCES jornada_card(id);
 alter table public.jornada_transicao add constraint jornada_transicao_de_fkey FOREIGN KEY (de) REFERENCES jornada_coluna(id);
@@ -2752,6 +2754,7 @@ alter table public.app_acesso_log add constraint app_acesso_log_aparelho_id_fkey
 alter table public.app_acesso_log add constraint app_acesso_log_paciente_id_fkey FOREIGN KEY (paciente_id) REFERENCES app_paciente(id) ON DELETE CASCADE;
 alter table public.app_conversa add constraint app_conversa_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE CASCADE;
 alter table public.app_conversa add constraint app_conversa_paciente_id_fkey FOREIGN KEY (paciente_id) REFERENCES app_paciente(id) ON DELETE CASCADE;
+alter table public.jornada_exame add constraint jornada_exame_card_id_fkey FOREIGN KEY (card_id) REFERENCES jornada_card(id);
 
 -- ===== Visões (5) =====
 

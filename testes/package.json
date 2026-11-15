@@ -50,6 +50,7 @@
     "test:contas": "node sql-contas.test.mjs",
     "test:acesso-sql": "node sql-acesso-app.test.mjs",
     "test:acompanhar-sql": "node sql-acompanhar-pedidos.test.mjs",
+    "test:checkin-klingo-sql": "node sql-checkin-klingo.test.mjs",
     "test:acompanhar-encerrados": "node sql-acompanhar-encerrados.test.mjs",
     "test:acompanhar": "node acompanhar.navegador.mjs",
     "test:acesso": "node acesso-app.navegador.mjs",
