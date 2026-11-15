@@ -7,6 +7,7 @@ CREATE OR REPLACE FUNCTION public.chat_pedido_escolha(p_conversa uuid, p_token t
  SET search_path TO ''
 AS $function$
 begin
+  perform public.app_pin_exigir_leitura();   -- PIN também no servidor (config.app_pin_servidor)
   perform public.chat_valida(p_conversa, p_token);
   if jsonb_typeof(p_escolha) <> 'array' or jsonb_array_length(p_escolha) > 20 or length(p_escolha::text) > 20000 then
     raise exception 'Escolha inválida.' using errcode = '22023';

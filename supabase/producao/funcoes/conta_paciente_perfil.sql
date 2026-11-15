@@ -8,6 +8,7 @@ CREATE OR REPLACE FUNCTION public.conta_paciente_perfil(p_nome text, p_telefone 
 AS $function$
 declare v_nome text := btrim(coalesce(p_nome, '')); v_tel text := regexp_replace(coalesce(p_telefone, ''), '\D', '', 'g');
 begin
+  perform public.app_pin_exigir_leitura();   -- PIN também no servidor (config.app_pin_servidor)
   if (select auth.uid()) is null or not exists (select 1 from public.contas_paciente where id = (select auth.uid())) then
     raise exception 'Entre na sua conta para salvar os dados.' using errcode = '42501';
   end if;

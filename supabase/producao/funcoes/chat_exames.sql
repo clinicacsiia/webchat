@@ -7,6 +7,7 @@ CREATE OR REPLACE FUNCTION public.chat_exames(p_conversa uuid, p_token text, p_m
  SET search_path TO ''
 AS $function$
 begin
+  perform public.app_pin_exigir_leitura();   -- PIN também no servidor (config.app_pin_servidor)
   perform public.chat_valida(p_conversa, p_token);
   if p_modalidade not in ('RM','TC','US','RX','MAMO','DENSITO') then raise exception 'Modalidade inválida.' using errcode = '22023'; end if;
   return coalesce((select jsonb_agg(jsonb_build_object('id', e.id, 'nome', e.nome, 'unilateral', e.unilateral, 'bilateral', e.bilateral))

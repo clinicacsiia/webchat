@@ -7,6 +7,7 @@ CREATE OR REPLACE FUNCTION public.chat_medico_limpar(p_conversa uuid, p_token te
  SET search_path TO ''
 AS $function$
 begin
+  perform public.app_pin_exigir_leitura();   -- PIN também no servidor (config.app_pin_servidor)
   perform public.chat_valida(p_conversa, p_token);
   update public.conversas set medico_preferido = null where id = p_conversa;
   return jsonb_build_object('ok', true);

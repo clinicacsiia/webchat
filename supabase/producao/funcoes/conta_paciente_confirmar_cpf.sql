@@ -8,6 +8,7 @@ CREATE OR REPLACE FUNCTION public.conta_paciente_confirmar_cpf(p_cpf text)
 AS $function$
 declare v_uid uuid := (select auth.uid()); v_cp record; s record; p record;
 begin
+  perform public.app_pin_exigir_leitura();   -- PIN também no servidor (config.app_pin_servidor)
   select * into v_cp from public.contas_paciente where id = v_uid for update;
   if v_uid is null or not found then raise exception 'Entre na sua conta para confirmar com o CPF.' using errcode = '42501'; end if;
   if not public.cpf_valido(p_cpf) then raise exception 'Os números do CPF não conferem. Confira, por favor.' using errcode = '22023'; end if;

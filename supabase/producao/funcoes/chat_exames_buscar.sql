@@ -8,6 +8,7 @@ CREATE OR REPLACE FUNCTION public.chat_exames_buscar(p_conversa uuid, p_token te
 AS $function$
 declare v_linhas text[]; l text; t text; v_mods text[]; v_regs text[]; v_lado text; r jsonb := '[]'::jsonb; v_parte jsonb; v_tok text[]; v_b int[]; n int := 0;
 begin
+  perform public.app_pin_exigir_leitura();   -- PIN também no servidor (config.app_pin_servidor)
   perform public.chat_valida(p_conversa, p_token);
   v_linhas := case when p_ocr then (select array_agg(x) from (select btrim(x) x from regexp_split_to_table(left(coalesce(p_termo, ''), 4000), '[\n;]+') x) q where length(x) >= 4)
                    else array[left(coalesce(p_termo, ''), 120)] end;

@@ -8,6 +8,7 @@ CREATE OR REPLACE FUNCTION public.chat_avaliacao_estado(p_conversa uuid, p_token
 AS $function$
 declare c record; v_ativa boolean; v_inst timestamptz;
 begin
+  perform public.app_pin_exigir_leitura();   -- PIN também no servidor (config.app_pin_servidor)
   perform public.chat_valida(p_conversa, p_token);
   v_ativa := coalesce((select valor from public.config where chave = 'avaliacao_ativa'), 'nao') = 'sim';
   begin v_inst := p_encerrada_em::timestamptz; exception when others then v_inst := null; end;

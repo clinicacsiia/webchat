@@ -8,6 +8,7 @@ CREATE OR REPLACE FUNCTION public.chat_corpo(p_conversa uuid, p_token text)
 AS $function$
 declare r jsonb;
 begin
+  perform public.app_pin_exigir_leitura();   -- PIN também no servidor (config.app_pin_servidor)
   perform public.chat_valida(p_conversa, p_token);
   select valor into r from public.chat_cache where chave = 'corpo' and calculado_em > now() - interval '1 hour';
   if r is null then r := public.chat_corpo_calcular(); end if;
