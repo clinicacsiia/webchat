@@ -49,12 +49,12 @@ async function chamarFuncao(nome, corpo) {
 
 const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH, args: ['--no-sandbox'] } : {});
 const erros = [];
-async function novaPagina(caminho = '/') {
+async function novaPagina(caminho = '/acesso/') {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 800 }, deviceScaleFactor: 1, locale: 'pt-BR', timezoneId: 'America/Sao_Paulo' });
   const page = await ctx.newPage();
   page.on('pageerror', (e) => erros.push('pageerror: ' + e.message));
   page.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) erros.push('console: ' + m.text()); });
-  await ctx.route(`${ORIGEM}/**`, (r) => r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: HTML }));
+  await ctx.route(`${ORIGEM}/**`, (r) => r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: new URL(r.request().url()).pathname === '/' ? '<!doctype html><title>chat</title><body>CHAT-DE-MENTIRA</body>' : HTML }));
   await ctx.route(`${API}/**`, async (r) => {
     const req = r.request();
     const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'POST, OPTIONS' };
@@ -74,6 +74,10 @@ async function pin(page, digitos) {
   for (const d of digitos) await page.locator(`.pad button[data-k="${d}"]`).click();
   await espera(450);
 }
+// Depois do PIN a página não tem mais tela inicial: vai direto ao chat (aqui, uma página de mentira em "/").
+const noChat = (page, ms = 6000) => page.waitForURL((u) => u.pathname === '/', { timeout: ms });
+// "Meus dados" como o botão do chat faz: com o PIN ainda válido abre direto, sem teclado.
+async function dados(page) { await page.goto(`${ORIGEM}/acesso/?ir=dados`); await esperaTexto(page, /Nascimento/); }
 const esperaTexto = (page, re, ms = 4000) => page.waitForFunction((s) => new RegExp(s).test(document.getElementById('app').innerText + document.body.innerText), re.source, { timeout: ms });
 const n = async (sqlTexto) => (await q(sqlTexto))[0].n;
 const AMANHA = new Date(Date.now() + 3 * 864e5).toISOString().slice(0, 10);
@@ -96,7 +100,7 @@ await caso('cadastro único: celular → nome/nascimento → filho → número d
   await ana.page.fill('#ctnome', 'Bia Amiga'); await ana.page.fill('#cttel', '71991230002'); await ana.page.selectOption('#ctrel', 'Irmão(ã)'); await ana.page.click('[data-act="c4"]');
   await pin(ana.page, '1357'); const confirme = await texto(ana.page);
   await pin(ana.page, '1357');
-  await esperaTexto(ana.page, /Olá, Ana/);
+  await noChat(ana.page);
   const c = (await q(`select (select count(*) from public.app_paciente)::int p, (select count(*) from public.app_filho)::int f, (select count(*) from public.app_contato_confianca)::int c`))[0];
   return { ok: /Leo Souza Teste/.test(lista) && /Confirme o PIN/.test(confirme) && c.p === 1 && c.f === 1 && c.c === 1, detalhe: JSON.stringify(c) };
 });
@@ -109,68 +113,29 @@ await caso('as chamadas usam só a chave pública (apikey) e mandam o PIN apenas
   const cad = chamadasRede.find((c) => c.nome === 'app_cadastrar');
   return { ok: !!cad && cad.apikey?.startsWith('sb_publishable_') && !cad.auth && cad.chaves.includes('p_pin') && cad.chaves.includes('p_filhos') && cad.chaves.includes('p_confianca'), detalhe: cad?.chaves.join() };
 });
-await caso('tela inicial: Eu, Leo e Todos juntos', async () => {
-  const t = await texto(ana.page);
-  return { ok: /Eu/.test(t) && /Leo/.test(t) && /Todos juntos/.test(t) && /Marcar pelo chat/.test(t) };
-});
-
-// ================================================================= marcação e filho novo
-let grupoAna;
-await caso('"Todos juntos" + Nova marcação gera uma solicitação para cada pessoa', async () => {
-  await ana.page.click('[data-act="whoall"]');
-  await ana.page.click('[data-act="go"][data-v="nova"]');
-  await ana.page.fill('#dtm', AMANHA); await ana.page.selectOption('#turno', 'Tarde'); await ana.page.selectOption('#exame', 'Ultrassom'); await ana.page.fill('#obs', 'Pedido de teste');
-  await ana.page.click('[data-act="nova"]');
-  await esperaTexto(ana.page, /Solicitação registrada/);
-  const resumo = await ana.page.locator('#resumo').innerText();
-  const m = await q(`select grupo, pessoa_nome, status from public.app_marcacao order by pessoa_nome`);
-  grupoAna = m[0].grupo;
-  return { ok: m.length === 2 && m[0].grupo === m[1].grupo && m.every((x) => x.status === 'solicitada') && /Ana Souza Teste/.test(resumo) && /Leo Souza Teste/.test(resumo) && /Tarde/.test(resumo), detalhe: m.map((x) => x.pessoa_nome).join(' + ') };
-});
-await caso('a solicitação aparece na tela inicial como "Aguardando confirmação"; a última escolha fica lembrada', async () => {
-  await ana.page.click('[data-act="go"][data-v="home"]');
-  const t = await texto(ana.page);
-  const sel = (await q(`select ultima_selecao from public.app_paciente`))[0].ultima_selecao;
-  return { ok: /Ana \+ Leo/.test(t) && /Aguardando confirmação/.test(t) && sel.length === 2, detalhe: JSON.stringify(sel) };
-});
-await caso('data passada é recusada pela tela', async () => {
-  await ana.page.click('[data-act="go"][data-v="nova"]'); await ana.page.evaluate(() => { document.getElementById('dtm').removeAttribute('min'); });
-  await ana.page.fill('#dtm', '2020-01-01'); await ana.page.click('[data-act="nova"]');
-  const t = await texto(ana.page); await ana.page.click('[data-act="go"][data-v="home"]');
-  return { ok: /a partir de hoje/.test(t) };
+await caso('depois do cadastro a pessoa vai direto ao chat: não existe mais tela inicial própria', async () => {
+  const t = await texto(ana.page).catch(() => '');
+  return { ok: new URL(ana.page.url()).pathname === '/' && !/Marcar pelo chat|Quem vai ser atendido|Deixar uma solicitação|Suas solicitações/.test(t), detalhe: ana.page.url() };
 });
 await caso('Meus dados → adicionar mais um filho a qualquer momento (painel funciona)', async () => {
-  await ana.page.click('[data-act="go"][data-v="dados"]');
+  await dados(ana.page);
   await ana.page.click('[data-act="sheet"][data-t="filho"]');
   await ana.page.fill('#fnome', 'Davi Souza Teste'); await ana.page.fill('#fnasc', NASC_DAVI); await ana.page.click('[data-act="sf"]');
   await esperaTexto(ana.page, /Davi Souza Teste/);
   return { ok: (await n(`select count(*)::int n from public.app_filho where removido_em is null`)) === 2 };
 });
-await caso('o filho novo já aparece na tela inicial para a próxima marcação', async () => {
-  await ana.page.click('[data-act="go"][data-v="home"]');
-  return { ok: /Davi/.test(await texto(ana.page)) };
-});
 await caso('painel: tocar dentro do painel não fecha; tocar no fundo fecha', async () => {
-  await ana.page.click('[data-act="go"][data-v="dados"]'); await ana.page.click('[data-act="sheet"][data-t="filho"]');
+  await ana.page.click('[data-act="go"][data-v="dados"]').catch(() => {}); await ana.page.click('[data-act="sheet"][data-t="filho"]');
   await ana.page.click('#fnome');
   const aberto = await ana.page.locator('.sheet').count();
   await ana.page.mouse.click(190, 20);
   const fechado = await ana.page.locator('.sheet').count();
   return { ok: aberto === 1 && fechado === 0, detalhe: `${aberto}/${fechado}` };
 });
-await caso('cancelar a solicitação pede confirmação e depois cancela no banco', async () => {
-  await ana.page.click('[data-act="go"][data-v="home"]');
-  await ana.page.click('[data-act="canc"]'); const pede = await texto(ana.page);
-  await ana.page.click('[data-act="confirmar"]');
-  await esperaTexto(ana.page, /Nenhuma solicitação ainda/);
-  const st = await q(`select status from public.app_marcacao where grupo = $1`, [grupoAna]);
-  return { ok: /Cancelar a solicitação/.test(pede) && st.every((x) => x.status === 'cancelada') };
-});
-
 // ================================================================= PIN ao reabrir
 await caso('reabrir o app: abre direto no PIN, sem pedir login nem cadastro', async () => {
-  await ana.page.reload(); const t = await texto(ana.page);
-  return { ok: /Olá, Ana/.test(t) && /Digite seu PIN/.test(t) && !/Vamos começar/.test(t) && !/Marcar pelo chat/.test(t) };
+  await ana.page.goto(`${ORIGEM}/acesso/`); const t = await texto(ana.page);
+  return { ok: /Olá, Ana/.test(t) && /Digite seu PIN/.test(t) && !/Vamos começar/.test(t) && !/Nascimento/.test(t) };
 });
 await caso('PIN errado: mostra quantas tentativas restam; no 5º erro bloqueia 1 minuto', async () => {
   await pin(ana.page, '0000'); const um = await texto(ana.page);
@@ -178,45 +143,47 @@ await caso('PIN errado: mostra quantas tentativas restam; no 5º erro bloqueia 1
   const quatro = await texto(ana.page);
   await pin(ana.page, '0000'); const cinco = await texto(ana.page);
   await pin(ana.page, '1357'); const certoBloqueado = await texto(ana.page);
-  return { ok: /Restam 4 tentativas/.test(um) && /Resta 1 tentativa/.test(quatro) && /Aguarde 1 minuto/.test(cinco) && /Aguarde 1 minuto/.test(certoBloqueado) && !/Marcar pelo chat/.test(certoBloqueado),
+  return { ok: /Restam 4 tentativas/.test(um) && /Resta 1 tentativa/.test(quatro) && /Aguarde 1 minuto/.test(cinco) && /Aguarde 1 minuto/.test(certoBloqueado) && !/Nascimento/.test(certoBloqueado),
     detalhe: [um, quatro, cinco, certoBloqueado].map((x) => (x.match(/PIN incorreto[^\n]*|Muitas[^\n]*/) || ['?'])[0]).join(' | ') };
 });
-await caso('passado o bloqueio, o PIN certo abre e a escolha anterior volta marcada', async () => {
+await caso('passado o bloqueio, o PIN certo abre e leva ao chat', async () => {
   await q(`update public.app_paciente set pin_bloqueado_ate = now() - interval '1 second'`);
-  await pin(ana.page, '1357'); await esperaTexto(ana.page, /Marcar pelo chat/);
-  return { ok: /Todos juntos/.test(await texto(ana.page)) };
+  await pin(ana.page, '1357'); await noChat(ana.page);
+  return { ok: new URL(ana.page.url()).pathname === '/' };
 });
 await caso('mais de 5 minutos em segundo plano: a tela trava e pede o PIN de novo (e some o conteúdo)', async () => {
+  await dados(ana.page);
   await ana.page.evaluate(() => { S.hiddenAt = Date.now() - 6 * 60000; document.dispatchEvent(new Event('visibilitychange')); });
   const t = await texto(ana.page);
-  await pin(ana.page, '1357'); await esperaTexto(ana.page, /Marcar pelo chat/);
+  await pin(ana.page, '1357'); await noChat(ana.page);
   return { ok: /Digite seu PIN/.test(t) && !/Leo|Davi/.test(t) };
 });
 await caso('menos de 5 minutos em segundo plano: não trava', async () => {
+  await dados(ana.page);
   await ana.page.evaluate(() => { S.hiddenAt = Date.now() - 2 * 60000; document.dispatchEvent(new Event('visibilitychange')); });
-  return { ok: /Marcar pelo chat/.test(await texto(ana.page)) };
+  return { ok: /Nascimento/.test(await texto(ana.page)) && (await ana.page.locator('.pad').count()) === 0 };
 });
-await caso('passados 30 min o servidor também exige o PIN: ao enviar, a tela volta ao teclado em vez de mostrar erro técnico', async () => {
+await caso('passados 30 min o servidor também exige o PIN: ao salvar, a tela volta ao teclado em vez de mostrar erro técnico', async () => {
   await q(`update public.app_aparelho set desbloqueada_ate = now() - interval '1 minute'`);
-  await ana.page.click('[data-act="go"][data-v="nova"]');
-  await ana.page.fill('#dtm', AMANHA); await ana.page.click('[data-act="nova"]');
+  await ana.page.click('[data-act="sheet"][data-t="filho"]');
+  await ana.page.fill('#fnome', 'Zeca Souza Teste'); await ana.page.fill('#fnasc', NASC_DAVI); await ana.page.click('[data-act="sf"]');
   await esperaTexto(ana.page, /Digite seu PIN/);
   const t = await texto(ana.page);
-  await pin(ana.page, '1357'); await esperaTexto(ana.page, /Marcar pelo chat/);
+  await pin(ana.page, '1357'); await noChat(ana.page);
   return { ok: /Digite seu PIN/.test(t) && !/erro|Erro/.test(t) };
 });
 await caso('"Meus dados" do chat (?ir=dados) com o PIN ainda válido abre direto em Meus dados, sem pedir o PIN de novo', async () => {
-  await ana.page.goto(`${ORIGEM}/?ir=dados`);
+  await ana.page.goto(`${ORIGEM}/acesso/?ir=dados`);
   await esperaTexto(ana.page, /Meus dados/);
   const t = await texto(ana.page);
   return { ok: /Nascimento/.test(t) && /Filhos/.test(t) && (await ana.page.locator('.pad').count()) === 0, detalhe: t.slice(0, 60).replace(/\n/g, ' ') };
 });
 await caso('"Meus dados" do chat com o PIN vencido (30 min) pede o PIN, como antes', async () => {
   await q(`update public.app_aparelho set desbloqueada_ate = now() - interval '1 minute'`);
-  await ana.page.goto(`${ORIGEM}/?ir=dados`);
+  await ana.page.goto(`${ORIGEM}/acesso/?ir=dados`);
   await esperaTexto(ana.page, /Digite seu PIN/);
   const pad = await ana.page.locator('.pad').count();
-  await pin(ana.page, '1357'); await esperaTexto(ana.page, /Marcar pelo chat/);
+  await pin(ana.page, '1357'); await noChat(ana.page);
   return { ok: pad === 1 };
 });
 await caso('o site não muda de cor com o tema escuro do celular (segue o chat, sempre claro)', async () => {
@@ -224,13 +191,13 @@ await caso('o site não muda de cor com o tema escuro do celular (segue o chat, 
   const pg = await ctx.newPage();
   await ctx.route(`${ORIGEM}/**`, (r) => r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: HTML }));
   await ctx.route(`${API}/**`, (r) => r.fulfill({ status: 200, headers: { 'access-control-allow-origin': '*', 'content-type': 'application/json' }, body: 'null' }));
-  await pg.goto(`${ORIGEM}/`); await espera(500);
+  await pg.goto(`${ORIGEM}/acesso/`); await espera(500);
   const cor = await pg.evaluate(() => getComputedStyle(document.body).backgroundColor);
   await ctx.close();
   return { ok: cor === 'rgb(248, 249, 250)', detalhe: cor };
 });
 await caso('trocar o PIN: PIN atual → novo → confirma; o antigo deixa de valer', async () => {
-  await ana.page.click('[data-act="go"][data-v="dados"]'); await ana.page.click('[data-act="trocapin"]');
+  await dados(ana.page); await ana.page.click('[data-act="trocapin"]');
   await pin(ana.page, '1357'); await pin(ana.page, '2468'); await pin(ana.page, '2468');
   await esperaTexto(ana.page, /Meus dados/);
   const ev = await n(`select count(*)::int n from public.app_evento where tipo = 'pin_trocado'`);
@@ -248,43 +215,39 @@ await caso('trocar o PIN com o atual errado avisa e recomeça', async () => {
 // ================================================================= número de confiança
 let codigo;
 await caso('adicionar número de confiança em Meus dados mostra o código de 6 dígitos para passar à pessoa', async () => {
-  await ana.page.click('[data-act="go"][data-v="dados"]').catch(() => {});
+  await dados(ana.page);
   const t = await texto(ana.page);
   codigo = (await q(`select codigo from public.app_contato_confianca`))[0].codigo;
   return { ok: new RegExp(codigo).test(t) && /Bia Amiga/.test(t), detalhe: codigo };
 });
 let bia = await novaPagina();
-await caso('a pessoa de confiança faz o próprio cadastro (celular dela) e AINDA não vê nada de Ana', async () => {
+await caso('a pessoa de confiança faz o próprio cadastro (celular dela) e AINDA não vê nada da Ana', async () => {
   await bia.page.fill('#tel', '71991230002'); await bia.page.click('[data-act="c1"]');
   await bia.page.fill('#nome', 'Beatriz Amiga Teste'); await bia.page.fill('#nasc', '1990-02-20'); await bia.page.click('[data-act="c2"]');
   await bia.page.click('[data-act="tf"][data-v="0"]'); await bia.page.click('[data-act="c3"]');
   await bia.page.click('[data-act="c4skip"]');
   await pin(bia.page, '8642'); await pin(bia.page, '8642');
-  await esperaTexto(bia.page, /Olá, Beatriz/);
+  await noChat(bia.page);
+  await dados(bia.page);
   const t = await texto(bia.page);
-  return { ok: !/Ana Souza|Leo|Davi/.test(t) && !/Você acompanha/.test(t) };
+  return { ok: !/Ana Souza|Leo|Davi/.test(t) && !/Você acompanha/.test(t) && (await bia.page.evaluate(() => S.perfil.confiam_em_mim.length)) === 0 };
 });
-await caso('código errado é recusado com mensagem; código certo vincula e ela passa a ver a Ana, os filhos e as solicitações', async () => {
-  await bia.page.click('[data-act="go"][data-v="dados"]');
+await caso('código errado é recusado com mensagem; código certo vincula e o servidor passa a listar a Ana, com os filhos, para ela', async () => {
   await bia.page.click('[data-act="sheet"][data-t="codigo"]'); await bia.page.fill('#cod', codigo === '000000' ? '111111' : '000000'); await bia.page.click('[data-act="scod"]');
   await esperaTexto(bia.page, /Código inválido/);
   await bia.page.fill('#cod', codigo); await bia.page.click('[data-act="scod"]');
-  await esperaTexto(bia.page, /Você acompanha: Ana Souza Teste/);
-  const t = await texto(bia.page);
-  return { ok: /Leo/.test(t) && /Davi/.test(t) && /Só leitura/.test(t) };
-});
-await caso('quem acompanha vê só leitura: não há botão de cancelar nem de marcar para a Ana', async () => {
-  const x = await bia.page.locator('[data-act="canc"]').count();
-  return { ok: x === 0 };
+  await esperaTexto(bia.page, /Você já acompanha essa pessoa/);
+  await bia.page.evaluate(() => atualizar()); await espera(400);
+  const v = await bia.page.evaluate(() => S.perfil.confiam_em_mim.map((c) => c.titular_nome + ':' + c.filhos.map((f) => f.nome).join('+')).join('|'));
+  return { ok: /Ana Souza Teste/.test(v) && /Leo/.test(v) && /Davi/.test(v), detalhe: v };
 });
 await caso('o titular vê que a pessoa já acompanha; remover tira o acesso dela na hora', async () => {
-  await ana.page.click('[data-act="go"][data-v="home"]'); await ana.page.click('[data-act="go"][data-v="dados"]');
+  await dados(ana.page);
   const antes = await texto(ana.page);
   await ana.page.click('[data-act="delc"]'); await ana.page.click('[data-act="confirmar"]');
   await esperaTexto(ana.page, /Ninguém ainda/);
-  await bia.page.click('[data-act="go"][data-v="home"]').catch(() => {});
-  await bia.page.reload(); await pin(bia.page, '8642'); await esperaTexto(bia.page, /Olá, Beatriz/);
-  return { ok: /Já acompanha/.test(antes) && !/Você acompanha/.test(await texto(bia.page)) };
+  await bia.page.evaluate(() => atualizar()); await espera(400);
+  return { ok: /Já acompanha/.test(antes) && (await bia.page.evaluate(() => S.perfil.confiam_em_mim.length)) === 0 };
 });
 
 // ================================================================= aparelho novo, esqueci o PIN, sair
@@ -293,12 +256,13 @@ await caso('aparelho novo: "Já tenho cadastro" → celular → PIN entra e traz
   await novo.page.click('[data-act="go"][data-v="entrar"]');
   await novo.page.fill('#tel', '(71) 99123-0001'); await novo.page.click('[data-act="entrar"]');
   await pin(novo.page, '1357'); const errado = await texto(novo.page);
-  await pin(novo.page, '2468'); await esperaTexto(novo.page, /Olá, Ana/);
+  await pin(novo.page, '2468'); await noChat(novo.page);
+  await dados(novo.page);
   const t = await texto(novo.page);
   return { ok: /Celular ou PIN incorretos/.test(errado) && /Leo/.test(t) && /Davi/.test(t) };
 });
 await caso('"Sair deste aparelho" apaga o código do celular e volta ao cadastro; o cadastro continua no banco', async () => {
-  await novo.page.click('[data-act="go"][data-v="dados"]'); await novo.page.click('[data-act="sheet"][data-t="sair"]'); await novo.page.click('[data-act="sair"]');
+  await novo.page.click('[data-act="sheet"][data-t="sair"]'); await novo.page.click('[data-act="sair"]');
   await esperaTexto(novo.page, /Vamos começar/);
   const st = await novo.page.evaluate(() => localStorage.getItem('csi_acesso_v2'));
   return { ok: st === null && (await n(`select count(*)::int n from public.app_paciente`)) === 2 };
@@ -318,7 +282,7 @@ await caso('"Esqueci o PIN" (aparelho sem cadastro): pelo "Já tenho cadastro", 
   const manteve = (await novo.page.inputValue('#nasc')) === NASC_ANA && (await novo.page.inputValue('#nome')) === 'Ana Outra Teste';
   await novo.page.fill('#nome', 'ana  SOUZA teste'); await novo.page.click('[data-act="esqueci2"]');
   await pin(novo.page, '7391'); await pin(novo.page, '7391');
-  await esperaTexto(novo.page, /Olá, Ana/);
+  await noChat(novo.page);
   const ev = await n(`select count(*)::int n from public.app_evento where tipo = 'pin_redefinido'`);
   const antigo = await ana.page.evaluate(async () => (await rpc('app_desbloquear', { p_token: S.dev, p_pin: '7391' })).erro);
   const login = await q(`select (select count(*) from public.app_aparelho a join public.app_paciente p on p.id = a.paciente_id where p.telefone = '71991230001')::int n`);
@@ -356,19 +320,18 @@ await caso('PIN óbvio (0000, 1234, 1111, 1212...) é recusado na hora, com a ex
   return { ok: msgs.every(Boolean) && segue, detalhe: `recusou=${msgs.join(',')} segue=${segue}` };
 });
 // ================================================================= integração com o chat
-await caso('tela inicial: "Marcar pelo chat da clínica" leva ao chat (a marcação de verdade); a solicitação sem chat continua como opção', async () => {
+await caso('entrar pelo celular e PIN, sem vir do chat, leva ao chat (a marcação de verdade); não há tela intermediária', async () => {
   const p = await novaPagina();
   await p.page.click('[data-act="go"][data-v="entrar"]');
   await p.page.fill('#tel', '71991230001'); await p.page.click('[data-act="entrar"]');
-  await pin(p.page, '7391'); await esperaTexto(p.page, /Marcar pelo chat/);
-  const href = await p.page.getAttribute('a.btn[href]', 'href');
-  const sec = /Deixar uma solicitação/.test(await texto(p.page));
+  await pin(p.page, '7391'); await noChat(p.page);
+  const t = await p.page.locator('body').innerText();
   ana = p;
-  return { ok: href === '../' && sec, detalhe: href };
+  return { ok: /CHAT-DE-MENTIRA/.test(t), detalhe: p.page.url() };
 });
 await caso('Meus dados: CPF por pessoa (informar, ver só a máscara, alterar, apagar); CPF inválido é recusado', async () => {
   const { page } = ana;
-  await page.click('[data-act="go"][data-v="dados"]');
+  await dados(page);
   const antes = await texto(page);
   await page.click('[data-act="sheet"][data-t="cpf"][data-p="eu"]');
   await page.fill('#cpfn', '11111111111'); await page.click('[data-act="scpf"]');
@@ -385,12 +348,12 @@ await caso('Meus dados: CPF por pessoa (informar, ver só a máscara, alterar, a
   return { ok: /ainda não salvo/.test(antes) && mascarado === '529.982.247-25' && /\*\*\*-25/.test(depois) && banco === '52998224725' && !naTela.includes('52998224725') && apagado === null, detalhe: mascarado };
 });
 await caso('veio do chat (?voltar=chat): depois do PIN a página devolve para o chat', async () => {
-  const p = await novaPagina('/?voltar=chat');
+  const p = await novaPagina('/acesso/?voltar=chat');
   await p.page.click('[data-act="go"][data-v="entrar"]');
   await p.page.fill('#tel', '71991230001'); await p.page.click('[data-act="entrar"]');
   await pin(p.page, '7391');
-  await p.page.waitForURL((u) => !String(u).includes('voltar'), { timeout: 5000 });
-  return { ok: !p.page.url().includes('voltar'), detalhe: p.page.url() };
+  await noChat(p.page);
+  return { ok: new URL(p.page.url()).pathname === '/' && !p.page.url().includes('voltar'), detalhe: p.page.url() };
 });
 await caso('nenhum erro de script nem violação da política de segurança do navegador durante todo o roteiro', async () => ({ ok: erros.length === 0, detalhe: erros.slice(0, 3).join(' | ') }));
 
