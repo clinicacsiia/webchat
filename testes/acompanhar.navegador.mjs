@@ -1,0 +1,282 @@
+// FLUXOGRAMA: entrada (o index.html REAL do chat e o minha-vez/index.html REAL num Chromium de celular; o Supabase é simulado por interceptação de rede) -> validação (botão grande e balão só com o acesso rápido; lista, ações e PIN do portal) -> lógica (balão = novidades do banco; tocar no pedido oferece a conversa; cancelar e remarcar pedem confirmação; resultado e arquivo guardado; PIN pedido sem login automático) -> saída (PASS/FAIL por caso)
+// Versão 1.0 — 15/11/2026 / Mudança: Implementação inicial (acompanhar pedidos). O banco em si é provado em sql-acompanhar-pedidos.test.mjs.
+// Dados inventados. Requer Chromium (CHROMIUM_PATH ou o do Playwright).
+import http from 'node:http';
+import { readFileSync, existsSync } from 'node:fs';
+import { extname, resolve } from 'node:path';
+import { chromium, criarMundo, novaPaginaChat } from './mock-chat.mjs';
+import { REPO } from './stubs-supabase.mjs';
+
+const resultados = [];
+const registrar = (nome, ok, d = '') => { resultados.push(ok); console.log(`${ok ? 'PASS' : 'FAIL'}  ${nome}${d ? '  -- ' + d : ''}`); };
+const caso = async (nome, fn) => { try { const r = await fn(); registrar(nome, r.ok, r.detalhe); } catch (e) { registrar(nome, false, 'exceção: ' + String(e.message).split('\n')[0]); } };
+const espera = (ms) => new Promise((r) => setTimeout(r, ms));
+const TIPOS = { '.html': 'text/html', '.js': 'text/javascript', '.webmanifest': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml' };
+const srv = http.createServer((req, res) => {
+  const f = resolve(REPO, '.' + new URL(req.url, 'http://x').pathname.replace(/\/$/, '/index.html'));
+  if (!f.startsWith(REPO) || !existsSync(f)) { res.writeHead(404).end(); return; }
+  res.writeHead(200, { 'Content-Type': TIPOS[extname(f)] || 'application/octet-stream' }).end(readFileSync(f));
+});
+await new Promise((ok) => srv.listen(0, '127.0.0.1', ok));
+const base = `http://127.0.0.1:${srv.address().port}`;
+const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH, args: ['--no-sandbox'] } : {});
+const lib = readFileSync(resolve(import.meta.dirname, 'node_modules/@supabase/supabase-js/dist/umd/supabase.js'), 'utf8');
+
+const DEV = 'dispositivo-de-teste';
+const C1 = '11111111-1111-4111-8111-111111111111', C2 = '22222222-2222-4222-8222-222222222222', C3 = '33333333-3333-4333-8333-333333333333', C9 = '99999999-9999-4999-8999-999999999999';
+const dia = (n) => { const d = new Date(Date.now() + n * 86400000); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+const dadosPadrao = () => ({
+  ok: true, nome: 'Ana Souza Teste', telefone_final: '0001', email_salvo: true,
+  pessoas: [{ nome: 'Ana Souza Teste', eu: true }, { nome: 'Leo Souza Teste', eu: false }],
+  pedidos: [
+    { conversa: C1, pessoa: 'Ana Souza Teste', eu: true, aberta: false, tipo: 'exame', exames: [{ id: 11, nome: 'RM JOELHO DIREITO', unidade: 'Centro', data: dia(3), hora: '08:40', ok: 2, excecao: null, resultado: null }], sig: 'a', novo: true },
+    { conversa: C2, pessoa: 'Leo Souza Teste', eu: false, aberta: true, tipo: 'exame', exames: [{ id: 12, nome: 'US ABDOME TOTAL', unidade: 'Centro', data: dia(5), hora: '09:20', ok: 3, excecao: null, resultado: null }], sig: 'b', novo: false },
+    { conversa: C3, pessoa: 'Ana Souza Teste', eu: true, aberta: false, tipo: 'exame', exames: [{ id: 13, nome: 'RM COLUNA LOMBAR', unidade: 'Centro', data: dia(-2), hora: '10:00', ok: 5, excecao: null, resultado: 'disponivel' }], sig: 'c', novo: false },
+  ],
+  novidades: 1,
+  resultados: [{ id: 'r1', pessoa: 'Leo Souza Teste', eu: false, nome: 'TC TORAX', data_exame: '2026-10-10', entregue_em: '2026-10-15T12:00:00Z', tem_arquivo: true, conversa: C9 }],
+});
+const perfil = (extra = {}) => ({ ok: true, perfil: { nome: 'Ana Souza Teste', nascimento: '1988-04-12', telefone: '71991230001', email: 'ana@exemplo.invalid', cpf_salvo: true, cpf_mascara: '***.***.***-25', selecao: ['eu'], filhos: [{ id: 'f1', nome: 'Leo Souza Teste', nascimento: '2019-08-30', cpf_salvo: false, cpf_mascara: null }], confiaveis: [], marcacoes: [], confiam_em_mim: [], ...extra } });
+
+// ======================================================= 1) a tela principal do chat
+async function abrirChat({ token = true, contagem = { ok: true, novidades: 2 }, perfilResp = perfil(), conversa = false } = {}) {
+  const mundo = criarMundo({ acessoAtivo: true });
+  mundo.acompanhar = { vincular: [], contagem: 0 };
+  const original = mundo.tratar;
+  mundo.tratar = async (nome, corpo, cab) => {
+    if (nome === 'app_perfil') return { body: perfilResp };
+    if (nome === 'app_pendencias') return { body: { ok: true, pendencias: [] } };
+    if (nome === 'app_conversa_vincular') { mundo.acompanhar.vincular.push(corpo); return { body: { ok: true } }; }
+    if (nome === 'app_pedidos_contagem') { mundo.acompanhar.contagem++; return { body: typeof contagem === 'function' ? contagem() : contagem }; }
+    return original(nome, corpo, cab);
+  };
+  const init = [];
+  if (token) init.push([(t) => { try { localStorage.setItem('csi_acesso_v2', JSON.stringify({ dev: t, nome1: 'Ana' })); } catch { /* sem armazenamento */ } }, DEV]);
+  if (conversa) init.push([(c) => { try { localStorage.setItem('webchat.conversa.v1', JSON.stringify(c)); } catch { /* sem armazenamento */ } }, { id: mundo.conversa, token: mundo.token, tipo: 'proprio', nomeCrianca: '', irmaos: [], irmaosModo: '' }]);
+  const { page, ctx, erros } = await novaPaginaChat(browser, mundo, { init });
+  await page.goto(`${base}/index.html`);
+  await page.waitForSelector(conversa ? '#telaChat' : '#formInicio', { state: 'visible', timeout: 10000 }).catch(() => {});
+  await espera(900);
+  return { page, ctx, mundo, erros };
+}
+
+await caso('tela principal: botão grande "Acompanhe seus pedidos" com o balão das novidades (2), levando ao check-in', async () => {
+  const { page, ctx, mundo, erros } = await abrirChat();
+  const a = await page.$eval('#linkAcompanhar', (n) => ({ visivel: !n.hidden && n.offsetHeight > 40, href: n.getAttribute('href'), txt: n.textContent }));
+  const b = await page.$eval('#balaoAcompanhar', (n) => ({ oculto: n.hidden, txt: n.textContent, aria: n.getAttribute('aria-label') }));
+  await ctx.close();
+  return { ok: a.visivel && /minha-vez\/\?acompanhar=1$/.test(a.href) && /Acompanhe seus pedidos/.test(a.txt) && !b.oculto && b.txt === '2' && b.aria === '2 novidades' && erros.excecoes.length === 0 && mundo.acompanhar.contagem >= 1,
+    detalhe: JSON.stringify({ a, b, erros: erros.excecoes }) };
+});
+await caso('sem novidades o balão some; o botão continua', async () => {
+  const { page, ctx } = await abrirChat({ contagem: { ok: true, novidades: 0 } });
+  const a = await page.$eval('#linkAcompanhar', (n) => !n.hidden), b = await page.$eval('#balaoAcompanhar', (n) => n.hidden);
+  await ctx.close();
+  return { ok: a && b };
+});
+await caso('sem acesso rápido neste aparelho (sem código guardado) não aparece botão nenhum', async () => {
+  const { page, ctx } = await abrirChat({ token: false });
+  const a = await page.$eval('#linkAcompanhar', (n) => n.hidden), m = await page.$eval('#btnAcompanhar', (n) => n.hidden);
+  await ctx.close();
+  return { ok: a && m };
+});
+await caso('PIN vencido: o botão continua (a pessoa digita o PIN no portal) e o balão some', async () => {
+  const { page, ctx } = await abrirChat({ perfilResp: { ok: false, erro: 'bloqueado', mensagem: 'Digite seu PIN para continuar.' }, contagem: { ok: false, erro: 'bloqueado' } });
+  const a = await page.$eval('#linkAcompanhar', (n) => !n.hidden), b = await page.$eval('#balaoAcompanhar', (n) => n.hidden);
+  await ctx.close();
+  return { ok: a && b };
+});
+await caso('o balão acompanha o banco: sobe de 0 para 3 sozinho na próxima conferência (voltando à aba)', async () => {
+  let n = 0;
+  const { page, ctx } = await abrirChat({ contagem: () => ({ ok: true, novidades: n }) });
+  const antes = await page.$eval('#balaoAcompanhar', (x) => x.hidden);
+  n = 3;
+  await page.evaluate(() => { Object.defineProperty(document, 'hidden', { configurable: true, get: () => false }); document.dispatchEvent(new Event('visibilitychange')); });
+  await espera(700);
+  const depois = await page.$eval('#balaoAcompanhar', (x) => ({ oculto: x.hidden, txt: x.textContent }));
+  await ctx.close();
+  return { ok: antes === true && depois.oculto === false && depois.txt === '3', detalhe: JSON.stringify(depois) };
+});
+await caso('no chat aberto: o acesso é pelo menu (com o balão) e a conversa do aparelho é ligada ao cadastro', async () => {
+  const { page, ctx, mundo } = await abrirChat({ conversa: true });
+  const grande = await page.$eval('#linkAcompanhar', (n) => n.hidden);
+  await page.click('#btnMenu');
+  const item = await page.$eval('#btnAcompanhar', (n) => ({ visivel: !n.hidden && n.offsetHeight > 0, txt: n.textContent }));
+  const vinc = mundo.acompanhar.vincular.find((v) => v.p_conversa === mundo.conversa);
+  await ctx.close();
+  return { ok: grande && item.visivel && /Acompanhe seus pedidos/.test(item.txt) && /2$/.test(item.txt) && !!vinc && vinc.p_token === DEV && vinc.p_conv_token === mundo.token, detalhe: JSON.stringify({ grande, item, vinc: !!vinc }) };
+});
+
+// ======================================================= 2) o portal (check-in) com login automático
+async function abrirPortal({ dev = true, dados = dadosPadrao(), bloqueado = false, perfilResp = perfil(), url = '/minha-vez/?acompanhar=1' } = {}) {
+  const ctx = await browser.newContext({ permissions: [], viewport: { width: 390, height: 780 } });
+  if (dev) await ctx.addInitScript((t) => { try { localStorage.setItem('csi_acesso_v2', JSON.stringify({ dev: t, nome1: 'Ana' })); } catch { /* sem armazenamento */ } }, DEV);
+  const estado = { rpcs: [], corpos: {}, dados, bloqueado, pinCerto: '1357', acao: null, checkin: null, nav: [] };
+  await ctx.route('**/cdn.jsdelivr.net/**', (r) => r.fulfill({ contentType: 'text/javascript', body: lib }));
+  await ctx.route('**/*.supabase.co/**', async (r) => {
+    const u = new URL(r.request().url()), j = (body, status = 200) => r.fulfill({ status, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(body) });
+    if (r.request().method() === 'OPTIONS') return r.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' } });
+    if (u.pathname.startsWith('/rest/v1/rpc/')) {
+      const nome = u.pathname.split('/').pop(); let c = {}; try { c = JSON.parse(r.request().postData() || '{}'); } catch { /* sem corpo */ }
+      estado.rpcs.push(nome); (estado.corpos[nome] = estado.corpos[nome] || []).push(c);
+      switch (nome) {
+        case 'app_pedidos': return estado.bloqueado ? j({ ok: false, erro: 'bloqueado', mensagem: 'Digite seu PIN para continuar.' }) : j(estado.dados);
+        case 'app_desbloquear': if (c.p_pin === estado.pinCerto) { estado.bloqueado = false; return j({ ok: true, perfil: perfil().perfil }); } return j({ ok: false, erro: 'pin', mensagem: 'PIN incorreto. Tente de novo.' });
+        case 'app_perfil': return j(perfilResp);
+        case 'app_pedido_visto': return j({ ok: true });
+        case 'app_pedido_acao': return j(estado.acao ? estado.acao(c) : { ok: true, conversa: c.p_conversa, token: 'tok-' + c.p_conversa, tipo: 'proprio', paciente_nome: null, aberta: true });
+        case 'app_resultado_arquivo': return j({ ok: true, mime: 'application/pdf', nome: 'laudo.pdf', base64: Buffer.from('%PDF-1.4 teste').toString('base64') });
+        case 'checkin_publico': estado.checkin = c; return j({ situacao: 'aguardando', ticket: 'tk-9', senha: 7, posicao: 3, a_frente: 2 });
+        case 'fila_minha_vez_ticket': return j({ situacao: 'aguardando', senha: 7, posicao: 3, a_frente: 2, total: 5, pode_chegar: true });
+        case 'fila_config_publica': return j({ vapid: null });
+        default: return j(null);
+      }
+    }
+    return j([]);
+  });
+  const page = await ctx.newPage();
+  const erros = []; page.on('pageerror', (e) => erros.push(e.message));
+  page.on('dialog', (d) => d.accept());
+  await page.goto(`${base}${url}`);
+  await espera(800);
+  return { page, ctx, estado, erros };
+}
+const textoDe = (page) => page.$eval('#raiz', (n) => n.innerText);
+
+await caso('login automático: com o código do aparelho a página já entra sozinha e mostra os pedidos de TODOS (titular e filho), sem pedir senha', async () => {
+  const { page, ctx, estado, erros } = await abrirPortal();
+  const t = await textoDe(page);
+  const n = await page.$$eval('.cartao.pedido', (ns) => ns.length);
+  await ctx.close();
+  return { ok: /Acompanhe seus pedidos/.test(t) && n === 3 && /Ana|Olá, Ana/.test(t) && /Leo/.test(t) && !/Entrar com e-mail/.test(t) && erros.length === 0 && estado.corpos.app_pedidos[0].p_token === DEV && estado.corpos.app_pedidos[0].p_renova === true, detalhe: `${n} pedidos ${erros.join('|')}` };
+});
+await caso('cada pedido mostra o status (marcado, confirmado, exame feito), a data e a unidade; os exames saem com o nome legível', async () => {
+  const { page, ctx } = await abrirPortal();
+  const t = await textoDe(page);
+  await ctx.close();
+  return { ok: /Exame marcado/.test(t) && /Tudo certo! Falta só você chegar/.test(t) && /Exame realizado/.test(t) && /às 08:40 · Centro/.test(t) && /Ressonância|RM/i.test(t), detalhe: t.slice(0, 200).replace(/\n/g, ' | ') };
+});
+await caso('pedido com novidade tem a etiqueta "Novidade"; o portal marca como visto sozinho (o balão da tela principal some)', async () => {
+  const { page, ctx, estado } = await abrirPortal();
+  const novo = await page.$$eval('.novo', (ns) => ns.length);
+  await espera(4200);
+  const visto = (estado.corpos.app_pedido_visto || [])[0];
+  await ctx.close();
+  return { ok: novo === 1 && !!visto && visto.p_token === DEV && !visto.p_conversa, detalhe: `${novo} ${JSON.stringify(visto)}` };
+});
+await caso('filtro por pessoa: "Eu" mostra só os da Ana; "Leo" só os do filho', async () => {
+  const { page, ctx } = await abrirPortal();
+  await page.click('.chip:has-text("Leo")');
+  const leo = await page.$$eval('.cartao.pedido', (ns) => ns.length);
+  await page.click('.chip:has-text("Eu")');
+  const eu = await page.$$eval('.cartao.pedido', (ns) => ns.length);
+  await page.click('.chip:has-text("Todos")');
+  const todos = await page.$$eval('.cartao.pedido', (ns) => ns.length);
+  await ctx.close();
+  return { ok: leo === 1 && eu === 2 && todos === 3, detalhe: `${leo}/${eu}/${todos}` };
+});
+await caso('tocar no pedido OFERECE levar até a conversa; aceitando, o código da conversa vai para o aparelho e o chat abre nela', async () => {
+  const { page, ctx, estado } = await abrirPortal();
+  estado.acao = (c) => ({ ok: true, conversa: c.p_conversa, token: 'tok-secreto', tipo: 'filho', paciente_nome: 'Leo Souza Teste', aberta: true });
+  await page.locator('.cartao.pedido', { hasText: 'Leo' }).click();
+  const oferta = await page.$eval('.folha', (n) => n.innerText);
+  await page.click('#acaoConversa');
+  await page.waitForURL(`${base}/`, { timeout: 8000 }).catch(() => {});
+  const conv = await page.evaluate(() => JSON.parse(localStorage.getItem('webchat.conversa.v1') || 'null'));
+  const acao = estado.corpos.app_pedido_acao[0];
+  await ctx.close();
+  return { ok: /conversa deste pedido/.test(oferta) && acao.p_acao === 'conversa' && acao.p_conversa === C2 && conv && conv.id === C2 && conv.token === 'tok-secreto' && conv.tipo === 'filho' && conv.nomeCrianca === 'Leo Souza Teste', detalhe: `${JSON.stringify(acao)} ${JSON.stringify(conv)}` };
+});
+await caso('Cancelar e Remarcar só aparecem para exame marcado/confirmado e pedem confirmação; cancelar chama a ação "cancelar" com o exame certo', async () => {
+  const { page, ctx, estado } = await abrirPortal();
+  await page.locator('.cartao.pedido', { hasText: 'JOELHO' }).click();
+  const botoes = await page.$$eval('.folha button', (bs) => bs.map((b) => b.textContent.trim()));
+  let confirmou = null; page.removeAllListeners('dialog'); page.on('dialog', (d) => { confirmou = d.message(); d.accept(); });
+  await page.locator('.folha button', { hasText: 'Cancelar:' }).click();
+  await page.waitForURL(`${base}/`, { timeout: 8000 }).catch(() => {});
+  const acao = estado.corpos.app_pedido_acao[0];
+  await ctx.close();
+  return { ok: botoes.some((b) => /Remarcar:/.test(b)) && botoes.some((b) => /Cancelar:/.test(b)) && /confirmar o cancelamento/.test(confirmou || '') && acao.p_acao === 'cancelar' && acao.p_exame === 11 && acao.p_conversa === C1, detalhe: JSON.stringify({ botoes, confirmou, acao }) };
+});
+await caso('exame já feito: sem cancelar/remarcar; com resultado disponível o botão é "Pedir meu resultado" (ação "resultado" com o exame)', async () => {
+  const { page, ctx, estado } = await abrirPortal();
+  const aviso = await page.locator('.cartao.pedido', { hasText: 'LOMBAR' }).innerText();
+  await page.locator('.cartao.pedido', { hasText: 'LOMBAR' }).click();
+  const botoes = await page.$$eval('.folha button', (bs) => bs.map((b) => b.textContent.trim()));
+  await page.locator('.folha button', { hasText: 'Pedir meu resultado' }).click();
+  await page.waitForURL(`${base}/`, { timeout: 8000 }).catch(() => {});
+  const acao = estado.corpos.app_pedido_acao[0];
+  await ctx.close();
+  return { ok: /resultado está disponível/.test(aviso) && !botoes.some((b) => /Cancelar:|Remarcar:/.test(b)) && acao.p_acao === 'resultado' && acao.p_exame === 13, detalhe: JSON.stringify({ botoes, acao }) };
+});
+await caso('resultados entregues ficam guardados à parte; "Ver o resultado" baixa o arquivo do banco', async () => {
+  const { page, ctx, estado } = await abrirPortal();
+  const t = await page.$eval('#resultados', (n) => n.innerText);
+  const [popup] = await Promise.all([ctx.waitForEvent('page', { timeout: 5000 }).catch(() => null), page.click('#resultados button:has-text("Ver o resultado")')]);
+  await espera(300);
+  const chamada = (estado.corpos.app_resultado_arquivo || [])[0];
+  await ctx.close();
+  return { ok: /Resultados guardados/.test(t) && /Leo/.test(t) && !!chamada && chamada.p_id === 'r1' && chamada.p_token === DEV && !!popup, detalhe: `${JSON.stringify(chamada)} popup=${!!popup}` };
+});
+await caso('check-in de um toque: usa nome, e-mail e celular do cadastro (nada digitado) e já abre a fila', async () => {
+  const { page, ctx, estado } = await abrirPortal();
+  await page.click('#btnCheckinApp');
+  await espera(900);
+  const t = await textoDe(page);
+  const c = estado.checkin;
+  await ctx.close();
+  return { ok: !!c && c.p_nome === 'Ana Souza Teste' && c.p_email === 'ana@exemplo.invalid' && c.p_telefone === '71991230001' && /Você está na fila|3º/.test(t) && /Acompanhe seus pedidos/.test(t), detalhe: `${JSON.stringify(c)} :: ${t.slice(0, 120).replace(/\n/g, ' | ')}` };
+});
+await caso('check-in sem e-mail no cadastro: pergunta só o e-mail, uma vez', async () => {
+  const { page, ctx, estado } = await abrirPortal({ perfilResp: perfil({ email: null }) });
+  await page.click('#btnCheckinApp');
+  await page.waitForSelector('#ceApp', { timeout: 4000 });
+  await page.fill('#ceApp', 'nova@exemplo.invalid');
+  await page.click('.folha button:has-text("Fazer check-in")');
+  await espera(900);
+  const c = estado.checkin;
+  await ctx.close();
+  return { ok: !!c && c.p_email === 'nova@exemplo.invalid' };
+});
+await caso('PIN vencido (30 min): o portal pede o PIN em vez de mostrar dado; PIN errado avisa; PIN certo abre os pedidos', async () => {
+  const { page, ctx, estado } = await abrirPortal({ bloqueado: true });
+  const pedeu = await page.$$eval('.pin-teclas button[data-tecla]', (bs) => bs.length);
+  const antes = await textoDe(page);
+  for (const d of '1111') await page.click(`.pin-teclas [data-tecla="${d}"]`);
+  await espera(600);
+  const errado = await textoDe(page);
+  for (const d of '1357') await page.click(`.pin-teclas [data-tecla="${d}"]`);
+  await espera(900);
+  const depois = await textoDe(page);
+  await ctx.close();
+  return { ok: pedeu === 10 && !/RM JOELHO|Ressonância/i.test(antes) && /PIN incorreto/.test(errado) && /Acompanhe seus pedidos/.test(depois) && (estado.corpos.app_desbloquear || []).length === 2, detalhe: `${pedeu} ${errado.slice(0, 80).replace(/\n/g, '|')}` };
+});
+await caso('atualiza sozinho: um pedido que muda no banco aparece na tela sem recarregar, e a recarga NÃO estende o PIN (p_renova = false)', async () => {
+  const { page, ctx, estado } = await abrirPortal();
+  estado.dados = JSON.parse(JSON.stringify(estado.dados)); estado.dados.pedidos[0].exames[0].ok = 3; estado.dados.pedidos[0].novo = true; estado.dados.novidades = 2;
+  await page.evaluate(() => { Object.defineProperty(document, 'hidden', { configurable: true, get: () => false }); document.dispatchEvent(new Event('visibilitychange')); });
+  await espera(900);
+  const t = await textoDe(page);
+  const recargas = (estado.corpos.app_pedidos || []).slice(1);
+  await ctx.close();
+  return { ok: (t.match(/Falta só você chegar/g) || []).length === 2 && recargas.length >= 1 && recargas.every((x) => x.p_renova === false), detalhe: `${(t.match(/Falta só você chegar/g) || []).length} ${JSON.stringify(recargas.map((x) => x.p_renova))}` };
+});
+await caso('sem acesso rápido neste aparelho: o portal mostra o check-in de sempre e um convite para criar o acesso rápido', async () => {
+  const { page, ctx, estado } = await abrirPortal({ dev: false });
+  const t = await textoDe(page);
+  const link = await page.$eval('#conviteAcesso a', (a) => a.getAttribute('href'));
+  await ctx.close();
+  return { ok: /Chegou na clínica/.test(t) && /Acompanhe seus pedidos/.test(t) && /voltar=acompanhar/.test(link) && !(estado.rpcs || []).includes('app_pedidos'), detalhe: link };
+});
+await caso('código do aparelho desconhecido pelo servidor: some do aparelho e cai no check-in comum', async () => {
+  const { page, ctx } = await abrirPortal({ dados: { ok: false, erro: 'sessao', mensagem: 'Entre de novo.' } });
+  const guardado = await page.evaluate(() => localStorage.getItem('csi_acesso_v2'));
+  const t = await textoDe(page);
+  await ctx.close();
+  return { ok: guardado === null && /Chegou na clínica/.test(t) };
+});
+
+await browser.close(); srv.close();
+const ok = resultados.filter(Boolean).length;
+console.log(`\n${ok}/${resultados.length} casos passaram.`);
+process.exit(ok === resultados.length ? 0 : 1);

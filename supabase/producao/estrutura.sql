@@ -1,5 +1,5 @@
 -- RETRATO DA ESTRUTURA DO BANCO DE PRODUÇÃO (projeto webchat-atendimento). GERADO: não editar à mão.
--- Atualização parcial em 2026-11-15T03:30:00+00:00 (funções app_* e painel_app_*, tabelas app_*). Retrato inteiro tirado em 2026-11-14T20:32:54.165875+00:00 · Postgres 17.11. Só estrutura: nenhuma linha de tabela, nenhum valor de configuração.
+-- Atualização parcial em 2026-11-15T03:51:12.071Z (funções app_* e painel_app_*, tabelas app_*). Retrato inteiro tirado em 2026-11-14T20:32:54.165875+00:00 · Postgres 17.11. Só estrutura: nenhuma linha de tabela, nenhum valor de configuração.
 -- Serve de referência e para os testes. NÃO rodar inteiro sobre a produção. Como refazer: supabase/producao/LEIAME.md.
 
 -- ===== Extensões =====
@@ -18,7 +18,7 @@
 -- authenticator: session_preload_libraries=supautils, safeupdate, statement_timeout=8s, lock_timeout=8s
 -- service_role: sem limite
 
--- ===== Tabelas (137) =====
+-- ===== Tabelas (139) =====
 
 create table public.agenda_ao_vivo (
   dia date not null,
@@ -687,39 +687,6 @@ comment on table public.conversa_agendado_conferencia is 'Conferência, em segun
 alter table public.conversa_agendado_conferencia enable row level security;
 create policy conversa_agendado_conferencia_select on public.conversa_agendado_conferencia as permissive for select to public
   using ((( SELECT papel_atual() AS papel_atual) = ANY (ARRAY['admin'::text, 'atendente'::text])));
--- concessão a anon: DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
--- concessão a authenticated: DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
-
-create table public.conversa_anexo (
-  id bigint generated always as identity not null,
-  conversa_id uuid not null,
-  tipo text default 'pedido_medico'::text not null,
-  mime text not null,
-  dados bytea not null,
-  ocr_texto text,
-  criado_em timestamp with time zone default now() not null,
-  largura integer,
-  altura integer,
-  ocr_motor text,
-  ocr_linhas jsonb,
-  ia_leitura jsonb,
-  ia_modelo text,
-  ia_ms integer,
-  ia_erro text,
-  ia_em timestamp with time zone,
-  escolha jsonb,
-  escolha_em timestamp with time zone,
-  gabarito jsonb,
-  gabarito_por uuid,
-  gabarito_em timestamp with time zone,
-  klingo_conferido_em timestamp with time zone,
-  klingo_conferido_por uuid,
-  nome text,
-  constraint conversa_anexo_pkey PRIMARY KEY (id)
-);
-comment on table public.conversa_anexo is 'Foto do pedido médico enviada pelo paciente. Sem policy: o chat grava por chat_anexo_enviar e a equipe lê por painel_anexo.';
-CREATE INDEX conversa_anexo_conversa ON public.conversa_anexo USING btree (conversa_id);
-alter table public.conversa_anexo enable row level security;
 -- concessão a anon: DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
 -- concessão a authenticated: DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
 
@@ -1936,30 +1903,6 @@ create table public.medico_turno (
 );
 alter table public.medico_turno enable row level security;
 
-create table public.mensagens (
-  id bigint generated always as identity not null,
-  conversa_id uuid not null,
-  autor text not null,
-  agente_id uuid,
-  texto text not null,
-  criado_em timestamp with time zone default now() not null,
-  opcoes jsonb,
-  editada_em timestamp with time zone,
-  excluida_em timestamp with time zone,
-  constraint mensagens_autor_check CHECK ((autor = ANY (ARRAY['cliente'::text, 'agente'::text, 'sistema'::text]))),
-  constraint mensagens_texto_check CHECK (((char_length(texto) >= 1) AND (char_length(texto) <= 4000))),
-  constraint mensagens_pkey PRIMARY KEY (id)
-);
-CREATE INDEX mensagens_agente_idx ON public.mensagens USING btree (agente_id);
-CREATE INDEX mensagens_conversa_idx ON public.mensagens USING btree (conversa_id, id);
-CREATE UNIQUE INDEX mensagens_despedida_unica ON public.mensagens USING btree (conversa_id, ((opcoes ->> 'encerrada_em'::text))) WHERE ((opcoes ->> 'tipo'::text) = 'despedida'::text);
-alter table public.mensagens enable row level security;
-create policy mensagens_insert on public.mensagens as permissive for insert to authenticated
-  with check (((( SELECT papel_atual() AS papel_atual) = ANY (ARRAY['admin'::text, 'atendente'::text])) AND (autor = 'agente'::text) AND (agente_id = ( SELECT auth.uid() AS uid))));
-create policy mensagens_select on public.mensagens as permissive for select to authenticated
-  using (((( SELECT papel_atual() AS papel_atual) = ANY (ARRAY['admin'::text, 'atendente'::text])) AND ((NOT ( SELECT permissao_restringe() AS permissao_restringe)) OR pode_ver_conversa(conversa_id))));
--- concessão a authenticated: SELECT
-
 create table public.ocr_aprendido (
   texto_norm text not null,
   procedimento_id integer not null,
@@ -2558,6 +2501,99 @@ alter table public.app_paciente enable row level security;
 
 
 
+
+create table public.app_conversa (
+  paciente_id uuid not null,
+  conversa_id uuid not null,
+  pessoa_nome text,
+  eu boolean default true not null,
+  visto_sig text,
+  visto_em timestamp with time zone,
+  criado_em timestamp with time zone default now() not null,
+  constraint app_conversa_pkey PRIMARY KEY (paciente_id, conversa_id)
+);
+comment on table public.app_conversa is 'Conversas que o aparelho provou ter (id + token + celular do cadastro). Só as funções app_* leem. Guarda a assinatura do que o paciente já viu (balão de novidades).';
+CREATE INDEX app_conversa_conversa_idx ON public.app_conversa USING btree (conversa_id);
+alter table public.app_conversa enable row level security;
+
+create table public.app_resultado (
+  id uuid default gen_random_uuid() not null,
+  paciente_id uuid not null,
+  conversa_id uuid not null,
+  exame_id bigint not null,
+  estado text default 'aguardando'::text not null,
+  conversa_resultado_id uuid,
+  conferido_em timestamp with time zone,
+  disponivel_em timestamp with time zone,
+  solicitado_em timestamp with time zone,
+  entregue_em timestamp with time zone,
+  anexo_id bigint,
+  mensagem_id bigint,
+  criado_em timestamp with time zone default now() not null,
+  constraint app_resultado_estado_check CHECK ((estado = ANY (ARRAY['aguardando'::text, 'disponivel'::text, 'solicitado'::text, 'entregue'::text]))),
+  constraint app_resultado_pkey PRIMARY KEY (id),
+  constraint app_resultado_paciente_id_conversa_id_exame_id_key UNIQUE (paciente_id, conversa_id, exame_id)
+);
+comment on table public.app_resultado is 'Estado do resultado de cada exame feito. Entregue = a equipe mandou o arquivo ou o link na conversa; a partir daí o sistema não confere mais o Klingo e o resultado fica na lista "Resultados" do paciente.';
+CREATE INDEX app_resultado_entrega_idx ON public.app_resultado USING btree (conversa_resultado_id) WHERE (estado = 'solicitado'::text);
+alter table public.app_resultado enable row level security;
+
+create table public.conversa_anexo (
+  id bigint generated always as identity not null,
+  conversa_id uuid not null,
+  tipo text default 'pedido_medico'::text not null,
+  mime text not null,
+  dados bytea not null,
+  ocr_texto text,
+  criado_em timestamp with time zone default now() not null,
+  largura integer,
+  altura integer,
+  ocr_motor text,
+  ocr_linhas jsonb,
+  ia_leitura jsonb,
+  ia_modelo text,
+  ia_ms integer,
+  ia_erro text,
+  ia_em timestamp with time zone,
+  escolha jsonb,
+  escolha_em timestamp with time zone,
+  gabarito jsonb,
+  gabarito_por uuid,
+  gabarito_em timestamp with time zone,
+  klingo_conferido_em timestamp with time zone,
+  klingo_conferido_por uuid,
+  nome text,
+  constraint conversa_anexo_pkey PRIMARY KEY (id)
+);
+comment on table public.conversa_anexo is 'Foto do pedido médico enviada pelo paciente. Sem policy: o chat grava por chat_anexo_enviar e a equipe lê por painel_anexo.';
+CREATE INDEX conversa_anexo_conversa ON public.conversa_anexo USING btree (conversa_id);
+alter table public.conversa_anexo enable row level security;
+-- concessão a authenticated: DELETE,INSERT,SELECT,UPDATE
+
+create table public.mensagens (
+  id bigint generated always as identity not null,
+  conversa_id uuid not null,
+  autor text not null,
+  agente_id uuid,
+  texto text not null,
+  criado_em timestamp with time zone default now() not null,
+  opcoes jsonb,
+  editada_em timestamp with time zone,
+  excluida_em timestamp with time zone,
+  constraint mensagens_autor_check CHECK ((autor = ANY (ARRAY['cliente'::text, 'agente'::text, 'sistema'::text]))),
+  constraint mensagens_texto_check CHECK (((char_length(texto) >= 1) AND (char_length(texto) <= 4000))),
+  constraint mensagens_pkey PRIMARY KEY (id)
+);
+CREATE INDEX mensagens_agente_idx ON public.mensagens USING btree (agente_id);
+CREATE INDEX mensagens_conversa_idx ON public.mensagens USING btree (conversa_id, id);
+CREATE UNIQUE INDEX mensagens_despedida_unica ON public.mensagens USING btree (conversa_id, ((opcoes ->> 'encerrada_em'::text))) WHERE ((opcoes ->> 'tipo'::text) = 'despedida'::text);
+alter table public.mensagens enable row level security;
+create policy mensagens_insert on public.mensagens as permissive for insert to authenticated
+  with check (((( SELECT public.papel_atual() AS papel_atual) = ANY (ARRAY['admin'::text, 'atendente'::text])) AND (autor = 'agente'::text) AND (agente_id = ( SELECT auth.uid() AS uid))));
+create policy mensagens_select on public.mensagens as permissive for select to authenticated
+  using (((( SELECT public.papel_atual() AS papel_atual) = ANY (ARRAY['admin'::text, 'atendente'::text])) AND ((NOT ( SELECT public.permissao_restringe() AS permissao_restringe)) OR public.pode_ver_conversa(conversa_id))));
+-- concessão a authenticated: DELETE,INSERT,SELECT,UPDATE
+
 -- ===== Chaves estrangeiras (depois de todas as tabelas) =====
 alter table public.agendamento_fechamento add constraint agendamento_fechamento_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE CASCADE;
 alter table public.agendamento_fechamento add constraint agendamento_fechamento_por_fkey FOREIGN KEY (por) REFERENCES agentes(id) ON DELETE SET NULL;
@@ -2575,8 +2611,6 @@ alter table public.chat_push_inscricao add constraint chat_push_inscricao_conver
 alter table public.contas_paciente add constraint contas_paciente_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE;
 alter table public.contas_paciente add constraint contas_paciente_paciente_id_fkey FOREIGN KEY (paciente_id) REFERENCES pacientes(id) ON DELETE SET NULL;
 alter table public.conversa_agendado_conferencia add constraint conversa_agendado_conferencia_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE CASCADE;
-alter table public.conversa_anexo add constraint conversa_anexo_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE CASCADE;
-alter table public.conversa_anexo add constraint conversa_anexo_gabarito_por_fkey FOREIGN KEY (gabarito_por) REFERENCES agentes(id) ON DELETE SET NULL;
 alter table public.conversa_encerramento add constraint conversa_encerramento_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE CASCADE;
 alter table public.conversa_evento add constraint conversa_evento_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE CASCADE;
 alter table public.conversa_fluxo add constraint conversa_fluxo_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE CASCADE;
@@ -2625,8 +2659,6 @@ alter table public.klingo_horarios_falha add constraint klingo_horarios_falha_co
 alter table public.klingo_oferta add constraint klingo_oferta_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE CASCADE;
 alter table public.klingo_operacao add constraint klingo_operacao_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE CASCADE;
 alter table public.klingo_operacao add constraint klingo_operacao_pre_agendamento_id_fkey FOREIGN KEY (pre_agendamento_id) REFERENCES pre_agendamentos(id) ON DELETE SET NULL;
-alter table public.mensagens add constraint mensagens_agente_id_fkey FOREIGN KEY (agente_id) REFERENCES agentes(id) ON DELETE SET NULL;
-alter table public.mensagens add constraint mensagens_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE CASCADE;
 alter table public.ocr_aprendido add constraint ocr_aprendido_procedimento_id_fkey FOREIGN KEY (procedimento_id) REFERENCES catalogo_procedimento(id) ON DELETE CASCADE;
 alter table public.org_membro add constraint org_membro_agente_id_fkey FOREIGN KEY (agente_id) REFERENCES agentes(id) ON DELETE SET NULL;
 alter table public.org_membro add constraint org_membro_equipe_id_fkey FOREIGN KEY (equipe_id) REFERENCES org_equipe(id) ON DELETE CASCADE;
@@ -2657,6 +2689,15 @@ alter table public.app_marcacao add constraint app_marcacao_filho_id_fkey FOREIG
 alter table public.app_marcacao add constraint app_marcacao_responsavel_id_fkey FOREIGN KEY (responsavel_id) REFERENCES public.app_paciente(id) ON DELETE CASCADE;
 alter table public.app_paciente add constraint app_paciente_conta_antiga_id_fkey FOREIGN KEY (conta_antiga_id) REFERENCES public.contas_paciente(id) ON DELETE SET NULL;
 alter table public.app_paciente add constraint app_paciente_paciente_sugerido_id_fkey FOREIGN KEY (paciente_sugerido_id) REFERENCES public.pacientes(id) ON DELETE SET NULL;
+alter table public.app_conversa add constraint app_conversa_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES public.conversas(id) ON DELETE CASCADE;
+alter table public.app_conversa add constraint app_conversa_paciente_id_fkey FOREIGN KEY (paciente_id) REFERENCES public.app_paciente(id) ON DELETE CASCADE;
+alter table public.app_resultado add constraint app_resultado_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES public.conversas(id) ON DELETE CASCADE;
+alter table public.app_resultado add constraint app_resultado_conversa_resultado_id_fkey FOREIGN KEY (conversa_resultado_id) REFERENCES public.conversas(id) ON DELETE SET NULL;
+alter table public.app_resultado add constraint app_resultado_paciente_id_fkey FOREIGN KEY (paciente_id) REFERENCES public.app_paciente(id) ON DELETE CASCADE;
+alter table public.conversa_anexo add constraint conversa_anexo_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES public.conversas(id) ON DELETE CASCADE;
+alter table public.conversa_anexo add constraint conversa_anexo_gabarito_por_fkey FOREIGN KEY (gabarito_por) REFERENCES public.agentes(id) ON DELETE SET NULL;
+alter table public.mensagens add constraint mensagens_agente_id_fkey FOREIGN KEY (agente_id) REFERENCES public.agentes(id) ON DELETE SET NULL;
+alter table public.mensagens add constraint mensagens_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES public.conversas(id) ON DELETE CASCADE;
 
 -- ===== Visões (5) =====
 
@@ -2975,6 +3016,8 @@ CREATE TRIGGER vinculo_log_imutavel BEFORE DELETE OR UPDATE ON public.vinculo_lo
 --   select public.klingo_operacao_vigiar()
 -- klingo-revisar-pacientes · */5 * * * * · ativa
 --   select public.klingo_revisao_disparar()
+-- app-resultados-vigia · */10 * * * * · ativa
+--   select public.app_resultados_disparar()
 -- klingo-saude · */2 * * * * · ativa
 --   select public.klingo_saude_disparar()
 -- klingo-sincronizar · 50 6 * * * · ativa
@@ -2993,4 +3036,4 @@ CREATE TRIGGER vinculo_log_imutavel BEFORE DELETE OR UPDATE ON public.vinculo_lo
 --   select net.http_post( url := 'https://nrvuynjwcgwpjdptkiay.supabase.co/functions/v1/sync-catalogo-klingo', headers := jsonb_build_object('Content-Type', 'application/json', 'x-sync-key', (select valor from public.config where chave = 'ia_segredo')), body := '{}'::jsonb, timeout_milliseconds := 120000);
 
 -- ===== Chaves existentes em public.config (só os nomes; os valores não são copiados) =====
--- agenda_ao_vivo, agenda_ao_vivo_max_dias, agenda_ao_vivo_trava_s, agenda_ao_vivo_validade_s, agendado_conferir_prazo_min, agendamento_cpf_divergentes_dia, agendamento_cpf_escritas_hora, agendamento_externo_modo, agendamento_ip_divergentes_hora, agendamento_ip_escritas_hora, agendamento_ip_por_minuto, agendamento_reconhecer, agendamento_reconhecer_msg_encerradas, app_acesso_modo, app_cadastros_max_hora, autoencerrar_horas, autoencerrar_modo, avaliacao_ativa, boas_vindas, cadastro_equipe_sem_convite, catalogo_csi, catalogo_desenvoar, catalogo_rmtc, chat_push_url, checkin_sem_login_max_dia, convenio_seguir_klingo, convenio_suspenso_texto, despedida_configurada, despedida_inatividade_ativa, despedida_inatividade_texto, despedida_versao_atual, disponibilidade_encerra_conversa, disponibilidade_max_avisos_dia, disponibilidade_max_avisos_total, encerramento_exige_motivo, encerramento_valida_agendado, equipe_push_url, fila_autochegada, fila_aviso_antes, fila_push_url, fila_vapid_publica, horario_trabalho, ia_ativa, ia_segredo, indicadores_fechar, jornada_identidade_klingo, jornada_relatorio_filtro, jornada_relatorio_id, klingo_api_cancelar, klingo_api_consultar, klingo_api_horarios, klingo_api_marcar, klingo_api_percentual, klingo_api_pos, klingo_api_pre_cadastro, klingo_api_remarcar, klingo_api_resultado, klingo_api_telefones_teste, klingo_auto, klingo_autogestao, klingo_conferir_ativo, klingo_funcoes_base, klingo_paciente_url, klingo_reconfirmar_dias, klingo_so_liberados, klingo_webhook, login_paciente, motor, motor_telefones_teste, nome_empresa, notificacao_modo, pedido_escolha_texto, pedido_horario_modo, pedido_oferta2_texto, pedido_parado_horas, pedido_sem_horario_texto, permissao_modo, previsao_decide_texto, previsao_final_texto, previsao_modo, previsao_monitor_modo, previsao_oferta_texto, previsao_texto, reabrir_dias, reaproveitar_cadastro_convidado, teste_agentes, teste_marcadores, vinculo_manual_quem
+-- agenda_ao_vivo, agenda_ao_vivo_max_dias, agenda_ao_vivo_trava_s, agenda_ao_vivo_validade_s, agendado_conferir_prazo_min, agendamento_cpf_divergentes_dia, agendamento_cpf_escritas_hora, agendamento_externo_modo, agendamento_ip_divergentes_hora, agendamento_ip_escritas_hora, agendamento_ip_por_minuto, agendamento_reconhecer, agendamento_reconhecer_msg_encerradas, app_acesso_modo, app_cadastros_max_hora, app_resultado_vigia, autoencerrar_horas, autoencerrar_modo, avaliacao_ativa, boas_vindas, cadastro_equipe_sem_convite, catalogo_csi, catalogo_desenvoar, catalogo_rmtc, chat_push_url, checkin_sem_login_max_dia, convenio_seguir_klingo, convenio_suspenso_texto, despedida_configurada, despedida_inatividade_ativa, despedida_inatividade_texto, despedida_versao_atual, disponibilidade_encerra_conversa, disponibilidade_max_avisos_dia, disponibilidade_max_avisos_total, encerramento_exige_motivo, encerramento_valida_agendado, equipe_push_url, fila_autochegada, fila_aviso_antes, fila_push_url, fila_vapid_publica, horario_trabalho, ia_ativa, ia_segredo, indicadores_fechar, jornada_identidade_klingo, jornada_relatorio_filtro, jornada_relatorio_id, klingo_api_cancelar, klingo_api_consultar, klingo_api_horarios, klingo_api_marcar, klingo_api_percentual, klingo_api_pos, klingo_api_pre_cadastro, klingo_api_remarcar, klingo_api_resultado, klingo_api_telefones_teste, klingo_auto, klingo_autogestao, klingo_conferir_ativo, klingo_funcoes_base, klingo_paciente_url, klingo_reconfirmar_dias, klingo_so_liberados, klingo_webhook, login_paciente, motor, motor_telefones_teste, nome_empresa, notificacao_modo, pedido_escolha_texto, pedido_horario_modo, pedido_oferta2_texto, pedido_parado_horas, pedido_sem_horario_texto, permissao_modo, previsao_decide_texto, previsao_final_texto, previsao_modo, previsao_monitor_modo, previsao_oferta_texto, previsao_texto, reabrir_dias, reaproveitar_cadastro_convidado, teste_agentes, teste_marcadores, vinculo_manual_quem
