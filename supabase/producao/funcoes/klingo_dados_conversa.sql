@@ -20,7 +20,7 @@ begin
     lateral generate_series(1, i.quantidade) g where i.conversa_id = p_conversa and i.ativo and i.procedimento_id is not null;
   v_n := coalesce(cardinality(v_procs), 0); v_proc := v_procs[1];
   return jsonb_build_object(
-    'tipo', pa.tipo, 'plano', pa.plano, 'pre_agendamento_id', pa.id, 'status', pa.status, 'procedimentos', coalesce(to_jsonb(v_procs), '[]'::jsonb), 'n_procedimentos', v_n, 'procedimento', v_proc,
+    'tipo', pa.tipo, 'plano', public.plano_exato_chave(p_conversa), 'pre_agendamento_id', pa.id, 'status', pa.status, 'procedimentos', coalesce(to_jsonb(v_procs), '[]'::jsonb), 'n_procedimentos', v_n, 'procedimento', v_proc,
     'cpf', case when public.fluxo_cpf_ok(v_cpf) then v_cpf end, 'nascimento', v_nasc,
     'nome', nullif(btrim(pa.paciente ->> 'nome'), ''), 'sexo', nullif(btrim(pa.paciente ->> 'sexo'), ''), 'mae', nullif(btrim(pa.paciente ->> 'mae'), ''),
     'celular', coalesce(nullif(regexp_replace(coalesce(pa.paciente ->> 'celular', ''), '\D', '', 'g'), ''), regexp_replace(coalesce(ct.telefone, ''), '\D', '', 'g')),

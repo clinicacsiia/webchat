@@ -19,7 +19,7 @@ begin
     update public.pre_agendamentos set escolha_horario = null, data_desejada = null, hora_desejada = null where conversa_id = p_conversa and status = 'rascunho';
     perform public.fluxo_set(p_conversa, '{"confirmado": false, "sem_horario": false}');
   when 6 then
-    perform public.fluxo_set(p_conversa, jsonb_build_object('confirmado', false, 'plano_anterior', null, 'plano_trocado_de', null));
+    perform public.fluxo_set(p_conversa, jsonb_build_object('confirmado', false, 'plano_anterior', null, 'plano_trocado_de', null, 'plano_exato_id', null, 'plano_exato_nome', null, 'plano_exato_de', null));
     update public.pre_agendamentos set plano = null where conversa_id = p_conversa and status = 'rascunho';
   when 7 then
     perform public.fluxo_set(p_conversa, '{"confirmado": false, "medico_feito": false}');

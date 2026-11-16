@@ -93,7 +93,7 @@ begin
     end if;
     if x = '' then return '{"ok": false}'; end if;
     perform public.fluxo_pre(p_conversa, jsonb_build_object('plano', left(x, 120), 'etapa', 'plano'));
-    perform public.fluxo_set(p_conversa, '{"plano_anterior": null}');
+    perform public.fluxo_set(p_conversa, '{"plano_anterior": null, "plano_exato_id": null, "plano_exato_nome": null, "plano_exato_de": null}');   -- plano-exato: trocou o convênio, a escolha antiga não vale
     perform public.convenio_avisar(p_conversa, x);   -- convenios-e-foto: aviso e regra "um exame por vez"
     -- convenio-quem-volta: corrigiu o plano na confirmação e escolheu OUTRO convênio: a carteirinha antiga não vale mais.
     select dados ->> 'plano_trocado_de' into k from public.conversa_fluxo where conversa_id = p_conversa;
@@ -115,6 +115,24 @@ begin
       perform public.fluxo_set(p_conversa, '{"confirmado": false}');
       return jsonb_build_object('ok', true, 'aviso', public.fluxo_t('plano_outro', jsonb_build_object('plano', left(x, 120))));
     end if;
+  when 'plano_exato' then   -- plano-exato
+    declare v_cv integer := public.plano_exato_convenio(pa.plano); v_nome text;
+    begin
+      if v_cv is null then return '{"ok": true}'::jsonb; end if;
+      if v = 'nao_sei' then
+        perform public.fluxo_set(p_conversa, jsonb_build_object('plano_exato_id', 0, 'plano_exato_nome', null, 'plano_exato_de', pa.plano));
+        perform public.fluxo_nota(p_conversa, 'Paciente não soube o plano exato de ' || pa.plano || ': conferir a carteirinha antes de marcar');
+      else
+        if v is null or v !~ '^[0-9]{1,9}$' then return '{"ok": false}'::jsonb; end if;
+        select i ->> 'rotulo' into v_nome from jsonb_array_elements(public.plano_exato_itens(v_cv)) i where i ->> 'valor' = v;
+        if v_nome is null then
+          return jsonb_build_object('ok', false, 'erro', 'Não achei esse plano na lista. Procure de novo pelo nome da carteirinha ou toque em "Não sei qual é o meu plano".');
+        end if;
+        perform public.fluxo_set(p_conversa, jsonb_build_object('plano_exato_id', v::integer, 'plano_exato_nome', left(v_nome, 120), 'plano_exato_de', pa.plano));
+        perform public.fluxo_nota(p_conversa, 'Plano escolhido pelo paciente: ' || left(v_nome, 120) || ' (' || pa.plano || ', id ' || v || ')');
+      end if;
+      perform public.fluxo_set(p_conversa, '{"confirmado": false}');
+    end;
   when 'plano_confirma' then
     select dados ->> 'plano_anterior' into x from public.conversa_fluxo where conversa_id = p_conversa;
     if v = 'sim' then
@@ -230,7 +248,7 @@ begin
     if v = 'ok' then perform public.fluxo_set(p_conversa, '{"confirmado": true}');
     elsif v = 'pedido' then perform public.fluxo_set(p_conversa, '{"refazer": "pedido", "confirmado": false}');
     elsif v = 'plano' then
-      perform public.fluxo_set(p_conversa, jsonb_build_object('plano_trocado_de', pa.plano, 'plano_anterior', null, 'confirmado', false));
+      perform public.fluxo_set(p_conversa, jsonb_build_object('plano_trocado_de', pa.plano, 'plano_anterior', null, 'confirmado', false, 'plano_exato_id', null, 'plano_exato_nome', null, 'plano_exato_de', null));
       update public.pre_agendamentos set plano = null where conversa_id = p_conversa;
     elsif v = 'horario' then
       update public.pre_agendamentos set escolha_horario = null, data_desejada = null, hora_desejada = null where conversa_id = p_conversa;

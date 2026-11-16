@@ -9,7 +9,7 @@ AS $function$
 declare
   ctx jsonb := public.fluxo_ctx(p_conversa); c public.conversas; pa public.pre_agendamentos; d jsonb;
   v_txt text; v_op jsonb; v_hist jsonb; v_it jsonb := '[]'::jsonb; v_ult jsonb; v_pend jsonb; v_med text[]; v_nome text; v_tel text; x text; v_dig jsonb;
-  v_etapa text; v_nse boolean; v_pref text := p_prefixo;
+  v_etapa text; v_nse boolean; v_pref text := p_prefixo; v_conv integer;
 begin
   select * into c from public.conversas where id = p_conversa;
   select * into pa from public.pre_agendamentos where conversa_id = p_conversa;
@@ -89,6 +89,11 @@ begin
     from (select operadora, count(*) n from public.catalogo_plano where coalesce(ativo, true) and operadora !~* '^(teste|particular)$' and public.convenio_ativo(operadora) group by operadora) o;
     v_op := public.fluxo_escolha(p_passo, jsonb_build_array(jsonb_build_object('valor', 'Particular', 'rotulo', 'Particular (sem convênio)')) || v_it,
       jsonb_build_object('filtro', true, 'outro', jsonb_build_object('rotulo', 'Meu convênio não está na lista', 'placeholder', 'Nome do convênio')));
+  when 'plano_exato' then   -- plano-exato: lista os planos reais do Klingo para o convênio escolhido
+    v_conv := public.plano_exato_convenio(pa.plano);
+    v_txt := public.fluxo_t('plano_exato', ctx || jsonb_build_object('convenio', initcap(lower(coalesce(pa.plano, '')))));
+    v_op := public.fluxo_escolha(p_passo, jsonb_build_array(jsonb_build_object('valor', 'nao_sei', 'rotulo', 'Não sei qual é o meu plano')) || public.plano_exato_itens(v_conv),
+      jsonb_build_object('filtro', true));
   when 'plano_confirma' then
     x := d ->> 'plano_anterior';
     v_txt := public.fluxo_t('plano_confirma', ctx || jsonb_build_object('como',
@@ -174,7 +179,7 @@ begin
   perform public.fluxo_dizer(p_conversa, v_txt, v_op);
   update public.conversa_fluxo set tentativas = case when passo is distinct from p_passo then 0 else tentativas end, passo = p_passo, atualizado_em = now()
   where conversa_id = p_conversa;
-  v_etapa := case when p_passo in ('motivo','exame','consulta','atalho','medico') then 'pedido' when p_passo in ('plano', 'plano_confirma', 'cpf_nasc', 'cpf_confirma') then 'plano' when p_passo = 'horario' then 'data_hora'
+  v_etapa := case when p_passo in ('motivo','exame','consulta','atalho','medico') then 'pedido' when p_passo in ('plano', 'plano_confirma', 'plano_exato', 'cpf_nasc', 'cpf_confirma') then 'plano' when p_passo = 'horario' then 'data_hora'
                   when p_passo in ('mudou','dados_ident','dados_contato','dados_endereco','dados_carteira','identidade') then 'dados' when p_passo = 'confirmar' then 'confirmacao' end;
   if v_etapa is not null then update public.pre_agendamentos set etapa = v_etapa where conversa_id = p_conversa and status = 'rascunho'; end if;
 end $function$;

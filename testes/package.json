@@ -117,6 +117,7 @@
     "test:simulacao-nav": "node simulacao.navegador.mjs",
     "test:producao-sql": "node sql-producao.test.mjs",
     "test:ponta-a-ponta": "node sql-ponta-a-ponta.test.mjs",
+    "test:plano-exato": "node sql-plano-exato.test.mjs",
     "test:sem-duplicata": "node sql-sem-duplicata.test.mjs",
     "test:marcado": "node marcado.navegador.mjs",
     "test:equipe-assume": "node chat-equipe-assume.navegador.mjs",

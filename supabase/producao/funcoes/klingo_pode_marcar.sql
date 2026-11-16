@@ -33,9 +33,9 @@ begin
     if v_id ->> 'situacao' = 'nao_encontrado' then v_novo := true; end if;
   end if;
   if v_novo and not public.klingo_ativo(p_conversa, 'klingo_api_pre_cadastro') then return jsonb_build_object('ok', false, 'motivo', 'paciente_novo'); end if;
-  v_pl := public.klingo_plano_resolver(pa.plano, nullif(v_id ->> 'plano_id', '')::int);
+  v_pl := public.klingo_plano_resolver(public.plano_exato_chave(p_conversa), nullif(v_id ->> 'plano_id', '')::int);
   if (v_pl ->> 'plano_id') is null and not (v_id is null or v_id ->> 'situacao' is null) then return jsonb_build_object('ok', false, 'motivo', coalesce(v_pl ->> 'motivo', 'sem_plano')); end if;
-  if (v_pl ->> 'plano_id') is not null and (v_pl ->> 'plano_id')::int is distinct from o.plano and (v_pl ->> 'via') = 'padrao' and o.plano <> (v_pl ->> 'plano_id')::int and v_id is not null then
+  if (v_pl ->> 'plano_id') is not null and (v_pl ->> 'plano_id')::int is distinct from o.plano and (v_pl ->> 'via') in ('padrao', 'escolhido') and o.plano <> (v_pl ->> 'plano_id')::int and v_id is not null then
     return jsonb_build_object('ok', false, 'motivo', 'plano_mudou_depois_da_oferta');
   end if;
   if pa.tipo = 'exame' and public.norm_nome(pa.plano) <> 'PARTICULAR' and public.klingo_cfg('klingo_api_exame_convenio', 'nao') <> 'sim' then

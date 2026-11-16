@@ -78,6 +78,8 @@ begin
       group by o.operadora) q
     where q.fortes > 0 order by q.acertos desc, length(q.operadora) limit 1;
     if x is not null then return to_jsonb(x); end if;
+  when 'plano_exato' then   -- plano-exato
+    if t ~ '(nao sei|nao lembro|nao tenho (a )?carteirinha|sem carteirinha)' then return '"nao_sei"'; end if;
   when 'plano_confirma' then
     if t ~ '(nao (mudou|mudei|mudaram|trocou|troquei)|nada mudou|continua|continuo)' then return '"sim"'; end if;
     if nao or t ~ '(mudou|mudei|mudaram|trocou|troquei|outro|novo|nova|diferente)' then return '"nao"'; end if;
