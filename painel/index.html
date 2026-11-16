@@ -4073,7 +4073,7 @@ h1.longo { font-size: 14mm; }
         let lerLista = null;
         ler = () => (lerLista ? lerLista() : String(atual));
         db.rpc('consultas_config_listar').then(({ data: d, error: er }) => {
-          if (er) { const campo = h('input', { type: 'text', value: String(atual), maxlength: '300', autocomplete: 'off' }); ctrl.replaceChildren(h('span', { class: 'dica' }, 'Não consegui ler a agenda. Escreva os nomes como no Klingo, separados por ponto e vírgula (;).'), campo); lerLista = () => campo.value.trim(); return; }
+          if (er) { ctrl.replaceChildren(h('span', { class: 'erro' }, 'Não consegui carregar as médicas da agenda do Klingo. Recarregue a página; as médicas já salvas continuam valendo.')); return; }
           const nomes = new Map();
           (d || []).forEach((x) => (x.medicos || []).forEach((m) => { if (!nomes.has(semAcento(m))) nomes.set(semAcento(m), m); }));
           const fora = marcadas.filter((m) => !nomes.has(semAcento(m)));
