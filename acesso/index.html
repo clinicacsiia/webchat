@@ -376,7 +376,7 @@ const V={
   pinnovo:()=>`${voltar(S.volta)}${pinView()}`,
   dados:()=>{
     const p=S.perfil;
-    return`<button class="link" data-act="go" data-v="home">← Voltar ao chat</button><h1>Meus dados</h1>${pendHtml()}
+    return`<button class="btn sec" style="margin:0 0 12px" data-act="go" data-v="home">← Voltar ao chat</button><h1>Meus dados</h1>${pendHtml()}
     <div class="card"><div class="item"><div><small>Nome</small><b>${esc(p.nome)}</b></div></div>
     <div class="item"><div><small>Nascimento</small><b>${fmtData(p.nascimento)} · ${fmtIdade(p.nascimento)}</b></div></div>
     <div class="item"><div><small>Celular (seu login)</small><b>${fmtTel(p.telefone)}</b></div></div>

@@ -39,6 +39,8 @@
   button.verde:disabled { opacity:.6; }
   button.link { background:none; border:0; color:var(--azul); text-decoration:underline; font-size:.95rem; padding:8px 0; cursor:pointer; }
   a { color:var(--azul); }
+  a.voltar-chat { display:block; box-sizing:border-box; width:100%; text-align:center; text-decoration:none; font-weight:800; font-size:1.05rem; padding:14px 16px; margin:8px 0 14px; border:2px solid var(--azul); border-radius:var(--radius-lg); background:var(--papel); color:var(--azul); }
+  a.voltar-chat:active { background:var(--azul-claro); }
   .erro { color:var(--erro); font-weight:600; }
   .posicao { text-align:center; }
   .posicao .num { font-size:5.5rem; font-weight:800; line-height:1; color:var(--azul); }
@@ -405,7 +407,7 @@
         h('span', { class: 'selo ' + (perto ? 'mau' : '') }, 'Senha ' + f.senha),
         perto ? h('p', { style: 'margin-top:12px' }, 'Está chegando a sua vez.') : null));
     } else if (f.situacao === 'atendido') {
-      nos.push(h('div', { class: 'cartao' }, h('h1', {}, 'Atendimento concluído'), h('p', {}, 'Obrigado pela visita! Se precisar de algo, é só falar com a gente pelo chat.'), h('a', { href: CHAT_URL }, 'Voltar ao chat')));
+      nos.push(h('div', { class: 'cartao' }, h('h1', {}, 'Atendimento concluído'), h('p', {}, 'Obrigado pela visita! Se precisar de algo, é só falar com a gente pelo chat.'), h('a', { class: 'voltar-chat', href: CHAT_URL }, '← Voltar ao chat')));
     } else {
       nos.push(h('div', { class: 'cartao' }, h('h1', {}, 'Chegou na clínica?'),
         f.pode_chegar === false ? h('p', {}, 'Avise a recepção que você chegou. Ela vai colocar você na fila e o portal mostrará a sua posição.')
@@ -566,7 +568,7 @@
       h('h1', {}, 'Olá' + (st.nome1 ? ', ' + st.nome1 : '') + '!'), h('p', { class: 'suave' }, 'Digite o seu PIN de 4 números para ver os seus pedidos.'), pontos, erro,
       h('div', { class: 'pin-teclas' }, ...[1, 2, 3, 4, 5, 6, 7, 8, 9].map(tecla), h('button', { type: 'button', class: 'vazio', tabindex: '-1', 'aria-hidden': 'true' }), tecla(0),
         h('button', { type: 'button', 'aria-label': 'Apagar', onclick: () => { if (!trabalhando) { buf = buf.slice(0, -1); marcar(); } } }, '⌫')),
-      h('p', { style: 'text-align:center;margin:8px 0 0' }, h('a', { href: '../acesso/?voltar=acompanhar' }, 'Esqueci o PIN'), ' · ', h('a', { href: '../' }, 'Voltar ao chat'))));
+      h('p', { style: 'text-align:center;margin:8px 0 12px' }, h('a', { href: '../acesso/?voltar=acompanhar' }, 'Esqueci o PIN')), h('a', { class: 'voltar-chat', href: '../' }, '← Voltar ao chat')));
   }
 
   // Entra sozinho com o código do aparelho. Sem PIN ativo, pede o PIN; sem código, mostra o convite.
@@ -796,7 +798,7 @@
       h('p', { class: 'suave' }, 'Chegou na clínica? Faça o check-in com um toque e acompanhe a sua vez aqui.'),
       h('button', { class: 'verde', style: 'font-size:1.4rem;padding:22px 12px', type: 'button', id: 'btnCheckinApp', onclick: (ev) => checkinApp(ev.currentTarget) }, 'Fazer check-in'))];
     nos.push(...appNos());
-    nos.push(h('p', { style: 'text-align:center' }, h('a', { href: '../' }, '← Voltar ao chat')));
+    nos.push(h('a', { class: 'voltar-chat', href: '../' }, '← Voltar ao chat'));
     mostrar(...nos);
   }
   // Um toque: o PIN já provou quem é, então o SERVIDOR (app_checkin) usa o nome, o e-mail e o celular do cadastro e põe na fila. Nunca pergunta senha nem e-mail.
