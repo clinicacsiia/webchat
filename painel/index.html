@@ -552,6 +552,20 @@
   .item .tag { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 2px 10px; }
   .item .tag::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
   .item .tag.encerrada::before { content: '✓'; width: auto; height: auto; background: none; font-size: 11px; }
+  /* Ver horários (Etapa 1) */
+  .hor-dias { display: grid; gap: 10px; max-height: 52vh; overflow: auto; margin-top: 8px; }
+  .hor-dia { border: 1px solid var(--linha); border-radius: var(--radius-sm); padding: 8px 10px; }
+  .hor-lista { display: flex; flex-wrap: wrap; gap: 6px 10px; margin-top: 6px; }
+  .hor-item { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border: 1px solid var(--linha); border-radius: 999px; cursor: pointer; font-weight: 650; }
+  .hor-item small { font-weight: 400; color: var(--suave); }
+  .hor-item:has(input:checked) { background: var(--csi-primary-soft); border-color: var(--csi-primary); }
+  /* Cartão enxuto: 1 ação principal + ícones + linha de contexto */
+  .item .l3 .prim { font-size: 12.5px; white-space: normal !important; max-width: 100%; line-height: 1.3; }
+  .item .l3 .mini { display: inline-grid; place-items: center; min-width: 24px; height: 22px; padding: 0 5px; border-radius: 999px; font-size: 12px; background: var(--csi-surface-2, #eef1f5); color: var(--csi-text-secondary); border: 1px solid transparent; }
+  .item .l3 .mini.alta { background: var(--csi-danger-bg); border-color: var(--csi-danger); } .item .l3 .mini.media { background: var(--csi-warning-soft); }
+  .item .meta { grid-column: 2; margin-top: 4px; font-size: 12px; color: var(--suave); display: flex; align-items: center; gap: 6px; }
+  .item .meta::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--csi-warning); flex: none; }
+  .item .meta.em_atendimento::before { background: var(--csi-primary); } .item .meta.encerrada::before { background: var(--csi-success); }
   @media (max-height: 820px) { .kpis, .painel-cab p.sub { display: none; } .painel-cab { padding-top: 10px; } .painel-cab h2 { font-size: 19px; } }
   @media (min-width: 861px) { .eu b, .eu > span { display: none; } }
   @media (max-width: 1100px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
@@ -1978,6 +1992,69 @@
     const t2 = setInterval(() => { if (!dlg.open || dlg.dataset.equipe !== '1') { clearInterval(t2); return; } carregarMarcouHoje(); }, 60000);
     dlg.addEventListener('close', () => { delete dlg.dataset.equipe; clearInterval(t); clearInterval(t2); }, { once: true });
   }
+  /* ---------- Ver horários reais da agenda (Klingo) dentro da conversa (16/11/2026, Etapa 1) ---------- */
+  // Só leitura. A função `painel-horarios` confere o papel (admin ou atendente), consulta a API com o pedido da conversa e devolve os horários livres; nada é gravado nem reservado.
+  // A atendente marca os que quer oferecer e o texto vai para a caixa de resposta (ela revisa e envia). Mensagens de "sem vaga" seguem a regra do dono: outro horário primeiro; se não aceitar, Disponibilidade futura.
+  const DIA_SEM = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+  const diaCurto = (iso) => { const d = new Date(String(iso) + 'T12:00:00'); return isNaN(d) ? dataPrev(iso) : `${DIA_SEM[d.getDay()]} ${dataPrev(iso).slice(0, 5)}`; };
+  const HOR_MOTIVO = {
+    dados_incompletos: (r) => `Ainda faltam no pedido: ${(r.faltando || []).join(', ') || 'dados do paciente'}. Peça ao paciente para completar.`,
+    sem_traducao: () => 'Não consegui ligar o convênio informado ao cadastro do Klingo. Confira o nome do convênio com o paciente.',
+    plano_desconhecido: () => 'O Klingo não reconhece este plano. Confira o convênio com o paciente.',
+    plano_inativo: (r) => 'O Klingo informa que este convênio está inativo ou suspenso. Ofereça atendimento particular ou outro convênio.' + (r.detalhe ? ' (' + r.detalhe + ')' : ''),
+    sem_medico: () => 'Nenhum médico credenciado neste convênio para este pedido. Ofereça outro convênio ou particular.',
+    regra_paciente: (r) => 'O Klingo não permite este procedimento para este paciente (idade ou sexo).' + (r.detalhe ? ' (' + r.detalhe + ')' : ''),
+    fora_do_escopo: () => 'Este pedido ainda não é consultado pela API (especialidade ou exame fora da lista liberada). Veja no Klingo.',
+    varios_procedimentos: () => 'O pedido tem mais de um exame. Consulte um de cada vez no Klingo.',
+    sem_pedido: () => 'Ainda não há consulta ou exame escolhido nesta conversa.',
+    limite: () => 'O Klingo pediu para esperar um pouco. Tente de novo em 1 minuto.',
+  };
+  const textoHorarios = (sel) => {
+    const por = new Map();
+    for (const x of sel) { const k = x.data + '|' + (x.profissional || ''); if (!por.has(k)) por.set(k, { data: x.data, prof: x.profissional, horas: [] }); por.get(k).horas.push(x); }
+    const linhas = [...por.values()].map((g) => `• ${diaCurto(g.data)} às ${g.horas.map((x) => x.hora).join(', ')}${g.prof ? ' — ' + g.prof : ''}${g.horas.some((x) => x.ordem_chegada) ? ' (ordem de chegada)' : ''}`);
+    return 'Tenho estas opções de horário:\n' + linhas.join('\n') + '\nQual fica melhor para você?';
+  };
+  async function abrirHorarios(janela = 0) {
+    if (!podeAtender()) return;
+    const c = conversaAberta(); if (!c) return;
+    dlg.className = 'equipe'; dlg.dataset.horarios = '1';
+    const cab = (...x) => h('h3', {}, 'Horários reais da agenda');
+    const desenhar = (corpo, rodape) => dlg.replaceChildren(cab(), h('p', { class: 'dica' }, 'Vem direto da agenda do Klingo, já descontando o que está marcado. É só consulta: nada é reservado nem enviado sozinho.'), corpo,
+      h('div', { class: 'rodape' }, ...(rodape || []), h('button', { class: 'btn', type: 'button', onclick: () => dlg.close() }, 'Fechar')));
+    desenhar(h('p', {}, 'Consultando a agenda…'));
+    if (!dlg.open) dlg.showModal();
+    dlg.addEventListener('close', () => { delete dlg.dataset.horarios; }, { once: true });
+    let r, falhou = false;
+    try { const x = await db.functions.invoke('painel-horarios', { body: { conversa: c.id, janela } }); if (x.error) throw x.error; r = x.data; } catch { falhou = true; }
+    if (!dlg.open || dlg.dataset.horarios !== '1') return;
+    const tentar = h('button', { class: 'btn', type: 'button', onclick: () => abrirHorarios(janela) }, 'Tentar de novo');
+    if (falhou || !r) { desenhar(h('p', {}, 'Não consegui consultar a agenda agora. Tente de novo; se repetir, avise a TI.'), [tentar]); return; }
+    if (!r.ok) { desenhar(h('p', { class: 'urg media', style: 'display:block;border-radius:8px;padding:8px 10px' }, (HOR_MOTIVO[r.motivo] || (() => 'Não consegui consultar a agenda agora. Tente de novo; se repetir, avise a TI.'))(r)), [tentar]); return; }
+    const periodo = `${dataPrev(r.de)} a ${dataPrev(r.ate)}`;
+    const mais = janela < 3 ? h('button', { class: 'btn', type: 'button', onclick: () => abrirHorarios(janela + 1) }, 'Ver mais 14 dias') : null;
+    if (r.estado === 'sem_horarios') {
+      desenhar(h('div', {}, h('p', { class: 'urg media', style: 'display:block;border-radius:8px;padding:8px 10px' }, `Sem vaga de ${periodo}.`),
+        h('p', {}, h('b', {}, 'O que fazer: '), 'veja os próximos 14 dias e ofereça outro médico ou outra unidade. Se o paciente não aceitar nenhuma opção, ofereça colocá-lo na ', h('b', {}, 'Disponibilidade futura'), ' (avisamos quando surgir vaga).')), [mais].filter(Boolean));
+      return;
+    }
+    const marcados = new Set(), todos = [];
+    const botIns = h('button', { class: 'btn prim', type: 'button', disabled: true, onclick: () => {
+      const sel = todos.filter((x, i) => marcados.has(i)); if (!sel.length) return;
+      const area = document.getElementById('caixa'); if (!area) return;
+      area.value = (area.value ? area.value.replace(/\s+$/, '') + '\n\n' : '') + textoHorarios(sel);
+      area.dispatchEvent(new Event('input', { bubbles: true })); dlg.close(); area.focus(); toast('Texto inserido na resposta. Revise e envie.');
+    } }, 'Inserir na resposta');
+    const atualizar = () => { botIns.disabled = marcados.size === 0; botIns.textContent = marcados.size ? `Inserir ${marcados.size} na resposta` : 'Inserir na resposta'; };
+    const dias = (r.dias || []).map((d) => h('div', { class: 'hor-dia' }, h('b', {}, diaCurto(d.data)),
+      h('div', { class: 'hor-lista' }, d.itens.map((it) => {
+        const i = todos.push({ data: d.data, hora: it.hora, profissional: it.profissional, ordem_chegada: it.ordem_chegada }) - 1;
+        return h('label', { class: 'hor-item', title: [it.profissional, curtaUnidade(it.unidade)].filter(Boolean).join(' · ') },
+          h('input', { type: 'checkbox', onchange: (e) => { if (e.target.checked) marcados.add(i); else marcados.delete(i); atualizar(); } }),
+          h('span', {}, it.hora + (it.ordem_chegada ? ' (chegada)' : '')), it.profissional ? h('small', {}, it.profissional) : null);
+      }))));
+    desenhar(h('div', {}, h('p', {}, h('b', {}, `${r.total} horário(s)`), ` de ${periodo}` + (r.cortado ? ' (mostrando os primeiros)' : '') + '. Marque os que quer oferecer.'), h('div', { class: 'hor-dias' }, dias)), [mais, botIns].filter(Boolean));
+  }
   /* ---------- Disponibilidade futura (14/11/2026; antiga "Lista de previsão") ---------- */
   // Pedidos de pacientes que não achavam horário e pediram aviso quando surgir vaga compatível. NÃO é agendamento nem reserva. O sistema procura sozinho na API do Klingo;
   // a equipe só age nas exceções ("Precisa de pessoa"). Uma lista só, com filtros por situação (nada de quadros repetidos). Dados: painel_disponibilidade_lista (admin e atendente).
@@ -2494,34 +2571,64 @@
     }
     return out;
   }
+  /* Cartão da lista: em vez de uma pilha de etiquetas, UMA ação principal (a mais importante a fazer agora, já com o horário e o exame reais
+     que vêm da agenda do Klingo) + ícones pequenos para o resto (passe o dedo/mouse para ler) + uma linha cinza de contexto.
+     Ordem de importância: urgente > chamar no zap > assumida e parada > paciente esperando > exame que já passou > exame em aberto > remarcar
+     > marcação sumiu/alerta da agenda > valor fora da referência > anexo a conferir > sem resposta do paciente. */
+  function sinaisCartao(p, st, destacarDono) {
+    const c = p.rep, out = [];
+    const ab = abertosDe(c.id), rm = remarcarDe(c.id), desde = desdeEspera(p), seg = desde ? (Date.now() - desde) / 1000 : 0, an = anexosDe(c.id);
+    const add = (k, nivel, ic, texto, titulo, attrs) => out.push({ k, nivel, ic, texto, titulo, attrs: attrs || {} });
+    if (p.membros.some((m) => m.triagem_urgencia === 'alta')) add('urgente', 'alta', '🚨', 'Urgente', 'Triagem marcou como urgente');
+    if (precisaZap(p)) add('zap', 'alta', '📲', 'Chamar no zap', 'Mais de 24 h sem resposta: chame no WhatsApp e peça para responder no site', { 'data-zap': '1' });
+    if (destacarDono) add('parada', 'alta', '⚠', `${nomeAgente(donoDe(p))} assumiu e ainda não resolveu`, 'Conversa assumida há mais de 2 h, com o paciente esperando resposta');
+    if (desde && seg >= LIMITE_ESPERA) add('espera', 'alta', '⏱', fmtCron(seg), 'Tempo que o paciente espera uma resposta', { cron: true });
+    if (ab.length) {
+      const a = ab.slice().sort((x, y) => String(x.quando || '').localeCompare(String(y.quando || '')))[0];
+      const mais = ab.length > 1 ? ` (+${ab.length - 1})` : '';
+      const quando = a.quando ? ' · ' + quandoCurto(a.quando) : '';
+      add('exame', a.passou ? 'alta' : 'media', a.passou ? '⏰' : '🩻', a.passou ? `Exame em aberto${quando} · horário passou, fechar` + mais : `Exame em aberto${quando}` + mais,
+        `${a.exames || 'Exame marcado'}${a.quando ? ' em ' + quandoCurto(a.quando) : ''}. Ninguém fechou ainda: compareceu, faltou, cancelou ou remarcou?`);
+    }
+    if (rm.length) add('remarcar', 'media', '🔁', 'Remarcar', { pendente: 'Faltou e ninguém avisou o paciente ainda', pedida: 'Pergunta enviada; esperando o paciente', aceita: 'Paciente aceitou e está remarcando pelo chat' }[rm[0].remarcacao] || 'Faltou e ainda falta marcar o novo horário');
+    if (c.alerta_agenda) add('agenda', 'media', '🗓', c.alerta_agenda, 'Conferência automática da agenda (Klingo)');
+    if (p.membros.some((m) => alertasDe(m.id).length)) add('valor', 'alta', '💲', 'Conferir valor', 'Valor informado fora da referência (só a equipe vê)');
+    if (an.total && an.sem_conferir) add('anexo', 'media', '📎', `Conferir pedido (${an.total})`, 'Foto do pedido médico anexada: falta conferir no Klingo');
+    if (aguardaPaciente(p)) add('semresp', 'info', '💬', 'Sem resposta há ' + fmtHa((Date.now() - desdeAguardaPac(p)) / 1000), 'Tempo desde a última mensagem da equipe, sem resposta do paciente', { 'data-pac': desdeAguardaPac(p) });
+    return out;
+  }
+  function linhasCartao(p, st, destacarDono) {
+    const c = p.rep, sin = sinaisCartao(p, st, destacarDono), an = anexosDe(c.id);
+    const cron = sin.find((s) => s.k === 'espera'), demais = sin.filter((s) => s !== cron);   // o cronômetro sempre por extenso (é curto e a equipe olha primeiro nele)
+    const [prim, ...resto] = demais;
+    const chip = (s, mini) => h('span', Object.assign({ class: (s.k === 'espera' ? 'cron' : 'urg ' + (s.nivel === 'info' ? '' : s.nivel)) + (mini ? ' mini' : ' prim'), title: s.titulo }, s.attrs), mini ? s.ic : (s.k === 'espera' ? s.ic + ' ' + s.texto : s.ic + ' ' + s.texto));
+    // Quem aparece como chip principal: se há mais de um sinal, o primeiro (mais importante) fica por extenso e os demais viram ícones.
+    const linha = [];
+    if (prim) linha.push(chip(prim, false));
+    if (cron) linha.push(chip(cron, false));
+    for (const s of resto.slice(0, 3)) linha.push(chip(s, true));
+    if (resto.length > 3) linha.push(h('span', { class: 'mini mais', title: resto.slice(3).map((s) => s.titulo).join('\n') }, '+' + (resto.length - 3)));
+    const ag = (p.membros.find((m) => m.agente_id) || {}).agente_id ? S.agentes.get(p.membros.find((m) => m.agente_id).agente_id) : null;
+    const meta = [];
+    if (st === 'encerrada') meta.push('Encerrada: ' + rotuloEncerrada(c));
+    else if (c.ia_ativa && st === 'aguardando') meta.push(c.motor === 'fluxo' ? 'Assistente automático conduzindo' : 'IA atendendo');
+    else if (ag) meta.push(`Com ${ag.nome}`);
+    else meta.push(ROTULO_STATUS[st]);
+    if (p.membros.length > 1) meta.push(`${p.membros.length} conversas unidas`);
+    if (an.total && !an.sem_conferir) meta.push(`pedido conferido (${an.total})`);
+    if (p.membros.every((m) => m.teste)) meta.push('teste da TI');
+    return [h('div', { class: 'l3' }, ...linha), h('div', { class: 'meta ' + st }, meta.join(' · '))];
+  }
   function itemPessoa(p, destacarDono) {
     {
       const c = p.rep, st = statusPessoa(p);
-      const ag = (p.membros.find((m) => m.agente_id) || {}).agente_id ? S.agentes.get(p.membros.find((m) => m.agente_id).agente_id) : null;
       const naoLidas = p.membros.reduce((n, m) => n + (m.nao_lidas_agente || 0), 0);
-      const nAb = abertosDe(c.id).length, nRem = remarcarDe(c.id).length;
-      const comAlerta = p.membros.some((m) => alertasDe(m.id).length);
       const desde = desdeEspera(p), seg = desde ? (Date.now() - desde) / 1000 : 0;
       return h('button', { class: 'item' + (desde && seg >= LIMITE_ESPERA ? ' espera' : ''), 'data-desde': desde || '', 'data-atencao': emAtencao(p) ? '1' : '', 'data-dono': donoDe(p) ? '1' : '', type: 'button', 'aria-current': String(p.membros.some((m) => m.id === S.abertaId)), onclick: () => abrirConversa(c.id) },
         h('span', { class: 'av-i', 'aria-hidden': 'true' }, iniciais(nomeLista(c))),
         h('div', { class: 'l1' }, h('span', {}, nomeLista(c)), h('span', { class: 'hora' }, fmtHoraLista(c.atualizado_em))),
         h('div', { class: 'l2' }, h('span', { class: 'prev' }, c.ultima_mensagem || 'Sem mensagens'), naoLidas > 0 ? h('span', { class: 'nl' }, naoLidas) : null),
-        h('div', { class: 'l3' }, h('span', { class: 'tag ' + st }, ROTULO_STATUS[st]),
-          p.membros.every((m) => m.teste) ? h('span', { class: 'urg', title: 'Conversa de teste da TI: fica no histórico, mas não entra nos indicadores' }, 'Teste') : null,
-          st === 'encerrada' ? h('span', { class: 'urg', title: 'Motivo do encerramento' }, rotuloEncerrada(c)) : null,
-          p.membros.length > 1 ? h('span', { class: 'urg', title: 'Conversas da mesma pessoa, unidas' }, `${p.membros.length} conversas unidas`) : null,
-          nAb ? h('span', { class: 'urg alta', title: 'Exame marcado que ninguém fechou ainda' }, 'Exame em aberto') : null,
-          nRem ? h('span', { class: 'urg media', title: 'Faltou e ainda falta marcar o novo horário' }, 'Remarcar') : null,
-          p.membros.some((m) => m.triagem_urgencia === 'alta') ? h('span', { class: 'urg alta' }, 'Urgente') : null,
-          c.alerta_agenda ? h('span', { class: 'urg media', title: 'Conferência automática da agenda' }, c.alerta_agenda) : null,
-          comAlerta ? h('span', { class: 'urg alta', title: 'Valor informado fora da referência (só a equipe vê)' }, 'Conferir valor') : null,
-          anexosDe(c.id).total ? h('span', { class: 'urg ' + (anexosDe(c.id).sem_conferir ? 'media' : ''), title: 'Foto do pedido médico anexada' + (anexosDe(c.id).sem_conferir ? ': falta conferir no Klingo' : ' (conferida)') }, `Anexo: ${anexosDe(c.id).total} foto${anexosDe(c.id).total > 1 ? 's' : ''}`) : null,
-          c.ia_ativa && st === 'aguardando' ? h('span', { style: 'color:var(--suave)' }, c.motor === 'fluxo' ? 'Assistente automático' : 'IA atendendo') : null,
-          ag ? h('span', { style: 'color:var(--suave)' }, ag.nome) : null,
-          destacarDono ? h('span', { class: 'urg alta', title: 'Conversa assumida há mais de 2 h, com o paciente esperando resposta' }, `⚠ ${nomeAgente(donoDe(p))} assumiu e ainda não resolveu`) : null,
-          desde && seg >= LIMITE_ESPERA ? h('span', { class: 'cron', title: 'Tempo que o paciente espera uma resposta' }, '⏱ ' + fmtCron(seg)) : null,
-          precisaZap(p) ? h('span', { class: 'urg alta', 'data-zap': '1', title: 'Mais de 24 h sem resposta: chame no WhatsApp e peça para responder no site' }, '📲 Chamar no zap') : null,
-          aguardaPaciente(p) ? h('span', { class: 'urg', 'data-pac': desdeAguardaPac(p), title: 'Tempo desde a última mensagem da equipe, sem resposta do paciente' }, '💬 Sem resposta há ' + fmtHa((Date.now() - desdeAguardaPac(p)) / 1000)) : null));
+        ...linhasCartao(p, st, destacarDono));
     }
   }
   // Cronômetro de resposta: desde quando o paciente espera alguém da equipe (coluna cliente_aguarda_desde).
@@ -2790,6 +2897,7 @@
         detalheInicio(c) ? h('span', { style: 'display:block;font-weight:600' }, detalheInicio(c)) : null),
       !minha && c.status !== 'encerrada' ? h('button', { class: 'btn prim assumir-topo', type: 'button', onclick: () => assumir(true) }, 'Assumir') : null,
       c.status === 'encerrada' ? h('button', { class: 'btn', type: 'button', onclick: () => assumir(true) }, 'Reabrir') : null,
+      podeAtender() && c.status !== 'encerrada' ? h('button', { class: 'btn', type: 'button', title: 'Ver os horários reais da agenda para o pedido desta conversa (só consulta)', onclick: () => abrirHorarios(0) }, 'Ver horários') : null,
       sel,
       c.status !== 'encerrada' ? h('button', { class: 'btn perigo', type: 'button', onclick: encerrar }, 'Encerrar') : null].filter(Boolean));
     renderProximo();
