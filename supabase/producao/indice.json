@@ -2275,6 +2275,19 @@
    ],
    "rls": true,
    "politicas": 0
+  },
+  {
+   "nome": "painel_oferta",
+   "colunas": [
+    "id",
+    "conversa_id",
+    "tipo",
+    "estado",
+    "agente_id",
+    "criado_em"
+   ],
+   "rls": true,
+   "politicas": 0
   }
  ],
  "visoes": [
@@ -13101,6 +13114,25 @@
    "md5": "6f5e34063c422dbb9f5d460c33bc94e8"
   },
   {
+   "nome": "painel_disponibilidade_registrar",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_dados",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "54d8e49a062a29291b18d553c6ea580b"
+  },
+  {
    "nome": "painel_exames_buscar",
    "args": [
     {
@@ -13398,6 +13430,44 @@
    "authenticated": true,
    "publico": false,
    "md5": "5db9fa4874bae25f1d52882d3d57ca26"
+  },
+  {
+   "nome": "painel_oferta_registrar",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_tipo",
+     "padrao": false
+    },
+    {
+     "nome": "p_estado",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "0aa0383892791b25bb6aad5885b7d5aa"
+  },
+  {
+   "nome": "painel_ofertas",
+   "args": [
+    {
+     "nome": "p_conversas",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "e3792d55b80d7bb6e9583a32e1479462"
   },
   {
    "nome": "painel_presenca",

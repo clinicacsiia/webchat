@@ -85,3 +85,18 @@ Os demais "não-ok" não são erro: `dados_incompletos` 3 e `sem_traducao_plano`
 - **Mensagens claras** em vez de código: convênio inativo/suspenso, sem médico credenciado, idade/sexo, dados que faltam (diz quais), pedido com vários exames, limite do Klingo.
 - **Sem vaga:** explica o caminho combinado: ver os próximos 14 dias (até 4 janelas), oferecer outro médico/unidade e, **se o paciente não aceitar nenhuma opção, oferecer a Disponibilidade futura**. O botão que já cadastra na Disponibilidade futura a partir daqui fica para a Etapa 2.
 - Tela: `sw.js` v36. Teste novo `npm run test:horarios` (5 casos). Sem mudança de banco.
+
+## 10. Etapa 2 feita (16/11/2026): ofertas com ação e área de avisos enxuta
+**O que a atendente vê agora (sempre visível, abaixo do aviso do topo):**
+- **Há vaga e ninguém ofereceu:** cartão "N horários livres · próximo: dia, hora, médico" com **Oferecer** (abre a escolha de horários) e **Dispensar**.
+- **Ofereceu:** cartão "Horários oferecidos" com **Aceitou** / **Recusou** / **Cobrar resposta** (coloca o atalho `DEMORA-DE-RESPONDER-HORARIO-OFERTADO` na caixa, sem enviar).
+- **Sem vaga:** **não oferece horário**. Cartão "Sem vaga agora" com **Oferecer Disponibilidade futura** (coloca o atalho `LISTA-DE-ESPERA` na caixa e registra a oferta), **Ver outros dias** e **Dispensar**.
+- **Recusou os horários:** só sobra a Disponibilidade futura. Se oferecida e o paciente aceitar, **Aceitou: cadastrar** grava o pedido (aviso pelo chat e pela equipe) e coloca `ACEITOU-LISTA-DE-ESPERA` na caixa. Se recusar também, **nenhum cartão volta**.
+- Os cartões só aparecem na conversa **assumida por quem está olhando**; exame em aberto, remarcar e valor fora da referência saíram de dentro do "detalhes e avisos" e ficaram na mesma faixa, com os mesmos botões e **sem os textos explicativos**. A área "detalhes e avisos" ficou só com o que é consulta (conversas unidas, histórico, triagem, fotos, pré-agendamento).
+- A faixa nunca passa de ~28% da altura da tela (rola por dentro), para não espremer as mensagens.
+
+**Regra "recusou uma vez, não oferece mais":** guardada no banco (`painel_oferta`), vale para a pessoa inteira (todas as conversas unidas) e é conferida pelo servidor (`painel_oferta_registrar` devolve `bloqueado`), não só pela tela. "Dispensar" tem o mesmo efeito. A consulta de vagas nem é feita depois de uma oferta ou recusa.
+
+**Banco** (`supabase/painel-ofertas.sql`, aplicada em 3 partes em 16/11/2026; retrato v1.24): tabela `painel_oferta` (fechada ao público) e `painel_oferta_registrar`, `painel_ofertas`, `painel_disponibilidade_registrar` (admin e atendente). Teste: `npm run test:painel-ofertas` (10). Tela: `npm run test:ofertas` (9), `sw.js` v37.
+**Achado:** o campo de origem dos eventos de disponibilidade corta em 40 letras; `painel_disponibilidade_cancelar` (já existente) grava `equipe:<id>` (43) e perde o fim do id. Não mexi nela; a nova grava `equipe` e o atendente no detalhe.
+**Ainda não feito:** o cadastro grava com período padrão (a partir de amanhã por 60 dias, qualquer turno). Escolher dias/turno pela tela fica para depois.

@@ -123,12 +123,12 @@ await caso('Lista os horários por dia, marca dois e insere o texto na resposta 
   const n = await page.locator('.hor-item').count();
   const desabilitado = await page.locator('dialog button:has-text("Inserir na resposta")').isDisabled();
   await page.locator('.hor-item:has-text("08:00") input').check(); await page.locator('.hor-item:has-text("08:30") input').check(); await page.locator('.hor-item:has-text("14:00") input').check();
-  await page.click('dialog button:has-text("Inserir 3 na resposta")');
+  await page.click('dialog button:has-text("Inserir 3 na resposta")'); await espera(500);
   const caixa = await page.inputValue('#caixa');
   const enviou = reg.pedidos.filter((x) => /\/rest\/v1\/mensagens/.test(x) && false).length;
   await ctx.close();
   const ok = n === 4 && desabilitado && /• ter 17\/11 às 08:00, 08:30 — Dra\. Teste/.test(caixa) && /• qua 18\/11 às 14:00 — Dr\. Outro \(ordem de chegada\)/.test(caixa) && /Qual fica melhor/.test(caixa)
-    && reg.chamadas.length === 1 && reg.chamadas[0].conversa === 'c2' && reg.chamadas[0].janela === 0 && !reg.excecoes.length;
+    && reg.chamadas.length >= 1 && reg.chamadas.at(-1).conversa === 'c2' && reg.chamadas.at(-1).janela === 0 && !reg.excecoes.length;
   return { ok, detalhe: reg.excecoes[0] ?? caixa.replace(/\n/g, ' | ') + ' ' + JSON.stringify(reg.chamadas) };
 });
 
@@ -139,7 +139,7 @@ await caso('Sem vaga: explica o que fazer (outro horário; se não aceitar, Disp
   const txt = await page.locator('dialog').innerText();
   await page.click('dialog button:has-text("Ver mais 14 dias")'); await espera(500);
   await ctx.close();
-  return { ok: /Disponibilidade futura/.test(txt) && /outro médico ou outra unidade/.test(txt) && reg.chamadas.length === 2 && reg.chamadas[1].janela === 1, detalhe: JSON.stringify(reg.chamadas) };
+  return { ok: /Disponibilidade futura/.test(txt) && /outro médico ou outra unidade/.test(txt) && reg.chamadas.at(-1).janela === 1 && reg.chamadas.length >= 2, detalhe: JSON.stringify(reg.chamadas) };
 });
 
 await caso('Convênio suspenso e dados faltando viram mensagens claras (sem código técnico)', async () => {
