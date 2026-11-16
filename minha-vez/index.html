@@ -449,7 +449,7 @@
       h('button', { class: 'principal', type: 'button', id: 'btnAvisos', onclick: async (e) => { e.currentTarget.disabled = true; try { await Notification.requestPermission(); } catch { /* ignora */ } if (modo === 'conta') assinarPush(); desenhar(ultimo); } }, 'Ativar avisos'))];
   }
   /* ---------- Seus exames: onde cada um está, sem horários ---------- */
-  const PASSOS = ['Pedido', 'Agendado', 'Confirmado', 'Chegada', 'Exame feito', 'Laudo'];
+  const PASSOS = ['Pedido', 'A confirmar', 'Confirmado', 'Chegada', 'Exame feito', 'Laudo'];
   const FRASE = {
     1: 'Recebemos o seu pedido. Estamos organizando o agendamento.',
     2: 'Exame agendado. Estamos confirmando o seu horário.',
@@ -463,6 +463,11 @@
     remarcado: 'Este exame foi remarcado. A recepção vai informar o novo dia.',
     faltou: 'Não vimos você neste exame. A recepção pode ajudar a remarcar.'
   };
+  // Passo "A confirmar" = o horário já está marcado (ok = 2) e falta o paciente confirmar: é o status real do Klingo.
+  // Com só o pedido recebido (ok = 1) nenhum passo fica "em andamento": a frase abaixo explica que a equipe está organizando o horário.
+  const passoAtual = (ok) => (ok === 1 ? 0 : ok === 2 ? 2 : ok + 1);
+  const feitoAte = (ok) => (ok === 2 ? 1 : ok);
+  const legendaPasso = (n) => (n === 2 ? 'aguardando confirmação' : 'em andamento');
   let jornada = null;
   async function carregarJornada() {
     try { const { data, error } = await db.rpc('paciente_jornada'); if (!error && data) jornada = data; } catch { /* mantém o que já tinha */ }
@@ -480,8 +485,8 @@
     if (e.excecao) { filhos.push(h('div', { class: 'excecao' }, FRASE_EXC[e.excecao] || 'Fale com a recepção sobre este exame.')); return h('div', { class: 'exame' }, filhos); }
     const ok = Math.max(0, Math.min(6, e.ok || 0));
     filhos.push(h('ol', { class: 'passos', 'aria-label': 'Andamento do exame' }, PASSOS.map((nome, i) => {
-      const n = i + 1, estado = n <= ok ? 'feito' : n === ok + 1 ? 'agora' : '';
-      return h('li', { class: estado, 'aria-current': estado === 'agora' ? 'step' : null }, h('div', { class: 'bolha' }, estado === 'feito' ? '✓' : ''), nome, estado === 'agora' ? h('div', {}, 'em andamento') : null);
+      const n = i + 1, estado = n <= feitoAte(ok) ? 'feito' : n === passoAtual(ok) ? 'agora' : '';
+      return h('li', { class: estado, 'aria-current': estado === 'agora' ? 'step' : null }, h('div', { class: 'bolha' }, estado === 'feito' ? '✓' : ''), nome, estado === 'agora' ? h('div', {}, legendaPasso(n)) : null);
     })));
     filhos.push(h('p', { class: 'msg' }, e.em_atendimento ? 'Seu exame está sendo feito agora. Fique tranquilo(a).' : (FRASE[ok] || FRASE[1])));
     return h('div', { class: 'exame' }, filhos);
@@ -624,8 +629,8 @@
     const ok = Math.max(0, Math.min(6, e.ok || 0));
     if (!p.aberta && ok <= 1) { filhos.push(h('p', { class: 'msg' }, 'Sem horário marcado.')); return h('div', { class: 'exame' }, filhos); }   // encerrado sem marcar: nada de "estamos organizando"
     if (ok >= 1) filhos.push(h('ol', { class: 'passos', 'aria-label': 'Andamento do exame' }, PASSOS.map((nome, i) => {
-      const n = i + 1, feito = e.resultado === 'entregue' ? n <= 6 : n <= ok, agora = !feito && n === (e.resultado === 'entregue' ? 7 : ok + 1);
-      return h('li', { class: feito ? 'feito' : agora ? 'agora' : '' }, h('div', { class: 'bolha' }, feito ? '✓' : ''), nome, agora ? h('div', {}, 'em andamento') : null);
+      const n = i + 1, feito = e.resultado === 'entregue' ? n <= 6 : n <= feitoAte(ok), agora = !feito && n === (e.resultado === 'entregue' ? 7 : passoAtual(ok));
+      return h('li', { class: feito ? 'feito' : agora ? 'agora' : '' }, h('div', { class: 'bolha' }, feito ? '✓' : ''), nome, agora ? h('div', {}, legendaPasso(n)) : null);
     })));
     filhos.push(h('p', { class: 'msg' }, e.resultado === 'entregue' ? 'Resultado entregue. Ele fica guardado em "Resultados" aqui embaixo.' : (MSG_PASSO[ok] || MSG_PASSO[1])));
     if (ok === 5 && e.resultado === 'disponivel') filhos.push(h('div', { class: 'res-box disp' }, '✅ Seu resultado está disponível. Toque para pedir: a equipe entrega na conversa.'));

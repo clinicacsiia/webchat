@@ -2,7 +2,7 @@
 
 Arquivos: `supabase/jornada-paciente.sql` (**aplicado em produção**), `minha-vez/index.html`, testes `npm run test:jornada-paciente` (8) e `npm run test:minha-vez` (13).
 
-Quem está logado vê, abaixo da fila, o cartão **Seus exames**: "1 de 3 exames feitos · faltam 2", uma barra de progresso e, para cada exame, 6 passos: **Pedido, Agendado, Confirmado, Chegada, Exame feito, Laudo**. Os feitos têm ✓ verde; o que está acontecendo agora gira e diz "em andamento"; cada exame tem uma frase calma ("Tudo certo! Falta só você chegar à clínica."). **Nenhum horário** aparece: só "Hoje", "Amanhã" ou o dia/mês.
+Quem está logado vê, abaixo da fila, o cartão **Seus exames**: "1 de 3 exames feitos · faltam 2", uma barra de progresso e, para cada exame, 6 passos: **Pedido, A confirmar, Confirmado, Chegada, Exame feito, Laudo**. Os feitos têm ✓ verde; o que está acontecendo agora gira e diz "em andamento"; cada exame tem uma frase calma ("Tudo certo! Falta só você chegar à clínica."). **Nenhum horário** aparece: só "Hoje", "Amanhã" ou o dia/mês.
 
 ## De onde vem o passo (cada exame tem o seu)
 
