@@ -204,6 +204,7 @@ Todas publicadas **sem exigir JWT** e cada uma confere o próprio segredo.
 |---|---|---|---|
 | `sync-catalogo-klingo` | pg_cron | cabeçalho `x-sync-key` = `config.ia_segredo` | sim |
 | `sync-jornada-klingo` | pg_cron | `x-sync-key` | sim |
+<!-- 16/11/2026: a leitura do relatório (jornada_klingo_lote) também fecha o pedido do chat quando TODAS as marcações dele estão canceladas no Klingo (pedido_fechar_cancelado_klingo: pedido vira `cancelado`, alerta "Marcação sumiu do Klingo" sai, nota interna na conversa). É o que tira o "Exame em aberto" do painel; sem o webhook, o atraso é o da leitura (10 min no expediente, 1 a 2 h fora). Arquivo: supabase/cancelamento-klingo-pedido.sql -->
 | `klingo-reconhecer` | pg_cron | `x-sync-key` | sim |
 | `klingo-paciente` | gatilho do banco (CPF + nascimento) | `x-sync-key` | sim |
 | `chat-agenda-ao-vivo` | o chat, ao chegar no calendário | token da conversa | sim |
