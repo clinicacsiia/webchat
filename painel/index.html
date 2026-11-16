@@ -308,15 +308,15 @@
   @media (min-width: 1280px) {
     /* Tela larga: a área de apoio é uma coluna à direita da conversa. Escondida, vira uma faixa fina na lateral (com o contador de avisos)
        e a conversa ocupa o resto da largura. */
-    .chat { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto auto auto minmax(0, 1fr) auto; }
-    .chat > .chat-topo { grid-column: 1 / -1; grid-row: 1; } .chat > #proximo { grid-column: 1 / -1; grid-row: 2; }
-    .chat > #ctxToggle { grid-column: 2; grid-row: 3; width: 380px; border-left: 1px solid var(--linha); }
-    .chat > #ctxToggle[aria-expanded="false"] { grid-row: 3 / 6; width: 46px; flex-direction: column; justify-content: flex-start; padding: 12px 0; border-bottom: 0; }
+    .chat { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto auto auto auto minmax(0, 1fr) auto; }
+    .chat > .chat-topo { grid-column: 1 / -1; grid-row: 1; } .chat > #proximo { grid-column: 1 / -1; grid-row: 2; } .chat > #acoes { grid-column: 1 / -1; grid-row: 3; }
+    .chat > #ctxToggle { grid-column: 2; grid-row: 4; width: 380px; border-left: 1px solid var(--linha); }
+    .chat > #ctxToggle[aria-expanded="false"] { grid-row: 4 / 7; width: 46px; flex-direction: column; justify-content: flex-start; padding: 12px 0; border-bottom: 0; }
     .chat > #ctxToggle[aria-expanded="false"] .rot { writing-mode: vertical-rl; }
     .chat > #ctxToggle[aria-expanded="false"] .seta { transform: rotate(90deg); } .chat > #ctxToggle[aria-expanded="true"] .seta { transform: rotate(-90deg); }
     .chat > #ctxToggle[aria-expanded="false"] .ctx-n { margin: 8px 0 0; }
-    .chat > #contexto.aberto { display: block; max-height: none; width: 380px; grid-column: 2; grid-row: 4 / 6; border-left: 1px solid var(--linha); border-bottom: 0; }
-    .chat > .msgs { grid-column: 1; grid-row: 3 / 5; } .chat > .compor { grid-column: 1; grid-row: 5; }
+    .chat > #contexto.aberto { display: block; max-height: none; width: 380px; grid-column: 2; grid-row: 5 / 7; border-left: 1px solid var(--linha); border-bottom: 0; }
+    .chat > .msgs { grid-column: 1; grid-row: 4 / 6; } .chat > .compor { grid-column: 1; grid-row: 6; }
   }
   /* Celular: cabeçalho e avisos mais enxutos para sobrar espaço para ler as mensagens */
   @media (max-width: 640px) {
@@ -552,6 +552,14 @@
   .item .tag { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 2px 10px; }
   .item .tag::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
   .item .tag.encerrada::before { content: '✓'; width: auto; height: auto; background: none; font-size: 11px; }
+  /* Ofertas com ação (Etapa 2): cartões curtos, sempre visíveis; a área nunca passa de ~1/4 da altura (rola por dentro) */
+  #acoes { max-height: 28vh; overflow-y: auto; overscroll-behavior: contain; } #acoes:empty { display: none; }
+  @media (max-height: 720px) { #acoes { max-height: 22vh; } }
+  #ofertas:empty { display: none; }
+  .of-card { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; padding: 8px 12px; margin: 6px 12px 0; border: 1px solid var(--csi-primary); background: var(--csi-primary-soft); border-radius: var(--radius-sm); }
+  .of-txt { display: flex; flex-direction: column; min-width: 0; flex: 1 1 200px; } .of-txt span { color: var(--suave); font-size: 13px; }
+  .of-acoes { display: flex; flex-wrap: wrap; gap: 6px; }
+  .ex-est { font-weight: 400; color: var(--suave); }
   /* Ver horários (Etapa 1) */
   .hor-dias { display: grid; gap: 10px; max-height: 52vh; overflow: auto; margin-top: 8px; }
   .hor-dia { border: 1px solid var(--linha); border-radius: var(--radius-sm); padding: 8px 10px; }
@@ -1992,6 +2000,78 @@
     const t2 = setInterval(() => { if (!dlg.open || dlg.dataset.equipe !== '1') { clearInterval(t2); return; } carregarMarcouHoje(); }, 60000);
     dlg.addEventListener('close', () => { delete dlg.dataset.equipe; clearInterval(t); clearInterval(t2); }, { once: true });
   }
+  /* ---------- Ofertas com ação (16/11/2026, Etapa 2) ---------- */
+  // Cartões curtos e sempre visíveis, cada um com a ação na ponta (nada de texto explicativo):
+  //   há vaga e ninguém ofereceu -> "Oferecer"; ofereceu -> "Aceitou" / "Recusou" / "Cobrar resposta"; sem vaga -> Disponibilidade futura.
+  // Regras do dono: sem vaga não se oferece horário; quem recusou uma vez (ou foi dispensado) não recebe a mesma oferta de novo (o banco também bloqueia: painel_oferta_registrar).
+  const OF = { vagas: new Map() };   // conversa -> { t, busy, r }: resultado da última consulta de horários (3 min)
+  async function carregarOfertas() {
+    const id = S.abertaId; if (!id || !podeAtender()) { S.ofertas = {}; renderOfertas(); return; }
+    try { const { data, error } = await db.rpc('painel_ofertas', { p_conversas: membrosDe(id) }); if (S.abertaId !== id) return; S.ofertas = error ? {} : (data || {}); } catch { S.ofertas = {}; }
+    renderOfertas();
+  }
+  async function ofertaRegistrar(tipo, estado) {
+    const c = conversaAberta(); if (!c) return null;
+    const { data, error } = await db.rpc('painel_oferta_registrar', { p_conversa: c.id, p_tipo: tipo, p_estado: estado });
+    if (error) { toast(msgErro(error)); return null; }
+    if (data && data.bloqueado) toast(tipo === 'horario' ? 'O paciente já recusou horários: não ofereça de novo.' : 'O paciente já recusou a Disponibilidade futura: não ofereça de novo.');
+    await carregarOfertas();
+    return data;
+  }
+  function inserirNaCaixa(texto) {
+    const area = document.getElementById('caixa'); if (!area) return;
+    area.value = (area.value ? area.value.replace(/\s+$/, '') + '\n\n' : '') + texto;
+    area.dispatchEvent(new Event('input', { bubbles: true })); area.focus();
+  }
+  async function inserirAtalho(nome, extra) {
+    try {
+      const r = (await carregarAtalhos()).find((x) => String(x.atalho).toLowerCase() === nome.toLowerCase());
+      if (!r) { toast('Não achei o atalho ' + nome + '. Escreva a mensagem à mão.'); return false; }
+      inserirNaCaixa(aplicarVariaveis(r.texto) + (extra || '')); return true;
+    } catch { toast('Não consegui carregar os atalhos agora.'); return false; }
+  }
+  async function sondarVaga(forcar) {
+    const c = conversaAberta(); if (!c || !podeAtender() || c.status !== 'em_atendimento' || c.agente_id !== S.me.id) return;
+    if (!S.ofertas || S.ofertas.horario || abertosDe(c.id).length) return;
+    const ant = OF.vagas.get(c.id);
+    if (ant && (ant.busy || (!forcar && Date.now() - ant.t < 180000))) return;
+    OF.vagas.set(c.id, { t: Date.now(), busy: true, r: ant && ant.r });
+    let r = null;
+    try { const x = await db.functions.invoke('painel-horarios', { body: { conversa: c.id, janela: 0 } }); if (!x.error) r = x.data; } catch { /* sem resposta: não mostra oferta */ }
+    OF.vagas.set(c.id, { t: Date.now(), r });
+    if (S.abertaId === c.id) renderOfertas();
+  }
+  function renderOfertas() {
+    const box = document.getElementById('ofertas'); if (!box) return;
+    const c = conversaAberta();
+    if (!c || c.status !== 'em_atendimento' || c.agente_id !== S.me.id || !podeAtender() || !S.ofertas) { box.replaceChildren(); return; }   // S.ofertas nulo = memória ainda não carregada: não decide nada antes disso
+    const of = S.ofertas || {}, hs = of.horario && of.horario.estado, ds = of.disponibilidade && of.disponibilidade.estado;
+    const v = (OF.vagas.get(c.id) || {}).r, comVaga = v && v.ok && v.estado === 'com_horarios', semVaga = v && v.ok && v.estado === 'sem_horarios';
+    const bt = (rot, fn, cls = '') => h('button', { class: 'btn ' + cls, type: 'button', onclick: async (ev) => { const b = ev.currentTarget; b.disabled = true; try { await fn(); } finally { b.disabled = false; } } }, rot);
+    const cartao = (titulo, detalhe, ...acoes) => h('div', { class: 'of-card' }, h('div', { class: 'of-txt' }, h('b', {}, titulo), detalhe ? h('span', {}, detalhe) : null), h('div', { class: 'of-acoes' }, ...acoes));
+    const out = [];
+    if (hs === 'oferecido') {
+      out.push(cartao('Horários oferecidos', 'esperando o paciente', bt('Aceitou', () => ofertaRegistrar('horario', 'aceito'), 'prim'), bt('Recusou', () => ofertaRegistrar('horario', 'recusado')), bt('Cobrar resposta', () => inserirAtalho('DEMORA-DE-RESPONDER-HORARIO-OFERTADO'))));
+    } else if (!hs && comVaga) {
+      const p = (v.dias[0] || {}).itens ? v.dias[0].itens[0] : null;
+      out.push(cartao(`${v.total} horário${v.total > 1 ? 's' : ''} livre${v.total > 1 ? 's' : ''}`, p ? `próximo: ${diaCurto(v.dias[0].data)} às ${p.hora}${p.profissional ? ' — ' + p.profissional : ''}` : null,
+        bt('Oferecer', () => abrirHorarios(0), 'prim'), bt('Dispensar', () => ofertaRegistrar('horario', 'dispensado'))));
+    }
+    if (ds === 'oferecido') {
+      out.push(cartao('Disponibilidade futura oferecida', 'esperando o paciente', bt('Aceitou: cadastrar', async () => {
+        const { data, error } = await db.rpc('painel_disponibilidade_registrar', { p_conversa: c.id, p_dados: {} });
+        if (error) { toast(msgErro(error)); return; }
+        toast(`Cadastrado na Disponibilidade futura (${dataPrev(data.data_ini)} a ${dataPrev(data.data_fim)}).`);
+        await inserirAtalho('ACEITOU-LISTA-DE-ESPERA'); await carregarOfertas();
+      }, 'prim'), bt('Recusou', () => ofertaRegistrar('disponibilidade', 'recusado'))));
+    } else if (!ds && (hs === 'recusado' || (!hs && semVaga))) {
+      out.push(cartao(hs === 'recusado' ? 'Recusou os horários' : 'Sem vaga agora', hs === 'recusado' ? 'ofereça avisar quando surgir vaga' : 'antes, veja outros dias ou médicos; se não servir, ofereça avisar quando surgir vaga',
+        bt('Oferecer Disponibilidade futura', async () => { const r = await ofertaRegistrar('disponibilidade', 'oferecido'); if (r && r.ok) await inserirAtalho('LISTA-DE-ESPERA'); }, 'prim'),
+        !hs ? bt('Ver outros dias', () => abrirHorarios(1)) : null, bt('Dispensar', () => ofertaRegistrar('disponibilidade', 'dispensado'))));
+    }
+    box.replaceChildren(...out);
+    if (!hs) sondarVaga();   // só consulta quando ninguém ofereceu ainda (3 min de cache)
+  }
   /* ---------- Ver horários reais da agenda (Klingo) dentro da conversa (16/11/2026, Etapa 1) ---------- */
   // Só leitura. A função `painel-horarios` confere o papel (admin ou atendente), consulta a API com o pedido da conversa e devolve os horários livres; nada é gravado nem reservado.
   // A atendente marca os que quer oferecer e o texto vai para a caixa de resposta (ela revisa e envia). Mensagens de "sem vaga" seguem a regra do dono: outro horário primeiro; se não aceitar, Disponibilidade futura.
@@ -2039,11 +2119,10 @@
       return;
     }
     const marcados = new Set(), todos = [];
-    const botIns = h('button', { class: 'btn prim', type: 'button', disabled: true, onclick: () => {
+    const botIns = h('button', { class: 'btn prim', type: 'button', disabled: true, onclick: async () => {
       const sel = todos.filter((x, i) => marcados.has(i)); if (!sel.length) return;
-      const area = document.getElementById('caixa'); if (!area) return;
-      area.value = (area.value ? area.value.replace(/\s+$/, '') + '\n\n' : '') + textoHorarios(sel);
-      area.dispatchEvent(new Event('input', { bubbles: true })); dlg.close(); area.focus(); toast('Texto inserido na resposta. Revise e envie.');
+      const reg = await ofertaRegistrar('horario', 'oferecido'); if (!reg || reg.bloqueado) return;   // recusou antes: o banco não deixa oferecer de novo
+      dlg.close(); inserirNaCaixa(textoHorarios(sel)); toast('Texto inserido na resposta. Revise e envie.');
     } }, 'Inserir na resposta');
     const atualizar = () => { botIns.disabled = marcados.size === 0; botIns.textContent = marcados.size ? `Inserir ${marcados.size} na resposta` : 'Inserir na resposta'; };
     const dias = (r.dias || []).map((d) => h('div', { class: 'hor-dia' }, h('b', {}, diaCurto(d.data)),
@@ -2172,10 +2251,8 @@
     box.replaceChildren(...lista.map((a) => {
       const cands = ((a.referencia && a.referencia.candidatos) || []).map((c) => `${c.rotulo}: ${reais(c.de)}${Number(c.ate) !== Number(c.de) ? ' a ' + reais(c.ate) : ''}`);
       return h('div', { class: 'triagem', style: 'border-color:#c0392b;background:#fdecea' },
-        h('b', {}, 'Atenção: confira o valor (só a equipe vê)'),
-        h('div', {}, `Você informou ${reais(a.valor_informado)}, que está ${a.tipo === 'abaixo' ? 'ABAIXO' : 'ACIMA'} do valor de referência${a.referencia && a.referencia.plano ? ' (' + a.referencia.plano + ')' : ''}.`),
+        h('b', {}, `Valor ${a.tipo === 'abaixo' ? 'abaixo' : 'acima'} da referência: informado ${reais(a.valor_informado)}`),
         cands.length ? h('div', { style: 'font-size:13px' }, 'Referência: ' + cands.join(' · ')) : null,
-        h('div', { style: 'font-size:12px;color:var(--suave)' }, 'O valor pode ter mudado no Klingo. Se estiver certo, marque como conferido.'),
         h('button', { class: 'btn', type: 'button', style: 'margin-top:6px', onclick: async () => {
           const { error } = await db.rpc('alerta_preco_conferir', { p_conversa: a.conversa_id });
           if (error) { toast(msgErro(error)); return; }
@@ -2417,14 +2494,13 @@
     ex.replaceChildren(
       ...ab.map((a) => h('div', { class: 'ex-caixa', 'data-aberto': a.conversa_id },
         h('b', {}, 'Exame em aberto: '), `${a.exames || 'exame marcado'}${a.quando ? ' — ' + quandoCurto(a.quando) : ''}`, a.passou ? h('span', { class: 'urg alta' }, 'o horário já passou') : null,
-        h('div', { class: 'dica' }, 'Alguém precisa fechar: a equipe aqui ou o próprio paciente pelo chat. Enquanto isso, a conversa não pode ser encerrada.'),
         h('div', { class: 'ex-acoes' },
           DESFECHOS.map(([v, rot]) => btn(rot, () => { if (confirm(`Registrar "${rot}" para ${a.exames || 'este exame'}?`)) rpcPessoa('agendamento_fechar', { p_conversa: a.conversa_id, p_desfecho: v, p_nota: null }, 'Exame fechado.'); })),
           btn('Perguntar ao paciente pelo chat', () => rpcPessoa('agendamento_perguntar', { p_conversa: a.conversa_id, p_modo: 'fechar', p_item: null },
             (r) => (r.canal === 'botoes' ? 'Pergunta enviada pelo chat, com botões para o paciente responder.' : 'Mensagem enviada ao paciente.')), 'prim')))),
       ...rm.map((r) => h('div', { class: 'ex-caixa falta', 'data-remarcar': r.fechamento_id },
         h('b', {}, r.desfecho === 'faltou' ? 'Faltou: ' : 'Quer remarcar: '), `${r.exames || 'exame'}${r.quando ? ' — ' + quandoCurto(r.quando) : ''}`,
-        h('div', { class: 'dica' }, { pendente: 'Ninguém avisou o paciente ainda.', pedida: 'Pergunta enviada. Esperando o paciente.', aceita: 'O paciente aceitou e está remarcando pelo chat. Quando o novo horário for marcado, isto fecha sozinho.' }[r.remarcacao] || ''),
+        { pedida: h('span', { class: 'ex-est' }, ' · pergunta enviada, esperando o paciente'), aceita: h('span', { class: 'ex-est' }, ' · paciente remarcando pelo chat') }[r.remarcacao] || null,
         h('div', { class: 'ex-acoes' },
           r.remarcacao !== 'aceita' ? btn('Pedir ao paciente que remarque pelo chat', () => rpcPessoa('agendamento_perguntar', { p_conversa: r.conversa_id, p_modo: 'remarcar', p_item: null },
             (x) => (x.canal === 'botoes' ? 'Pedido enviado pelo chat, com botões.' : 'Mensagem enviada ao paciente.')), 'prim') : null,
@@ -2616,7 +2692,8 @@
     else meta.push(ROTULO_STATUS[st]);
     if (p.membros.length > 1) meta.push(`${p.membros.length} conversas unidas`);
     if (an.total && !an.sem_conferir) meta.push(`pedido conferido (${an.total})`);
-    if (p.membros.every((m) => m.teste)) meta.push('teste da TI');
+    // O selo "Teste" (conversa da TI, fora dos indicadores) continua por extenso: os indicadores e a equipe procuram por ele.
+    if (p.membros.every((m) => m.teste)) linha.push(h('span', { class: 'urg', title: 'Conversa de teste da TI: fica no histórico, mas não entra nos indicadores' }, 'Teste'));
     return [h('div', { class: 'l3' }, ...linha), h('div', { class: 'meta ' + st }, meta.join(' · '))];
   }
   function itemPessoa(p, destacarDono) {
@@ -2812,11 +2889,11 @@
     const clipe = h('button', { class: 'btn', type: 'button', id: 'btnAnexar', title: 'Enviar foto ou PDF ao paciente', 'aria-label': 'Anexar foto ou PDF', onclick: () => arq.click() }, '📎');
     area.addEventListener('input', () => { area.style.height = 'auto'; area.style.height = Math.min(area.scrollHeight, 140) + 'px'; });
     area.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); enviarMsg(); } });
-    box.replaceChildren(h('div', { class: 'chat-topo', id: 'chatTopo' }), h('div', { id: 'proximo', 'aria-live': 'polite' }),
+    box.replaceChildren(h('div', { class: 'chat-topo', id: 'chatTopo' }), h('div', { id: 'proximo', 'aria-live': 'polite' }), h('div', { id: 'acoes' }, h('div', { id: 'ofertas' }), h('div', { id: 'exameAberto' }), h('div', { id: 'alertaPreco' })),
       h('button', { type: 'button', id: 'ctxToggle', 'aria-expanded': 'false', 'aria-controls': 'contexto', onclick: () => { abrirContexto(!S.ctxAberto); try { localStorage.setItem('painel.ctx', S.ctxAberto ? '1' : '0'); } catch {} } }),
-      h('div', { id: 'contexto' }, h('div', { id: 'pessoa' }), h('div', { id: 'historicoPaciente' }), h('div', { id: 'exameAberto' }), h('div', { id: 'triagem' }), h('div', { id: 'alertaPreco' }), h('div', { id: 'anexosBox' }), h('div', { id: 'cartaoJ' }), h('div', { id: 'pre' })),
+      h('div', { id: 'contexto' }, h('div', { id: 'pessoa' }), h('div', { id: 'historicoPaciente' }), h('div', { id: 'triagem' }), h('div', { id: 'anexosBox' }), h('div', { id: 'cartaoJ' }), h('div', { id: 'pre' })),
       h('div', { class: 'msgs', id: 'msgs', 'aria-live': 'polite' }), h('div', { class: 'compor' }, clipe, arq, area, enviar, ligarAtalhos(area)));
-    renderTopoChat(); renderPessoaChat(); renderAlertaPreco(); renderAnexosBox(); renderCartaoJ(); desenharMsgs(true);
+    S.ofertas = null; renderTopoChat(); renderPessoaChat(); renderAlertaPreco(); renderAnexosBox(); renderCartaoJ(); desenharMsgs(true); carregarOfertas();
     // Escolha do atendente (botão da faixa) vale daqui em diante; sem escolha, fechada em tela pequena e aberta em tela larga.
     let pref = null; try { pref = localStorage.getItem('painel.ctx'); } catch {}
     abrirContexto(pref === null ? window.matchMedia('(min-width: 1280px)').matches : pref === '1');
@@ -2836,13 +2913,13 @@
   // "Próximo passo": escolhe, pela ordem do que é mais urgente, a única decisão que falta e leva o atendente até ela.
   // Só lê o que a tela já carregou; não grava nada. Os outros pontos continuam logo abaixo, na área de apoio.
   function renderProximo() {
+    renderOfertas();
     const box = document.getElementById('proximo'); if (!box) return;
     const c = conversaAberta(); if (!c || c.status === 'encerrada') { box.replaceChildren(); return; }
     const ir = (id) => () => { abrirContexto(true); setTimeout(() => document.getElementById(id)?.scrollIntoView?.({ block: 'start', behavior: 'smooth' }), 0); };
     const ids = membrosDe(c.id), minha = c.status === 'em_atendimento' && c.agente_id === S.me.id;
     const urgente = ids.some((i) => ((S.conversas.find((x) => x.id === i) || {}).triagem_urgencia) === 'alta');
     const dono = c.agente_id && c.agente_id !== S.me.id ? S.agentes.get(c.agente_id) : null;
-    const ab = abertosDe(c.id), rm = remarcarDe(c.id), al = alertasDe(c.id);
     const pre = S.pre && ['rascunho', 'pronto'].includes(S.pre.status) ? S.pre : null;
     const ultima = S.msgs.length ? S.msgs[S.msgs.length - 1] : null;
     let pontos = [];
@@ -2850,11 +2927,7 @@
       pontos = [{ tom: urgente ? 'alta' : 'media', titulo: dono ? `Esta conversa está com ${dono.nome || 'outro atendente'}` : (urgente ? 'Urgente: assuma esta conversa agora' : 'Assuma esta conversa para responder'),
         detalhe: dono ? 'Só assuma se combinar com essa pessoa.' : (c.triagem_resumo || 'Ninguém atende ainda. Leia o resumo e as mensagens abaixo.'), rot: dono ? 'Assumir mesmo assim' : 'Assumir', fn: () => assumir() }];
     } else {
-      if (al.length) pontos.push({ tom: 'alta', titulo: 'Confira o valor informado', detalhe: 'Está fora do valor de referência. Confirme no Klingo.', rot: 'Ver valor', fn: ir('alertaPreco'), noPainel: true });
       if (anexosDe(c.id).sem_conferir) pontos.push({ tom: 'media', titulo: 'Pedido com foto: confira no Klingo', detalhe: 'Veja a foto, confira o cadastro, o convênio e o exame no Klingo e marque como conferido.', rot: 'Ver fotos', fn: ir('anexosBox'), noPainel: true });
-      if (ab.length) pontos.push({ tom: ab.some((a) => a.passou) ? 'alta' : 'media', titulo: ab.some((a) => a.passou) ? 'O horário do exame já passou: registre o que aconteceu' : 'Exame marcado sem desfecho',
-        detalhe: 'Compareceu, faltou, cancelou ou remarcou. Registrar ajuda o histórico, mas não impede de encerrar a conversa.', rot: 'Fechar exame', fn: ir('exameAberto'), noPainel: true });
-      if (rm.length) pontos.push({ tom: 'media', titulo: 'Falta remarcar o exame', detalhe: 'Peça ao paciente que remarque pelo chat ou registre que já foi remarcado.', rot: 'Remarcar', fn: ir('exameAberto'), noPainel: true });
       if (pre) pontos.push({ tom: 'media', titulo: 'Marque o horário no Klingo e depois avise o paciente', detalhe: 'O pré-agendamento está pronto para conferir.', rot: 'Ver pré-agendamento', fn: ir('pre'), noPainel: true });
       if (ultima && ultima.autor === 'cliente') pontos.push({ tom: 'media', titulo: 'O paciente está esperando a sua resposta', detalhe: String(ultima.texto || '').slice(0, 90), rot: 'Responder', fn: () => document.getElementById('caixa')?.focus() });
     }
