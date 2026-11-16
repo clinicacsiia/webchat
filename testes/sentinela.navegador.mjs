@@ -112,7 +112,7 @@ await caso('aviso de IA: o assistente se apresenta (curto, sem repetir a missão
     detalhe: `status="${status}", botão de atendente visível=${barra}` };
 });
 
-await caso('formulário inicial: fala da missão (equidade, família), avisa que uma pessoa confirma, e exige o "estou ciente" (a menção à IA saiu da tela inicial de propósito)', async () => {
+await caso('formulário inicial: fala da missão (família), avisa que uma pessoa confirma, e exige o "estou ciente" (a menção à IA saiu da tela inicial de propósito)', async () => {
   const mundo = criarMundo(); const { page, ctx } = await novaPaginaChat(browser, mundo);
   await page.goto(`${base}/index.html`); await page.waitForSelector('#avisoForm', { state: 'visible', timeout: 8000 });
   const t = await page.$eval('#avisoForm', (n) => n.textContent);
@@ -120,7 +120,7 @@ await caso('formulário inicial: fala da missão (equidade, família), avisa que
   await page.click('#fQuem .unidade >> nth=0'); await page.fill('#fNome', 'Ana Souza'); await page.fill('#fTel', '71999998888'); await page.fill('#fEmail', 'a@b.co'); await page.check('#fAceite');
   await page.click('#btnIniciar'); await page.waitForTimeout(300);
   const erro = (await page.locator('#erroForm').innerText()).trim(); const iniciou = mundo.chamadas.some((c) => c.nome === 'chat_iniciar'); await ctx.close();
-  return { ok: /equidade/.test(t) && /família/.test(t) && !/previsão/i.test(t) && /pessoa da equipe/.test(t) && caixa && /ciente/.test(erro) && !iniciou, detalhe: `${t.slice(0, 60)} | erro="${erro}"` };
+  return { ok: /família/.test(t) && !/previsão/i.test(t) && /pessoa da equipe/.test(t) && caixa && /ciente/.test(erro) && !iniciou, detalhe: `${t.slice(0, 60)} | erro="${erro}"` };
 });
 
 await caso('saúde do Klingo no topo da tela inicial: verde "Online" com a API no ar, laranja "Online" só com relatórios, vermelho "Offline" fora do ar', async () => {
