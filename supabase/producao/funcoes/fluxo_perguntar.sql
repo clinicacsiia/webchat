@@ -18,6 +18,10 @@ begin
   v_nse := coalesce((d ->> 'nao_sou_eu')::boolean, false);   -- "não sou eu": nenhum preenchimento prévio
   if v_nse then v_dig := coalesce(d -> 'digitado', '{}'::jsonb); end if;
 
+  if p_passo = 'primeira_consulta' then   -- primeira-consulta: avisa o paciente e passa para a atendente, sem marcar
+    perform public.fluxo_primeira_consulta_equipe(p_conversa);
+    return;
+  end if;
   case p_passo
   when 'identidade' then
     v_txt := public.fluxo_t('identidade', ctx);

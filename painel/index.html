@@ -2098,6 +2098,14 @@
     }
     return { ok: false, estado: 'demorou' };
   }
+  async function liberarPrimeira() {
+    if (!podeAtender()) return;
+    const c = conversaAberta(); if (!c) return;
+    if (!confirm('Confirma que este paciente JÁ foi atendido pela médica? Depois disso ele poderá marcar consultas sozinho pelo chat.')) return;
+    const { data, error } = await db.rpc('painel_primeira_liberar', { p_conversa: c.id });
+    if (error) { toast('Não consegui liberar: ' + error.message); return; }
+    toast(data && data.permanente ? 'Liberado. Este paciente marca sozinho daqui em diante.' : 'Liberado nesta conversa (sem CPF e nascimento para guardar).');
+  }
   async function abrirMarcacoes() {
     if (!podeAtender()) return;
     const c = conversaAberta(); if (!c) return;
@@ -3040,6 +3048,7 @@
       c.status === 'encerrada' ? h('button', { class: 'btn', type: 'button', onclick: () => assumir(true) }, 'Reabrir') : null,
       podeAtender() && c.status !== 'encerrada' ? h('button', { class: 'btn', type: 'button', title: 'Ver os horários reais da agenda para o pedido desta conversa (só consulta)', onclick: () => abrirHorarios(0) }, 'Ver horários') : null,
       podeAtender() && c.status !== 'encerrada' ? h('button', { class: 'btn', type: 'button', title: 'Ver e cancelar as marcações deste paciente no Klingo', onclick: abrirMarcacoes }, 'Marcações') : null,
+      podeAtender() && c.status !== 'encerrada' && /PRIMEIRA CONSULTA com a médica/.test(c.triagem_resumo || '') ? h('button', { class: 'btn', type: 'button', title: 'O paciente já foi atendido pela médica: libera para marcar sozinho daqui em diante', onclick: liberarPrimeira }, 'Liberar autoatendimento') : null,
       sel,
       c.status !== 'encerrada' ? h('button', { class: 'btn perigo', type: 'button', onclick: encerrar }, 'Encerrar') : null].filter(Boolean));
     renderProximo();
@@ -3788,6 +3797,10 @@
       { k: 'marcacao_auto_desenvoar', tipo: 'sim', rot: 'Desenvoar: marcar sozinho', dica: 'Desligado: horários da Desenvoar não aparecem no chat; a equipe agenda.' },
       { k: 'marcacao_auto_csi', tipo: 'sim', rot: 'CSI: marcar sozinho', dica: 'Desligado: horários da CSI não aparecem no chat; a equipe agenda.' },
       { k: 'marcacao_auto_rmtc', tipo: 'sim', rot: 'CSI RM/TC: marcar sozinho', dica: 'Desligado: horários da CSI RM/TC não aparecem no chat; a equipe agenda.' },
+    ] },
+    { id: 'primeira_consulta', icone: 'pessoa', titulo: 'Primeira consulta com a médica', desc: 'Quem nunca foi atendido pela médica (pelo Klingo) é passado para a atendente e não marca sozinho. Quem já foi atendido marca sozinho. Se o Klingo não mostrar o atendimento anterior, a atendente usa o botão "Liberar autoatendimento" na conversa. Só ligue depois de conferir que o histórico foi carregado.', campos: [
+      { k: 'primeira_consulta_modo', tipo: 'sim', rot: 'Primeira consulta só com atendente', dica: 'Desligado: tudo como era antes (o chat marca consultas sozinho).' },
+      { k: 'primeira_consulta_medicas', tipo: 'texto', rot: 'Médica(s) da regra', dica: 'Nome como aparece no Klingo (coluna Profissional). Mais de um: separe com ponto e vírgula (;).' },
     ] },
     { id: 'atualizacao', icone: 'livro', titulo: 'Encerramento e avaliação', desc: 'Chaves da atualização do WebChat. Ligue uma por vez e confira o dia seguinte; desligar volta ao comportamento anterior na hora.', custom: 'autoencerrar', campos: [
       { k: 'encerramento_exige_motivo', tipo: 'sim', rot: 'Exigir motivo ao encerrar', dica: 'Ligado: o painel só encerra a conversa com um motivo escolhido. Desligado: o motivo fica opcional.' },

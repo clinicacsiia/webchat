@@ -1,5 +1,5 @@
 // FLUXOGRAMA: entrada (linhas do relatório de marcações do Klingo, #13825 ou o duplicado por data do exame) -> validação (id da marcação, data do exame e uma forma de identificar o paciente: prontuário, ou nome + telefone; textos cortados) -> lógica (janela de leitura por modo e filtro; telefone vira marca/hash; sem valor em R$) -> saída (linhas enxutas {m,a,p,n,f,x,o,u,e,d,s,t,r,c} em lotes para jornada_klingo_lote)
-// Versão 1.5 — 15/11/2026 / Mudança: lê o Check-In - Data (col18) e manda como 'k' para o banco (jornada_exame.checkin_em); v1.4: #14359 ganhou colunas (Celular=col16, Atendido=col17, Check-In=col18, 2º Prontuário=col19, Primeira Vez=col20); trava que para a leitura se o layout mudar de novo; colunas achadas pelo título (layoutPorTitulos)
+// Versão 1.6 — 16/11/2026 / Mudança: lê o "Profissional" (col21) e separa as consultas JÁ ATENDIDAS (Atendido = S) para a regra "primeira consulta só com atendente" (consulta_feita_lote); modo "historico" (um ano para trás, só isso); v1.5 — 15/11/2026: lê o Check-In - Data (col18) e manda como 'k' para o banco (jornada_exame.checkin_em); v1.4: #14359 ganhou colunas (Celular=col16, Atendido=col17, Check-In=col18, 2º Prontuário=col19, Primeira Vez=col20); trava que para a leitura se o layout mudar de novo; colunas achadas pelo título (layoutPorTitulos)
 //
 // Tudo aqui é função pura (sem rede, sem banco), para testar sem Klingo. As linhas trazem nome e telefone de pacientes: ficam só na memória da Edge Function;
 // o telefone nunca sai daqui, vira só uma marca (SHA-256 dos 8 últimos dígitos + o segredo da clínica) que o banco usa para achar a conversa do chat.
@@ -10,14 +10,14 @@
 
 export type Row = Record<string, unknown>;
 export type LinhaLote = { m: string; a: string; p: string; n: string; f: string; x: string; o: string; u: string; e: string; d: string; s: string; t: string; r: string; c: string; k?: string };
-export type Modo = "rapido" | "completo";
+export type Modo = "rapido" | "completo" | "historico";
 export type Filtro = "criacao" | "exame";
 
 // Em que coluna (colN) está cada campo, por relatório. "criacao" = #13825; "exame" = #14359, refeito em 14/11/2026 (nome e responsável vieram para o começo).
-export type Layout = { m: string; a: string; pront: string; nome: string; resp: string; em: string; d: string; proc: string; oper: string; unid: string; conf: string; motivo: string; status: string; atend: string; cel: string; tel: string; checkin?: string; primeira?: string };
+export type Layout = { m: string; a: string; pront: string; nome: string; resp: string; em: string; d: string; proc: string; oper: string; unid: string; conf: string; motivo: string; status: string; atend: string; cel: string; tel: string; checkin?: string; primeira?: string; prof?: string };
 export const LAYOUT_CRIACAO: Layout = { m: "col0", a: "col1", pront: "col2", em: "col3", d: "col4", proc: "col5", oper: "col6", unid: "col14", conf: "col10", motivo: "col11", status: "col12", atend: "col13", nome: "col15", cel: "col16", tel: "col17", resp: "col7" };
 // 15/11/2026: o dono acrescentou colunas ao #14359 e o Celular passou para col16 e o Atendido para col17 (antes era o contrário). col18 = Check-In - Data (ainda não lida), col19 = um 2º "Prontuário" (repetido; ignorar), col20 = Primeira Vez.
-export const LAYOUT_EXAME: Layout = { m: "col0", a: "col1", nome: "col2", resp: "col3", pront: "col4", em: "col5", d: "col6", proc: "col7", oper: "col8", unid: "col9", conf: "col12", motivo: "col13", tel: "col14", status: "col15", cel: "col16", atend: "col17", checkin: "col18" };
+export const LAYOUT_EXAME: Layout = { m: "col0", a: "col1", nome: "col2", resp: "col3", pront: "col4", em: "col5", d: "col6", proc: "col7", oper: "col8", unid: "col9", conf: "col12", motivo: "col13", tel: "col14", status: "col15", cel: "col16", atend: "col17", checkin: "col18", prof: "col21" };
 export const layoutDe = (f: Filtro): Layout => (f === "exame" ? LAYOUT_EXAME : LAYOUT_CRIACAO);
 
 // Colunas pelo TÍTULO (15/11/2026). O Klingo manda, junto com as linhas, a lista de colunas {name: "col17", title: "Atendido"}. Achando cada campo pelo título,
@@ -27,10 +27,10 @@ export type Coluna = { name?: unknown; title?: unknown };
 export const TITULOS_EXAME: Record<string, string> = {
   m: "Id da Marcação", a: "Id do Atendimento", nome: "Paciente - Nome", resp: "Responsável", pront: "Prontuário", em: "Data Agendado Em", d: "Data Agendado Para",
   proc: "Procedimento", oper: "Operadora", unid: "Unidade", conf: "Confirm Status", motivo: "Cancelamento - Motivo", tel: "Paciente - Telefone", status: "Status",
-  cel: "Paciente - Celular", atend: "Atendido", checkin: "Check-In - Data", primeira: "Primeira Vez",
+  cel: "Paciente - Celular", atend: "Atendido", checkin: "Check-In - Data", primeira: "Primeira Vez", prof: "Profissional",
 };
 // Não bloqueiam a leitura se faltarem (não são usados para gravar nada hoje).
-const OPCIONAIS = new Set<string>(["resp", "checkin", "primeira"]);
+const OPCIONAIS = new Set<string>(["resp", "checkin", "primeira", "prof"]);
 
 const normTitulo = (v: unknown): string => String(v ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
 const numeroDaColuna = (n: unknown): number => { const m = /^col(\d+)$/.exec(String(n ?? "").trim()); return m ? Number(m[1]) : Number.NaN; };
@@ -48,10 +48,10 @@ export function layoutPorTitulos(colunas: Coluna[], reserva: Layout): { layout: 
     const col = achada(TITULOS_EXAME[campo]);
     if (!col) {
       if (!OPCIONAIS.has(campo)) faltando.push(TITULOS_EXAME[campo]);
-      else if (campo === "checkin" || campo === "primeira") delete L[campo];   // sem o título, nada de herdar a posição da ordem fixa: não manda k
+      else if (campo === "checkin" || campo === "primeira" || campo === "prof") delete L[campo];   // sem o título, nada de herdar a posição da ordem fixa: não manda k
       continue;
     }
-    if (campo !== "checkin" && campo !== "primeira" && R[campo] !== col) diferenteDoFixo.push(campo);
+    if (campo !== "checkin" && campo !== "primeira" && campo !== "prof" && R[campo] !== col) diferenteDoFixo.push(campo);
     L[campo] = col;
   }
   return { layout, faltando, diferenteDoFixo };
@@ -130,6 +130,7 @@ export async function mapearLinha(r: Row, segredo: string, L: Layout = LAYOUT_CR
 //  - filtro "criacao" (#13825, que só filtra pela data em que a marcação foi FEITA): rápido = marcações de ontem e de hoje (pega as novas);
 //    completo = as feitas nos últimos 45 dias (pega confirmação, cancelamento e atendimento de marcações mais antigas).
 export function janelaLeitura(modo: Modo, filtro: Filtro, hoje: string): { de: string; ate: string } {
+  if (modo === "historico") return { de: somaDias(hoje, -365), ate: somaDias(hoje, -1) };   // só o que já passou (consultas já atendidas)
   if (filtro === "exame") return modo === "rapido" ? { de: hoje, ate: somaDias(hoje, 7) } : { de: hoje, ate: somaDias(hoje, CARTOES_FRENTE) };
   return modo === "rapido" ? { de: somaDias(hoje, -1), ate: hoje } : { de: somaDias(hoje, -45), ate: hoje };
 }
@@ -194,7 +195,23 @@ export function emLotes<T>(itens: T[], tamanho: number): T[][] {
   return lotes;
 }
 
-export const modoValido = (v: unknown): Modo => (v === "completo" ? "completo" : "rapido");
+export const modoValido = (v: unknown): Modo => (v === "completo" ? "completo" : v === "historico" ? "historico" : "rapido");
 export const filtroValido = (v: unknown): Filtro => (v === "exame" ? "exame" : "criacao");
 // Id de relatório do Klingo: só dígitos (vem da config; nunca vai cru para a URL).
 export const relatorioValido = (v: unknown): string => (/^\d{1,8}$/.test(String(v ?? "").trim()) ? String(v).trim() : "13825");
+
+// Consultas JÁ ATENDIDAS (Atendido = S) com o nome do profissional: base da regra "primeira consulta só com atendente". Só prontuário de verdade (a chave por nome "n:" fica de fora),
+// só linhas com profissional e data. Nada de nome, telefone ou valor. Serve de qualquer data (inclusive as que a Jornada não mostra).
+export type ConsultaFeita = { m: string; p: string; q: string; x: string; d: string };
+export function consultasFeitas(linhas: Row[], L: Layout): ConsultaFeita[] {
+  if (!L.prof) return [];
+  const porId = new Map<string, ConsultaFeita>();
+  for (const r of linhas) {
+    if (!/^S$/i.test(txt(r[L.atend], 3))) continue;
+    if (/^cancelada$/i.test(txt(r[L.status], 20))) continue;
+    const m = txt(r[L.m], 40), p = txt(r[L.pront], 40), q = txt(r[L.prof], 120), d = txt(r[L.d], 30);
+    if (!m || !p || !q || !ISO.test(d)) continue;
+    porId.set(m, { m, p, q, x: txt(r[L.proc], 200), d: d.slice(0, 10) });
+  }
+  return [...porId.values()];
+}

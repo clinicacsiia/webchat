@@ -2299,6 +2299,30 @@
    ],
    "rls": true,
    "politicas": 0
+  },
+  {
+   "nome": "consulta_feita",
+   "colunas": [
+    "marcacao_id",
+    "prontuario",
+    "profissional",
+    "procedimento",
+    "atendido_em",
+    "atualizado_em",
+    "chave"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "primeira_consulta_liberada",
+   "colunas": [
+    "chave",
+    "liberado_por",
+    "liberado_em"
+   ],
+   "rls": true,
+   "politicas": 0
   }
  ],
  "visoes": [
@@ -2388,6 +2412,12 @@
    "quando": "*/10 * * * *",
    "ativa": true,
    "comando": "select public.chat_corpo_atualizar()"
+  },
+  {
+   "nome": "consulta-atendida-sync",
+   "quando": "*/10 * * * *",
+   "ativa": true,
+   "comando": "select public.consulta_atendida_disparar()"
   },
   {
    "nome": "convenio-seguir-klingo",
@@ -2699,6 +2729,8 @@
   "previsao_monitor_modo",
   "previsao_oferta_texto",
   "previsao_texto",
+  "primeira_consulta_medicas",
+  "primeira_consulta_modo",
   "reabrir_dias",
   "reaproveitar_cadastro_convidado",
   "teste_agentes",
@@ -6972,6 +7004,40 @@
    "md5": "571e9e3105aa7f1b67a92d748a876c75"
   },
   {
+   "nome": "consulta_atendida_disparar",
+   "args": [
+    {
+     "nome": "p_de",
+     "padrao": true
+    },
+    {
+     "nome": "p_ate",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "3b85a3b3d4b40b25ee5fd938a5982072"
+  },
+  {
+   "nome": "consulta_atendida_lote",
+   "args": [
+    {
+     "nome": "p_linhas",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "7f4dde3df44c7beebd13f378d739cd34"
+  },
+  {
    "nome": "consulta_config_salvar",
    "args": [
     {
@@ -6993,6 +7059,21 @@
    "authenticated": true,
    "publico": true,
    "md5": "68d8da421a71a204cc66d6a1d84634ea"
+  },
+  {
+   "nome": "consulta_feita_lote",
+   "args": [
+    {
+     "nome": "p_linhas",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "57508b69edd270ac9a358a1cc12a1675"
   },
   {
    "nome": "consultas_config_listar",
@@ -9260,7 +9341,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "4a3ff399cb8f76500f1ccfb0ba6ac300"
+   "md5": "057af84eab8f3ee6f0c731e29a5be180"
   },
   {
    "nome": "fluxo_pos_aplicar",
@@ -9366,6 +9447,21 @@
    "md5": "824969f5bca052c781d4bceb1ee6d388"
   },
   {
+   "nome": "fluxo_primeira_consulta_equipe",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "26592a2d86013c747e32dc957ca4bc41"
+  },
+  {
    "nome": "fluxo_procs",
    "args": [
     {
@@ -9393,7 +9489,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "b26eedebcd825176e4800dd53d6ada02"
+   "md5": "f42eeaaeba12f248bd94e56f28518588"
   },
   {
    "nome": "fluxo_proximo_assunto",
@@ -11588,7 +11684,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "c8170748a65f2809eec235d836909b27"
+   "md5": "0fd42af3cea606870af60ef8018fe9d9"
   },
   {
    "nome": "klingo_pre_gravar",
@@ -13585,6 +13681,21 @@
    "md5": "69e3752a68c375f354b3bda502e7a9f6"
   },
   {
+   "nome": "painel_primeira_liberar",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "e5d91957e96fdbf9d2846524d6ab2813"
+  },
+  {
    "nome": "painel_resultado_entregue",
    "args": [
     {
@@ -14605,6 +14716,21 @@
    "authenticated": false,
    "publico": false,
    "md5": "e4b875f1985e129ff61988f9ae0d1812"
+  },
+  {
+   "nome": "primeira_consulta_ok",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "eb0de9e6740484cf889b45e6551cd5cf"
   },
   {
    "nome": "profissional_bloqueado",
