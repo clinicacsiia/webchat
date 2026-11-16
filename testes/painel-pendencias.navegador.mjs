@@ -76,7 +76,11 @@ function servidor() {
   });
 }
 
-async function pagina(browser, { nivel = 'supervisor', falha = false, falhaAcao = false, papel = 'atendente' } = {}) {
+const CODIGOS = [
+  { id: 'cd1', finalidade: 'cadastro', celular: '71991230071', nome: 'Hugo <b>Teste</b>', email: 'hugo@x.invalid', codigo: '482913', criado_em: agora, expira_em: new Date(Date.now() + 3600e3).toISOString(), digitado: false, tentativas: 0, envio: 'erro', envio_erro: 'smtp_senha_recusada' },
+  { id: 'cd2', finalidade: 'esqueci_pin', celular: '71991230072', nome: 'Lia Teste', email: null, codigo: '071155', criado_em: agora, expira_em: new Date(Date.now() + 3600e3).toISOString(), digitado: false, tentativas: 1, envio: 'sem_email', envio_erro: null },
+  { id: 'cd3', finalidade: 'cadastro', celular: '71991230073', nome: 'Noé Teste', email: 'noe@x.invalid', codigo: '990021', criado_em: agora, expira_em: new Date(Date.now() + 3600e3).toISOString(), digitado: true, tentativas: 0, envio: 'enviado', envio_erro: null }];
+async function pagina(browser, { nivel = 'supervisor', falha = false, falhaAcao = false, papel = 'atendente', codigos = false } = {}) {
   const EUX = { ...EU, papel };
   const ctx = await browser.newContext();
   await ctx.addInitScript(([id, token, email]) => {
@@ -104,7 +108,9 @@ async function pagina(browser, { nivel = 'supervisor', falha = false, falhaAcao 
     else if (p.startsWith('/rest/v1/v_jornada_quadro')) corpo = [];
     else if (p.endsWith('/rpc/org_nivel')) corpo = nivel;
     else if (p.endsWith('/rpc/painel_indicadores_atendentes')) { reg.rpcs.push(JSON.parse(req.postData() || '{}')); if (false) { status = 500; corpo = { message: 'falhou' }; } else corpo = { pessoas: [{ nome: 'Outra Pessoa', agendados: 3 }, { nome: 'Atendente de Teste', agendados: 1 }] }; }
-    else if (p.endsWith('/rpc/painel_app_pendencias_resumo')) { reg.rpcs.push('resumo'); corpo = falha ? { message: 'falhou' } : RESUMO; if (falha) status = 500; }
+    else if (p.endsWith('/rpc/painel_app_pendencias_resumo')) { reg.rpcs.push('resumo'); corpo = falha ? { message: 'falhou' } : (codigos ? { ...RESUMO, codigos: 2 } : RESUMO); if (falha) status = 500; }
+    else if (p.endsWith('/rpc/painel_app_codigos')) { reg.rpcs.push({ rpc: 'codigos' }); corpo = CODIGOS; }
+    else if (p.endsWith('/rpc/painel_app_codigo_descartar')) { const a = JSON.parse(req.postData() || '{}'); reg.rpcs.push({ rpc: 'painel_app_codigo_descartar', ...a }); corpo = 1; }
     else if (p.endsWith('/rpc/painel_app_solicitacoes')) { const a = JSON.parse(req.postData() || '{}'); reg.rpcs.push({ rpc: 'solic', ...a }); if (falha) { status = 500; corpo = { message: 'falhou' }; } else corpo = a.p_status === 'confirmada' ? SOLIC_CONF : SOLIC; }
     else if (p.endsWith('/rpc/painel_app_revisoes')) { reg.rpcs.push({ rpc: 'rev' }); corpo = REV; }
     else if (p.endsWith('/rpc/painel_app_acessos')) { reg.rpcs.push({ rpc: 'acessos', ...JSON.parse(req.postData() || '{}') }); corpo = ACESSOS; }
@@ -217,6 +223,37 @@ await caso('Erro do banco mostra aviso e o painel continua funcionando; erro ao 
   await b.page.click('#tabPendSolic tbody tr:nth-child(1) button:has-text("Confirmar")'); await espera(500);
   const aindaLa = await b.page.locator('#tabPendSolic tbody tr').count(); const toastTxt = await b.page.locator('body').innerText(); await b.ctx.close();
   return { ok: itens >= 0 && exc === 0 && aindaLa === 2 && /Não foi possível salvar/.test(toastTxt), detalhe: `linhas=${aindaLa}` };
+});
+await caso('Códigos: o contador soma os códigos (5 + 2 = 7) e a janela já abre na aba dos códigos', async () => {
+  const { page, ctx, reg } = await abrir({ nivel: 'atendente', codigos: true });
+  await page.waitForFunction(() => { const s = document.getElementById('seloPendencias'); return s && !s.hidden && s.textContent === '7'; }, null, { timeout: 5000 });
+  await page.click('#btnPendencias'); await page.waitForSelector('#tabPendCodigos tbody tr');
+  const ativa = await page.locator('button[data-pend="codigos"][aria-pressed="true"]').count(), rot = await page.locator('button[data-pend="codigos"]').textContent();
+  await ctx.close();
+  return { ok: ativa === 1 && /Códigos de confirmação \(2\)/.test(rot) && !reg.excecoes.length, detalhe: rot };
+});
+await caso('Códigos: mostra o código grande, a finalidade, o estado do e-mail (erro, sem e-mail, enviado) e o motivo; nome vira texto; WhatsApp só com celular', async () => {
+  const { page, ctx, reg } = await abrir({ nivel: 'atendente', codigos: true });
+  await page.click('#btnPendencias'); await page.waitForSelector('#tabPendCodigos tbody tr');
+  const linhas = await page.$$eval('#tabPendCodigos tbody tr', (trs) => trs.map((t) => t.textContent));
+  const zap = await page.locator('#tabPendCodigos tbody tr:nth-child(1) a').getAttribute('href');
+  const tags = await page.locator('#tabPendCodigos tbody tr:nth-child(1) th b').count();
+  await ctx.close();
+  return { ok: linhas.length === 3 && /Hugo <b>Teste<\/b>/.test(linhas[0]) && /482913/.test(linhas[0]) && /Primeiro acesso/.test(linhas[0]) && /E-mail não saiu/.test(linhas[0]) && /smtp_senha_recusada/.test(linhas[0])
+    && /071155/.test(linhas[1]) && /Esqueci o PIN/.test(linhas[1]) && /Sem e-mail no cadastro/.test(linhas[1]) && /Já digitado/.test(linhas[2]) && /E-mail enviado/.test(linhas[2])
+    && zap === 'https://wa.me/5571991230071' && tags === 0 && !reg.excecoes.length, detalhe: linhas[0].slice(0, 90) };
+});
+await caso('Códigos: o aviso orienta a confirmar a pessoa antes de passar o código e Descartar pede confirmação e chama painel_app_codigo_descartar', async () => {
+  const { page, ctx, reg } = await abrir({ nivel: 'atendente', codigos: true });
+  await page.click('#btnPendencias'); await page.waitForSelector('#tabPendCodigos tbody tr');
+  const aviso = await page.locator('dialog').textContent();
+  page.once('dialog', (d) => d.dismiss()); await page.locator('#tabPendCodigos tbody tr:nth-child(2) button').click(); await page.waitForTimeout(300);
+  const nada = !reg.rpcs.some((r) => r.rpc === 'painel_app_codigo_descartar');
+  page.once('dialog', (d) => d.accept()); await page.locator('#tabPendCodigos tbody tr:nth-child(2) button').click();
+  await page.waitForFunction(() => /Código descartado/.test(document.body.innerText), null, { timeout: 4000 }).catch(() => {});
+  const ch = reg.rpcs.find((r) => r.rpc === 'painel_app_codigo_descartar');
+  await ctx.close();
+  return { ok: /confirme por telefone que é a própria pessoa/.test(aviso) && nada && ch && ch.p_id === 'cd2' && !reg.excecoes.length, detalhe: JSON.stringify(ch) };
 });
 await caso('Quem não atende (marketing) não vê o botão', async () => {
   const { page, ctx } = await abrir({ nivel: 'marketing', papel: 'marketing' }).catch(() => ({}));

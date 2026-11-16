@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!--
 FLUXOGRAMA: entrada (celular + PIN de 4 dígitos; no primeiro acesso, cadastro único em 5 passos) -> validação (a página confere o formato; quem decide é o servidor: funções app_* do Supabase, supabase/acesso-rapido-paciente.sql) -> lógica (o aparelho guarda só um código de acesso e o primeiro nome; PIN, filhos, números de confiança e marcações ficam no banco; o PIN é pedido de novo depois de 5 minutos em segundo plano) -> saída (tela inicial com Eu / cada filho / Todos juntos; solicitações de marcação; quem confia em você)
-Versão 3.0 — 15/11/2026 / Mudança: quem já tem PIN e entra pela conta antiga (e-mail e senha) agora tem as duas JUNTAS (`app_conta_antiga_unir`: senha + PIN, só se for a mesma pessoa; traz as conversas da conta); antes a sessão antiga era descartada sem ligar nada. Versão 2.9 — 15/11/2026 / Mudança: apagada a tela inicial do acesso rápido ("Quem vai ser atendido?", "Marcar pelo chat", "Deixar uma solicitação (sem chat)", "Suas solicitações"): era cópia do chat (o botão só abria o chat), a solicitação sem chat nunca foi usada (0 na produção) e o chat já tem "Meus dados" e "Sair"; depois do PIN a pessoa vai direto ao chat. Versão 2.8 — 15/11/2026 / Mudança: o botão "Meus dados" do chat (?ir=dados) abre direto em Meus dados quando o PIN dos últimos 30 minutos ainda vale (antes pedia o PIN de novo e caía na tela inicial); o site (acesso e Minha vez) deixou de mudar para o tema escuro do celular e segue sempre o visual claro do chat. Versão 2.7 — 15/11/2026 / Mudança: quem tem conta de e-mail E já criou o PIN pelo celular (cadastro separado, sem ligação com a conta) não cai mais em "Confira os seus dados": a página pergunta ao servidor se o celular já tem PIN (app_pre_cadastro, só leitura) e leva direto para digitar o PIN, tanto ao abrir pelo chat quanto ao tocar em Continuar. Versão 2.6 — 15/11/2026 / Mudança: visual do site (cabeçalho com a logo da CSI, cores e fonte do chat, tema escuro); CPF conferido na hora, com os dígitos verificadores, em todas as telas que pedem CPF; o que a pessoa já digitou no cadastro (nome, nascimento, filho, CPF, contato) não se perde ao voltar, ao trocar Sim/Não ou ao ser mandada de volta por um erro do servidor. Versão 2.5 — 15/11/2026 / Mudança: some o cartão "Falta pouco" da tela inicial e de Meus dados (o que falta só é pedido na entrada, com o PIN obrigatório). Versão 2.4 — 15/11/2026 / Mudança: PIN OBRIGATÓRIO (quando config.app_pin_obrigatorio = sim): o primeiro acesso pede também o CPF (só o que o banco ainda não sabe) antes do PIN, quem entra com cadastro incompleto é obrigado a completar antes de seguir, e cada entrada é registrada (aparelho e, com permissão, a posição) (supabase/acesso-rapido-pin-obrigatorio.sql). Versão 2.3 — 15/11/2026 / Mudança: filhos da conta antiga (lista do histórico para conferir), filho com o nome do responsável (é ela mesma ou confirma), filho repetido (supabase/acesso-rapido-filhos.sql). Versão 2.2 — 15/11/2026 / Mudança: cartão "Falta pouco" (CPF dela e dos filhos, e-mail) para TODO paciente (supabase/acesso-rapido-pendencias.sql). Versão 2.1 — 15/11/2026 / Mudança: quem tem conta antiga (e-mail e senha) entra uma última vez, confere os dados que já temos e cria o PIN (supabase/acesso-rapido-conta-antiga.sql); "Meus dados" mais claro. Versão 2.0 — 14/11/2026 / Mudança: ligado ao Supabase (versão 1 guardava tudo só no celular)
+Versão 3.1 — 16/11/2026 / Mudança: **confirmação por e-mail** (supabase/acesso-codigo-email.sql, chave `app_codigo_email`, nasce desligada): celular novo (primeiro acesso) e "esqueci o PIN" passam por um código de 6 números enviado ao e-mail; quem não recebe (spam, e-mail errado, falha no envio, cadastro sem e-mail) pede o código à atendente, que o vê no painel (Pendências > Códigos). Telas novas c4e, c4c e esqc. Versão 3.0 — 15/11/2026 / Mudança: quem já tem PIN e entra pela conta antiga (e-mail e senha) agora tem as duas JUNTAS (`app_conta_antiga_unir`: senha + PIN, só se for a mesma pessoa; traz as conversas da conta); antes a sessão antiga era descartada sem ligar nada. Versão 2.9 — 15/11/2026 / Mudança: apagada a tela inicial do acesso rápido ("Quem vai ser atendido?", "Marcar pelo chat", "Deixar uma solicitação (sem chat)", "Suas solicitações"): era cópia do chat (o botão só abria o chat), a solicitação sem chat nunca foi usada (0 na produção) e o chat já tem "Meus dados" e "Sair"; depois do PIN a pessoa vai direto ao chat. Versão 2.8 — 15/11/2026 / Mudança: o botão "Meus dados" do chat (?ir=dados) abre direto em Meus dados quando o PIN dos últimos 30 minutos ainda vale (antes pedia o PIN de novo e caía na tela inicial); o site (acesso e Minha vez) deixou de mudar para o tema escuro do celular e segue sempre o visual claro do chat. Versão 2.7 — 15/11/2026 / Mudança: quem tem conta de e-mail E já criou o PIN pelo celular (cadastro separado, sem ligação com a conta) não cai mais em "Confira os seus dados": a página pergunta ao servidor se o celular já tem PIN (app_pre_cadastro, só leitura) e leva direto para digitar o PIN, tanto ao abrir pelo chat quanto ao tocar em Continuar. Versão 2.6 — 15/11/2026 / Mudança: visual do site (cabeçalho com a logo da CSI, cores e fonte do chat, tema escuro); CPF conferido na hora, com os dígitos verificadores, em todas as telas que pedem CPF; o que a pessoa já digitou no cadastro (nome, nascimento, filho, CPF, contato) não se perde ao voltar, ao trocar Sim/Não ou ao ser mandada de volta por um erro do servidor. Versão 2.5 — 15/11/2026 / Mudança: some o cartão "Falta pouco" da tela inicial e de Meus dados (o que falta só é pedido na entrada, com o PIN obrigatório). Versão 2.4 — 15/11/2026 / Mudança: PIN OBRIGATÓRIO (quando config.app_pin_obrigatorio = sim): o primeiro acesso pede também o CPF (só o que o banco ainda não sabe) antes do PIN, quem entra com cadastro incompleto é obrigado a completar antes de seguir, e cada entrada é registrada (aparelho e, com permissão, a posição) (supabase/acesso-rapido-pin-obrigatorio.sql). Versão 2.3 — 15/11/2026 / Mudança: filhos da conta antiga (lista do histórico para conferir), filho com o nome do responsável (é ela mesma ou confirma), filho repetido (supabase/acesso-rapido-filhos.sql). Versão 2.2 — 15/11/2026 / Mudança: cartão "Falta pouco" (CPF dela e dos filhos, e-mail) para TODO paciente (supabase/acesso-rapido-pendencias.sql). Versão 2.1 — 15/11/2026 / Mudança: quem tem conta antiga (e-mail e senha) entra uma última vez, confere os dados que já temos e cria o PIN (supabase/acesso-rapido-conta-antiga.sql); "Meus dados" mais claro. Versão 2.0 — 14/11/2026 / Mudança: ligado ao Supabase (versão 1 guardava tudo só no celular)
 -->
 <html lang="pt-BR">
 <head>
@@ -184,7 +184,7 @@ function lerCacheChat(){
 const aparelho=()=>(navigator.userAgentData&&navigator.userAgentData.platform)||(/iPhone|iPad/.test(navigator.userAgent)?'iPhone/iPad':/Android/.test(navigator.userAgent)?'Android':'Navegador');
 
 /* ===== Estado ===== */
-const S={dev:null,perfil:null,view:'',d:{filhos:[],confiavel:null},buf:'',mode:'unlock',tmp:'',old:'',after:null,unlocked:false,sheet:null,temFilhos:null,hiddenAt:0,busy:false,volta:'home',esq:null,tel:'',resumo:'',confirma:null,conta:null,aem:'',pend:null,pendOculta:false,porta:null,falta:[],completar:[],rasc:{},evento:null,soHome:false,cacheEmail:'',uniao:null};
+const S={dev:null,perfil:null,view:'',d:{filhos:[],confiavel:null},buf:'',mode:'unlock',tmp:'',old:'',after:null,unlocked:false,sheet:null,temFilhos:null,hiddenAt:0,busy:false,volta:'home',esq:null,tel:'',resumo:'',confirma:null,conta:null,aem:'',pend:null,pendOculta:false,porta:null,falta:[],completar:[],rasc:{},evento:null,soHome:false,cacheEmail:'',uniao:null,cod:null};
 const app=$('#app');
 function toast(t){const e=document.createElement('div');e.className='toast';e.textContent=t;document.body.appendChild(e);setTimeout(()=>e.remove(),2600)}
 function erro(m){const e=$('#err');if(e)e.textContent=m||''}
@@ -288,6 +288,8 @@ const MSG_PIN_FRACO='Escolha um PIN menos óbvio: não use números repetidos (1
 /* ===== Layout ===== */
 const prog=n=>`<div class="prog">${[1,2,3,4,5].map(i=>`<i class="${i<=n?'on':''}"></i>`).join('')}</div>`;
 const voltar=v=>`<button class="link back" data-act="go" data-v="${v}">← Voltar</button>`;
+/* O e-mail com o código pode demorar ou cair no spam; e a atendente pode passar o código depois de confirmar quem é a pessoa. */
+const avisoSpam=()=>`<div class="card" role="note"><b>Não chegou?</b><p class="sub" style="margin:6px 0 0">Olhe a pasta de <b>spam (lixo eletrônico)</b> e a <b>lixeira</b> do seu e-mail. Se não achar, fale com a clínica: a atendente confirma que é você e passa o código.</p></div>`;
 /* CPF salvo: o chat não pergunta CPF e nascimento de novo. A página só vê a máscara; o número inteiro fica no banco. */
 function cpfLinha(id,x){return`<small>CPF: ${x.cpf_salvo?esc(x.cpf_mascara||'salvo'):'ainda não salvo'} · <button class="link inline" data-act="sheet" data-t="cpf" data-p="${esc(id)}">${x.cpf_salvo?'Alterar':'Informar'}</button></small>`}
 function contatoForm(){
@@ -370,6 +372,22 @@ const V={
     <button class="btn" data-act="c4">Continuar</button>
     <button class="btn sec" data-act="c4skip">Pular por enquanto</button>`,
   c5:()=>`${prog(5)}${voltar('c4')}${padView(S.mode==='new2'?'Confirme o PIN':'Crie seu PIN',pinSub())}`,
+  c4e:()=>`${prog(4)}${voltar('c4')}<h1>Confirme seu e-mail</h1><p class="sub">Vamos mandar um código de 6 números para o seu e-mail. Isso garante que o cadastro é seu.</p>
+    <div class="card"><label for="cemail">Seu e-mail</label><input id="cemail" type="email" inputmode="email" autocomplete="email" autocapitalize="off" placeholder="nome@exemplo.com" value="${esc((S.cod&&S.cod.email)||S.d.email||S.cacheEmail||'')}">
+    <div class="err" id="err" role="alert"></div></div>
+    <button class="btn" data-act="c4e">Enviar código</button>`,
+  c4c:()=>`${prog(4)}${voltar('c4e')}<h1>Digite o código</h1><p class="sub">Enviamos 6 números para <b>${esc((S.cod&&S.cod.mask)||'o seu e-mail')}</b>.</p>
+    ${avisoSpam()}
+    <div class="card"><label for="cod">Código</label><input id="cod" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="000000">
+    <div class="err" id="err" role="alert"></div></div>
+    <button class="btn" data-act="c4c">Confirmar código</button>
+    <button class="btn sec" data-act="go" data-v="c4e">Enviar de novo / trocar o e-mail</button>`,
+  esqc:()=>`${voltar('esqueci')}<h1>Digite o código</h1><p class="sub">${S.cod&&S.cod.enviado?`Enviamos 6 números para <b>${esc(S.cod.mask)}</b>.`:'Não temos um e-mail seu no cadastro, então nenhum e-mail foi enviado.'}</p>
+    ${S.cod&&S.cod.enviado?avisoSpam():''}
+    <div class="card"><label for="cod">Código</label><input id="cod" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="000000">
+    <div class="err" id="err" role="alert"></div></div>
+    <button class="btn" data-act="esqc">Confirmar código</button>
+    <button class="btn sec" data-act="go" data-v="esqueci">Pedir outro código</button>`,
   esqueci:()=>`${voltar(S.dev?'pin':'entrar')}<h1>Esqueci o PIN</h1><p class="sub">Confirme seus dados para criar um novo PIN.</p>
     <div class="card"><label for="tel">Seu celular com DDD</label><input id="tel" inputmode="numeric" autocomplete="tel-national" placeholder="(71) 99999-9999" value="${fmtTel((S.esq&&S.esq.tel)||(S.dev?'':S.tel))}">
     <label for="nome">Nome completo</label><input id="nome" autocomplete="name" value="${esc(S.esq?S.esq.nome:'')}">
@@ -411,7 +429,7 @@ function sheetHtml(){
   return`<div class="sheet" role="dialog" aria-modal="true"><div>${c}<button class="btn sec" data-act="closesheet">Cancelar</button></div></div>`;
 }
 function render(){
-  if(!S.dev&&!['c1','c2','c3','c3b','c4','c5','entrar','esqueci','pinnovo','indisp','antiga','antiga2'].includes(S.view)&&!(S.view==='pin'&&['login','new1','new2'].includes(S.mode)))S.view='c1';
+  if(!S.dev&&!['c1','c2','c3','c3b','c4','c4e','c4c','c5','entrar','esqueci','esqc','pinnovo','indisp','antiga','antiga2'].includes(S.view)&&!(S.view==='pin'&&['login','new1','new2'].includes(S.mode)))S.view='c1';
   if(S.view==='dados'&&!S.perfil){S.view=S.dev?'pin':'c1';S.mode='unlock'}
   app.innerHTML=(V[S.view]?V[S.view]():'')+sheetHtml();
   const t=$('#tel');if(t)t.addEventListener('input',()=>{t.value=fmtTel(t.value)});
@@ -420,7 +438,7 @@ function render(){
   document.querySelectorAll('input[data-cp],#pend input[data-pc="cpf"],#cpfn').forEach(ligarCpf);
 }
 /* O que a pessoa já digitou nas telas do cadastro fica guardado só na memória da página: voltar, trocar Sim/Não ou ser mandada de volta por um erro não apaga nada. */
-const RASC_TELAS=['c1','c2','c3','c4'];   // a tela do CPF (c3b) guarda direto no cadastro em andamento (S.d): os campos dela mudam de posição conforme o que o banco já sabe
+const RASC_TELAS=['c1','c2','c3','c4','c4e'];   // a tela do CPF (c3b) guarda direto no cadastro em andamento (S.d): os campos dela mudam de posição conforme o que o banco já sabe
 function guardarRascunho(el){if(!RASC_TELAS.includes(S.view)||!el.id||el.type==='password')return;S.rasc[S.view+'.'+el.id]=el.value}
 function limparRascunho(...ids){ids.forEach(id=>delete S.rasc[S.view+'.'+id])}
 function restaurarRascunho(){
@@ -540,8 +558,32 @@ const A={
     if(S.completar.some(x=>!x.opcional)){render();return erro('Ainda falta preencher o que está acima.')}
     S.pend=null;toast('Cadastro completo. Obrigado!');await concluirEntrada();
   },
-  c4:()=>{const r=lerContato();if(r.e)return erro(r.e);S.d.confiavel=r.c;iniciaPin()},
-  c4skip:()=>{S.d.confiavel=null;iniciaPin()},
+  c4:()=>{const r=lerContato();if(r.e)return erro(r.e);S.d.confiavel=r.c;depoisContato()},
+  c4skip:()=>{S.d.confiavel=null;depoisContato()},
+  c4e:async()=>{
+    const em=$('#cemail').value.trim().toLowerCase();S.d.email=em;
+    if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em))return erro('Esse e-mail não parece certo.');
+    ocupado(true);const r=await rpc('app_codigo_pedir',{p_telefone:S.d.telefone,p_finalidade:'cadastro',p_email:em,p_nome:S.d.nome});ocupado(false);
+    if(r.erro==='indisponivel')return go('indisp');
+    if(r.erro==='telefone_cadastrado'){S.tel=S.d.telefone;S.mode='login';S.buf='';go('pin');setTimeout(()=>erro(r.mensagem),0);return}
+    if(r.ok&&r.exigido===false){S.cod=null;return iniciaPin()}
+    if(!r.ok)return erro(r.mensagem||'Não foi possível enviar o código. Tente de novo.');
+    S.cod={tel:S.d.telefone,email:em,mask:r.email_mascara,validado:false};go('c4c');
+  },
+  c4c:async()=>{
+    const c=digits($('#cod').value);if(c.length!==6)return erro('O código tem 6 números.');
+    ocupado(true);const r=await rpc('app_codigo_validar',{p_telefone:S.d.telefone,p_finalidade:'cadastro',p_codigo:c});ocupado(false);
+    if(r.erro==='indisponivel')return go('indisp');
+    if(!r.ok){if(r.erro==='codigo_vencido'||r.erro==='codigo_bloqueado'){S.cod=null;go('c4e');setTimeout(()=>erro(r.mensagem),0);return}return erro(r.mensagem||'Código incorreto.')}
+    S.cod=Object.assign(S.cod||{},{tel:S.d.telefone,validado:true,t:Date.now()});iniciaPin();
+  },
+  esqc:async()=>{
+    const c=digits($('#cod').value);if(c.length!==6)return erro('O código tem 6 números.');
+    ocupado(true);const r=await rpc('app_codigo_validar',{p_telefone:S.esq.tel,p_finalidade:'esqueci_pin',p_codigo:c});ocupado(false);
+    if(r.erro==='indisponivel')return go('indisp');
+    if(!r.ok){if(r.erro==='codigo_vencido'||r.erro==='codigo_bloqueado'){S.cod=null;go('esqueci');setTimeout(()=>erro(r.mensagem),0);return}return erro(r.mensagem||'Código incorreto.')}
+    esqueciPin();
+  },
   esqueci:()=>{S.esq=null;go('esqueci')},
   pendsalvar:async()=>{
     const campos=[...document.querySelectorAll('#pend input')].filter(i=>i.value.trim());
@@ -589,18 +631,16 @@ const A={
     if(tem){S.uniao=S.conta.token;S.conta=null;return irParaPin(tel,'Este celular já tem PIN. Digite o seu PIN para entrar e juntar com a sua conta antiga.')}
     iniciaPinAntiga();
   },
-  esqueci2:()=>{
+  esqueci2:async()=>{
     const tel=digits($('#tel').value),nome=$('#nome').value.trim(),nasc=$('#nasc').value;
     if(!telOk(tel))return erro('Celular inválido. Use DDD + 9 dígitos.');
     if(!nome||!dataOk(nasc))return erro('Digite o nome completo e a data de nascimento do cadastro.');
-    S.esq={tel,nome,nasc};S.volta='esqueci';S.mode='new1';S.buf='';S.tmp='';
-    S.after=async pin=>{
-      ocupado(true);const r=await rpc('app_pin_esqueci',{p_telefone:S.esq.tel,p_nome:S.esq.nome,p_nascimento:S.esq.nasc,p_pin_novo:pin,p_aparelho:aparelho()});ocupado(false);
-      if(r.ok){S.esq=null;entrou(r);toast('Novo PIN criado');aposEntrar('pin_esqueci');return}
-      if(r.erro==='indisponivel')return go('indisp');
-      go('esqueci');setTimeout(()=>erro(r.mensagem||'Os dados não conferem com o cadastro.'),0);
-    };
-    go('pinnovo');
+    S.esq={tel,nome,nasc};
+    ocupado(true);const r=await rpc('app_codigo_pedir',{p_telefone:tel,p_finalidade:'esqueci_pin',p_nome:nome,p_nascimento:nasc});ocupado(false);
+    if(r.erro==='indisponivel')return go('indisp');
+    if(r.erro==='rede'||(r.ok&&r.exigido===false)){S.cod=null;return esqueciPin()}   // desligada (ou sem resposta): como antes; o servidor continua sendo quem decide
+    if(!r.ok)return erro(r.mensagem||'Os dados não conferem com o cadastro.');
+    S.cod={tel,mask:r.email_mascara,enviado:!!r.enviado};go('esqc');
   },
   trocapin:()=>{
     S.volta='dados';S.mode='old';S.buf='';
@@ -738,19 +778,42 @@ async function depoisFilhos(){
   S.falta=r.falta||[];
   go(S.falta.length?'c3b':'c4');
 }
+function esqueciPin(){
+  S.volta='esqueci';S.mode='new1';S.buf='';S.tmp='';
+  S.after=async pin=>{
+    ocupado(true);const r=await rpc('app_pin_esqueci',{p_telefone:S.esq.tel,p_nome:S.esq.nome,p_nascimento:S.esq.nasc,p_pin_novo:pin,p_aparelho:aparelho()});ocupado(false);
+    if(r.ok){S.esq=null;S.cod=null;entrou(r);toast('Novo PIN criado');aposEntrar('pin_esqueci');return}
+    if(r.erro==='indisponivel')return go('indisp');
+    S.cod=r.erro==='codigo_email'?null:S.cod;
+    go('esqueci');setTimeout(()=>erro(r.mensagem||'Os dados não conferem com o cadastro.'),0);
+  };
+  go('pinnovo');
+}
+/* Depois do número de confiança: se o servidor exige a confirmação do e-mail, passa por ela antes do PIN; se já foi confirmada nos últimos 25 minutos, segue direto. */
+async function depoisContato(){
+  if(S.cod&&S.cod.validado&&S.cod.tel===S.d.telefone&&Date.now()-S.cod.t<25*60000)return iniciaPin();
+  ocupado(true);const r=await rpc('app_codigo_pedir',{p_telefone:S.d.telefone,p_finalidade:'cadastro',p_email:'',p_nome:S.d.nome});ocupado(false);
+  if(r.erro==='indisponivel')return go('indisp');
+  if(r.ok&&r.exigido===false)return iniciaPin();                  // confirmação desligada: como antes
+  if(r.erro==='telefone_cadastrado'){S.tel=S.d.telefone;S.mode='login';S.buf='';go('pin');setTimeout(()=>erro(r.mensagem),0);return}
+  if(r.erro==='celular'){go('c1');setTimeout(()=>erro(r.mensagem),0);return}
+  if(r.erro==='rede')return iniciaPin();                          // sem resposta: segue; quem decide é o servidor (sem código aceito ele recusa e a página volta para o e-mail)
+  go('c4e');                                                      // exigida: pede o e-mail (o pedido sem e-mail só confere, não gera código)
+}
 function iniciaPin(){
   S.mode='new1';S.buf='';S.tmp='';
   S.after=async pin=>{
     const d=S.d,obrig=!!(S.porta&&S.porta.obrigatorio);
     const args={p_telefone:d.telefone,p_nome:d.nome,p_nascimento:d.nascimento,p_pin:pin,p_filhos:d.filhos,p_aparelho:aparelho()};
     if(d.confiavel)args.p_confianca=d.confiavel;
-    if(obrig){args.p_cpf=d.cpf||null;if(/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(S.cacheEmail||''))args.p_email=S.cacheEmail}
+    if(obrig){args.p_cpf=d.cpf||null;const em=(S.cod&&S.cod.validado&&S.cod.email)||S.cacheEmail||'';if(/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em))args.p_email=em}
     ocupado(true);const r=await rpc(obrig?'app_pin_criar':'app_cadastrar',args);ocupado(false);
     if(r.ok){entrou(r);S.d={filhos:[],confiavel:null};S.rasc={};toast('Cadastro concluído');aposEntrar('cadastro');return}
     if(r.erro==='indisponivel')return go('indisp');
     if(r.erro==='pin_fraco'){S.mode='new1';S.buf='';S.tmp='';go('c5');setTimeout(()=>erro(r.mensagem||MSG_PIN_FRACO),0);return}   // PIN óbvio: fica na etapa do PIN
     // volta para a etapa que tem o problema, com a explicação do servidor
-    const etapa={celular:'c1',telefone_cadastrado:'c1',nome:'c2',nascimento:'c2',menor:'c2',filho:'c3',homonimo:'c3',mesmo_cadastro:'c3',confianca:'c4',cpf:'c3b',cpf_falta:'c3b',filho_cpf:'c3b',filho_cpf_falta:'c3b'}[r.erro]||'c4';
+    const etapa={celular:'c1',telefone_cadastrado:'c1',nome:'c2',nascimento:'c2',menor:'c2',filho:'c3',homonimo:'c3',mesmo_cadastro:'c3',confianca:'c4',cpf:'c3b',cpf_falta:'c3b',filho_cpf:'c3b',filho_cpf_falta:'c3b',codigo_email:'c4e'}[r.erro]||'c4';
+    if(r.erro==='codigo_email')S.cod=null;
     if(etapa==='c3b')S.falta=[{pessoa:'eu'},...d.filhos.map((f,i)=>({pessoa:'filho',indice:i}))];   // o servidor recusou o CPF: pede de novo todos os CPFs
     S.mode='new1';S.buf='';S.tmp='';go(etapa);setTimeout(()=>erro(r.mensagem),0);
     if(r.erro==='telefone_cadastrado')S.tel=d.telefone;
