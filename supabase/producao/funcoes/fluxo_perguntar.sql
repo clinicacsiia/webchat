@@ -9,7 +9,7 @@ AS $function$
 declare
   ctx jsonb := public.fluxo_ctx(p_conversa); c public.conversas; pa public.pre_agendamentos; d jsonb;
   v_txt text; v_op jsonb; v_hist jsonb; v_it jsonb := '[]'::jsonb; v_ult jsonb; v_pend jsonb; v_med text[]; v_nome text; v_tel text; x text; v_dig jsonb;
-  v_etapa text; v_nse boolean; v_pref text := p_prefixo;
+  v_etapa text; v_nse boolean; v_pref text := p_prefixo; v_val jsonb; v_linhas jsonb; v_conv integer;
 begin
   select * into c from public.conversas where id = p_conversa;
   select * into pa from public.pre_agendamentos where conversa_id = p_conversa;
@@ -89,6 +89,11 @@ begin
     from (select operadora, count(*) n from public.catalogo_plano where coalesce(ativo, true) and operadora !~* '^(teste|particular)$' and public.convenio_ativo(operadora) group by operadora) o;
     v_op := public.fluxo_escolha(p_passo, jsonb_build_array(jsonb_build_object('valor', 'Particular', 'rotulo', 'Particular (sem convênio)')) || v_it,
       jsonb_build_object('filtro', true, 'outro', jsonb_build_object('rotulo', 'Meu convênio não está na lista', 'placeholder', 'Nome do convênio')));
+  when 'plano_exato' then   -- plano-exato: lista os planos reais do Klingo para o convênio escolhido
+    v_conv := public.plano_exato_convenio(pa.plano);
+    v_txt := public.fluxo_t('plano_exato', ctx || jsonb_build_object('convenio', initcap(lower(coalesce(pa.plano, '')))));
+    v_op := public.fluxo_escolha(p_passo, jsonb_build_array(jsonb_build_object('valor', 'nao_sei', 'rotulo', 'Não sei qual é o meu plano')) || public.plano_exato_itens(v_conv),
+      jsonb_build_object('filtro', true));
   when 'plano_confirma' then
     x := d ->> 'plano_anterior';
     v_txt := public.fluxo_t('plano_confirma', ctx || jsonb_build_object('como',
@@ -157,7 +162,25 @@ begin
     v_op := jsonb_build_object('tipo', 'campos', 'passo', p_passo, 'botao', 'Continuar', 'pular', 'Não estou com a carteirinha agora', 'campos', jsonb_build_array(
       jsonb_build_object('nome', 'matricula', 'rotulo', 'Número da carteirinha (' || coalesce(initcap(lower(pa.plano)), 'convênio') || ')', 'tipo', 'texto', 'obrigatorio', false, 'valor', v_dig ->> 'matricula'),
       jsonb_build_object('nome', 'validade', 'rotulo', 'Validade', 'tipo', 'data', 'obrigatorio', false, 'valor', v_dig ->> 'validade')));
+  when 'valor' then   -- particular-valor: o valor da API, em destaque; sem preço, a assistência informa
+    v_val := public.particular_valor_obter(p_conversa);
+    if coalesce((v_val ->> 'completo')::boolean, false) then
+      select string_agg('• ' || (e ->> 'nome') || case when (e ->> 'qtd')::int > 1 then ' (' || (e ->> 'qtd') || 'x ' || public.preco_brl((e ->> 'unitario')::numeric) || ')' else '' end || ': ' || public.preco_brl((e ->> 'subtotal')::numeric), E'\n' order by t.ord),
+             jsonb_agg(to_jsonb((e ->> 'nome') || case when (e ->> 'qtd')::int > 1 then ' (' || (e ->> 'qtd') || 'x)' else '' end || ': ' || public.preco_brl((e ->> 'subtotal')::numeric)) order by t.ord)
+        into x, v_linhas from jsonb_array_elements(v_val -> 'itens') with ordinality as t(e, ord);
+      v_txt := public.fluxo_t('valor', jsonb_build_object('itens', x, 'total', public.preco_brl((v_val ->> 'total')::numeric)));
+      perform public.fluxo_set(p_conversa, jsonb_build_object('valor_exibido', jsonb_build_object('assin', public.particular_valor_assinatura(p_conversa), 'total', (v_val ->> 'total')::numeric)));
+      v_op := public.fluxo_escolha(p_passo, jsonb_build_array(jsonb_build_object('valor', 'sim', 'rotulo', 'Concordo com o valor e quero marcar'),
+                                                              jsonb_build_object('valor', 'nao', 'rotulo', 'Não quero marcar por causa do valor')),
+                jsonb_build_object('destaque', jsonb_build_object('titulo', 'Valor total (Particular)', 'valor', public.preco_brl((v_val ->> 'total')::numeric), 'linhas', coalesce(v_linhas, '[]'::jsonb))));
+    else
+      perform public.particular_valor_disparar(p_conversa);
+      v_txt := public.fluxo_t('valor_sem', ctx);
+      v_op := public.fluxo_escolha(p_passo, jsonb_build_array(jsonb_build_object('valor', 'sim', 'rotulo', 'Sim, quero saber o valor'),
+                                                              jsonb_build_object('valor', 'nao', 'rotulo', 'Não preciso do valor agora')));
+    end if;
   when 'confirmar' then
+    perform public.particular_valor_disparar(p_conversa);   -- particular-valor: pede o preço à API enquanto o paciente confere o resumo
     v_txt := public.fluxo_t('confirmar', ctx || jsonb_build_object('resumo', public.fluxo_leitura(p_conversa)));
     v_it := jsonb_build_array(jsonb_build_object('valor', 'ok', 'rotulo', 'Está tudo certo'),
       jsonb_build_object('valor', 'pedido', 'rotulo', case when pa.tipo = 'consulta' then 'Corrigir a consulta' else 'Corrigir o exame' end),
@@ -174,8 +197,8 @@ begin
   perform public.fluxo_dizer(p_conversa, v_txt, v_op);
   update public.conversa_fluxo set tentativas = case when passo is distinct from p_passo then 0 else tentativas end, passo = p_passo, atualizado_em = now()
   where conversa_id = p_conversa;
-  v_etapa := case when p_passo in ('motivo','exame','consulta','atalho','medico') then 'pedido' when p_passo in ('plano', 'plano_confirma', 'cpf_nasc', 'cpf_confirma') then 'plano' when p_passo = 'horario' then 'data_hora'
-                  when p_passo in ('mudou','dados_ident','dados_contato','dados_endereco','dados_carteira','identidade') then 'dados' when p_passo = 'confirmar' then 'confirmacao' end;
+  v_etapa := case when p_passo in ('motivo','exame','consulta','atalho','medico') then 'pedido' when p_passo in ('plano', 'plano_confirma', 'plano_exato', 'cpf_nasc', 'cpf_confirma') then 'plano' when p_passo = 'horario' then 'data_hora'
+                  when p_passo in ('mudou','dados_ident','dados_contato','dados_endereco','dados_carteira','identidade') then 'dados' when p_passo in ('confirmar', 'valor') then 'confirmacao' end;
   if v_etapa is not null then update public.pre_agendamentos set etapa = v_etapa where conversa_id = p_conversa and status = 'rascunho'; end if;
 end $function$;
 

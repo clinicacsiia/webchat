@@ -17,7 +17,9 @@ begin
     into x from public.pre_agendamento_itens i where i.conversa_id = p_conversa and i.ativo;
   if x is not null then v := v || (case when pa.tipo = 'consulta' then 'Consulta:' else 'Exames:' end || E'\n' || x); end if;
   if pa.profissional is not null then v := v || ('Médico: ' || initcap(lower(pa.profissional))); end if;
-  v := v || ('Plano: ' || coalesce(initcap(lower(pa.plano)), '—'));
+  v := v || ('Plano: ' || coalesce(initcap(lower(pa.plano)), '—')
+             || case when lower(btrim(coalesce(d ->> 'plano_exato_de', ''))) = lower(btrim(coalesce(pa.plano, ''))) and nullif(d ->> 'plano_exato_nome', '') is not null
+                     then ' — ' || (d ->> 'plano_exato_nome') else '' end);   -- plano-exato
   select string_agg(v_dias[extract(dow from (e ->> 'data')::date)::int + 1] || ' ' || to_char((e ->> 'data')::date, 'DD/MM') || ' às ' || (e ->> 'hora')
                     || coalesce(' — ' || regexp_replace(e ->> 'unidade', '^CLÍNICA DE SAÚDE E IMAGEM - ', 'CSI '), ''), E'\n' order by (e ->> 'grupo')::int)
     into x from jsonb_array_elements(coalesce(pa.escolha_horario, '[]'::jsonb)) e;

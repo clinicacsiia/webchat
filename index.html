@@ -414,6 +414,11 @@
   /* Motor de atendimento: opções grandes, filtro, campos e acompanhamento */
   .msg.com-widget { width: 94%; max-width: 94%; }
   .op-lista { display: grid; gap: 8px; margin-top: 4px; }
+  /* particular-valor: valor do atendimento Particular em destaque, antes de marcar */
+  .valor-destaque { margin: 6px 0 10px; padding: 14px 16px; border: 2px solid var(--csi-primary, #0b5cab); border-radius: 14px; background: rgba(11, 92, 171, .07); text-align: center; }
+  .valor-destaque .vd-titulo { font-size: calc(14px * var(--esc)); color: var(--texto-suave); font-weight: 600; }
+  .valor-destaque .vd-valor { font-size: calc(34px * var(--esc)); font-weight: 800; line-height: 1.15; color: var(--texto); margin: 4px 0; }
+  .valor-destaque .vd-linhas { list-style: none; margin: 6px 0 0; padding: 0; font-size: calc(13.5px * var(--esc)); color: var(--texto-suave); }
   .op-lista.rolar { max-height: 340px; overflow-y: auto; padding: 2px; }
   .op { text-align: left; width: 100%; border: 1px solid var(--csi-primary); background: transparent; color: var(--texto); border-radius: var(--radius-md); padding: 12px 16px; min-height: 48px; font-size: calc(17px * var(--esc)); cursor: pointer; transition: background-color var(--csi-ease), color var(--csi-ease); }
   .op strong { display: block; font-weight: 650; color: var(--verde); }
@@ -703,7 +708,7 @@
   const CHAVE_HIST = 'webchat.historico.v1';   // as últimas conversas deste aparelho (cada uma com o seu token): dá para voltar a elas
   const MAX_HIST = 5;                          // mínimo pedido: 3
   // Muda a cada alteração do chat. Cópia de mensagens guardada por outra versão é descartada (era isso que mostrava conversa velha e travada).
-  const VERSAO_APP = '2026.11.16-8';
+  const VERSAO_APP = '2026.11.16-9';
   // Mesmas regras do banco (fluxo_nome_ok, fluxo_telefone_ok, fluxo_email_ok): o banco confere de novo, aqui é só para avisar logo.
   const LET = 'A-Za-zÀ-ÖØ-öø-ÿ';
   const nomeCompletoOk = (v) => { const t = String(v || '').trim(); return t.length >= 5 && t.length <= 120 && new RegExp(`^[${LET}][${LET}'’.-]*( +[${LET}][${LET}'’.-]*)+$`).test(t) && t.split(/ +/).filter((w) => w.replace(new RegExp(`[^${LET}]`, 'g'), '').length >= 2).length >= 2; };
@@ -1849,6 +1854,12 @@
       if (oculta && i.valor === '') b.dataset.fixo = '1'; // "Tanto faz" sempre aparece
       return b;
     });
+    if (o.destaque && typeof o.destaque === 'object' && o.destaque.valor) {   // particular-valor
+      w.append(h('div', { class: 'valor-destaque', role: 'group', 'aria-label': 'Valor do atendimento Particular' },
+        h('div', { class: 'vd-titulo' }, String(o.destaque.titulo || 'Valor')),
+        h('div', { class: 'vd-valor' }, String(o.destaque.valor)),
+        Array.isArray(o.destaque.linhas) && o.destaque.linhas.length > 1 ? h('ul', { class: 'vd-linhas' }, o.destaque.linhas.map((l) => h('li', {}, String(l)))) : null));
+    }
     if (oculta) w._anotar = () => anotarMedicos(botoes);   // médico disponível ao vivo: roda quando a pergunta fica ativa
     if (o.filtro || oculta) w.append(...caixaFiltro(botoes, oculta ? 'Digite a 1ª letra do nome do médico' : undefined, oculta));
     w.append(h('div', { class: 'op-lista' + (botoes.length > 8 ? ' rolar' : '') }, botoes));

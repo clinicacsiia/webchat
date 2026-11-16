@@ -59,6 +59,11 @@ begin
   -- klingo-auto: CPF e data de nascimento válidos são obrigatórios antes do plano (a agenda real e a marcação dependem deles)
   if not public.fluxo_cpf_ok(pa.paciente ->> 'cpf') or public.fluxo_ler_data(pa.paciente ->> 'dt_nasc') is null or coalesce((d ->> 'cpf_nasc_refazer')::boolean, false) then return 'cpf_nasc'; end if;
   if pa.plano is null then return 'plano'; end if;
+  -- plano-exato: convênio com muitos planos (Bradesco, SulAmérica, Unimed...) precisa do plano exato antes de consultar horários
+  if public.plano_exato_convenio(pa.plano) is not null
+     and (nullif(d ->> 'plano_exato_id', '') is null or lower(btrim(coalesce(d ->> 'plano_exato_de', ''))) is distinct from lower(btrim(pa.plano))) then
+    return 'plano_exato';
+  end if;
   v_procs := public.fluxo_procs(p_conversa);
   if v_procs is not null and not coalesce((d ->> 'sem_horario')::boolean, false)
      and jsonb_array_length(coalesce(pa.escolha_horario, '[]'::jsonb)) < jsonb_array_length(public.agenda_grupos(v_procs)) then
@@ -75,6 +80,8 @@ begin
   if not v_ja and not coalesce((d ->> 'g_contato')::boolean, false) then return 'dados_contato'; end if;
   -- carteirinha-removida: o passo 'dados_carteira' não é mais perguntado; o atendente confere o convênio depois.
   if not coalesce((d ->> 'confirmado')::boolean, false) then return 'confirmar'; end if;
+  -- particular-valor: Particular só segue depois de ver o valor e responder (a resposta vale só para este plano + exames)
+  if public.particular_valor_ativo(p_conversa) and (d -> 'valor_resp' ->> 'assin') is distinct from public.particular_valor_assinatura(p_conversa) then return 'valor'; end if;
   return 'pronto';
 end $function$;
 
