@@ -94,6 +94,7 @@ test("o erro nunca carrega o corpo da resposta (CPF/nome) e é classificado por 
   await assert.rejects(() => api.pacientePorCpf(CPF), (e: any) => e instanceof KlingoErro && e.tipo === "paciente_nao_identificado" && !e.message.includes(CPF) && !JSON.stringify(e).includes(CPF));
   assert.equal(classificar(403, "Plano BRADESCO SAUDE inativado."), "plano_inativo");
   assert.equal(classificar(403, "Plano BRADESCO SAUDE inativo."), "plano_inativo");
+  assert.equal(classificar(403, '{"status_code":403,"msg":"Operadora GEAP com atendimento suspenso."}'), "plano_inativo");   // 16/11/2026
   assert.equal(classificar(403, '{"plano":["Plano não identificado."]}'), "plano_desconhecido");
   assert.equal(classificar(403, "Nenhum médico credenciado para CONSULTA (68), para operadora X."), "sem_medico");
   assert.equal(classificar(400, "Horário já ocupado. …"), "horario_ocupado");

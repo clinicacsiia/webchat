@@ -61,3 +61,20 @@ Na conversa e no cartão da Jornada: "Ver marcações do paciente" (operação `
 - Banco: arquivo novo em `supabase/` (fluxograma, versão, rollback) → testar no clone → aplicar em partes → refazer o retrato → `npm run test:retrato`.
 - Tela: trocar `VERSAO` nos `sw.js`.
 - **Relatórios do Klingo:** nenhuma etapa acima depende de relatório novo (usa só a API de agenda e vouchers). A única pendência de relatório que existe é a da **hora real de atendimento** (`klingo-relatorios-pendentes.md`), que não bloqueia este plano.
+
+## 7. Decisões do dono (16/11/2026)
+- Os 15 atalhos podem ser usados nas sugestões (com `{nome}`, `{medico}`, `{data}`, `{hora}`).
+- **Sem vaga:** primeiro oferecer outro horário/médico; se o paciente não aceitar nem outro horário, **oferecer o cadastro na Disponibilidade futura** (regra da Etapa 2).
+- Investigar e resolver os erros da API (abaixo).
+
+## 8. Erros da API de horários: o que era (16/11/2026)
+`klingo_consulta` tem 37 consultas (todas em modo `sim`, 14 e 15/11). Das 9 "erro_api":
+| Causa | Qtd | O que é |
+|---|---|---|
+| 403 "Operadora GEAP com atendimento suspenso" (plano 21) | 5 | **Regra do convênio**, não falha da API. Não era reconhecida e virava "indisponível" para o paciente e entrava na conta de erros que faz o sistema recuar |
+| 403 sem mensagem gravada (plano 1, 14/11 17:49 a 17:50) | 3 | Registrados antes de a mensagem ser guardada; a mesma regra de idade (procedimento só até 17 anos) já tratada na v2.1 de 14/11 |
+| 403 "só para idade até 17 anos" | 1 | Regra do procedimento; já tratada como regra de negócio desde 14/11 |
+Os demais "não-ok" não são erro: `dados_incompletos` 3 e `sem_traducao_plano` 3 são o chat ainda sem CPF/convênio; `api_sem_horarios` 3 é o exame 1659 realmente sem vaga. **Nenhuma falha técnica real (timeout, 5xx, HTML, limite) apareceu.**
+
+**Correção:** `classificar()` passa a tratar "Operadora … suspenso" como `plano_inativo` (o resto do sistema já trata isso como regra de negócio: mensagem de convênio ao paciente, aviso à equipe, fora da conta de erros). Aplicada nas 5 cópias idênticas de `klingo-api.ts`, com teste (`klingo-auto.test.ts`). Testes das Edge Functions: 272 de 272.
+**Falta publicar** as Edge Functions que usam essa cópia: `chat-agenda-api`, `klingo-identificar`, `klingo-executar`, `disponibilidade-vigia` e `klingo-sincronizar`. Até publicar, o comportamento na produção não muda.

@@ -40,6 +40,7 @@ export class KlingoErro extends Error {
 export function classificar(status: number, texto: string): TipoErro {
   if (status === 429) return "limite";
   if (/Plano .{0,80}inativ/i.test(texto)) return "plano_inativo";
+  if (/Operadora .{0,80}suspens/i.test(texto)) return "plano_inativo";   // 16/11/2026: "Operadora GEAP com atendimento suspenso" (403) é regra do convênio, não falha da API
   if (/Plano n[ãa]o identificado/i.test(texto)) return "plano_desconhecido";
   if (/Nenhum m[ée]dico credenciado/i.test(texto)) return "sem_medico";
   if (/Hor[áa]rio j[áa] ocupado/i.test(texto)) return "horario_ocupado";
