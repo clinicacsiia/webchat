@@ -4773,7 +4773,7 @@ h1.longo { font-size: 14mm; }
       add(tF >= 20 ? 'ruim' : tF >= 10 ? 'atencao' : 'bom', `${pTxt(tF)} dos pacientes com exame marcado faltaram (${nf(K.faltaram)} de ${nf(nF)})${dif != null && Math.abs(dif) >= 1 ? `, ${dif > 0 ? 'subiu' : 'caiu'} ${(Math.round(Math.abs(dif) * 10) / 10).toString().replace('.', ',')} pontos percentuais em relação ao período anterior` : ''}.`);
       const dims = [['confirmação', K.falta_confirmacao, (x) => ROT_CONFIRMA[x] || x], ['antecedência', K.falta_antecedencia, (x) => x], ['unidade', K.falta_unidade, (x) => x], ['tipo de atendimento', K.falta_plano, (x) => x]];
       const achados = [];
-      for (const [dim, gr, rot] of dims) for (const g of gr || []) { const n = g.atendidos + g.faltaram, t = taxa(g.faltaram, n); if (n >= 20 && t >= tF * 1.25) achados.push({ dim, nome: rot(g.nome), t, n, f: g.faltaram, r: t / tF }); }
+      for (const [dim, gr, rot] of dims) for (const g of gr || []) { const n = g.atendidos + g.faltaram, t = taxa(g.faltaram, n); if (n >= 20 && t > 0 && t >= tF * 1.25) achados.push({ dim, nome: rot(g.nome), t, n, f: g.faltaram, r: t / tF }); }
       achados.sort((x, y) => y.r - x.r).slice(0, 2).forEach((x) => add('atencao', `Faltam mais: ${x.dim} "${x.nome}" tem ${pTxt(x.t)} de falta (a média é ${pTxt(tF)}; ${nf(x.f)} de ${nf(x.n)}).`));
     }
     const ordem = { ruim: 0, atencao: 1, bom: 2 };
@@ -4830,7 +4830,7 @@ h1.longo { font-size: 14mm; }
       (d.motivos_falha || []).length ? h('p', { class: 'dica' }, 'O que mandou para a equipe: ' + d.motivos_falha.map((x) => `${x.codigo} (${x.n})`).join(', ') + '.') : null);
   }
   /* Conferência Klingo x webchat (supabase/klingo-conferencia.sql, relatório #14554): explica a divergência dos números e lista, marcação por marcação, o que precisa de atenção. Só números e códigos. */
-  const ROT_ORIGEM = { Whatsapp: 'WhatsApp', Telefone: 'Telefone', 'Recepção': 'Recepção', sem_origem: 'Sem origem (em branco no Klingo)' };
+  const ROT_ORIGEM = { Whatsapp: 'WhatsApp', Telefone: 'Telefone', 'Recepção': 'Recepção', Webchat: 'Webchat', sem_origem: 'Sem origem (em branco no Klingo)' };
   const ROT_CAMPO_CONF = { nome: 'nome', nascimento: 'nascimento', cpf: 'CPF', celular: 'celular', email: 'e-mail' };
   const campoTxt = (xs) => listaPt((xs || []).map((x) => ROT_CAMPO_CONF[x] || x));
   function textoProblema(x) {
@@ -4846,7 +4846,10 @@ h1.longo { font-size: 14mm; }
     if (!d || d.total == null) return h('div', {}, tit, intro, h('p', { class: 'ind-aviso' }, 'A conferência ainda não está disponível (falta aplicar o SQL supabase/klingo-conferencia.sql ou ligar a leitura do relatório #14554).'));
     const T = d.total || 0, E = d.explicacao || {}, W = d.webchat || {}, X = W.exames || {}, Q = d.qualidade_klingo || {}, P = d.problemas || {};
     const semLeitura = (d.dias_sem_leitura || []);
-    const origens = ['Whatsapp', 'Telefone', 'Recepção', 'sem_origem'].map((k) => [k, (d.por_origem || {})[k] || 0]);
+    // Todas as origens que vieram do Klingo (inclusive Webchat e as que ainda não conhecemos), sem lista fixa: assim a soma das barras fecha com o total.
+    const ordemOrigem = ['Whatsapp', 'Telefone', 'Recepção', 'Webchat'], todasOrigens = d.por_origem || {};
+    const chavesOrigem = [...ordemOrigem, ...Object.keys(todasOrigens).filter((k) => !ordemOrigem.includes(k) && k !== 'sem_origem'), 'sem_origem'];
+    const origens = chavesOrigem.map((k) => [k, todasOrigens[k] || 0]);
     const maxO = Math.max(1, ...origens.map((x) => x[1]));
     const passo = (n, t) => h('h4', { class: 'ind-conf-passo' }, h('span', {}, String(n)), t);
     const conta = (linhas) => h('div', { class: 'ind-conta' }, linhas.map(([rot, v, cls]) => [h('span', { class: cls || '' }, rot), h('b', { class: cls || '' }, nf(v))]).flat());
@@ -4869,7 +4872,7 @@ h1.longo { font-size: 14mm; }
       passo(1, 'Quantas marcações o Klingo tem, e por onde chegaram'),
       h('div', { class: 'ind-grade' },
         painel('Marcações feitas no período', 'Origem registrada no Klingo na hora de marcar.', h('div', { class: 'ind-minis' }, h('div', { class: 'ind-mini' }, h('b', {}, nf(T)), h('span', {}, 'marcações no Klingo'))),
-          origens.map(([k, v]) => barra(ROT_ORIGEM[k], v, maxO, `${nf(v)} · ${pTxt(taxa(v, T))}`, k === 'sem_origem' ? 'cinza' : 'azul'))),
+          origens.map(([k, v]) => barra(ROT_ORIGEM[k] || k, v, maxO, `${nf(v)} · ${pTxt(taxa(v, T))}`, k === 'sem_origem' ? 'cinza' : 'azul'))),
         painel('Por que o cartão "Marcações novas" mostra menos', 'Do total do Klingo até o número do cartão do topo.', conta([
           ['Marcações no Klingo', T], ['− exame marcado para depois de 30 dias (ainda não entra no banco)', E.fora_do_banco || 0], ['= já estão no banco', E.no_banco || 0, 'tot'],
           ['− marcações remarcadas', E.remarcadas || 0], ['= "Marcações novas" do cartão', E.novas_marcacoes_indicador || 0, 'tot']]),
