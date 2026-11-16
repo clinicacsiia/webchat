@@ -3800,7 +3800,7 @@
     ] },
     { id: 'primeira_consulta', icone: 'pessoa', titulo: 'Primeira consulta com a médica', desc: 'Quem nunca foi atendido pela médica (pelo Klingo) é passado para a atendente e não marca sozinho. Quem já foi atendido marca sozinho. Se o Klingo não mostrar o atendimento anterior, a atendente usa o botão "Liberar autoatendimento" na conversa. Só ligue depois de conferir que o histórico foi carregado.', campos: [
       { k: 'primeira_consulta_modo', tipo: 'sim', rot: 'Primeira consulta só com atendente', dica: 'Desligado: tudo como era antes (o chat marca consultas sozinho).' },
-      { k: 'primeira_consulta_medicas', tipo: 'texto', rot: 'Médica(s) da regra', dica: 'Nome como aparece no Klingo (coluna Profissional). Mais de um: separe com ponto e vírgula (;).' },
+      { k: 'primeira_consulta_medicas', tipo: 'medicas', rot: 'Médicas da regra', dica: 'Marque as médicas que atendem primeira vez só com atendente. A lista vem da agenda de consultas do Klingo; médica nova aparece aqui quando entrar na agenda.' },
     ] },
     { id: 'atualizacao', icone: 'livro', titulo: 'Encerramento e avaliação', desc: 'Chaves da atualização do WebChat. Ligue uma por vez e confira o dia seguinte; desligar volta ao comportamento anterior na hora.', custom: 'autoencerrar', campos: [
       { k: 'encerramento_exige_motivo', tipo: 'sim', rot: 'Exigir motivo ao encerrar', dica: 'Ligado: o painel só encerra a conversa com um motivo escolhido. Desligado: o motivo fica opcional.' },
@@ -4065,6 +4065,28 @@ h1.longo { font-size: 14mm; }
         ctrl = h('input', { type: 'checkbox', id, role: 'switch', class: 'chave' }); ctrl.checked = atual === 'sim'; ler = () => (ctrl.checked ? 'sim' : 'nao');
       } else if (f.tipo === 'area') { ctrl = h('textarea', { id, rows: '3', maxlength: String(f.max || 300) }); ctrl.value = atual; ler = () => ctrl.value.trim(); }
       else if (f.tipo === 'escolha') { ctrl = h('select', { id }, f.opcoes.map(([val, r]) => h('option', { value: val }, r))); ctrl.value = atual; ler = () => ctrl.value; }
+      else if (f.tipo === 'medicas') {
+        // Lista de médicas da agenda de consultas (as mesmas do Klingo) com caixinhas; o valor guardado é "NOME;NOME" como no Klingo.
+        const semAcento = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z ]+/g, ' ').replace(/\s+/g, ' ').trim();
+        const marcadas = String(atual).split(';').map((s) => s.trim()).filter(Boolean);
+        ctrl = h('div', { id, class: 'cfg-medicas', style: 'display:grid;gap:6px' }, h('span', { class: 'dica' }, 'Carregando as médicas da agenda…'));
+        let lerLista = null;
+        ler = () => (lerLista ? lerLista() : String(atual));
+        db.rpc('consultas_config_listar').then(({ data: d, error: er }) => {
+          if (er) { ctrl.replaceChildren(h('span', { class: 'erro' }, 'Não consegui carregar as médicas da agenda do Klingo. Recarregue a página; as médicas já salvas continuam valendo.')); return; }
+          const nomes = new Map();
+          (d || []).forEach((x) => (x.medicos || []).forEach((m) => { if (!nomes.has(semAcento(m))) nomes.set(semAcento(m), m); }));
+          const fora = marcadas.filter((m) => !nomes.has(semAcento(m)));
+          fora.forEach((m) => nomes.set(semAcento(m), m));
+          const bonito = (s) => String(s).toLowerCase().replace(/(^|\s)(\S)/g, (_, a, b) => a + b.toUpperCase());
+          const caixas = [...nomes.entries()].sort((a, b) => a[0].localeCompare(b[0], 'pt-BR')).map(([k, m]) => {
+            const cx = h('input', { type: 'checkbox', value: m }); cx.checked = marcadas.some((x) => semAcento(x) === k);
+            return h('label', { style: 'display:flex;gap:8px;align-items:center' }, cx, h('span', {}, bonito(m), fora.includes(m) ? h('small', { class: 'dica' }, ' (não está na agenda de hoje)') : null));
+          });
+          ctrl.replaceChildren(...(caixas.length ? caixas : [h('span', { class: 'dica' }, 'Nenhuma médica com agenda de consulta vigente.')]));
+          lerLista = () => [...ctrl.querySelectorAll('input[type=checkbox]:checked')].map((i) => i.value).join(';');
+        }).catch(() => {});
+      }
       else if (f.tipo === 'numero') { ctrl = h('input', { type: 'number', id, min: String(f.min ?? 0), max: String(f.max ?? 99), value: atual, style: 'max-width:110px' }); ler = () => String(Math.max(f.min ?? 0, Math.min(f.max ?? 99, parseInt(ctrl.value, 10) || 0))); }
       else { ctrl = h('input', { type: f.tipo === 'url' ? 'url' : f.tipo === 'senha' ? 'password' : 'text', id, value: atual, maxlength: String(f.max || 300), autocomplete: 'off' }); ler = () => ctrl.value.trim() || (f.padrao || ''); }
       if (!existe) { ctrl.disabled = true; }
