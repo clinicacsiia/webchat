@@ -125,6 +125,7 @@ Pontos em aberto do paciente novo:
 - **Provado:** para uma marcação **sem laudo** (voucher de teste cancelado), `GET /resultado/{id}` e `GET /resultado/pdf/{id}` respondem **`403` com uma página HTML** (não JSON). O código deve tratar 403 como "sem resultado" e **não** tentar ler JSON. **Não testado:** o laudo pronto em si (nenhum paciente de teste tem exame feito; não se buscou laudo de terceiros).
 - Cuidado: `GET /atendimentos?data=AAAA-MM-DD` devolve **todos os atendimentos do dia com dados completos dos pacientes** (nome, CPF, mãe, endereço, telefone; ~140 a 250 linhas) — não usar sem necessidade; **não traz o número da marcação**, então não leva ao laudo.
 - Regras: conferir CPF + nascimento antes; só entregar se `pronto` for verdadeiro; não guardar o PDF nem logar o conteúdo.
+- **Em uso desde 16/11/2026** pela Edge Function `app-laudos` (`docs/laudos-no-app.md`): a lista de marcações vem de `GET /vouchers` (status `atendido`) com a sessão do próprio paciente, e cada download consulta `GET /resultado/{id}` na hora. **Ainda sem laudo real provado.**
 
 ### 2.7 Aviso automático de mudança (webhook, **não configurado**)
 O Klingo chama uma URL nossa quando a marcação muda. Cabeçalhos `X-APP-TOKEN`, `X-DOMAIN`, `X-EVENT` (`STATUS-MARCACAO`, `REMARCACAO`, `CHAMADA`, `FIM-ATENDIMENTO`). Corpo: `id_marcacao`, `status` (A aberto, B bloqueado, C cancelado), `motivo`, `checkin`, `evento {nome, local}`, `nova` (só na remarcação). Substitui a leitura de relatórios para saber que um paciente chegou ou cancelou.

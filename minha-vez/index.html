@@ -191,7 +191,7 @@
       h('button', { class: 'verde', type: 'button', id: 'btnCheckin', onclick: () => telaCheckin() }, 'Fazer check-in'),
       h('p', { class: 'suave', style: 'margin-top:14px' }, 'Ainda não se cadastrou? Sem problema: faça o check-in e você será chamado.'),
       h('p', { style: 'margin-top:18px;margin-bottom:0' }, 'Já tem conta? ', h('button', { class: 'link', type: 'button', id: 'btnJaTenho', onclick: () => telaLogin() }, 'Entrar com e-mail e senha'))),
-      h('div', { class: 'cartao', id: 'conviteAcesso' }, h('h2', {}, 'Acompanhe seus pedidos'), h('p', { class: 'suave' }, 'Com o acesso rápido (celular e PIN) você vê o andamento dos seus pedidos e dos seus filhos, remarca, cancela e recebe os resultados.'),
+      h('div', { class: 'cartao', id: 'conviteAcesso' }, h('h2', {}, 'Acompanhe seus pedidos'), h('p', { class: 'suave' }, 'Com o acesso rápido (celular e PIN) você vê o andamento dos seus pedidos e dos seus filhos, remarca, cancela e recebe os laudos em PDF.'),
         h('a', { class: 'link', href: '../acesso/?voltar=acompanhar' }, 'Entrar ou criar o acesso rápido')));
   }
 
@@ -579,6 +579,7 @@
     if (data.erro === 'indisponivel') { app.dev = ''; return false; }
     appAplicar(data, true);
     appLigar();
+    laudosCarregar(false);
     desenharApp();
     return true;
   }
@@ -605,7 +606,7 @@
   function appLigar() {
     if (app.tPoll) return;
     app.tPoll = setInterval(appAtualizar, 20000);
-    if (!appLigar.vis) { appLigar.vis = true; document.addEventListener('visibilitychange', () => { if (!document.hidden) appAtualizar(); }); }
+    if (!appLigar.vis) { appLigar.vis = true; document.addEventListener('visibilitychange', () => { if (!document.hidden) { appAtualizar(); if (laudos.em && Date.now() - laudos.em > 60000) laudosCarregar(false); } }); }
   }
   function appDesligar() { clearInterval(app.tPoll); app.tPoll = null; clearTimeout(app.tVisto); }
 
@@ -753,6 +754,83 @@
       h('button', { class: 'link', type: 'button', style: 'width:100%;text-align:center', onclick: fecharFolha }, 'Agora não'));
     document.body.append(h('div', { class: 'folha', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Avaliar o atendimento', onclick: (ev) => { if (ev.target === ev.currentTarget) fecharFolha(); } }, h('div', {}, form)));
   }
+  /* ---------- Meus laudos (16/11/2026) ----------
+     Vêm da Edge Function app-laudos: a clínica confirma CPF + nascimento + nome no Klingo, lista as marcações atendidas e diz se o laudo está pronto.
+     O PDF NÃO fica guardado em lugar nenhum: cada toque em "Baixar" busca no Klingo de novo. Se a equipe retirou o laudo para ajuste, o download é recusado e o cartão mostra "em revisão". */
+  const LAUDOS_URL = SUPABASE_URL + '/functions/v1/app-laudos';
+  const laudos = { itens: null, pessoas: [], erro: '', carregando: false, em: 0, baixando: new Set(), abertos: {} };
+  async function laudosChamar(corpo) {
+    const r = await fetch(LAUDOS_URL, { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }, body: JSON.stringify({ token: app.dev, ...corpo }) });
+    return r.json();
+  }
+  async function laudosCarregar(forcar) {
+    if (!app.dev || laudos.carregando) return;
+    laudos.carregando = true; if (forcar) redesenhar();
+    try {
+      const r = await laudosChamar({ acao: 'listar', forcar: !!forcar });
+      if (r && r.erro === 'bloqueado') { appDesligar(); laudos.carregando = false; return telaPin(); }
+      if (r && r.erro === 'desligado') { laudos.itens = []; laudos.pessoas = []; laudos.erro = ''; }
+      else if (!r || !r.ok) laudos.erro = (r && r.mensagem) || 'Não foi possível consultar os laudos agora.';
+      else { laudos.itens = Array.isArray(r.itens) ? r.itens : []; laudos.pessoas = Array.isArray(r.pessoas) ? r.pessoas : []; laudos.erro = ''; laudos.em = Date.now(); }
+    } catch { laudos.erro = 'Sem conexão para consultar os laudos. Tente de novo.'; }
+    laudos.carregando = false;
+    if (!document.querySelector('.folha')) redesenhar();
+  }
+  function laudoArquivo(a) {
+    const bytes = Uint8Array.from(atob(a.base64), (c) => c.charCodeAt(0));
+    const url = URL.createObjectURL(new Blob([bytes], { type: a.mime || 'application/pdf' }));
+    setTimeout(() => URL.revokeObjectURL(url), 5 * 60000);
+    return { url, nome: a.nome || 'laudo.pdf' };
+  }
+  async function laudoBaixar(it, btn) {
+    if (laudos.baixando.has(it.id)) return;
+    laudos.baixando.add(it.id); btn.disabled = true; btn.textContent = 'Conferindo com a clínica…';
+    try {
+      const r = await laudosChamar({ acao: 'baixar', id: it.id });
+      if (r && (r.erro === 'bloqueado' || r.erro === 'sessao')) { laudos.baixando.delete(it.id); if (r.erro === 'bloqueado') { appDesligar(); return telaPin(); } try { localStorage.removeItem(ACESSO_CHAVE); } catch { /* ignora */ } app.dev = ''; return telaInicio(); }
+      if (!r || !r.ok || !Array.isArray(r.arquivos) || !r.arquivos.length) {
+        avisoTela((r && r.mensagem) || 'Não foi possível baixar o laudo agora. Tente de novo.');
+        if (r && r.erro === 'indisponivel') { laudos.baixando.delete(it.id); laudos.carregando = false; await laudosCarregar(false); }
+      } else {
+        const arqs = r.arquivos.map(laudoArquivo); laudos.abertos[it.id] = arqs;
+        for (const a of arqs) { try { const l = h('a', { href: a.url, download: a.nome }); document.body.append(l); l.click(); l.remove(); } catch { /* o link "Abrir o laudo" abaixo serve de reserva */ } }
+        redesenhar();
+      }
+    } catch { avisoTela('Sem conexão. Tente de novo.'); }
+    laudos.baixando.delete(it.id);
+    if (!document.querySelector('.folha')) redesenhar();
+  }
+  const ORDEM_LAUDO = { disponivel: 0, em_revisao: 1, aguardando: 2 };
+  function laudosNos() {
+    if (!app.dados) return [];
+    const varias = app.dados.pessoas.length > 1;
+    const itens = (laudos.itens || []).slice().sort((a, b) => (ORDEM_LAUDO[a.estado] - ORDEM_LAUDO[b.estado]) || String(b.data || '').localeCompare(String(a.data || '')));
+    const sem = laudos.pessoas.filter((p) => p.situacao === 'sem_cpf'), divergentes = laudos.pessoas.filter((p) => p.situacao === 'divergente'), travados = laudos.pessoas.filter((p) => p.situacao === 'travado');
+    if (laudos.itens === null && !laudos.erro) return laudos.carregando ? [h('div', { class: 'cartao', id: 'laudos' }, h('p', { class: 'suave', style: 'margin:0', role: 'status' }, 'Procurando os seus laudos…'))] : [];
+    if (!itens.length && !laudos.erro && !sem.length && !divergentes.length && !travados.length) return [];   // nada a mostrar: quem ainda não fez exame não vê cartão vazio
+    const laudosDe = (p) => (p.eu ? 'os seus laudos' : 'os laudos de ' + primeiroNome(p.nome)), cadastroDe = (p) => (p.eu ? 'o seu cadastro' : 'o cadastro de ' + primeiroNome(p.nome));
+    const aviso = (txt, link) => h('p', { class: 'suave', style: 'margin:8px 0 0' }, txt, link ? [' ', h('a', { href: '../acesso/?ir=dados' }, 'Abrir Meus dados')] : null);
+    const lista = itens.map((it) => {
+      const rot = (varias ? primeiroNome(it.pessoa) + ' · ' : '') + (it.data ? 'exame de ' + dataBR(it.data) : '') + (it.unidade ? ' · ' + it.unidade : '');
+      const filhos = [h('b', {}, tituloExame(it.nome || 'Exame')), h('p', { class: 'dia' }, rot)];
+      if (it.estado === 'disponivel') {
+        const ocupado = laudos.baixando.has(it.id);
+        filhos.push(h('button', { class: 'principal', type: 'button', 'data-laudo': it.id, disabled: ocupado, onclick: (ev) => laudoBaixar(it, ev.currentTarget) }, ocupado ? 'Conferindo com a clínica…' : '📄 Baixar laudo (PDF)'));
+        for (const a of laudos.abertos[it.id] || []) filhos.push(h('a', { class: 'abrir-laudo', href: a.url, download: a.nome, target: '_blank', rel: 'noopener', style: 'display:block;margin-top:8px' }, '↗ Abrir o laudo baixado'));
+      } else if (it.estado === 'em_revisao') filhos.push(h('div', { class: 'res-box', 'data-estado': 'em_revisao' }, '⚠️ Este laudo está em revisão pela equipe e não pode ser baixado agora. Ele volta a aparecer aqui assim que for liberado.'));
+      else filhos.push(h('div', { class: 'res-box', 'data-estado': 'aguardando' }, 'Aguardando a liberação do laudo. Quando estiver pronto, ele aparece aqui.'));
+      return h('div', { class: 'exame', 'data-id': it.id }, filhos);
+    });
+    const cartao = h('div', { class: 'cartao', id: 'laudos' }, h('h2', {}, 'Meus laudos'),
+      itens.some((i) => i.estado === 'disponivel') ? h('p', { class: 'suave', style: 'margin:0 0 6px' }, 'Você pode baixar quantas vezes quiser. Antes de cada download conferimos com a clínica se o laudo continua liberado.') : null,
+      lista,
+      sem.length ? aviso('Para ver ' + sem.map(laudosDe).join(' e ') + ', informe o CPF em', true) : null,
+      divergentes.length ? aviso('Não conseguimos confirmar na clínica ' + divergentes.map(cadastroDe).join(' e ') + '. Confira o CPF, a data de nascimento e o nome em', true) : null,
+      travados.length ? aviso('Muitas tentativas para ' + travados.map(cadastroDe).join(' e ') + '. Tente de novo mais tarde ou fale com a clínica.') : null,
+      laudos.erro ? h('p', { class: 'erro', role: 'alert', style: 'margin:8px 0 0' }, laudos.erro) : null,
+      h('button', { class: 'link', type: 'button', id: 'laudosAtualizar', disabled: laudos.carregando, onclick: () => laudosCarregar(true) }, laudos.carregando ? 'Atualizando…' : 'Atualizar laudos'));
+    return [cartao];
+  }
   function resultadosNos() {
     const lista = (app.dados && app.dados.resultados) || []; if (!lista.length) return [];
     const arquivo = async (r, btn) => {
@@ -783,6 +861,7 @@
       varias ? h('div', { class: 'quem', role: 'group', 'aria-label': 'Quem' }, [h('button', { class: 'chip' + (!filtro ? ' on' : ''), type: 'button', onclick: () => { app.pessoa = 'todos'; desenharApp.atual(); } }, 'Todos'),
         ...d.pessoas.map((p) => { const k = p.eu ? 'eu' : primeiroNome(p.nome); return h('button', { class: 'chip' + (filtro === k ? ' on' : ''), type: 'button', onclick: () => { app.pessoa = k; desenharApp.atual(); } }, p.eu ? 'Eu' : primeiroNome(p.nome)); })]) : null)];
     if (app.aviso) nos.unshift(h('div', { class: 'cartao' }, h('p', { class: app.avisoBom ? 'bom' : 'erro', role: app.avisoBom ? 'status' : 'alert', id: 'avisoTela', style: 'margin:0' }, app.aviso)));
+    nos.push(...laudosNos());
     if (!lista.length) nos.push(h('div', { class: 'cartao' }, h('p', { style: 'margin:0' }, 'Nenhum pedido por aqui ainda. Os pedidos feitos neste aparelho aparecem sozinhos.'), h('a', { href: '../', style: 'display:inline-block;margin-top:10px' }, 'Fazer um pedido no chat')));
     for (const p of lista) nos.push(pedidoNo(p, varias));
     nos.push(...resultadosNos());
