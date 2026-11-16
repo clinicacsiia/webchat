@@ -2081,6 +2081,7 @@
   // Cancelar não tem volta pelo painel, então a confirmação mostra data, hora e exame por extenso. Remarcar ainda não existe aqui (cancelar e escolher outro horário em "Ver horários").
   const MARC_MOTIVO = {
     desligado: () => 'Esta função está desligada para esta conversa (chaves do Klingo em Configurações).',
+    unidade_bloqueada: () => 'A marcação automática está desligada para esta unidade (Configurações > Marcação automática por unidade).',
     dados_incompletos: (r) => `Ainda faltam no pedido: ${(r.faltando || []).join(', ') || 'dados do paciente'}.`,
     paciente_vendo: () => 'O paciente está vendo as marcações no chat agora. Tente de novo em instantes.',
     nao_encontrada: () => 'Esta marcação não está mais na lista. Consulte de novo.',
@@ -3782,6 +3783,11 @@
       { k: 'catalogo_desenvoar', tipo: 'sim', rot: 'Desenvoar (atendimento pediátrico)', dica: 'Desligado: a Desenvoar some da escolha de unidade no começo do chat.' },
       { k: 'catalogo_csi', tipo: 'sim', rot: 'CSI (exames e consultas)', dica: 'Desligado: a CSI some da escolha de unidade no começo do chat.' },
       { k: 'catalogo_rmtc', tipo: 'sim', rot: 'CSI RM/TC (ressonância e tomografia)', dica: 'Desligado: a CSI RM/TC some da escolha de unidade no começo do chat.' },
+    ] },
+    { id: 'marcacao_unidade', icone: 'pin', titulo: 'Marcação automática por unidade', desc: 'Desligue a unidade em que o chat NÃO deve marcar sozinho (por exemplo, depois de um cadastro na unidade errada). Desligada: o paciente não vê os horários dessa unidade, recebe o aviso de que no momento o agendamento automático está só para as unidades ligadas e a equipe agenda com ele. Vale na hora para os próximos horários mostrados.', campos: [
+      { k: 'marcacao_auto_desenvoar', tipo: 'sim', rot: 'Desenvoar: marcar sozinho', dica: 'Desligado: horários da Desenvoar não aparecem no chat; a equipe agenda.' },
+      { k: 'marcacao_auto_csi', tipo: 'sim', rot: 'CSI: marcar sozinho', dica: 'Desligado: horários da CSI não aparecem no chat; a equipe agenda.' },
+      { k: 'marcacao_auto_rmtc', tipo: 'sim', rot: 'CSI RM/TC: marcar sozinho', dica: 'Desligado: horários da CSI RM/TC não aparecem no chat; a equipe agenda.' },
     ] },
     { id: 'atualizacao', icone: 'livro', titulo: 'Encerramento e avaliação', desc: 'Chaves da atualização do WebChat. Ligue uma por vez e confira o dia seguinte; desligar volta ao comportamento anterior na hora.', custom: 'autoencerrar', campos: [
       { k: 'encerramento_exige_motivo', tipo: 'sim', rot: 'Exigir motivo ao encerrar', dica: 'Ligado: o painel só encerra a conversa com um motivo escolhido. Desligado: o motivo fica opcional.' },

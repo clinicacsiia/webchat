@@ -703,7 +703,7 @@
   const CHAVE_HIST = 'webchat.historico.v1';   // as últimas conversas deste aparelho (cada uma com o seu token): dá para voltar a elas
   const MAX_HIST = 5;                          // mínimo pedido: 3
   // Muda a cada alteração do chat. Cópia de mensagens guardada por outra versão é descartada (era isso que mostrava conversa velha e travada).
-  const VERSAO_APP = '2026.11.16-6';
+  const VERSAO_APP = '2026.11.16-7';
   // Mesmas regras do banco (fluxo_nome_ok, fluxo_telefone_ok, fluxo_email_ok): o banco confere de novo, aqui é só para avisar logo.
   const LET = 'A-Za-zÀ-ÖØ-öø-ÿ';
   const nomeCompletoOk = (v) => { const t = String(v || '').trim(); return t.length >= 5 && t.length <= 120 && new RegExp(`^[${LET}][${LET}'’.-]*( +[${LET}][${LET}'’.-]*)+$`).test(t) && t.split(/ +/).filter((w) => w.replace(new RegExp(`[^${LET}]`, 'g'), '').length >= 2).length >= 2; };
@@ -2948,7 +2948,7 @@
     const corpo = $('#folhaCorpo'), rodape = $('#folhaRodape'), est = r.estado;
     corpo.replaceChildren(); rodape.replaceChildren();
     const falhou = est === 'indisponivel' || est === 'sem_consulta';
-    corpo.append(h('p', { class: 'aviso-cal', role: 'status' }, est === 'sem_horarios' ? 'Não encontramos horários disponíveis para esse atendimento no momento.'
+    corpo.append(h('p', { class: 'aviso-cal', role: 'status' }, est === 'sem_horarios' ? (r.unidades_bloqueadas && r.aviso ? r.aviso : 'Não encontramos horários disponíveis para esse atendimento no momento.')
         : falhou ? 'Não foi possível consultar os horários agora.'
         : r.estado_motivo === 'sem_traducao_plano' ? 'Para o seu convênio, a nossa equipe precisa confirmar o plano antes de mostrar os horários.'
         : r.estado_motivo === 'varios_procedimentos' ? 'Pedidos com mais de um exame são agendados pela nossa equipe.'

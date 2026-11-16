@@ -41,6 +41,7 @@ begin
      and not exists (select 1 from jsonb_array_elements(v_outros) e where e ->> 'data' = o.data::text and e ->> 'hora' = o.hora)
    order by o.id limit 1;
   if v_o.id is null then raise exception 'Esse horário acabou de ficar indisponível. Escolha outro, por favor.' using errcode = 'P0002'; end if;
+  if not public.unidade_marca_auto(v_o.unidade) then raise exception '%', public.unidade_aviso_bloqueio() using errcode = 'P0001'; end if;
   v_conf := public.klingo_ativo(p_conversa, 'klingo_api_marcar');
 
   v_novo := jsonb_build_object('grupo', greatest(p_grupo, 1), 'data', p_data, 'hora', v_o.hora, 'unidade', v_o.unidade, 'profissional', v_o.profissional, 'local', null, 'min', 30, 'chegada', v_o.ordem_chegada,
@@ -65,5 +66,5 @@ begin
   update public.conversas set status = case when status = 'encerrada' then 'aguardando' else status end where id = p_conversa;
   insert into public.mensagens (conversa_id, autor, texto) values (p_conversa, 'cliente', v_txt) returning id into v_msg;
   return jsonb_build_object('ok', true, 'restantes', greatest(v_total - v_feitos, 0), 'escolha', v_novo, 'mensagem_id', v_msg);
-end $function$;
+end $function$;;
 

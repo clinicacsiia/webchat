@@ -22,6 +22,7 @@ begin
     return jsonb_build_object('ok', false, 'motivo', 'sem_oferta_da_api',
       'detalhe', coalesce(public.klingo_motivo_texto(p_conversa), 'o chat não recebeu horários reais do Klingo nesta conversa (o horário escolhido veio da grade)'));
   end if;
+  if not public.unidade_marca_auto(o.unidade) then return jsonb_build_object('ok', false, 'motivo', 'unidade_bloqueada', 'detalhe', 'marcação automática desligada para esta unidade em Configurações'); end if;
   if o.procedimento is distinct from (d ->> 'procedimento')::int
      and not exists (select 1 from public.klingo_especialidade e where (d ->> 'procedimento')::int = any (e.procedimentos) and o.procedimento = any (e.procedimentos)) then
     return jsonb_build_object('ok', false, 'motivo', 'oferta_de_outro_procedimento');
@@ -42,5 +43,5 @@ begin
     return jsonb_build_object('ok', false, 'motivo', 'exame_com_convenio');
   end if;
   return jsonb_build_object('ok', true, 'novo', v_novo, 'remarcar', v_rem);
-end $function$;
+end $function$;;
 

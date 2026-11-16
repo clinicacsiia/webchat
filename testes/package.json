@@ -61,6 +61,7 @@
     "test:acesso": "node acesso-app.navegador.mjs",
     "test:acesso-chat-sql": "node sql-acesso-chat.test.mjs",
     "test:dados-ident-sem-repetir": "node sql-dados-ident-sem-repetir.test.mjs",
+    "test:marcacao-por-unidade": "node sql-marcacao-por-unidade.test.mjs",
     "test:acesso-chat": "node acesso-chat.navegador.mjs",
     "test:acesso-antiga-sql": "node sql-acesso-conta-antiga.test.mjs",
     "test:acesso-antiga": "node acesso-conta-antiga.navegador.mjs",
