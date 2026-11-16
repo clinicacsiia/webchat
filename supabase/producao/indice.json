@@ -13194,7 +13194,7 @@
    "anon": false,
    "authenticated": true,
    "publico": false,
-   "md5": "1f15fe58a3adeffbfb65a771fbe0a632"
+   "md5": "2620455db97fa05728f5d2b2ebfbffe0"
   },
   {
    "nome": "painel_conversa_pessoa_un",
@@ -13337,7 +13337,7 @@
    "anon": false,
    "authenticated": true,
    "publico": false,
-   "md5": "ee7874a90597fd8cfb708c36cab4dd0f"
+   "md5": "50a018f06fd6397a7d0d5d005cf8d202"
   },
   {
    "nome": "painel_indicadores_conferencia",
@@ -13364,7 +13364,7 @@
    "anon": false,
    "authenticated": true,
    "publico": false,
-   "md5": "a25c8391f29387b047d010a3effd2557"
+   "md5": "a3fdefef1000a7b5a8ee64aa04273081"
   },
   {
    "nome": "painel_indicadores_decisao",
@@ -13392,6 +13392,25 @@
    "authenticated": true,
    "publico": false,
    "md5": "0737a3b6432131800a3fa73adc0a9eed"
+  },
+  {
+   "nome": "painel_indicadores_mensal",
+   "args": [
+    {
+     "nome": "p_meses",
+     "padrao": true
+    },
+    {
+     "nome": "p_unidade",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "d740738915038153b6a346bbedbcedc0"
   },
   {
    "nome": "painel_indicadores_equipe",

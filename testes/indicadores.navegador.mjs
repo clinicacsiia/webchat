@@ -62,6 +62,11 @@ function servidor() {
 }
 
 
+// Respostas de painel_indicadores_mensal (gráfico mensal). Tudo inventado; total = atendidos + faltaram + cancelados + remarcados + por vir.
+const MENSAL = { de: '2026-06-01', ate: '2026-11-01', meses: [
+  { mes: '2026-06', total: 0, atendidos: 0, faltaram: 0, cancelados: 0, remarcados: 0, por_vir: 0 }, { mes: '2026-07', total: 0, atendidos: 0, faltaram: 0, cancelados: 0, remarcados: 0, por_vir: 0 },
+  { mes: '2026-08', total: 0, atendidos: 0, faltaram: 0, cancelados: 0, remarcados: 0, por_vir: 0 }, { mes: '2026-09', total: 0, atendidos: 0, faltaram: 0, cancelados: 0, remarcados: 0, por_vir: 0 },
+  { mes: '2026-10', total: 432, atendidos: 273, faltaram: 59, cancelados: 62, remarcados: 38, por_vir: 0 }, { mes: '2026-11', total: 5807, atendidos: 2355, faltaram: 451, cancelados: 663, remarcados: 711, por_vir: 1627 }] };
 // Respostas de painel_indicadores_conferencia (supabase/klingo-conferencia.sql) e de paciente_avisos com os dois tipos novos. Tudo inventado.
 const CONFERENCIA = {
   periodo: { de: HOJE, ate: HOJE }, ultima_leitura: `${HOJE}T15:00:00Z`, dias_sem_leitura: [], total: 200,
@@ -114,6 +119,7 @@ async function pagina(browser, { semSql = false, admin = false, semAtend = false
       const b = JSON.parse(req.postData() || '{}'); reg.rpcs.push(['decisao', b]);
       if (semSql) { status = 404; corpo = { code: 'PGRST202', message: 'Could not find the function public.painel_indicadores_decisao in the schema cache' }; } else corpo = DECISAO(b);
     }
+    else if (p.endsWith('/rpc/painel_indicadores_mensal')) { const b = JSON.parse(req.postData() || '{}'); reg.rpcs.push(['mensal', b]); corpo = MENSAL; }
     else if (p.endsWith('/rpc/painel_indicadores_conferencia')) { const b = JSON.parse(req.postData() || '{}'); reg.rpcs.push(['conferencia', b]); corpo = conf ? CONFERENCIA : {}; }
     else if (p.endsWith('/rpc/paciente_avisos')) corpo = conf ? AVISOS_CONF : [];
     else if (p.startsWith('/rest/v1/rpc/')) corpo = {};
@@ -213,7 +219,7 @@ await caso('Faltas: painéis por confirmação, antecedência, unidade e tipo; o
 });
 await caso('Não sobrou a tabela "Por dia" nem os números antigos (reentradas, transferências, atravessaram a meia-noite)', async () => {
   const t = await abrir(); await abaInd(t);
-  const txt = await textoAba(t); const tabelas = await t.page.locator('table').count();
+  const txt = await textoAba(t); const tabelas = await t.page.locator('table:not(.ind-tab-graf)').count();   // a tabela do gráfico mensal é de propósito
   await t.ctx.close();
   return { ok: tabelas === 0 && !/reentradas|transferências|meia-noite|Conversas por pessoa|Confirmaram/i.test(txt), detalhe: txt.slice(0, 80) };
 });
@@ -324,6 +330,18 @@ await caso('Conferência: pede o mesmo período e unidade dos outros blocos e mo
   const t = await abrir({ conf: true }); await abaInd(t); await t.page.waitForSelector('.ind-conf-passo');
   const a = ultimo(t.reg, 'conferencia'), txt = await textoAba(t); await t.ctx.close();
   return { ok: a.p_de === HOJE && a.p_ate === HOJE && a.p_unidade === null && /200\s*marcações no Klingo/.test(txt) && /WhatsApp/.test(txt) && /Telefone/.test(txt) && /Recepção/.test(txt) && /Sem origem \(em branco no Klingo\)/.test(txt) && /45% · 90|90 · 45%/.test(txt) && !t.reg.excecoes.length, detalhe: JSON.stringify(a) + (t.reg.excecoes[0] ?? '') };
+});
+await caso('Gráfico mensal: 5 barras por mês (total, cancelados, remarcados, atendidos, faltaram), tabela com as porcentagens, escolher meses e esconder uma barra', async () => {
+  const t = await abrir({ conf: true }); await abaInd(t); await t.page.waitForSelector('.ind-graf svg');
+  const pedido = t.reg.rpcs.find((x) => x[0] === 'mensal');
+  const barras = await t.page.locator('.ind-graf svg path').count(), leg = await t.page.locator('.ind-graf-leg button').allInnerTexts();
+  const tab = (await t.page.locator('.ind-graf table').innerText()).replace(/\s+/g, ' ');
+  await t.page.locator('.ind-graf-leg button', { hasText: 'Faltaram' }).click(); const barras4 = await t.page.locator('.ind-graf svg path').count();
+  await t.page.locator('.ind-graf .chip', { hasText: '3 meses' }).click(); const linhas3 = await t.page.locator('.ind-graf tbody tr').count();
+  await t.page.locator('.ind-graf svg .zona').last().hover(); const dica = await t.page.locator('.ind-graf-dica').innerText();
+  await t.page.screenshot({ path: process.env.FOTO_GRAFICO || '/tmp/grafico.png', fullPage: false });
+  await t.ctx.close();
+  return { ok: pedido && pedido[1].p_meses === 12 && barras === 10 && barras4 === 8 && leg.length === 5 && /Novembro de 2026 5\.807 663 11,4% 711 12,2% 2\.355 451 16,1% 1\.627/i.test(tab.replace('novembro','Novembro')) && linhas3 === 3 && /novembro de 2026/.test(dica) && /5\.807/.test(dica), detalhe: JSON.stringify({ barras, barras4, leg, linhas3 }) + ' ' + tab.slice(-230) };
 });
 await caso('Conferência: explica a divergência passo a passo (200 do Klingo, 30 fora do banco, 170 no banco, 10 remarcadas, 160 no cartão)', async () => {
   const t = await abrir({ conf: true }); await abaInd(t); await t.page.waitForSelector('.ind-conta');

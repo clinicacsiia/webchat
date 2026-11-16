@@ -55,3 +55,6 @@ Versão 1.1 — 16/11/2026 / Mudança: todo bloco que conta marcações do Kling
 - Pendência de dado (não é código): a conversa da marcação 27474 (TESTE DO SISTEMA) não está marcada como teste, então entra nos números. Marcar a conversa como teste a tira.
 - O Klingo não tem campo de origem na marcação pela API: o chat não consegue gravar "Webchat"; é pedido ao suporte do Klingo.
 - Nenhum indicador depende do webhook do Klingo (`klingo_webhook`, desligado).
+
+## Gráfico mensal (16/11/2026)
+Aba Indicadores, logo abaixo dos cartões: barras agrupadas por mês do exame com **total, cancelados, remarcados, atendidos e faltaram** (ordem e cores fixas), com 3, 6 ou 12 meses, legenda que esconde/mostra cada barra, dica ao passar o mouse e a tabela com os números e as porcentagens (% cancelados, % remarcados, % faltas). Função nova `painel_indicadores_mensal` (`supabase/indicadores-mensal.sql`, migração `indicadores_mensal_parte1`), lê `jornada_exame` e respeita o filtro de unidade. Conferido: em novembro/2026 2.355 + 451 + 663 + 711 + 1.627 (por vir) = 5.807. O histórico do banco começa em outubro/2026; meses antes aparecem com zero. `klingo_conferencia` só tem novembro, por isso o gráfico não usa a data de marcação.

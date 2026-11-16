@@ -384,7 +384,21 @@
   .num span { color: var(--suave); font-size: 13px; }
   /* Aba Indicadores (decisão, 11/11/2026) */
   .ind-pg { max-width: 1180px; margin: 0 auto; width: 100%; }
-  .ind-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; margin: 14px 0 6px; }
+  /* Gráfico mensal (cores da paleta validada, ordem fixa; ver docs/klingo-conferencia.md) */
+  .ind-graf { --g1: #2a78d6; --g2: #eb6834; --g3: #1baf7a; --g4: #eda100; --g5: #e87ba4; margin: 8px 0 4px; position: relative; }
+  .ind-graf-leg { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+  .ind-graf-leg button { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--linha); background: var(--papel); color: var(--texto); border-radius: 999px; padding: 4px 10px; font-size: 13px; cursor: pointer; }
+  .ind-graf-leg button[aria-pressed=false] { opacity: .45; text-decoration: line-through; }
+  .ind-graf-leg i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+  .ind-graf-rolagem { overflow-x: auto; }
+  .ind-graf svg { display: block; }
+  .ind-graf svg text { fill: var(--suave); font-size: 12px; }
+  .ind-graf .grade { stroke: var(--linha); stroke-width: 1; }
+  .ind-graf .zona:hover { fill: rgba(0,0,0,.04); }
+  .ind-graf-dica { position: absolute; z-index: 5; pointer-events: none; background: var(--papel); border: 1px solid var(--linha); border-radius: 8px; padding: 8px 10px; font-size: 13px; box-shadow: 0 4px 14px rgba(0,0,0,.14); min-width: 190px; }
+  .ind-graf-dica b { display: block; margin-bottom: 4px; }
+  .ind-graf-dica div { display: flex; justify-content: space-between; gap: 14px; }
+  .ind-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin: 14px 0 6px; }
   .ind-kpi { background: var(--csi-surface); border: 1px solid var(--csi-border); border-radius: var(--radius-md); box-shadow: var(--shadow-sm); padding: 14px 16px; display: flex; flex-direction: column; gap: 2px; }
   .ind-kpi-rot { font-size: 13px; font-weight: 600; color: var(--suave); }
   .ind-kpi b { font-size: 34px; line-height: 1.1; }
@@ -418,10 +432,10 @@
   .ind-mini b { display: block; font-size: 22px; line-height: 1.15; } .ind-mini span { font-size: 12.5px; color: var(--suave); }
   .ind-conf-passo { margin: 14px 0 4px; font-size: 15px; } .ind-conf-passo span { display: inline-block; min-width: 22px; height: 22px; line-height: 22px; text-align: center; border-radius: 11px; background: var(--csi-primary-soft, #e6efff); color: var(--csi-primary, #1d4ed8); font-size: 13px; margin-right: 6px; }
   .ind-conta { display: grid; grid-template-columns: 1fr auto; gap: 2px 14px; max-width: 560px; font-size: 14px; } .ind-conta b { text-align: right; font-variant-numeric: tabular-nums; } .ind-conta .tot { border-top: 1px solid var(--csi-border); padding-top: 4px; font-weight: 700; }
-  .ind-tab { width: 100%; border-collapse: collapse; font-size: 13px; } .ind-tab th, .ind-tab td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--csi-border); vertical-align: top; } .ind-tab th { color: var(--suave); font-weight: 600; }
+  .ind-tab, .ind-tab-graf { width: 100%; border-collapse: collapse; font-size: 13px; } .ind-tab th, .ind-tab td, .ind-tab-graf th, .ind-tab-graf td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--csi-border); vertical-align: top; } .ind-tab th, .ind-tab-graf th { color: var(--suave); font-weight: 600; }
   .ind-tab-rolagem { max-height: 420px; overflow: auto; border: 1px solid var(--csi-border); border-radius: var(--radius-md); background: var(--csi-surface); }
   .ind-tag { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 12px; background: var(--csi-border); } .ind-tag.alerta { background: var(--csi-warning-soft); color: var(--csi-warning-strong); } .ind-tag.filho { background: #e8f1ff; color: #1e40af; }
-  .ind-como { margin: 20px 0 8px; font-size: 14px; color: var(--suave); } .ind-como summary { cursor: pointer; font-weight: 600; }
+  .ind-como, .ind-como-graf { margin: 20px 0 8px; font-size: 14px; color: var(--suave); } .ind-como summary, .ind-como-graf summary { cursor: pointer; font-weight: 600; }
   @media (max-width: 640px) { .ind-grade { grid-template-columns: 1fr; } .ind-linha { grid-template-columns: 1fr auto; } .ind-linha .ind-trilho { grid-column: 1 / -1; order: 3; } }
   .barras-h { display: flex; align-items: flex-end; gap: 6px; padding: 10px 12px; background: var(--csi-surface); border: 1px solid var(--csi-border); border-radius: var(--radius-md); box-shadow: var(--shadow-sm); overflow-x: auto; }
   .barras-h .bh { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 2px; min-width: 34px; flex: 1; }
@@ -4817,6 +4831,58 @@ h1.longo { font-size: 14mm; }
         h('div', { class: 'ind-mini' }, h('b', {}, num(av.media_site)), h('span', {}, 'nota do site (0 a 10)')), h('div', { class: 'ind-mini' }, h('b', {}, nf(pc.WhatsApp)), h('span', {}, 'conheceram pelo WhatsApp')),
         h('div', { class: 'ind-mini' }, h('b', {}, nf(pc.Instagram)), h('span', {}, 'pelo Instagram')), h('div', { class: 'ind-mini' }, h('b', {}, nf(pc.Google)), h('span', {}, 'pelo Google'))));
   }
+  /* Gráfico mensal agrupado (supabase/indicadores-mensal: painel_indicadores_mensal). Barras: total, cancelados, remarcados, atendidos e faltaram, por mês do exame. */
+  const SERIES_MES = [['total', 'Total de exames', 'g1'], ['cancelados', 'Cancelados', 'g2'], ['remarcados', 'Remarcados', 'g3'], ['atendidos', 'Atendidos', 'g4'], ['faltaram', 'Faltaram', 'g5']];
+  const MESES_PT = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'], MESES_LONGO = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+  const rotMes = (ym) => { const [a, m] = ym.split('-'); return `${MESES_PT[+m - 1]}/${a.slice(2)}`; };
+  const rotMesLongo = (ym) => { const [a, m] = ym.split('-'); return `${MESES_LONGO[+m - 1]} de ${a}`; };
+  const GRAF = { meses: 6, ocultas: new Set() };
+  const svgEl = (tag, attrs, ...kids) => { const e = document.createElementNS('http://www.w3.org/2000/svg', tag); for (const [k, v] of Object.entries(attrs || {})) e.setAttribute(k, v); kids.flat().forEach((c) => c != null && e.append(c.nodeType ? c : document.createTextNode(String(c)))); return e; };
+  const topoArredondado = (x, y, w, hh, r) => { const rr = Math.min(r, w / 2, hh); return `M${x},${y + hh} L${x},${y + rr} Q${x},${y} ${x + rr},${y} L${x + w - rr},${y} Q${x + w},${y} ${x + w},${y + rr} L${x + w},${y + hh} Z`; };
+  function blocoMensal(resp) {
+    const dados = resp && !resp.error && resp.data && Array.isArray(resp.data.meses) ? resp.data.meses : null;
+    const tit = h('h3', { class: 'ind-sec' }, 'Visão mensal: total, cancelados, remarcados e mais');
+    if (!dados) return h('div', {}, tit, h('p', { class: 'dica' }, 'O gráfico mensal ainda não está disponível (falta aplicar supabase/indicadores-mensal.sql).'));
+    const cx = h('div', { class: 'ind-graf' });
+    const desenhar = () => {
+      const meses = dados.slice(-GRAF.meses), vis = SERIES_MES.filter(([k]) => !GRAF.ocultas.has(k));
+      const maxV = Math.max(1, ...meses.flatMap((m) => vis.map(([k]) => Number(m[k]) || 0)));
+      const passo = (() => { const bruto = maxV / 4, pot = Math.pow(10, Math.floor(Math.log10(bruto))), f = bruto / pot; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * pot; })();
+      const topo = Math.ceil(maxV / passo) * passo, ESQ = 52, DIR = 12, ALT = 250, PT = 12, PB = 34, BAR = 20, GAP = 2;
+      const gw = Math.max(vis.length, 1) * (BAR + GAP) - GAP, grupo = Math.max(gw + 36, Math.floor((1000 - ESQ - DIR) / meses.length)), W = ESQ + DIR + grupo * meses.length, areaH = ALT - PT - PB;
+      const y = (v) => PT + areaH - (v / topo) * areaH;
+      const dica = h('div', { class: 'ind-graf-dica', hidden: true });
+      const svg = svgEl('svg', { width: W, height: ALT, viewBox: `0 0 ${W} ${ALT}`, role: 'img', 'aria-label': 'Gráfico de barras agrupadas por mês: ' + vis.map(([, r]) => r).join(', ') });
+      for (let v = 0; v <= topo; v += passo) { svg.append(svgEl('line', { class: 'grade', x1: ESQ, x2: W - DIR, y1: y(v), y2: y(v) }), svgEl('text', { x: ESQ - 8, y: y(v) + 4, 'text-anchor': 'end' }, nf(v))); }
+      meses.forEach((m, i) => {
+        const x0 = ESQ + i * grupo + (grupo - gw) / 2;
+        vis.forEach(([k, , cor], j) => { const v = Number(m[k]) || 0, hh = (v / topo) * areaH; if (v > 0) svg.append(svgEl('path', { d: topoArredondado(x0 + j * (BAR + GAP), y(v), BAR, Math.max(hh, 1), 4), fill: `var(--${cor})` })); });
+        svg.append(svgEl('text', { x: x0 + gw / 2, y: ALT - 12, 'text-anchor': 'middle' }, rotMes(m.mes)));
+        const zona = svgEl('rect', { class: 'zona', x: ESQ + i * grupo, y: PT, width: grupo, height: areaH + PB, fill: 'transparent' });
+        const mostrar = () => {
+          dica.replaceChildren(h('b', {}, rotMesLongo(m.mes)), ...SERIES_MES.map(([k, rot, cor]) => h('div', {}, h('span', {}, h('i', { style: `display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;background:var(--${cor})` }), rot), h('b', { style: 'margin:0' }, nf(m[k])))));
+          dica.hidden = false; const lado = ESQ + i * grupo + grupo + 8; dica.style.left = Math.max(4, Math.min(lado, cx.clientWidth - 210)) + 'px'; dica.style.top = '40px';
+        };
+        zona.addEventListener('pointerenter', mostrar); zona.addEventListener('pointerleave', () => { dica.hidden = true; });
+        svg.append(zona);
+      });
+      const leg = h('div', { class: 'ind-graf-leg', role: 'group', 'aria-label': 'Escolher o que aparece no gráfico' }, SERIES_MES.map(([k, rot, cor]) =>
+        h('button', { type: 'button', 'aria-pressed': String(!GRAF.ocultas.has(k)), onclick: () => { if (GRAF.ocultas.has(k)) GRAF.ocultas.delete(k); else if (vis.length > 1) GRAF.ocultas.add(k); desenhar(); } }, h('i', { style: `background:var(--${cor})` }), rot)));
+      const chips = h('div', { class: 'chips', role: 'group', 'aria-label': 'Quantos meses' }, [[3, 'Últimos 3 meses'], [6, 'Últimos 6 meses'], [12, 'Últimos 12 meses']].map(([n, t]) =>
+        h('button', { class: 'chip', type: 'button', 'aria-pressed': String(GRAF.meses === n), onclick: () => { GRAF.meses = n; desenhar(); } }, t)));
+      const pc = (a, b) => (b > 0 ? pTxt(taxa(a, b)) : '—');
+      const tabela = h('details', { class: 'ind-como-graf', open: true }, h('summary', {}, 'Ver os números do gráfico'),
+        h('div', { class: 'ind-tab-rolagem' }, h('table', { class: 'ind-tab-graf' },
+          h('thead', {}, h('tr', {}, ['Mês', 'Total de exames', 'Cancelados', '% cancelados', 'Remarcados', '% remarcados', 'Atendidos', 'Faltaram', '% faltas', 'Ainda por vir'].map((t) => h('th', {}, t)))),
+          h('tbody', {}, meses.map((m) => h('tr', {}, h('td', {}, rotMesLongo(m.mes)), h('td', {}, nf(m.total)), h('td', {}, nf(m.cancelados)), h('td', {}, pc(m.cancelados, m.total)), h('td', {}, nf(m.remarcados)), h('td', {}, pc(m.remarcados, m.total)),
+            h('td', {}, nf(m.atendidos)), h('td', {}, nf(m.faltaram)), h('td', {}, pc(m.faltaram, (m.atendidos || 0) + (m.faltaram || 0))), h('td', {}, nf(m.por_vir))))))));
+      cx.replaceChildren(chips, leg, h('div', { class: 'ind-graf-rolagem' }, svg), dica, tabela);
+    };
+    desenhar();
+    return h('div', {}, tit,
+      h('p', { class: 'dica' }, 'Cada mês mostra os exames pela data em que acontecem (todos os canais do Klingo). Total = cancelados + remarcados + atendidos + faltaram + ainda por vir. "% faltas" é faltaram ÷ (atendidos + faltaram). O mês atual ainda está em andamento. O histórico do banco começa em outubro de 2026, por isso meses antigos aparecem vazios. Clique no nome de uma barra para escondê-la e comparar as outras.'),
+      cx);
+  }
   /* Autoatendimento com a API do Klingo (planejamento de 12/11/2026): só números, nenhum dado de paciente. */
   function blocoAutoatendimento(d) {
     if (!d) return null;
@@ -4940,11 +5006,12 @@ h1.longo { font-size: 14mm; }
     const minha = viewIndicadores.seq = (viewIndicadores.seq || 0) + 1;   // só a última escolha pinta a tela
     const un = UN.sel || null;
     const args = { p_de: IND.de, p_ate: IND.ate, p_unidade: un, p_incluir_teste: IND.teste };
-    const [r, eq, ext, au, cf] = await Promise.all([db.rpc('painel_indicadores_decisao', args),
+    const [r, eq, ext, au, cf, mensal] = await Promise.all([db.rpc('painel_indicadores_decisao', args),
       Promise.resolve(db.rpc('painel_indicadores_atendentes', args)).then((x) => x, () => ({ error: true, data: null })),
       Promise.resolve(db.rpc('painel_indicadores_extras_v2', args)).then((x) => x, () => ({ error: true, data: null })),
       Promise.resolve(db.rpc('painel_automacao_resumo', { p_de: IND.de, p_ate: IND.ate })).then((x) => x, () => ({ error: true, data: null })),
-      Promise.resolve(db.rpc('painel_indicadores_conferencia', args)).then((x) => x, () => ({ error: true, data: null }))]);
+      Promise.resolve(db.rpc('painel_indicadores_conferencia', args)).then((x) => x, () => ({ error: true, data: null })),
+      Promise.resolve(db.rpc('painel_indicadores_mensal', { p_meses: 12, p_unidade: un })).then((x) => x, () => ({ error: true, data: null }))]);
     if (S.aba !== 'indicadores' || minha !== viewIndicadores.seq) return;
     if (r.error || !r.data) {
       c.replaceChildren(h('div', { class: 'pagina' }, titulo, h('p', { class: 'erro' }, msgErro(r.error || { message: 'Sem resposta do banco.' })),
@@ -5018,6 +5085,7 @@ h1.longo { font-size: 14mm; }
       h('div', { class: 'ind-destaques' }, h('h3', {}, 'O que chama atenção'),
         lista.length ? h('ul', {}, lista.map((d) => h('li', { class: d.nivel }, d.txt))) : h('p', { class: 'dica' }, 'Ainda não há dados suficientes neste período para destacar algo. Tente um período maior.')),
       cartoes,
+      blocoMensal(mensal),
       blocoAutoatendimento(au && au.data),
 
       h('h3', { class: 'ind-sec' }, '1. Por que não estão agendando?'),
