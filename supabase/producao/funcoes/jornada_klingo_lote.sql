@@ -21,6 +21,8 @@ declare
   n_cards   integer := 0;
   n_mudou   integer := 0;
   n_linha   integer;
+  v_canc    text[] := '{}';
+  n_fecha   integer := 0;
 begin
   perform set_config('jornada.sem_aviso', '1', true);
   if p_linhas is null or jsonb_typeof(p_linhas) <> 'array' then
@@ -35,7 +37,7 @@ begin
     v_dia := (r ->> 'd')::timestamp::date;
     v_unid := public.jornada_unidade_curta(r ->> 'u');
     v_status := public.jornada_status_exame(r ->> 's', r ->> 't', r ->> 'r', r ->> 'c', v_dia, v_hoje);
-    -- Check-in do Klingo (col18 do #14359), hora de Brasília. Chave 'k' ausente = leitura antiga: não mexe; 'k' vazio = sem check-in (limpa).
+    if v_status = 'cancelado' then v_canc := v_canc || (r ->> 'm'); end if;
     v_checkin := case when coalesce(r ->> 'k', '') ~ '^\d{4}-\d{2}-\d{2}' then (r ->> 'k')::timestamp at time zone 'America/Sao_Paulo' end;
 
     insert into public.jornada_paciente as p (prontuario, nome, fone_chave)
@@ -73,7 +75,8 @@ begin
     n_mudou := n_mudou + n_linha;
     n_ok := n_ok + 1;
   end loop;
-  return jsonb_build_object('lidas', n_ok, 'puladas', n_pula, 'cartoes_criados', n_cards, 'alteradas', n_mudou);
+  if coalesce(array_length(v_canc, 1), 0) > 0 then n_fecha := public.pedido_fechar_cancelado_klingo(v_canc); end if;
+  return jsonb_build_object('lidas', n_ok, 'puladas', n_pula, 'cartoes_criados', n_cards, 'alteradas', n_mudou, 'pedidos_cancelados', n_fecha);
 end;
 $function$;
 

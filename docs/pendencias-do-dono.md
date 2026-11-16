@@ -16,7 +16,7 @@ A mesma lista existe como página (com caixas de marcar): peça ao Claude "abra 
 | Chave / item | Por que não liguei | O que falta |
 |---|---|---|
 | `klingo_api_resultado` (laudo) | Nunca foi testado com laudo liberado real; o link e a senha do resultado seguem pela equipe | Resposta do suporte do Klingo (item 2.3) e um paciente real para o teste |
-| `klingo_webhook` | O Klingo ainda não cadastrou a URL | Pedir ao Klingo para cadastrar |
+| `klingo_webhook` | O Klingo ainda não cadastrou a URL. **Desde 16/11/2026 o cancelamento feito direto no Klingo já chega ao pedido do chat pela leitura do relatório** (`pedido_fechar_cancelado_klingo`, chamada por `jornada_klingo_lote`): até 10 min no expediente e até 1 a 2 h fora dele. O webhook deixaria isso imediato | Pedir ao Klingo para cadastrar |
 | `permissao_modo` = `observacao` | Ligar bloqueia o que a equipe vê por unidade; a estrutura (Luzia, Juliana, atendentes, unidades) ainda não está fechada | Itens 1.1 e 2.1 |
 | `cadastro_equipe_sem_convite`, `reaproveitar_cadastro_convidado` | `nao` é o estado **seguro** (só convite cria equipe; convidado não reaproveita cadastro) | Nada: não ligar |
 | `disponibilidade_encerra_conversa`, `agendamento_reconhecer_msg_encerradas` | Decisão operacional sua | Dizer se quer |
