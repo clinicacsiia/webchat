@@ -386,6 +386,7 @@
   #blocoAcesso a.link-add { text-decoration: none; }
   /* Acompanhe seus pedidos: o botão grande da tela principal (só com acesso rápido) e o balão de novidades */
   .acompanhar-grande { display: flex; align-items: center; gap: 12px; position: relative; margin: 0 0 14px; padding: 12px 16px; min-height: 64px; border-radius: var(--radius-lg); background: var(--csi-surface); border: 2px solid var(--csi-primary); color: var(--csi-primary-strong); text-decoration: none; font-weight: 800; font-size: calc(17px * var(--esc)); text-align: left; box-shadow: var(--shadow-sm); }
+  button.acompanhar-grande { width: 100%; font-family: inherit; cursor: pointer; }
   .acompanhar-grande[hidden] { display: none; }
   .acompanhar-grande:active { background: var(--verde-claro); transform: translateY(1px); }
   .acompanhar-grande .ac-icone { font-size: calc(26px * var(--esc)); line-height: 1; flex: none; }
@@ -642,8 +643,8 @@
       <button class="btn-primario" id="btnIniciar" type="submit">Começar</button>
     </form>
     <a class="acompanhar-grande" id="linkAcompanhar" href="minha-vez/?acompanhar=1" hidden><span class="ac-icone" aria-hidden="true">📋</span><span class="ac-txt">Acompanhe seus pedidos<small>Status, remarcar, cancelar e resultados</small></span><span class="ac-seta" aria-hidden="true">›</span><span class="balao" id="balaoAcompanhar" hidden role="status"></span></a>
-    <button type="button" class="link-add" id="btnHistoricoForm" hidden>Ver conversas anteriores</button>
-    <details class="inst-clinica">
+    <button type="button" class="acompanhar-grande" id="btnHistoricoForm" hidden><span class="ac-icone" aria-hidden="true">💬</span><span class="ac-txt">Ver conversas anteriores<small>Continue de onde parou</small></span><span class="ac-seta" aria-hidden="true">›</span></button>
+    <details class="inst-clinica" open>
       <summary id="instNome">Sobre a clínica · endereço e horários</summary>
       <p>Rua Teixeira de Barros, 27, Brotas, Salvador - Bahia<br><a href="https://www.google.com/maps/search/?api=1&query=Rua+Teixeira+de+Barros%2C+27%2C+Brotas%2C+Salvador+-+BA" target="_blank" rel="noopener">Ver no Google Maps</a></p>
       <p>Tel: <a href="tel:+557131817666">(71) 3181-7666</a> | WhatsApp: <a href="https://wa.me/5571999803806" target="_blank" rel="noopener">(71) 99980-3806</a></p>
@@ -699,7 +700,7 @@
   const CHAVE_HIST = 'webchat.historico.v1';   // as últimas conversas deste aparelho (cada uma com o seu token): dá para voltar a elas
   const MAX_HIST = 5;                          // mínimo pedido: 3
   // Muda a cada alteração do chat. Cópia de mensagens guardada por outra versão é descartada (era isso que mostrava conversa velha e travada).
-  const VERSAO_APP = '2026.11.16-3';
+  const VERSAO_APP = '2026.11.16-4';
   // Mesmas regras do banco (fluxo_nome_ok, fluxo_telefone_ok, fluxo_email_ok): o banco confere de novo, aqui é só para avisar logo.
   const LET = 'A-Za-zÀ-ÖØ-öø-ÿ';
   const nomeCompletoOk = (v) => { const t = String(v || '').trim(); return t.length >= 5 && t.length <= 120 && new RegExp(`^[${LET}][${LET}'’.-]*( +[${LET}][${LET}'’.-]*)+$`).test(t) && t.split(/ +/).filter((w) => w.replace(new RegExp(`[^${LET}]`, 'g'), '').length >= 2).length >= 2; };
