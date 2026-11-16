@@ -1,5 +1,5 @@
 -- RETRATO DA ESTRUTURA DO BANCO DE PRODUÇÃO (projeto webchat-atendimento). GERADO: não editar à mão.
--- Atualização parcial em 2026-11-16T03:09:09.103419+00:00 (funções app_* e painel_app_*, tabelas app_*). Retrato inteiro tirado em 2026-11-14T20:32:54.165875+00:00 · Postgres 17.11. Só estrutura: nenhuma linha de tabela, nenhum valor de configuração.
+-- Atualização parcial em 2026-11-16T04:28:00.03729+00:00 (funções app_* e painel_app_*, tabelas app_*). Retrato inteiro tirado em 2026-11-14T20:32:54.165875+00:00 · Postgres 17.11. Só estrutura: nenhuma linha de tabela, nenhum valor de configuração.
 -- Serve de referência e para os testes. NÃO rodar inteiro sobre a produção. Como refazer: supabase/producao/LEIAME.md.
 
 -- ===== Extensões =====
@@ -18,7 +18,7 @@
 -- authenticator: session_preload_libraries=supautils, safeupdate, statement_timeout=8s, lock_timeout=8s
 -- service_role: sem limite
 
--- ===== Tabelas (144) =====
+-- ===== Tabelas (145) =====
 
 create table public.agenda_ao_vivo (
   dia date not null,
@@ -2712,6 +2712,22 @@ comment on table public.app_codigo_email is 'Código de 6 números para confirma
 CREATE INDEX app_codigo_email_tel ON public.app_codigo_email USING btree (telefone, finalidade, criado_em DESC);
 alter table public.app_codigo_email enable row level security;
 
+
+create table public.painel_oferta (
+  id uuid default gen_random_uuid() not null,
+  conversa_id uuid not null,
+  tipo text not null,
+  estado text not null,
+  agente_id uuid default auth.uid(),
+  criado_em timestamp with time zone default now() not null,
+  constraint painel_oferta_estado_ck CHECK ((estado = ANY (ARRAY['oferecido'::text, 'aceito'::text, 'recusado'::text, 'dispensado'::text]))),
+  constraint painel_oferta_tipo_ck CHECK ((tipo = ANY (ARRAY['horario'::text, 'disponibilidade'::text]))),
+  constraint painel_oferta_pkey PRIMARY KEY (id)
+);
+comment on table public.painel_oferta is 'Passos de cada oferta feita pela equipe no painel (horário ou Disponibilidade futura): oferecido, aceito, recusado ou dispensado. Quem recusou ou foi dispensado não recebe nova oferta do mesmo tipo. Só as funções painel_oferta* leem e gravam.';
+CREATE INDEX painel_oferta_conversa_idx ON public.painel_oferta USING btree (conversa_id, tipo, criado_em DESC);
+alter table public.painel_oferta enable row level security;
+
 -- ===== Chaves estrangeiras (depois de todas as tabelas) =====
 alter table public.agendamento_fechamento add constraint agendamento_fechamento_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE CASCADE;
 alter table public.agendamento_fechamento add constraint agendamento_fechamento_por_fkey FOREIGN KEY (por) REFERENCES agentes(id) ON DELETE SET NULL;
@@ -2820,6 +2836,7 @@ alter table public.app_conversa add constraint app_conversa_paciente_id_fkey FOR
 alter table public.jornada_exame add constraint jornada_exame_card_id_fkey FOREIGN KEY (card_id) REFERENCES jornada_card(id);
 alter table public.app_laudo add constraint app_laudo_paciente_id_fkey FOREIGN KEY (paciente_id) REFERENCES public.app_paciente(id) ON DELETE CASCADE;
 alter table public.app_laudo_pessoa add constraint app_laudo_pessoa_paciente_id_fkey FOREIGN KEY (paciente_id) REFERENCES public.app_paciente(id) ON DELETE CASCADE;
+alter table public.painel_oferta add constraint painel_oferta_conversa_fk FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE CASCADE;
 
 -- ===== Visões (5) =====
 
