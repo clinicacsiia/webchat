@@ -28,13 +28,15 @@ begin
   if p_acao = 'resultado' then
     select e.id, e.procedimento, to_char(e.agendado_para at time zone 'America/Bahia', 'DD/MM/YYYY') as dia into v_exame
       from public.jornada_exame e join public.jornada_card jc on jc.id = e.card_id
-     where e.id = p_exame and jc.conversa_id = p_conversa and e.status = 'atendido';
+     where e.id = p_exame and e.status = 'atendido'
+       and (jc.conversa_id = p_conversa or e.marcacao_id in (select 'm' || m from public.pre_agendamentos pa, unnest(coalesce(pa.klingo_marcacoes, '{}'::text[])) m where pa.conversa_id = p_conversa));
     if not found then return jsonb_build_object('ok', false, 'erro', 'exame', 'mensagem', 'Este exame ainda não aparece como realizado.'); end if;
     v_item := v_exame.procedimento || coalesce(' (feito em ' || v_exame.dia || ')', '');
   else
     v_item := coalesce((select e.procedimento || coalesce(' do dia ' || to_char(e.agendado_para at time zone 'America/Bahia', 'DD/MM/YYYY'), '')
                           from public.jornada_exame e join public.jornada_card jc on jc.id = e.card_id
-                         where jc.conversa_id = p_conversa and e.id = p_exame), 'o meu pedido');
+                         where e.id = p_exame
+                           and (jc.conversa_id = p_conversa or e.marcacao_id in (select 'm' || m from public.pre_agendamentos pa, unnest(coalesce(pa.klingo_marcacoes, '{}'::text[])) m where pa.conversa_id = p_conversa))), 'o meu pedido');
   end if;
   v_texto := case p_acao
     when 'resultado' then 'Quero receber o resultado do exame: ' || v_item || '.'
@@ -89,4 +91,3 @@ begin
   return jsonb_build_object('ok', true, 'conversa', v_id, 'token', v_ntok, 'aberta', true, 'nova', true, 'dirigida', v_dir, 'passo', v_passo, 'tipo', coalesce(c.paciente_tipo, 'proprio'),
                             'paciente_nome', c.paciente_nome, 'irmaos', '[]'::jsonb, 'irmaos_modo', null);
 end $function$;
-
