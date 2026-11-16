@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">CSI</string>
+    <string name="title_activity_main">CSI</string>
+    <string name="package_name">br.com.csi.paciente</string>
+    <string name="custom_url_scheme">br.com.csi.paciente</string>
+</resources>

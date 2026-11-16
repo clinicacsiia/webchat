@@ -1,0 +1,20 @@
+{
+  "appId": "br.com.csi.paciente",
+  "appName": "CSI",
+  "webDir": "www",
+  "server": {
+    "url": "https://clinicacsiia.github.io/webchat/",
+    "cleartext": false,
+    "allowNavigation": [
+      "clinicacsiia.github.io",
+      "nrvuynjwcgwpjdptkiay.supabase.co",
+      "challenges.cloudflare.com",
+      "wa.me",
+      "www.google.com"
+    ]
+  },
+  "ios": { "contentInset": "always", "limitsNavigationsToAppBoundDomains": false },
+  "plugins": {
+    "SplashScreen": { "launchShowDuration": 800, "backgroundColor": "#ffffff" }
+  }
+}
