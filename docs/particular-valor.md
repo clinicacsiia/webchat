@@ -33,7 +33,7 @@ plano Particular escolhido ──► o banco pede à API (assíncrono) o preço 
 | Banco, parte 1 (tabela `klingo_preco_api`, chave, 5 textos, 6 funções) | `supabase/particular-valor-parte1-base.sql` |
 | Banco, partes 2 e 3 (`fluxo_proximo`, `fluxo_ler_texto`, `klingo_pode_marcar`, `fluxo_perguntar`, `fluxo_aplicar`, `fluxo_finalizar`) | `supabase/particular-valor-parte2-roteiro.sql`, `...-parte3-telas.sql`. **Lêem a definição que está no banco e trocam só os trechos marcados** (erro e nada aplicado se algum trecho não existir exatamente uma vez); rodar de novo não faz nada |
 | Edge Function `klingo-preco` (só lê o `/preco`, usa a cota global, só o banco chama, segredo do cofre) | `supabase/functions/klingo-preco/` |
-| Tela (cartão `.valor-destaque`, chat `2026.11.16-8`, `sw.js` v68) | `index.html` |
+| Tela (cartão `.valor-destaque`, chat `2026.11.16-9`, `sw.js` v69) | `index.html` |
 | Testes | `testes/sql-particular-valor.test.mjs` (`npm run test:particular-valor`, 20 casos), `testes/particular-valor.navegador.mjs` (4), `klingo-preco/preco.test.ts` (em `test:edge`) |
 | Como fica a tela | `docs/particular-valor-tela.png` |
 
