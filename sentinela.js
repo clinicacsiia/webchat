@@ -1,4 +1,5 @@
 /* FLUXOGRAMA: entrada (eventos do chat + DOM da conversa + chamadas ao Supabase + erros de JavaScript) -> validação (regras: ordem das mensagens, mensagem pendente, resposta que não vem, tela travada, erro de chamada, paciente parado, conversa antiga) -> lógica (cura sozinha o que dá, fala com o paciente numa faixa acima do campo de mensagem, aprende os tempos deste aparelho) -> saída (aviso com botões, código de rastreio CSI-AAMMDD-HHMM-TIPO-XXXX e incidente enviado ao Supabase)
+   Versão 1.2 — 16/11/2026 / Mudança: chat em versão antiga que o servidor recusa com "pin_obrigatorio" (código CSI-...-RPC- do dia 16/11): explica o que houve, pede para atualizar e, com um toque, limpa a cópia velha, pede o PIN e volta para a MESMA conversa (nasce o tipo PIN, só para a equipe acompanhar, sem alarme)
    Versão 1.1 — 11/11/2026 / Mudança: falha de rede numa consulta de ROTINA (a que o chat repete sozinho) só vira aviso na 3ª seguida, e como aviso de conexão, não como erro com código (eram 30 alarmes falsos em 5 dias); texto do aviso "Atualizei a conversa" corrigido (também acontece quando a equipe assume)
    Versão 1.0 — 31/10/2026 / Mudança: Implementação inicial
 
@@ -14,7 +15,7 @@
   if (raiz && raiz.document) raiz.Sentinela = S;
 })(typeof window !== 'undefined' ? window : globalThis, function (janela) {
   'use strict';
-  const VERSAO = '1.1';
+  const VERSAO = '1.2';
   const ALFABETO = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';   // sem 0/O/1/I/L: o código é lido e ditado por telefone
   // erro = gera código de rastreio e vai para a equipe; os demais só ajudam o paciente.
   const TIPOS = {
@@ -28,6 +29,7 @@
     NET: { rotulo: 'Sem conexão', erro: false },
     ANT: { rotulo: 'Conversa antiga ou indisponível', erro: false },
     LIM: { rotulo: 'Muitas mensagens em pouco tempo', erro: false },
+    PIN: { rotulo: 'Chat em versão antiga: o servidor pede o PIN', erro: false },
     PAR: { rotulo: 'Parado na mesma etapa', erro: false }
   };
 
@@ -73,8 +75,17 @@
     if (cod === '22023' || /j[aá] foi respondida/i.test(msg)) return { tipo: 'DES', cod, msg: mascarar(msg) };
     if (cod === '28000') return { tipo: 'ANT', cod, msg: mascarar(msg) };
     if (cod === '54000') return { tipo: 'LIM', cod, msg: mascarar(msg) };
+    if (/pin_obrigatorio/.test(msg)) return { tipo: 'PIN', cod, msg: mascarar(msg) };
     return { tipo: 'RPC', cod, msg: mascarar(msg) };
   }
+  // O chat que manda o código do aparelho ao servidor e sabe voltar à tela do PIN nasceu na versão 2026.11.15-8.
+  // Antes dela, quando o servidor passou a exigir o PIN (15/11), a tela só dizia "problema com o servidor".
+  const PRIMEIRA_COM_PORTA = '2026.11.15-8';
+  const numeroDaVersao = (v) => { const m = /^(\d{4})\.(\d{1,2})\.(\d{1,2})-(\d+)$/.exec(String(v || '')); return m ? ((+m[1] * 100 + +m[2]) * 100 + +m[3]) * 1000 + +m[4] : null; };
+  // true = esta versão da tela NÃO sabe lidar com o PIN do servidor (sem versão conhecida também conta como antiga).
+  const versaoSemPorta = (v) => { const n = numeroDaVersao(v); return n === null || n < numeroDaVersao(PRIMEIRA_COM_PORTA); };
+  // Endereço do chat com a barra final, mesmo que a página esteja dentro de /acesso/, /painel/ etc.
+  const raizDoChat = (caminho) => String(caminho || '/').replace(/[^/]*$/, '').replace(/(?:acesso|painel|fila|minha-vez|agendamento)\/.*$/, '');
   // Consultas que o chat faz sozinho, sem toque do paciente, e repete em seguida: uma falha de rede isolada nelas não é notícia.
   const ROTINA = new Set(['chat_listar', 'chat_acompanhar', 'chat_push_estado', 'chat_push_config', 'chat_avaliacao_estado', 'login_paciente_ativo', 'conta_paciente_resumo', 'chat_config']);
   const FALHAS_ROTINA_PARA_AVISAR = 3;
@@ -83,7 +94,7 @@
     if (!ROTINA.has(nome)) return 'erro';
     return seguidas >= FALHAS_ROTINA_PARA_AVISAR ? 'instavel' : 'ignorar';
   }
-  const PURO = { gerarCodigo, codigoValido, percentil, mediana, limiarLento, limiarParado, ordemOk, mascarar, limpar, classificarRpc, decidirFalhaDeRede, ROTINA, TIPOS, versao: VERSAO };
+  const PURO = { gerarCodigo, codigoValido, percentil, mediana, limiarLento, limiarParado, ordemOk, mascarar, limpar, classificarRpc, decidirFalhaDeRede, versaoSemPorta, raizDoChat, ROTINA, TIPOS, versao: VERSAO };
   if (!janela.document) return PURO;   // Node: só as funções puras
 
   /* ---------- navegador ---------- */
@@ -162,6 +173,28 @@
   }
   const amostrasEnvio = () => [].concat(mem.rpc.chat_responder || [], mem.rpc.chat_enviar || []);
   let falhasRotina = 0, instavelAvisada = false;   // falhas de rede seguidas nas consultas de rotina
+  /* --- chat em versão antiga que o servidor recusa por falta de PIN ---
+     A cópia velha do chat não manda o código do aparelho e não sabe voltar à tela do PIN. Aqui (arquivo que se atualiza sozinho) explicamos,
+     pedimos para atualizar e, ao toque, limpamos a cópia velha, levamos ao PIN e voltamos para a MESMA conversa: ela fica guardada no aparelho
+     (webchat.conversa.v1) e as mensagens vêm do servidor, então nada se perde. Chat novo (2026.11.15-8 em diante) trata isso sozinho: aqui fica quieto. */
+  function pinObrigatorio(nome, status, corpo) {
+    if (!versaoSemPorta(ctx().versao)) return;
+    if (apoioAtual && apoioAtual.id === 'pin') return;
+    const codigo = registrar('PIN', { chamada: nome, status, codigo_pg: corpo && corpo.code, erro: corpo && corpo.message, versao_antiga: true }, { enviar: true });
+    mostrar({ id: 'pin', nivel: 'aviso', titulo: 'Precisamos atualizar o seu chat', codigo,
+      texto: 'O chat guardado no seu celular é de uma versão antiga. Desde 15/11 a clínica pede o seu PIN para proteger os seus dados, e essa versão não sabe pedir, por isso a conversa não carrega. '
+        + 'Toque no botão: atualizamos o chat, você digita o PIN e voltamos para esta mesma conversa, de onde você parou. '
+        + 'Se não der certo, ligue (71) 3181-7666 ou chame no WhatsApp (71) 99980-3806 e informe o código abaixo.',
+      botoes: [{ rotulo: 'Atualizar e continuar a conversa', principal: true, manter: true, fn: () => { atualizarEVoltar(); } }] });
+  }
+  async function atualizarEVoltar() {
+    mostrar({ id: 'pin', nivel: 'aviso', titulo: 'Atualizando…', texto: 'Só um instante. Já já você digita o PIN e volta para a conversa.' });
+    const raiz = raizDoChat(janela.location.pathname), limite = (p) => Promise.race([p, new Promise((ok) => setTimeout(ok, 4000))]);
+    try { for (const k of (await limite(janela.caches.keys())) || []) if (/^webchat-cliente/.test(k)) await janela.caches.delete(k); } catch { /* sem cache: segue */ }
+    try { for (const r of (await limite(janela.navigator.serviceWorker.getRegistrations())) || []) await limite(r.unregister()); } catch { /* sem service worker: segue */ }
+    try { await limite(Promise.all([janela.fetch(raiz + 'index.html', { cache: 'reload' }), janela.fetch(raiz + 'sentinela.js', { cache: 'reload' })])); } catch { /* o navegador busca na rede de qualquer jeito */ }
+    janela.location.replace(raiz + 'acesso/?voltar=chat');   // depois do PIN, a página de acesso devolve ao chat, que reabre a conversa guardada
+  }
   function aoTerminarRpc(nome, status, ms, corpo) {
     guardar(rpcs, { n: nome, s: status, ms, t: Date.now() }, 15);
     if (status > 0 && ROTINA.has(nome)) { falhasRotina = 0; if (instavelAvisada) { instavelAvisada = false; fechar('net'); } }   // o servidor respondeu: a conexão voltou
@@ -187,6 +220,7 @@
       }
       return;
     }
+    if (corpo && /pin_obrigatorio/.test(String(corpo.message || ''))) { pinObrigatorio(nome, status, corpo); return; }   // vale também para as chamadas silenciosas: o paciente precisa saber
     if (SILENCIOSAS.has(nome)) return;
     const c = classificarRpc(nome, status, corpo, janela.navigator.onLine);
     const detalhe = { chamada: nome, status, codigo_pg: c.cod, erro: c.msg, ms };

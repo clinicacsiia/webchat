@@ -31,6 +31,9 @@ const k = (...a) => S.classificarRpc(...a).tipo;
 registrar('erro: sem resposta e aparelho offline = NET; online = RPC', k('chat_enviar', 0, null, false) === 'NET' && k('chat_enviar', 0, null, true) === 'RPC');
 registrar('erro: "pergunta já respondida" (22023) = DES', k('chat_responder', 400, { code: '22023', message: 'Essa pergunta já foi respondida.' }, true) === 'DES');
 registrar('erro: 28000 = ANT, 54000 = LIM, qualquer outro = RPC', k('x', 400, { code: '28000' }) === 'ANT' && k('x', 429, { code: '54000' }) === 'LIM' && k('x', 500, { code: 'XX000' }) === 'RPC');
+registrar('erro: "pin_obrigatorio" (servidor exigindo o PIN) = PIN, não RPC', k('chat_listar', 400, { code: 'P0001', message: 'pin_obrigatorio' }, true) === 'PIN' && !S.TIPOS.PIN.erro);
+registrar('versão do chat sem a porta do PIN (antes de 2026.11.15-8, vazia ou estranha) é "antiga"; da 2026.11.15-8 em diante não', ['2026.11.14-2', '2026.11.01-2', '2026.11.15-7', '', null, 'abc'].every(S.versaoSemPorta) && ['2026.11.15-8', '2026.11.15-15', '2026.11.16-8', '2026.12.01-1'].every((v) => !S.versaoSemPorta(v)));
+registrar('endereço do chat: tira acesso/, painel/ etc. e mantém a barra final', S.raizDoChat('/webchat/index.html') === '/webchat/' && S.raizDoChat('/webchat/acesso/') === '/webchat/' && S.raizDoChat('/') === '/' && S.raizDoChat('/pagina.html') === '/');
 
 // privacidade: nada de conteúdo do paciente no registro
 const l = S.limpar({ passo: 'plano', ms: 12, texto: 'meu CPF 123.456.789-09', valor: { cpf: 1 }, nome: 'Maria', telefone: '71999998888', erro: 'falha para 71999998888 em maria@x.com', ok: true, objeto: { a: 1 } });
