@@ -2,7 +2,7 @@
 
 Arquivos: `supabase/jornada-paciente.sql` (**aplicado em produção**), `minha-vez/index.html`, testes `npm run test:jornada-paciente` (8) e `npm run test:minha-vez` (13).
 
-Quem está logado vê, abaixo da fila, o cartão **Seus exames**: "1 de 3 exames feitos · faltam 2", uma barra de progresso e, para cada exame, 6 passos: **Pedido, A confirmar, Confirmado, Chegada, Exame feito, Laudo**. Os feitos têm ✓ verde; o que está acontecendo agora gira e diz "em andamento"; cada exame tem uma frase calma ("Tudo certo! Falta só você chegar à clínica."). **Nenhum horário** aparece: só "Hoje", "Amanhã" ou o dia/mês.
+Quem está logado vê, abaixo da fila, o cartão **Seus exames**: "1 de 3 exames feitos · faltam 2", uma barra de progresso e, para cada exame, 7 etapas num **status único**: **Pedido, A confirmar, Confirmado, Chegada, Em atendimento, Exame feito, Laudo**. O destaque (círculo girando) fica **onde o exame está agora** e as etapas anteriores têm ✓ verde. O status junta as colunas do #14359: *Confirm Status* (A Confirmar/Sem Resposta = A confirmar; Confirmado), *Check-In - Data* (Chegada, só no dia do exame), *Atendido* (Em atendimento no dia do exame; Exame feito depois), e o laudo (pronto, pedido ou entregue). Cancelado, remarcado e faltou saem da linha e mostram um aviso. Cada etapa tem uma frase calma (ex.: "Tudo certo! Falta só você chegar à clínica."). Nenhum horário** aparece: só "Hoje", "Amanhã" ou o dia/mês.
 
 ## De onde vem o passo (cada exame tem o seu)
 

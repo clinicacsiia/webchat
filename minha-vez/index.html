@@ -449,25 +449,37 @@
       h('button', { class: 'principal', type: 'button', id: 'btnAvisos', onclick: async (e) => { e.currentTarget.disabled = true; try { await Notification.requestPermission(); } catch { /* ignora */ } if (modo === 'conta') assinarPush(); desenhar(ultimo); } }, 'Ativar avisos'))];
   }
   /* ---------- Seus exames: onde cada um está, sem horários ---------- */
-  const PASSOS = ['Pedido', 'A confirmar', 'Confirmado', 'Chegada', 'Exame feito', 'Laudo'];
-  const FRASE = {
-    1: 'Recebemos o seu pedido. Estamos organizando o agendamento.',
-    2: 'Exame agendado. Estamos confirmando o seu horário.',
-    3: 'Tudo certo! Falta só você chegar à clínica.',
-    4: 'Você está na clínica. Logo chamamos você para o exame.',
-    5: 'Exame realizado! O seu laudo está sendo preparado.',
-    6: 'Laudo pronto. É só pedir na recepção.'
-  };
+  // STATUS ÚNICO do exame: junta Confirm Status, Status, Atendido, Check-In e o laudo do Klingo numa só linha do tempo.
+  // O destaque fica ONDE O EXAME ESTÁ agora (os passos anteriores têm ✓). Etapa 8 = tudo concluído (laudo entregue).
+  const ETAPAS = [
+    { nome: 'Pedido', legenda: 'recebido', frase: 'Recebemos o seu pedido. A equipe está organizando o horário.' },
+    { nome: 'A confirmar', legenda: 'aguardando confirmação', frase: 'Exame marcado. Estamos confirmando o seu horário.' },
+    { nome: 'Confirmado', legenda: 'presença confirmada', frase: 'Tudo certo! Falta só você chegar à clínica.' },
+    { nome: 'Chegada', legenda: 'na clínica', frase: 'Você está na clínica. Logo chamamos você para o exame.' },
+    { nome: 'Em atendimento', legenda: 'fazendo o exame', frase: 'Seu exame está sendo feito agora. Fique tranquilo(a).' },
+    { nome: 'Exame feito', legenda: 'laudo em preparo', frase: 'Exame realizado! O seu laudo está sendo preparado.' },
+    { nome: 'Laudo', legenda: 'pronto', frase: 'Laudo pronto. É só pedir na recepção.' }
+  ];
+  // ok do banco: 1 pedido · 2 marcado (A confirmar) · 3 confirmado · 4 chegou · 5 atendimento aberto no Klingo · 6 laudo pronto.
+  // Atendimento aberto no dia do exame = "Em atendimento"; em outro dia, o exame já foi feito. res = estado do laudo (aplicativo de pedidos).
+  function etapaDe(ok, dia, res, emAtend) {
+    if (res === 'entregue') return 8;
+    if (emAtend) return 5;
+    if (ok >= 6 || res === 'disponivel' || res === 'solicitado') return 7;
+    if (ok >= 5) return emAtend || dia === hojeBR() ? 5 : 6;
+    return Math.max(1, ok);
+  }
+  function passosNos(etapa) {
+    return h('ol', { class: 'passos', 'aria-label': 'Andamento do exame' }, ETAPAS.map((x, i) => {
+      const n = i + 1, estado = n < etapa ? 'feito' : n === etapa ? 'agora' : '';
+      return h('li', { class: estado, 'aria-current': estado === 'agora' ? 'step' : null }, h('div', { class: 'bolha' }, estado === 'feito' ? '✓' : ''), x.nome, estado === 'agora' ? h('div', {}, x.legenda) : null);
+    }));
+  }
   const FRASE_EXC = {
     cancelado: 'Este exame foi cancelado. Se foi engano, fale com a recepção.',
     remarcado: 'Este exame foi remarcado. A recepção vai informar o novo dia.',
     faltou: 'Não vimos você neste exame. A recepção pode ajudar a remarcar.'
   };
-  // Passo "A confirmar" = o horário já está marcado (ok = 2) e falta o paciente confirmar: é o status real do Klingo.
-  // Com só o pedido recebido (ok = 1) nenhum passo fica "em andamento": a frase abaixo explica que a equipe está organizando o horário.
-  const passoAtual = (ok) => (ok === 1 ? 0 : ok === 2 ? 2 : ok + 1);
-  const feitoAte = (ok) => (ok === 2 ? 1 : ok);
-  const legendaPasso = (n) => (n === 2 ? 'aguardando confirmação' : 'em andamento');
   let jornada = null;
   async function carregarJornada() {
     try { const { data, error } = await db.rpc('paciente_jornada'); if (!error && data) jornada = data; } catch { /* mantém o que já tinha */ }
@@ -479,16 +491,13 @@
     return String(iso).slice(8, 10) + '/' + String(iso).slice(5, 7);
   }
   const tituloExame = (nome) => { try { return window.NomesExame ? window.NomesExame.apresentar(nome, { semPrefixo: false }).titulo : String(nome || 'Exame'); } catch { return String(nome || 'Exame'); } };
-  function exameNo(e) {
+  function exameNo(e, dia) {
     const filhos = [h('b', {}, tituloExame(e.nome))];
     if (e.voucher) filhos.push(h('p', { class: 'voucher' }, 'Marcação nº ', h('b', {}, e.voucher), e.chegada ? ' · chegada às ' + e.chegada : ''));
     if (e.excecao) { filhos.push(h('div', { class: 'excecao' }, FRASE_EXC[e.excecao] || 'Fale com a recepção sobre este exame.')); return h('div', { class: 'exame' }, filhos); }
-    const ok = Math.max(0, Math.min(6, e.ok || 0));
-    filhos.push(h('ol', { class: 'passos', 'aria-label': 'Andamento do exame' }, PASSOS.map((nome, i) => {
-      const n = i + 1, estado = n <= feitoAte(ok) ? 'feito' : n === passoAtual(ok) ? 'agora' : '';
-      return h('li', { class: estado, 'aria-current': estado === 'agora' ? 'step' : null }, h('div', { class: 'bolha' }, estado === 'feito' ? '✓' : ''), nome, estado === 'agora' ? h('div', {}, legendaPasso(n)) : null);
-    })));
-    filhos.push(h('p', { class: 'msg' }, e.em_atendimento ? 'Seu exame está sendo feito agora. Fique tranquilo(a).' : (FRASE[ok] || FRASE[1])));
+    const ok = Math.max(0, Math.min(6, e.ok || 0)), etapa = etapaDe(ok, dia, null, e.em_atendimento);
+    filhos.push(passosNos(etapa));
+    filhos.push(h('p', { class: 'msg' }, (ETAPAS[etapa - 1] || ETAPAS[0]).frase));
     return h('div', { class: 'exame' }, filhos);
   }
   function jornadaNos() {
@@ -502,7 +511,7 @@
         : r.feitos + ' de ' + r.total + (r.total === 1 ? ' exame feito' : ' exames feitos') + ' · ' + (r.faltam === 1 ? 'falta 1' : 'faltam ' + r.faltam)),
       h('div', { class: 'barra', role: 'progressbar', 'aria-valuemin': 0, 'aria-valuemax': 100, 'aria-valuenow': pct }, h('i', { style: 'width:' + pct + '%' })),
       r.laudos ? h('p', { class: 'suave', style: 'margin:0' }, r.laudos === 1 ? '1 laudo pronto' : r.laudos + ' laudos prontos') : null)];
-    for (const v of vis) nos.push(h('div', { class: 'cartao' }, h('p', { class: 'dia' }, rotuloDia(v.data) + (v.unidade ? ' · ' + v.unidade : '')), v.exames.map(exameNo)));
+    for (const v of vis) nos.push(h('div', { class: 'cartao' }, h('p', { class: 'dia' }, rotuloDia(v.data) + (v.unidade ? ' · ' + v.unidade : '')), v.exames.map((x) => exameNo(x, v.data))));
     return nos;
   }
   function ligarTempoReal() {
@@ -628,11 +637,9 @@
     if (e.excecao) { filhos.push(h('div', { class: 'excecao' }, EXC_MSG[e.excecao] || 'Fale com a clínica pela conversa.')); return h('div', { class: 'exame' }, filhos); }
     const ok = Math.max(0, Math.min(6, e.ok || 0));
     if (!p.aberta && ok <= 1) { filhos.push(h('p', { class: 'msg' }, 'Sem horário marcado.')); return h('div', { class: 'exame' }, filhos); }   // encerrado sem marcar: nada de "estamos organizando"
-    if (ok >= 1) filhos.push(h('ol', { class: 'passos', 'aria-label': 'Andamento do exame' }, PASSOS.map((nome, i) => {
-      const n = i + 1, feito = e.resultado === 'entregue' ? n <= 6 : n <= feitoAte(ok), agora = !feito && n === (e.resultado === 'entregue' ? 7 : passoAtual(ok));
-      return h('li', { class: feito ? 'feito' : agora ? 'agora' : '' }, h('div', { class: 'bolha' }, feito ? '✓' : ''), nome, agora ? h('div', {}, legendaPasso(n)) : null);
-    })));
-    filhos.push(h('p', { class: 'msg' }, e.resultado === 'entregue' ? 'Resultado entregue. Ele fica guardado em "Resultados" aqui embaixo.' : (MSG_PASSO[ok] || MSG_PASSO[1])));
+    const etapa = etapaDe(ok, e.data, e.resultado, false);
+    if (ok >= 1) filhos.push(passosNos(etapa));
+    filhos.push(h('p', { class: 'msg' }, e.resultado === 'entregue' ? 'Resultado entregue. Ele fica guardado em "Resultados" aqui embaixo.' : ok === 0 ? MSG_PASSO[0] : (ETAPAS[etapa - 1] || ETAPAS[0]).frase));
     if (ok === 5 && e.resultado === 'disponivel') filhos.push(h('div', { class: 'res-box disp' }, '✅ Seu resultado está disponível. Toque para pedir: a equipe entrega na conversa.'));
     else if (ok === 5 && e.resultado === 'solicitado') filhos.push(h('div', { class: 'res-box' }, 'Resultado pedido. A equipe entrega na conversa.'));
     else if (ok === 5 && e.resultado === 'aguardando') filhos.push(h('div', { class: 'res-box' }, 'Avisamos aqui quando o resultado estiver disponível.'));
