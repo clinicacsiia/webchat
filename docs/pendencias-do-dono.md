@@ -182,8 +182,8 @@ Feito e no ar: a Jornada lê o check-in (col18 do #14359) e a tela "Minha vez" m
 
 ## 2.19 Laudos no aplicativo (16/11/2026): o que só você decide ou testa
 O paciente baixa o PDF no cartão **Meus laudos** (`laudos-no-app.md`); o sistema pergunta ao Klingo a cada download e bloqueia se a equipe retirou o laudo. **Banco e função no ar; a tela vai ao ar quando o PR for aprovado e entrar na `main`.**
-- [ ] **Teste real (só você pode):** com o seu CPF e nascimento (ou de um paciente que autorize), abra *Acompanhe seus pedidos > Meus laudos*, baixe um laudo pronto e confira o PDF. Depois peça à equipe para **retirar o laudo no Klingo** e tente baixar de novo: tem que recusar com "em revisão". As rotas de resultado do Klingo nunca foram provadas com laudo real.
-- [ ] Se não aparecer nada ou aparecer "Aguardando" com o laudo pronto: me diga **só o formato** da resposta (nomes dos campos), nunca o conteúdo. Laudo de **imagem** (rota por *accession number*) ainda não está coberto.
+- [ ] **Teste real (só você pode):** com o seu CPF e nascimento (ou de um paciente que autorize), abra *Acompanhe seus pedidos > Meus laudos*, baixe um laudo pronto e confira o PDF. Depois peça à equipe para **retirar o laudo no Klingo** e tente baixar de novo: tem que recusar com "em revisão". O formato do laudo **já foi provado com laudos reais** (16/11/2026); falta provar a parte do paciente (CPF + nascimento) e a retirada de um laudo.
+- [ ] Se não aparecer nada ou aparecer "Aguardando" com o laudo pronto, me avise (nunca mande o conteúdo do laudo). Pode faltar exame antigo se o Klingo só devolver o histórico recente em `/vouchers`.
 - [ ] **Jurídico (2.5):** citar a entrega de laudos e o que fica guardado (id da marcação, nome do exame, data, unidade; sem o PDF) em `privacidade.html`. Não alterei o texto.
 - [ ] Desligar na hora, se precisar: `update public.config set valor = 'nao' where chave = 'app_laudos';` ([abrir o SQL Editor](https://supabase.com/dashboard/project/nrvuynjwcgwpjdptkiay/sql/new)).
 

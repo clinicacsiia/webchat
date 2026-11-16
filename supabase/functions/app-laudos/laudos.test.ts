@@ -2,10 +2,14 @@
 // Versão 1.0 — 16/11/2026 / Mudança: Implementação inicial. Nenhum dado real: os formatos de laudo seguem o swagger (lista[].resultado_pdf), que NUNCA foi provado com laudo real.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { baixar, type Banco, type Ctx, extrairLaudos, identificar, listar, lerResultado, nomeConfere, pdfBase64, type PessoaCtx, tratar } from "./laudos.ts";
+import { baixar, type Banco, type BuscarArquivo, type Ctx, extrairLaudos, identificar, listar, lerResultado, nomeConfere, pdfBase64, type PessoaCtx, tratar, urlLaudo } from "./laudos.ts";
 import { KlingoErro } from "./api.ts";
 
 const PDF = "JVBERi0xLjQKJSBsYXVkbyBkZSB0ZXN0ZQ==";   // "%PDF-1.4 ... teste"
+// FORMATO REAL (provado em 16/11/2026): resultado_pdf é um link assinado do S3 (1 h), não o PDF. Link inventado, no mesmo formato.
+const LINK = (n: number) => `https://s3.amazonaws.com/arquivos.azuremed/clientes/clinicacsi/laudos/laudo_${n}_${n}.pdf?response-cache-control=private&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Expires=3600&X-Amz-Signature=abc123`;
+const baixados: string[] = [];
+const buscarFalso: BuscarArquivo = async (url) => { baixados.push(url); return PDF; };
 const CPF = "52998224725", NASC = "1988-04-12", NASC_LEO = "2019-08-30", CPF_LEO = "11144477735";
 type Cenario = {
   pacientes?: Record<string, { id: string; dt_nasc: string; nome?: string }>;     // por CPF
@@ -61,7 +65,7 @@ const laudoOk = (pronto = true) => ({ lista: [{ id_laudo: 1, pronto, status: pro
 const mundo = (c: Cenario = {}, pessoas: PessoaCtx[] = [ana()], pinValido = true) => {
   const base: Cenario = { pacientes: { [CPF]: { id: "P100", dt_nasc: NASC, nome: "ANA SOUZA TESTE" } }, logins: { P100: { nascimento: NASC, nome: "Ana Souza Teste" } }, vouchers: { P100: [voucher(501), voucher(502, "US ABDOME TOTAL"), voucher(503, "CONSULTA", "agendado")] }, resultados: { "501": laudoOk(), "502": "403" } };
   const k = klingoFalso({ ...base, ...c }); const b = bancoFalso({ pessoas, pinValido });
-  return { ctx: { api: k.api, db: b.db } as Ctx, k, b };
+  return { ctx: { api: k.api, db: b.db, buscarArquivo: buscarFalso } as Ctx, k, b };
 };
 
 test("nomeConfere segue a regra do banco (acento, caixa, nome do meio, nomes diferentes)", () => {
@@ -92,29 +96,29 @@ test("extrairLaudos aceita {lista:[...]}, lista direta e laudo solto", () => {
 
 test("lerResultado: pronto + PDF = entrega; sem 'pronto' ou pronto=false = nada; 403 em HTML = ainda sem laudo", async () => {
   const { k } = mundo({ resultados: { "1": laudoOk(), "2": laudoOk(false), "3": { lista: [{ resultado_pdf: PDF }] }, "4": "403", "5": { lista: [{ pronto: true, status: "ok" }] } }, pdfs: { "5": { id_marcacao: "5", pdf_base64: PDF } } });
-  assert.equal((await lerResultado(k.api, "1")).arquivos.length, 1);
-  assert.equal((await lerResultado(k.api, "1")).arquivos[0].mime, "application/pdf");
-  assert.equal((await lerResultado(k.api, "2")).pronto, false, "pronto=false: não entrega, mesmo com o PDF na resposta");
-  assert.equal((await lerResultado(k.api, "3")).pronto, false, "sem o campo pronto: na dúvida, não entrega");
-  assert.equal((await lerResultado(k.api, "4")).pronto, false);
-  const lab = await lerResultado(k.api, "5");
+  assert.equal((await lerResultado({ api: k.api, buscarArquivo: buscarFalso }, "1")).arquivos.length, 1);
+  assert.equal((await lerResultado({ api: k.api, buscarArquivo: buscarFalso }, "1")).arquivos[0].mime, "application/pdf");
+  assert.equal((await lerResultado({ api: k.api, buscarArquivo: buscarFalso }, "2")).pronto, false, "pronto=false: não entrega, mesmo com o PDF na resposta");
+  assert.equal((await lerResultado({ api: k.api, buscarArquivo: buscarFalso }, "3")).pronto, false, "sem o campo pronto: na dúvida, não entrega");
+  assert.equal((await lerResultado({ api: k.api, buscarArquivo: buscarFalso }, "4")).pronto, false);
+  const lab = await lerResultado({ api: k.api, buscarArquivo: buscarFalso }, "5");
   assert.equal(lab.pronto, true, "laboratório: o PDF vem pela rota /resultado/pdf/{id}");
   assert.equal(lab.arquivos[0].base64, PDF);
 });
 
 test("lerResultado: pronto sem nenhum arquivo = não pronto; só HTML vira arquivo .html; erro de rede NÃO vira 'sem laudo'", async () => {
   const a = mundo({ resultados: { "1": { lista: [{ pronto: true }] } } });
-  assert.equal((await lerResultado(a.k.api, "1")).pronto, false);
+  assert.equal((await lerResultado({ api: a.k.api, buscarArquivo: buscarFalso }, "1")).pronto, false);
   const b = mundo({ resultados: { "1": { lista: [{ pronto: true, resultado_html: "<p>laudo</p>" }] } } });
-  const r = await lerResultado(b.k.api, "1");
+  const r = await lerResultado({ api: b.k.api, buscarArquivo: buscarFalso }, "1");
   assert.equal(r.pronto, true); assert.equal(r.arquivos[0].mime, "text/html"); assert.match(r.arquivos[0].nome, /\.html$/);
   const c = mundo({ foraDoAr: true });
-  await assert.rejects(() => lerResultado(c.k.api, "1"), (e: unknown) => e instanceof KlingoErro && e.tipo === "timeout");
+  await assert.rejects(() => lerResultado({ api: c.k.api, buscarArquivo: buscarFalso }, "1"), (e: unknown) => e instanceof KlingoErro && e.tipo === "timeout");
 });
 
 test("lerResultado: dois laudos na mesma marcação, um pronto e um em revisão: só o pronto sai", async () => {
   const { k } = mundo({ resultados: { "7": { lista: [{ pronto: true, resultado_pdf: PDF, procedimento: { descr: "RX TORAX" } }, { pronto: false, resultado_pdf: PDF, procedimento: { descr: "RX COLUNA" } }] } } });
-  const r = await lerResultado(k.api, "7");
+  const r = await lerResultado({ api: k.api, buscarArquivo: buscarFalso }, "7");
   assert.equal(r.arquivos.length, 1); assert.match(r.arquivos[0].nome, /rx-torax/);
 });
 
@@ -216,17 +220,17 @@ test("baixar: a equipe RETIRA o laudo para ajuste no Klingo -> o download é blo
   assert.equal((await baixar(m.ctx, { token: "t", id: "501" })).corpo.ok, true);
   (m.k.api as unknown as { chamar: unknown }).chamar = undefined;   // troca o cenário abaixo
   const k2 = klingoFalso({ resultados: { "501": laudoOk(false) } });
-  const ctx2: Ctx = { api: k2.api, db: m.ctx.db };
+  const ctx2: Ctx = { api: k2.api, db: m.ctx.db, buscarArquivo: buscarFalso };
   const r = await baixar(ctx2, { token: "t", id: "501" });
   assert.equal(r.corpo.ok, false); assert.equal(r.corpo.erro, "indisponivel"); assert.equal(r.corpo.arquivos, undefined, "nenhum arquivo sai");
   assert.equal(m.b.st.itens.get("501")!.estado, "em_revisao");
   assert.ok(m.b.st.eventos.includes("laudo_bloqueado"));
   // a equipe retira de outro jeito: o Klingo passa a responder 403 em HTML
   const k3 = klingoFalso({ resultados: { "501": "403" } });
-  assert.equal((await baixar({ api: k3.api, db: m.ctx.db }, { token: "t", id: "501" })).corpo.ok, false);
+  assert.equal((await baixar({ api: k3.api, db: m.ctx.db, buscarArquivo: buscarFalso }, { token: "t", id: "501" })).corpo.ok, false);
   // liberou de novo
   const k4 = klingoFalso({ resultados: { "501": laudoOk(true) } });
-  assert.equal((await baixar({ api: k4.api, db: m.ctx.db }, { token: "t", id: "501" })).corpo.ok, true);
+  assert.equal((await baixar({ api: k4.api, db: m.ctx.db, buscarArquivo: buscarFalso }, { token: "t", id: "501" })).corpo.ok, true);
   assert.equal(m.b.st.itens.get("501")!.estado, "disponivel");
 });
 
@@ -234,7 +238,7 @@ test("baixar: Klingo fora do ar NÃO entrega (nunca libera na dúvida) e não ma
   const m = mundo();
   await listar(m.ctx, { token: "t", forcar: false });
   const k2 = klingoFalso({ foraDoAr: true });
-  const r = await baixar({ api: k2.api, db: m.ctx.db }, { token: "t", id: "501" });
+  const r = await baixar({ api: k2.api, db: m.ctx.db, buscarArquivo: buscarFalso }, { token: "t", id: "501" });
   assert.equal(r.corpo.ok, false); assert.equal(r.corpo.erro, "klingo");
   assert.equal(m.b.st.itens.get("501")!.estado, "disponivel", "queda de rede não significa laudo retirado");
 });
@@ -255,5 +259,82 @@ test("tratar: ação desconhecida, corpo sem token e versão", async () => {
   const m = mundo();
   assert.equal((await tratar(m.ctx, { acao: "x", token: "t" })).status, 400);
   assert.equal((await tratar(m.ctx, { acao: "listar" })).status, 400);
-  assert.equal((await tratar(m.ctx, { acao: "versao" })).corpo.versao, "1.0");
+  assert.equal((await tratar(m.ctx, { acao: "versao" })).corpo.versao, "1.1");
+});
+
+// ---------------------------------------------------------------------------------------------------------------------------------------------
+// Formato REAL do Klingo (laudos prontos de 16/11/2026): resultado_pdf = link assinado do S3
+// ---------------------------------------------------------------------------------------------------------------------------------------------
+const real = (pronto: boolean, extra: Record<string, unknown> = {}) => ({ lista: [{ id_laudo: 9, id_marcacao: 501, id_atendimento: 7, id_atendimento_procedimento: 8, dt_atendimento: "2026-11-12 08:40:00", procedimento: { descr: "RM DE CRÂNIO", id: 1 },
+  status: pronto ? "Laudado" : "Aberto", pronto, medico: { nome: "DR TESTE" }, unidade: { nome: "Centro" }, resultado_html: pronto ? null : "<p>rascunho do laudo</p>", resultado_pdf: pronto ? LINK(1) : "", anexos: [], ...extra }] });
+
+test("urlLaudo só aceita o endereço dos laudos da clínica (https, s3.amazonaws.com, pasta da CSI, .pdf)", () => {
+  assert.ok(urlLaudo(LINK(1)));
+  assert.equal(urlLaudo("http://s3.amazonaws.com/arquivos.azuremed/clientes/clinicacsi/laudos/a.pdf"), null, "http não");
+  assert.equal(urlLaudo("https://exemplo.com/arquivos.azuremed/clientes/clinicacsi/laudos/a.pdf"), null, "outro host");
+  assert.equal(urlLaudo("https://s3.amazonaws.com.exemplo.com/arquivos.azuremed/clientes/clinicacsi/laudos/a.pdf"), null, "host parecido");
+  assert.equal(urlLaudo("https://s3.amazonaws.com/outro-bucket/clientes/clinicacsi/laudos/a.pdf"), null, "outro bucket");
+  assert.equal(urlLaudo("https://s3.amazonaws.com/arquivos.azuremed/clientes/outraclinica/laudos/a.pdf"), null, "outra clínica");
+  assert.equal(urlLaudo("https://s3.amazonaws.com/arquivos.azuremed/clientes/clinicacsi/laudos/../../x.pdf"), null, "..");
+  assert.equal(urlLaudo("https://s3.amazonaws.com/arquivos.azuremed/clientes/clinicacsi/laudos/a.html"), null, "não é pdf");
+  assert.equal(urlLaudo("https://u:p@s3.amazonaws.com/arquivos.azuremed/clientes/clinicacsi/laudos/a.pdf"), null, "usuário na url");
+  assert.equal(urlLaudo("https://s3.amazonaws.com:8443/arquivos.azuremed/clientes/clinicacsi/laudos/a.pdf"), null, "porta");
+  assert.equal(urlLaudo("http://169.254.169.254/latest/meta-data/"), null);
+  assert.equal(urlLaudo(""), null);
+});
+
+test("formato real: pronto=true com link do S3 -> baixa o PDF no link e entrega os bytes (o link nunca sai da função)", async () => {
+  const { k } = mundo({ resultados: { "501": real(true) } });
+  baixados.length = 0;
+  const r = await lerResultado({ api: k.api, buscarArquivo: buscarFalso }, "501", true);
+  assert.equal(r.pronto, true); assert.equal(r.arquivos[0].base64, PDF); assert.match(r.arquivos[0].nome, /^laudo-rm-de-cranio\.pdf$/);
+  assert.equal(baixados.length, 1); assert.ok(baixados[0].startsWith("https://s3.amazonaws.com/"));
+  assert.equal(JSON.stringify(r).includes("X-Amz"), false, "nenhum pedaço do link vai na resposta");
+});
+
+test("formato real: na CONFERÊNCIA da lista o PDF NÃO é baixado (só confirma pronto + arquivo apontado)", async () => {
+  const { k } = mundo({ resultados: { "501": real(true) } });
+  baixados.length = 0;
+  const r = await lerResultado({ api: k.api, buscarArquivo: buscarFalso }, "501", false);
+  assert.equal(r.pronto, true); assert.equal(baixados.length, 0); assert.equal(r.arquivos[0].base64, "");
+});
+
+test("formato real: rascunho (pronto=false, com o texto do laudo no resultado_html) NÃO entrega nada", async () => {
+  const { k } = mundo({ resultados: { "501": real(false) } });
+  const r = await lerResultado({ api: k.api, buscarArquivo: buscarFalso }, "501", true);
+  assert.equal(r.pronto, false); assert.equal(r.arquivos.length, 0);
+});
+
+test("formato real: pronto=true mas o link é de outro lugar = não entrega (nunca busca endereço fora da lista) e o resultado não é HTML", async () => {
+  baixados.length = 0;
+  const { k } = mundo({ resultados: { "501": real(true, { resultado_pdf: "https://exemplo.com/laudo.pdf" }) } });
+  const r = await lerResultado({ api: k.api, buscarArquivo: buscarFalso }, "501", true);
+  assert.equal(r.pronto, false); assert.equal(baixados.length, 0);
+});
+
+test("formato real: o endereço não devolve um PDF (null) ou a rede cai = ERRO (não entrega, e baixar() não marca como retirado)", async () => {
+  const { k } = mundo({ resultados: { "501": real(true) } });
+  await assert.rejects(() => lerResultado({ api: k.api, buscarArquivo: async () => null }, "501", true));
+  await assert.rejects(() => lerResultado({ api: k.api, buscarArquivo: async () => { throw new Error("rede"); } }, "501", true));
+  const m = mundo({ resultados: { "501": real(true) } });
+  await listar(m.ctx, { token: "t", forcar: false });
+  m.b.st.itens.get("501")!.estado = "disponivel";
+  const ctx2: Ctx = { api: m.k.api, db: m.ctx.db, buscarArquivo: async () => null };
+  const r = await baixar(ctx2, { token: "t", id: "501" });
+  assert.equal(r.corpo.ok, false); assert.equal(r.corpo.erro, "klingo");
+  assert.equal(m.b.st.itens.get("501")!.estado, "disponivel", "falha ao buscar o arquivo não significa laudo retirado");
+});
+
+test("formato real de ponta a ponta: lista mostra disponível sem baixar; o download baixa; retirado (pronto=false) bloqueia", async () => {
+  baixados.length = 0;
+  const m = mundo({ resultados: { "501": real(true), "502": "403" } });
+  const l = await listar(m.ctx, { token: "t", forcar: false });
+  assert.equal((l.corpo.itens as Array<{ id: string; estado: string }>).find((i) => i.id === "501")!.estado, "disponivel");
+  assert.equal(baixados.length, 0, "listar nunca baixa PDF");
+  const d = await baixar(m.ctx, { token: "t", id: "501" });
+  assert.equal(d.corpo.ok, true); assert.equal(baixados.length, 1);
+  const k2 = klingoFalso({ resultados: { "501": real(false) } });
+  const b = await baixar({ api: k2.api, db: m.ctx.db, buscarArquivo: buscarFalso }, { token: "t", id: "501" });
+  assert.equal(b.corpo.ok, false); assert.equal(b.corpo.erro, "indisponivel"); assert.equal(baixados.length, 1, "nenhum download novo");
+  assert.equal(m.b.st.itens.get("501")!.estado, "em_revisao");
 });

@@ -108,6 +108,18 @@ await caso('Baixar: chama a função com o id, o arquivo é um PDF de verdade e 
   await ctx.close();
   return { ok: dl.suggestedFilename() === 'laudo-rm-joelho.pdf' && bytes === PDF_TXT && estado.baixar.length === 1 && estado.baixar[0].id === '501' && estado.baixar[0].token === DEV, detalhe: dl.suggestedFilename() + ' ' + bytes.slice(0, 10) };
 });
+await caso('exame com 2 laudos: não dispara 2 downloads de uma vez; mostra um link para cada e cada link baixa o seu PDF', async () => {
+  const dois = () => ({ ok: true, arquivos: [{ nome: 'laudo-a.pdf', mime: 'application/pdf', base64: PDF_B64 }, { nome: 'laudo-b-2.pdf', mime: 'application/pdf', base64: PDF_B64 }] });
+  const { page, ctx } = await abrirPortal({ baixar: dois });
+  let auto = 0; page.on('download', () => { auto++; });
+  await page.click('button[data-laudo="501"]');
+  await espera(900);
+  const antes = auto;
+  const links = await page.$$eval('#laudos a.abrir-laudo', (ns) => ns.map((n) => n.textContent));
+  const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 5000 }), page.click('#laudos a.abrir-laudo >> nth=1')]);
+  await ctx.close();
+  return { ok: antes === 0 && links.length === 2 && /laudo 1 de 2/.test(links[0]) && /laudo 2 de 2/.test(links[1]) && dl.suggestedFilename() === 'laudo-b-2.pdf', detalhe: JSON.stringify({ antes, links, nome: dl.suggestedFilename() }) };
+});
 await caso('baixar quantas vezes quiser: cada toque faz uma nova conferência com a clínica (3 toques = 3 chamadas) e 3 downloads', async () => {
   const { page, ctx, estado } = await abrirPortal();
   let baixados = 0;

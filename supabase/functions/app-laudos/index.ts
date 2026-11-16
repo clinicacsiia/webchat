@@ -1,14 +1,14 @@
 // FLUXOGRAMA: entrada (POST JSON {"acao":"listar"|"baixar","token":<código do aparelho>,"id":<marcação>} vindo da página minha-vez/ do paciente) -> validação (tamanho do corpo; o BANCO confere o aparelho e o PIN dos
 //   últimos 30 minutos; cada pessoa só entra depois de CPF + nascimento + nome conferidos no Klingo) -> lógica (laudos.ts: lista as marcações atendidas, confere o Klingo a cada download) -> saída (JSON enxuto;
 //   o PDF vai só na resposta do download, em base64; nunca é guardado nem registrado em log; erro do Klingo nunca vira laudo liberado)
-// Versão 1.0 — 16/11/2026 / Mudança: primeira versão. Publicar SÓ depois de aplicar supabase/laudos-no-app.sql.
+// Versão 1.1 — 16/11/2026 / Mudança: baixa o PDF do link assinado do S3 que o Klingo devolve (formato real). Versão 1.0: primeira versão. Publicar SÓ depois de aplicar supabase/laudos-no-app.sql.
 //
 // Publicar com verify_jwt=false (a página não tem login do Supabase; quem protege é o código do aparelho com PIN, conferido pelo banco).
 // Secrets: KLINGO_APP_TOKEN (o mesmo das outras funções). RPCs usadas (todas só do service_role): app_laudos_contexto, app_laudos_pessoa_gravar, app_laudos_itens_gravar, app_laudos_a_checar,
 // app_laudos_estado, app_laudos_lista, app_laudos_pode, app_evento_gravar, klingo_hash, klingo_cota_pegar, klingo_identidade_registrar.
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { cotaGlobal, KlingoApi } from "./api.ts";
-import { type Banco, type Ctx, tratar } from "./laudos.ts";
+import { type Banco, type BuscarArquivo, bytesParaBase64, type Ctx, MAX_BYTES, tratar } from "./laudos.ts";
 
 const ORIGENS = ["https://clinicacsiia.github.io", "http://localhost:8000", "http://localhost:8080", "http://127.0.0.1:8000", "http://127.0.0.1:8080"];
 const MAX_CORPO = 4 * 1024;
@@ -60,7 +60,16 @@ Deno.serve(async (req: Request) => {
     async registrarIdentidade(cpf, nascimento, r) { await rpc("klingo_identidade_registrar", { p_cpf: cpf, p_nasc: nascimento, p_r: r }); },
   };
   const api = new KlingoApi(appToken, (u, i) => fetch(u, i), { antes: cotaGlobal((n, a) => supabase.rpc(n, a)), timeoutMs: 25_000 });
-  const ctx: Ctx = { api, db };
+  // Baixa o PDF do endereço assinado (já validado por urlLaudo em laudos.ts). Sem seguir redirecionamento; só aceita o que começa com %PDF e cabe no limite.
+  const buscarArquivo: BuscarArquivo = async (url) => {
+    const res = await fetch(url, { redirect: "error", signal: AbortSignal.timeout(30_000) });
+    if (!res.ok) throw new Error("arquivo");
+    if (Number(res.headers.get("content-length") ?? 0) > MAX_BYTES) return null;
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    if (bytes.length === 0 || bytes.length > MAX_BYTES || String.fromCharCode(...bytes.subarray(0, 4)) !== "%PDF") return null;
+    return bytesParaBase64(bytes);
+  };
+  const ctx: Ctx = { api, db, buscarArquivo };
   try {
     const r = await tratar(ctx, corpo);
     return json(r.corpo, r.status, origem);
