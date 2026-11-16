@@ -10707,7 +10707,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "6be47e1a2de66ad99f0a4c69edec53fb"
+   "md5": "db2ab72fe14a592caa4d1dd822056a8c"
   },
   {
    "nome": "klingo_catalogo_cru_disparar",
@@ -13407,6 +13407,70 @@
    "authenticated": true,
    "publico": false,
    "md5": "a79094ec68dc9d95f4283644ea279dd3"
+  },
+  {
+   "nome": "painel_marcacao_cancelar",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_voucher",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "1140bd9df8c6bc0eb010b592d3d53f11"
+  },
+  {
+   "nome": "painel_marcacao_op",
+   "args": [
+    {
+     "nome": "p_op",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "25c057e1014e991ac928c640bad8967c"
+  },
+  {
+   "nome": "painel_marcacoes",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "1f9f09bdcb46636f8ee90197e15ec306"
+  },
+  {
+   "nome": "painel_marcacoes_pedir",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "0aef22c99687baf92ec50f7852d71994"
   },
   {
    "nome": "painel_mensagem_alterar",

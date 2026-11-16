@@ -560,6 +560,10 @@
   .of-txt { display: flex; flex-direction: column; min-width: 0; flex: 1 1 200px; } .of-txt span { color: var(--suave); font-size: 13px; }
   .of-acoes { display: flex; flex-wrap: wrap; gap: 6px; }
   .ex-est { font-weight: 400; color: var(--suave); }
+  /* Marcações no Klingo (Etapa 3) */
+  .marc-lista { display: grid; gap: 8px; max-height: 52vh; overflow: auto; margin-top: 8px; }
+  .marc-linha { display: flex; align-items: center; justify-content: space-between; gap: 10px; border: 1px solid var(--linha); border-radius: var(--radius-sm); padding: 8px 10px; }
+  .marc-txt { display: flex; flex-direction: column; min-width: 0; } .marc-txt small { color: var(--suave); }
   /* Ver horários (Etapa 1) */
   .hor-dias { display: grid; gap: 10px; max-height: 52vh; overflow: auto; margin-top: 8px; }
   .hor-dia { border: 1px solid var(--linha); border-radius: var(--radius-sm); padding: 8px 10px; }
@@ -2072,6 +2076,69 @@
     box.replaceChildren(...out);
     if (!hs) sondarVaga();   // só consulta quando ninguém ofereceu ainda (3 min de cache)
   }
+  /* ---------- Marcações do paciente no Klingo: ver e cancelar pelo painel (16/11/2026, Etapa 3) ---------- */
+  // Usa a mesma Edge Function do chat (klingo-executar): ela confere a identidade do paciente e só cancela marcação ATIVA dele. O paciente NÃO recebe mensagem: quem avisa é a atendente.
+  // Cancelar não tem volta pelo painel, então a confirmação mostra data, hora e exame por extenso. Remarcar ainda não existe aqui (cancelar e escolher outro horário em "Ver horários").
+  const MARC_MOTIVO = {
+    desligado: () => 'Esta função está desligada para esta conversa (chaves do Klingo em Configurações).',
+    dados_incompletos: (r) => `Ainda faltam no pedido: ${(r.faltando || []).join(', ') || 'dados do paciente'}.`,
+    paciente_vendo: () => 'O paciente está vendo as marcações no chat agora. Tente de novo em instantes.',
+    nao_encontrada: () => 'Esta marcação não está mais na lista. Consulte de novo.',
+    lista_antiga: () => 'A lista ficou velha (mais de 10 minutos). Consulte de novo antes de cancelar.',
+    incerto_conferir: () => 'A tentativa anterior não confirmou. Confira no Klingo se a marcação ainda existe ANTES de tentar de novo.',
+  };
+  const esperarMs = (ms) => new Promise((r) => setTimeout(r, ms));
+  async function aguardarOp(op, limiteMs = 40000) {
+    const fim = Date.now() + limiteMs;
+    while (Date.now() < fim) {
+      const { data, error } = await db.rpc('painel_marcacao_op', { p_op: op });
+      if (!error && data && data.ok && !['pendente', 'executando'].includes(data.estado)) return data;
+      await esperarMs(1500);
+    }
+    return { ok: false, estado: 'demorou' };
+  }
+  async function abrirMarcacoes() {
+    if (!podeAtender()) return;
+    const c = conversaAberta(); if (!c) return;
+    dlg.className = 'equipe'; dlg.dataset.marcacoes = '1';
+    const aberto = () => dlg.open && dlg.dataset.marcacoes === '1';
+    const desenhar = (corpo, rodape) => dlg.replaceChildren(h('h3', {}, 'Marcações no Klingo'),
+      h('p', { class: 'dica' }, 'Direto do Klingo, só as próximas. O paciente não recebe aviso: depois de cancelar, avise por aqui.'), corpo,
+      h('div', { class: 'rodape' }, ...(rodape || []), h('button', { class: 'btn', type: 'button', onclick: () => dlg.close() }, 'Fechar')));
+    const aviso = (txt, cls = 'media') => h('p', { class: 'urg ' + cls, style: 'display:block;border-radius:8px;padding:8px 10px' }, txt);
+    const tentar = h('button', { class: 'btn', type: 'button', onclick: () => abrirMarcacoes() }, 'Consultar de novo');
+    desenhar(h('p', {}, 'Consultando o Klingo…'));
+    if (!dlg.open) dlg.showModal();
+    dlg.addEventListener('close', () => { delete dlg.dataset.marcacoes; }, { once: true });
+    let ped;
+    try { const x = await db.rpc('painel_marcacoes_pedir', { p_conversa: c.id }); if (x.error) throw x.error; ped = x.data; } catch { if (aberto()) desenhar(aviso('Não consegui consultar agora. Tente de novo.'), [tentar]); return; }
+    if (!aberto()) return;
+    if (!ped || !ped.ok) { desenhar(aviso((MARC_MOTIVO[ped && ped.motivo] || (() => 'Não consegui consultar agora.'))(ped || {})), [tentar]); return; }
+    const fim = await aguardarOp(ped.op);
+    if (!aberto()) return;
+    if (fim.estado !== 'sucesso') { desenhar(aviso(fim.estado === 'demorou' ? 'O Klingo demorou para responder. Tente de novo.' : `O Klingo não respondeu a consulta${fim.codigo ? ' (' + fim.codigo + ')' : ''}. Tente de novo.`), [tentar]); return; }
+    const { data: l, error } = await db.rpc('painel_marcacoes', { p_conversa: c.id });
+    if (!aberto()) return;
+    const lista = !error && l && Array.isArray(l.marcacoes) ? l.marcacoes : [];
+    if (!lista.length) { desenhar(h('p', {}, 'Nenhuma marcação futura deste paciente no Klingo.'), [tentar]); return; }
+    const linhas = lista.map((m) => {
+      const quando = `${diaCurto(m.data)} às ${String(m.hora || '').slice(0, 5)}`;
+      const nome = `${String(m.procedimento || 'Marcação').toLowerCase()}`;
+      return h('div', { class: 'marc-linha', 'data-voucher': m.voucher },
+        h('div', { class: 'marc-txt' }, h('b', {}, quando), h('span', {}, nome), h('small', {}, [curtaUnidade(m.unidade), m.profissional].filter(Boolean).join(' · '))),
+        h('button', { class: 'btn perigo', type: 'button', onclick: async (ev) => {
+          if (!confirm(`Cancelar no Klingo?\n\n${quando} · ${nome}${m.profissional ? '\n' + m.profissional : ''}\n\nO paciente NÃO é avisado por aqui.`)) return;
+          const b = ev.currentTarget; b.disabled = true; b.textContent = 'Cancelando…';
+          let r; try { const x = await db.rpc('painel_marcacao_cancelar', { p_conversa: c.id, p_voucher: m.voucher }); if (x.error) throw x.error; r = x.data; } catch { toast('Não consegui cancelar agora. Confira no Klingo.'); b.disabled = false; b.textContent = 'Cancelar'; return; }
+          if (!r || !r.ok) { toast((MARC_MOTIVO[r && r.motivo] || (() => 'Não consegui cancelar agora.'))(r || {})); b.disabled = false; b.textContent = 'Cancelar'; return; }
+          const f = await aguardarOp(r.op);
+          if (f.estado === 'sucesso') { toast('Marcação cancelada no Klingo. Avise o paciente.'); if (aberto()) abrirMarcacoes(); return; }
+          toast(f.estado === 'incerto' || f.estado === 'demorou' ? 'Não deu para confirmar. Confira no Klingo ANTES de tentar de novo.' : `O Klingo não cancelou${f.codigo ? ' (' + f.codigo + ')' : ''}. Confira no Klingo.`);
+          b.textContent = 'Cancelar'; b.disabled = false;
+        } }, 'Cancelar'));
+    });
+    desenhar(h('div', { class: 'marc-lista' }, linhas), [tentar]);
+  }
   /* ---------- Ver horários reais da agenda (Klingo) dentro da conversa (16/11/2026, Etapa 1) ---------- */
   // Só leitura. A função `painel-horarios` confere o papel (admin ou atendente), consulta a API com o pedido da conversa e devolve os horários livres; nada é gravado nem reservado.
   // A atendente marca os que quer oferecer e o texto vai para a caixa de resposta (ela revisa e envia). Mensagens de "sem vaga" seguem a regra do dono: outro horário primeiro; se não aceitar, Disponibilidade futura.
@@ -2971,6 +3038,7 @@
       !minha && c.status !== 'encerrada' ? h('button', { class: 'btn prim assumir-topo', type: 'button', onclick: () => assumir(true) }, 'Assumir') : null,
       c.status === 'encerrada' ? h('button', { class: 'btn', type: 'button', onclick: () => assumir(true) }, 'Reabrir') : null,
       podeAtender() && c.status !== 'encerrada' ? h('button', { class: 'btn', type: 'button', title: 'Ver os horários reais da agenda para o pedido desta conversa (só consulta)', onclick: () => abrirHorarios(0) }, 'Ver horários') : null,
+      podeAtender() && c.status !== 'encerrada' ? h('button', { class: 'btn', type: 'button', title: 'Ver e cancelar as marcações deste paciente no Klingo', onclick: abrirMarcacoes }, 'Marcações') : null,
       sel,
       c.status !== 'encerrada' ? h('button', { class: 'btn perigo', type: 'button', onclick: encerrar }, 'Encerrar') : null].filter(Boolean));
     renderProximo();
