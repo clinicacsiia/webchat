@@ -242,6 +242,19 @@ await caso('Período livre: "Ver período" pede esse intervalo, datas invertidas
   await t.ctx.close();
   return { ok: a.p_de === d1 && a.p_ate === d2 && aprox === 0 && !t.reg.excecoes.length, detalhe: `${a.p_de}..${a.p_ate}` };
 });
+await caso('Período livre: mudar as duas datas carrega sozinho (sem clicar) e data futura avisa em vez de ser aceita em silêncio', async () => {
+  const t = await abrir(); await abaInd(t);
+  const d = mais(HOJE, -3), fut = mais(HOJE, 5);
+  await t.page.fill('.ind-ctl input[aria-label="Data inicial"]', d); await t.page.fill('.ind-ctl input[aria-label="Data final"]', d);
+  await t.page.waitForFunction(([x]) => document.querySelector('.pagina .sub')?.textContent.includes(x), [d.split('-').reverse().join('/')], { timeout: 4000 });
+  const a = ultimo(t.reg, 'decisao');
+  await t.page.fill('.ind-ctl input[aria-label="Data inicial"]', fut); await t.page.fill('.ind-ctl input[aria-label="Data final"]', fut);
+  await t.page.click('.ind-ctl .btn >> text=Ver período'); await new Promise((r) => setTimeout(r, 1300));
+  const aviso = await t.page.locator('.toast, #toast').first().innerText().catch(() => '');
+  const futuras = t.reg.rpcs.filter((r) => r[0] === 'decisao' && (r[1].p_de > HOJE || r[1].p_ate > HOJE)).length;
+  await t.ctx.close();
+  return { ok: a.p_de === d && a.p_ate === d && futuras === 0 && /ainda não chegaram/.test(aviso) && !t.reg.excecoes.length, detalhe: `${a.p_de}..${a.p_ate} futuras=${futuras} ${aviso}` };
+});
 await caso('Filtro de unidade do topo vai para a consulta e os números mudam (60 → 40 pessoas)', async () => {
   const t = await abrir(); await abaInd(t);
   await t.page.selectOption('#selUnidade', 'desenvoar'); await t.page.waitForFunction(() => /Unidade Desenvoar/.test(document.querySelector('.pagina')?.innerText || ''));
