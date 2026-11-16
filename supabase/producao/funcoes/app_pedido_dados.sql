@@ -17,23 +17,39 @@ AS $function$
       left join public.pre_agendamentos pa on pa.conversa_id = c.id
      where ac.paciente_id = p_pac and (p_conversa is null or ac.conversa_id = p_conversa)
        and (ac.removido_em is null or c.status <> 'encerrada' or c.encerrada_em > ac.removido_em)
-  ), jor as (
-    select b.conversa_id, e.id as exame_id, e.procedimento as nome, e.unidade,
-           case when e.marcacao_id ~ '^m\d+$' then substr(e.marcacao_id, 2) end as voucher,
-           case when (e.checkin_em at time zone 'America/Bahia')::date = (e.agendado_para at time zone 'America/Bahia')::date then to_char(e.checkin_em at time zone 'America/Bahia', 'HH24:MI') end as chegada,
-           to_char(e.agendado_para at time zone 'America/Bahia', 'YYYY-MM-DD') as data, to_char(e.agendado_para at time zone 'America/Bahia', 'HH24:MI') as hora,
-           case when e.status in ('cancelado', 'faltou') or (e.status = 'pedido' and b.pre_status = 'cancelado') then null
-                when e.status = 'atendido' then 5
-                when e.status = 'pedido' then 1
-                when jc.coluna in ('chegou', 'em_atendimento') then 4
-                when (e.checkin_em at time zone 'America/Bahia')::date = (e.agendado_para at time zone 'America/Bahia')::date then 4
-                when e.status = 'confirmado' or lower(coalesce(e.confirm_status, '')) = 'confirmado' then 3
-                else 2 end as ok,
-           case when e.status in ('cancelado', 'faltou') then e.status when e.status = 'pedido' and b.pre_status = 'cancelado' then 'cancelado' end as excecao
+  ), jor_fonte as (
+    -- 1) exames do cartão da própria conversa (o pedido do chat e, quando o Klingo já foi ligado ao cartão, as marcações dele)
+    select b.conversa_id, b.pre_status, false as do_klingo, e.id as exame_id, e.procedimento, e.unidade, e.marcacao_id, e.status, e.confirm_status, e.checkin_em, e.agendado_para, jc.coluna
       from base b
       join public.jornada_card jc on jc.conversa_id = b.conversa_id
       join public.jornada_exame e on e.card_id = jc.id
      where e.status <> 'remarcado'
+    union all
+    -- 2) NOVO (16/11/2026): marcações do Klingo guardadas no próprio pedido (pre_agendamentos.klingo_marcacoes), que o agendamento feito pelo chat grava.
+    --    A Jornada coloca essas marcações em outro cartão, sem ligação com a conversa; sem isto o pedido ficava para sempre em "Pedido".
+    select b.conversa_id, b.pre_status, true, e.id, e.procedimento, e.unidade, e.marcacao_id, e.status, e.confirm_status, e.checkin_em, e.agendado_para, jc.coluna
+      from base b
+      join public.pre_agendamentos pa on pa.conversa_id = b.conversa_id
+      cross join lateral unnest(coalesce(pa.klingo_marcacoes, '{}'::text[])) as m(id)
+      join public.jornada_exame e on e.marcacao_id = 'm' || m.id
+      join public.jornada_card jc on jc.id = e.card_id
+     where e.status <> 'remarcado' and jc.conversa_id is distinct from b.conversa_id
+  ), jor as (
+    select f.conversa_id, f.exame_id, f.procedimento as nome, f.unidade,
+           case when f.marcacao_id ~ '^m\d+$' then substr(f.marcacao_id, 2) end as voucher,
+           case when (f.checkin_em at time zone 'America/Bahia')::date = (f.agendado_para at time zone 'America/Bahia')::date then to_char(f.checkin_em at time zone 'America/Bahia', 'HH24:MI') end as chegada,
+           to_char(f.agendado_para at time zone 'America/Bahia', 'YYYY-MM-DD') as data, to_char(f.agendado_para at time zone 'America/Bahia', 'HH24:MI') as hora,
+           case when f.status in ('cancelado', 'faltou') or (f.status = 'pedido' and f.pre_status = 'cancelado') then null
+                when f.status = 'atendido' then 5
+                when f.status = 'pedido' then 1
+                when f.coluna in ('chegou', 'em_atendimento') then 4
+                when (f.checkin_em at time zone 'America/Bahia')::date = (f.agendado_para at time zone 'America/Bahia')::date then 4
+                when f.status = 'confirmado' or lower(coalesce(f.confirm_status, '')) = 'confirmado' then 3
+                else 2 end as ok,
+           case when f.status in ('cancelado', 'faltou') then f.status when f.status = 'pedido' and f.pre_status = 'cancelado' then 'cancelado' end as excecao
+      from jor_fonte f
+     -- o "pedido" do chat é só o lugar-reservado: quando o Klingo já tem a marcação do pedido agendado, vale a situação real dele
+     where not (f.status = 'pedido' and f.pre_status = 'agendado' and exists (select 1 from jor_fonte k where k.conversa_id = f.conversa_id and k.do_klingo))
   ), pre as (
     select b.conversa_id, null::bigint as exame_id, coalesce(nullif(i.procedimento, ''), nullif(b.pre_proc, ''), 'Atendimento') as nome, b.pre_unidade as unidade,
            null::text as voucher, null::text as chegada,
@@ -96,4 +112,3 @@ AS $function$
           or (cstatus <> 'encerrada' and primeiro_humano_em is not null))
      and not (cstatus = 'encerrada' and apaga_em < now())
 $function$;
-

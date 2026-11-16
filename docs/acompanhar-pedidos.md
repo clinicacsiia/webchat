@@ -55,3 +55,7 @@ O celular **não é confirmado** (sem SMS, decisão do dono). Por isso só entra
 
 ## Voltar atrás
 Comandos no cabeçalho de `supabase/acompanhar-pedidos.sql`. Só esconder as telas: o botão some sozinho com `app_acesso_modo = 'nao'`.
+
+
+## Pedido agendado pelo chat acompanha o Klingo (16/11/2026)
+Quando o chat agenda, o número da marcação do Klingo fica guardado no pedido (`pre_agendamentos.klingo_marcacoes`), mas a Jornada põe essa marcação em outro cartão, sem ligação com a conversa. Antes, a tela lia só o cartão da conversa e o exame ficava para sempre em "Pedido" (72 de 72 agendamentos dos últimos 7 dias). Agora `app_pedido_dados` junta as marcações guardadas no pedido e mostra a situação real (A confirmar, Confirmado, Chegada, Em atendimento, Cancelado); `app_pedido_acao` aceita esse exame para pedir resultado, remarcar e cancelar. Arquivo: `supabase/pedido-marcacao-klingo.sql` (reversão: `-rollback.sql`); teste: `testes/sql-pedido-marcacao-klingo.test.mjs`. Aplicada em 16/11/2026 em 2 partes (`pedido_marcacao_klingo_p1..p2`). Não mexe em `paciente_jornada` (tela "Minha vez"), que lê os cartões pela conta e pelo telefone.
