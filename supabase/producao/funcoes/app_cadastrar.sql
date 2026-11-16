@@ -12,7 +12,7 @@ declare
   v_nasc date := public.app_data(p_nascimento);
   v_filhos jsonb := coalesce(p_filhos, '[]'::jsonb);
   v_f jsonb; v_fd date; v_id uuid; v_sug uuid; v_max integer; v_ctel text; v_token text;
-  v_c jsonb; v_vistos text[] := '{}'; v_chave text;
+  v_c jsonb; v_vistos text[] := '{}'; v_chave text; v_cod public.app_codigo_email%rowtype;
 begin
   if not public.app_modo() then return public.app_erro_json('indisponivel'); end if;
   if v_tel !~ '^[1-9]{2}9[0-9]{8}$' then return jsonb_build_object('ok', false, 'erro', 'celular', 'mensagem', 'Celular inválido. Use DDD + 9 dígitos.'); end if;
@@ -44,6 +44,10 @@ begin
   if exists (select 1 from public.app_paciente where telefone = v_tel) then
     return jsonb_build_object('ok', false, 'erro', 'telefone_cadastrado', 'mensagem', 'Este celular já tem cadastro. Entre com o seu PIN.');
   end if;
+  if public.app_codigo_exigido() then   -- confirmação do e-mail (supabase/acesso-codigo-email.sql): sem código digitado e aceito, não nasce cadastro
+    select * into v_cod from public.app_codigo_email where telefone = v_tel and finalidade = 'cadastro' and validado_em > now() - interval '30 minutes' and usado_em is null and descartado_em is null order by validado_em desc limit 1 for update;
+    if not found then return jsonb_build_object('ok', false, 'erro', 'codigo_email', 'mensagem', 'Confirme o seu e-mail com o código antes de criar o PIN.'); end if;
+  end if;
   begin
     select (array_agg(p.id))[1] into v_sug from public.pacientes p
      where p.dt_nasc = v_nasc and p.telefones && array[v_tel, '55' || v_tel] and public.app_norm(p.nome) = public.app_norm(v_nome) having count(*) = 1;
@@ -55,6 +59,10 @@ begin
   exception when unique_violation then
     return jsonb_build_object('ok', false, 'erro', 'telefone_cadastrado', 'mensagem', 'Este celular já tem cadastro. Entre com o seu PIN.');
   end;
+  if v_cod.id is not null then
+    update public.app_codigo_email set usado_em = now() where id = v_cod.id;
+    update public.app_paciente set email = v_cod.email where id = v_id;
+  end if;
   for v_f in select * from jsonb_array_elements(v_filhos) loop
     v_chave := public.app_norm(v_f ->> 'nome') || '|' || (v_f ->> 'nascimento');
     continue when v_chave = any(v_vistos);

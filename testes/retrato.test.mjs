@@ -70,7 +70,7 @@ for (const i of INDIRETAS) usos.push({ ...i, arquivo: 'painel/index.html', linha
 // PENDENTES DE PUBLICAÇÃO (v2.0, 14/11/2026): função que a tela já chama, ainda não está na produção, mas está definida numa migração VERSIONADA do repositório
 // (supabase/webchat-v2-parte*.sql e supabase/acesso-rapido-pin-obrigatorio.sql, esta desde 15/11/2026). Só vale enquanto a migração não for aplicada: depois de aplicar, refazer o retrato e esta lista fica vazia.
 const pendentes = new Set();
-for (const f of readdirSync(`${REPO}/supabase`).filter((x) => /^(webchat-v2-parte.*|acesso-rapido-pin-obrigatorio|acesso-codigo-email)\.sql$/.test(x))) {
+for (const f of readdirSync(`${REPO}/supabase`).filter((x) => /^(webchat-v2-parte.*|acesso-rapido-pin-obrigatorio)\.sql$/.test(x))) {
   for (const m of readFileSync(`${REPO}/supabase/${f}`, 'utf8').matchAll(/create or replace function public\.([a-z0-9_]+)\(/gi)) pendentes.add(m[1].toLowerCase());
 }
 caso(`as telas chamam ${new Set(usos.map((u) => u.nome)).size} funções diferentes do banco e TODAS existem na produção (ou em migração versionada ainda não aplicada)`, () => {

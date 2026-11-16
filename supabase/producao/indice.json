@@ -2254,6 +2254,27 @@
    ],
    "rls": true,
    "politicas": 0
+  },
+  {
+   "nome": "app_codigo_email",
+   "colunas": [
+    "id",
+    "finalidade",
+    "telefone",
+    "nome",
+    "email",
+    "codigo",
+    "criado_em",
+    "expira_em",
+    "validado_em",
+    "usado_em",
+    "descartado_em",
+    "tentativas",
+    "envio",
+    "envio_erro"
+   ],
+   "rls": true,
+   "politicas": 0
   }
  ],
  "visoes": [
@@ -2567,6 +2588,8 @@
   "agendamento_reconhecer_msg_encerradas",
   "app_acesso_modo",
   "app_cadastros_max_hora",
+  "app_codigo_email",
+  "app_codigo_validade_min",
   "app_laudos",
   "app_local_ativo",
   "app_pin_obrigatorio",
@@ -3480,7 +3503,7 @@
    "anon": true,
    "authenticated": true,
    "publico": false,
-   "md5": "c032bb0e4a5586568e1aa3ca410cec8a"
+   "md5": "b644a186de223312c6125cadd96bed2b"
   },
   {
    "nome": "app_chat_dados",
@@ -3561,6 +3584,123 @@
    "authenticated": true,
    "publico": false,
    "md5": "94eab05604cfd7a62a83e6426337d606"
+  },
+  {
+   "nome": "app_codigo_disparar",
+   "args": [
+    {
+     "nome": "p_id",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "985a4facb2bcb67874bba492729a2c42"
+  },
+  {
+   "nome": "app_codigo_envio_marcar",
+   "args": [
+    {
+     "nome": "p_id",
+     "padrao": false
+    },
+    {
+     "nome": "p_ok",
+     "padrao": false
+    },
+    {
+     "nome": "p_erro",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "0242c4fb9f9e6423d8c13d5a16832e3f"
+  },
+  {
+   "nome": "app_codigo_exigido",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "a59e5bf58d2c9fd338f05469d7168a28"
+  },
+  {
+   "nome": "app_codigo_para_enviar",
+   "args": [
+    {
+     "nome": "p_id",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "5cab8ca527db5f89d05c946fd32d5830"
+  },
+  {
+   "nome": "app_codigo_pedir",
+   "args": [
+    {
+     "nome": "p_telefone",
+     "padrao": false
+    },
+    {
+     "nome": "p_finalidade",
+     "padrao": false
+    },
+    {
+     "nome": "p_email",
+     "padrao": true
+    },
+    {
+     "nome": "p_nome",
+     "padrao": true
+    },
+    {
+     "nome": "p_nascimento",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "c39e7e69762386d1c3ebcec57aff4134"
+  },
+  {
+   "nome": "app_codigo_validar",
+   "args": [
+    {
+     "nome": "p_telefone",
+     "padrao": false
+    },
+    {
+     "nome": "p_finalidade",
+     "padrao": false
+    },
+    {
+     "nome": "p_codigo",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "4fe8b6aa4395692d08bcf4e315a9fc45"
   },
   {
    "nome": "app_conferir_cadastro",
@@ -4762,6 +4902,37 @@
    "md5": "f828ae9fab74fc39cc91a97e4d924958"
   },
   {
+   "nome": "app_pin_esqueci",
+   "args": [
+    {
+     "nome": "p_telefone",
+     "padrao": false
+    },
+    {
+     "nome": "p_nome",
+     "padrao": false
+    },
+    {
+     "nome": "p_nascimento",
+     "padrao": false
+    },
+    {
+     "nome": "p_pin_novo",
+     "padrao": false
+    },
+    {
+     "nome": "p_aparelho",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "c6bcd584277377486e003fb27134d222"
+  },
+  {
    "nome": "app_pin_exigir",
    "args": [],
    "definer": true,
@@ -4793,37 +4964,6 @@
    "authenticated": true,
    "publico": false,
    "md5": "f8f38f68845853e8b366250e72c05b4b"
-  },
-  {
-   "nome": "app_pin_esqueci",
-   "args": [
-    {
-     "nome": "p_telefone",
-     "padrao": false
-    },
-    {
-     "nome": "p_nome",
-     "padrao": false
-    },
-    {
-     "nome": "p_nascimento",
-     "padrao": false
-    },
-    {
-     "nome": "p_pin_novo",
-     "padrao": false
-    },
-    {
-     "nome": "p_aparelho",
-     "padrao": true
-    }
-   ],
-   "definer": true,
-   "gatilho": false,
-   "anon": true,
-   "authenticated": true,
-   "publico": false,
-   "md5": "87035dc82870d729ea04769641a6bd34"
   },
   {
    "nome": "app_pin_exigir_leitura",
@@ -12767,6 +12907,31 @@
    "md5": "3f293a8f2bc072158479f2e4f97efa18"
   },
   {
+   "nome": "painel_app_codigo_descartar",
+   "args": [
+    {
+     "nome": "p_id",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "ce1812e2b5e270071cbab6145b2d75f6"
+  },
+  {
+   "nome": "painel_app_codigos",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "792703b9421495eb50a7599d136b4820"
+  },
+  {
    "nome": "painel_app_contas_antigas",
    "args": [],
    "definer": true,
@@ -12784,7 +12949,7 @@
    "anon": false,
    "authenticated": true,
    "publico": false,
-   "md5": "df00d8de15128d6e27c1c6b2d70dd9cd"
+   "md5": "cde82cd8d5a01166f4d970a28cb88c2d"
   },
   {
    "nome": "painel_app_revisao_resolver",
