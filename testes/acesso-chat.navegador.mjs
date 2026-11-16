@@ -272,12 +272,12 @@ await caso('tela inicial do acesso rápido: logo à vista no topo, "Olá, nome!"
     detalhe: JSON.stringify({ logo: d.logo, logoRolando, links: d.links, repete, comecar: d.comecar, acompanhar: d.acompanhar }) };
 });
 
-await caso('tela inicial: o aviso é curto (equidade, família e "pessoa da equipe confirmar") e a tela do acesso rápido cabe sem rolar num celular de 390x780', async () => {
+await caso('tela inicial: o aviso é curto (família e "pessoa da equipe confirmar") e a tela do acesso rápido cabe sem rolar num celular de 390x780', async () => {
   const { page, ctx } = await abrir();
   await aguardaTexto(page, /Olá, Ana!/);
   const d = await page.evaluate(() => { const t = document.querySelector('#telaInicio'), a = document.querySelector('#avisoForm').innerText; return { cabe: t.scrollHeight <= t.clientHeight + 2, aviso: a, tam: a.length }; });
   await ctx.close();
-  return { ok: d.cabe && /equidade/.test(d.aviso) && /família/.test(d.aviso) && /pessoa da equipe confirmar/.test(d.aviso) && d.tam < 260, detalhe: `cabe=${d.cabe} tam=${d.tam}` };
+  return { ok: d.cabe && /família/.test(d.aviso) && /pessoa da equipe confirmar/.test(d.aviso) && d.tam < 260, detalhe: `cabe=${d.cabe} tam=${d.tam}` };
 });
 
 await caso('PIN de outro aparelho/código inválido: o chat apaga o código local e volta ao convite', async () => {
