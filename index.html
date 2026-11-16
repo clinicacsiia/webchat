@@ -497,6 +497,30 @@
   .seg button { border: 0; background: var(--papel); color: var(--verde); padding: 12px 8px; min-height: 48px; font-weight: 650; font-size: calc(16px * var(--esc)); cursor: pointer; }
   .seg button + button { border-left: 1.5px solid var(--verde); }
   .seg button[aria-pressed="true"] { background: var(--verde); color: #fff; }
+  /* Pedido v2 (16/11/2026): lista com caixinhas + boneco só de visualização */
+  .pedido-grade { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; margin: 0 0 12px; }
+  .pedido-corpo { display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 12px; order: -1; position: sticky; top: -14px; z-index: 2; background: var(--fundo); padding: 6px 0; border-bottom: 1px solid var(--linha); }
+  .pedido-corpo .chips { margin: 0; flex-direction: column; }
+  .pedido-corpo .corpo-svg { width: auto; height: 120px; flex: none; }
+  .pedido-corpo .corpo-cap { font-size: calc(12.5px * var(--esc)); flex: 1; text-align: left; margin: 0; }
+  @media (min-width: 640px) {
+    .pedido-grade { grid-template-columns: minmax(0, 1fr) 200px; align-items: start; }
+    .pedido-corpo { order: 0; top: 0; flex-direction: column; gap: 4px; border-bottom: 0; padding: 0; }
+    .pedido-corpo .chips { flex-direction: row; }
+    .pedido-corpo .corpo-cap { text-align: center; flex: none; }
+    .pedido-corpo .corpo-svg { width: 100%; height: auto; max-height: 56vh; }
+  }
+  .corpo-svg .parte.vista { cursor: default; pointer-events: none; }
+  .busca-ex { width: 100%; box-sizing: border-box; min-height: 48px; padding: 10px 14px; margin: 0 0 10px; border: 1.5px solid var(--linha); border-radius: 12px; font-size: calc(16px * var(--esc)); background: var(--papel); }
+  .busca-ex:focus { outline: 2px solid var(--verde); border-color: var(--verde); }
+  .grupo-ex { border: 1.5px solid var(--linha); border-radius: 12px; background: var(--papel); margin: 0 0 8px; padding: 0 10px; }
+  .grupo-ex[open] { padding-bottom: 6px; }
+  .grupo-ex summary { cursor: pointer; display: flex; align-items: center; gap: 8px; min-height: 48px; font-weight: 650; font-size: calc(16.5px * var(--esc)); }
+  .grupo-ex summary .nome { flex: 1; }
+  .grupo-ex summary .cont { font-size: calc(13.5px * var(--esc)); color: var(--texto-suave); font-weight: 600; }
+  .ex-item { margin: 0 0 6px; }
+  .lado-sel.dentro { margin: 0 0 6px 12px; padding: 8px 10px; border-left: 3px solid var(--verde); background: var(--verde-claro); border-radius: 0 10px 10px 0; }
+  .aviso-lado { color: var(--aviso); font-weight: 650; }
   .partes-lista { margin: 0 0 12px; }
   .partes-grupo { margin: 0 0 14px; }
   .partes-grupo h3 { margin: 0 0 6px; font-size: calc(14px * var(--esc)); text-transform: uppercase; letter-spacing: .04em; color: var(--texto-suave); }
@@ -675,7 +699,7 @@
   const CHAVE_HIST = 'webchat.historico.v1';   // as últimas conversas deste aparelho (cada uma com o seu token): dá para voltar a elas
   const MAX_HIST = 5;                          // mínimo pedido: 3
   // Muda a cada alteração do chat. Cópia de mensagens guardada por outra versão é descartada (era isso que mostrava conversa velha e travada).
-  const VERSAO_APP = '2026.11.16-2';
+  const VERSAO_APP = '2026.11.16-3';
   // Mesmas regras do banco (fluxo_nome_ok, fluxo_telefone_ok, fluxo_email_ok): o banco confere de novo, aqui é só para avisar logo.
   const LET = 'A-Za-zÀ-ÖØ-öø-ÿ';
   const nomeCompletoOk = (v) => { const t = String(v || '').trim(); return t.length >= 5 && t.length <= 120 && new RegExp(`^[${LET}][${LET}'’.-]*( +[${LET}][${LET}'’.-]*)+$`).test(t) && t.split(/ +/).filter((w) => w.replace(new RegExp(`[^${LET}]`, 'g'), '').length >= 2).length >= 2; };
@@ -918,8 +942,8 @@
   }
   // Em uma linha só (resumo do pedido, busca): "Mão e punho · Inclui artro-ressonância (contraste injetado na articulação)". semPrefixo: o tipo de exame já está na frase.
   const exameTexto = (nome, semPrefixo) => { const a = exameBonito(nome, { semPrefixo: !!semPrefixo }); return a.titulo + (a.detalhe ? ' · ' + a.detalhe : ''); };
-  function organizarExames(lista, parte) {
-    try { if (window.NomesExame) return window.NomesExame.organizar(lista, { semPrefixo: true, regiao: parte ? parte.regiao_nome : '' }); } catch { /* sem o arquivo: lista como veio */ }
+  function organizarExames(lista, parte, limite) {
+    try { if (window.NomesExame) return window.NomesExame.organizar(lista, { semPrefixo: true, regiao: parte ? parte.regiao_nome : '' }, limite); } catch { /* sem o arquivo: lista como veio */ }
     return { principais: lista.map((e) => ({ ...e, titulo: nomeBonito(e.nome), detalhe: '' })), outros: [] };
   }
   function cartao(titulo, texto, marcado, aoClicar) {
@@ -1690,7 +1714,7 @@
       // A foto vem primeiro (a pergunta é "você tem o pedido médico?"); sem pedido, o paciente monta o pedido por tipo, parte do corpo e lado.
       w.append(h('div', { class: 'acoes-w' },
         h('button', { class: 'btn-w', type: 'button', onclick: () => abrirFotoPedido(o) }, '📷 Tenho o pedido médico: enviar a foto'),
-        h('button', { class: 'btn-w sec', type: 'button', onclick: () => abrirPedido() }, 'Escolher o exame (tipo, parte do corpo e lado)'),
+        h('button', { class: 'btn-w sec', type: 'button', onclick: () => abrirPedido() }, 'Escolher o exame (tipo, lista e lado)'),
         h('button', { class: 'link-add', type: 'button', onclick: () => abrirBusca(o) }, 'Sei o nome do exame: procurar pelo nome')));
     } else if (o.tipo === 'arquivo') {
       widgetArquivo(w, o);
@@ -2525,7 +2549,7 @@
     if (!conv) return;
     const f = abrirFolha('Montar pedido de exames');
     f.corpo.replaceChildren(h('p', { class: 'carregando' }, 'Carregando…'));
-    P = { cfg: null, mod: null, partes: new Map(), vista: 'frente', modo: 'desenho', carrinho: Array.isArray(inicial) ? inicial : [], fotos: fotos || 0, passo: 'tipo', exames: new Map(), escolhas: new Map(), lista: [], simples: null, simplesLado: 'A' };
+    P = { cfg: null, mod: null, partes: new Map(), vista: 'frente', modo: 'desenho', carrinho: Array.isArray(inicial) ? inicial : [], fotos: fotos || 0, passo: 'tipo', exames: new Map(), grupos: null, busca: '', abertos: new Set() };
     try {
       const { data, error } = await db.rpc('chat_corpo', { p_conversa: conv.id, p_token: conv.token });
       if (error) throw error;
@@ -2539,15 +2563,17 @@
     const corpo = $('#folhaCorpo'), rodape = $('#folhaRodape');
     const rolagem = corpo.scrollTop;
     corpo.replaceChildren(); rodape.replaceChildren();
+    const falta = P.carrinho.some((i) => !i.texto && i.regiao && i.lado == null);   // exame de parte com lado ainda sem lado escolhido
     if (P.carrinho.length || P.fotos) corpo.append(blocoCarrinho());
-    if (P.passo === 'exames') passoExames(corpo); else if (P.passo === 'mapa' && modAtual()) passoMapa(corpo); else passoTipo(corpo);
-    rodape.append(h('button', { class: 'btn-w', type: 'button', disabled: !P.carrinho.length, onclick: enviarPedido }, `Enviar pedido (${P.carrinho.length} ${P.carrinho.length === 1 ? 'exame' : 'exames'})`),
+    if (P.passo === 'exames' && modAtual()) passoExames(corpo); else passoTipo(corpo);
+    rodape.append(h('button', { class: 'btn-w', type: 'button', disabled: !P.carrinho.length || falta, onclick: enviarPedido }, `Enviar pedido (${P.carrinho.length} ${P.carrinho.length === 1 ? 'exame' : 'exames'})`),
+      ...(falta ? [h('p', { class: 'w-nota aviso-lado' }, 'Falta escolher o lado de um exame (direito, esquerdo ou os dois).')] : []),
       h('p', { class: 'w-nota' }, 'Seu pedido segue para a equipe, que confirma tudo com você.'));
     corpo.scrollTop = rolagem;
   }
   function rotuloItem(i) {
     if (i.texto) return `${i.texto} (o atendente confere)`;
-    const lado = LADO_TXT[i.lado] ? ` (${LADO_TXT[i.lado]})` : '';
+    const lado = LADO_TXT[i.lado] ? ` (${LADO_TXT[i.lado]})` : (i.regiao && i.lado == null ? ' (falta escolher o lado)' : '');
     if (!i.modalidade) return i.procedimento ? exameTexto(i.procedimento, true) : 'o atendente escolhe o exame';
     return `${MOD_NOME[i.modalidade] || i.modalidade}${i.regiao_nome ? ' — ' + i.regiao_nome : ''}${lado}: ${i.procedimento ? exameTexto(i.procedimento, true) : 'o atendente escolhe o exame'}${i.lado === 'A' && i.procedimento && !/bilateral/i.test(i.procedimento) ? ' (2 exames, um de cada lado)' : ''}`;
   }
@@ -2558,103 +2584,29 @@
       P.fotos ? h('p', { class: 'w-nota' }, `📎 ${P.fotos} ${P.fotos === 1 ? 'foto do pedido vai' : 'fotos do pedido vão'} junto, para o atendente conferir.`) : null);
   }
   function passosTopo(atual, total) {
-    const rot = total === 3 ? ['Tipo', 'Parte', 'Exame'] : ['Tipo', 'Exame'];
+    const rot = ['Tipo', 'Exames'];
     return h('ol', { class: 'passos', 'aria-label': `Passo ${atual} de ${total}` }, rot.map((t, k) => h('li', { class: k + 1 === atual ? 'ativo' : k + 1 < atual ? 'feito' : '', 'aria-current': k + 1 === atual ? 'step' : null },
       h('span', { class: 'n' }, k + 1 < atual ? '✓' : String(k + 1)), h('span', { class: 't' }, t))));
   }
   // Passo 1: o tipo de exame, em botões grandes iguais (um toque escolhe e avança).
   function passoTipo(corpo) {
-    corpo.append(passosTopo(1, 3), h('h2', { class: 'passo-titulo' }, 'Que tipo de exame?'),
-      h('p', { class: 'passo-sub' }, 'Toque em um. Depois você escolhe a parte do corpo e o exame.'),
+    corpo.append(passosTopo(1, 2), h('h2', { class: 'passo-titulo' }, 'Que tipo de exame?'),
+      h('p', { class: 'passo-sub' }, 'Toque em um. Depois você marca os exames na lista.'),
       h('div', { class: 'op-grade', role: 'group', 'aria-label': 'Tipo de exame' }, P.cfg.modalidades.filter((m) => m.total > 0).map((m) =>
         h('button', { class: 'op', type: 'button', 'aria-pressed': String(m.codigo === P.mod),
-          onclick: () => { P.mod = m.codigo; P.partes.clear(); P.simples = null; P.passo = 'mapa'; desenharPedido(); } },
+          onclick: () => escolherTipo(m) },
           h('strong', {}, MOD_NOME[m.codigo] || m.nome), h('span', {}, `${m.total} ${m.total === 1 ? 'exame' : 'exames'}`)))),
       h('div', { class: 'acoes-w', style: 'margin-top:10px' },
         h('button', { class: 'btn-w sec', type: 'button', onclick: () => { const base = P.carrinho.slice(), n = P.fotos; fecharFolha(); abrirFotoPedido(null, base, n); } },
           P.fotos ? '📷 Enviar mais uma foto do pedido' : '📷 Tenho o pedido médico: enviar a foto')));
   }
-  // Passo 2: a parte do corpo, pelo desenho ou por uma lista organizada.
-  function passoMapa(corpo) {
-    const m = modAtual();
-    if (!m.mapa) { corpo.append(passosTopo(2, 2), h('h2', { class: 'passo-titulo' }, MOD_NOME[m.codigo] || m.nome), h('p', { class: 'passo-sub' }, 'Toque no exame que está no seu pedido.')); passoListaSimples(corpo, m); return; }
-    corpo.append(passosTopo(2, 3), h('h2', { class: 'passo-titulo' }, 'Qual parte do corpo?'),
-      h('p', { class: 'passo-sub' }, `${MOD_NOME[m.codigo] || m.nome}: toque na parte do corpo. Pode marcar mais de uma.`),
-      h('div', { class: 'seg', role: 'group', 'aria-label': 'Como escolher a parte do corpo' },
-        [['desenho', 'Desenho do corpo'], ['lista', 'Lista']].map(([v, t]) => h('button', { type: 'button', 'aria-pressed': String(P.modo === v), onclick: () => { P.modo = v; desenharPedido(); } }, t))));
-    corpo.append(P.modo === 'lista' ? listaPartes(m) : mapaCorpo(m), selecionadas(),
-      h('div', { class: 'acoes-w' },
-        h('button', { class: 'btn-w', type: 'button', disabled: !P.partes.size, onclick: irParaExames }, 'Ver exames para essas partes do corpo'),
-        h('button', { class: 'btn-w sec', type: 'button', onclick: () => { P.passo = 'tipo'; desenharPedido(); } }, 'Trocar o tipo de exame')));
-  }
-  // Lista alinhada: um grupo por região do corpo; nome à esquerda e dois botões do mesmo tamanho (Direito, Esquerdo) à direita.
-  const GRUPOS_CORPO = [['Cabeça e pescoço', ['cranio', 'face', 'pescoco']], ['Tronco', ['ombro', 'torax', 'mama', 'abdome', 'pelve', 'quadril']],
-    ['Braços e mãos', ['braco', 'cotovelo', 'antebraco', 'punho_mao']], ['Pernas e pés', ['coxa', 'joelho', 'perna', 'tornozelo_pe']],
-    ['Coluna', ['coluna_cervical', 'coluna_toracica', 'coluna_lombar']]];
-  function listaPartes(m) {
-    const ativas = new Set(m.regioes), regs = P.cfg.regioes.filter((r) => ativas.has(r.codigo) && r.codigo !== 'outros');
-    const usados = new Set(GRUPOS_CORPO.flatMap((g) => g[1]));
-    const grupos = GRUPOS_CORPO.map(([t, cods]) => [t, regs.filter((r) => cods.includes(r.codigo))]);
-    const resto = regs.filter((r) => !usados.has(r.codigo));
-    if (resto.length) grupos.push(['Outras partes', resto]);
-    if (ativas.has('outros')) grupos.push(['Outros', [{ codigo: 'outros', nome: 'Pele, vasos e procedimentos', tem_lado: false }]]);
-    const botao = (r, lado, so) => {
-      const marcado = P.partes.has(`${r.codigo}:${lado}`);
-      return h('button', { type: 'button', class: so ? 'so' : null, 'aria-pressed': String(marcado),
-        'aria-label': `${r.nome}${lado === 'D' ? ', direito' : lado === 'E' ? ', esquerdo' : ''}`, onclick: () => alternar(r.codigo, lado) },
-        (marcado ? '✓ ' : '') + (lado === 'D' ? 'Direito' : lado === 'E' ? 'Esquerdo' : 'Escolher'));
-    };
-    return h('div', { class: 'partes-lista' }, grupos.filter(([, rs]) => rs.length).map(([titulo, rs]) =>
-      h('section', { class: 'partes-grupo' }, h('h3', {}, titulo),
-        rs.map((r) => h('div', { class: 'parte-linha' }, h('span', { class: 'nome' }, r.nome), ...(r.tem_lado ? [botao(r, 'D'), botao(r, 'E')] : [botao(r, 'N', true)]))))));
-  }
-  function alternar(cod, lado) {
-    const k = `${cod}:${lado}`;
-    if (P.partes.has(k)) P.partes.delete(k); else P.partes.set(k, { regiao: cod, lado });
-    desenharPedido();
-  }
-  function mapaCorpo(m) {
-    const frente = P.vista === 'frente';
-    const ativas = new Set(m.regioes);
-    const svg = hs('svg', { viewBox: '0 0 200 460', class: 'corpo-svg', role: 'group', 'aria-label': `Mapa do corpo, vista ${frente ? 'de frente' : 'de costas'}` });
-    for (const [cod, ladoV, tipo, attrs] of (frente ? FORMAS_FRENTE : FORMAS_COSTAS)) {
-      const lado = ladoDaForma(ladoV, P.vista), reg = regiaoPorCodigo(cod);
-      const on = ativas.has(cod), sel = P.partes.has(`${cod}:${lado}`);
-      const nome = reg.tem_lado ? `${reg.nome}, ${lado === 'D' ? 'direito' : 'esquerdo'}` : reg.nome;
-      const forma = hs(tipo, Object.assign({ class: 'parte' + (sel ? ' sel' : '') + (on ? '' : ' off'), role: 'button', tabindex: on ? '0' : '-1',
-        'aria-pressed': String(sel), 'aria-disabled': String(!on), 'aria-label': on ? nome : `${nome} (sem exame disponível)` }, attrs), hs('title', {}, nome));
-      if (on) {
-        forma.addEventListener('click', () => alternar(cod, lado));
-        forma.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); alternar(cod, lado); } });
-      }
-      svg.append(forma);
-      if (sel && reg.tem_lado) {
-        const cx = attrs.cx ?? (attrs.x + attrs.width / 2), cy = attrs.cy ?? (attrs.y + attrs.height / 2);
-        svg.append(hs('text', { x: cx, y: cy + 4, 'text-anchor': 'middle', class: 'letra' }, lado));
-      }
-    }
-    // Letras de orientação nas bordas do desenho: D = direito do paciente, E = esquerdo do paciente.
-    svg.append(hs('text', { x: 4, y: 14 }, frente ? 'D' : 'E'), hs('text', { x: 190, y: 14 }, frente ? 'E' : 'D'));
-    const cap = frente ? 'De frente: o lado DIREITO do paciente fica à ESQUERDA do desenho (letra D).' : 'De costas: o lado DIREITO do paciente fica à DIREITA do desenho (letra D).';
-    const vistas = h('div', { class: 'chips', role: 'group', 'aria-label': 'Vista do corpo' },
-      ['frente', 'costas'].map((v) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(P.vista === v), onclick: () => { P.vista = v; desenharPedido(); } }, v === 'frente' ? 'Vista de frente' : 'Vista de costas')));
-    return h('div', { class: 'corpo-wrap' }, vistas, svg, h('p', { class: 'corpo-cap' }, cap));
-  }
-  function agruparPartes() {
-    const porRegiao = new Map();
-    for (const { regiao, lado } of P.partes.values()) { const s = porRegiao.get(regiao) || new Set(); s.add(lado); porRegiao.set(regiao, s); }
-    return [...porRegiao.entries()].map(([cod, lados]) => {
-      const reg = cod === 'outros' ? { codigo: 'outros', nome: 'Outros exames', tem_lado: false } : regiaoPorCodigo(cod);
-      const lado = !reg.tem_lado ? 'N' : (lados.has('D') && lados.has('E') ? 'A' : (lados.has('D') ? 'D' : 'E'));
-      return { regiao: cod, regiao_nome: reg.nome, tem_lado: reg.tem_lado, lado };
-    });
-  }
-  function selecionadas() {
-    const partes = agruparPartes();
-    if (!partes.length) return h('p', { class: 'p-dica' }, 'Nenhuma parte escolhida ainda.');
-    return h('div', { class: 'sel-lista' }, partes.map((p) => h('span', { class: 'tag' }, `${p.regiao_nome || 'Parte do corpo'}${LADO_TXT[p.lado] ? ' — ' + LADO_TXT[p.lado] : ''}`,
-      h('button', { type: 'button', 'aria-label': 'Tirar ' + (p.regiao_nome || 'a parte do corpo'), onclick: () => { for (const k of [...P.partes.keys()]) if (k.startsWith(p.regiao + ':')) P.partes.delete(k); desenharPedido(); } }, '×'))));
-  }
+  // Passo 2 (v2, 16/11/2026): uma tela só. Lista de exames com caixinhas (agrupada por parte do corpo), busca que filtra ao digitar e o
+  // boneco ao lado, só para mostrar o que já foi marcado. Só aparece exame que a API do Klingo oferece (chat_exames só devolve exame com agenda ativa).
+  const norm = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  const chaveItem = (g, e) => `${P.mod}|${g.regiao || ''}|${e.id}`;
+  const achaItem = (g, e) => P.carrinho.filter((i) => i.procedimento_id === e.id && i.modalidade === P.mod && (i.regiao || '') === (g.regiao || ''));
+  // O lado só é perguntado quando o exame é de uma parte com lado e não é "bilateral". Mamografia: só se o nome diz "unilateral".
+  const pedeLado = (g, e) => g.tem_lado && !e.bilateral && (g.simples ? e.unilateral : true);
   async function examesDe(mod, regiao) {
     const k = `${mod}|${regiao}`, estado = P;   // a folha pode ser fechada (P = null) enquanto a consulta roda
     if (!estado.exames.has(k)) {
@@ -2664,102 +2616,108 @@
     }
     return estado.exames.get(k);
   }
-  async function irParaExames() {
+  async function escolherTipo(m) {
     const estado = P;
-    P.lista = agruparPartes(); P.escolhas = new Map();
-    $('#folhaCorpo').replaceChildren(h('p', { class: 'carregando' }, 'Buscando os exames…'));
-    try { await Promise.all(P.lista.map((p) => examesDe(P.mod, p.regiao))); } catch (e) { if (P !== estado) return; toast(mensagemErro(e)); P.passo = 'mapa'; desenharPedido(); return; }
-    if (P !== estado) return;
-    P.lista.forEach((p) => {
-      const o = organizarExames(opcoesDaParte(p), p), todos = [...o.principais, ...o.outros];
-      if (todos.length === 1) P.escolhas.set(chaveParte(p), todos[0].id);   // só uma opção diferente na tela: já vem marcada
-    });
-    P.passo = 'exames'; desenharPedido();
+    P.mod = m.codigo; P.busca = ''; P.grupos = null; P.abertos = new Set(); P.passo = 'exames'; desenharPedido();
+    try { await Promise.all((m.mapa ? m.regioes : ['todos']).map((r) => examesDe(m.codigo, r))); }
+    catch (e) { if (P !== estado) return; toast(mensagemErro(e)); P.passo = 'tipo'; P.mod = null; desenharPedido(); return; }
+    if (P !== estado || P.mod !== m.codigo) return;
+    P.grupos = montarGrupos(m); desenharPedido();
   }
-  const chaveParte = (p) => `${p.regiao}:${p.lado}`;
-  // Lado único (D/E) não combina com exame "bilateral"; "ambos" prefere o exame bilateral, senão repete o unilateral.
-  function opcoesDaParte(p) {
-    let todos = P.exames.get(`${P.mod}|${p.regiao}`) || [];
-    // Parte do corpo sem lado (tórax, abdome...): o banco não guarda o lado, então o exame "unilateral" não pode ser pedido aqui.
-    // O mesmo exame aparece dentro de cada articulação (ombro, joelho, punho...), onde o lado é guardado.
-    if (!p.tem_lado) todos = todos.filter((e) => !e.unilateral);
-    if (p.lado === 'D' || p.lado === 'E') return todos.filter((e) => !e.bilateral);
-    if (p.lado === 'A') return todos.slice().sort((a, b) => Number(b.bilateral) - Number(a.bilateral));
-    return todos;
+  function montarGrupos(m) {
+    const todos = (lista, reg) => { const o = organizarExames(lista, reg, 1000); return [...o.principais, ...o.outros]; };
+    if (!m.mapa) {
+      const mama = m.codigo === 'MAMO', reg = { codigo: mama ? 'mama' : null, nome: mama ? 'Mama' : (MOD_NOME[m.codigo] || m.nome), tem_lado: mama };
+      return [{ regiao: reg.codigo, nome: reg.nome, tem_lado: reg.tem_lado, simples: true, exames: todos(P.exames.get(`${m.codigo}|todos`) || [], null) }].filter((g) => g.exames.length);
+    }
+    const ordem = P.cfg.regioes.map((r) => r.codigo).concat('outros');
+    return m.regioes.slice().sort((a, b) => ordem.indexOf(a) - ordem.indexOf(b)).map((cod) => {
+      const reg = cod === 'outros' ? { codigo: 'outros', nome: 'Pele, vasos e procedimentos', tem_lado: false } : regiaoPorCodigo(cod);
+      let lista = P.exames.get(`${m.codigo}|${cod}`) || [];
+      if (!reg.tem_lado) lista = lista.filter((e) => !e.unilateral);   // parte sem lado (tórax, abdome...): o banco não guarda o lado do exame unilateral
+      return { regiao: cod, nome: reg.nome, tem_lado: reg.tem_lado, simples: false, exames: todos(lista, { regiao_nome: reg.nome }) };
+    }).filter((g) => g.exames.length);
   }
-  const LADO_ROTULO = { D: 'Direito', E: 'Esquerdo', A: 'Os dois lados' };
-  // O paciente confirma o lado aqui, na hora de escolher o exame (as opções mudam com o lado).
-  function mudarLado(p, v) {
-    P.escolhas.delete(chaveParte(p)); p.lado = v;
-    const o = organizarExames(opcoesDaParte(p), p), todos = [...o.principais, ...o.outros];
-    if (todos.length === 1) P.escolhas.set(chaveParte(p), todos[0].id);
+  function alternarExame(g, e) {
+    const ja = achaItem(g, e);
+    if (ja.length) P.carrinho = P.carrinho.filter((i) => !ja.includes(i));
+    else {
+      P.carrinho.push({ modalidade: P.mod, regiao: g.regiao, regiao_nome: g.regiao ? g.nome : null, lado: g.tem_lado ? (pedeLado(g, e) ? null : 'A') : 'N', procedimento_id: e.id, procedimento: e.nome });
+      const formas = P.vista === 'frente' ? FORMAS_FRENTE : FORMAS_COSTAS;   // se a parte só existe na outra vista do boneco, vira a vista
+      if (g.regiao && !formas.some((f) => f[0] === g.regiao)) P.vista = P.vista === 'frente' ? 'costas' : 'frente';
+    }
     desenharPedido();
   }
+  function ladoDoItem(g, e, lado) { for (const i of achaItem(g, e)) i.lado = lado; desenharPedido(); }
+  const LADO_BTN = { D: 'Direito', E: 'Esquerdo', A: 'Os dois lados' };
+  function linhaExame(g, e) {
+    const itens = achaItem(g, e), marcado = itens.length > 0, lado = marcado ? itens[0].lado : null;
+    const rotulo = h('label', { class: 'opcao-ex' + (marcado ? ' marcada' : '') },
+      h('input', { type: 'checkbox', checked: marcado, onchange: () => alternarExame(g, e) }),
+      h('span', { class: 'ex-txt' }, h('strong', { class: 'ex-titulo' }, e.titulo), e.detalhe ? h('small', { class: 'ex-detalhe' }, e.detalhe) : null,
+        g.tem_lado && e.bilateral ? h('span', { class: 'ex-lado' }, 'Os dois lados, um exame só') : null));
+    if (!marcado || !pedeLado(g, e)) return h('div', { class: 'ex-item' }, rotulo);
+    return h('div', { class: 'ex-item' }, rotulo, h('div', { class: 'lado-sel dentro', role: 'group', 'aria-label': `Qual lado: ${e.titulo}` },
+      h('p', { class: 'lado-q' }, lado ? 'Lado do exame:' : 'Qual lado é o exame?'),
+      h('div', { class: 'seg tres' }, ['D', 'E', 'A'].map((v) => h('button', { type: 'button', 'aria-pressed': String(lado === v), onclick: () => ladoDoItem(g, e, v) }, LADO_BTN[v]))),
+      lado === 'A' && !e.bilateral ? h('p', { class: 'w-nota' }, '2 exames: um de cada lado.') : null));
+  }
+  // Filtra ao digitar: cada palavra precisa estar no nome do exame ou no nome da parte do corpo (sem acento, sem maiúscula).
+  function gruposFiltrados() {
+    const ps = norm(P.busca).split(/\s+/).filter(Boolean);
+    return P.grupos.map((g) => {
+      const alvo = norm(g.nome);
+      const exames = !ps.length ? g.exames : g.exames.filter((e) => { const t = alvo + ' ' + norm(e.nome) + ' ' + norm(e.titulo) + ' ' + norm(e.detalhe); return ps.every((p) => t.includes(p)); });
+      return { g, exames };
+    }).filter((x) => x.exames.length);
+  }
+  function desenharListaExames() {
+    const caixa = $('#listaEx'); if (!caixa) return;
+    const filtrando = norm(P.busca).trim() !== '', achados = gruposFiltrados();
+    if (!achados.length) { caixa.replaceChildren(h('p', { class: 'p-dica' }, filtrando ? 'Nenhum exame com esse nome. Tente outra palavra (ex.: joelho, crânio).' : 'Nenhum exame disponível neste tipo.')); return; }
+    caixa.replaceChildren(...achados.map(({ g, exames }) => {
+      const nSel = g.exames.filter((e) => achaItem(g, e).length).length, chave = String(g.regiao);
+      const aberto = filtrando || P.abertos.has(chave) || nSel > 0 || P.grupos.length === 1;
+      const d = h('details', { class: 'grupo-ex', open: aberto, 'data-regiao': chave },
+        h('summary', {}, h('span', { class: 'nome' }, g.nome), h('span', { class: 'cont' }, nSel ? `${nSel} marcado${nSel > 1 ? 's' : ''}` : `${exames.length}`)),
+        exames.map((e) => linhaExame(g, e)));
+      d.addEventListener('toggle', () => { if (d.open) P.abertos.add(chave); else P.abertos.delete(chave); });
+      return d;
+    }));
+  }
+  // O boneco só mostra: acende a parte (e o lado) de cada exame que está no pedido. Não recebe toque.
+  function bonecoPedido() {
+    const frente = P.vista === 'frente';
+    const itens = P.carrinho.filter((i) => i.regiao);
+    const acende = (cod, lado) => itens.some((i) => i.regiao === cod && (lado === 'N' || i.lado == null || i.lado === 'A' || i.lado === 'N' || i.lado === lado));
+    const svg = hs('svg', { viewBox: '0 0 200 460', class: 'corpo-svg', role: 'img', 'aria-label': `Boneco, vista ${frente ? 'de frente' : 'de costas'}: mostra as partes do corpo do seu pedido` });
+    for (const [cod, ladoV, tipo, attrs] of (frente ? FORMAS_FRENTE : FORMAS_COSTAS)) {
+      const lado = ladoDaForma(ladoV, P.vista), sel = acende(cod, lado);
+      svg.append(hs(tipo, Object.assign({ class: 'parte vista' + (sel ? ' sel' : '') }, attrs)));
+      if (sel && regiaoPorCodigo(cod).tem_lado) {
+        const cx = attrs.cx ?? (attrs.x + attrs.width / 2), cy = attrs.cy ?? (attrs.y + attrs.height / 2);
+        svg.append(hs('text', { x: cx, y: cy + 4, 'text-anchor': 'middle', class: 'letra' }, lado));
+      }
+    }
+    svg.append(hs('text', { x: 4, y: 14 }, frente ? 'D' : 'E'), hs('text', { x: 190, y: 14 }, frente ? 'E' : 'D'));
+    const vistas = h('div', { class: 'chips', role: 'group', 'aria-label': 'Vista do boneco' },
+      ['frente', 'costas'].map((v) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(P.vista === v), onclick: () => { P.vista = v; desenharPedido(); } }, v === 'frente' ? 'Frente' : 'Costas')));
+    return h('aside', { class: 'pedido-corpo', 'aria-label': 'Boneco do pedido' }, vistas, svg,
+      h('p', { class: 'corpo-cap' }, itens.length ? 'As partes acesas são as do seu pedido. D = direito do paciente, E = esquerdo.' : 'Quando você marcar um exame, a parte do corpo acende aqui.'));
+  }
   function passoExames(corpo) {
-    corpo.append(passosTopo(3, 3), h('h2', { class: 'passo-titulo' }, 'Qual exame?'), h('p', { class: 'passo-sub' }, 'Toque no exame que está no seu pedido. Se não tiver certeza, deixe o atendente escolher.'));
-    for (const p of P.lista) {
-      const o = organizarExames(opcoesDaParte(p), p), nome = 'ex' + p.regiao + p.lado, atual = P.escolhas.get(chaveParte(p));
-      const bloco = h('section', { class: 'bloco-parte' }, h('h3', {}, `${MOD_NOME[P.mod] || 'Exame'} — ${p.regiao_nome || 'parte do corpo'}`));
-      if (p.tem_lado) {
-        bloco.append(h('div', { class: 'lado-sel', role: 'group', 'aria-label': `Qual lado: ${p.regiao_nome || 'parte do corpo'}` }, h('p', { class: 'lado-q' }, 'Qual lado é o exame?'),
-          h('div', { class: 'seg tres' }, ['D', 'E', 'A'].map((v) => h('button', { type: 'button', 'aria-pressed': String(p.lado === v), onclick: () => mudarLado(p, v) }, LADO_ROTULO[v])))));
-      }
-      // O lado aparece em cada opção, com palavras simples (nada de "unilateral").
-      const ladoDe = (e) => (!p.tem_lado ? '' : p.lado === 'D' ? 'Lado direito' : p.lado === 'E' ? 'Lado esquerdo' : (e.bilateral ? 'Os dois lados, um exame só' : '2 exames: um de cada lado'));
-      const linha = (id, titulo, detalhe, neutra, lado) => h('label', { class: 'opcao-ex' + (atual === id ? ' marcada' : '') + (neutra ? ' neutra' : '') },
-        h('input', { type: 'radio', name: nome, checked: atual === id, onchange: () => { P.escolhas.set(chaveParte(p), id); desenharPedido(); } }),
-        h('span', { class: 'ex-txt' }, h('strong', { class: 'ex-titulo' }, titulo), detalhe ? h('small', { class: 'ex-detalhe' }, detalhe) : null, lado ? h('span', { class: 'ex-lado' }, lado) : null));
-      const de = (e) => linha(e.id, e.titulo, e.detalhe, false, ladoDe(e));
-      o.principais.forEach((e) => bloco.append(de(e)));
-      if (o.outros.length) {
-        bloco.append(h('details', { class: 'ex-mais', open: o.outros.some((e) => e.id === atual) },
-          h('summary', {}, `Ver outros ${o.outros.length} exames`), ...o.outros.map(de)));
-      }
-      bloco.append(linha(0, 'Não sei: o atendente escolhe o exame', '', true, ''));
-      corpo.append(bloco);
-    }
-    const tudo = P.lista.every((p) => P.escolhas.has(chaveParte(p)));
+    const m = modAtual();
+    corpo.append(passosTopo(2, 2), h('h2', { class: 'passo-titulo' }, `${MOD_NOME[m.codigo] || m.nome}: quais exames?`),
+      h('p', { class: 'passo-sub' }, 'Digite para filtrar ou toque nas caixinhas. Pode marcar mais de um.'));
+    if (!P.grupos) { corpo.append(h('p', { class: 'carregando' }, 'Buscando os exames…')); return; }
+    const busca = h('input', { type: 'search', class: 'busca-ex', placeholder: 'Digite o exame ou a parte do corpo (ex.: joelho)', 'aria-label': 'Filtrar exames', value: P.busca, autocomplete: 'off', enterkeyhint: 'search' });
+    busca.addEventListener('input', () => { P.busca = busca.value; desenharListaExames(); });
+    corpo.append(h('div', { class: 'pedido-grade' }, h('div', { class: 'pedido-lista' }, busca, h('div', { id: 'listaEx' })), m.mapa || m.codigo === 'MAMO' ? bonecoPedido() : null));
+    desenharListaExames();
     corpo.append(h('div', { class: 'acoes-w' },
-      h('button', { class: 'btn-w', type: 'button', disabled: !tudo, onclick: adicionarAoPedido }, 'Adicionar ao pedido'),
-      h('button', { class: 'btn-w sec', type: 'button', onclick: () => { P.passo = 'mapa'; desenharPedido(); } }, 'Voltar')));
-  }
-  function empilhar(item) {
-    P.carrinho = P.carrinho.filter((i) => !(i.modalidade === item.modalidade && i.regiao === item.regiao && i.lado === item.lado && i.procedimento_id === item.procedimento_id));
-    P.carrinho.push(item);
-  }
-  function adicionarAoPedido() {
-    for (const p of P.lista) {
-      const id = P.escolhas.get(chaveParte(p)), ex = (P.exames.get(`${P.mod}|${p.regiao}`) || []).find((e) => e.id === id);
-      empilhar({ modalidade: P.mod, regiao: p.regiao, regiao_nome: p.regiao_nome, lado: p.lado, procedimento_id: ex ? ex.id : null, procedimento: ex ? ex.nome : null });
-    }
-    P.partes.clear(); P.passo = 'tipo'; P.mod = null; desenharPedido();
-    toast('Adicionado ao pedido. Escolha outro exame ou envie o pedido.');
-  }
-  // Mamografia e densitometria: lista direta, sem mapa.
-  async function passoListaSimples(corpo, m) {
-    corpo.append(h('p', { class: 'carregando' }, 'Buscando os exames…'));
-    try { await examesDe(m.codigo, 'todos'); } catch (e) { toast(mensagemErro(e)); return; }
-    if (!P || P.mod !== m.codigo || P.passo !== 'mapa') return;
-    const lista = P.exames.get(`${m.codigo}|todos`) || [];
-    const caixa = corpo.querySelector('.carregando'); if (!caixa) return;
-    const bloco = h('div', { class: 'bloco-parte' });
-    const o = organizarExames(lista);
-    const linha = (e) => h('label', { class: 'opcao-ex' + (P.simples === e.id ? ' marcada' : '') }, h('input', { type: 'radio', name: 'simples', checked: P.simples === e.id, onchange: () => { P.simples = e.id; P.simplesLado = e.unilateral ? 'A' : 'N'; desenharPedido(); } }),
-      h('span', { class: 'ex-txt' }, h('strong', { class: 'ex-titulo' }, e.titulo), e.detalhe ? h('small', { class: 'ex-detalhe' }, e.detalhe) : null));
-    o.principais.forEach((e) => bloco.append(linha(e)));
-    if (o.outros.length) bloco.append(h('details', { class: 'ex-mais', open: o.outros.some((e) => e.id === P.simples) }, h('summary', {}, `Ver outros ${o.outros.length} exames`), ...o.outros.map(linha)));
-    const ex = lista.find((e) => e.id === P.simples);
-    const extra = [];
-    if (ex && ex.unilateral && m.codigo === 'MAMO') {
-      extra.push(h('p', { class: 'p-dica' }, 'De qual lado?'), h('div', { class: 'chips' }, ['D', 'E', 'A'].map((l) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(P.simplesLado === l),
-        onclick: () => { P.simplesLado = l; desenharPedido(); } }, l === 'D' ? 'Direito' : l === 'E' ? 'Esquerdo' : 'Os dois lados'))));
-    }
-    extra.push(h('button', { class: 'btn-w', type: 'button', disabled: !ex, onclick: () => {
-      const mama = m.codigo === 'MAMO';
-      empilhar({ modalidade: m.codigo, regiao: mama ? 'mama' : null, regiao_nome: mama ? 'Mama' : null, lado: mama ? (ex.bilateral ? 'A' : P.simplesLado) : 'N', procedimento_id: ex.id, procedimento: ex.nome });
-      P.simples = null; P.passo = 'tipo'; P.mod = null; desenharPedido(); toast('Adicionado ao pedido.');
-    } }, 'Adicionar ao pedido'));
-    caixa.replaceWith(bloco, ...extra);
+      h('button', { class: 'btn-w sec', type: 'button', onclick: () => { P.passo = 'tipo'; P.mod = null; desenharPedido(); } }, 'Escolher outro tipo de exame'),
+      h('button', { class: 'btn-w sec', type: 'button', onclick: () => { const base = P.carrinho.slice(), n = P.fotos; fecharFolha(); abrirFotoPedido(null, base, n); } },
+        P.fotos ? '📷 Enviar mais uma foto do pedido' : '📷 Tenho o pedido médico: enviar a foto')));
   }
   async function enviarPedido() {
     if (!P || !P.carrinho.length) return;

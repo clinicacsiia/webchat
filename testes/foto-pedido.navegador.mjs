@@ -36,7 +36,7 @@ await caso('a pergunta do exame começa pela foto; a lista (tipo, parte, lado) v
   await page.waitForSelector('#msgs .widget[data-tipo=busca_exame] button');
   const rotulos = await page.$$eval('#msgs .widget[data-tipo=busca_exame] button', (bs) => bs.map((b) => b.textContent.trim()));
   await ctx.close();
-  return { ok: /pedido médico/.test(rotulos[0]) && /tipo, parte do corpo e lado/.test(rotulos[1]) && erros.excecoes.length === 0, detalhe: rotulos.join(' | ') + (erros.excecoes[0] ? ' | ' + erros.excecoes[0] : '') };
+  return { ok: /pedido médico/.test(rotulos[0]) && /tipo, lista e lado/.test(rotulos[1]) && erros.excecoes.length === 0, detalhe: rotulos.join(' | ') + (erros.excecoes[0] ? ' | ' + erros.excecoes[0] : '') };
 });
 
 await caso('foto: folha separada, foto vai ao atendente, segue só com a foto e envia tudo junto', async () => {
@@ -72,8 +72,7 @@ await caso('sem pedido: monta por tipo/parte/lado, pode juntar uma foto depois e
   const passo = await page.locator('#folhaCorpo').innerText();
   await page.click('#folhaCorpo .op >> text=Mamografia');
   await page.waitForSelector('.opcao-ex');
-  await page.locator('.opcao-ex').first().click();
-  await page.click('#folhaCorpo button >> text=Adicionar ao pedido');
+  await page.locator('.opcao-ex').first().click();   // caixinha: entra direto no pedido
   await page.waitForSelector('.carrinho');
   await page.click('#folhaCorpo button >> text=Tenho o pedido médico');
   await page.waitForSelector('#folhaTitulo >> text=Foto do pedido médico');
