@@ -552,6 +552,13 @@
   .item .tag { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 2px 10px; }
   .item .tag::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
   .item .tag.encerrada::before { content: '✓'; width: auto; height: auto; background: none; font-size: 11px; }
+  /* Ver horários (Etapa 1) */
+  .hor-dias { display: grid; gap: 10px; max-height: 52vh; overflow: auto; margin-top: 8px; }
+  .hor-dia { border: 1px solid var(--linha); border-radius: var(--radius-sm); padding: 8px 10px; }
+  .hor-lista { display: flex; flex-wrap: wrap; gap: 6px 10px; margin-top: 6px; }
+  .hor-item { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border: 1px solid var(--linha); border-radius: 999px; cursor: pointer; font-weight: 650; }
+  .hor-item small { font-weight: 400; color: var(--suave); }
+  .hor-item:has(input:checked) { background: var(--csi-primary-soft); border-color: var(--csi-primary); }
   /* Cartão enxuto: 1 ação principal + ícones + linha de contexto */
   .item .l3 .prim { font-size: 12.5px; white-space: normal !important; max-width: 100%; line-height: 1.3; }
   .item .l3 .mini { display: inline-grid; place-items: center; min-width: 24px; height: 22px; padding: 0 5px; border-radius: 999px; font-size: 12px; background: var(--csi-surface-2, #eef1f5); color: var(--csi-text-secondary); border: 1px solid transparent; }
@@ -1985,6 +1992,69 @@
     const t2 = setInterval(() => { if (!dlg.open || dlg.dataset.equipe !== '1') { clearInterval(t2); return; } carregarMarcouHoje(); }, 60000);
     dlg.addEventListener('close', () => { delete dlg.dataset.equipe; clearInterval(t); clearInterval(t2); }, { once: true });
   }
+  /* ---------- Ver horários reais da agenda (Klingo) dentro da conversa (16/11/2026, Etapa 1) ---------- */
+  // Só leitura. A função `painel-horarios` confere o papel (admin ou atendente), consulta a API com o pedido da conversa e devolve os horários livres; nada é gravado nem reservado.
+  // A atendente marca os que quer oferecer e o texto vai para a caixa de resposta (ela revisa e envia). Mensagens de "sem vaga" seguem a regra do dono: outro horário primeiro; se não aceitar, Disponibilidade futura.
+  const DIA_SEM = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+  const diaCurto = (iso) => { const d = new Date(String(iso) + 'T12:00:00'); return isNaN(d) ? dataPrev(iso) : `${DIA_SEM[d.getDay()]} ${dataPrev(iso).slice(0, 5)}`; };
+  const HOR_MOTIVO = {
+    dados_incompletos: (r) => `Ainda faltam no pedido: ${(r.faltando || []).join(', ') || 'dados do paciente'}. Peça ao paciente para completar.`,
+    sem_traducao: () => 'Não consegui ligar o convênio informado ao cadastro do Klingo. Confira o nome do convênio com o paciente.',
+    plano_desconhecido: () => 'O Klingo não reconhece este plano. Confira o convênio com o paciente.',
+    plano_inativo: (r) => 'O Klingo informa que este convênio está inativo ou suspenso. Ofereça atendimento particular ou outro convênio.' + (r.detalhe ? ' (' + r.detalhe + ')' : ''),
+    sem_medico: () => 'Nenhum médico credenciado neste convênio para este pedido. Ofereça outro convênio ou particular.',
+    regra_paciente: (r) => 'O Klingo não permite este procedimento para este paciente (idade ou sexo).' + (r.detalhe ? ' (' + r.detalhe + ')' : ''),
+    fora_do_escopo: () => 'Este pedido ainda não é consultado pela API (especialidade ou exame fora da lista liberada). Veja no Klingo.',
+    varios_procedimentos: () => 'O pedido tem mais de um exame. Consulte um de cada vez no Klingo.',
+    sem_pedido: () => 'Ainda não há consulta ou exame escolhido nesta conversa.',
+    limite: () => 'O Klingo pediu para esperar um pouco. Tente de novo em 1 minuto.',
+  };
+  const textoHorarios = (sel) => {
+    const por = new Map();
+    for (const x of sel) { const k = x.data + '|' + (x.profissional || ''); if (!por.has(k)) por.set(k, { data: x.data, prof: x.profissional, horas: [] }); por.get(k).horas.push(x); }
+    const linhas = [...por.values()].map((g) => `• ${diaCurto(g.data)} às ${g.horas.map((x) => x.hora).join(', ')}${g.prof ? ' — ' + g.prof : ''}${g.horas.some((x) => x.ordem_chegada) ? ' (ordem de chegada)' : ''}`);
+    return 'Tenho estas opções de horário:\n' + linhas.join('\n') + '\nQual fica melhor para você?';
+  };
+  async function abrirHorarios(janela = 0) {
+    if (!podeAtender()) return;
+    const c = conversaAberta(); if (!c) return;
+    dlg.className = 'equipe'; dlg.dataset.horarios = '1';
+    const cab = (...x) => h('h3', {}, 'Horários reais da agenda');
+    const desenhar = (corpo, rodape) => dlg.replaceChildren(cab(), h('p', { class: 'dica' }, 'Vem direto da agenda do Klingo, já descontando o que está marcado. É só consulta: nada é reservado nem enviado sozinho.'), corpo,
+      h('div', { class: 'rodape' }, ...(rodape || []), h('button', { class: 'btn', type: 'button', onclick: () => dlg.close() }, 'Fechar')));
+    desenhar(h('p', {}, 'Consultando a agenda…'));
+    if (!dlg.open) dlg.showModal();
+    dlg.addEventListener('close', () => { delete dlg.dataset.horarios; }, { once: true });
+    let r, falhou = false;
+    try { const x = await db.functions.invoke('painel-horarios', { body: { conversa: c.id, janela } }); if (x.error) throw x.error; r = x.data; } catch { falhou = true; }
+    if (!dlg.open || dlg.dataset.horarios !== '1') return;
+    const tentar = h('button', { class: 'btn', type: 'button', onclick: () => abrirHorarios(janela) }, 'Tentar de novo');
+    if (falhou || !r) { desenhar(h('p', {}, 'Não consegui consultar a agenda agora. Tente de novo; se repetir, avise a TI.'), [tentar]); return; }
+    if (!r.ok) { desenhar(h('p', { class: 'urg media', style: 'display:block;border-radius:8px;padding:8px 10px' }, (HOR_MOTIVO[r.motivo] || (() => 'Não consegui consultar a agenda agora. Tente de novo; se repetir, avise a TI.'))(r)), [tentar]); return; }
+    const periodo = `${dataPrev(r.de)} a ${dataPrev(r.ate)}`;
+    const mais = janela < 3 ? h('button', { class: 'btn', type: 'button', onclick: () => abrirHorarios(janela + 1) }, 'Ver mais 14 dias') : null;
+    if (r.estado === 'sem_horarios') {
+      desenhar(h('div', {}, h('p', { class: 'urg media', style: 'display:block;border-radius:8px;padding:8px 10px' }, `Sem vaga de ${periodo}.`),
+        h('p', {}, h('b', {}, 'O que fazer: '), 'veja os próximos 14 dias e ofereça outro médico ou outra unidade. Se o paciente não aceitar nenhuma opção, ofereça colocá-lo na ', h('b', {}, 'Disponibilidade futura'), ' (avisamos quando surgir vaga).')), [mais].filter(Boolean));
+      return;
+    }
+    const marcados = new Set(), todos = [];
+    const botIns = h('button', { class: 'btn prim', type: 'button', disabled: true, onclick: () => {
+      const sel = todos.filter((x, i) => marcados.has(i)); if (!sel.length) return;
+      const area = document.getElementById('caixa'); if (!area) return;
+      area.value = (area.value ? area.value.replace(/\s+$/, '') + '\n\n' : '') + textoHorarios(sel);
+      area.dispatchEvent(new Event('input', { bubbles: true })); dlg.close(); area.focus(); toast('Texto inserido na resposta. Revise e envie.');
+    } }, 'Inserir na resposta');
+    const atualizar = () => { botIns.disabled = marcados.size === 0; botIns.textContent = marcados.size ? `Inserir ${marcados.size} na resposta` : 'Inserir na resposta'; };
+    const dias = (r.dias || []).map((d) => h('div', { class: 'hor-dia' }, h('b', {}, diaCurto(d.data)),
+      h('div', { class: 'hor-lista' }, d.itens.map((it) => {
+        const i = todos.push({ data: d.data, hora: it.hora, profissional: it.profissional, ordem_chegada: it.ordem_chegada }) - 1;
+        return h('label', { class: 'hor-item', title: [it.profissional, curtaUnidade(it.unidade)].filter(Boolean).join(' · ') },
+          h('input', { type: 'checkbox', onchange: (e) => { if (e.target.checked) marcados.add(i); else marcados.delete(i); atualizar(); } }),
+          h('span', {}, it.hora + (it.ordem_chegada ? ' (chegada)' : '')), it.profissional ? h('small', {}, it.profissional) : null);
+      }))));
+    desenhar(h('div', {}, h('p', {}, h('b', {}, `${r.total} horário(s)`), ` de ${periodo}` + (r.cortado ? ' (mostrando os primeiros)' : '') + '. Marque os que quer oferecer.'), h('div', { class: 'hor-dias' }, dias)), [mais, botIns].filter(Boolean));
+  }
   /* ---------- Disponibilidade futura (14/11/2026; antiga "Lista de previsão") ---------- */
   // Pedidos de pacientes que não achavam horário e pediram aviso quando surgir vaga compatível. NÃO é agendamento nem reserva. O sistema procura sozinho na API do Klingo;
   // a equipe só age nas exceções ("Precisa de pessoa"). Uma lista só, com filtros por situação (nada de quadros repetidos). Dados: painel_disponibilidade_lista (admin e atendente).
@@ -2827,6 +2897,7 @@
         detalheInicio(c) ? h('span', { style: 'display:block;font-weight:600' }, detalheInicio(c)) : null),
       !minha && c.status !== 'encerrada' ? h('button', { class: 'btn prim assumir-topo', type: 'button', onclick: () => assumir(true) }, 'Assumir') : null,
       c.status === 'encerrada' ? h('button', { class: 'btn', type: 'button', onclick: () => assumir(true) }, 'Reabrir') : null,
+      podeAtender() && c.status !== 'encerrada' ? h('button', { class: 'btn', type: 'button', title: 'Ver os horários reais da agenda para o pedido desta conversa (só consulta)', onclick: () => abrirHorarios(0) }, 'Ver horários') : null,
       sel,
       c.status !== 'encerrada' ? h('button', { class: 'btn perigo', type: 'button', onclick: encerrar }, 'Encerrar') : null].filter(Boolean));
     renderProximo();

@@ -77,4 +77,11 @@ Na conversa e no cartão da Jornada: "Ver marcações do paciente" (operação `
 Os demais "não-ok" não são erro: `dados_incompletos` 3 e `sem_traducao_plano` 3 são o chat ainda sem CPF/convênio; `api_sem_horarios` 3 é o exame 1659 realmente sem vaga. **Nenhuma falha técnica real (timeout, 5xx, HTML, limite) apareceu.**
 
 **Correção:** `classificar()` passa a tratar "Operadora … suspenso" como `plano_inativo` (o resto do sistema já trata isso como regra de negócio: mensagem de convênio ao paciente, aviso à equipe, fora da conta de erros). Aplicada nas 5 cópias idênticas de `klingo-api.ts`, com teste (`klingo-auto.test.ts`). Testes das Edge Functions: 272 de 272.
-**Falta publicar** as Edge Functions que usam essa cópia: `chat-agenda-api`, `klingo-identificar`, `klingo-executar`, `disponibilidade-vigia` e `klingo-sincronizar`. Até publicar, o comportamento na produção não muda.
+**Publicada em 16/11/2026:** `chat-agenda-api` v25 (é onde o erro acontecia; teste de fumaça: 400 "Pedido inválido" para pedido vazio). As outras quatro cópias (`klingo-executar`, `klingo-identificar`, `disponibilidade-vigia`, `klingo-sincronizar`) já estão corrigidas no repositório e **ainda não foram publicadas**: o efeito prático seria só uma mensagem melhor quando o Klingo recusar a marcação ou a vigia por convênio suspenso.
+
+## 9. Etapa 1 feita (16/11/2026): ver horários dentro da conversa
+- **Botão "Ver horários"** no topo da conversa aberta (admin e atendente). Abre uma janela com os horários livres da API, por dia; a atendente marca os que quer oferecer e **"Inserir na resposta"** coloca o texto na caixa (ela revisa e envia; nada é enviado nem reservado sozinho).
+- **Função `painel-horarios`** (Edge Function, `verify_jwt` ligado; só leitura): confere o papel pelo login, usa o pedido da conversa (consulta ou exame, convênio, CPF e nascimento já informados) e a mesma cota da API do chat. Não grava nada.
+- **Mensagens claras** em vez de código: convênio inativo/suspenso, sem médico credenciado, idade/sexo, dados que faltam (diz quais), pedido com vários exames, limite do Klingo.
+- **Sem vaga:** explica o caminho combinado: ver os próximos 14 dias (até 4 janelas), oferecer outro médico/unidade e, **se o paciente não aceitar nenhuma opção, oferecer a Disponibilidade futura**. O botão que já cadastra na Disponibilidade futura a partir daqui fica para a Etapa 2.
+- Tela: `sw.js` v36. Teste novo `npm run test:horarios` (5 casos). Sem mudança de banco.
