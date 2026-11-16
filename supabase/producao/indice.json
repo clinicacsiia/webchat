@@ -2220,6 +2220,40 @@
    ],
    "rls": true,
    "politicas": 1
+  },
+  {
+   "nome": "app_laudo",
+   "colunas": [
+    "paciente_id",
+    "marcacao_id",
+    "pessoa",
+    "ident_hash",
+    "procedimento",
+    "data_exame",
+    "unidade",
+    "estado",
+    "checado_em",
+    "disponivel_em",
+    "retirado_em",
+    "atualizado_em"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "app_laudo_pessoa",
+   "colunas": [
+    "paciente_id",
+    "pessoa",
+    "ident_hash",
+    "klingo_id",
+    "situacao",
+    "verificado_em",
+    "voucher_em",
+    "criado_em"
+   ],
+   "rls": true,
+   "politicas": 0
   }
  ],
  "visoes": [
@@ -2533,6 +2567,7 @@
   "agendamento_reconhecer_msg_encerradas",
   "app_acesso_modo",
   "app_cadastros_max_hora",
+  "app_laudos",
   "app_local_ativo",
   "app_pin_obrigatorio",
   "app_pin_servidor",
@@ -4108,6 +4143,166 @@
    "authenticated": false,
    "publico": false,
    "md5": "b748a1a14fcc6ac8decd380b33aa0454"
+  },
+  {
+   "nome": "app_laudos_a_checar",
+   "args": [
+    {
+     "nome": "p_pac",
+     "padrao": false
+    },
+    {
+     "nome": "p_max",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "2a0b2db7d16942406bdbe8d6ad49c734"
+  },
+  {
+   "nome": "app_laudos_contexto",
+   "args": [
+    {
+     "nome": "p_token",
+     "padrao": false
+    },
+    {
+     "nome": "p_renova",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "c94b65618de0db59e13a860ec706b8f9"
+  },
+  {
+   "nome": "app_laudos_estado",
+   "args": [
+    {
+     "nome": "p_pac",
+     "padrao": false
+    },
+    {
+     "nome": "p_marcacao",
+     "padrao": false
+    },
+    {
+     "nome": "p_pronto",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "da9ad3f172b3a8af00dfe92a982da6ba"
+  },
+  {
+   "nome": "app_laudos_itens_gravar",
+   "args": [
+    {
+     "nome": "p_pac",
+     "padrao": false
+    },
+    {
+     "nome": "p_pessoa",
+     "padrao": false
+    },
+    {
+     "nome": "p_itens",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "74a93aba675e13775b361ad55025b5b1"
+  },
+  {
+   "nome": "app_laudos_lista",
+   "args": [
+    {
+     "nome": "p_pac",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "6578811de25a2f39a62cd3649d9cd42c"
+  },
+  {
+   "nome": "app_laudos_pessoa_gravar",
+   "args": [
+    {
+     "nome": "p_pac",
+     "padrao": false
+    },
+    {
+     "nome": "p_pessoa",
+     "padrao": false
+    },
+    {
+     "nome": "p_situacao",
+     "padrao": false
+    },
+    {
+     "nome": "p_klingo_id",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "5d91275d7af0f349242edc273ca0b370"
+  },
+  {
+   "nome": "app_laudos_pessoas",
+   "args": [
+    {
+     "nome": "p_pac",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "a43886d40cda1d7c31d7bdb95a9c7dbc"
+  },
+  {
+   "nome": "app_laudos_pode",
+   "args": [
+    {
+     "nome": "p_token",
+     "padrao": false
+    },
+    {
+     "nome": "p_marcacao",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "e33ea130020d1dac590ce7daccb527fd"
   },
   {
    "nome": "app_login",
