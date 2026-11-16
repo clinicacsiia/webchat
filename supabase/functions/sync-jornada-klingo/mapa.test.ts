@@ -1,7 +1,7 @@
 // Testes com dados INVENTADOS (nenhum paciente real). Colunas do #14359 achadas pelo título.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { LAYOUT_EXAME, LAYOUT_CRIACAO, TITULOS_EXAME, checkinSuspeito, layoutPorTitulos, layoutSuspeito, lerCheckin, mapearLinha, layoutDe, prepararLinhas } from "./mapa.ts";
+import { consultasFeitas, janelaLeitura, modoValido, LAYOUT_EXAME, LAYOUT_CRIACAO, TITULOS_EXAME, checkinSuspeito, layoutPorTitulos, layoutSuspeito, lerCheckin, mapearLinha, layoutDe, prepararLinhas } from "./mapa.ts";
 
 const SAL = "segredo-de-teste";
 // Ordem real devolvida pelo Klingo em 15/11/2026 (21 colunas; "Prontuário" aparece duas vezes).
@@ -71,7 +71,7 @@ test("colunas opcionais ausentes (check-in, primeira vez, responsável) não blo
 });
 
 test("lista vazia ou sem nomes válidos: tudo que é obrigatório aparece como faltando", () => {
-  const obrigatorios = Object.keys(TITULOS_EXAME).filter((k) => !["resp", "checkin", "primeira"].includes(k)).length;
+  const obrigatorios = Object.keys(TITULOS_EXAME).filter((k) => !["resp", "checkin", "primeira", "prof"].includes(k)).length;
   assert.equal(layoutPorTitulos([], LAYOUT_EXAME).faltando.length, obrigatorios);
   assert.equal(layoutPorTitulos([{ name: "x", title: "Atendido" }, { title: "Status" }], LAYOUT_EXAME).faltando.length, obrigatorios);
 });
@@ -131,4 +131,42 @@ test("checkinSuspeito: poucos inválidos passam; coluna cheia de lixo é suspeit
   assert.equal(checkinSuspeito(0, 19), false, "menos de 20 inválidos: não decide");
   assert.equal(checkinSuspeito(10, 30), true);
   assert.equal(checkinSuspeito(900, 100), false, "10% inválido: ainda aceitável");
+});
+
+// ===== primeira consulta: "Profissional" (col21, 16/11/2026) =====
+const ORDEM_PROF = [...ORDEM_REAL, "Profissional"];
+const MEDICA = "MEDICA DE TESTE";
+
+test("Profissional: achado pelo título (col21) e opcional (sem ele a leitura segue)", () => {
+  const r = layoutPorTitulos(colunas(ORDEM_PROF), LAYOUT_EXAME);
+  assert.deepEqual(r.faltando, []);
+  assert.equal(r.layout.prof, "col21");
+  const sem = layoutPorTitulos(colunas(ORDEM_REAL), LAYOUT_EXAME);
+  assert.deepEqual(sem.faltando, []);
+  assert.equal(sem.layout.prof, undefined, "sem o título, nada de herdar a posição fixa");
+});
+
+test("consultasFeitas: só Atendido = S, com prontuário e profissional; canceladas e chave por nome ficam de fora", () => {
+  const L = layoutPorTitulos(colunas(ORDEM_PROF), LAYOUT_EXAME).layout;
+  const l = (o: Record<string, string>) => linha(ORDEM_PROF, { Profissional: MEDICA, ...o });
+  const feitas = consultasFeitas([
+    l({ "Id da Marcação": "1" }),
+    l({ "Id da Marcação": "2", Atendido: "N" }),
+    l({ "Id da Marcação": "3", Prontuário: "" }),
+    l({ "Id da Marcação": "4", Profissional: "" }),
+    l({ "Id da Marcação": "5", Status: "Cancelada" }),
+    l({ "Id da Marcação": "1", Procedimento: "NEUROPEDIATRIA" }),
+  ], L);
+  assert.equal(feitas.length, 1);
+  assert.deepEqual(Object.keys(feitas[0]).sort(), ["d", "m", "p", "q", "x"], "só prontuário, profissional, procedimento e data: nada de nome nem telefone");
+  assert.equal(feitas[0].q, MEDICA);
+  assert.equal(feitas[0].x, "NEUROPEDIATRIA", "a mesma marcação repetida vale a última");
+  assert.equal(feitas[0].d, "2026-11-16");
+  assert.deepEqual(consultasFeitas([l({})], LAYOUT_CRIACAO), [], "layout sem Profissional não manda nada");
+});
+
+test("modo historico: um ano para trás até ontem; modoValido aceita", () => {
+  assert.equal(modoValido("historico"), "historico");
+  assert.equal(modoValido("lixo"), "rapido");
+  assert.deepEqual(janelaLeitura("historico", "exame", "2026-11-16"), { de: "2025-11-16", ate: "2026-11-15" });
 });

@@ -1,7 +1,7 @@
 // FLUXOGRAMA: entrada (POST do pg_cron com x-sync-key e {"modo":"rapido"|"completo"}) -> validação (chave = config.ia_segredo; token KLINGO_APP_TOKEN; relatório e filtro vindos da config) -> lógica (lê o relatório do Klingo na janela do modo, mapeia, manda em lotes para jornada_klingo_lote e fecha com jornada_klingo_fechar) -> saída (resumo SEM dado de paciente; em erro, jornada_klingo_falha)
-// Versão 1.5 — 15/11/2026 / Mudança: manda o check-in (col18) como 'k'; v1.4: no #14359 as colunas são achadas pelo TÍTULO (a ordem pode mudar); título obrigatório sumido para a leitura; trava de valores mantida
+// Versão 1.6 — 16/11/2026 / Mudança: no modo historico o #14359 exige o filtro "marcado em" (periodo2) largo para devolver datas passadas, e aceita {de, ate} no corpo (carga por faixa); manda as consultas já atendidas (com o profissional) para consulta_feita_lote; modo "historico" (1 ano para trás, só isso, sem mexer na Jornada); v1.5 — 15/11/2026: manda o check-in (col18) como 'k'; v1.4: no #14359 as colunas são achadas pelo TÍTULO (a ordem pode mudar); título obrigatório sumido para a leitura; trava de valores mantida
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { emLotes, filtroValido, hojeBrasilia, janelaLeitura, layoutDe, layoutPorTitulos, checkinSuspeito, layoutSuspeito, modoValido, prepararLinhas, relatorioValido, somaDias, CARTOES_ATRAS, CARTOES_FRENTE, type Coluna, type Row } from "./mapa.ts";
+import { consultasFeitas, emLotes, filtroValido, hojeBrasilia, janelaLeitura, layoutDe, layoutPorTitulos, checkinSuspeito, layoutSuspeito, modoValido, prepararLinhas, relatorioValido, somaDias, CARTOES_ATRAS, CARTOES_FRENTE, type Coluna, type Row } from "./mapa.ts";
 
 // Lê as marcações do Klingo e alimenta o quadro "Jornada" do painel. Quem chama é o pg_cron (todo minuto, mas o banco só dispara quando é a hora: jornada_klingo_agendar).
 // As linhas do relatório têm nome e telefone de pacientes: ficam só na memória desta função; o telefone vira uma marca (hash) e o valor em R$ nunca é lido.
@@ -14,8 +14,8 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 
 // O relatório em uma faixa de datas; se o Klingo cortar (limite de linhas), divide a faixa ao meio e junta.
 // campo = id do filtro de período no relatório: periodo0 nos dois (#13825 = marcado_em; #14359 refeito em 14/11/2026 = data_agendado_para).
-async function marcacoes(token: string, id: string, campo: string, de: string, ate: string, meta: { colunas?: Coluna[] }, nivel = 0): Promise<Row[]> {
-  const params = new URLSearchParams({ id, [`:${campo}`]: "l", [`:${campo}-from`]: de, [`:${campo}-to`]: ate });
+async function marcacoes(token: string, id: string, campo: string, de: string, ate: string, meta: { colunas?: Coluna[] }, nivel = 0, extra: Record<string, string> = {}): Promise<Row[]> {
+  const params = new URLSearchParams({ id, [`:${campo}`]: "l", [`:${campo}-from`]: de, [`:${campo}-to`]: ate, ...extra });
   const res = await fetch(`${KLINGO_URL}?${params}`, { headers: { "X-APP-TOKEN": token }, signal: AbortSignal.timeout(90_000) });
   if (!res.ok) throw new Error(`Klingo retornou HTTP ${res.status} nas marcações`);
   const payload = await res.json();
@@ -23,8 +23,8 @@ async function marcacoes(token: string, id: string, campo: string, de: string, a
   if (payload?.limit) {
     if (de >= ate || nivel >= 6) throw new Error("O Klingo cortou as marcações mesmo em faixa curta");
     const meio = new Date((Date.parse(`${de}T00:00:00Z`) + Date.parse(`${ate}T00:00:00Z`)) / 2).toISOString().slice(0, 10);
-    const a = await marcacoes(token, id, campo, de, meio, meta, nivel + 1);
-    const b = await marcacoes(token, id, campo, somaDias(meio, 1), ate, meta, nivel + 1);
+    const a = await marcacoes(token, id, campo, de, meio, meta, nivel + 1, extra);
+    const b = await marcacoes(token, id, campo, somaDias(meio, 1), ate, meta, nivel + 1, extra);
     return [...a, ...b];
   }
   if (payload?.result === "") return [];
@@ -57,12 +57,19 @@ Deno.serve(async (req: Request) => {
   // Desde 14/11/2026 o #14359 filtra por periodo0 ("Data Agendado Para"); o periodo1 não existe mais e devolvia vazio.
   const campo = "periodo0";
   const hoje = hojeBrasilia();
-  const { de, ate } = janelaLeitura(modo, filtro, hoje);
+  let { de, ate } = janelaLeitura(modo, filtro, hoje);
+  // historico: o #14359 só devolve datas passadas quando o filtro "marcado em" (periodo2) também recebe um período largo. Faixa opcional {de, ate} no corpo (carga mês a mês). O Klingo recusa (erro ".") período maior que ~12 meses: por isso 360 dias (marcações feitas há mais de um ano ficam de fora).
+  const dataOk = (v: unknown): v is string => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v);
+  const extra: Record<string, string> = {};
+  if (modo === "historico") {
+    if (dataOk(corpo?.de) && dataOk(corpo?.ate) && corpo.de <= corpo.ate && corpo.ate < hoje && corpo.de >= somaDias(hoje, -730)) { de = corpo.de; ate = corpo.ate; }
+    Object.assign(extra, { ":periodo2": "l", ":periodo2-from": somaDias(hoje, -360), ":periodo2-to": hoje });
+  }
   const inicio = Date.now();
 
   try {
     const meta: { colunas?: Coluna[] } = {};
-    const brutas = await marcacoes(token, relatorio, campo, de, ate, meta);
+    const brutas = await marcacoes(token, relatorio, campo, de, ate, meta, 0, extra);
     // Uma leitura completa que volta vazia é quase sempre o Klingo fora do ar ou o relatório mudado: não finge que deu certo.
     if (modo === "completo" && brutas.length === 0) throw new Error("O relatório veio vazio na leitura completa");
     // #14359 ("exame"): colunas pelo título. Se o Klingo não mandar a lista de colunas, usa a ordem fixa (reserva). #13825 ("criacao") segue pela ordem fixa.
@@ -74,6 +81,16 @@ Deno.serve(async (req: Request) => {
     }
     const suspeito = layoutSuspeito(brutas, layout);
     if (suspeito) throw new Error(suspeito);
+    // primeira-consulta: atendimentos já feitos com o profissional (toda data lida, mesmo fora da janela da Jornada). Falha aqui nunca derruba a Jornada.
+    let feitasGravadas = 0;
+    const feitas = consultasFeitas(brutas, layout);
+    try {
+      for (const lote of emLotes(feitas, TAMANHO_LOTE)) {
+        const { data, error } = await supabase.rpc("consulta_feita_lote", { p_linhas: lote });
+        if (!error) feitasGravadas += (data as { gravadas?: number })?.gravadas ?? 0;
+      }
+    } catch (_) { /* segue */ }
+    if (modo === "historico") return json({ ok: true, modo, janela: `${de}..${ate}`, linhas_klingo: brutas.length, consultas_feitas: feitas.length, gravadas: feitasGravadas, tem_profissional: !!layout.prof, leitura_ms: Date.now() - inicio });
     const { linhas, descartadas, descartes, fora, semProntuario, checkinLidos, checkinInvalidos } = await prepararLinhas(brutas, config.ia_segredo, hoje, layout);
     const checkinIgnorado = checkinSuspeito(checkinLidos, checkinInvalidos);
     if (checkinIgnorado) for (const l of linhas) delete l.k;   // coluna do check-in estranha: não grava (o banco mantém o que já tinha)
@@ -86,7 +103,7 @@ Deno.serve(async (req: Request) => {
       lidas += r?.lidas ?? 0; alteradas += r?.alteradas ?? 0; cartoesCriados += r?.cartoes_criados ?? 0;
     }
 
-    const resumo = { modo, relatorio, filtro, colunas_por: colunasPor, colunas_fora_da_ordem_fixa: diferentes, janela: `${de}..${ate}`, linhas_klingo: brutas.length, descartadas, descartes, chave_por_nome: semProntuario, checkin_lidos: checkinLidos, checkin_invalidos: checkinInvalidos, checkin_ignorado: checkinIgnorado, fora_da_janela: fora, lidas, alteradas, cartoes_criados: cartoesCriados, leitura_ms: Date.now() - inicio };
+    const resumo = { modo, relatorio, filtro, colunas_por: colunasPor, colunas_fora_da_ordem_fixa: diferentes, janela: `${de}..${ate}`, linhas_klingo: brutas.length, descartadas, descartes, chave_por_nome: semProntuario, checkin_lidos: checkinLidos, checkin_invalidos: checkinInvalidos, checkin_ignorado: checkinIgnorado, fora_da_janela: fora, consultas_feitas: feitas.length, consultas_gravadas: feitasGravadas, lidas, alteradas, cartoes_criados: cartoesCriados, leitura_ms: Date.now() - inicio };
     const { data: fechado, error: e2 } = await supabase.rpc("jornada_klingo_fechar", { p_atras: CARTOES_ATRAS, p_frente: CARTOES_FRENTE, p_resumo: resumo });
     if (e2) throw new Error(`O banco recusou o fechamento (${e2.code ?? "sem código"}): ${e2.message.slice(0, 120)}`);
     return json({ ok: true, ...(fechado as Record<string, unknown>) });

@@ -18,6 +18,10 @@ begin
        from public.conversa_fluxo f where f.conversa_id = p_conversa), false) then
     return jsonb_build_object('ok', false, 'motivo', 'valor_nao_aceito', 'detalhe', 'o paciente Particular não aceitou (ou não viu) o valor');
   end if;
+  -- primeira-consulta: segunda trava (a primeira fica em fluxo_proximo); sem histórico com a médica não marca sozinho
+  if pa.tipo = 'consulta' and coalesce((public.primeira_consulta_ok(p_conversa) ->> 'bloqueia')::boolean, false) then
+    return jsonb_build_object('ok', false, 'motivo', 'primeira_consulta', 'detalhe', 'primeira consulta com a médica: só a atendente marca');
+  end if;
   d := public.klingo_dados_conversa(p_conversa);
   if (d ->> 'n_procedimentos')::int <> 1 then return jsonb_build_object('ok', false, 'motivo', 'varios_procedimentos'); end if;
   if jsonb_typeof(pa.escolha_horario) <> 'array' or jsonb_array_length(pa.escolha_horario) <> 1 then return jsonb_build_object('ok', false, 'motivo', 'horario_nao_unico'); end if;

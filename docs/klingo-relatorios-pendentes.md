@@ -115,3 +115,10 @@ A simulação (`simulacao.md`) usa só o #14359 pela Jornada (marcações, situa
 
 ## #14359 com colunas novas (15/11/2026)
 O dono acrescentou Check-In - Data, um 2º Prontuário e Primeira Vez; Celular e Atendido trocaram de lugar (`col16` Celular, `col17` Atendido, `col18` Check-In, `col19` Prontuário repetido, `col20` Primeira Vez). Leitura corrigida (`sync-jornada-klingo` v8, com trava contra nova mudança de ordem). Análise completa, mapa das colunas e como ler check-in/atendido em `docs/klingo-14359-colunas-2026-11-15.md`. **Regra: ao mexer nas colunas deste relatório, avisar antes**, porque a leitura é por posição.
+
+
+## Relatório #14637 (16/11/2026): atendimentos por profissional (primeira consulta)
+Criado pelo dono. Filtros: `periodo0` = Data Agendado Em (período; sem filtro vale "hoje") e `parm1` = Unidade. Colunas: 0 Data do Atendimento, 1 Primeira Vez, 2 Paciente - Nome (nunca lido), 3 Profissional, 4 Paciente - CPF, 5 Paciente - Prontuario, 6 Paciente - Nascimento. **Devolve datas passadas** (02 a 15/11: 1.972 atendimentos; só existe histórico a partir de maio/2026). Usado pela `sync-atendimentos-klingo`; ver `primeira-consulta.md`. **Regra: ao mexer nas colunas, avisar antes** (a leitura é pelo título; sumir Data do Atendimento, Profissional, CPF ou Nascimento para a leitura).
+
+## #14359: coluna Profissional (16/11/2026)
+O dono acrescentou `col21` Profissional. Lida pela `sync-jornada-klingo` v1.6 (opcional). Pela API o #14359 só devolve datas passadas se o filtro "marcado em" (`periodo2`) também for enviado.

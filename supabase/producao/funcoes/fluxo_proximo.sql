@@ -46,6 +46,8 @@ begin
     if coalesce(cardinality(v_med), 0) > 1 then return 'medico'; end if;
     perform public.fluxo_set(p_conversa, '{"medico_feito": true}');
   end if;
+  -- primeira-consulta: primeira consulta com a médica controlada só com atendente (primeira_consulta_ok; desligada por padrão)
+  if pa.tipo = 'consulta' and coalesce((public.primeira_consulta_ok(p_conversa) ->> 'bloqueia')::boolean, false) then return 'primeira_consulta'; end if;
   -- klingo-auto: paciente que o chat já conhecia (dados guardados de antes, nada digitado nesta conversa) confirma só o CPF; conferência velha ou "não sou eu" = tudo de novo
   if public.klingo_ativo(p_conversa, 'klingo_api_marcar') and not coalesce((d ->> 'nao_sou_eu')::boolean, false) and not coalesce((d ->> 'cpf_confirmado')::boolean, false)
      and public.fluxo_cpf_ok(pa.paciente ->> 'cpf') and public.fluxo_ler_data(pa.paciente ->> 'dt_nasc') is not null and (d -> 'digitado' ->> 'cpf') is null then
