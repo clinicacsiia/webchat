@@ -32,12 +32,12 @@ await caso('CSI e RM/TC desligadas: só a Desenvoar marca', async () => ({ ok: (
 await caso('unidade desconhecida ou vazia nunca é travada', async () => ({ ok: (await marca('Outro lugar')) && (await um(`select public.unidade_marca_auto(null) as v`)).v }));
 await caso('o aviso cita só a Desenvoar', async () => {
   const t = (await um(`select public.unidade_aviso_bloqueio() as v`)).v;
-  return { ok: /só para Desenvoar\./.test(t) && !/CSI/.test(t), detalhe: t };
+  return { ok: /agenda para Desenvoar\./.test(t) && !/CSI/.test(t), detalhe: t };
 });
 await q(`update public.config set valor = 'sim' where chave = 'marcacao_auto_csi'`);
 await caso('religar a CSI: o aviso passa a citar as duas', async () => {
   const t = (await um(`select public.unidade_aviso_bloqueio() as v`)).v;
-  return { ok: /Desenvoar e CSI\./.test(t), detalhe: t };
+  return { ok: /agenda para Desenvoar e CSI\./.test(t), detalhe: t };
 });
 for (const f of ['chat_horarios', 'chat_horario_escolher', 'klingo_pode_marcar']) {
   await caso(`${f} carrega a trava por unidade`, async () => ({ ok: (await um(`select pg_get_functiondef('public.${f}'::regproc) like '%unidade_marca_auto%' as v`)).v }));
