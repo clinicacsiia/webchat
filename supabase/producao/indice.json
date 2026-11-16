@@ -4633,7 +4633,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "4579aaef5b3e0e62a0cce5f987b0b3ca"
+   "md5": "9d0820e83887bed9539777e7a6051d96"
   },
   {
    "nome": "app_pedido_apagar",
@@ -10313,7 +10313,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "9cc946a84e358d3f7c839bf8393931c9"
+   "md5": "ff85a600dd5b6b91d6731705b2d4ec09"
   },
   {
    "nome": "jornada_klingo_pode_mover",
@@ -13588,6 +13588,21 @@
    "authenticated": true,
    "publico": false,
    "md5": "cfab3c0b8fea36fa74f8df02093c5026"
+  },
+  {
+   "nome": "pedido_fechar_cancelado_klingo",
+   "args": [
+    {
+     "nome": "p_vouchers",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "8fc891c17ea614f86ae768e02f54aa83"
   },
   {
    "nome": "pedido_horario_vigiar",

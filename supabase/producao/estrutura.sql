@@ -1,5 +1,5 @@
 -- RETRATO DA ESTRUTURA DO BANCO DE PRODUÇÃO (projeto webchat-atendimento). GERADO: não editar à mão.
--- Atualização parcial em 2026-11-16T04:28:00.03729+00:00 (funções app_* e painel_app_*, tabelas app_*). Retrato inteiro tirado em 2026-11-14T20:32:54.165875+00:00 · Postgres 17.11. Só estrutura: nenhuma linha de tabela, nenhum valor de configuração.
+-- Atualização parcial em 2026-11-16T04:58:19+00:00 (funções app_* e painel_app_*, tabelas app_*). Retrato inteiro tirado em 2026-11-14T20:32:54.165875+00:00 · Postgres 17.11. Só estrutura: nenhuma linha de tabela, nenhum valor de configuração.
 -- Serve de referência e para os testes. NÃO rodar inteiro sobre a produção. Como refazer: supabase/producao/LEIAME.md.
 
 -- ===== Extensões =====
@@ -2727,6 +2727,7 @@ create table public.painel_oferta (
 comment on table public.painel_oferta is 'Passos de cada oferta feita pela equipe no painel (horário ou Disponibilidade futura): oferecido, aceito, recusado ou dispensado. Quem recusou ou foi dispensado não recebe nova oferta do mesmo tipo. Só as funções painel_oferta* leem e gravam.';
 CREATE INDEX painel_oferta_conversa_idx ON public.painel_oferta USING btree (conversa_id, tipo, criado_em DESC);
 alter table public.painel_oferta enable row level security;
+
 
 -- ===== Chaves estrangeiras (depois de todas as tabelas) =====
 alter table public.agendamento_fechamento add constraint agendamento_fechamento_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE CASCADE;
