@@ -158,7 +158,7 @@ await caso('cada pedido mostra o status (marcado, confirmado, exame feito), a da
   const { page, ctx } = await abrirPortal();
   const t = await textoDe(page);
   await ctx.close();
-  return { ok: /Exame marcado/.test(t) && /Tudo certo! Falta só você chegar/.test(t) && /Exame realizado/.test(t) && /às 08:40 · Centro/.test(t) && /Ressonância|RM/i.test(t), detalhe: t.slice(0, 200).replace(/\n/g, ' | ') };
+  return { ok: /Exame marcado/.test(t) && /Tudo certo! Falta só você chegar/.test(t) && /Laudo pronto/.test(t) && /às 08:40 · Centro/.test(t) && /Ressonância|RM/i.test(t), detalhe: t.slice(0, 200).replace(/\n/g, ' | ') };
 });
 await caso('pedido com novidade tem a etiqueta "Novidade"; o portal marca como visto sozinho (o balão da tela principal some)', async () => {
   const { page, ctx, estado } = await abrirPortal();

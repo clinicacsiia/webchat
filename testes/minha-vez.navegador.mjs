@@ -133,15 +133,15 @@ await caso('sessão guardada abre direto no portal; quando chamam, mostra "É a 
   const av = await page.evaluate(() => window.__avisos); await ctx.close();
   return { ok: av.includes('Está perto da sua vez') || av.includes('É a sua vez!'), detalhe: JSON.stringify(av) };
 });
-await caso('Seus exames: resumo "1 de 3 feitos · faltam 2", passo de cada exame, "em andamento" e nenhum horário', async () => {
+await caso('Seus exames: resumo "1 de 3 feitos · faltam 2", passo de cada exame, "Em atendimento", "A confirmar" no exame marcado e nenhum horário', async () => {
   const { page, ctx, estado } = await abrir({ logado: true });
-  estado.jornada = { conferida: true, resumo: { total: 3, feitos: 1, faltam: 2, laudos: 0 }, visitas: [{ data: new Date().toISOString().slice(0, 10), unidade: 'Centro', exames: [
-    { nome: 'RM JOELHO', ok: 5, em_atendimento: false, excecao: null }, { nome: 'RM COLUNA', ok: 4, em_atendimento: true, excecao: null }, { nome: 'US ABDOME', ok: 2, em_atendimento: false, excecao: null }, { nome: 'TC CRANIO', ok: null, excecao: 'cancelado' }] }] };
+  estado.jornada = { conferida: true, resumo: { total: 3, feitos: 1, faltam: 2, laudos: 0 }, visitas: [{ data: new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10), unidade: 'Centro', exames: [{ nome: 'RM JOELHO', ok: 5, em_atendimento: false, excecao: null }] }, { data: new Date().toISOString().slice(0, 10), unidade: 'Centro', exames: [
+    { nome: 'RM COLUNA', ok: 4, em_atendimento: true, excecao: null }, { nome: 'US ABDOME', ok: 2, em_atendimento: false, excecao: null }, { nome: 'TC CRANIO', ok: null, excecao: 'cancelado' }] }] };
   await page.waitForFunction(() => /Chegou na clínica/.test(document.body.innerText));
   await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
   await page.waitForFunction(() => /Seus exames/.test(document.body.innerText), null, { timeout: 5000 });
   const t = await texto(page); const feitos = await page.locator('.passos li.feito').count(); const agora = await page.locator('.passos li.agora').count(); await ctx.close();
-  return { ok: /1 de 3 exames feitos · faltam 2/.test(t) && /Seu exame está sendo feito agora/.test(t) && /Laudo está sendo preparado|laudo está sendo preparado/.test(t) && /foi cancelado/.test(t) && /em andamento/.test(t) && feitos === 5 + 4 + 2 && agora === 3 && !/\d{1,2}:\d{2}/.test(t), detalhe: feitos + ' ' + agora + ' ' + t.replace(/\n+/g, ' | ').slice(0, 160) };
+  return { ok: /1 de 3 exames feitos · faltam 2/.test(t) && /Seu exame está sendo feito agora/.test(t) && /Laudo está sendo preparado|laudo está sendo preparado/.test(t) && /foi cancelado/.test(t) && /A confirmar\s*\n?\s*aguardando confirmação/.test(t) && !/Agendado/.test(t) && feitos === 5 + 4 + 1 && agora === 3 && /Em atendimento\s*\n?\s*fazendo o exame/.test(t) && !/\d{1,2}:\d{2}/.test(t), detalhe: feitos + ' ' + agora + ' ' + t.replace(/\n+/g, ' | ').slice(0, 160) };
 });
 await caso('conta: com exame de hoje no Klingo mostra "Você está na clínica", etapa e número da marcação, e não o lugar na fila', async () => {
   const hoje = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(new Date());
