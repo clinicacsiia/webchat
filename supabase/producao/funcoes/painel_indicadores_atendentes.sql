@@ -31,10 +31,12 @@ begin
   msg as (select m.agente_id, count(distinct m.conversa_id) as conversas from public.mensagens m join cv on cv.id = m.conversa_id
            where m.autor = 'agente' and m.agente_id is not null and m.criado_em >= v_i and m.criado_em < v_f group by m.agente_id),
   -- Crédito do agendamento: quem marcou à mão; se o sistema confirmou sozinho com o Klingo, o dono da conversa; sem dono, quem mais escreveu nela. Sem ninguém: fica só no total do sistema.
-  agd as (select x.agente_id, count(*) as n, count(*) filter (where x.automatico) as n_auto
+  agd as (select x.agente_id, count(*) as n, count(*) filter (where x.automatico) as n_auto, count(*) filter (where x.cancelado) as n_canc
             from (select coalesce(p.agendado_por, c.agente_id, (select m.agente_id from public.mensagens m where m.conversa_id = p.conversa_id and m.autor = 'agente' and m.agente_id is not null
                                                                   group by m.agente_id order by count(*) desc, m.agente_id limit 1)) as agente_id,
-                         p.agendado_por is null as automatico
+                         p.agendado_por is null as automatico,
+                         (coalesce(cardinality(p.klingo_marcacoes), 0) > 0 and not exists (select 1 from unnest(p.klingo_marcacoes) u
+                            where not exists (select 1 from public.klingo_conferencia z where z.m = u::text and z.status_klingo = 'Cancelada'))) as cancelado
                     from public.pre_agendamentos p join cv on cv.id = p.conversa_id join public.conversas c on c.id = p.conversa_id
                    where coalesce(p.agendado_em, p.agendado_auto_em) >= v_i and coalesce(p.agendado_em, p.agendado_auto_em) < v_f) x
            where x.agente_id is not null group by x.agente_id),
@@ -53,7 +55,7 @@ begin
             order by x.conversa_id, x.n desc),
   nota as (select prin.agente_id, count(*) as n, round(avg(av.nota_atendimento)::numeric, 1) as media
              from av join prin on prin.conversa_id = av.conversa_id group by prin.agente_id),
-  pes as (select q.nome, coalesce(msg.conversas, 0) as conversas, coalesce(agd.n, 0) as agendados, coalesce(agd.n_auto, 0) as agendados_automaticos, coalesce(nota.n, 0) as avaliacoes, nota.media as nota_media,
+  pes as (select q.nome, coalesce(msg.conversas, 0) as conversas, coalesce(agd.n, 0) as agendados, coalesce(agd.n_auto, 0) as agendados_automaticos, coalesce(agd.n_canc, 0) as agendados_cancelados, coalesce(nota.n, 0) as avaliacoes, nota.media as nota_media,
                  coalesce(resp.primeiras, 0) as primeiras, resp.espera_mediana_min
             from quem q left join msg on msg.agente_id = q.id left join agd on agd.agente_id = q.id left join nota on nota.agente_id = q.id left join resp on resp.agente_id = q.id
            where q.papel = 'atendente' or coalesce(msg.conversas, 0) > 0 or coalesce(agd.n, 0) > 0)
@@ -63,4 +65,3 @@ begin
     into v_out;
   return v_out;
 end $function$;
-

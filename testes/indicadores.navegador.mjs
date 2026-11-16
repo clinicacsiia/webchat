@@ -284,7 +284,7 @@ await caso('"Incluir conversas de teste": só o administrador vê a caixa; marca
 });
 await caso('Equipe: barras por atendente (conversas, agendamentos, nota) com o melhor em destaque e aviso de poucas avaliações', async () => {
   const t = await abrir(); await abaInd(t);
-  const secao = t.page.locator('h3', { hasText: '3. Equipe' }); await secao.waitFor();
+  const secao = t.page.locator('h3', { hasText: '4. Equipe' }); await secao.waitFor();
   const paineis = await t.page.locator('.ind-painel').evaluateAll((l) => l.map((p) => ({ tit: p.querySelector('h4').textContent, linhas: [...p.querySelectorAll('.ind-linha')].map((x) => x.innerText.replace(/\n/g, ' ')) })));
   const por = (t0) => paineis.find((x) => x.tit.startsWith(t0)) || { linhas: [] };
   const forte = await t.page.locator('.ind-linha.forte', { hasText: 'Ana' }).count();
@@ -296,11 +296,11 @@ await caso('Equipe: barras por atendente (conversas, agendamentos, nota) com o m
 });
 await caso('Avaliações dos pacientes voltaram: só o administrador vê; atendente comum não', async () => {
   const adm = await abrir({ admin: true }); await abaInd(adm);
-  await adm.page.waitForFunction(() => /4\. Avaliações dos pacientes/.test(document.querySelector('.pagina')?.innerText || ''));
+  await adm.page.waitForFunction(() => /5\. Avaliações dos pacientes/.test(document.querySelector('.pagina')?.innerText || ''));
   const ta = await textoAba(adm); await adm.ctx.close();
   const c = await abrir(); await abaInd(c); await new Promise((r) => setTimeout(r, 300));
   const tc = await textoAba(c); await c.ctx.close();
-  return { ok: /10 avaliações/.test(ta) && /8,5 nota do atendimento/.test(ta) && /5 pelo Instagram/.test(ta) && !/Avaliações dos pacientes/.test(tc) && /3\. Equipe/.test(tc) };
+  return { ok: /10 avaliações/.test(ta) && /8,5 nota do atendimento/.test(ta) && /5 pelo Instagram/.test(ta) && !/Avaliações dos pacientes/.test(tc) && /4\. Equipe/.test(tc) };
 });
 await caso('Sem o SQL dos atendentes, a parte da equipe avisa qual arquivo rodar e o resto da tela funciona', async () => {
   const t = await abrir({ semAtend: true }); await abaInd(t);
@@ -333,13 +333,13 @@ await caso('Conferência: explica a divergência passo a passo (200 do Klingo, 3
 await caso('Conferência: marcações com conversa no webchat (40), por pedido (25) e por celular e nome (15), e o que aconteceu com o exame', async () => {
   const t = await abrir({ conf: true }); await abaInd(t); await t.page.waitForSelector('.ind-conf-passo');
   const txt = await textoAba(t); await t.ctx.close();
-  return { ok: /40\s*marcações com conversa no chat \(20%\)/.test(txt) && /25\s*ligadas pelo pedido do chat/.test(txt) && /15\s*ligadas por celular e nome/.test(txt) && /160\s*sem conversa no chat/.test(txt)
+  return { ok: /40\s*marcações com conversa no chat, total \(20% do Klingo\)/.test(txt) && /25\s*ligadas pelo pedido do chat/.test(txt) && /15\s*ligadas por celular e nome/.test(txt) && /160\s*sem conversa no chat/.test(txt)
     && /15\s*dessas, exame atendido/.test(txt) && /3\s*faltaram/.test(txt) && /18\s*por vir/.test(txt), detalhe: txt.slice(txt.indexOf('Quantas têm'), txt.indexOf('Quantas têm') + 300) };
 });
 await caso('Conferência: funil do webchat (60 procuraram, 52 atendidas pela equipe, 30 pedido pronto, 25 agendaram) e as 3 agendadas sem marcação no Klingo ficam à vista com o nome', async () => {
   const t = await abrir({ conf: true }); await abaInd(t); await t.page.waitForSelector('.ind-conf-passo');
   const txt = await textoAba(t); await t.ctx.close();
-  return { ok: /60\s*pessoas procuraram o chat/.test(txt) && /52\s*foram atendidas pela equipe/.test(txt) && /30\s*chegaram ao pedido pronto/.test(txt) && /25\s*geraram agendamento/.test(txt)
+  return { ok: /60\s*pessoas procuraram o chat/.test(txt) && /52\s*tiveram resposta da equipe/.test(txt) && /30\s*chegaram ao pedido pronto/.test(txt) && /25\s*tiveram o pedido agendado/.test(txt)
     && /3\s*agendadas no chat, sem marcação no Klingo/.test(txt) && /Jose de Teste/i.test(txt), detalhe: '' };
 });
 await caso('Conferência: cadastro incompleto no Klingo (sem CPF 32%, sem e-mail 46%, sem celular 3%)', async () => {
