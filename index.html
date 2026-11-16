@@ -675,7 +675,7 @@
   const CHAVE_HIST = 'webchat.historico.v1';   // as últimas conversas deste aparelho (cada uma com o seu token): dá para voltar a elas
   const MAX_HIST = 5;                          // mínimo pedido: 3
   // Muda a cada alteração do chat. Cópia de mensagens guardada por outra versão é descartada (era isso que mostrava conversa velha e travada).
-  const VERSAO_APP = '2026.11.16-1';
+  const VERSAO_APP = '2026.11.16-2';
   // Mesmas regras do banco (fluxo_nome_ok, fluxo_telefone_ok, fluxo_email_ok): o banco confere de novo, aqui é só para avisar logo.
   const LET = 'A-Za-zÀ-ÖØ-öø-ÿ';
   const nomeCompletoOk = (v) => { const t = String(v || '').trim(); return t.length >= 5 && t.length <= 120 && new RegExp(`^[${LET}][${LET}'’.-]*( +[${LET}][${LET}'’.-]*)+$`).test(t) && t.split(/ +/).filter((w) => w.replace(new RegExp(`[^${LET}]`, 'g'), '').length >= 2).length >= 2; };
@@ -2877,6 +2877,22 @@
     meu.buscandoMais = false;
     await recarregarSilencioso();
   }
+  // Ao avançar o calendário para um mês ainda não consultado, procura sozinha as datas que faltam (até o limite de 45 dias).
+  async function irParaMes(m) {
+    const meu = C; if (!meu) return;
+    meu.mes = m; desenharCalendario();
+    if (meu.buscandoMais) return; // a busca em andamento confere o mês atual ao terminar
+    const hoje = new Date(), h0 = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
+    const falta = () => {
+      const fim = new Date(meu.mes.getFullYear(), meu.mes.getMonth() + 1, 0);
+      return (meu.janela || 0) < 2 && 15 * ((meu.janela || 0) + 1) < Math.round((fim - h0) / 864e5);
+    };
+    while (C === meu && falta()) {
+      const antes = meu.janela || 0;
+      await maisDatas();
+      if (C !== meu || (meu.janela || 0) === antes) break;
+    }
+  }
   function desenharCalendario() {
     if (!C || !C.res) return;
     const r = C.res, corpo = $('#folhaCorpo'), rodape = $('#folhaRodape');
@@ -2913,9 +2929,9 @@
     const mes = C.mes, primeiroDow = mes.getDay(), qtd = new Date(mes.getFullYear(), mes.getMonth() + 1, 0).getDate();
     const prox = new Date(mes.getFullYear(), mes.getMonth() + 1, 1), ant = new Date(mes.getFullYear(), mes.getMonth() - 1, 1);
     corpo.append(h('div', { class: 'cal-nav' },
-      h('button', { type: 'button', 'aria-label': 'Mês anterior', disabled: ant < new Date(hoje.getFullYear(), hoje.getMonth(), 1), onclick: () => { C.mes = ant; desenharCalendario(); } }, '‹'),
+      h('button', { type: 'button', 'aria-label': 'Mês anterior', disabled: ant < new Date(hoje.getFullYear(), hoje.getMonth(), 1), onclick: () => irParaMes(ant) }, '‹'),
       h('strong', {}, `${MESES[mes.getMonth()][0].toUpperCase()}${MESES[mes.getMonth()].slice(1)} de ${mes.getFullYear()}`),
-      h('button', { type: 'button', 'aria-label': 'Próximo mês', disabled: ymd(prox) > limite, onclick: () => { C.mes = prox; desenharCalendario(); } }, '›')));
+      h('button', { type: 'button', 'aria-label': 'Próximo mês', disabled: ymd(prox) > limite, onclick: () => irParaMes(prox) }, '›')));
     const grade = h('div', { class: 'cal-grade', role: 'grid' }, ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((x) => h('div', { class: 'sem', 'aria-hidden': 'true' }, x)));
     for (let i = 0; i < primeiroDow; i++) grade.append(h('div', {}));
     for (let d = 1; d <= qtd; d++) {
