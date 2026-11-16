@@ -2288,6 +2288,17 @@
    ],
    "rls": true,
    "politicas": 0
+  },
+  {
+   "nome": "klingo_preco_api",
+   "colunas": [
+    "procedimento_id",
+    "plano_id",
+    "valor",
+    "consultado_em"
+   ],
+   "rls": true,
+   "politicas": 0
   }
  ],
  "visoes": [
@@ -2674,12 +2685,14 @@
   "motor_telefones_teste",
   "nome_empresa",
   "notificacao_modo",
+  "particular_valor_modo",
   "pedido_escolha_texto",
   "pedido_horario_modo",
   "pedido_oferta2_texto",
   "pedido_parado_horas",
   "pedido_sem_horario_texto",
   "permissao_modo",
+  "plano_exato_modo",
   "previsao_decide_texto",
   "previsao_final_texto",
   "previsao_modo",
@@ -8745,7 +8758,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "129216caa17f647920c4abfa929dbec8"
+   "md5": "e639d4f654ea9666172a5e1bb514d536"
   },
   {
    "nome": "fluxo_assunto_aplicar",
@@ -8937,7 +8950,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "af1b34859644e7d3ddfeec67dfed0bc9"
+   "md5": "50c1bd74b49a4280d49b2eefa2a2f4ba"
   },
   {
    "nome": "fluxo_finalizar_humano",
@@ -8979,7 +8992,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "0da371fd434474a82e313fd6a12e6888"
+   "md5": "c050329ffe300830cbf39d68e89fbbb0"
   },
   {
    "nome": "fluxo_ler_data",
@@ -9017,7 +9030,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "83b8cfdcfc871b97c4965473586f2e12"
+   "md5": "8aab1b14bd6965d78ffd4bdd5d517225"
   },
   {
    "nome": "fluxo_marc_aplicar",
@@ -9247,7 +9260,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "8d2f3ce7c74d72024ef7abe986ec9c6e"
+   "md5": "4a3ff399cb8f76500f1ccfb0ba6ac300"
   },
   {
    "nome": "fluxo_pos_aplicar",
@@ -9380,7 +9393,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "a3ca5d469857a94485457595119a56a3"
+   "md5": "b26eedebcd825176e4800dd53d6ada02"
   },
   {
    "nome": "fluxo_proximo_assunto",
@@ -10980,7 +10993,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "4d7c2fac32b9a4c68704c079cd407bc0"
+   "md5": "f6f35622b522bb44d6babaac0222f5dd"
   },
   {
    "nome": "klingo_decidir",
@@ -11560,7 +11573,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "30efb4e6c74ef306052d8d61aa45c78c"
+   "md5": "49fde0287a61e36fe0d70744ae89538d"
   },
   {
    "nome": "klingo_pode_marcar",
@@ -11575,7 +11588,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "9a1bfb99b5208cee629ab2553ed90afb"
+   "md5": "c8170748a65f2809eec235d836909b27"
   },
   {
    "nome": "klingo_pre_gravar",
@@ -11626,6 +11639,21 @@
    "authenticated": false,
    "publico": false,
    "md5": "73094170a3e18a28ca3b909bd6904a71"
+  },
+  {
+   "nome": "klingo_preco_gravar",
+   "args": [
+    {
+     "nome": "p_linhas",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "cdc59a9a20e970ba7302b70a31a545e0"
   },
   {
    "nome": "klingo_prof_confere",
@@ -13657,6 +13685,76 @@
    "md5": "cfab3c0b8fea36fa74f8df02093c5026"
   },
   {
+   "nome": "particular_plano_id",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "dc78af66e533b090af9708a6acb10ae7"
+  },
+  {
+   "nome": "particular_valor_assinatura",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "7106781be21e2f362ff108c8f118e6b2"
+  },
+  {
+   "nome": "particular_valor_ativo",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "0ae1a1135f9b67bd28691bfbfccf2044"
+  },
+  {
+   "nome": "particular_valor_disparar",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "6d32671620404e95e10d29c2217fd253"
+  },
+  {
+   "nome": "particular_valor_obter",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "8895ff2ed8373d9353fd67f6e396cf13"
+  },
+  {
    "nome": "pedido_fechar_cancelado_klingo",
    "args": [
     {
@@ -14143,6 +14241,51 @@
    "authenticated": false,
    "publico": false,
    "md5": "57bfdb2762da53f3f24244e7ccefdbd9"
+  },
+  {
+   "nome": "plano_exato_chave",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "67c44ee770f5787ccc28fd53d9edc1d4"
+  },
+  {
+   "nome": "plano_exato_convenio",
+   "args": [
+    {
+     "nome": "p_operadora",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "6cbe33c7b510b6499f735889993df63e"
+  },
+  {
+   "nome": "plano_exato_itens",
+   "args": [
+    {
+     "nome": "p_convenio",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "e9dcf91a6b93c74977604d9e21fc9071"
   },
   {
    "nome": "pode_ver_conversa",

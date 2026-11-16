@@ -10,7 +10,7 @@ declare
   v text := case when jsonb_typeof(p_valor) = 'string' then p_valor #>> '{}' else null end;
   o jsonb := case when jsonb_typeof(p_valor) = 'object' then p_valor else '{}'::jsonb end;
   c public.conversas; pa public.pre_agendamentos; ctx jsonb := public.fluxo_ctx(p_conversa);
-  v_n int; v_dt date; v_pac jsonb := '{}'::jsonb; v_err text[] := '{}'; v_ok boolean; v_med text[]; k text; x text; v_uni text;
+  v_n int; v_dt date; v_pac jsonb := '{}'::jsonb; v_err text[] := '{}'; v_ok boolean; v_med text[]; k text; x text; v_uni text; v_val jsonb; v_ex jsonb;
 begin
   select * into c from public.conversas where id = p_conversa;
   select * into pa from public.pre_agendamentos where conversa_id = p_conversa;
@@ -93,7 +93,8 @@ begin
     end if;
     if x = '' then return '{"ok": false}'; end if;
     perform public.fluxo_pre(p_conversa, jsonb_build_object('plano', left(x, 120), 'etapa', 'plano'));
-    perform public.fluxo_set(p_conversa, '{"plano_anterior": null}');
+    perform public.fluxo_set(p_conversa, '{"plano_anterior": null, "plano_exato_id": null, "plano_exato_nome": null, "plano_exato_de": null}');   -- plano-exato: trocou o convênio, a escolha antiga não vale
+    perform public.particular_valor_disparar(p_conversa);   -- particular-valor: já pede o preço à API
     perform public.convenio_avisar(p_conversa, x);   -- convenios-e-foto: aviso e regra "um exame por vez"
     -- convenio-quem-volta: corrigiu o plano na confirmação e escolheu OUTRO convênio: a carteirinha antiga não vale mais.
     select dados ->> 'plano_trocado_de' into k from public.conversa_fluxo where conversa_id = p_conversa;
@@ -115,6 +116,24 @@ begin
       perform public.fluxo_set(p_conversa, '{"confirmado": false}');
       return jsonb_build_object('ok', true, 'aviso', public.fluxo_t('plano_outro', jsonb_build_object('plano', left(x, 120))));
     end if;
+  when 'plano_exato' then   -- plano-exato
+    declare v_cv integer := public.plano_exato_convenio(pa.plano); v_nome text;
+    begin
+      if v_cv is null then return '{"ok": true}'::jsonb; end if;
+      if v = 'nao_sei' then
+        perform public.fluxo_set(p_conversa, jsonb_build_object('plano_exato_id', 0, 'plano_exato_nome', null, 'plano_exato_de', pa.plano));
+        perform public.fluxo_nota(p_conversa, 'Paciente não soube o plano exato de ' || pa.plano || ': conferir a carteirinha antes de marcar');
+      else
+        if v is null or v !~ '^[0-9]{1,9}$' then return '{"ok": false}'::jsonb; end if;
+        select i ->> 'rotulo' into v_nome from jsonb_array_elements(public.plano_exato_itens(v_cv)) i where i ->> 'valor' = v;
+        if v_nome is null then
+          return jsonb_build_object('ok', false, 'erro', 'Não achei esse plano na lista. Procure de novo pelo nome da carteirinha ou toque em "Não sei qual é o meu plano".');
+        end if;
+        perform public.fluxo_set(p_conversa, jsonb_build_object('plano_exato_id', v::integer, 'plano_exato_nome', left(v_nome, 120), 'plano_exato_de', pa.plano));
+        perform public.fluxo_nota(p_conversa, 'Plano escolhido pelo paciente: ' || left(v_nome, 120) || ' (' || pa.plano || ', id ' || v || ')');
+      end if;
+      perform public.fluxo_set(p_conversa, '{"confirmado": false}');
+    end;
   when 'plano_confirma' then
     select dados ->> 'plano_anterior' into x from public.conversa_fluxo where conversa_id = p_conversa;
     if v = 'sim' then
@@ -226,11 +245,29 @@ begin
     perform public.fluxo_set(p_conversa, jsonb_build_object(case p_passo when 'dados_ident' then 'g_ident' when 'dados_contato' then 'g_contato'
                                                              when 'dados_endereco' then 'g_endereco' else 'g_carteira' end, true,
       'digitado', coalesce((select dados -> 'digitado' from public.conversa_fluxo where conversa_id = p_conversa), '{}'::jsonb) || (o - 'pular')));
+  when 'valor' then   -- particular-valor
+    if v not in ('sim', 'nao') then return '{"ok": false}'; end if;
+    v_val := public.particular_valor_obter(p_conversa);
+    if not coalesce((v_val ->> 'particular')::boolean, false) then return '{"ok": false}'; end if;
+    if coalesce((v_val ->> 'completo')::boolean, false) then
+      select f.dados -> 'valor_exibido' into v_ex from public.conversa_fluxo f where f.conversa_id = p_conversa;
+      if v = 'sim' and ((v_ex ->> 'assin') is distinct from public.particular_valor_assinatura(p_conversa) or (v_ex ->> 'total')::numeric is distinct from (v_val ->> 'total')::numeric) then
+        return jsonb_build_object('ok', false, 'erro', 'O valor foi atualizado. Confira de novo, por favor.');
+      end if;
+      perform public.fluxo_set(p_conversa, jsonb_build_object('valor_resp', jsonb_build_object('resp', case when v = 'sim' then 'aceito' else 'recusado' end,
+        'assin', public.particular_valor_assinatura(p_conversa), 'total', (v_val ->> 'total')::numeric, 'itens', v_val -> 'itens', 'em', now())));
+      perform public.fluxo_nota(p_conversa, case when v = 'sim' then 'Paciente VIU e ACEITOU o valor Particular de ' || public.preco_brl((v_val ->> 'total')::numeric) || ' (preço da API do Klingo).'
+                                                  else 'Paciente VIU o valor Particular de ' || public.preco_brl((v_val ->> 'total')::numeric) || ' e RECUSOU: não cadastrar no Klingo.' end);
+    else
+      perform public.fluxo_set(p_conversa, jsonb_build_object('valor_resp', jsonb_build_object('resp', case when v = 'sim' then 'quer_valor' else 'dispensou' end,
+        'assin', public.particular_valor_assinatura(p_conversa), 'em', now())));
+      perform public.fluxo_nota(p_conversa, case when v = 'sim' then 'Particular SEM preço na API: o paciente QUER saber o valor (equipe responde).' else 'Particular SEM preço na API: o paciente não pediu o valor agora.' end);
+    end if;
   when 'confirmar' then
     if v = 'ok' then perform public.fluxo_set(p_conversa, '{"confirmado": true}');
     elsif v = 'pedido' then perform public.fluxo_set(p_conversa, '{"refazer": "pedido", "confirmado": false}');
     elsif v = 'plano' then
-      perform public.fluxo_set(p_conversa, jsonb_build_object('plano_trocado_de', pa.plano, 'plano_anterior', null, 'confirmado', false));
+      perform public.fluxo_set(p_conversa, jsonb_build_object('plano_trocado_de', pa.plano, 'plano_anterior', null, 'confirmado', false, 'plano_exato_id', null, 'plano_exato_nome', null, 'plano_exato_de', null));
       update public.pre_agendamentos set plano = null where conversa_id = p_conversa;
     elsif v = 'horario' then
       update public.pre_agendamentos set escolha_horario = null, data_desejada = null, hora_desejada = null where conversa_id = p_conversa;
