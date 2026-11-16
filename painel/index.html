@@ -4892,11 +4892,18 @@ h1.longo { font-size: 14mm; }
     const atalhos = h('div', { class: 'chips ind-atalhos', role: 'group', 'aria-label': 'Período' },
       PRESETS_IND.map(([k, t]) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(IND.preset === k), onclick: () => { IND.preset = k; viewIndicadores(c); } }, t)));
     const campoDe = h('input', { type: 'date', value: IND.de, max: hojeISO, 'aria-label': 'Data inicial' }), campoAte = h('input', { type: 'date', value: IND.ate, max: hojeISO, 'aria-label': 'Data final' });
+    const dataOk = (v) => /^\d{4}-\d{2}-\d{2}$/.test(v) && v >= '2020-01-01';   // ano ainda sendo digitado (0002, 0020…) não vale
     const verPeriodo = () => {
-      if (!campoDe.value || !campoAte.value) { toast('Escolha as duas datas.'); return; }
+      clearTimeout(verPeriodo.t);
+      if (!dataOk(campoDe.value) || !dataOk(campoAte.value)) { toast('Escolha as duas datas completas (dia, mês e ano).'); return; }
       let de = campoDe.value, ate = campoAte.value; if (de > ate) [de, ate] = [ate, de];
+      if (de > hojeISO) { toast('Essas datas ainda não chegaram: escolha até hoje (' + dmy(hojeISO) + ').'); return; }
+      if (ate > hojeISO) { ate = hojeISO; toast('A data final passou de hoje; usei ' + dmy(hojeISO) + '.'); }
       IND.preset = 'livre'; IND.de = de; IND.ate = ate; viewIndicadores(c);
     };
+    // Mudou a data e as duas estão completas: carrega sozinho (sem precisar achar o botão). Espera um pouco para o ano terminar de ser digitado.
+    const aoMudarData = () => { clearTimeout(verPeriodo.t); if (dataOk(campoDe.value) && dataOk(campoAte.value) && campoDe.value <= campoAte.value && (campoDe.value !== IND.de || campoAte.value !== IND.ate)) verPeriodo.t = setTimeout(verPeriodo, 900); };
+    campoDe.addEventListener('change', aoMudarData); campoAte.addEventListener('change', aoMudarData);
     const caixaTeste = ehAdmin() ? h('label', { class: 'ind-teste', title: 'Conversas da conta de teste da TI. Por padrão ficam fora dos números.' },
       h('input', { type: 'checkbox', checked: IND.teste, onchange: (ev) => { IND.teste = ev.target.checked; viewIndicadores(c); } }), ' Incluir conversas de teste') : null;
     const nomePer = (p) => (p.de === p.ate ? dmy(p.de) : `${dmy(p.de)} a ${dmy(p.ate)}`);
