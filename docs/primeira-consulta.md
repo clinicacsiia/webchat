@@ -4,7 +4,7 @@
 
 ## Como ligar (Configurações > "Primeira consulta com a médica")
 - `primeira_consulta_modo` = sim/nao. **Nasce `nao`**: nada muda até o dono ligar.
-- `primeira_consulta_medicas`: nome como aparece no Klingo (coluna Profissional); mais de uma, separadas por `;`. Hoje: `GEANNE CHRISTINA PINHEIRO` (neuropediatra da Desenvoar, a única "NEUROLOGIA" do catálogo).
+- `primeira_consulta_medicas`: em Configurações aparece como **lista de médicas com caixinhas** (vem da agenda de consultas do Klingo); marque as que atendem primeira vez só com atendente. Guardado como `NOME;NOME`, no nome do Klingo (coluna Profissional). Se a lista não carregar, o campo vira texto (separe os nomes com `;`). Hoje: `GEANNE CHRISTINA PINHEIRO` (neuropediatra da Desenvoar, a única "NEUROLOGIA" do catálogo).
 - Desligar volta tudo ao normal na hora.
 
 ## Como decide (`primeira_consulta_ok`)
