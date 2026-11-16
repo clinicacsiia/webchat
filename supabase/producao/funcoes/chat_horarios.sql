@@ -8,7 +8,7 @@ CREATE OR REPLACE FUNCTION public.chat_horarios(p_conversa uuid, p_token text, p
 AS $function$
 declare
   v_procs int[]; v_grupos jsonb; v_g jsonb; v_de date := coalesce(p_de, current_date); v_ate date; v_meta timestamptz; v_dias jsonb := '[]'::jsonb; v_unid jsonb := '[]'::jsonb; v_sem int;
-  v_escolhas jsonb; v_pref text; v_med text; v_med_sem boolean := false; v_sug jsonb; v_estado text; v_motivo text; v_ult record; v_n int; v_aviso text;
+  v_escolhas jsonb; v_pref text; v_med text; v_med_sem boolean := false; v_sug jsonb; v_estado text; v_motivo text; v_ult record; v_n int; v_aviso text; v_bloq int := 0;
   v_agora timestamp := now() at time zone 'America/Bahia'; v_todos integer;
 begin
   perform public.app_pin_exigir_leitura();   -- PIN também no servidor (config.app_pin_servidor)
@@ -42,20 +42,22 @@ begin
                      when v_ult.resultado in ('estrutura_invalida', 'erro_api', 'limite', 'erro_gravacao') then 'indisponivel'
                      else 'nao_integrado' end;
     if v_estado = 'com_horarios' then
-      select count(*) into v_n from public.klingo_oferta o where o.conversa_id = p_conversa and not o.sombra and o.expira_em > now() and (o.data + o.hora::time) > v_agora;
+      select count(*) into v_n from public.klingo_oferta o where o.conversa_id = p_conversa and not o.sombra and o.expira_em > now() and (o.data + o.hora::time) > v_agora and public.unidade_marca_auto(o.unidade);
+      select count(*) into v_bloq from public.klingo_oferta o where o.conversa_id = p_conversa and not o.sombra and o.expira_em > now() and (o.data + o.hora::time) > v_agora and not public.unidade_marca_auto(o.unidade);
       v_estado := case when v_n > 0 then 'com_horarios' else 'sem_horarios' end;
     end if;
   end if;
 
   if v_estado = 'com_horarios' then
     v_med := v_pref;
-    if v_med is not null and not exists (select 1 from public.klingo_oferta o where o.conversa_id = p_conversa and not o.sombra and o.expira_em > now() and (o.data + o.hora::time) > v_agora
+    if v_med is not null and not exists (select 1 from public.klingo_oferta o where o.conversa_id = p_conversa and not o.sombra and o.expira_em > now() and (o.data + o.hora::time) > v_agora and public.unidade_marca_auto(o.unidade)
                                           and o.data between v_de and v_ate and public.klingo_prof_confere(o.profissional, v_med)) then
       v_med := null; v_med_sem := true;
     end if;
     with o as (
       select o.* from public.klingo_oferta o
        where o.conversa_id = p_conversa and not o.sombra and o.expira_em > now() and o.data between v_de and v_ate and (o.data + o.hora::time) > v_agora
+         and public.unidade_marca_auto(o.unidade)
          and (p_unidade is null or p_unidade = '' or public.norm_nome(o.unidade) = public.norm_nome(p_unidade))
          and (p_periodo is null or p_periodo = '' or (p_periodo = 'manha' and o.hora < '12:00') or (p_periodo = 'tarde' and o.hora >= '12:00' and o.hora < '18:00') or (p_periodo = 'noite' and o.hora >= '18:00'))
          and (v_med is null or public.klingo_prof_confere(o.profissional, v_med))
@@ -65,7 +67,7 @@ begin
       from (select um.data, jsonb_agg(jsonb_build_object('hora', um.hora, 'unidade', um.unidade, 'profissional', um.profissional, 'local', null, 'min', 30, 'chegada', um.ordem_chegada, 'oferta', um.chave) order by um.hora) slots
               from um group by um.data) d;
     select coalesce(jsonb_agg(distinct o.unidade), '[]'::jsonb), max(o.criado_em) into v_unid, v_meta from public.klingo_oferta o
-     where o.conversa_id = p_conversa and not o.sombra and o.expira_em > now() and o.unidade is not null;
+     where o.conversa_id = p_conversa and not o.sombra and o.expira_em > now() and o.unidade is not null and public.unidade_marca_auto(o.unidade);
     select jsonb_build_object('data', s.data, 'hora', s.hora, 'unidade', s.unidade, 'profissional', s.profissional, 'apos', pc.paciente_nome) into v_sug
     from public.conversas c join public.conversas pc on pc.id = c.irmao_de
     join public.pre_agendamentos pp on pp.conversa_id = pc.id and jsonb_typeof(pp.escolha_horario) = 'array'
@@ -79,12 +81,12 @@ begin
   end if;
 
   v_aviso := case v_estado
-    when 'sem_horarios' then 'Não encontramos horários disponíveis para esse atendimento no momento.'
+    when 'sem_horarios' then case when v_bloq > 0 then public.unidade_aviso_bloqueio() else 'Não encontramos horários disponíveis para esse atendimento no momento.' end
     when 'indisponivel' then 'Não foi possível consultar os horários agora.'
     when 'nao_integrado' then 'Este atendimento é agendado pela nossa equipe.'
     else null end;
   return jsonb_build_object('janelas', '{}'::jsonb, 'grupos', v_grupos, 'grupo', greatest(p_grupo, 1), 'de', v_de, 'ate', v_ate, 'dias', v_dias, 'unidades', v_unid,
     'escolhas', coalesce(v_escolhas, '[]'::jsonb), 'sem_exame', v_sem, 'medico_preferido', v_pref, 'medico_filtrando', v_med is not null, 'medico_sem_horario', v_med_sem, 'sugerido', v_sug,
-    'atualizado_em', v_meta, 'klingo_api', v_estado = 'com_horarios', 'estado', v_estado, 'estado_motivo', v_motivo, 'origem', case when v_estado = 'com_horarios' then 'api_klingo' else 'nenhuma' end, 'aviso', v_aviso);
-end $function$;
+    'atualizado_em', v_meta, 'klingo_api', v_estado = 'com_horarios', 'estado', v_estado, 'estado_motivo', v_motivo, 'origem', case when v_estado = 'com_horarios' then 'api_klingo' else 'nenhuma' end, 'aviso', v_aviso, 'unidades_bloqueadas', v_bloq > 0);
+end $function$;;
 

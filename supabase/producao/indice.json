@@ -2667,6 +2667,9 @@
   "klingo_so_liberados",
   "klingo_webhook",
   "login_paciente",
+  "marcacao_auto_csi",
+  "marcacao_auto_desenvoar",
+  "marcacao_auto_rmtc",
   "motor",
   "motor_telefones_teste",
   "nome_empresa",
@@ -6250,7 +6253,7 @@
    "anon": true,
    "authenticated": true,
    "publico": false,
-   "md5": "fd714f40d07552f583f87cfde6d56e82"
+   "md5": "4e8bad7e77728878c2c757a2439dc32e"
   },
   {
    "nome": "chat_horarios",
@@ -6293,7 +6296,7 @@
    "anon": true,
    "authenticated": true,
    "publico": false,
-   "md5": "152d4765901f6308c6dec8508913c0ec"
+   "md5": "41efb252b7cda98b4edfa50038248d1b"
   },
   {
    "nome": "chat_incidente",
@@ -11572,7 +11575,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "050de1239c680e49fed37c17a10e1279"
+   "md5": "9a1bfb99b5208cee629ab2553ed90afb"
   },
   {
    "nome": "klingo_pre_gravar",
@@ -14625,6 +14628,16 @@
    "md5": "b55bf7ca1502d4370320bedcbc1e8df7"
   },
   {
+   "nome": "unidade_aviso_bloqueio",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "6c5146ae4cb919a6a3f7b1d7100c745d"
+  },
+  {
    "nome": "unidade_chave",
    "args": [
     {
@@ -14638,6 +14651,21 @@
    "authenticated": true,
    "publico": true,
    "md5": "5709a5964df0534eecdba1898fe09214"
+  },
+  {
+   "nome": "unidade_marca_auto",
+   "args": [
+    {
+     "nome": "p_unidade",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "300cd6acaa65a4a1d2d0f782fda2538c"
   },
   {
    "nome": "unidade_medicos",
