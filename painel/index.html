@@ -2431,7 +2431,6 @@
           podeAtender() ? h('button', { class: 'btn', type: 'button', id: 'btnPrevisao', title: 'Pacientes que pediram aviso quando surgir vaga compatível (não é agendamento nem reserva)', onclick: abrirPrevisao }, icone('calendario'), 'Disponibilidade futura') : null,
           podeAtender() ? h('button', { class: 'btn', type: 'button', id: 'btnPendencias', title: 'O que espera a equipe: solicitações do acesso rápido, cadastros para conferir e contas antigas sem PIN', onclick: abrirPendencias },
             icone('lista'), 'Pendências', h('span', { class: 'selo', id: 'seloPendencias', hidden: true }, '0')) : null,
-          podeAtender() ? h('button', { class: 'btn', type: 'button', id: 'btnSimulacao', title: 'Simulação da clínica com os dados reais do Klingo e os indicadores (abre em outra aba)', onclick: () => window.open(new URL('../simulacao/', location.href).href, '_blank', 'noopener') }, icone('calendario'), 'Simulação') : null,
           ehChefia() ? h('button', { class: 'btn', type: 'button', id: 'btnEquipe', title: 'Quanto cada atendente está atendendo agora (só TI, gerência e supervisão)', onclick: abrirEquipe }, icone('pessoas'), 'Equipe agora') : null,
           h('div', { class: 'data-hoje' }, icone('calendario'), 'Hoje, ' + new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'short', year: 'numeric' })))),
       h('div', { class: 'kpis', id: 'kpis', 'aria-label': 'Indicadores do dia' }));
