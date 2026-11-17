@@ -13398,6 +13398,29 @@
    "md5": "a3d36254f31137bae8a69a69991a9e99"
   },
   {
+   "nome": "painel_indicadores_diretoria",
+   "args": [
+    {
+     "nome": "p_de",
+     "padrao": true
+    },
+    {
+     "nome": "p_ate",
+     "padrao": true
+    },
+    {
+     "nome": "p_incluir_teste",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "3abff1489b06b816c2e7c655fbab8f81"
+  },
+  {
    "nome": "painel_indicadores_decisao",
    "args": [
     {

@@ -84,3 +84,5 @@ Versão 1.5 — 16/11/2026 / Mudança: indicadores com total, canceladas e ativa
 Versão 1.6 — 17/11/2026 / Mudança: auditoria dos indicadores (migrações `indicadores_sincronia_parte1..4`, arquivo `supabase/indicadores-sincronia.sql`): `ind_decisao_periodo`, `painel_indicadores_mensal`, `painel_indicadores_conferencia` e `painel_automacao_resumo`. Atualização incremental; md5 conferido na produção.
 
 Versão 1.7 — 17/11/2026 / Mudança: indicadores focados na plataforma, consulta e exame separados (migrações `indicadores_plataforma_parte1..4`, arquivo `supabase/indicadores-plataforma.sql`): funções novas `painel_indicadores_plataforma` e `ind_clinica_periodo`; alteradas `ind_decisao_periodo` e `painel_indicadores_mensal`. Atualização incremental; md5 conferido na produção.
+
+Versão 1.8 — 17/11/2026 / Mudança: resumo para a diretoria (migração `indicadores_diretoria_parte1`, arquivo `supabase/indicadores-diretoria.sql`): função nova `painel_indicadores_diretoria`. Atualização incremental; md5 conferido na produção.

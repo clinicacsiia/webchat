@@ -396,7 +396,20 @@
   .ind-graf .grade { stroke: var(--linha); stroke-width: 1; }
   .ind-graf .zona:hover { fill: rgba(0,0,0,.04); }
   .ind-tab-graf .ind-tot td { font-weight: 650; } .ind-tab-graf .ind-sub td:first-child { padding-left: 22px; color: var(--suave); } .ind-tab-graf .ind-pc td { color: var(--suave); }
+  .ind-det { margin-top: 18px; } .ind-det > summary { margin-bottom: 8px; }
   .ind-sec-sum { font-size: 20px; font-weight: 650; cursor: pointer; margin: 26px 0 6px; color: var(--texto); }
+  .ind-dir { margin: 14px 0 6px; display: grid; gap: 12px; }
+  .ind-dir-geral { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 14px 16px; border-radius: 12px; border: 1px solid var(--linha); background: var(--papel); font-size: 18px; }
+  .ind-dir-geral span:last-child { color: var(--suave); font-size: 15px; }
+  .ind-chip { display: inline-block; padding: 3px 12px; border-radius: 999px; font-weight: 700; font-size: 13px; color: #fff; background: #8a94a0; }
+  .ind-chip.bom { background: #1f9d55; } .ind-chip.atencao { background: #d98a00; } .ind-chip.ruim { background: #d03a2f; }
+  .ind-dir-lin { display: grid; grid-template-columns: minmax(230px, 1fr) 2fr; gap: 8px 18px; padding: 14px 16px; border-radius: 12px; border: 1px solid var(--linha); border-left-width: 6px; background: var(--papel); }
+  .ind-dir-lin.bom { border-left-color: #1f9d55; } .ind-dir-lin.atencao { border-left-color: #d98a00; } .ind-dir-lin.ruim { border-left-color: #d03a2f; } .ind-dir-lin.sem { border-left-color: #8a94a0; }
+  .ind-dir-topo { grid-column: 1 / -1; display: flex; gap: 10px; align-items: center; } .ind-dir-tit { font-size: 16px; }
+  .ind-dir-num b { display: block; font-size: 32px; line-height: 1.1; } .ind-dir-num span { display: block; font-size: 14px; color: var(--suave); } .ind-dir-num .ind-dir-ref { font-size: 12.5px; margin-top: 4px; }
+  .ind-dir-txt { font-size: 14.5px; } .ind-dir-txt ul { margin: 4px 0 8px 18px; padding: 0; } .ind-dir-txt p { margin: 4px 0 8px; } .ind-dir-txt b { font-size: 13.5px; color: var(--suave); }
+  .ind-tab-graf tr.ind-baixo td { color: #b3261e; }
+  @media (max-width: 640px) { .ind-dir-lin { grid-template-columns: 1fr; } }
   .ind-graf-dica { position: absolute; z-index: 5; pointer-events: none; background: var(--papel); border: 1px solid var(--linha); border-radius: 8px; padding: 8px 10px; font-size: 13px; box-shadow: 0 4px 14px rgba(0,0,0,.14); min-width: 190px; }
   .ind-graf-dica b { display: block; margin-bottom: 4px; }
   .ind-graf-dica div { display: flex; justify-content: space-between; gap: 14px; }
@@ -4760,38 +4773,9 @@ h1.longo { font-size: 14mm; }
     const pior = lin.reduce((m, g, i) => (g.n >= 20 && taxas[i] >= (geral || 0) * 1.25 && (m < 0 || taxas[i] > taxas[m]) ? i : m), -1);
     return painel(tit, dica, lin.length ? lin.map((g, i) => barra(g.nome, taxas[i], maxT, `${pTxt(taxas[i])} · ${nf(g.f)} de ${nf(g.n)}`, i === pior ? 'verm' : 'azul', i === pior)) : h('p', { class: 'dica' }, 'Sem exames que já aconteceram neste período.'));
   }
-  // Frases de destaque, escritas pelas regras abaixo a partir dos números (sem inventar nada).
-  function destaques(A, B, c, PL) {
-    const out = [], add = (nivel, txt) => out.push({ nivel, txt });
-    const F = A.chat?.funil || {};
-    const ent = F.entraram || 0, ag = F.agendaram || 0;
-    if (ent >= 10) {
-      const t = taxa(ag, ent);
-      add(t < 30 ? 'ruim' : t < 50 ? 'atencao' : 'bom', `Só ${pTxt(t)} das pessoas que procuraram o chat agendaram (${nf(ag)} de ${nf(ent)}).`);
-      let pior = null;
-      for (let i = 1; i < PASSOS_FUNIL.length; i++) { const de = F[PASSOS_FUNIL[i - 1][0]] || 0, para = F[PASSOS_FUNIL[i][0]] || 0, perda = de - para; if (de >= 10 && (!pior || perda > pior.perda)) pior = { perda, de, i }; }
-      if (pior && pior.perda > 0) add('atencao', `A maior perda é entre "${PASSOS_FUNIL[pior.i - 1][1]}" e "${PASSOS_FUNIL[pior.i][1]}": ${nf(pior.perda)} pessoas (${pTxt(taxa(pior.perda, pior.de))}) não seguiram.`);
-      const sem = (A.chat?.sem_agendar_motivo || {}).sem_equipe || 0;
-      if (sem >= 3) add('ruim', `${nf(sem)} pessoas nunca foram respondidas por alguém da equipe.`);
-    }
-    // Plataforma: o que o chat marcou (consultas e exames separados); a clínica toda só entra como comparação.
-    const T = PL?.total || {}, PT = PL?.por_tipo || {}, CM = PL?.clinica_mesmo_periodo || {};
-    if ((T.total || 0) >= 10) {
-      const perdidas = (T.canceladas || 0) + (T.remarcadas || 0), p = taxa(perdidas, T.total);
-      add(p >= 20 ? 'ruim' : p >= 10 ? 'atencao' : 'bom', `${pTxt(p)} das marcações da plataforma foram canceladas ou remarcadas (${nf(perdidas)} de ${nf(T.total)}).`);
-    }
-    const nF = (T.atendidas || 0) + (T.faltaram || 0), tF = taxa(T.faltaram, nF);
-    if (nF >= 20) add(tF >= 20 ? 'ruim' : tF >= 10 ? 'atencao' : 'bom', `${pTxt(tF)} dos pacientes que a plataforma marcou faltaram (${nf(T.faltaram)} de ${nf(nF)} atendimentos que já aconteceram).`);
-    for (const [k, rot] of [['consulta', 'consultas'], ['exame', 'exames']]) {
-      const pl = (PT[k] || {}).total || 0, cl = CM[k] || 0;
-      if (cl >= 20) { const p = taxa(pl, cl); add(p < 20 ? 'atencao' : 'bom', `Das ${nf(cl)} ${rot} ${k === 'consulta' ? 'marcadas' : 'marcados'} na clínica neste período, ${nf(pl)} (${pTxt(p)}) vieram da plataforma.`); }
-    }
-    const ordem = { ruim: 0, atencao: 1, bom: 2 };
-    return out.sort((x, y) => ordem[x.nivel] - ordem[y.nivel]).slice(0, 7);
-  }
   // Seção 3: cada atendente, com barras para ver quem atendeu/agendou mais e quem tem a melhor nota.
   function secaoEquipe(eq) {
-    const cab = [h('h3', { class: 'ind-sec' }, '4. Equipe: quem atende e agenda mais'),
+    const cab = [h('h3', { class: 'ind-sec' }, 'Equipe: quem atende e agenda mais'),
       h('p', { class: 'dica' }, 'Cada atendente no período. "Agendou" conta o que a pessoa marcou como agendado e também o que o sistema confirmou sozinho com o Klingo, creditado a quem atendia a conversa (o dono dela; se não tinha dono, quem mais escreveu). Sem nenhum atendente na conversa, não é creditado a ninguém. A nota é a das avaliações dos pacientes nas conversas em que a pessoa mais escreveu.')];
     const E = !eq.error && eq.data && Array.isArray(eq.data.pessoas) ? eq.data : null;
     if (!E) return h('div', {}, ...cab, h('p', { class: 'dica' }, 'Para ver esta parte falta rodar o SQL supabase/indicadores-atendentes.sql.'));
@@ -4822,7 +4806,7 @@ h1.longo { font-size: 14mm; }
     const av = !ext.error && ext.data ? ext.data.avaliacoes : null;
     if (!av || !ehAdmin()) return null;
     const pc = av.por_canal || {}, num = (v) => (v == null ? '—' : String(v).replace('.', ','));
-    return h('div', {}, h('h3', { class: 'ind-sec' }, '5. Avaliações dos pacientes'),
+    return h('div', {}, h('h3', { class: 'ind-sec' }, 'Avaliações dos pacientes'),
       h('div', { class: 'ind-minis' }, h('div', { class: 'ind-mini' }, h('b', {}, nf(av.total)), h('span', {}, 'avaliações')), h('div', { class: 'ind-mini' }, h('b', {}, num(av.media_atendimento)), h('span', {}, 'nota do atendimento (0 a 10)')),
         h('div', { class: 'ind-mini' }, h('b', {}, num(av.media_site)), h('span', {}, 'nota do site (0 a 10)')), h('div', { class: 'ind-mini' }, h('b', {}, nf(pc.WhatsApp)), h('span', {}, 'conheceram pelo WhatsApp')),
         h('div', { class: 'ind-mini' }, h('b', {}, nf(pc.Instagram)), h('span', {}, 'pelo Instagram')), h('div', { class: 'ind-mini' }, h('b', {}, nf(pc.Google)), h('span', {}, 'pelo Google'))));
@@ -4891,7 +4875,7 @@ h1.longo { font-size: 14mm; }
     const cadTotal = Object.values(cad).reduce((s, x) => s + Number(x || 0), 0);
     const posEquipe = (pos['cancelar:incerto'] || 0) + (pos['cancelar:falha'] || 0) + (pos['remarcar:incerto'] || 0) + (pos['remarcar:falha'] || 0);
     return h('div', { class: 'ind-auto' },
-      h('h3', { class: 'ind-sec' }, '3. Autoatendimento: marcações feitas pelo chat'),
+      h('h3', { class: 'ind-sec' }, 'Autoatendimento: marcações feitas pelo chat'),
       h('p', { class: 'dica' }, 'O chat marca sozinho no Klingo (horários reais). Quando algo não conclui, a conversa vai para a equipe com o motivo. Conta só o que o chat tentou no período; marcação feita pela recepção ou pelo telefone não entra aqui. "Canceladas" são as que o chat marcou e que hoje estão canceladas no Klingo (por quem for: paciente, recepção ou o próprio chat).'),
       h('h4', { class: 'ind-conf-passo' }, 'Marcações que o chat tentou fazer'),
       h('div', { class: 'ind-minis' }, mini2(tentativas, 'tentativas no total'), mini2(feitas, 'marcadas com sucesso'), mini2(canc, 'dessas, canceladas ou remarcadas'), mini2(ativas, 'dessas, ativas'),
@@ -4920,7 +4904,7 @@ h1.longo { font-size: 14mm; }
     return partes.join(' ');
   }
   function blocoConferencia(d, c) {
-    const tit = h('h3', { class: 'ind-sec' }, '6. Conferência Klingo × webchat: de onde vêm as diferenças');
+    const tit = h('h3', { class: 'ind-sec' }, 'Conferência Klingo × webchat: de onde vêm as diferenças');
     const intro = h('p', { class: 'dica' }, 'Cada marcação do relatório #14554 do Klingo (pela data em que foi marcada), conferida uma a uma com o chat. Só números e códigos: CPF, e-mail e telefone não ficam guardados aqui.');
     if (!d || d.total == null) return h('div', {}, tit, intro, h('p', { class: 'ind-aviso' }, 'A conferência ainda não está disponível (falta aplicar o SQL supabase/klingo-conferencia.sql ou ligar a leitura do relatório #14554).'));
     const T = d.total || 0, E = d.explicacao || {}, W = d.webchat || {}, X = W.exames || {}, Q = d.qualidade_klingo || {}, P = d.problemas || {};
@@ -4997,9 +4981,104 @@ h1.longo { font-size: 14mm; }
       h('div', { class: 'ind-conf-acoes' }, h('button', { class: 'btn prim', type: 'button', onclick: () => { S.aba = 'avisos'; renderAba(); } }, 'Ver avisos')),
       tabProb, tabLig);
   }
+  /* ---------- Resumo para a diretoria: foi bem ou mal, por quê e o que melhorar. Só regras sobre os números do período (nada inventado). ---------- */
+  const LIMITES_DIR = { conversao: [50, 30], cancel: [10, 20], falta: [10, 20], espera: [10, 30] };   // [bom até/desde, ruim a partir de/abaixo de]
+  const ROT_NIVEL = { bom: 'Bom', atencao: 'Atenção', ruim: 'Ruim', sem: 'Poucos dados' };
+  const SUG_MOTIVO = { nao_respondido: 'Retomar a conversa de quem parou de responder (mensagem de retorno no dia seguinte) e responder mais rápido.', sem_equipe: 'Garantir que toda conversa nova receba resposta de alguém da equipe.',
+    apenas_informacoes: 'Deixar à vista, logo no início do chat, as informações mais pedidas (preço, endereço, documentos) para quem só quer informação.', desistiu: 'Perguntar o motivo da desistência e oferecer outro horário ou outra unidade.',
+    outro: 'Detalhar o motivo no encerramento para sabermos o que melhorar.', sem_motivo: 'Preencher o motivo ao encerrar a conversa: sem isso não sabemos o que melhorar.', nova_conversa: 'Juntar as conversas da mesma pessoa para não contar duas vezes.' };
+  const SUG_CANCEL = { paciente_cancelou: 'Confirmar presença um dia antes e oferecer a remarcação na mesma mensagem.', remarcou_depois: 'Deixar a remarcação pelo chat à vista ("Acompanhe seus pedidos").',
+    convenio_cobertura: 'Conferir cobertura e autorização do plano antes de marcar.', outro_lugar: 'Perguntar na confirmação se o paciente ainda quer o horário.', imprevisto_clinica: 'Avisar o paciente cedo e já oferecer novo horário.',
+    erro_duplicidade: 'Conferir se o paciente já tem horário antes de marcar, para evitar marcação duplicada.', sem_motivo: 'A recepção deve digitar o motivo ao cancelar no Klingo.', outros: 'Ler os textos dos cancelamentos para achar um padrão.' };
+  const rotuloPedido = (n) => { const t = String(n || '').toLowerCase().replace(/(^|[\s(-])([a-zà-ú])/g, (m, a, b) => a + b.toUpperCase()); return t === 'Consulta' ? 'Consulta (sem especialidade informada)' : t; };
+  function blocoDiretoria({ A, B, PL, D }) {
+    const CA = A.chat || {}, F = CA.funil || {}, CB = B.chat || {}, K = A.clinica || {};
+    const ent = F.entraram || 0, ag = F.agendaram || 0, tAg = taxa(ag, ent), tAgB = taxa((CB.funil || {}).agendaram, (CB.funil || {}).entraram);
+    const T = (PL || {}).total || {}, perdidas = (T.canceladas || 0) + (T.remarcadas || 0), tCan = taxa(perdidas, T.total);
+    const nF = (T.atendidas || 0) + (T.faltaram || 0), tFal = taxa(T.faltaram, nF);
+    const esp = CA.espera_mediana_min;
+    const nivel = (v, [lim1, lim2], maior) => (v == null ? 'sem' : maior ? (v >= lim1 ? 'bom' : v >= lim2 ? 'atencao' : 'ruim') : (v < lim1 ? 'bom' : v < lim2 ? 'atencao' : 'ruim'));
+    const nvConv = ent >= 10 ? nivel(tAg, LIMITES_DIR.conversao, true) : 'sem';
+    const nvCan = (T.total || 0) >= 10 ? nivel(tCan, LIMITES_DIR.cancel, false) : 'sem';
+    const nvFal = nF >= 20 ? nivel(tFal, LIMITES_DIR.falta, false) : 'sem';
+    const nvEsp = esp == null ? 'sem' : esp <= LIMITES_DIR.espera[0] ? 'bom' : esp <= LIMITES_DIR.espera[1] ? 'atencao' : 'ruim';
+    const niveis = [nvConv, nvCan, nvFal, nvEsp].filter((x) => x !== 'sem');
+    const nRuim = niveis.filter((x) => x === 'ruim').length, nAt = niveis.filter((x) => x === 'atencao').length;
+    const geral = !niveis.length ? 'sem' : nRuim >= 2 ? 'ruim' : (nRuim === 1 || nAt >= 2) ? 'atencao' : 'bom';
+    // por quê (conversão): maior perda no funil, motivos de quem terminou sem agendar (sem as conversas ainda abertas), planos e pedidos que quase não agendam
+    const motivos = Object.entries(CA.sem_agendar_motivo || {}).filter(([k]) => k !== 'em_andamento').sort((x, y) => y[1] - x[1]), totM = motivos.reduce((q, x) => q + x[1], 0);
+    const porqueConv = [];
+    let pior = null;
+    for (let i = 1; i < PASSOS_FUNIL.length; i++) { const de = F[PASSOS_FUNIL[i - 1][0]] || 0, para = F[PASSOS_FUNIL[i][0]] || 0, perda = de - para; if (de >= 10 && (!pior || perda > pior.perda)) pior = { perda, de, i }; }
+    if (pior && pior.perda > 0) porqueConv.push(`A maior perda é entre "${PASSOS_FUNIL[pior.i - 1][1]}" e "${PASSOS_FUNIL[pior.i][1]}": ${nf(pior.perda)} pessoas (${pTxt(taxa(pior.perda, pior.de))}).`);
+    if (totM >= 5) porqueConv.push(`Das ${nf(totM)} que terminaram sem agendar: ${motivos.slice(0, 3).map(([k, v]) => `${pTxt(taxa(v, totM))} ${(MOT_SEM_AGENDAR[k] || k).toLowerCase()}`).join('; ')}.`);
+    const baixos = [...((D || {}).planos || []).map((x) => ({ ...x, tipo: 'plano' })), ...((D || {}).pedidos || []).map((x) => ({ ...x, tipo: 'pedido' }))].filter((x) => x.pessoas >= 8 && taxa(x.agendaram, x.pessoas) < 15 && x.nome !== '(sem procedimento)')
+      .sort((x, y) => taxa(x.agendaram, x.pessoas) - taxa(y.agendaram, y.pessoas)).slice(0, 2);
+    if (baixos.length) porqueConv.push(`Quase não agendam: ${baixos.map((x) => `${x.tipo === 'plano' ? 'plano ' : ''}${rotuloPedido(x.nome)} (${nf(x.agendaram)} de ${nf(x.pessoas)})`).join('; ')}.`);
+    const melhorarConv = motivos.length && totM >= 5 ? (SUG_MOTIVO[motivos[0][0]] || null) : null;
+    // por quê (cancelamentos e remarcações da plataforma)
+    const cm = Object.entries((PL || {}).cancel_motivos || {}).sort((x, y) => y[1] - x[1]), totC = cm.reduce((q, x) => q + x[1], 0);
+    const porqueCan = [];
+    if ((T.total || 0) >= 10) porqueCan.push(`${nf(T.canceladas)} canceladas e ${nf(T.remarcadas)} remarcadas, de ${nf(T.total)} marcações.`);
+    if (totC >= 3) porqueCan.push(`Motivo mais comum das canceladas: ${(ROT_CANCEL[cm[0][0]] || cm[0][0]).toLowerCase()} (${nf(cm[0][1])} de ${nf(totC)}).`);
+    const melhorarCan = totC >= 3 ? SUG_CANCEL[cm[0][0]] : null;
+    // por quê (faltas): a clínica toda mostra quem falta mais
+    const porqueFal = [];
+    const nFc = (K.atendidos || 0) + (K.faltaram || 0), tFc = taxa(K.faltaram, nFc);
+    const piorConf = (K.falta_confirmacao || []).map((g) => ({ nome: ROT_CONFIRMA[g.nome] || g.nome, n: g.atendidos + g.faltaram, f: g.faltaram, t: taxa(g.faltaram, g.atendidos + g.faltaram) })).filter((g) => g.n >= 20 && g.t >= (tFc || 0) * 1.25 && g.t > 0).sort((x, y) => y.t - x.t)[0];
+    if (nF >= 20) porqueFal.push(`${nf(T.faltaram)} faltaram de ${nf(nF)} atendimentos que já aconteceram.`);
+    if (piorConf) porqueFal.push(`Na clínica toda, falta mais quem está "${piorConf.nome.toLowerCase()}": ${pTxt(piorConf.t)} (média ${pTxt(tFc)}).`);
+    const melhorarFal = nF >= 20 ? 'Pedir confirmação de presença e lembrar o paciente no dia anterior.' : null;
+    // por quê (resposta da equipe)
+    const semEq = (CA.sem_agendar_motivo || {}).sem_equipe || 0;
+    const porqueEsp = [];
+    if (esp != null) porqueEsp.push(`Tempo mediano até a primeira resposta da equipe: ${nf(esp)} min.`);
+    if (semEq > 0) porqueEsp.push(`${nf(semEq)} pessoa${semEq === 1 ? '' : 's'} não foram respondidas por ninguém da equipe.`);
+    const melhorarEsp = esp != null && esp > LIMITES_DIR.espera[0] ? 'Responder primeiro as conversas novas e dividir a fila nos horários de pico.' : semEq > 0 ? SUG_MOTIVO.sem_equipe : null;
+    const linha = (titulo, nv, valor, sub, ref, porque, melhorar, cmp) => h('div', { class: 'ind-dir-lin ' + nv },
+      h('div', { class: 'ind-dir-topo' }, h('span', { class: 'ind-chip ' + nv }, ROT_NIVEL[nv]), h('b', { class: 'ind-dir-tit' }, titulo)),
+      h('div', { class: 'ind-dir-num' }, h('b', {}, valor), h('span', {}, sub), cmp || null, h('span', { class: 'ind-dir-ref' }, ref)),
+      h('div', { class: 'ind-dir-txt' },
+        nv === 'sem' ? h('p', { class: 'dica' }, 'Ainda não há casos suficientes neste período para dizer se foi bom ou ruim. Escolha um período maior.') : null,
+        nv !== 'bom' && nv !== 'sem' && porque.length ? h('div', {}, h('b', {}, 'Por que não foi bem'), h('ul', {}, porque.map((x) => h('li', {}, x)))) : null,
+        nv === 'bom' && porque.length ? h('div', {}, h('b', {}, 'Detalhe'), h('ul', {}, porque.map((x) => h('li', {}, x)))) : null,
+        melhorar && nv !== 'sem' ? h('div', {}, h('b', {}, nv === 'bom' ? 'O que dá para melhorar' : 'O que fazer'), h('p', {}, melhorar)) : null));
+    const rotGeral = { bom: 'O período foi bom.', atencao: 'O período pede atenção.', ruim: 'O período foi ruim.', sem: 'Ainda sem dados suficientes.' }[geral];
+    const resumo = { ruim: `${nRuim} indicador${nRuim === 1 ? '' : 'es'} ruim${nRuim === 1 ? '' : 's'}${nAt ? ' e ' + nAt + ' em atenção' : ''}.`, atencao: nRuim ? '1 indicador ruim.' : `${nAt} indicadores em atenção.`, bom: 'Todos os indicadores com dados estão bons.', sem: '' }[geral];
+    return h('div', { class: 'ind-dir' },
+      h('div', { class: 'ind-dir-geral ' + geral }, h('span', { class: 'ind-chip ' + geral }, ROT_NIVEL[geral]), h('b', {}, rotGeral), h('span', {}, resumo)),
+      linha('Pessoas que agendaram pelo chat', nvConv, pTxt(tAg), `${nf(ag)} de ${nf(ent)} pessoas que procuraram`, `Bom: ${LIMITES_DIR.conversao[0]}% ou mais · Ruim: abaixo de ${LIMITES_DIR.conversao[1]}%`, porqueConv, melhorarConv, delta(tAg, tAgB, { base: Math.min(ent, (CB.funil || {}).entraram || 0) })),
+      linha('Marcações da plataforma canceladas ou remarcadas', nvCan, pTxt(tCan), `${nf(perdidas)} de ${nf(T.total)} marcações`, `Bom: abaixo de ${LIMITES_DIR.cancel[0]}% · Ruim: ${LIMITES_DIR.cancel[1]}% ou mais`, porqueCan, melhorarCan),
+      linha('Faltas das marcações da plataforma', nvFal, pTxt(tFal), `${nf(T.faltaram)} faltaram de ${nf(nF)} que já aconteceram`, `Bom: abaixo de ${LIMITES_DIR.falta[0]}% · Ruim: ${LIMITES_DIR.falta[1]}% ou mais`, porqueFal, melhorarFal),
+      linha('Rapidez da primeira resposta da equipe', nvEsp, esp != null ? nf(esp) + ' min' : '—', 'tempo mediano', `Bom: até ${LIMITES_DIR.espera[0]} min · Ruim: mais de ${LIMITES_DIR.espera[1]} min`, porqueEsp, melhorarEsp),
+      h('p', { class: 'dica' }, 'Como o veredito é calculado: cada indicador é comparado com os limites escritos abaixo dele (podem ser mudados com a diretoria). O período é "ruim" se 2 ou mais indicadores forem ruins, "atenção" se 1 for ruim ou 2 estiverem em atenção. As frases de "por que" e "o que fazer" saem dos números do período, não são opinião.'));
+  }
+  // Por unidade: onde o chat está funcionando e onde não está. Quem ainda não tem unidade definida aparece em todas.
+  function blocoUnidades(D) {
+    const tit = h('h3', { class: 'ind-sec' }, 'Por unidade');
+    if (!D || !D.unidades) return h('div', {}, tit, h('p', { class: 'dica' }, 'Esta parte ainda não está disponível (falta aplicar supabase/indicadores-diretoria.sql).'));
+    const pc = (a, b) => (b > 0 ? pTxt(taxa(a, b)) : '—');
+    const linhas = UNIDADES_PAINEL.map(([k, rot]) => { const u = D.unidades[k] || {}, m = u.marcacoes || {}, pt = u.por_tipo || {}, nFu = (m.atendidas || 0) + (m.faltaram || 0);
+      return h('tr', {}, h('td', {}, h('b', {}, rot)), h('td', {}, nf(u.pessoas)), h('td', {}, `${nf(u.agendaram)} (${pc(u.agendaram, u.pessoas)})`), h('td', {}, nf(m.total)), h('td', {}, `${nf((pt.consulta || {}).total)} · ${nf((pt.exame || {}).total)}`),
+        h('td', {}, `${nf((m.canceladas || 0) + (m.remarcadas || 0))} (${pc((m.canceladas || 0) + (m.remarcadas || 0), m.total)})`), h('td', {}, nFu ? `${nf(m.faltaram)} de ${nf(nFu)} (${pc(m.faltaram, nFu)})` : '—')); });
+    return h('div', {}, tit,
+      h('p', { class: 'dica' }, 'Quem ainda não escolheu a unidade no chat aparece em todas as unidades, por isso as pessoas somam mais que o total. As marcações usam a unidade do Klingo.'),
+      h('div', { class: 'ind-tab-rolagem' }, h('table', { class: 'ind-tab-graf' },
+        h('thead', {}, h('tr', {}, ['Unidade', 'Pessoas que procuraram', 'Agendaram', 'Marcações da plataforma', 'Consultas · exames', 'Canceladas ou remarcadas', 'Faltas'].map((t) => h('th', {}, t)))), h('tbody', {}, linhas))));
+  }
+  // O que os pacientes mais pedem e quais planos usam, e quantos desses agendaram.
+  function blocoPedidosPlanos(D) {
+    const tit = h('h3', { class: 'ind-sec' }, 'O que mais pedem e quais planos');
+    if (!D) return h('div', {}, tit, h('p', { class: 'dica' }, 'Esta parte ainda não está disponível (falta aplicar supabase/indicadores-diretoria.sql).'));
+    const tabela = (cab, lista) => h('table', { class: 'ind-tab-graf' }, h('thead', {}, h('tr', {}, [cab, 'Pessoas', 'Agendaram', '%'].map((t) => h('th', {}, t)))),
+      h('tbody', {}, lista.length ? lista.slice(0, 6).map((x) => h('tr', { class: x.pessoas >= 8 && taxa(x.agendaram, x.pessoas) < 15 ? 'ind-baixo' : '' }, h('td', {}, rotuloPedido(x.nome)), h('td', {}, nf(x.pessoas)), h('td', {}, nf(x.agendaram)), h('td', {}, pTxt(taxa(x.agendaram, x.pessoas))))) : [h('tr', {}, h('td', { colspan: 4 }, 'Nenhum pedido neste período.'))]));
+    return h('div', {}, tit,
+      h('p', { class: 'dica' }, 'Pessoas que começaram um pedido no chat no período e quantas delas agendaram. Linha em vermelho: pelo menos 8 pessoas e menos de 15% agendaram. Uma pessoa pode aparecer em mais de um pedido.'),
+      h('div', { class: 'ind-grade' }, painel('Mais pedidos', null, h('div', { class: 'ind-tab-rolagem' }, tabela('Pedido', D.pedidos || []))), painel('Planos mais usados', null, h('div', { class: 'ind-tab-rolagem' }, tabela('Plano', D.planos || [])))));
+  }
   /* Seção 2: o que a PLATAFORMA marcou, com consulta e exame separados (painel_indicadores_plataforma). Total = canceladas + remarcadas + ativas. */
   function blocoPlataforma(d) {
-    const tit = h('h3', { class: 'ind-sec' }, '2. O que a plataforma marcou: consultas e exames');
+    const tit = h('h3', { class: 'ind-sec' }, 'Marcações da plataforma: consultas e exames');
     const intro = h('p', { class: 'dica' }, 'Marcações do Klingo que vieram de uma conversa do chat (ligadas pelo pedido ou por celular e nome), pela data em que foram marcadas. Total = canceladas + remarcadas + ativas; ativas = atendidas + faltaram + por vir. Consulta é o que o Klingo chama de "CONSULTA"; todo o resto é exame. O Klingo mostra a remarcação como "Cancelada"; aqui as duas ficam separadas.');
     if (!d || !d.total) return h('div', {}, tit, intro, h('p', { class: 'dica' }, 'Esta parte ainda não está disponível (falta aplicar supabase/indicadores-plataforma.sql).'));
     const P = d.por_tipo || {}, C = P.consulta || {}, E = P.exame || {}, S = P.sem_tipo || {}, T = d.total, CM = d.clinica_mesmo_periodo || {};
@@ -5049,7 +5128,7 @@ h1.longo { font-size: 14mm; }
         blocoMensal(mensal));
     };
     desenhar();
-    return h('details', { class: 'ind-clin', open: true }, h('summary', { class: 'ind-sec-sum' }, '7. Para comparar: a clínica toda (Klingo, todos os canais)'), cx);
+    return h('details', { class: 'ind-clin' }, h('summary', { class: 'ind-sec-sum' }, 'Para comparar: a clínica toda (Klingo, todos os canais)'), cx);
   }
   async function viewIndicadores(c, silencioso = false) {
     if (IND.preset !== 'livre') [IND.de, IND.ate] = periodoDe(IND.preset);
@@ -5058,13 +5137,14 @@ h1.longo { font-size: 14mm; }
     const minha = viewIndicadores.seq = (viewIndicadores.seq || 0) + 1;   // só a última escolha pinta a tela
     const un = UN.sel || null;
     const args = { p_de: IND.de, p_ate: IND.ate, p_unidade: un, p_incluir_teste: IND.teste };
-    const [r, eq, ext, au, cf, mensal, plat] = await Promise.all([db.rpc('painel_indicadores_decisao', args),
+    const [r, eq, ext, au, cf, mensal, plat, dir] = await Promise.all([db.rpc('painel_indicadores_decisao', args),
       Promise.resolve(db.rpc('painel_indicadores_atendentes', args)).then((x) => x, () => ({ error: true, data: null })),
       Promise.resolve(db.rpc('painel_indicadores_extras_v2', args)).then((x) => x, () => ({ error: true, data: null })),
       Promise.resolve(db.rpc('painel_automacao_resumo', { p_de: IND.de, p_ate: IND.ate })).then((x) => x, () => ({ error: true, data: null })),
       Promise.resolve(db.rpc('painel_indicadores_conferencia', args)).then((x) => x, () => ({ error: true, data: null })),
       Promise.resolve(db.rpc('painel_indicadores_mensal', { p_meses: 12, p_unidade: un })).then((x) => x, () => ({ error: true, data: null })),
-      Promise.resolve(db.rpc('painel_indicadores_plataforma', args)).then((x) => x, () => ({ error: true, data: null }))]);
+      Promise.resolve(db.rpc('painel_indicadores_plataforma', args)).then((x) => x, () => ({ error: true, data: null })),
+      Promise.resolve(db.rpc('painel_indicadores_diretoria', { p_de: IND.de, p_ate: IND.ate, p_incluir_teste: IND.teste })).then((x) => x, () => ({ error: true, data: null }))]);
     if (S.aba !== 'indicadores' || minha !== viewIndicadores.seq) return;
     if (r.error || !r.data) {
       c.replaceChildren(h('div', { class: 'pagina' }, titulo, h('p', { class: 'erro' }, msgErro(r.error || { message: 'Sem resposta do banco.' })),
@@ -5097,14 +5177,7 @@ h1.longo { font-size: 14mm; }
     const entA = FA.entraram || 0, entB = (CB.funil || {}).entraram || 0, agA = FA.agendaram || 0, agB = (CB.funil || {}).agendaram || 0;
     const tAgA = taxa(agA, entA), tAgB = taxa(agB, entB);
     const nFA = (KA.atendidos || 0) + (KA.faltaram || 0), nFB = (KB.atendidos || 0) + (KB.faltaram || 0), tFA = taxa(KA.faltaram, nFA), tFB = taxa(KB.faltaram, nFB);
-    const PLd = plat && !plat.error && plat.data && plat.data.total ? plat.data : null, PLT = (PLd || {}).total || {}, PLP = (PLd || {}).por_tipo || {};
-    const nFP = (PLT.atendidas || 0) + (PLT.faltaram || 0), tFP = taxa(PLT.faltaram, nFP);
-    const cartoes = h('div', { class: 'ind-kpis' },
-      kpi('Pessoas que procuraram o chat', nf(entA), 'abriram conversa no período', delta(entA, entB, { cont: true, base: entB }), 'Cada pessoa conta uma vez, mesmo que tenha aberto mais de uma conversa.'),
-      kpi('Agendaram pelo chat', pTxt(tAgA), `${nf(agA)} de ${nf(entA)} pessoas`, delta(tAgA, tAgB, { base: Math.min(entA, entB) }), 'Das pessoas que procuraram o chat, quantas terminaram com consulta ou exame agendado (pelo sistema ou pela equipe).'),
-      PLd ? kpi('Marcações feitas pela plataforma', nf(PLT.total), `${nf((PLP.consulta || {}).total)} consultas · ${nf((PLP.exame || {}).total)} exames`, null, 'Marcações do Klingo que vieram de uma conversa do chat (ligadas pelo pedido ou por celular e nome), pela data em que foram marcadas.') : null,
-      PLd ? kpi('Canceladas e remarcadas', nf((PLT.canceladas || 0) + (PLT.remarcadas || 0)), `${nf(PLT.canceladas)} canceladas · ${nf(PLT.remarcadas)} remarcadas`, null, 'Entre as marcações feitas pela plataforma. Remarcada é a que o paciente trocou de data; cancelada é a que acabou sem nova data.') : null,
-      PLd ? kpi('Faltas das marcações da plataforma', pTxt(tFP), `${nf(PLT.faltaram)} faltaram de ${nf(nFP)} atendimentos que já aconteceram`, null, 'Faltaram ÷ (atendidos + faltaram), só entre o que a plataforma marcou. O que ainda vai acontecer não entra.') : null);
+    const PLd = plat && !plat.error && plat.data && plat.data.total ? plat.data : null;
 
     // ----- Funil do chat -----
     const maxFun = Math.max(1, FA.entraram || 0);
@@ -5129,8 +5202,6 @@ h1.longo { font-size: 14mm; }
 
     // ----- Clínica: faltas e cancelamentos -----
     const mini = (n, rot) => h('div', { class: 'ind-mini' }, h('b', {}, nf(n)), h('span', {}, rot));
-    const lista = destaques(A, B, c, PLd);
-    const pouco = entA < 10;
 
     c.replaceChildren(h('div', { class: 'pagina ind-pg' }, titulo,
       h('p', { class: 'sub' }, `Período: ${nomePer(R.periodo)}. Comparado com ${nomePer(R.anterior_periodo)}. ${R.gerado_em ? 'Atualizado às ' + fmtDataHora(R.gerado_em) + '. ' : ''}Só números, nenhum dado de paciente.`),
@@ -5138,12 +5209,13 @@ h1.longo { font-size: 14mm; }
       h('div', { class: 'ind-ctl' }, h('label', {}, 'De ', campoDe), h('label', {}, ' até ', campoAte), h('button', { class: 'btn', type: 'button', onclick: verPeriodo }, 'Ver período'),
         h('button', { class: 'btn', type: 'button', onclick: () => viewIndicadores(c, true) }, 'Atualizar agora'), caixaTeste),
       h('p', { class: 'dica' }, 'Filtro de unidade do topo: ' + escopo),
-      pouco ? h('p', { class: 'ind-aviso' }, 'Poucas pessoas neste período: escolha "Últimos 30 dias" para os números ficarem mais confiáveis.') : null,
-      h('div', { class: 'ind-destaques' }, h('h3', {}, 'O que chama atenção'),
-        lista.length ? h('ul', {}, lista.map((d) => h('li', { class: d.nivel }, d.txt))) : h('p', { class: 'dica' }, 'Ainda não há dados suficientes neste período para destacar algo. Tente um período maior.')),
-      cartoes,
+      blocoDiretoria({ A, B, PL: PLd, D: dir && !dir.error ? dir.data : null }),
+      blocoUnidades(dir && !dir.error ? dir.data : null),
+      blocoPedidosPlanos(dir && !dir.error ? dir.data : null),
 
-      h('h3', { class: 'ind-sec' }, '1. Chat: por que não estão agendando?'),
+      blocoPlataforma(PLd),
+      h('details', { class: 'ind-det' }, h('summary', { class: 'ind-sec-sum' }, 'Detalhes para análise: chat, autoatendimento, equipe, avaliações, conferência com o Klingo e a clínica toda'),
+      h('h3', { class: 'ind-sec' }, 'Chat: por que não estão agendando?'),
       h('p', { class: 'dica' }, 'Acompanha as pessoas que abriram conversa no chat no período, passo a passo, até o agendamento.'),
       h('div', { class: 'ind-grade' },
         painel('Caminho do paciente no chat', espera != null ? `Demora mediana para a primeira resposta da equipe: ${nf(espera)} min.` : 'Cada barra mostra quantas pessoas chegaram até aquele passo.', funil),
@@ -5152,18 +5224,17 @@ h1.longo { font-size: 14mm; }
           painel('Onde as pessoas pararam', 'Último passo do pedido de quem não agendou.', etapas.some((x) => x[1]) ? etapas.map(([rot, v]) => barra(rot, v, maxEt, `${nf(v)} · ${pTxt(taxa(v, totEt))}`, 'azul')) : h('p', { class: 'dica' }, 'Ninguém parou no meio do caminho neste período.')),
           painel('Por que a conversa terminou sem agendar', 'Motivo da última conversa de cada pessoa que não agendou.', motivos.length ? motivos.map(([k, v]) => barra(MOT_SEM_AGENDAR[k] || k, v, maxMot, `${nf(v)} · ${pTxt(taxa(v, totMot))}`, k === 'sem_equipe' ? 'verm' : 'azul', k === 'sem_equipe')) : h('p', { class: 'dica' }, 'Todos agendaram neste período.')))),
 
-      blocoPlataforma(PLd),
       blocoAutoatendimento(au && au.data),
       secaoEquipe(eq),
       secaoAvaliacoes(ext),
       blocoConferencia(cf && !cf.error ? cf.data : null, c),
-      blocoClinica(A, mensal),
+      blocoClinica(A, mensal)),
       h('details', { class: 'ind-como' }, h('summary', {}, 'Como ler estes números'),
         h('ul', {},
           h('li', {}, 'Cada pessoa conta uma vez, mesmo que tenha aberto mais de uma conversa. Conversas de teste da TI ficam de fora.'),
           h('li', {}, '"Agendaram" inclui o agendamento feito pelo sistema e o marcado pela equipe (ou conversa encerrada como "agendado").'),
           h('li', {}, 'As setas comparam com o período anterior de mesmo tamanho. Com poucos casos (menos de 8) o painel avisa em vez de comparar.'),
-          h('li', {}, 'As seções 1 a 6 falam da plataforma (o chat). A seção 7 é a clínica toda, só para comparar, e sempre separa consulta de exame.'),
+          h('li', {}, 'O alto da página é o resumo para a diretoria e fala só da plataforma (o chat). Dentro de "Detalhes" está a clínica toda, só para comparar, sempre separando consulta de exame.'),
           h('li', {}, 'Consulta é o que o Klingo chama de "CONSULTA"; todo o resto é exame. Total = canceladas + remarcadas + ativas.'),
           h('li', {}, 'O dia de hoje ainda está em andamento: faltas só aparecem depois que o atendimento passa.')))));
     // Avaliações (só administrador) saíram desta tela de decisão; ficam no resumo da conversa.
