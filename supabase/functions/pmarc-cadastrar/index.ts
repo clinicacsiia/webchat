@@ -10,8 +10,8 @@ const TAMANHO_LOTE = 400;
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
 // O relatório numa faixa de datas (campo = id do filtro de período). Se o Klingo cortar por limite de linhas, divide a faixa ao meio e junta.
-async function ler(token: string, id: string, campo: string, de: string, ate: string, meta: { colunas?: Coluna[] }, nivel = 0): Promise<Row[]> {
-  const params = new URLSearchParams({ id, [`:${campo}`]: "l", [`:${campo}-from`]: de, [`:${campo}-to`]: ate });
+async function ler(token: string, id: string, campo: string, de: string, ate: string, meta: { colunas?: Coluna[]; formato?: Record<string, unknown> }, nivel = 0, extra: Record<string, string> = {}): Promise<Row[]> {
+  const params = new URLSearchParams({ id, [`:${campo}`]: "l", [`:${campo}-from`]: de, [`:${campo}-to`]: ate, ...extra });
   const res = await fetch(`${KLINGO_URL}?${params}`, { headers: { "X-APP-TOKEN": token }, signal: AbortSignal.timeout(90_000) });
   if (!res.ok) throw new Error(`Klingo retornou HTTP ${res.status} no relatório ${id}`);
   const payload = await res.json();
@@ -19,9 +19,16 @@ async function ler(token: string, id: string, campo: string, de: string, ate: st
   if (payload?.limit) {
     if (de >= ate || nivel >= 6) throw new Error(`O Klingo cortou o relatório ${id} mesmo em faixa curta`);
     const meio = new Date((Date.parse(`${de}T00:00:00Z`) + Date.parse(`${ate}T00:00:00Z`)) / 2).toISOString().slice(0, 10);
-    return [...await ler(token, id, campo, de, meio, meta, nivel + 1), ...await ler(token, id, campo, somaDias(meio, 1), ate, meta, nivel + 1)];
+    return [...await ler(token, id, campo, de, meio, meta, nivel + 1, extra), ...await ler(token, id, campo, somaDias(meio, 1), ate, meta, nivel + 1, extra)];
   }
   if (payload?.result === "") return [];
+  // Só a FORMA da resposta (nomes de campos e totais numéricos), nunca o conteúdo: ajuda a ver se o Klingo está paginando ou cortando.
+  if (meta.formato && !meta.formato.chaves) {
+    const r = payload?.result ?? {};
+    meta.formato.chaves = Object.keys(payload ?? {}).join(",");
+    meta.formato.chaves_result = Object.keys(r).join(",");
+    for (const k of ["total", "per_page", "current_page", "last_page", "count", "limit"]) if (typeof (r as Record<string, unknown>)[k] === "number" || typeof (payload as Record<string, unknown>)?.[k] === "number") meta.formato[k] = (r as Record<string, unknown>)[k] ?? (payload as Record<string, unknown>)[k];
+  }
   const dados = payload?.result?.data;
   if (!Array.isArray(dados)) throw new Error(`Formato inesperado no relatório ${id}`);
   if (!meta.colunas) {
@@ -54,8 +61,11 @@ Deno.serve(async (req: Request) => {
   const resumo: Record<string, unknown> = { modo };
   try {
     if (exame) {
-      const meta: { colunas?: Coluna[] } = {};
-      const brutas = await ler(token, "14359", "periodo0", exame.de, exame.ate, meta);
+      const meta: { colunas?: Coluna[]; formato?: Record<string, unknown> } = { formato: {} };
+      // O #14359 tem um 2º filtro de período, "marcado em" (periodo2). Sem ele o Klingo devolve só as marcações feitas HOJE (medido em 17/11/2026: 49 linhas em vez de ~3.000).
+      // Com a faixa larga abaixo vêm todas as marcações feitas no último ano para os dias de exame pedidos.
+      const marcadoEm = { ":periodo2": "l", ":periodo2-from": somaDias(hoje, -360), ":periodo2-to": hoje };
+      const brutas = await ler(token, "14359", "periodo0", exame.de, exame.ate, meta, 0, marcadoEm);
       const { layout, faltando, por } = layoutPorTitulos(meta.colunas);
       if (faltando.length) throw new Error(`O #14359 perdeu coluna(s): ${faltando.join(", ")}`);
       const { linhas, descartadas, semProntuario } = await prepararCadastro(brutas, layout, sal);
@@ -65,7 +75,7 @@ Deno.serve(async (req: Request) => {
         if (error) throw new Error(`O banco recusou um lote (${error.code ?? "sem código"}): ${error.message.slice(0, 120)}`);
         novas += (data as { novas?: number })?.novas ?? 0; alteradas += (data as { alteradas?: number })?.alteradas ?? 0;
       }
-      Object.assign(resumo, { janela_exame: `${exame.de}..${exame.ate}`, linhas_14359: brutas.length, pessoas: linhas.length, descartadas, sem_prontuario: semProntuario, novas, alteradas, colunas_por: por });
+      Object.assign(resumo, { janela_exame: `${exame.de}..${exame.ate}`, linhas_14359: brutas.length, pessoas: linhas.length, descartadas, sem_prontuario: semProntuario, novas, alteradas, colunas_por: por, formato: meta.formato });
     }
     if (feitas) {
       let brutas: Row[];

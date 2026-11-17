@@ -22,7 +22,7 @@ const OPCIONAIS = new Set<string>(["tel", "primeira"]);
 const txt = (v: unknown, max = 200): string => String(v ?? "").trim().slice(0, max);
 export const digitos = (v: unknown): string => String(v ?? "").replace(/\D/g, "");
 const ISO = /^\d{4}-\d{2}-\d{2}/;
-const normTitulo = (v: unknown): string => String(v ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+const normTitulo = (v: unknown): string => String(v ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
 const numeroDaColuna = (n: unknown): number => { const m = /^col(\d+)$/.exec(String(n ?? "").trim()); return m ? Number(m[1]) : Number.NaN; };
 
 export const somaDias = (iso: string, n: number): string => new Date(Date.parse(`${iso}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
@@ -33,7 +33,7 @@ const sha256Hex = async (texto: string): Promise<string> =>
 
 // Nome sem acento, em maiúsculas, só letras/números e espaço simples (igual ao da Jornada: a mesma pessoa dá sempre a mesma chave).
 export const normNome = (v: unknown): string =>
-  String(v ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().replace(/[^A-Z0-9]+/g, " ").trim();
+  String(v ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().replace(/[^A-Z0-9]+/g, " ").trim();
 
 // IGUAL a chavePaciente de sync-jornada-klingo/mapa.ts: prontuário; ou "n:" + 24 primeiras letras do SHA-256 de (nome | 8 últimos dígitos do celular, senão do telefone | segredo).
 export async function chavePessoa(r: Row, L: Layout, segredo: string): Promise<string> {
