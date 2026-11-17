@@ -46,6 +46,7 @@ const DECISAO = (a) => {
     clinica: { novas_marcacoes: 250, novas_pelo_chat: 30, previstos: 300, atendidos: 220, faltaram: 30, cancelados: 10, remarcados: 10, por_vir: 30, falta_confirmacao: [], falta_antecedencia: [], falta_unidade: [], falta_plano: [], cancel_motivos: {} } };
   atual.clinica_consulta = { ...atual.clinica, previstos: 90, atendidos: 60, faltaram: 10, cancelados: 10, remarcados: 5, por_vir: 5, novas_marcacoes: 60 };
   atual.clinica_exame = { ...atual.clinica, previstos: 210, atendidos: 140, faltaram: 40, cancelados: 10, remarcados: 10, por_vir: 10, novas_marcacoes: 140 };
+  if (a.p_de.endsWith('-01') && a.p_ate > a.p_de) { const mm = Number(a.p_de.slice(5, 7)); atual.chat.funil.entraram = 10 * mm; atual.chat.funil.agendaram = mm; }   // gráfico mês a mês: cada mês com valor próprio
   return { periodo: { de: a.p_de, ate: a.p_ate }, anterior_periodo: { de: mais(a.p_de, -1), ate: mais(a.p_de, -1) }, unidade: un, incluir_teste: !!a.p_incluir_teste, gerado_em: agora, atual, anterior };
 };
 const ATENDENTES = (a) => ({ periodo: { de: a.p_de, ate: a.p_ate }, unidade: a.p_unidade, gerado_em: agora, nota_media_geral: 8.5,
@@ -161,6 +162,7 @@ const abrir = async (opc) => { const t = await pagina(browser, opc); await t.pag
 const cartoes = (page) => page.locator('#kpis .kpi').evaluateAll((l) => Object.fromEntries(l.map((k) => [k.querySelector('small').textContent, k.querySelector('strong').textContent])));
 const esperaCartao = (page, rot, v) => page.waitForFunction(([r, x]) => [...document.querySelectorAll('#kpis .kpi')].some((k) => k.querySelector('small').textContent === r && k.querySelector('strong').textContent === x), [rot, v], { timeout: 5000 });
 const abaInd = async (t) => { await t.page.click('.nav button[data-aba=indicadores]'); await t.page.waitForSelector('.ind-kpis .ind-kpi', { timeout: 8000 }).catch((e) => { throw new Error(e.message.split('\n')[0] + ' | erros da página: ' + (t.reg.excecoes.join(' ; ') || 'nenhum')); }); await t.page.evaluate(() => document.querySelectorAll('.ind-det, .ind-num-det').forEach((d) => { d.open = true; })); };
+const ultimoD = async (t) => { const [de, ate] = await t.page.locator('.ind-ctl input[type=date]').evaluateAll((l) => l.map((i) => i.value)); return t.reg.rpcs.filter((r) => r[0] === 'decisao' && r[1].p_de === de && r[1].p_ate === ate).at(-1)?.[1]; };   // as consultas do gráfico mensal têm outras datas
 const ultimo = (reg, k) => reg.rpcs.filter((r) => r[0] === k).at(-1)?.[1];
 
 await caso('Cartões do topo: 5 conversas, 4 pessoas atendidas e 1 concluída hoje; a conversa de TESTE fica fora e não existe "Conversas por pessoa"', async () => {
@@ -195,7 +197,7 @@ const textoAba = async (t) => (await t.page.locator('.pagina').first().innerText
 const kpiTxt = async (t) => t.page.locator('.ind-kpi').evaluateAll((l) => Object.fromEntries(l.map((k) => [k.querySelector('.ind-kpi-rot').textContent, [k.querySelector('b').textContent, k.querySelector('.ind-kpi-sub').textContent, k.querySelector('.ind-delta')?.textContent ?? ''].join(' | ')])));
 await caso('Aba Indicadores: período padrão é Hoje e pede só a consulta nova de cada bloco (uma chamada por bloco, sem equipe, avaliações, conferência nem gráfico mensal)', async () => {
   const t = await abrir(); await abaInd(t);
-  const a = ultimo(t.reg, 'decisao'), ctrl = await t.page.locator('.ind-ctl input[type=date]').evaluateAll((l) => l.map((i) => i.value));
+  const a = await ultimoD(t), ctrl = await t.page.locator('.ind-ctl input[type=date]').evaluateAll((l) => l.map((i) => i.value));
   const nomes = [...new Set(t.reg.rpcs.map((r) => r[0]))].sort().join();
   await t.ctx.close();
   return { ok: a.p_de === HOJE && a.p_ate === HOJE && a.p_unidade === null && a.p_incluir_teste === false && ctrl.join() === `${HOJE},${HOJE}` && nomes === 'automacao,decisao,diretoria,plataforma' && !t.reg.excecoes.length, detalhe: JSON.stringify(a) + ' ' + nomes + (t.reg.excecoes[0] ?? '') };
@@ -213,6 +215,27 @@ await caso('Poucos casos no período anterior: mostra o número de antes em vez 
   const k = await kpiTxt(t); await t.ctx.close();
   return { ok: /período anterior: 3 \(poucos casos para comparar\)/.test(k['Pessoas que procuraram o chat']) && !/sem base/.test(JSON.stringify(k)), detalhe: JSON.stringify(k['Pessoas que procuraram o chat']) };
 });
+await caso('Gráfico mês a mês (SVG puro): 6 meses, total e melhor mês calculados sozinhos, tooltip ao passar o mouse e troca para "Agendaram pelo chat"', async () => {
+  const t = await abrir(); await abaInd(t); await t.page.waitForSelector('.ind-area', { timeout: 8000 });
+  let [a, m] = HOJE.split('-').map(Number); const meses = []; for (let i = 0; i < 6; i++) { meses.unshift(m); m -= 1; if (m === 0) { m = 12; a -= 1; } }
+  const soma = meses.reduce((q, x) => q + 10 * x, 0), somaAg = meses.reduce((q, x) => q + x, 0), ult = meses[5];
+  const pontos = await t.page.locator('.ind-area .pt').count(), grad = await t.page.locator('.ind-area linearGradient').count(), caminhos = await t.page.locator('.ind-area path').count(), externos = await t.page.locator('script[src^="http"]:not([src*="supabase"])').count();
+  const minis = await t.page.locator('.ind-painel', { hasText: 'Mês a mês' }).locator('.ind-mini').allInnerTexts();
+  await t.page.locator('.ind-area .zona').nth(1).hover(); await t.page.waitForSelector('.ind-area-dica:not([hidden])');
+  const dica = (await t.page.locator('.ind-area-dica').innerText()).replace(/\s+/g, ' ');
+  await t.page.locator('.ind-painel .chip', { hasText: 'Agendaram pelo chat' }).click(); await t.page.waitForSelector('.ind-area');
+  const minis2 = await t.page.locator('.ind-painel', { hasText: 'Mês a mês' }).locator('.ind-mini').allInnerTexts();
+  const meses12 = (await t.page.locator('.ind-area text:not([text-anchor=end])').allInnerTexts()).length;
+  await t.ctx.close();
+  return { ok: pontos === 6 && grad === 1 && caminhos === 2 && externos === 0 && minis[0].replace(/\s+/g, ' ').startsWith(`${soma.toLocaleString('pt-BR')} total nos 6 meses`) && /melhor mês \(\d+\)/.test(minis[1].replace(/\s+/g, ' ')) && minis[1].startsWith(String(['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'][ult - 1]))
+    && /de 20\d\d \d+ pessoas que procuraram o chat/.test(dica) && minis2[0].startsWith(String(somaAg)) && meses12 === 6, detalhe: JSON.stringify({ pontos, grad, caminhos, minis, dica, minis2, meses12, soma, somaAg }) };
+});
+await caso('Gráfico mês a mês: se uma consulta falhar mostra aviso e o resto da página continua', async () => {
+  const t = await abrir({ semSql: false }); await t.page.route('**/rpc/painel_indicadores_decisao', async (r) => { const b = JSON.parse(r.request().postData() || '{}'); if (b.p_de.endsWith('-01') && b.p_ate > b.p_de && b.p_de < HOJE.slice(0, 8) + '01') return r.fulfill({ status: 500, headers: CORS, contentType: 'application/json', body: '{"message":"x"}' }); return r.fallback(); });
+  await abaInd(t); await t.page.waitForFunction(() => /Não consegui carregar o gráfico/.test(document.querySelector('.pagina')?.innerText || ''), null, { timeout: 8000 });
+  const k = await kpiTxt(t); await t.ctx.close();
+  return { ok: k['Pessoas que procuraram o chat'].startsWith('60 |'), detalhe: JSON.stringify(k) };
+});
 await caso('Sem veredito: nada de "Bom/Ruim/Atenção", "período foi bom", "o que fazer" ou "por quê"; só números', async () => {
   const t = await abrir(); await abaInd(t);
   const txt = await textoAba(t); const chips = await t.page.locator('.ind-chip, .ind-faixa, .ind-dir, .ind-why').count();
@@ -223,7 +246,7 @@ await caso('Ordem da página: resumo, onde as pessoas param, onde o site mais é
   const t = await abrir({ admin: true }); await abaInd(t);
   const tits = await t.page.locator('.ind-pg h3.ind-sec').allInnerTexts(); const txt = await textoAba(t);
   await t.ctx.close();
-  return { ok: tits.join('|') === 'Onde as pessoas param|Onde o site mais é usado|Comparação com o Klingo|Autoatendimento' && !/Avaliações dos pacientes|Nota média|Conferência|Para comparar: a clínica toda|Faltas por|Motivos dos cancelamentos/.test(txt), detalhe: tits.join('|') };
+  return { ok: tits.join('|') === 'Mês a mês|Onde as pessoas param|Onde o site mais é usado|Comparação com o Klingo|Autoatendimento' && !/Avaliações dos pacientes|Nota média|Conferência|Para comparar: a clínica toda|Faltas por|Motivos dos cancelamentos/.test(txt), detalhe: tits.join('|') };
 });
 await caso('Funil: 6 passos, a maior queda marcada (só uma) e os dois painéis de por que pararam', async () => {
   const t = await abrir(); await abaInd(t);
@@ -285,7 +308,7 @@ await caso('Atalhos de período: Ontem, 7 dias, 30 dias, Este mês e Mês anteri
     await t.page.click(`.ind-atalhos .chip >> text=${rot}`);
     await t.page.waitForFunction(([r]) => document.querySelector('.ind-atalhos .chip[aria-pressed=true]')?.textContent === r, [rot]);
     await t.page.waitForSelector('.ind-kpis .ind-kpi');
-    const q = ultimo(t.reg, 'decisao'); if (q.p_de !== de || q.p_ate !== ate) falhas.push(`${rot}: ${q.p_de}..${q.p_ate} (esperado ${de}..${ate})`);
+    const q = await ultimoD(t); if (q.p_de !== de || q.p_ate !== ate) falhas.push(`${rot}: ${q.p_de}..${q.p_ate} (esperado ${de}..${ate})`);
   }
   await t.ctx.close();
   return { ok: !falhas.length && !t.reg.excecoes.length, detalhe: falhas.join(' | ') };
@@ -297,7 +320,7 @@ await caso('Período livre: "Ver período" pede esse intervalo, datas invertidas
   await t.page.fill('.ind-ctl input[aria-label="Data inicial"]', d2); await t.page.fill('.ind-ctl input[aria-label="Data final"]', d1);   // invertido de propósito
   await t.page.click('.ind-ctl .btn >> text=Ver período');
   await t.page.waitForFunction(([x]) => document.querySelector('.pagina .sub')?.textContent.includes(x), [d1.split('-').reverse().join('/')]);
-  const a = ultimo(t.reg, 'decisao'), aprox = await t.page.locator('.ind-atalhos .chip[aria-pressed=true]').count();
+  const a = await ultimoD(t), aprox = await t.page.locator('.ind-atalhos .chip[aria-pressed=true]').count();
   await t.ctx.close();
   return { ok: a.p_de === d1 && a.p_ate === d2 && aprox === 0 && !t.reg.excecoes.length, detalhe: `${a.p_de}..${a.p_ate}` };
 });
@@ -306,7 +329,7 @@ await caso('Período livre: mudar as duas datas carrega sozinho (sem clicar) e d
   const d = mais(HOJE, -3), fut = mais(HOJE, 5);
   await t.page.fill('.ind-ctl input[aria-label="Data inicial"]', d); await t.page.fill('.ind-ctl input[aria-label="Data final"]', d);
   await t.page.waitForFunction(([x]) => document.querySelector('.pagina .sub')?.textContent.includes(x), [d.split('-').reverse().join('/')], { timeout: 4000 });
-  const a = ultimo(t.reg, 'decisao');
+  const a = await ultimoD(t);
   await t.page.fill('.ind-ctl input[aria-label="Data inicial"]', fut); await t.page.fill('.ind-ctl input[aria-label="Data final"]', fut);
   await t.page.click('.ind-ctl .btn >> text=Ver período'); await new Promise((r) => setTimeout(r, 1300));
   const aviso = await t.page.locator('.toast, #toast').first().innerText().catch(() => '');
@@ -318,7 +341,7 @@ await caso('Filtro de unidade do topo vai para a consulta e os números mudam (6
   const t = await abrir(); await abaInd(t);
   await t.page.selectOption('#selUnidade', 'desenvoar'); await t.page.waitForFunction(() => /Unidade Desenvoar/.test(document.querySelector('.pagina')?.innerText || ''));
   const v = (await t.page.locator('.ind-kpi b').first().innerText()).trim();
-  const un = ultimo(t.reg, 'decisao').p_unidade;
+  const un = (await ultimoD(t)).p_unidade;
   await t.ctx.close();
   return { ok: v === '40' && un === 'desenvoar' && !t.reg.excecoes.length, detalhe: `${v} ${un}` };
 });
@@ -330,7 +353,7 @@ await caso('"Incluir conversas de teste": só o administrador vê a caixa; marca
   const vistaAdm = await t.page.locator('.ind-teste').count();
   await t.page.check('.ind-teste input'); await t.page.waitForFunction(() => document.querySelector('.ind-teste input')?.checked);
   await new Promise((r) => setTimeout(r, 300));
-  const a = ultimo(t.reg, 'decisao');
+  const a = await ultimoD(t);
   await t.ctx.close();
   return { ok: vistaComum === 0 && vistaAdm === 1 && a.p_incluir_teste === true, detalhe: `comum=${vistaComum} adm=${vistaAdm} ${a.p_incluir_teste}` };
 });

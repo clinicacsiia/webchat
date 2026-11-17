@@ -81,3 +81,6 @@ Ordem da página:
 5. **Autoatendimento:** tentativas do chat de marcar sozinho, marcadas, foram para a equipe, horário ocupado, resolvidas sem atendente, tempo médio e cancelar/remarcar pelo chat.
 
 Banco: nada mudou. A tela chama só `painel_indicadores_decisao`, `painel_indicadores_plataforma`, `painel_indicadores_diretoria` e `painel_automacao_resumo`. Nenhum relatório novo do Klingo é necessário. Painel `sw.js` v50. Teste: `cd testes && npm run test:indicadores` (22 verificações).
+
+### Gráfico mês a mês (17/11/2026)
+Logo abaixo do resumo há um gráfico de área dos últimos 6 meses (SVG puro com `linearGradient` e `path`, sem biblioteca). Mostra "Pessoas que procuraram o chat" ou "Agendaram pelo chat" (botões), o total dos 6 meses e o melhor mês, tudo calculado do array `dados`; passar o mouse (ou tocar) num mês mostra o valor exato. O último mês é parcial e a dica avisa. Sem mudança no banco: a tela faz uma consulta a `painel_indicadores_decisao` por mês, em paralelo, e o filtro de unidade do topo vale. Painel `sw.js` v53. Teste: `npm run test:indicadores` (25 verificações).
