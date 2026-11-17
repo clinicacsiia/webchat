@@ -428,7 +428,7 @@
   .ind-area-caixa { position: relative; margin-top: 8px; } .ind-area { width: 100%; height: auto; display: block; }
   .ind-area text { fill: var(--suave); font-size: 12px; } .ind-area .grade { stroke: var(--linha); stroke-width: 1; }
   .ind-area .pt { fill: var(--papel); stroke: #2a78d6; stroke-width: 2; } .ind-area .pt.melhor { fill: #2a78d6; } .ind-area .pt.on { r: 7; fill: #2a78d6; }
-  .ind-area .rot-bl { font-size: 11.5px; } .ind-area .pt { stroke: #1b2733; } .ind-area .pt.on { fill: #1b2733; }
+  .ind-area .rot-bl { font-size: 11.5px; } .ind-area .val-ad { font-size: 12.5px; font-weight: 700; fill: var(--texto); } .ind-area .pt { stroke: #1b2733; } .ind-area .pt.on { fill: #1b2733; }
   .ind-area-dica i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; } .ind-area-dica i.lin, .ind-leg-chip i.lin { height: 3px; width: 14px; border-radius: 2px; }
   .ind-leg-chip, .ind-leg-chip[aria-pressed=true] { display: inline-flex; align-items: center; gap: 6px; background: var(--papel); color: var(--texto); border: 1px solid var(--csi-border-strong, var(--linha)); } .ind-leg-chip i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; }
   .ind-leg-chip[aria-pressed=false] { opacity: .5; text-decoration: line-through; }
@@ -4906,6 +4906,50 @@ h1.longo { font-size: 14mm; }
     desenhar();
     return painel('Evolução a cada 30 dias', 'Passe o mouse (ou toque) em um período para ver o detalhe. O período em andamento é marcado com * e ainda cresce.', box);
   }
+  /* ---------- Antes e depois do programa (17/11/2026): marcações da CLÍNICA TODA (Klingo, todos os canais) por 30 dias, antes (set e out, números guardados na config) x depois (blocos de 30 dias do gráfico acima). ---------- */
+  function graficoAntesDepois(blocos, mediaAntes) {
+    const W = 760, H = 270, ESQ = 56, DIR = 20, TOPO = 28, BAIXO = 40, aw = W - ESQ - DIR, ah = H - TOPO - BAIXO;
+    const max = Math.max(1, mediaAntes || 0, ...blocos.map((b) => b.por30));
+    const passo = max <= 20 ? 5 : max <= 100 ? 20 : max <= 500 ? 100 : max <= 3000 ? 500 : 2000, topo = Math.ceil(max / passo) * passo;
+    const gw = aw / blocos.length, bw = Math.min(90, gw * 0.55), cx = (i) => ESQ + gw * i + gw / 2, y = (v) => TOPO + ah - (v / topo) * ah;
+    const svg = svgEl('svg', { viewBox: `0 0 ${W} ${H}`, class: 'ind-area', role: 'img', 'aria-label': 'Marcações da clínica por 30 dias: ' + blocos.map((b) => `${rotBloco(b)} ${nf(Math.round(b.por30))}`).join('; ') });
+    for (let v = 0; v <= topo; v += passo) svg.append(svgEl('line', { class: 'grade', x1: ESQ, x2: W - DIR, y1: y(v), y2: y(v) }), svgEl('text', { x: ESQ - 8, y: y(v) + 4, 'text-anchor': 'end' }, nf(v)));
+    blocos.forEach((b, i) => {
+      const alt = (b.por30 / topo) * ah;
+      svg.append(svgEl('rect', { class: 'barra-ad ' + (b.depois ? 'depois' : 'antes'), x: cx(i) - bw / 2, y: y(b.por30), width: bw, height: Math.max(alt, 1), rx: 4, fill: b.depois ? '#2a78d6' : '#8aa0b8' }, svgEl('title', {}, `${dmy(b.de)} a ${dmy(b.ate)} (${b.dias} dias): ${nf(b.total)} marcações, ${nf(Math.round(b.total / b.dias))} por dia`)),
+        svgEl('text', { x: cx(i), y: y(b.por30) - 6, 'text-anchor': 'middle', class: 'val-ad' }, nf(Math.round(b.por30))),
+        svgEl('text', { x: cx(i), y: H - 16, 'text-anchor': 'middle', class: 'rot-bl' }, rotBloco(b) + (b.parcial ? '*' : '')));
+    });
+    if (mediaAntes != null) svg.append(svgEl('line', { class: 'linha-media', x1: ESQ, x2: W - DIR, y1: y(mediaAntes), y2: y(mediaAntes), stroke: '#1b2733', 'stroke-width': 2, 'stroke-dasharray': '6 5' }),
+      svgEl('text', { x: W - DIR - 2, y: y(mediaAntes) - 6, 'text-anchor': 'end', class: 'val-ad' }, `média antes: ${nf(Math.round(mediaAntes))}`));
+    return h('div', { class: 'ind-area-caixa' }, svg);
+  }
+  function blocoAntesDepois(dados, base, un) {
+    const aviso = (t) => painel('Antes e depois do programa', null, h('p', { class: 'dica' }, t));
+    if (!base || !Array.isArray(base.blocos) || !base.blocos.length) return aviso('Sem os números de antes do programa guardados no banco (chave base_antes_programa). Peça para recarregar.');
+    if (dados.some((d) => d.clinica == null)) return aviso('Esta versão do banco ainda não devolve o total da clínica por período (falta aplicar supabase/indicadores-antes-do-programa-parte2.sql).');
+    const antes = base.blocos.map((b) => { const us = un && b.por_unidade[un] ? [b.por_unidade[un]] : Object.values(b.por_unidade || {});
+      const ab = us.reduce((q, u) => q + (u.abertas || 0), 0), ca = us.reduce((q, u) => q + (u.canceladas || 0), 0);
+      return { de: b.de, ate: b.ate, dias: b.dias, total: ab + ca, canc: ca, site: null, depois: false, parcial: false }; });
+    const depois = dados.map((d) => ({ de: d.de, ate: d.ate, dias: d.dias, total: d.clinica, canc: d.clinicaCanc || 0, site: d.total, depois: true, parcial: d.parcial }));
+    const todos = [...antes, ...depois].map((b) => ({ ...b, pordia: b.total / b.dias, por30: (b.total / b.dias) * 30 }));
+    const soma = (l) => ({ total: l.reduce((q, b) => q + b.total, 0), dias: l.reduce((q, b) => q + b.dias, 0), canc: l.reduce((q, b) => q + b.canc, 0) });
+    const A = soma(todos.filter((b) => !b.depois)), D = soma(todos.filter((b) => b.depois));
+    const mA = A.dias ? (A.total / A.dias) * 30 : null, mD = D.dias ? (D.total / D.dias) * 30 : null;
+    const varp = mA && mD != null ? Math.round(((mD - mA) / mA) * 100) : null;
+    const mini = (n, rot) => h('div', { class: 'ind-mini' }, h('b', {}, n), h('span', {}, rot));
+    const iniA = antes[0].de, fimA = antes[antes.length - 1].ate, iniD = depois[0].de, fimD = depois[depois.length - 1].ate;
+    const linhas = todos.map((b) => h('tr', { class: b.depois ? '' : 'ind-sub' }, h('td', {}, b.depois ? 'Depois' : 'Antes'), h('td', {}, `${dmy(b.de)} a ${dmy(b.ate)}`, b.parcial ? h('div', { class: 'dica' }, `em andamento: ${b.dias} de 30 dias`) : null), h('td', {}, nf(b.dias)),
+      h('td', {}, nf(b.total)), h('td', {}, nf(Math.round(b.pordia))), h('td', {}, h('b', {}, nf(Math.round(b.por30)))), h('td', {}, `${nf(b.canc)} (${pTxt(taxa(b.canc, b.total))})`), h('td', {}, b.site == null ? '—' : `${nf(b.site)} (${pTxt(taxa(b.site, b.total))})`)));
+    return painel('Antes e depois do programa: marcações da clínica toda', 'Todas as marcações do Klingo (todos os canais), pela data "Agendado em", sem as de bloqueio. Cada período é levado para 30 dias para dar para comparar.',
+      h('p', { class: 'ind-resumo' }, 'Antes do programa (', `${dmy(iniA)} a ${dmy(fimA)}, ${nf(A.dias)} dias): `, h('b', {}, nf(Math.round(mA))), ' marcações por 30 dias. Depois (', `${dmy(iniD)} a ${dmy(fimD)}, ${nf(D.dias)} dias): `, h('b', {}, nf(Math.round(mD))), ' por 30 dias', varp == null ? '.' : ` (${varp > 0 ? '+' : varp < 0 ? '−' : ''}${Math.abs(varp)}%).`),
+      h('div', { class: 'ind-minis' }, mini(`${nf(Math.round(A.total / A.dias))} por dia`, `antes (${nf(A.total)} marcações em ${nf(A.dias)} dias)`), mini(`${nf(Math.round(D.total / D.dias))} por dia`, `depois (${nf(D.total)} marcações em ${nf(D.dias)} dias)`),
+        mini(varp == null ? '—' : `${varp > 0 ? '+' : varp < 0 ? '−' : ''}${Math.abs(varp)}%`, 'variação por 30 dias'), mini(pTxt(taxa(A.canc, A.total)) + ' → ' + pTxt(taxa(D.canc, D.total)), 'canceladas, antes → depois')),
+      graficoAntesDepois(todos, mA),
+      h('details', { class: 'ind-num-det', open: true }, h('summary', {}, 'Ver os números de cada período'), h('div', { class: 'ind-tab-rolagem' }, h('table', { class: 'ind-tab-graf' },
+        h('thead', {}, h('tr', {}, ['', 'Período', 'Dias', 'Marcações', 'Por dia', 'Por 30 dias', 'Canceladas', 'Vieram do site'].map((t) => h('th', {}, t)))), h('tbody', {}, linhas)))),
+      h('p', { class: 'dica' }, 'Cuidados ao ler: (1) o Klingo começou a ser usado de verdade em 01/09/2026; 29 a 31/08 foi carga inicial (cerca de 4.000 marcações em 3 dias) e ficou de fora. (2) As marcações recentes ainda vão ser canceladas, então a taxa de canceladas "depois" tende a subir; compare o total de marcações, não o que sobrou. (3) A comparação é da clínica toda; ela não prova sozinha que a mudança vem do site. (4) Dias de feriado e de fim de semana pesam mais em períodos curtos.'));
+  }
   // Acha o 1º dia de uso (1ª conversa real), monta os blocos de 30 dias e busca cada um (2 consultas por bloco, em paralelo). Sem mexer no banco.
   async function carregarEvolucaoSite(lugar, un, teste, seq, hojeISO) {
     let d0 = null;
@@ -4918,8 +4962,8 @@ h1.longo { font-size: 14mm; }
       Promise.resolve(db.rpc('painel_automacao_resumo', { p_de: b.de, p_ate: b.ate })).then((x) => x, () => ({ error: true }))])));
     if (S.aba !== 'indicadores' || seq !== viewIndicadores.seq) return;
     if (res.some(([p]) => p.error || !p.data || !p.data.total)) { lugar.replaceChildren(h('p', { class: 'dica' }, 'Não consegui carregar a evolução a cada 30 dias agora. Use "Atualizar agora" para tentar de novo (se continuar, falta aplicar supabase/indicadores-plataforma.sql).')); return; }
-    const dados = blocos.map((b, i) => { const T = res[i][0].data.total, Q = res[i][0].data.quem_marcou || null, A = (res[i][1] && res[i][1].data) || {}; return { ...b, ativas: T.ativas || 0, canceladas: T.canceladas || 0, remarcadas: T.remarcadas || 0, total: T.total || 0, sozinhas: Q ? Number(Q.api_sem_atendente) || 0 : Number(A.resolvidas_sem_humano) || 0, apiCom: Q ? Number(Q.api_com_atendente) || 0 : null, pessoa: Q ? (Number(Q.pessoa_sem_atendente) || 0) + (Number(Q.pessoa_com_atendente) || 0) : null }; });
-    lugar.replaceChildren(blocoEvolucao(dados, d0, dados.some((d) => d.apiCom == null)));
+    const dados = blocos.map((b, i) => { const T = res[i][0].data.total, Q = res[i][0].data.quem_marcou || null, CT = res[i][0].data.clinica_todas || null, A = (res[i][1] && res[i][1].data) || {}; return { ...b, ativas: T.ativas || 0, canceladas: T.canceladas || 0, remarcadas: T.remarcadas || 0, total: T.total || 0, sozinhas: Q ? Number(Q.api_sem_atendente) || 0 : Number(A.resolvidas_sem_humano) || 0, apiCom: Q ? Number(Q.api_com_atendente) || 0 : null, pessoa: Q ? (Number(Q.pessoa_sem_atendente) || 0) + (Number(Q.pessoa_com_atendente) || 0) : null, clinica: CT ? Number(CT.total) || 0 : null, clinicaCanc: CT ? Number(CT.canceladas) || 0 : null }; });
+    lugar.replaceChildren(blocoEvolucao(dados, d0, dados.some((d) => d.apiCom == null)), blocoAntesDepois(dados, res[0][0].data.antes_do_programa || null, un));
   }
   async function viewIndicadores(c, silencioso = false) {
     if (IND.preset !== 'livre') [IND.de, IND.ate] = periodoDe(IND.preset);

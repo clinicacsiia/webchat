@@ -2653,6 +2653,7 @@
   "autoencerrar_horas",
   "autoencerrar_modo",
   "avaliacao_ativa",
+  "base_antes_programa",
   "boas_vindas",
   "cadastro_equipe_sem_convite",
   "catalogo_csi",
@@ -13492,7 +13493,7 @@
    "anon": false,
    "authenticated": true,
    "publico": false,
-   "md5": "64b76fd039edb7705142b5b7d1a7e384"
+   "md5": "5c41481da865f63e5abb451bf9d6be4a"
   },
   {
    "nome": "painel_indicadores_equipe",
