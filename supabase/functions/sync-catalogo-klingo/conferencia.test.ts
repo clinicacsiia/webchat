@@ -1,8 +1,16 @@
+test("filtroMarcadoEm: 'Marcado em' de hoje-170 até hoje (Brasília), nunca data futura", () => {
+  const f = filtroMarcadoEm(new Date("2026-11-17T18:00:00Z"));
+  assert.equal(f[":data_marcacao-to"], "2026-11-17");
+  assert.equal(f[":data_marcacao-from"], "2026-05-31");
+  // 01h UTC ainda é o dia anterior em Brasília: a data final nunca passa de "hoje" para o Klingo
+  assert.equal(filtroMarcadoEm(new Date("2026-11-18T01:00:00Z"))[":data_marcacao-to"], "2026-11-17");
+});
+
 // Rodar: node --experimental-strip-types --test supabase/functions/sync-catalogo-klingo/conferencia.test.ts
 // Só dados fictícios.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { avaliar, escolherAlvos, fonesDaLinha, linhaDe, nomeConfere, normNome, slotPassou, type Alvo } from "./conferencia.ts";
+import { avaliar, escolherAlvos, filtroMarcadoEm, fonesDaLinha, linhaDe, nomeConfere, normNome, slotPassou, type Alvo } from "./conferencia.ts";
 
 const alvo = (extra: Partial<Alvo> = {}): Alvo => ({
   id: "pre-1", status: "pronto", conf: null, fones: ["80001111"], nomes: ["ANA MARIA SOUZA"], procs: ["RESSONANCIA MAGNETICA DE JOELHO DIREITO"],
