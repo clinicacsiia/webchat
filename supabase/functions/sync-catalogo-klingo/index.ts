@@ -1,5 +1,5 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { avaliar, escolherAlvos, linhaDe, slotPassou, type Alvo, type Linha } from "./conferencia.ts";
+import { avaliar, escolherAlvos, filtroMarcadoEm, linhaDe, slotPassou, type Alvo, type Linha } from "./conferencia.ts";
 import { AgregadorPrecos } from "./precos.ts";
 
 // Atualiza o catálogo que a IA consulta (procedimentos, agenda e planos) a partir de relatórios do Klingo.
@@ -191,7 +191,7 @@ async function precosParticular(supabase: Supa, token: string) {
 
 // Lê o relatório #7 (marcações) de uma faixa de datas; se o Klingo cortar, divide a faixa ao meio.
 async function lerAgendaMarcada(token: string, de: string, ate: string, nivel = 0): Promise<Row[]> {
-  const params = new URLSearchParams({ id: "7", ":data_atendimento": "l", ":data_atendimento-from": de, ":data_atendimento-to": ate });
+  const params = new URLSearchParams({ id: "7", ":data_atendimento": "l", ":data_atendimento-from": de, ":data_atendimento-to": ate, ...filtroMarcadoEm() });
   const res = await fetch(`${KLINGO_URL}?${params}`, { headers: { "X-APP-TOKEN": token }, signal: AbortSignal.timeout(90_000) });
   if (!res.ok) throw new Error(`Klingo retornou HTTP ${res.status} na agenda marcada`);
   const payload = await res.json();

@@ -765,7 +765,7 @@
     ['bairro', 'Bairro'], ['cidade', 'Cidade'], ['uf', 'UF'], ['matricula', 'Carteirinha'], ['validade', 'Validade']];
   const MOD_ROTULO = { RM: 'Ressonância', TC: 'Tomografia', US: 'Ultrassom', RX: 'Raio-X', MAMO: 'Mamografia', DENSITO: 'Densitometria' };
   const LADO_ROTULO = { D: 'lado direito', E: 'lado esquerdo', A: 'os dois lados', N: '' };
-  const linhaItem = (i) => `${MOD_ROTULO[i.modalidade] || i.modalidade}${i.regiao_nome ? ' — ' + i.regiao_nome : ''}${LADO_ROTULO[i.lado] ? ' (' + LADO_ROTULO[i.lado] + ')' : ''}: ${i.procedimento || 'exame a definir'}${i.quantidade > 1 ? ' ×' + i.quantidade : ''}`;
+  const linhaItem = (i) => i.modalidade === 'CONSULTA' ? `${i.procedimento || 'Consulta'}${i.quantidade > 1 ? ' ×' + i.quantidade : ''}` : `${MOD_ROTULO[i.modalidade] || i.modalidade}${i.regiao_nome ? ' — ' + i.regiao_nome : ''}${LADO_ROTULO[i.lado] ? ' (' + LADO_ROTULO[i.lado] + ')' : ''}: ${i.procedimento || 'exame a definir'}${i.quantidade > 1 ? ' ×' + i.quantidade : ''}`;
   const dataBR = (d) => (d ? String(d).split('-').reverse().join('/') : '');
   const linhasHorario = (p) => (Array.isArray(p.escolha_horario) ? p.escolha_horario : []).map((e) =>
     `${dataBR(e.data)} ${e.chegada ? 'ordem de chegada a partir das ' : 'às '}${e.hora}${e.unidade ? ' — ' + String(e.unidade).replace(/^CLÍNICA DE SAÚDE E IMAGEM - /, '') : ''}${e.local ? ' (' + e.local + ')' : ''}`);
@@ -782,7 +782,7 @@
     const topo = [['Tipo', p.tipo], ['Especialidade', p.especialidade], ['Procedimento', p.procedimento], ['Plano', p.plano], ['Unidade', p.unidade], ['Profissional', p.profissional], ['Preferência', p.preferencia_horario]];
     const exames = (S.preItens || []).map(linhaItem);
     const horarios = linhasHorario(p);
-    const extra = [...(exames.length ? ['Exames pedidos:', ...exames.map((x) => '• ' + x)] : []), ...(horarios.length ? ['Horário escolhido pelo paciente (confirmar no Klingo):', ...horarios.map((x) => '• ' + x)] : [])];
+    const extra = [...(exames.length ? [(S.preItens || []).every((i) => i.modalidade === 'CONSULTA') ? 'Consulta pedida:' : 'Exames pedidos:', ...exames.map((x) => '• ' + x)] : []), ...(horarios.length ? ['Horário escolhido pelo paciente (confirmar no Klingo):', ...horarios.map((x) => '• ' + x)] : [])];
     return topo.concat(CAMPOS_PRE.map(([k, r]) => [r, (p.paciente || {})[k]])).filter(([, v]) => v).map(([r, v]) => r + ': ' + v).concat(extra).join('\n');
   }
   async function carregarPre() {
@@ -852,7 +852,7 @@
     const box = document.getElementById('pre'); if (!box) return;
     const p = S.pre;
     if (!p) { box.replaceChildren(); renderProximo(); return; }
-    const resumo = [p.tipo, p.especialidade, p.procedimento, p.plano && 'Plano: ' + p.plano, p.unidade, p.profissional && 'Prof.: ' + p.profissional, p.preferencia_horario && 'Preferência: ' + p.preferencia_horario].filter(Boolean).join(' · ');
+    const resumo = [p.tipo, ...[p.especialidade, p.procedimento].filter((x, i, v) => x && String(x).toLowerCase() !== String(p.tipo || '').toLowerCase() && v.indexOf(x) === i), p.plano && 'Plano: ' + p.plano, p.unidade, p.profissional && 'Prof.: ' + p.profissional, p.preferencia_horario && 'Preferência: ' + p.preferencia_horario].filter(Boolean).join(' · ');
     const linhas = CAMPOS_PRE.filter(([k]) => (p.paciente || {})[k]);
     const aberto = p.status === 'rascunho' || p.status === 'pronto';
     box.replaceChildren(h('div', { class: 'pre' },
@@ -864,7 +864,7 @@
         p.conferencia_detalhe ? h('div', { style: 'font-weight:400;margin-top:2px' }, p.conferencia_detalhe) : null)
         : (['rascunho', 'pronto'].includes(p.status) && Array.isArray(p.escolha_horario) && p.escolha_horario.length ? h('div', { class: 'dica' }, 'Aguardando a marcação aparecer no Klingo: conferindo a cada 15 segundos.') : null),
       resumo ? h('div', {}, resumo) : null,
-      (S.preItens || []).length ? h('div', { style: 'margin-top:6px' }, h('b', {}, 'Exames pedidos'), h('ul', { style: 'margin:4px 0 0;padding-left:18px' }, S.preItens.map((i) => h('li', {}, linhaItem(i))))) : null,
+      (S.preItens || []).length ? h('div', { style: 'margin-top:6px' }, h('b', {}, S.preItens.every((i) => i.modalidade === 'CONSULTA') ? 'Consulta pedida' : 'Exames pedidos'), h('ul', { style: 'margin:4px 0 0;padding-left:18px' }, S.preItens.map((i) => h('li', {}, linhaItem(i))))) : null,
       (() => { const ds = (Array.isArray(p.escolha_horario) ? p.escolha_horario : []).map((e) => e.data); const mesmoDia = ds.some((d, i) => ds.indexOf(d) !== i);
         const mods = new Set((S.preItens || []).map((i) => i.modalidade)); return (mesmoDia || mods.size > 1) ? h('div', { class: 'urg media', style: 'display:block;margin-top:6px;border-radius:8px' },
           'Exames diferentes' + (mesmoDia ? ' no mesmo dia' : '') + ': confira a ordem, o preparo de cada um (jejum, bexiga cheia, contraste) e o deslocamento entre unidades antes de confirmar.') : null; })(),
@@ -3112,7 +3112,7 @@
     tg.setAttribute('aria-expanded', String(S.ctxAberto));
     const n = S.ctxN || 0;
     tg.replaceChildren(h('span', { class: 'rot' }, S.ctxAberto ? 'Esconder detalhes e avisos' : 'Ver detalhes, avisos e fotos desta conversa'),
-      n ? h('span', { class: 'ctx-n', role: 'status', 'aria-label': n + ' aviso(s) para conferir' }, n + (n === 1 ? ' aviso' : ' avisos')) : null,
+      n ? h('span', { class: 'ctx-n', role: 'status', 'aria-label': n + ' aviso(s) para conferir' }, n + (n === 1 ? ' aviso' : ' avisos')) : '',   // nunca null: replaceChildren(null) escreve a palavra "null" na tela
       h('span', { class: 'seta', 'aria-hidden': 'true' }, '▾'));
   }
   // "Próximo passo": escolhe, pela ordem do que é mais urgente, a única decisão que falta e leva o atendente até ela.
@@ -3684,7 +3684,7 @@
         h('td', {}, h('div', { class: 'tags' }, (x.tags || []).map((t) => h('span', { class: 'tag' }, t)))),
         h('td', {}, fmtDataHora(x.ultimo_contato_em)),
         h('td', {}, h('button', { class: 'btn', type: 'button', onclick: () => editarContato(x) }, 'Editar')))))),
-      lista.length > mostrar.length ? h('div', { class: 'dica', style: 'padding:10px 12px' }, `Mostrando ${mostrar.length} de ${lista.length}. Use a busca ou exporte o CSV para ver todos.`) : null);
+      lista.length > mostrar.length ? h('div', { class: 'dica', style: 'padding:10px 12px' }, `Mostrando ${mostrar.length} de ${lista.length}. Use a busca ou exporte o CSV para ver todos.`) : '');
   }
   function editarContato(x) {
     const nome = h('input', { type: 'text', value: x.nome, maxlength: '120', id: 'eNome' });
@@ -3860,7 +3860,7 @@
     } }, 'Ver indicadores por pessoa e equipe');
     box.replaceChildren(cab,
       h('p', { class: 'sub' }, 'Equipes e quem é de cada uma. Os nomes "Atendente 1…" são provisórios: ligue cada um à conta real. Nenhuma conta é criada aqui e nenhum papel é alterado.'),
-      ehTI ? h('div', { style: 'display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0' }, h('label', { for: 'modoPermissao' }, 'Permissões no servidor:'), modoSel, btnSim) : null, simulacao,
+      ehTI ? h('div', { style: 'display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0' }, h('label', { for: 'modoPermissao' }, 'Permissões no servidor:'), modoSel, btnSim) : '', simulacao,
       ...data.equipes.map(blocoEquipe), h('div', { style: 'margin-top:12px' }, btnInd), indic);
   }
   async function redefinirSenha(a) {
@@ -4764,7 +4764,7 @@ h1.longo { font-size: 14mm; }
         desenhar();
         abas.conv.replaceChildren(
           h('p', { class: 'dica' }, 'Chave ligada = o médico aceita o convênio. Cada clique já vale para os próximos agendamentos pelo chat. Para aceitar o convênio em geral mas não em um exame, use "Não aceitar neste exame". Quem escolhe Particular sempre vê o médico.'),
-          temCob ? h('p', { class: 'dica' }, 'Os filtros "Deste médico" e "Da unidade" mostram os convênios que têm preço no Klingo para algum exame do médico (ou da unidade). É um palpite pelas tabelas de preço, não a lista oficial de cobertura. O convênio que você já ajustou aparece sempre. Faltou algum? Use "Todos os convênios".') : null,
+          temCob ? h('p', { class: 'dica' }, 'Os filtros "Deste médico" e "Da unidade" mostram os convênios que têm preço no Klingo para algum exame do médico (ou da unidade). É um palpite pelas tabelas de preço, não a lista oficial de cobertura. O convênio que você já ajustou aparece sempre. Faltou algum? Use "Todos os convênios".') : '',
           part, busca, barra, resumo, lista);
       }
 

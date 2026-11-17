@@ -133,3 +133,12 @@ export function escolherAlvos(alvos: Alvo[], maxDias = 8, rng: () => number = Ma
   }
   return escolhidos;
 }
+
+// Relatório #7: o Klingo ganhou o filtro "Marcado em" (data_marcacao) que, sem ser enviado, vale "hoje" e devolve só as marcações
+// FEITAS hoje (16/11/2026: 16 linhas em vez de 166 para o dia 25/11). Por isso toda marcação de dias anteriores "sumia".
+// O Klingo aceita até ~180 dias e recusa data final no futuro (erro "."): vai de hoje-170 até hoje (Brasília, UTC-3).
+export function filtroMarcadoEm(agora: Date = new Date()): Record<string, string> {
+  const hoje = new Date(agora.getTime() - 3 * 3600_000);
+  const dia = (d: Date) => d.toISOString().slice(0, 10);
+  return { ":data_marcacao": "l", ":data_marcacao-from": dia(new Date(hoje.getTime() - 170 * 86_400_000)), ":data_marcacao-to": dia(hoje) };
+}

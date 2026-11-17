@@ -21,9 +21,15 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const DATA = /^\d{4}-\d{2}-\d{2}$/;
 const dorme = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+// Relatório #7 tem o filtro "Marcado em" (data_marcacao): sem enviá-lo vale "hoje" e só voltam as marcações feitas hoje.
+// O Klingo aceita até ~180 dias e recusa data final no futuro: de hoje-170 até hoje (Brasília). Mesma regra de sync-catalogo-klingo/conferencia.ts.
+function filtroMarcadoEm(): Record<string, string> {
+  const hoje = new Date(Date.now() - 3 * 3600_000), d = (x: Date) => x.toISOString().slice(0, 10);
+  return { ":data_marcacao": "l", ":data_marcacao-from": d(new Date(hoje.getTime() - 170 * 86_400_000)), ":data_marcacao-to": d(hoje) };
+}
 // Relatório #7 (marcações) de uma faixa de dias; se o Klingo cortar por limite de linhas, divide a faixa ao meio.
 async function lerKlingo(token: string, de: string, ate: string, nivel = 0): Promise<Row[]> {
-  const params = new URLSearchParams({ id: "7", ":data_atendimento": "l", ":data_atendimento-from": de, ":data_atendimento-to": ate });
+  const params = new URLSearchParams({ id: "7", ":data_atendimento": "l", ":data_atendimento-from": de, ":data_atendimento-to": ate, ...filtroMarcadoEm() });
   const res = await fetch(`${KLINGO_URL}?${params}`, { headers: { "X-APP-TOKEN": token }, signal: AbortSignal.timeout(15_000) });
   if (!res.ok) throw new Error(`Klingo retornou HTTP ${res.status}`);
   const payload = await res.json();
