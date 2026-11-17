@@ -19,20 +19,27 @@ begin
   return jsonb_build_object(
     'de', v_ini, 'ate', v_mes_atual, 'unidade', v_un, 'gerado_em', now(),
     'meses', coalesce((
+      with base as (
+        select date_trunc('month', e.agendado_para at time zone 'America/Sao_Paulo')::date as mes, e.status,
+               case when e.procedimento ~* '^consulta' then 'consulta' else 'exame' end as tipo
+          from public.jornada_exame e
+         where e.status <> 'pedido' and e.agendado_para is not null
+           and e.marcacao_id not in (select 'm' || z.m from public.klingo_conferencia z join public.conversas c on c.id = z.conversa_id where c.teste)
+           and (v_un is null or public.unidade_chave(e.unidade) is null or public.unidade_chave(e.unidade) = v_un))
       select jsonb_agg(jsonb_build_object('mes', to_char(m.d, 'YYYY-MM'),
-               'total', coalesce(x.total, 0), 'atendidos', coalesce(x.atendidos, 0), 'faltaram', coalesce(x.faltaram, 0),
-               'cancelados', coalesce(x.cancelados, 0), 'remarcados', coalesce(x.remarcados, 0), 'por_vir', coalesce(x.por_vir, 0)) order by m.d)
+               'total', t.todos -> 'total', 'atendidos', t.todos -> 'atendidos', 'faltaram', t.todos -> 'faltaram', 'cancelados', t.todos -> 'cancelados',
+               'remarcados', t.todos -> 'remarcados', 'por_vir', t.todos -> 'por_vir', 'consulta', t.co, 'exame', t.ex) order by m.d)
         from generate_series(v_ini, v_mes_atual, interval '1 month') as m(d)
-        left join (
-          select date_trunc('month', e.agendado_para at time zone 'America/Sao_Paulo')::date as mes,
-                 count(*) as total,
-                 count(*) filter (where e.status = 'atendido') as atendidos,
-                 count(*) filter (where e.status = 'faltou') as faltaram,
-                 count(*) filter (where e.status = 'cancelado') as cancelados,
-                 count(*) filter (where e.status = 'remarcado') as remarcados,
-                 count(*) filter (where e.status in ('agendado', 'confirmado')) as por_vir
-            from public.jornada_exame e
-           where e.status <> 'pedido' and e.agendado_para is not null
-             and (v_un is null or public.unidade_chave(e.unidade) is null or public.unidade_chave(e.unidade) = v_un)
-           group by 1) x on x.mes = m.d), '[]'::jsonb));
+        cross join lateral (
+          select
+            (select jsonb_build_object('total', count(*), 'atendidos', count(*) filter (where status = 'atendido'), 'faltaram', count(*) filter (where status = 'faltou'),
+                    'cancelados', count(*) filter (where status = 'cancelado'), 'remarcados', count(*) filter (where status = 'remarcado'), 'por_vir', count(*) filter (where status in ('agendado', 'confirmado')))
+               from base b where b.mes = m.d) as todos,
+            (select jsonb_build_object('total', count(*), 'atendidos', count(*) filter (where status = 'atendido'), 'faltaram', count(*) filter (where status = 'faltou'),
+                    'cancelados', count(*) filter (where status = 'cancelado'), 'remarcados', count(*) filter (where status = 'remarcado'), 'por_vir', count(*) filter (where status in ('agendado', 'confirmado')))
+               from base b where b.mes = m.d and b.tipo = 'consulta') as co,
+            (select jsonb_build_object('total', count(*), 'atendidos', count(*) filter (where status = 'atendido'), 'faltaram', count(*) filter (where status = 'faltou'),
+                    'cancelados', count(*) filter (where status = 'cancelado'), 'remarcados', count(*) filter (where status = 'remarcado'), 'por_vir', count(*) filter (where status in ('agendado', 'confirmado')))
+               from base b where b.mes = m.d and b.tipo = 'exame') as ex
+        ) t), '[]'::jsonb));
 end $function$;

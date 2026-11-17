@@ -12,22 +12,22 @@ begin
   if coalesce((select public.papel_atual()), '') not in ('admin', 'atendente') then
     raise exception 'Somente administrador e atendente veem estes números.' using errcode = '42501';
   end if;
-  v_ate := least(coalesce(p_ate, v_hoje), v_hoje); v_de := greatest(coalesce(p_de, v_ate - 6), v_ate - 400); v_dias := greatest(v_ate - v_de + 1, 1);
+  v_ate := least(coalesce(p_ate, v_hoje), v_hoje); v_de := greatest(coalesce(p_de, v_ate - 6), v_ate - 400); if v_de > v_ate then v_de := v_ate; end if; v_dias := greatest(v_ate - v_de + 1, 1);
   return jsonb_build_object(
     'modos', jsonb_build_object('mestre', public.klingo_mestre(), 'horarios', public.klingo_cfg('klingo_api_horarios', 'nao'), 'marcar', public.klingo_cfg('klingo_api_marcar', 'nao'), 'percentual', public.klingo_cfg('klingo_api_percentual', '100'),
                                 'pre_cadastro', public.klingo_cfg('klingo_api_pre_cadastro', 'nao'), 'webhook', public.klingo_cfg('klingo_webhook', 'nao'), 'autogestao', public.klingo_cfg('klingo_autogestao', 'sim')),
-    'operacoes', (select coalesce(jsonb_object_agg(estado, n), '{}'::jsonb) from (select estado, count(*) n from public.klingo_operacao where tipo = 'marcar'
+    'operacoes', (select coalesce(jsonb_object_agg(estado, n), '{}'::jsonb) from (select estado, count(*) n from public.klingo_operacao where (conversa_id is null or conversa_id not in (select id from public.conversas where teste)) and tipo = 'marcar'
                     and (criado_em at time zone 'America/Sao_Paulo')::date between v_de and v_ate group by estado) x),
     'agendadas_sozinhas', (select count(*) from public.pre_agendamentos pa join public.conversas c on c.id = pa.conversa_id
                             where pa.agendado_origem = 'chat_api' and not c.teste and (pa.agendado_auto_em at time zone 'America/Sao_Paulo')::date between v_de and v_ate),
     'resolvidas_sem_humano', (select count(*) from public.pre_agendamentos pa join public.conversas c on c.id = pa.conversa_id
                                where pa.agendado_origem = 'chat_api' and not c.teste and c.primeiro_humano_em is null and (pa.agendado_auto_em at time zone 'America/Sao_Paulo')::date between v_de and v_ate),
     'marcar_canceladas_no_klingo', (select count(*) from public.klingo_operacao o join public.klingo_conferencia k on k.m = o.voucher_id
-                                     where o.tipo = 'marcar' and o.estado = 'sucesso' and k.status_klingo = 'Cancelada' and (o.criado_em at time zone 'America/Sao_Paulo')::date between v_de and v_ate),
-    'tempo_medio_s', (select round(avg(extract(epoch from concluido_em - criado_em)))::int from public.klingo_operacao where tipo = 'marcar' and estado = 'sucesso' and (criado_em at time zone 'America/Sao_Paulo')::date between v_de and v_ate),
+                                     where (o.conversa_id is null or o.conversa_id not in (select id from public.conversas where teste)) and o.tipo = 'marcar' and o.estado = 'sucesso' and k.status_klingo = 'Cancelada' and (o.criado_em at time zone 'America/Sao_Paulo')::date between v_de and v_ate),
+    'tempo_medio_s', (select round(avg(extract(epoch from concluido_em - criado_em)))::int from public.klingo_operacao where (conversa_id is null or conversa_id not in (select id from public.conversas where teste)) and tipo = 'marcar' and estado = 'sucesso' and (criado_em at time zone 'America/Sao_Paulo')::date between v_de and v_ate),
     'motivos_falha', (select coalesce(jsonb_agg(jsonb_build_object('codigo', codigo, 'n', n) order by n desc), '[]'::jsonb) from (select coalesce(codigo, 'sem_codigo') codigo, count(*) n
-                       from public.klingo_operacao where tipo = 'marcar' and estado in ('falha', 'incerto') and (criado_em at time zone 'America/Sao_Paulo')::date between v_de and v_ate group by 1 order by 2 desc limit 8) x),
-    'pos', (select coalesce(jsonb_object_agg(k, n), '{}'::jsonb) from (select tipo || ':' || estado k, count(*) n from public.klingo_operacao where tipo in ('cancelar', 'remarcar', 'ler_vouchers') and (criado_em at time zone 'America/Sao_Paulo')::date between v_de and v_ate group by 1) x),
+                       from public.klingo_operacao where (conversa_id is null or conversa_id not in (select id from public.conversas where teste)) and tipo = 'marcar' and estado in ('falha', 'incerto') and (criado_em at time zone 'America/Sao_Paulo')::date between v_de and v_ate group by 1 order by 2 desc limit 8) x),
+    'pos', (select coalesce(jsonb_object_agg(k, n), '{}'::jsonb) from (select tipo || ':' || estado k, count(*) n from public.klingo_operacao where (conversa_id is null or conversa_id not in (select id from public.conversas where teste)) and tipo in ('cancelar', 'remarcar', 'ler_vouchers') and (criado_em at time zone 'America/Sao_Paulo')::date between v_de and v_ate group by 1) x),
     'cadastros', (select coalesce(jsonb_object_agg(situacao, n), '{}'::jsonb) from (select situacao, count(*) n from public.klingo_identidade where (conferido_em at time zone 'America/Sao_Paulo')::date between v_de and v_ate group by situacao) x),
     'convenios', jsonb_build_object('traduzidos', (select count(*) from public.klingo_plano_map where origem <> 'nao_atende'), 'sem_traducao', (select count(*) from public.klingo_plano_map where origem = 'nao_atende')),
     'horarios_api', jsonb_build_object('ok', public.klingo_medida_soma('horarios_api_ok', v_dias), 'erro', public.klingo_medida_soma('horarios_api_erro', v_dias), 'limite', public.klingo_medida_soma('horarios_api_limite', v_dias),
