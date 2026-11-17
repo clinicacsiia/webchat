@@ -2652,6 +2652,7 @@
   "autoencerrar_horas",
   "autoencerrar_modo",
   "avaliacao_ativa",
+  "base_antes_programa",
   "boas_vindas",
   "cadastro_equipe_sem_convite",
   "catalogo_csi",
@@ -2733,6 +2734,8 @@
   "primeira_consulta_modo",
   "reabrir_dias",
   "reaproveitar_cadastro_convidado",
+  "retorno_dias_limite",
+  "retorno_dias_modo",
   "teste_agentes",
   "teste_marcadores",
   "vinculo_manual_quem"
@@ -9364,7 +9367,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "057af84eab8f3ee6f0c731e29a5be180"
+   "md5": "52c58ade7169ec19db90ff7ebabff5ff"
   },
   {
    "nome": "fluxo_pos_aplicar",
@@ -9512,7 +9515,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "f42eeaaeba12f248bd94e56f28518588"
+   "md5": "15200a8ecda0b631e278a5048980e535"
   },
   {
    "nome": "fluxo_proximo_assunto",
@@ -9562,6 +9565,21 @@
    "authenticated": false,
    "publico": false,
    "md5": "bf58d58e0f29a7069b3a2f6d611eca55"
+  },
+  {
+   "nome": "fluxo_retorno_equipe",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "a7641fa118e1102df65095f6faf86033"
   },
   {
    "nome": "fluxo_rotulo_item",
@@ -11765,7 +11783,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "a0a979e963d8330dfcd6085c9e131c0d"
+   "md5": "8534719bae1947c79337de48f9b4068f"
   },
   {
    "nome": "klingo_pre_gravar",
@@ -14967,6 +14985,21 @@
    "authenticated": false,
    "publico": false,
    "md5": "8e65c452f13b8b95384ccb3f9ef09026"
+  },
+  {
+   "nome": "retorno_recente_ok",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "f16d4afeb973420ca5514972886e14f6"
   },
   {
    "nome": "sim_causa",
