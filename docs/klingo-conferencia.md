@@ -52,8 +52,8 @@ Versão 1.1 — 16/11/2026 / Mudança: todo bloco que conta marcações do Kling
 - `painel_automacao_resumo`: **cadastros agora respeitam o período** (antes somavam a tabela inteira: 65/98/25 era acumulado) e novo `marcar_canceladas_no_klingo`.
 - Tela: origens vêm dos dados (inclui Webchat, a soma fecha com o total); alerta "Faltam mais" só com taxa maior que 0%; seções numeradas 1 a 5; rótulos dizem se contam pessoas, conversas ou marcações.
 - Conferido em 16/11 (326/327 do dia em andamento): 327 marcações = 309 ativas + 18 canceladas; origens 24+90+78+1+134 = 327. Das 11 marcações certas do chat, 4 estão canceladas.
-- Pendência de dado (não é código): a conversa da marcação 27474 (TESTE DO SISTEMA) não está marcada como teste, então entra nos números. Marcar a conversa como teste a tira.
-- O Klingo não tem campo de origem na marcação pela API: o chat não consegue gravar "Webchat"; é pedido ao suporte do Klingo.
+- A conversa da marcação 27474 (TESTE DO SISTEMA) foi marcada como teste em 17/11/2026 (por `conversa_marcar_teste_interno`) e saiu dos números.
+- O Klingo não tem campo de origem na marcação pela API: o chat não consegue gravar "Webchat"; essa marcação continua aparecendo como "Sem origem" (nada será pedido ao suporte).
 - Nenhum indicador depende do webhook do Klingo (`klingo_webhook`, desligado).
 
 ## Gráfico mensal (16/11/2026)

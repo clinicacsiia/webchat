@@ -15,8 +15,7 @@ A mesma lista existe como página (com caixas de marcar): peça ao Claude "abra 
 **Continua desligado de propósito, porque depende de você ou do Klingo:**
 | Chave / item | Por que não liguei | O que falta |
 |---|---|---|
-| `klingo_api_resultado` (laudo) | Nunca foi testado com laudo liberado real; o link e a senha do resultado seguem pela equipe | Resposta do suporte do Klingo (item 2.3) e um paciente real para o teste |
-| `klingo_webhook` | O Klingo ainda não cadastrou a URL. **Desde 16/11/2026 o cancelamento feito direto no Klingo já chega ao pedido do chat pela leitura do relatório** (`pedido_fechar_cancelado_klingo`, chamada por `jornada_klingo_lote`): até 10 min no expediente e até 1 a 2 h fora dele. O webhook deixaria isso imediato | Pedir ao Klingo para cadastrar |
+| `klingo_api_resultado` (laudo) | Nunca foi testado com laudo liberado real; o link e a senha do resultado seguem pela equipe | Um paciente real para o teste |
 | `permissao_modo` = `observacao` | Ligar bloqueia o que a equipe vê por unidade; a estrutura (Luzia, Juliana, atendentes, unidades) ainda não está fechada | Itens 1.1 e 2.1 |
 | `cadastro_equipe_sem_convite`, `reaproveitar_cadastro_convidado` | `nao` é o estado **seguro** (só convite cria equipe; convidado não reaproveita cadastro) | Nada: não ligar |
 | `disponibilidade_encerra_conversa`, `agendamento_reconhecer_msg_encerradas` | Decisão operacional sua | Dizer se quer |
@@ -62,15 +61,8 @@ Estão no ar com a redação proposta; dá para editar em Configurações.
 - Aviso de previsão: *"Importante: os dias e horários que mostramos aqui são uma previsão de agendamento. Quem confirma o seu agendamento é uma pessoa da nossa equipe."*
 - Convênio suspenso: *"O convênio {convenio} está temporariamente suspenso por decisão administrativa. Posso te ajudar a escolher outro convênio ou o atendimento particular?"*
 
-### 2.3 Perguntas ao suporte do Klingo
-Enviar para **suporte@klingo.com.br** (o texto-base está em `docs/fase-0-email-suporte-klingo.md`):
-1. Onde fica cadastrado o **preço Particular**? (o relatório D não traz)
-2. O Klingo gera **link e senha do resultado** para o paciente? Qual consulta devolve?
-3. Há como saber que um **convênio foi inativado**?
-4. Existe **última atualização do cadastro** e **hora real do atendimento**?
-5. O histórico de marcações é mesmo curto? (3 e 12 meses deram o mesmo total)
-
-Sem essas respostas: o preço Particular continua digitado à mão no Cardápio, a suspensão de convênio é controlada aqui e o resultado de exame não é entregue pelo chat.
+### 2.3 (retirado em 17/11/2026) Perguntas ao suporte do Klingo
+A lista de perguntas ao suporte foi retirada a pedido do dono. Enquanto não houver resposta: o preço Particular segue digitado no Cardápio, a suspensão de convênio é controlada aqui e o resultado de exame não é entregue pelo chat.
 
 ### 2.4 Um paciente real para o teste do Klingo
 A conferência por CPF + nascimento (`klingo-paciente`) nunca foi provada com um paciente de verdade. Preciso de **um paciente cadastrado que autorize** (ou do seu nome completo e nascimento como estão no Klingo).
@@ -93,7 +85,6 @@ Decidir se o login continua opcional como está ou se vira o cadastro único (no
 ## 2.8 Autoatendimento Klingo (12/11/2026): o que só você ou o Klingo fazem
 Detalhes e números em [`klingo-autoatendimento.md`](klingo-autoatendimento.md).
 - **Primeiro teste real de marcação** (o único passo para abrir a marcação sozinha): um paciente que autorize, o celular dele em `klingo_api_telefones_teste` (Configurações) e o call center avisado para cancelar. Passo a passo na seção 6 do documento. Sem isso a marcação sozinha fica em modo teste (ninguém usa) e o sistema não avança.
-- **Perguntas ao suporte do Klingo** (e-mail em `docs/klingo-api-externa/roteiro-reuniao-suporte.md`): a URL do webhook (`https://nrvuynjwcgwpjdptkiay.supabase.co/functions/v1/klingo-webhook`, com a chave da clínica no cabeçalho `X-APP-TOKEN`); o limite de chamadas por minuto; liberar ortopedia, endocrinologia e as outras especialidades na API (hoje só neurologia, pediatria e radiologia); o número do plano da ASSEFAZ; uma agenda de teste na API; se `/vouchers` mostra o `id_externo`.
 - **13 pacientes com nascimento diferente do Klingo** (o mesmo CPF com outra data): o sistema não marca sozinho para eles; a recepção confere (pode ser CPF do responsável de uma criança).
 - **Revisar `privacidade.html`** para citar a marcação automática e o envio de CPF ao Klingo (junto com o item 2.5).
 - **Código por e-mail** (segundo fator; SMS descartado pelo dono em 15/11/2026): sem ele, resultado de exame e troca de telefone ficam com a equipe (plano, etapa 6).
@@ -121,9 +112,8 @@ Resumo e plano completo: [`reestruturacao-2026-11-14/00-leia-primeiro.md`](reest
 1. **Autorizar a publicação**, na ordem de [`06-plano-de-publicacao.md`](reestruturacao-2026-11-14/06-plano-de-publicacao.md): segurança da `klingo-agendamento` → migrações (partes 1, 2, 4, 3, 5) → Edge Functions (`chat-agenda-api` v2, `klingo-executar` v1.1, `disponibilidade-vigia`) → tela e painel (merge) → **configuração pública** (`webchat-v2-config-publica.sql`). **Atenção:** entre a parte 1 e a configuração pública o público fica sem marcação automática; o plano concentra isso numa janela única.
 2. **Validação com o Klingo real**: todos os testes usam Klingo simulado. Indicar um paciente de teste e uma agenda que a equipe aceite cancelar para conferir marcar, ver, cancelar e remarcar de verdade (lista em `06`, seção 3). Nenhuma marcação real foi feita.
 3. **Decidir a política de encerramento** de conversa quando o paciente registra disponibilidade futura (`disponibilidade_encerra_conversa`, hoje `nao`).
-4. **Suporte do Klingo**: webhook, resultado de exame liberado, remarcação atômica, marcações do balcão em `/vouchers`, limite por minuto, catálogo (lista em [`05-pendencias.md`](reestruturacao-2026-11-14/05-pendencias.md), seção A).
-5. **Jurídico**: `privacidade.html` precisa citar solicitação de disponibilidade, consulta de marcações, aviso no chat, retenção e opt-out (item 2.5).
-6. **Telefone de teste no GitHub:** tratado na minha branch (histórico reescrito, com a sua autorização). **Sobra:** o mesmo número já estava na `main` desde 10/11 e nas branches antigas, e o GitHub guarda commits antigos por código. Decisão sua: ver [`08-limpeza-do-telefone-no-github.md`](reestruturacao-2026-11-14/08-limpeza-do-telefone-no-github.md). Trocar o telefone na lista de teste resolve o risco prático.
+4. **Jurídico**: `privacidade.html` precisa citar solicitação de disponibilidade, consulta de marcações, aviso no chat, retenção e opt-out (item 2.5).
+5. **Telefone de teste no GitHub:** tratado na minha branch (histórico reescrito, com a sua autorização). **Sobra:** o mesmo número já estava na `main` desde 10/11 e nas branches antigas, e o GitHub guarda commits antigos por código. Decisão sua: ver [`08-limpeza-do-telefone-no-github.md`](reestruturacao-2026-11-14/08-limpeza-do-telefone-no-github.md). Trocar o telefone na lista de teste resolve o risco prático.
 7. Apagar as funções temporárias `klingo-comparar-chat`, `klingo-comparar-14554`, `klingo-teste-api` e `klingo-inspecionar-chat` (a `klingo-agendamento` **fica**).
 
 ### 2.14 Acesso rápido do paciente (14/11/2026) — banco aplicado e **LIGADO em 15/11/2026**
@@ -169,16 +159,14 @@ Abrir: https://clinicacsiia.github.io/webchat/simulacao/ (entre com a conta do p
 1. **Capacidade real:** o Klingo não informa quantas salas e profissionais há por setor. Abra a simulação, ajuste as estações até refletir a clínica e clique em **Definir como capacidade atual da clínica** (fica salvo no seu navegador). Se quiser que fique para todos, me diga e gravo no banco.
 2. **Tempos de guichê, preparo e exame:** se alguém da equipe medir com cronômetro por alguns dias, ponha em **Premissas** (hoje são hipóteses: guichê 3 a 6 min, preparo 4 a 8 min, exame pelo padrão de cada modalidade).
 3. **"Confirmado" na recepção:** confirme com a equipe se a recepção marca "Confirmado" quando o paciente chega. Se marcar, a taxa de falta dos confirmados (≈ 11%) fica otimista.
-4. **Suporte do Klingo (pergunta 4 de `klingo-relatorios-pendentes.md`):** hora real de início e de fim do atendimento. É o que troca hipótese por medida.
-5. **Entrega do resultado:** o sistema não registra quando o paciente busca o resultado (a Jornada tem 2 "concluídos" e `app_resultado` está vazia). Por isso a etapa "Exame feito, resultado" da área externa aparece como ponto cego. Decidir como registrar (equipe marca na conversa? Klingo informa?).
-6. **Limites de atenção da área externa** (chat 15/60/240 min, pedido 8/24/72 h, confirmação 10/20/30%): são palpites meus; diga se a clínica usa outros.
-7. **Check-in pelo "Minha vez":** só 5 pacientes usaram até 15/11/2026. É a única espera de verdade; incentivar na recepção melhora a simulação.
+4. **Entrega do resultado:** o sistema não registra quando o paciente busca o resultado (a Jornada tem 2 "concluídos" e `app_resultado` está vazia). Por isso a etapa "Exame feito, resultado" da área externa aparece como ponto cego. Decidir como registrar (equipe marca na conversa? Klingo informa?).
+5. **Limites de atenção da área externa** (chat 15/60/240 min, pedido 8/24/72 h, confirmação 10/20/30%): são palpites meus; diga se a clínica usa outros.
+6. **Check-in pelo "Minha vez":** só 5 pacientes usaram até 15/11/2026. É a única espera de verdade; incentivar na recepção melhora a simulação.
 
 ## 2.18 Check-in do Klingo na tela "Minha vez" (15/11/2026): o que só você decide ou testa
 Feito e no ar: a Jornada lê o check-in (col18 do #14359) e a tela "Minha vez" mostra, no lugar do lugar na fila, o número da marcação e a etapa de cada exame de hoje (`docs/checkin-klingo-minha-vez.md`). O que depende de você:
 1. **Segunda-feira (16/11), com a recepção:** na primeira chegada, conferir se a tela mostra "Marcação nº" e depois "Chegada registrada às …", e se o número é o mesmo que a recepção vê no Klingo (é o que prova que o número do relatório é o voucher da API).
 2. **Decidir se o Cheguei também registra o check-in no Klingo pela API.** Hoje a recepção registra a chegada e a tela acompanha. Fazer pela API exige um teste real com uma marcação de hoje (mexe na agenda do Klingo) e ligar a pessoa do acesso rápido ao cadastro do Klingo por CPF + nascimento. Diga "faça o check-in pela API" numa segunda-feira de manhã e combinamos o teste.
-3. **Pedir ao suporte do Klingo (pergunta 4):** hora de início e de fim do atendimento. Sem isso, "Em atendimento" quer dizer "o Klingo abriu o atendimento".
 
 ## 2.19 Laudos no aplicativo (16/11/2026): o que só você decide ou testa
 O paciente baixa o PDF no cartão **Meus laudos** (`laudos-no-app.md`); o sistema pergunta ao Klingo a cada download e bloqueia se a equipe retirou o laudo. **Banco e função no ar; a tela vai ao ar quando o PR for aprovado e entrar na `main`.**

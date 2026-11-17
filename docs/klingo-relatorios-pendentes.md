@@ -62,22 +62,17 @@ Ensaiado no banco real em transação desfeita (gatilho, vínculo e notas) e cha
 2. **Resultado de exame: link e senha** serão passados pela equipe (decisão do dono). Falta definir o canal e a tela: sugestão é a atendente enviar pelo chat/painel, com a senha em mensagem separada. O relatório C só diz se o laudo está pronto.
 3. **Histórico do Klingo para o paciente ver no chat** (hoje só a equipe vê o resumo; o paciente que volta usa o histórico do próprio chat). `klingo-paciente` já tem as ações `historico` e `resultados` para isso.
 4. **Aviso na tela do painel** com o vínculo (selo "Klingo: cadastro incompleto"); hoje aparece só nas notas do resumo.
-5. **Suporte do Klingo:** preço Particular; link/senha do resultado; convênio inativado; última atualização do cadastro e hora real do atendimento.
-6. **Limpeza que sobrou:** `fila_avisar_n8n`, `fila_entrar` e `fila_reenviar_link` ainda citam o n8n (módulo da fila, `supabase/saida-n8n-fila.sql`, não aplicado). `privacidade.html` cita o n8n: só mudar com revisão jurídica. Apagar a função temporária `klingo-inspecionar-chat` no painel do Supabase.
-7. Confirmar com a clínica se o histórico do Klingo é curto (3 e 12 meses deram o mesmo total no relatório B).
+5. **Limpeza que sobrou:** `fila_avisar_n8n`, `fila_entrar` e `fila_reenviar_link` ainda citam o n8n (módulo da fila, `supabase/saida-n8n-fila.sql`, não aplicado). `privacidade.html` cita o n8n: só mudar com revisão jurídica. Apagar a função temporária `klingo-inspecionar-chat` no painel do Supabase.
+6. Confirmar com a clínica se o histórico do Klingo é curto (3 e 12 meses deram o mesmo total no relatório B).
 
 ## Pendências com o suporte do Klingo
-(Texto de e-mail em `docs/fase-0-email-suporte-klingo.md`; acrescentar estas perguntas.)
-1. Onde fica cadastrado o **preço Particular** (a tabela "Particular" não aparece no relatório D)?
-2. O Klingo gera **link e senha/código do resultado** para o paciente? Qual relatório ou consulta devolve?
-3. Há como saber que um **convênio foi inativado** (campo ou relatório)?
-4. Existe campo de **última atualização do cadastro** do paciente e de **hora real do atendimento**?
+Retiradas a pedido do dono em 17/11/2026 (nada será pedido ao suporte por enquanto).
 
 ## Próximos passos
 - ~~Executar A a E para validar colunas e filtros~~ (feito em 03/11/2026 com a função `klingo-inspecionar-chat`, que só devolve estrutura e contagem).
 - Testar `klingo-paciente` com um paciente real cadastrado (ver acima).
 - ~~Ligar ao chat~~ (feito, ver acima).
-- Enquanto a pergunta 1 não for respondida, o valor Particular continua deduzido das marcações.
+- O valor Particular continua deduzido das marcações.
 
 ## Regra de trabalho
 Sempre que uma tarefa depender de relatório do Klingo editado ou criado, o Claude avisa **antes de começar** e diz qual relatório falta. Esta regra está em `CLAUDE.md`.
@@ -86,7 +81,7 @@ Sempre que uma tarefa depender de relatório do Klingo editado ou criado, o Clau
 Busca de histórico sob demanda (B); verificação por CPF e pedido de atualização de dado (A); ligação automática chat-prontuário com aviso (A).
 
 ## Ainda travadas
-Envio de link e senha do resultado ao paciente (sem link/senha no C; depende do suporte).
+Envio de link e senha do resultado ao paciente (sem link/senha no relatório C).
 
 
 ## Relatório #14554 (13/11/2026): todas as marcações com os dados do paciente
