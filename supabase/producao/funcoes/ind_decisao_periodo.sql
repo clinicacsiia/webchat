@@ -10,7 +10,7 @@ declare v_chat jsonb;
 begin
   with
   pu as (select x.conversa_id, x.pessoa from public.painel_conversa_pessoa_un() x
-          where p_un is null or x.chaves is null or cardinality(x.chaves) = 0 or p_un = any (x.chaves)),
+          where p_un is null or (p_un = 'sem' and (x.chaves is null or cardinality(x.chaves) = 0)) or (p_un <> 'sem' and p_un = any (x.chaves))),
   cv as (select c.id, pu.pessoa, c.criado_em, c.primeiro_humano_em, c.status, c.motivo_encerramento
            from public.conversas c join pu on pu.conversa_id = c.id
           where (p_teste or not c.teste) and (c.criado_em at time zone 'America/Sao_Paulo')::date between p_de and p_ate),
@@ -23,6 +23,7 @@ begin
   ult as (select distinct on (cv.pessoa) cv.pessoa, cv.status as ult_status, cv.motivo_encerramento as ult_motivo from cv order by cv.pessoa, cv.criado_em desc),
   ag as (select cv.pessoa, bool_or(cv.primeiro_humano_em is not null) as humano, bool_or(cv.motivo_encerramento = 'agendado') as marcou_motivo from cv group by cv.pessoa),
   pes as (select ag.pessoa, ag.humano, case when pr.t_ex then 'exame' when pr.t_co then 'consulta' end as tipo,
+                 coalesce(pr.r, 0) as rf,
                  case when coalesce(pr.r, 0) = 8 or ag.marcou_motivo then 8 else coalesce(pr.r, 0) end as er,
                  case when not ag.humano then 'sem_equipe'
                       when ult.ult_status <> 'encerrada' then 'em_andamento'
@@ -34,18 +35,19 @@ begin
     'entraram', (select count(*) from pes),
     'funil', jsonb_build_object(
         'entraram', (select count(*) from pes),
-        'pedido', (select count(*) from pes where er >= 1),
-        'data_hora', (select count(*) from pes where er >= 4),
-        'horario', (select count(*) from pes where er >= 5),
-        'completo', (select count(*) from pes where er >= 7),
-        'agendaram', (select count(*) from pes where er = 8)),
+        'pedido', (select count(*) from pes where rf >= 1 or er = 8),
+        'data_hora', (select count(*) from pes where rf >= 4),
+        'horario', (select count(*) from pes where rf >= 5),
+        'completo', (select count(*) from pes where rf >= 7),
+        'agendaram', (select count(*) from pes where er = 8),
+        'agendaram_so_pelo_motivo', (select count(*) from pes where er = 8 and rf < 8)),
     'parou_em', jsonb_build_object(
         'conversou', (select count(*) from pes where er = 0), 'exame', (select count(*) from pes where er = 1), 'plano', (select count(*) from pes where er = 2),
         'preferencias', (select count(*) from pes where er = 3), 'data_hora', (select count(*) from pes where er = 4),
         'dados', (select count(*) from pes where er in (5, 6)), 'pronto', (select count(*) from pes where er = 7)),
     'sem_agendar_motivo', coalesce((select jsonb_object_agg(m.motivo, m.n) from (select motivo, count(*) as n from pes where er < 8 group by motivo) m), '{}'::jsonb),
-    'por_tipo', coalesce((select jsonb_object_agg(q.t, q.o) from (select coalesce(tipo, 'sem_tipo') as t, jsonb_build_object('pedido', count(*) filter (where er >= 1), 'data_hora', count(*) filter (where er >= 4),
-                          'horario', count(*) filter (where er >= 5), 'completo', count(*) filter (where er >= 7), 'agendaram', count(*) filter (where er = 8)) as o from pes where er >= 1 group by 1) q), '{}'::jsonb),
+    'por_tipo', coalesce((select jsonb_object_agg(q.t, q.o) from (select coalesce(tipo, 'sem_tipo') as t, jsonb_build_object('pedido', count(*) filter (where rf >= 1 or er = 8), 'data_hora', count(*) filter (where rf >= 4),
+                          'horario', count(*) filter (where rf >= 5), 'completo', count(*) filter (where rf >= 7), 'agendaram', count(*) filter (where er = 8)) as o from pes where rf >= 1 or er = 8 group by 1) q), '{}'::jsonb),
     'espera_mediana_min', (select round(med::numeric, 0) from espera)
   ) into v_chat;
 
@@ -54,3 +56,4 @@ begin
     'clinica_consulta', public.ind_clinica_periodo(p_de, p_ate, p_un, p_teste, 'consulta'),
     'clinica_exame', public.ind_clinica_periodo(p_de, p_ate, p_un, p_teste, 'exame'));
 end $function$;
+
