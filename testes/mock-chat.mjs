@@ -148,9 +148,14 @@ export function criarMundo(opcoes = {}) {
           .map(([data, hs]) => ({ data, slots: hs.map((hora) => ({ hora, unidade: 'CLÍNICA DE SAÚDE E IMAGEM - CSI', profissional: 'DRA ANA', local: null, min: 30, chegada: false })) }));
         const janelas = {}; for (let i = 0; i < 7; i++) janelas[String(i)] = { ini: '08:00', fim: '12:00', passo: 30 };
         const ok = m.api.estado === 'com_horarios';
-        return { body: { janelas, grupos: [{ indice: 1, procs: [1], nomes: ['CONSULTA'] }], grupo: 1, de: corpo.p_de, ate: corpo.p_ate, dias: ok ? dias : [],
-          unidades: ['CLÍNICA DE SAÚDE E IMAGEM - CSI'], escolhas: [], sem_exame: 0, atualizado_em: agora(), aviso: null, estado: m.api.estado, klingo_api: ok, origem: ok ? 'api_klingo' : 'nenhuma' } };
+        // 17/11/2026: médico escolhido pelo paciente. m.medico = { nome, achaNaJanela } (achaNaJanela = menor janela da API com horário dele; ausente = nunca tem). O banco real devolve a lista só dele(a).
+        const jMax = m.chamadasApi.reduce((x, c) => Math.max(x, Number(c.corpo && c.corpo.janela) || 0), -1);
+        const med = m.medico ? { medico_preferido: m.medico.nome, medico_filtrando: true, medico_sem_horario: !(m.medico.achaNaJanela != null && jMax >= m.medico.achaNaJanela) } : {};
+        const mostra = ok && !med.medico_sem_horario;
+        return { body: { janelas, grupos: [{ indice: 1, procs: [1], nomes: ['CONSULTA'] }], grupo: 1, de: corpo.p_de, ate: corpo.p_ate, dias: mostra ? dias : [],
+          unidades: ['CLÍNICA DE SAÚDE E IMAGEM - CSI'], escolhas: [], sem_exame: 0, atualizado_em: agora(), aviso: null, estado: m.api.estado, klingo_api: ok, origem: ok ? 'api_klingo' : 'nenhuma', ...med } };
       }
+      case 'chat_medico_sem_horario_abrir': { (m.medico.abertos = m.medico.abertos || []).push(corpo); return { body: { ok: true, solicitacao: { id: 'sol-med', estado: 'ativa' } } }; }
       case 'chat_disponibilidade_registrar': { m.disp.registros.push(corpo.p_dados); return { body: { ok: true, solicitacao: { id: 'sol-1', estado: 'ativa', ...corpo.p_dados } } }; }
       case 'chat_disponibilidade_ver': return { body: { solicitacoes: m.disp.lista } };
       case 'chat_disponibilidade_alterar': { m.disp.registros.push(corpo.p_dados); return { body: { ok: true } }; }

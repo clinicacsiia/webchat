@@ -6,7 +6,7 @@ CREATE OR REPLACE FUNCTION public.chat_disponibilidade_registrar(p_conversa uuid
  SECURITY DEFINER
  SET search_path TO ''
 AS $function$
-declare v_r jsonb; v_texto text; v_prox text;
+declare v_r jsonb; v_texto text; v_prox text; v_pref text; v_dados jsonb := coalesce(p_dados, '{}'::jsonb);
 begin
   perform public.app_pin_exigir_leitura();   -- PIN também no servidor (config.app_pin_servidor)
   perform public.chat_valida(p_conversa, p_token);
@@ -15,7 +15,10 @@ begin
   if (select count(*) from public.mensagens where conversa_id = p_conversa and autor = 'cliente' and criado_em > now() - interval '1 minute') >= 20 then
     raise exception 'Muitas mensagens em pouco tempo. Aguarde um instante.' using errcode = '54000';
   end if;
-  v_r := public.disponibilidade_gravar(p_conversa, coalesce(p_dados, '{}'::jsonb));
+  -- médico escolhido pelo paciente: a solicitação é só com ele(a)
+  select c.medico_preferido into v_pref from public.conversas c where c.id = p_conversa;
+  if v_pref is not null then v_dados := v_dados || jsonb_build_object('profissional', v_pref, 'aceita_outros_profissionais', false); end if;
+  v_r := public.disponibilidade_gravar(p_conversa, v_dados);
   v_texto := 'Registrei a sua disponibilidade para ' || coalesce(v_r ->> 'procedimento', 'o atendimento') || ', de ' || to_char((v_r ->> 'data_ini')::date, 'DD/MM') || ' a ' || to_char((v_r ->> 'data_fim')::date, 'DD/MM') || '.'
     || E'\n\nIsso NÃO é um agendamento e não reserva horário: é um pedido para avisarmos você quando surgir uma vaga compatível. '
     || case when (v_r ->> 'aceita_notificacao')::boolean then 'Quando isso acontecer, você receberá um aviso aqui no chat e poderá tentar agendar na hora.' else 'Você não autorizou avisos; para acompanhar, volte aqui e toque em "Minha disponibilidade".' end;

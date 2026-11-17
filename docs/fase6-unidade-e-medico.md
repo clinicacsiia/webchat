@@ -58,7 +58,7 @@ O pedido só aceitava **exames de imagem**; sem item no pedido o calendário nã
 
 Se a lista de unidades não carregar, o formulário volta ao comportamento antigo e a IA pergunta a unidade no chat.
 
-No calendário: a unidade escolhida já vem selecionada; o médico filtra os horários (sem vaga, mostra os de outros médicos e avisa; com o filtro ativo há o botão **Ver outros médicos**).
+No calendário: a unidade escolhida já vem selecionada; o médico filtra os horários. **Desde 17/11/2026** o médico escolhido nunca é trocado: sem vaga dele(a) o chat não mostra os de outros médicos nem tem o botão "Ver outros médicos" (ver `medico-escolhido-fica.md`).
 
 ## Preço: a IA não fala; o sistema vigia o atendente (Fase 6b)
 

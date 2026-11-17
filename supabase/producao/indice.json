@@ -6044,7 +6044,7 @@
    "anon": true,
    "authenticated": true,
    "publico": false,
-   "md5": "425b5f5df341b59f936486842711e66b"
+   "md5": "94b630ca3810a6ea3ea880fb2f78cfc6"
   },
   {
    "nome": "chat_disponibilidade_cancelar",
@@ -6090,7 +6090,7 @@
    "anon": true,
    "authenticated": true,
    "publico": false,
-   "md5": "3b97433c8538f59d8efcfb1e66a7b13d"
+   "md5": "ab515e543d78e6d2d2b03331e16ff6f1"
   },
   {
    "nome": "chat_disponibilidade_responder",
@@ -6298,7 +6298,7 @@
    "anon": true,
    "authenticated": true,
    "publico": false,
-   "md5": "4e8bad7e77728878c2c757a2439dc32e"
+   "md5": "4c349f4a4d24c06d388c0143e7bc7397"
   },
   {
    "nome": "chat_horarios",
@@ -6341,7 +6341,7 @@
    "anon": true,
    "authenticated": true,
    "publico": false,
-   "md5": "41efb252b7cda98b4edfa50038248d1b"
+   "md5": "11798ffd73083d53deb024be7c00874f"
   },
   {
    "nome": "chat_incidente",
@@ -6493,6 +6493,29 @@
    "authenticated": true,
    "publico": true,
    "md5": "6d33a9a14517d9f95e10b98b3c7175e3"
+  },
+  {
+   "nome": "chat_medico_sem_horario_abrir",
+   "args": [
+    {
+     "nome": "p_conversa",
+     "padrao": false
+    },
+    {
+     "nome": "p_token",
+     "padrao": false
+    },
+    {
+     "nome": "p_dados",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "24d73381b649eb21026cedc94867de4c"
   },
   {
    "nome": "chat_medicos_disponiveis",
@@ -11742,7 +11765,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "0fd42af3cea606870af60ef8018fe9d9"
+   "md5": "a0a979e963d8330dfcd6085c9e131c0d"
   },
   {
    "nome": "klingo_pre_gravar",
