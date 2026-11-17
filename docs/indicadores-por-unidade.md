@@ -66,3 +66,18 @@ Atenção: o id da marcação no Klingo tem "m" na frente (`m22544`), diferente 
 - **Quem respondeu primeiro (11/11/2026):** sem registro novo: a primeira mensagem de atendente de cada conversa abre o "primeiro a responder" (vale também para o histórico). A aba mostra, por atendente, quantas conversas respondeu primeiro e a **mediana de minutos** até essa resposta (verde = mais rápido, vermelho > 30 min). Conversas contadas pelo dia em que abriram. Mesmo arquivo `supabase/indicadores-atendentes.sql` (reaplicado).
 
 > Publicação (11/11/2026): a publicação do GitHub Pages do PR #142 travou na fila sem iniciar (0 etapas) e não pôde ser cancelada. Este commit só de documentação existe para gerar uma publicação nova, como em 09/11/2026 (#110 e #111 travaram e o merge seguinte, #112, publicou).
+
+
+## Aba Indicadores enxugada: uso do site (17/11/2026)
+
+A aba ficou curta e operacional. Só mostra o que o site (chat) produz, com o Klingo como referência. **Saíram:** o veredito "Bom / Atenção / Ruim" e as faixas coloridas, os textos "por quê" e "o que fazer", a equipe por atendente, as avaliações, a conferência Klingo × webchat, a clínica toda (faltas, cancelamentos) e o gráfico mensal. Os dados continuam no banco; é só tela.
+
+Ordem da página:
+
+1. **Resumo (5 números, com seta neutra contra o período anterior):** pessoas que procuraram o chat, começaram um pedido, agendaram pelo chat, marcações do site no Klingo (e que parte das marcações novas da clínica isso é) e tempo mediano da 1ª resposta da equipe.
+2. **Onde as pessoas param:** caminho do paciente no chat (com a maior queda marcada), último passo de quem não agendou e como a conversa terminou sem agendar. "Caminho separado por consulta e exame" fica recolhido.
+3. **Onde o site mais é usado:** por unidade, mais pedidos e planos (destaca em vermelho só quem tem 8+ pessoas e menos de 15% agendando).
+4. **Comparação com o Klingo:** marcações novas da clínica toda × as que vieram do site (consultas, exames, total e a parte do site) e o que aconteceu com as do site (ativas, remarcadas, canceladas; atendidas, faltaram, por vir).
+5. **Autoatendimento:** tentativas do chat de marcar sozinho, marcadas, foram para a equipe, horário ocupado, resolvidas sem atendente, tempo médio e cancelar/remarcar pelo chat.
+
+Banco: nada mudou. A tela chama só `painel_indicadores_decisao`, `painel_indicadores_plataforma`, `painel_indicadores_diretoria` e `painel_automacao_resumo`. Nenhum relatório novo do Klingo é necessário. Painel `sw.js` v50. Teste: `cd testes && npm run test:indicadores` (22 verificações).
