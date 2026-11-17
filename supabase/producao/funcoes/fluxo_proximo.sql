@@ -48,6 +48,8 @@ begin
   end if;
   -- primeira-consulta: primeira consulta com a médica controlada só com atendente (primeira_consulta_ok; desligada por padrão)
   if pa.tipo = 'consulta' and coalesce((public.primeira_consulta_ok(p_conversa) ->> 'bloqueia')::boolean, false) then return 'primeira_consulta'; end if;
+  -- retorno-30-dias: pediu consulta na mesma especialidade com atendimento de menos de 30 dias: avisa e passa para a atendente (retorno_recente_ok; chave retorno_dias_modo)
+  if pa.tipo = 'consulta' and coalesce((public.retorno_recente_ok(p_conversa) ->> 'bloqueia')::boolean, false) then return 'retorno_recente'; end if;
   -- klingo-auto: paciente que o chat já conhecia (dados guardados de antes, nada digitado nesta conversa) confirma só o CPF; conferência velha ou "não sou eu" = tudo de novo
   if public.klingo_ativo(p_conversa, 'klingo_api_marcar') and not coalesce((d ->> 'nao_sou_eu')::boolean, false) and not coalesce((d ->> 'cpf_confirmado')::boolean, false)
      and public.fluxo_cpf_ok(pa.paciente ->> 'cpf') and public.fluxo_ler_data(pa.paciente ->> 'dt_nasc') is not null and (d -> 'digitado' ->> 'cpf') is null then

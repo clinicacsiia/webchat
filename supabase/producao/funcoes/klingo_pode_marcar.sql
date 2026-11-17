@@ -22,6 +22,10 @@ begin
   if pa.tipo = 'consulta' and coalesce((public.primeira_consulta_ok(p_conversa) ->> 'bloqueia')::boolean, false) then
     return jsonb_build_object('ok', false, 'motivo', 'primeira_consulta', 'detalhe', 'primeira consulta com a médica: só a atendente marca');
   end if;
+  -- retorno-30-dias: segunda trava (a primeira fica em fluxo_proximo); consulta na mesma especialidade com atendimento de menos de 30 dias não marca sozinho
+  if pa.tipo = 'consulta' and coalesce((public.retorno_recente_ok(p_conversa) ->> 'bloqueia')::boolean, false) then
+    return jsonb_build_object('ok', false, 'motivo', 'retorno_recente', 'detalhe', 'consulta da mesma especialidade com atendimento de menos de 30 dias: só a atendente marca');
+  end if;
   d := public.klingo_dados_conversa(p_conversa);
   if (d ->> 'n_procedimentos')::int <> 1 then return jsonb_build_object('ok', false, 'motivo', 'varios_procedimentos'); end if;
   if jsonb_typeof(pa.escolha_horario) <> 'array' or jsonb_array_length(pa.escolha_horario) <> 1 then return jsonb_build_object('ok', false, 'motivo', 'horario_nao_unico'); end if;
