@@ -9920,6 +9920,37 @@
    "md5": "668eeaa9239603b0c6cdffd11fb5a77f"
   },
   {
+   "nome": "ind_clinica_periodo",
+   "args": [
+    {
+     "nome": "p_de",
+     "padrao": false
+    },
+    {
+     "nome": "p_ate",
+     "padrao": false
+    },
+    {
+     "nome": "p_un",
+     "padrao": false
+    },
+    {
+     "nome": "p_teste",
+     "padrao": false
+    },
+    {
+     "nome": "p_tipo",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "f582075ce11066ec17723360fe9ee33a"
+  },
+  {
    "nome": "ind_decisao_periodo",
    "args": [
     {
@@ -9944,7 +9975,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "8b3cdf3028aa13097414450978aca9e0"
+   "md5": "7651982e3969fc5e19f67c729cdf5630"
   },
   {
    "nome": "ind_fechar_dia",
@@ -13410,7 +13441,34 @@
    "anon": false,
    "authenticated": true,
    "publico": false,
-   "md5": "9186bf088b19f7087e903b8970803f5d"
+   "md5": "c3b24f8622b8d3f5e12adfc82564c863"
+  },
+  {
+   "nome": "painel_indicadores_plataforma",
+   "args": [
+    {
+     "nome": "p_de",
+     "padrao": true
+    },
+    {
+     "nome": "p_ate",
+     "padrao": true
+    },
+    {
+     "nome": "p_unidade",
+     "padrao": true
+    },
+    {
+     "nome": "p_incluir_teste",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "5f98f7b3219050b926af0d3a96f51fc6"
   },
   {
    "nome": "painel_indicadores_equipe",
