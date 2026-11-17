@@ -117,3 +117,7 @@ Criado pelo dono. Filtros: `periodo0` = Data Agendado Em (período; sem filtro v
 
 ## #14359: coluna Profissional (16/11/2026)
 O dono acrescentou `col21` Profissional. Lida pela `sync-jornada-klingo` v1.6 (opcional). Pela API o #14359 só devolve datas passadas se o filtro "marcado em" (`periodo2`) também for enviado.
+
+
+## Webchat de Previsão de marcação (17/11/2026): nenhum relatório novo; achado sobre o #14359
+Usa o **#14359** (nome, prontuário, celular, telefone, primeira vez, status) e o **#14554** (e-mail, nascimento, "tem CPF"), pela Edge Function `pmarc-cadastrar`. **Nenhum relatório precisa ser criado ou editado.** Achado: o #14359 tem um 2º filtro de período, **"marcado em" (`periodo2`)**; sem ele o Klingo devolve só as marcações feitas hoje (49 linhas) e com ele devolve 3.158 (faixa de exame de hoje a +1 ano, marcadas nos últimos 360 dias). A `pmarc-cadastrar` envia o `periodo2`; a `sync-jornada-klingo` (Jornada) ainda não envia (ver `pendencias-do-dono.md`, 2.21). **Regra:** ao mexer nas colunas ou filtros do #14359, avisar antes.

@@ -2323,6 +2323,60 @@
    ],
    "rls": true,
    "politicas": 0
+  },
+  {
+   "nome": "pmarc_estado",
+   "colunas": [
+    "id",
+    "completo_em",
+    "rapido_em",
+    "tentativa_em",
+    "resultado",
+    "erro"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "pmarc_pessoa",
+   "colunas": [
+    "id",
+    "chave",
+    "codigo",
+    "nome",
+    "celular",
+    "telefone",
+    "email",
+    "nascimento",
+    "tem_cpf",
+    "primeira_vez",
+    "origem",
+    "resposta",
+    "respondeu_em",
+    "informado",
+    "primeiro_acesso_em",
+    "ultimo_acesso_em",
+    "aceitou_lgpd_em",
+    "link_enviado_em",
+    "link_enviado_por",
+    "contato_id",
+    "conversa_id",
+    "criado_em",
+    "atualizado_em"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "pmarc_tentativa",
+   "colunas": [
+    "id",
+    "marca",
+    "tipo",
+    "quando"
+   ],
+   "rls": true,
+   "politicas": 0
   }
  ],
  "visoes": [
@@ -2534,6 +2588,12 @@
    "comando": "select public.pessoa_agrupar_pendentes()"
   },
   {
+   "nome": "pmarc-cadastrar",
+   "quando": "*/10 * * * *",
+   "ativa": true,
+   "comando": "select public.pmarc_vigiar()"
+  },
+  {
    "nome": "previsao-vigia",
    "quando": "*/10 * * * *",
    "ativa": true,
@@ -2726,6 +2786,10 @@
   "plano_exato_modo",
   "previsao_decide_texto",
   "previsao_final_texto",
+  "previsao_marcacao_aviso",
+  "previsao_marcacao_final",
+  "previsao_marcacao_modo",
+  "previsao_marcacao_novos_max_hora",
   "previsao_modo",
   "previsao_monitor_modo",
   "previsao_oferta_texto",
@@ -13856,6 +13920,83 @@
    "md5": "e3792d55b80d7bb6e9583a32e1479462"
   },
   {
+   "nome": "painel_pmarc_conversa",
+   "args": [
+    {
+     "nome": "p_id",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "04b36fbb36241b2a4ecbb1c2161c8a3d"
+  },
+  {
+   "nome": "painel_pmarc_estado",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "0815048fbc90c67a90609f6e34fa80c2"
+  },
+  {
+   "nome": "painel_pmarc_link_enviado",
+   "args": [
+    {
+     "nome": "p_id",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "74fd4e10cedc873824f98d767b893ccb"
+  },
+  {
+   "nome": "painel_pmarc_lista",
+   "args": [
+    {
+     "nome": "p_filtro",
+     "padrao": true
+    },
+    {
+     "nome": "p_busca",
+     "padrao": true
+    },
+    {
+     "nome": "p_limite",
+     "padrao": true
+    },
+    {
+     "nome": "p_pular",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "66c6f4b5e7d2153f1a8337d351aa21f1"
+  },
+  {
+   "nome": "painel_pmarc_resumo",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "3ea73d064ce6a37713a40c64582f636d"
+  },
+  {
    "nome": "painel_presenca",
    "args": [],
    "definer": true,
@@ -14592,6 +14733,325 @@
    "authenticated": false,
    "publico": false,
    "md5": "e9dcf91a6b93c74977604d9e21fc9071"
+  },
+  {
+   "nome": "pmarc_abrir",
+   "args": [
+    {
+     "nome": "p_codigo",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "14e787862419505911dc9cfc01f85671"
+  },
+  {
+   "nome": "pmarc_classificar",
+   "args": [
+    {
+     "nome": "p_texto",
+     "padrao": false
+    }
+   ],
+   "definer": false,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "e085be923eab47529e8933e364af0195"
+  },
+  {
+   "nome": "pmarc_conversa_garantir",
+   "args": [
+    {
+     "nome": "p_id",
+     "padrao": false
+    },
+    {
+     "nome": "p_por",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "ab96cb838ad87528a4dc43c3fbc82219"
+  },
+  {
+   "nome": "pmarc_disparar",
+   "args": [
+    {
+     "nome": "p_modo",
+     "padrao": true
+    },
+    {
+     "nome": "p_extra",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "3672ba2048e01114f5d5c98aae335168"
+  },
+  {
+   "nome": "pmarc_enriquecer_lote",
+   "args": [
+    {
+     "nome": "p_linhas",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "c05aaf47b808c94fbe322844eeffa351"
+  },
+  {
+   "nome": "pmarc_enviar",
+   "args": [
+    {
+     "nome": "p_codigo",
+     "padrao": false
+    },
+    {
+     "nome": "p_texto",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "6dee0ea2d9a853a87816ecb079a34168"
+  },
+  {
+   "nome": "pmarc_estado_gravar",
+   "args": [
+    {
+     "nome": "p_modo",
+     "padrao": false
+    },
+    {
+     "nome": "p_resultado",
+     "padrao": true
+    },
+    {
+     "nome": "p_erro",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "6290a35311244821f1a17f0565301be6"
+  },
+  {
+   "nome": "pmarc_identificar",
+   "args": [
+    {
+     "nome": "p_celular",
+     "padrao": false
+    },
+    {
+     "nome": "p_nascimento",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "bc5a334b9ff6376276dbf619e5936698"
+  },
+  {
+   "nome": "pmarc_itens",
+   "args": [
+    {
+     "nome": "p_chave",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "7305ebcb0a60382a1cdd35f37dc6d451"
+  },
+  {
+   "nome": "pmarc_ligada",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "d5a520908e3783c5fef58205578c2595"
+  },
+  {
+   "nome": "pmarc_lote",
+   "args": [
+    {
+     "nome": "p_linhas",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "a94b5d25ad0a9f3d797e9c4bae755a44"
+  },
+  {
+   "nome": "pmarc_mensagens",
+   "args": [
+    {
+     "nome": "p_codigo",
+     "padrao": false
+    },
+    {
+     "nome": "p_apos",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "5e8eac7a0c47549804794812db6851b7"
+  },
+  {
+   "nome": "pmarc_novo",
+   "args": [
+    {
+     "nome": "p_nome",
+     "padrao": false
+    },
+    {
+     "nome": "p_celular",
+     "padrao": false
+    },
+    {
+     "nome": "p_nascimento",
+     "padrao": true
+    },
+    {
+     "nome": "p_texto",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "d32ed5cd7be1e7e877e22abd3baa0399"
+  },
+  {
+   "nome": "pmarc_responder",
+   "args": [
+    {
+     "nome": "p_codigo",
+     "padrao": false
+    },
+    {
+     "nome": "p_dados",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "d827f8466e4d288cb4bb8d360bc60879"
+  },
+  {
+   "nome": "pmarc_telefone",
+   "args": [
+    {
+     "nome": "p_texto",
+     "padrao": false
+    }
+   ],
+   "definer": false,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "f4ef86d810587dab5cf07761754625d1"
+  },
+  {
+   "nome": "pmarc_texto",
+   "args": [
+    {
+     "nome": "p_chave",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "4f971e4cf956ec482b1e5edd04ce345e"
+  },
+  {
+   "nome": "pmarc_tipo",
+   "args": [
+    {
+     "nome": "p_procedimento",
+     "padrao": false
+    }
+   ],
+   "definer": false,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "4fe0e1bc7a469fa9fc3036e1e7c7f90c"
+  },
+  {
+   "nome": "pmarc_vigiar",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "8936dcf6910b32dc6ff00d49d1cf2d46"
+  },
+  {
+   "nome": "pmarc_vista",
+   "args": [
+    {
+     "nome": "p_id",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "2e74322eaab3eb7ccaa1cebc5619a38c"
   },
   {
    "nome": "pode_ver_conversa",
