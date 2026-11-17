@@ -4982,6 +4982,7 @@ h1.longo { font-size: 14mm; }
         h('div', { class: 'ind-mini' }, h('b', {}, nf(W.agendaram_no_chat)), h('span', {}, 'tiveram o pedido agendado (pessoas, não marcações)')),
         h('div', { class: 'ind-mini' }, h('b', {}, nf(W.agendaram_e_ligadas_ao_klingo)), h('span', {}, 'agendamentos já ligados a uma marcação do Klingo')),
         h('div', { class: 'ind-mini' }, h('b', {}, nf(W.agendadas_sem_marcacao_no_klingo)), h('span', {}, 'agendadas no chat, sem marcação no Klingo'))),
+      h('p', { class: 'dica' }, 'Estes números usam a mesma regra do funil do bloco 1 (pessoas que procuraram, terminaram o pedido e agendaram). Se "agendaram" for maior que "já ligados" mais "sem marcação", a diferença são conversas que a equipe encerrou como "agendado" sem pedido marcado como agendado no chat.'),
       (W.agendadas_sem_marcacao_no_klingo || 0) > 0 ? h('div', {}, h('p', { class: 'ind-aviso' }, 'Estas pessoas aparecem como agendadas no chat, mas nenhuma marcação do Klingo foi ligada a elas. Confira se a marcação foi feita, em outro nome ou celular, ou se a pessoa se perdeu.'),
         h('div', { class: 'ind-tab-rolagem' }, h('table', { class: 'ind-tab' }, h('thead', {}, h('tr', {}, ['Paciente', 'Última atualização'].map((t) => h('th', {}, t)))),
           h('tbody', {}, sem.map((x) => h('tr', {}, h('td', {}, quem(x)), h('td', {}, fmtDataHora(x.atualizado_em)))))))) : null,

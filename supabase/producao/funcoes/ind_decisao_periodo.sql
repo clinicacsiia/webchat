@@ -51,6 +51,7 @@ begin
                 lower(btrim(coalesce(e.cancelamento_motivo, ''))) as m
            from public.jornada_exame e
           where e.status <> 'pedido'
+            and (p_teste or e.marcacao_id not in (select 'm' || z.m from public.klingo_conferencia z join public.conversas c on c.id = z.conversa_id where c.teste))
             and (p_un is null or public.unidade_chave(e.unidade) is null or public.unidade_chave(e.unidade) = p_un)),
   pm as (select distinct 'm' || unnest(klingo_marcacoes) as m from public.pre_agendamentos where klingo_marcacoes is not null),
   ep as (select * from ex where (agendado_para at time zone 'America/Sao_Paulo')::date between p_de and p_ate),

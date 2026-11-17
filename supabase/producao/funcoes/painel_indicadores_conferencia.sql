@@ -35,7 +35,8 @@ begin
     select pa.id as pre_id, pa.conversa_id, pa.atualizado_em from public.pre_agendamentos pa join cv on cv.id = pa.conversa_id
      where pa.status = 'agendado' and coalesce(cardinality(pa.klingo_marcacoes), 0) = 0
        and not exists (select 1 from public.klingo_conferencia z where z.conversa_id = pa.conversa_id)),
-  dias as (select d::date as d from generate_series(v_de, v_ate, interval '1 day') d)
+  dias as (select d::date as d from generate_series(v_de, v_ate, interval '1 day') d),
+  fn as materialized (select public.ind_decisao_periodo(v_de, v_ate, v_un, coalesce(p_incluir_teste, false)) -> 'chat' -> 'funil' as f)
   select jsonb_build_object(
     'periodo', jsonb_build_object('de', v_de, 'ate', v_ate), 'unidade', v_un, 'gerado_em', now(),
     'ultima_leitura', (select max(lido_em) from k),
@@ -61,10 +62,10 @@ begin
             'atendido', count(*) filter (where st_banco = 'atendido'), 'faltou', count(*) filter (where st_banco = 'faltou'),
             'por_vir', count(*) filter (where st_banco in ('agendado', 'confirmado')), 'cancelado_ou_remarcado', count(*) filter (where st_banco in ('cancelado', 'remarcado')),
             'ainda_fora_do_banco', count(*) filter (where st_banco is null)) from k where tem_conversa),
-        'pessoas_que_procuraram', (select count(distinct pessoa) from cv),
+        'pessoas_que_procuraram', (select (f ->> 'entraram')::int from fn),
         'atendidas_pela_equipe', (select count(distinct pessoa) from cv where primeiro_humano_em is not null),
-        'com_pedido_pronto', (select count(distinct cv.pessoa) from cv join public.pre_agendamentos pa on pa.conversa_id = cv.id where pa.status in ('pronto', 'agendado')),
-        'agendaram_no_chat', (select count(distinct cv.pessoa) from cv join public.pre_agendamentos pa on pa.conversa_id = cv.id where pa.status = 'agendado'),
+        'com_pedido_pronto', (select (f ->> 'completo')::int from fn),
+        'agendaram_no_chat', (select (f ->> 'agendaram')::int from fn),
         'agendaram_e_ligadas_ao_klingo', (select count(distinct cv.pessoa) from cv join public.pre_agendamentos pa on pa.conversa_id = cv.id
                                            where pa.status = 'agendado' and (coalesce(cardinality(pa.klingo_marcacoes), 0) > 0 or exists (select 1 from public.klingo_conferencia z where z.conversa_id = pa.conversa_id))),
         'agendadas_sem_marcacao_no_klingo', (select count(distinct conversa_id) from perd)),

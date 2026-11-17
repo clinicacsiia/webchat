@@ -9944,7 +9944,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "819fe0b839385ee980d92440bb74dc3b"
+   "md5": "8b3cdf3028aa13097414450978aca9e0"
   },
   {
    "nome": "ind_fechar_dia",
@@ -13194,7 +13194,7 @@
    "anon": false,
    "authenticated": true,
    "publico": false,
-   "md5": "2620455db97fa05728f5d2b2ebfbffe0"
+   "md5": "2a1283eadeb5fb7598ab012a167fd496"
   },
   {
    "nome": "painel_conversa_pessoa_un",
@@ -13364,7 +13364,7 @@
    "anon": false,
    "authenticated": true,
    "publico": false,
-   "md5": "a3fdefef1000a7b5a8ee64aa04273081"
+   "md5": "a3d36254f31137bae8a69a69991a9e99"
   },
   {
    "nome": "painel_indicadores_decisao",
@@ -13410,7 +13410,7 @@
    "anon": false,
    "authenticated": true,
    "publico": false,
-   "md5": "d740738915038153b6a346bbedbcedc0"
+   "md5": "9186bf088b19f7087e903b8970803f5d"
   },
   {
    "nome": "painel_indicadores_equipe",

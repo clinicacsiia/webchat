@@ -33,6 +33,7 @@ begin
                  count(*) filter (where e.status in ('agendado', 'confirmado')) as por_vir
             from public.jornada_exame e
            where e.status <> 'pedido' and e.agendado_para is not null
+             and e.marcacao_id not in (select 'm' || z.m from public.klingo_conferencia z join public.conversas c on c.id = z.conversa_id where c.teste)
              and (v_un is null or public.unidade_chave(e.unidade) is null or public.unidade_chave(e.unidade) = v_un)
            group by 1) x on x.mes = m.d), '[]'::jsonb));
 end $function$;
