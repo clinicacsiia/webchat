@@ -17,24 +17,42 @@ language sql immutable set search_path = '' as $$
               else 'outro' end
 $$;
 
--- ---------- 1) lista de exames, consultas e outros (só o que tem agenda) ----------
+-- ---------- 1) lista de exames, consultas e outros ----------
+-- Regra do dono (17/11/2026): aparece o que a clínica FEZ nos últimos 30 dias (marcação com status `atendido` na Jornada, casada pelo nome do procedimento) e, para consultas,
+-- as especialidades que têm agenda. A Jornada só guarda o nome ("CONSULTA MEDICA" vale para 75 cadastros de especialidades diferentes), por isso a consulta é mostrada pela
+-- especialidade do catálogo. Um item por nome (e por especialidade, nas consultas). `agenda` = tem horário na grade: só então a página oferece "Ver a disponibilidade".
+-- PLANOS: a lista é a mesma para todos os planos e NÃO mostra preço nem cobertura; quem decide cobertura, autorização e valor é a equipe (a página avisa e pergunta o plano, sem exigir).
 create or replace function public.pmarc_catalogo(p_busca text default null, p_tipo text default null) returns jsonb
 language plpgsql stable security definer set search_path = '' as $$
 declare v_busca text := nullif(btrim(public.norm_nome(left(coalesce(p_busca, ''), 60))), ''); v_tipo text := nullif(btrim(coalesce(p_tipo, '')), ''); v_itens jsonb;
 begin
   if not public.pmarc_ligada() then return jsonb_build_object('ok', false, 'motivo', 'desligado'); end if;
   if v_tipo is not null and v_tipo not in ('consulta', 'exame', 'outro') then v_tipo := null; end if;
-  select coalesce(jsonb_agg(jsonb_build_object('id', x.id, 'nome', x.nome, 'tipo', x.tipo, 'modalidade', x.modalidade) order by x.demanda desc, x.nome), '[]'::jsonb) into v_itens
-  from (
-    select p.id, p.nome, p.modalidade, public.pmarc_tipo_proc(p.modalidade) as tipo, coalesce(p.demanda_90d, 0) as demanda
+  -- os "feitos" são contados UMA vez (agrupados por nome) e ligados ao catálogo por junção; a versão com subconsulta por procedimento passava de 60 s na produção
+  with feitos as (
+    select public.norm_nome(e.procedimento) as n, count(*) as c from public.jornada_exame e
+     where e.status = 'atendido' and e.agendado_para >= now() - interval '30 days' and e.agendado_para < now() group by 1
+  ), com_agenda as (
+    select distinct a.procedimento_id from public.catalogo_agenda a where a.vig_fim >= current_date and a.profissional !~* 'teste'
+  ), k as (
+    select p.id, p.modalidade, public.pmarc_tipo_proc(p.modalidade) as tipo, coalesce(p.demanda_90d, 0) as demanda,
+      case when p.modalidade = 'CONSULTA' and public.norm_nome(p.nome) in ('CONSULTA', 'CONSULTA MEDICA') then btrim('Consulta ' || coalesce(initcap(lower(p.especialidade)), '')) else p.nome end as nome,
+      public.norm_nome(p.nome) || case when p.modalidade = 'CONSULTA' then '|' || public.norm_nome(coalesce(p.especialidade, '')) else '' end as chave,
+      (ca.procedimento_id is not null) as agenda, coalesce(f.c, 0) as feitos
     from public.catalogo_procedimento p
+    left join com_agenda ca on ca.procedimento_id = p.id
+    left join feitos f on f.n = public.norm_nome(p.nome)
     where p.ativo
       and public.norm_nome(p.nome) !~ 'ACRESCENTAR|\mPCTE\M|PACOTE|\mCONTRASTE\M|RECONSTRUCAO|PLANEJAMENTO|PUNCAO|BIOPSIA|DRENAGEM|AMNIOCENTESE|RADIOCIRURGIA|SEDACAO|ADICIONAL'
-      and exists (select 1 from public.catalogo_agenda a where a.procedimento_id = p.id and a.vig_fim >= current_date and a.profissional !~* 'teste')
       and (v_tipo is null or public.pmarc_tipo_proc(p.modalidade) = v_tipo)
-      and (v_busca is null or public.norm_nome(p.nome) like '%' || replace(replace(v_busca, '%', ''), '_', '') || '%')
-    order by coalesce(p.demanda_90d, 0) desc, p.nome limit 60
-  ) x;
+  ), x as (
+    select distinct on (k.chave) k.id, k.nome, k.modalidade, k.tipo, k.agenda, k.feitos, k.demanda
+    from k
+    where (k.feitos > 0 and k.modalidade <> 'CONSULTA' or (k.modalidade = 'CONSULTA' and k.agenda))
+      and (v_busca is null or public.norm_nome(k.nome) like '%' || replace(replace(v_busca, '%', ''), '_', '') || '%')
+    order by k.chave, k.agenda desc, k.demanda desc, k.id
+  )
+  select coalesce(jsonb_agg(jsonb_build_object('id', x.id, 'nome', x.nome, 'tipo', x.tipo, 'modalidade', x.modalidade, 'agenda', x.agenda) order by x.feitos desc, x.demanda desc, x.nome), '[]'::jsonb) into v_itens from x;
   return jsonb_build_object('ok', true, 'itens', v_itens);
 end $$;
 
@@ -79,7 +97,7 @@ begin
     into v_total, v_dias;
   return jsonb_build_object('ok', true, 'procedimento', jsonb_build_object('id', v_proc.id, 'nome', v_proc.nome), 'de', v_hoje, 'ate', v_ate_dia, 'total', v_total,
     'dias', v_dias, 'atualizado_em', v_meta,
-    'aviso', 'Estes horários são uma PREVISÃO a partir da agenda da clínica. Não estão reservados nem confirmados: a nossa equipe confirma pelo webchat, WhatsApp e telefone.');
+    'aviso', 'Estes horários são uma PREVISÃO a partir da agenda da clínica. Não estão reservados nem confirmados: a nossa equipe confirma pelo webchat, WhatsApp e telefone. Alguns profissionais não atendem todos os planos: a equipe confere o seu.');
 end $$;
 
 -- ---------- 3) pedido de previsão ----------
@@ -89,7 +107,7 @@ create or replace function public.pmarc_pedido(p_codigo text, p_dados jsonb) ret
 language plpgsql security definer set search_path = '' as $$
 declare
   p public.pmarc_pessoa; d jsonb := case when jsonb_typeof(p_dados) = 'object' then p_dados else '{}'::jsonb end;
-  v_pid integer; v_nome text; v_txt text; v_turno text; v_apos text; v_ate text; v_dia date; v_unid text; v_obs text; v_h jsonb; v_hdata date; v_hhora text; v_msg text; v_ped jsonb; v_conv uuid; v_lista jsonb;
+  v_pid integer; v_nome text; v_txt text; v_turno text; v_apos text; v_ate text; v_dia date; v_unid text; v_obs text; v_plano text; v_h jsonb; v_hdata date; v_hhora text; v_msg text; v_ped jsonb; v_conv uuid; v_lista jsonb;
 begin
   if not public.pmarc_ligada() then return jsonb_build_object('ok', false, 'motivo', 'desligado'); end if;
   select * into p from public.pmarc_pessoa where codigo = btrim(coalesce(p_codigo, '')) for update;
@@ -106,6 +124,7 @@ begin
   begin v_dia := nullif(d ->> 'data_ate', '')::date; exception when others then v_dia := null; end;
   v_unid := nullif(left(btrim(coalesce(d ->> 'unidade', '')), 40), '');
   v_obs := nullif(left(btrim(coalesce(d ->> 'observacao', '')), 1000), '');
+  v_plano := nullif(left(btrim(coalesce(d ->> 'plano', '')), 80), '');
   v_h := case when jsonb_typeof(d -> 'horario') = 'object' then d -> 'horario' end;
   if v_h is not null then
     begin v_hdata := (v_h ->> 'data')::date; exception when others then v_hdata := null; end;
@@ -114,7 +133,7 @@ begin
   end if;
 
   v_ped := jsonb_strip_nulls(jsonb_build_object('em', now(), 'procedimento_id', v_pid, 'procedimento', coalesce(v_nome, v_txt), 'turno', v_turno, 'hora_apos', v_apos, 'hora_ate', v_ate,
-    'data_ate', v_dia, 'unidade', v_unid, 'observacao', v_obs, 'sem_preferencia', (v_turno is null and v_apos is null and v_ate is null and v_dia is null and v_h is null),
+    'data_ate', v_dia, 'unidade', v_unid, 'observacao', v_obs, 'plano', v_plano, 'sem_preferencia', (v_turno is null and v_apos is null and v_ate is null and v_dia is null and v_h is null),
     'horario', case when v_h is not null then jsonb_build_object('data', v_hdata, 'hora', v_hhora, 'unidade', left(v_h ->> 'unidade', 40), 'profissional', left(v_h ->> 'profissional', 80)) end));
   select coalesce(jsonb_agg(e), '[]'::jsonb) into v_lista from (select e from jsonb_array_elements(coalesce(p.informado -> 'pedidos', '[]'::jsonb) || jsonb_build_array(v_ped)) with ordinality t(e, o) order by o desc limit 10) z;
   update public.pmarc_pessoa set informado = informado || jsonb_build_object('pedidos', v_lista), aceitou_lgpd_em = coalesce(aceitou_lgpd_em, now()),
@@ -131,6 +150,7 @@ begin
       || case when v_dia is not null then E'\nAté o dia: ' || to_char(v_dia, 'DD/MM/YYYY') else '' end
       || case when v_unid is not null then E'\nUnidade: ' || v_unid else '' end
       || case when v_turno is null and v_apos is null and v_ate is null and v_dia is null and v_h is null then E'\nSem preferência de horário: só quer ver a disponibilidade.' else '' end
+      || case when v_plano is not null then E'\nPlano/convênio informado: ' || v_plano || ' (conferir; cobertura e valor são com a equipe)' else '' end
       || case when v_obs is not null then E'\nObservação: ' || v_obs else '' end;
     insert into public.mensagens (conversa_id, autor, texto) values (v_conv, 'cliente', v_msg);
     if coalesce(p.informado ->> 'final_em', '') = '' then

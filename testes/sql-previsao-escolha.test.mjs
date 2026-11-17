@@ -38,6 +38,31 @@ await db.exec(`
   insert into public.catalogo_agenda (unidade, local, profissional, procedimento_id, procedimento, dia_num, hora_ini, hora_fim, duracao_min, vig_ini, vig_fim)
     select 'DESENVOAR', 'SALA 9', 'DRA CICRANA', 9101, 'ULTRASSONOGRAFIA ABDOME TOTAL', dn, '14:00', '16:00', 30, current_date - 1, current_date + 60 from generate_series(0, 6) dn;
 `);
+await db.exec(`
+  insert into public.catalogo_procedimento (id, nome, classe, especialidade, busca, ativo, demanda_90d) values
+    (9105, 'ULTRASSONOGRAFIA ANTIGA DO PASSADO', 'ULTRASSONOGRAFIA', null, to_tsvector('simple', 'x'), true, 9),
+    (9106, 'ULTRASSONOGRAFIA CONTRASTE ADICIONAL', 'ULTRASSONOGRAFIA', null, to_tsvector('simple', 'x'), true, 9),
+    (9107, 'CONSULTA MEDICA', 'CONSULTAS', 'CARDIOLOGIA', to_tsvector('simple', 'x'), true, 0),
+    (9108, 'CONSULTA MEDICA', 'CONSULTAS', 'NUTRICAO', to_tsvector('simple', 'x'), true, 0),
+    (9109, 'RAIO X SO AGENDADO', 'RADIOLOGIA', null, to_tsvector('simple', 'x'), true, 9);
+  update public.catalogo_procedimento set especialidade = 'PEDIATRIA' where id = 9102;
+  insert into public.catalogo_agenda (unidade, local, profissional, procedimento_id, procedimento, dia_num, hora_ini, hora_fim, duracao_min, vig_ini, vig_fim)
+    select 'CLÍNICA DE SAÚDE E IMAGEM - CSI', 'SALA 2', 'DRA SICRANA', pid, pnome, dn, '08:00', '12:00', 30, current_date - 1, current_date + 60
+    from (values (9105, 'ULTRASSONOGRAFIA ANTIGA DO PASSADO'), (9107, 'CONSULTA MEDICA'), (9108, 'CONSULTA MEDICA')) p(pid, pnome), generate_series(0, 6) dn;
+`);
+
+// ---- Jornada inventada: o que a clínica FEZ nos últimos 30 dias (status atendido) decide a lista de exames ----
+await db.exec(`
+  insert into public.jornada_coluna (id, nome, ordem, etapa, origem) values ('atendido', 'Atendido', 9, 'depois', 'klingo'), ('agendado', 'Agendado', 1, 'agendamento', 'klingo') on conflict do nothing;
+  insert into public.jornada_paciente (prontuario, nome, fone_chave) values ('8801', 'PACIENTE INVENTADO', 'q1') on conflict do nothing;
+  insert into public.jornada_card (paciente_chave, data_ref, unidade, coluna) values ('8801', current_date - 5, 'CSI', 'atendido');
+`);
+const cardJ = (await q(`select id from public.jornada_card where paciente_chave = '8801' limit 1`))[0].id;
+for (const [n, nome, dias, st] of [[1, 'ULTRASSONOGRAFIA ABDOME TOTAL', 10, 'atendido'], [2, 'ULTRASSONOGRAFIA ABDOME TOTAL', 3, 'atendido'], [3, 'RESSONANCIA JOELHO', 5, 'atendido'], [4, 'ULTRASSONOGRAFIA ANTIGA DO PASSADO', 45, 'atendido'],
+    [5, 'ULTRASSONOGRAFIA CONTRASTE ADICIONAL', 4, 'atendido'], [6, 'RAIO X SO AGENDADO', 2, 'cancelado']]) {
+  await db.query(`insert into public.jornada_exame (card_id, marcacao_id, procedimento, unidade, agendado_para, status) values ($1, $2, $3, 'CSI', now() - make_interval(days => $4::int), $5)`, [cardJ, `jx${n}`, nome, dias, st]);
+}
+
 await ligar('nao');
 
 await caso('desligado: lista, disponibilidade e pedido respondem "desligado" e nada é gravado', async () => {
@@ -46,18 +71,20 @@ await caso('desligado: lista, disponibilidade e pedido respondem "desligado" e n
 });
 await ligar('sim');
 
-await caso('lista: só o que tem agenda (sem o inativo nem a ressonância sem grade), por tipo e com busca sem acento', async () => {
+await caso('lista: o que foi atendido nos últimos 30 dias (com ou sem agenda) + consultas com agenda; sem adicionais, sem o antigo, sem o inativo, sem o que só foi agendado', async () => {
   const todos = await chamar('pmarc_catalogo', [null, null]); const cons = await chamar('pmarc_catalogo', [null, 'consulta']);
   const ex = await chamar('pmarc_catalogo', [null, 'exame']); const busca = await chamar('pmarc_catalogo', ['ultrassonografia abdôme', null]); const nada = await chamar('pmarc_catalogo', ['zzzz', null]);
   const ids = (r) => (r.itens || []).map((i) => i.id).sort().join(',');
-  return { ok: ids(todos) === '9101,9102' && ids(cons) === '9102' && cons.itens[0].tipo === 'consulta' && ids(ex) === '9101' && ids(busca) === '9101' && (nada.itens || []).length === 0 && todos.itens[0].id === 9102,
-    detalhe: JSON.stringify({ todos: ids(todos), cons: ids(cons), ex: ids(ex), busca: ids(busca) }) };
+  const por = Object.fromEntries((todos.itens || []).map((i) => [i.id, i]));
+  return { ok: ids(todos) === '9101,9102,9103,9107,9108' && ids(cons) === '9102,9107,9108' && ids(ex) === '9101,9103' && ids(busca) === '9101' && (nada.itens || []).length === 0
+      && por[9101].agenda === true && por[9103].agenda === false && todos.itens[0].id === 9101 && por[9107].nome === 'Consulta Cardiologia' && por[9108].nome === 'Consulta Nutricao',
+    detalhe: JSON.stringify({ todos: ids(todos), cons: ids(cons), ex: ids(ex), nomes: [por[9107]?.nome, por[9108]?.nome] }) };
 });
 
 const todos = (r) => (r.dias || []).flatMap((d) => d.slots.map((s) => ({ data: d.data, ...s })));
 await caso('disponibilidade sem escolher nada: mostra os próximos horários previstos, com aviso de que não é reserva', async () => {
   const r = await chamar('pmarc_disponibilidade', [9101, '{}']); const s = todos(r);
-  return { ok: r.ok === true && s.length > 0 && r.dias.length <= 10 && r.dias.every((d) => d.slots.length <= 8) && /PREVISÃO/.test(r.aviso) && /reservados/.test(r.aviso) && r.procedimento.id === 9101 && r.total >= s.length,
+  return { ok: r.ok === true && s.length > 0 && r.dias.length <= 10 && r.dias.every((d) => d.slots.length <= 8) && /PREVISÃO/.test(r.aviso) && /reservados/.test(r.aviso) && /planos/.test(r.aviso) && r.procedimento.id === 9101 && r.total >= s.length,
     detalhe: JSON.stringify({ dias: r.dias?.length, slots: s.length, total: r.total, erro: r.erro }) };
 });
 await caso('turno manhã só traz antes das 12h; tarde entre 12h e 18h; noite 18h ou mais', async () => {
@@ -108,12 +135,12 @@ const novo = await chamar('pmarc_novo', ['ANA TESTE', '71988887777', '1990-05-17
 const cod = novo.codigo;
 await caso('pedido com exame, turno, "a partir de", "até o dia" e o horário visto: vira mensagem para a equipe com o robô DESLIGADO', async () => {
   const lim = (await um(`select (current_date + 10)::text d`)).d;
-  const r = await chamar('pmarc_pedido', [cod, JSON.stringify({ procedimento_id: 9101, turno: 'tarde', hora_apos: '13:30', data_ate: lim, unidade: 'CSI', horario: { data: lim, hora: '14:00', unidade: 'CSI', profissional: 'DR FULANO' } })]);
+  const r = await chamar('pmarc_pedido', [cod, JSON.stringify({ procedimento_id: 9101, turno: 'tarde', hora_apos: '13:30', data_ate: lim, unidade: 'CSI', plano: 'Convênio Inventado', horario: { data: lim, hora: '14:00', unidade: 'CSI', profissional: 'DR FULANO' } })]);
   const conv = await um(`select c.id, c.ia_ativa from public.conversas c join public.pmarc_pessoa p on p.conversa_id = c.id where p.codigo = $1`, [cod]);
   const msgs = await q(`select autor, texto from public.mensagens where conversa_id = $1 order by id`, [conv.id]);
   const cli = msgs.find((m) => m.autor === 'cliente' && /Pedido de previsão/.test(m.texto));
   const fim = msgs.some((m) => m.autor === 'agente' && /previsão/.test(m.texto));
-  return { ok: r.ok === true && conv.ia_ativa === false && !!cli && /ULTRASSONOGRAFIA ABDOME TOTAL/.test(cli.texto) && /Turno: tarde/.test(cli.texto) && /A partir das: 13:30/.test(cli.texto) && /previsão, não reservado/.test(cli.texto) && fim,
+  return { ok: r.ok === true && conv.ia_ativa === false && !!cli && /ULTRASSONOGRAFIA ABDOME TOTAL/.test(cli.texto) && /Turno: tarde/.test(cli.texto) && /A partir das: 13:30/.test(cli.texto) && /previsão, não reservado/.test(cli.texto) && /Plano\/convênio informado: Convênio Inventado/.test(cli.texto) && fim,
     detalhe: JSON.stringify({ ok: r.ok, ia: conv.ia_ativa, texto: cli?.texto }) };
 });
 await caso('"não escolher": só o exame, sem preferência, também vale e é anotado como "só quer ver a disponibilidade"', async () => {

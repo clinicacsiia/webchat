@@ -3,6 +3,7 @@
 FLUXOGRAMA: entrada (o link pessoal ?c=CÓDIGO, ou celular + nascimento) -> validação (a página só confere o formato; quem decide é o servidor: funções pmarc_* do Supabase, supabase/previsao-marcacao-parte2-paciente.sql; NADA aqui barra a pessoa: "não sei" e "seguimos" valem como resposta)
   -> lógica (mostra a PREVISÃO das marcações abertas no Klingo, pergunta se está certo, anota o que a pessoa disser, abre a conversa com a equipe)
   -> saída (a conversa aparece no painel da equipe; o aviso "a previsão será vista e confirmada pelo webchat, WhatsApp e telefone" aparece em toda tela) | ROLLBACK: apagar a pasta previsao/ ou desligar `previsao_marcacao_modo`
+Versão 1.2 — 17/11/2026 / Mudança: a lista mostra o que a clínica fez nos últimos 30 dias (consultas: as especialidades com agenda); item sem agenda vai direto para a equipe; aviso e campo opcional de plano/convênio.
 Versão 1.1 — 17/11/2026 / Mudança: nova tela "Pedir uma previsão": a pessoa escolhe o exame ou a consulta (lista com busca), escolhe turno / a partir de / até / até o dia, ou NÃO escolhe nada, vê a disponibilidade prevista e pede à equipe (pmarc_catalogo, pmarc_disponibilidade, pmarc_pedido; supabase/previsao-marcacao-parte5-escolha.sql).
 Versão 1.0 — 17/11/2026 / Mudança: primeira versão (Webchat de Previsão de marcação). É um segundo webchat, separado do chat de marcação (index.html): sem robô, sem PIN, sem CPF obrigatório.
 -->
@@ -95,7 +96,7 @@ button{font:inherit;cursor:pointer}
    as tabelas são fechadas e a credencial é o código secreto do link (ou celular + nascimento, com limite de tentativas). */
 const SUPABASE_URL='https://nrvuynjwcgwpjdptkiay.supabase.co';
 const SUPABASE_KEY='sb_publishable_e2GK1YGEj06STa_ESCevow_nvtATB-y';
-const VERSAO_PREVISAO='2026.11.17-2';
+const VERSAO_PREVISAO='2026.11.17-3';
 async function rpc(nome,args){
   const ctl=new AbortController(),t=setTimeout(()=>ctl.abort(),20000);
   try{
@@ -386,6 +387,7 @@ function telaPedidoExame(volta){
     <div class="lista-proc" id="lista" role="list" aria-live="polite"></div>
     <p class="msg-erro" id="erro" role="alert"></p>
   </section>
+  <p class="rodape">Aqui aparece o que a clínica fez nos últimos 30 dias. Cobertura, autorização e valor dependem do seu plano ou convênio: a nossa equipe confirma com você.</p>
   <button class="btn linha" id="naoAchei" type="button">Não achei o que procuro</button>
   <button class="btn sec" id="voltar" type="button">Voltar</button>`,'#busca');
   const carregar=async()=>{
@@ -398,7 +400,7 @@ function telaPedidoExame(volta){
     if(!r.itens.length){box.innerHTML='<p class="sub">Nada encontrado com esse nome. Tente outra palavra ou toque em “Não achei o que procuro”.</p>';return}
     E.lista=r.itens;
     box.innerHTML=r.itens.map((i,n)=>{const nm=nomeExame(i.nome);return`<button class="proc" type="button" role="listitem" data-i="${n}"><span class="tag${i.tipo==='consulta'?' c':''}">${i.tipo==='consulta'?'Consulta':i.tipo==='exame'?'Exame':'Outro'}</span><b>${esc(nm.titulo)}</b>${nm.detalhe?`<small>${esc(nm.detalhe)}</small>`:''}</button>`}).join('');
-    box.querySelectorAll('button[data-i]').forEach(b=>b.onclick=()=>{const i=E.lista[+b.dataset.i];E.pe={...E.pe,proc:{id:i.id,nome:i.nome,tipo:i.tipo},texto:undefined,horario:undefined};telaQuando()});
+    box.querySelectorAll('button[data-i]').forEach(b=>b.onclick=()=>{const i=E.lista[+b.dataset.i];E.pe={...E.pe,proc:{id:i.id,nome:i.nome,tipo:i.tipo,agenda:!!i.agenda},texto:undefined,horario:undefined};telaQuando()});
   };
   app.querySelectorAll('button[data-tipo]').forEach(b=>b.onclick=()=>{E.tipo=b.dataset.tipo;app.querySelectorAll('button[data-tipo]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));carregar()});
   $('#busca').addEventListener('input',()=>{clearTimeout(tBusca);tBusca=setTimeout(carregar,350)});
@@ -420,7 +422,7 @@ function telaTextoLivre(){
 }
 /* Passo 2: quando? (turno, a partir de, até, até o dia, unidade) — ou nada */
 function telaQuando(){
-  const pe=E.pe,nome=pe.proc?nomeExame(pe.proc.nome).titulo:pe.texto,semAgenda=!pe.proc;
+  const pe=E.pe,nome=pe.proc?nomeExame(pe.proc.nome).titulo:pe.texto,semAgenda=!pe.proc||!pe.proc.agenda;
   mostrar(`<h1>Quando você prefere?</h1>
   <p class="sub"><b>${esc(nome)}</b> · <a href="#" id="trocar">trocar</a></p>
   ${avisoHtml()}
@@ -433,13 +435,14 @@ function telaQuando(){
     </div>
     <label for="dia">Até o dia <span class="opc">(se quiser)</span></label><input id="dia" type="date" min="${hojeIso()}" value="${esc(pe.dia||'')}">
     <label for="unid">Unidade</label><select id="unid"><option value="">Qualquer unidade</option>${[['CSI','CSI'],['DESENVOAR','Desenvoar'],['RM/TC','CSI RM/TC']].map(([v,t])=>`<option value="${v}"${pe.unid===v?' selected':''}>${t}</option>`).join('')}</select>
-    <p class="sub" style="margin-top:12px">Não precisa escolher nada: é só tocar em “Ver a disponibilidade”.</p>
+    <label for="plano">Seu plano ou convênio <span class="opc">(se souber)</span></label><input id="plano" maxlength="80" autocomplete="off" value="${esc(pe.plano||'')}" placeholder="Ex.: particular, nome do convênio">
+    <p class="sub" style="margin-top:12px">${semAgenda?'Para este item a nossa equipe olha a agenda e fala com você. Se quiser, diga quando prefere.':'Não precisa escolher nada: é só tocar em “Ver a disponibilidade”.'} Cobertura, autorização e valor dependem do plano: a equipe confirma.</p>
     <p class="msg-erro" id="erro" role="alert"></p>
     ${semAgenda?'':'<button class="btn" type="submit">Ver a disponibilidade</button>'}
     <button class="btn ${semAgenda?'':'linha'}" id="pedirJa" type="button">${semAgenda?'Pedir para a equipe':'Pedir para a equipe sem ver os horários'}</button>
     <button class="btn sec" id="voltar" type="button">Voltar</button>
   </form>`);
-  const ler=()=>{pe.apos=$('#apos').value||undefined;pe.ate=$('#ate').value||undefined;pe.dia=$('#dia').value||undefined;pe.unid=$('#unid').value||undefined};
+  const ler=()=>{pe.apos=$('#apos').value||undefined;pe.ate=$('#ate').value||undefined;pe.dia=$('#dia').value||undefined;pe.unid=$('#unid').value||undefined;pe.plano=$('#plano').value.trim()||undefined};
   app.querySelectorAll('button[data-turno]').forEach(b=>b.onclick=()=>{pe.turno=b.dataset.turno;app.querySelectorAll('button[data-turno]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)))});
   $('#trocar').onclick=ev=>{ev.preventDefault();telaPedidoExame()};
   $('#voltar').onclick=()=>telaPedidoExame();
@@ -491,7 +494,7 @@ function telaDisponibilidade(r){
 /* Enviar o pedido à equipe (quem não tem link deixa nome e celular antes; nada barra) */
 function dadosPedido(){
   const pe=E.pe;
-  return{procedimento_id:pe.proc?pe.proc.id:undefined,procedimento_texto:pe.proc?undefined:pe.texto,turno:pe.turno&&pe.turno!=='qualquer'?pe.turno:undefined,hora_apos:pe.apos,hora_ate:pe.ate,data_ate:pe.dia,unidade:pe.unid,horario:pe.horario};
+  return{procedimento_id:pe.proc?pe.proc.id:undefined,procedimento_texto:pe.proc?undefined:pe.texto,turno:pe.turno&&pe.turno!=='qualquer'?pe.turno:undefined,hora_apos:pe.apos,hora_ate:pe.ate,data_ate:pe.dia,unidade:pe.unid,plano:pe.plano,horario:pe.horario};
 }
 async function enviarPedido(){
   if(!E.codigo)return telaIdentPedido();
@@ -508,7 +511,7 @@ async function enviarPedido(){
   telaPedidoEnviado();
 }
 function telaPedidoEnviado(){
-  parar();E.pe={};
+  parar();E.pe={};E.tipo='';
   mostrar(`<h1>Pedido enviado</h1>${avisoHtml()}
   <section class="card"><p class="ok-linha">✓ A nossa equipe recebeu o seu pedido de previsão.</p><p class="sub">${esc((E.v&&E.v.final)||'A previsão vai ser vista e confirmada pela nossa equipe pelo webchat, pelo WhatsApp e por telefone.')}</p></section>
   <button class="btn" id="conversa" type="button">Falar com a equipe</button>

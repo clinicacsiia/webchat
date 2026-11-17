@@ -35,6 +35,17 @@ await db.exec(`
     select 'CSI', 'SALA 1', 'DR FULANO', pid, pnome, dn, '07:00', '19:00', 30, current_date - 1, current_date + 60
     from (values (9101, 'ULTRASSONOGRAFIA ABDOME TOTAL'), (9102, 'CONSULTA PEDIATRIA')) p(pid, pnome), generate_series(0, 6) dn;
 `);
+
+await db.exec(`
+  insert into public.catalogo_procedimento (id, nome, classe, busca, ativo, demanda_90d) values (9103, 'RESSONANCIA JOELHO', 'RESSONANCIA MAGNETICA', to_tsvector('simple', 'ressonancia joelho'), true, 5);
+  insert into public.jornada_coluna (id, nome, ordem, etapa, origem) values ('atendido', 'Atendido', 9, 'depois', 'klingo'), ('agendado', 'Agendado', 1, 'agendamento', 'klingo') on conflict do nothing;
+  insert into public.jornada_paciente (prontuario, nome, fone_chave) values ('8801', 'PACIENTE INVENTADO', 'q1') on conflict do nothing;
+  insert into public.jornada_card (paciente_chave, data_ref, unidade, coluna) values ('8801', current_date - 5, 'CSI', 'atendido');
+`);
+const cardJ = (await q(`select id from public.jornada_card where paciente_chave = '8801' limit 1`))[0].id;
+for (const [n, nome, dias] of [[1, 'ULTRASSONOGRAFIA ABDOME TOTAL', 10], [2, 'RESSONANCIA JOELHO', 5]]) {
+  await db.query(`insert into public.jornada_exame (card_id, marcacao_id, procedimento, unidade, agendado_para, status) values ($1, $2, $3, 'CSI', now() - make_interval(days => $4::int), 'atendido')`, [cardJ, `jx${n}`, nome, dias]);
+}
 const CODIGO = (await q(`select codigo from public.pmarc_pessoa where chave = '7001'`))[0].codigo;
 
 const HTML = readFileSync(`${REPO}/previsao/index.html`, 'utf8');
@@ -181,6 +192,17 @@ await caso('"Pedir outra previsão" volta à lista; "Não achei o que procuro" a
   await clicaTexto(b.page, 'Pedir para a equipe'); await esperaTexto(b.page, /Pedido enviado/);
   const m = (await q(`select m.texto from public.mensagens m join public.pmarc_pessoa p on p.conversa_id = m.conversa_id where p.chave = '7001' and m.autor = 'cliente' and m.texto like 'Pedido de previsão: exame de sangue%'`));
   return { ok: semBotaoVer && m.length === 1, detalhe: `${m.length} mensagens` };
+});
+await caso('item feito nos últimos 30 dias mas sem agenda (ressonância): vai direto para a equipe, com o plano informado e o aviso sobre planos', async () => {
+  await clicaTexto(b.page, 'Pedir outra previsão'); await esperaTexto(b.page, /1\. O que você quer/);
+  await esperaTexto(b.page, /últimos 30 dias/); await b.page.fill('#busca', 'joelho');
+  await b.page.waitForFunction(() => { const l = document.querySelector('#lista'); return l.querySelector('.proc') && /joelho/i.test(l.innerText) && !/abdome/i.test(l.innerText); });
+  await b.page.locator('#lista button.proc').first().click(); await esperaTexto(b.page, /Quando você prefere/);
+  const t = await texto(b.page);
+  const semVer = (await b.page.locator('#fQuando button[type=submit]').count()) === 0;
+  await b.page.fill('#plano', 'Convênio Inventado'); await clicaTexto(b.page, 'Pedir para a equipe'); await esperaTexto(b.page, /Pedido enviado/);
+  const m = (await q(`select m.texto from public.mensagens m join public.pmarc_pessoa p on p.conversa_id = m.conversa_id where p.chave = '7001' and m.autor = 'cliente' and m.texto like 'Pedido de previsão: RESSONANCIA JOELHO%'`));
+  return { ok: semVer && /equipe olha a agenda/.test(t) && /Seu plano ou convênio/.test(t) && /dependem do plano/.test(t) && m.length === 1 && /Plano\/convênio informado: Convênio Inventado/.test(m[0].texto), detalhe: m[0] && m[0].texto.replace(/\n/g, ' | ') };
 });
 await b.ctx.close();
 
