@@ -3,6 +3,8 @@
 FLUXOGRAMA: entrada (o link pessoal ?c=CÓDIGO, ou celular + nascimento) -> validação (a página só confere o formato; quem decide é o servidor: funções pmarc_* do Supabase, supabase/previsao-marcacao-parte2-paciente.sql; NADA aqui barra a pessoa: "não sei" e "seguimos" valem como resposta)
   -> lógica (mostra a PREVISÃO das marcações abertas no Klingo, pergunta se está certo, anota o que a pessoa disser, abre a conversa com a equipe)
   -> saída (a conversa aparece no painel da equipe; o aviso "a previsão será vista e confirmada pelo webchat, WhatsApp e telefone" aparece em toda tela) | ROLLBACK: apagar a pasta previsao/ ou desligar `previsao_marcacao_modo`
+Versão 1.2 — 17/11/2026 / Mudança: a lista mostra o que a clínica fez nos últimos 30 dias (consultas: as especialidades com agenda); item sem agenda vai direto para a equipe; aviso e campo opcional de plano/convênio.
+Versão 1.1 — 17/11/2026 / Mudança: nova tela "Pedir uma previsão": a pessoa escolhe o exame ou a consulta (lista com busca), escolhe turno / a partir de / até / até o dia, ou NÃO escolhe nada, vê a disponibilidade prevista e pede à equipe (pmarc_catalogo, pmarc_disponibilidade, pmarc_pedido; supabase/previsao-marcacao-parte5-escolha.sql).
 Versão 1.0 — 17/11/2026 / Mudança: primeira versão (Webchat de Previsão de marcação). É um segundo webchat, separado do chat de marcação (index.html): sem robô, sem PIN, sem CPF obrigatório.
 -->
 <html lang="pt-BR">
@@ -71,6 +73,16 @@ button{font:inherit;cursor:pointer}
 .rodape{font-size:.82rem;color:var(--mut);margin-top:18px}
 .rodape a{color:var(--pri)}
 .ok-linha{color:var(--ok);font-weight:600}
+/* tela "Pedir uma previsão" */
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0}
+.chip{width:auto;padding:9px 14px;border:1.5px solid var(--bd);border-radius:999px;background:var(--card);color:var(--tx);font-weight:600}
+.chip[aria-pressed=true]{background:var(--pri);border-color:var(--pri);color:var(--on-pri)}
+.lista-proc{display:grid;gap:8px;margin:8px 0;max-height:46vh;overflow:auto;padding:2px}
+.proc{display:block;width:100%;text-align:left;padding:11px 12px;border:1.5px solid var(--bd);border-radius:12px;background:var(--card);color:var(--tx)}
+.proc small{display:block;color:var(--mut)}
+.dia-h{margin:12px 0 2px;font-weight:700;color:var(--pri2)}
+.linha2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.resumo-f{font-size:.9rem;color:var(--mut);margin:2px 0 8px}
 </style>
 </head>
 <body>
@@ -84,7 +96,7 @@ button{font:inherit;cursor:pointer}
    as tabelas são fechadas e a credencial é o código secreto do link (ou celular + nascimento, com limite de tentativas). */
 const SUPABASE_URL='https://nrvuynjwcgwpjdptkiay.supabase.co';
 const SUPABASE_KEY='sb_publishable_e2GK1YGEj06STa_ESCevow_nvtATB-y';
-const VERSAO_PREVISAO='2026.11.17-1';
+const VERSAO_PREVISAO='2026.11.17-3';
 async function rpc(nome,args){
   const ctl=new AbortController(),t=setTimeout(()=>ctl.abort(),20000);
   try{
@@ -131,11 +143,13 @@ function telaAchar(msg){
     <p class="msg-erro" id="erro" role="alert">${esc(msg||'')}</p>
     <button class="btn" type="submit">Ver a minha previsão</button>
   </form>
+  <button class="btn" id="btnPedir" type="button">Escolher um exame ou consulta e ver a disponibilidade</button>
   <button class="btn linha" id="btnSem" type="button">Não achei / quero falar com a equipe</button>
   <p class="rodape">Se a clínica mandou um link pelo WhatsApp, é só tocar nele: não precisa digitar nada.</p>`,'#cel');
   $('#cel').addEventListener('input',e=>{e.target.value=fmtTel(e.target.value)});
   $('#nasc').addEventListener('input',e=>{const d=digits(e.target.value).slice(0,8);e.target.value=d.length>4?`${d.slice(0,2)}/${d.slice(2,4)}/${d.slice(4)}`:d.length>2?`${d.slice(0,2)}/${d.slice(2)}`:d});
   $('#btnSem').onclick=()=>telaNovo();
+  $('#btnPedir').onclick=()=>telaPedidoExame(()=>telaAchar());
   $('#fAchar').onsubmit=async ev=>{
     ev.preventDefault();
     const cel=digits($('#cel').value),nasc=dataIso($('#nasc').value),er=$('#erro'),b=ev.submitter||$('#fAchar button[type=submit]');
@@ -239,7 +253,10 @@ function telaPrevisao(){
     <button class="btn sec" data-r="nao_sei" type="button">Não sei / pode seguir</button>
   </div>
   <p class="rodape">Qualquer resposta serve. Você pode continuar mesmo sem saber.</p>
+  <h2>Quer outro exame ou consulta?</h2>
+  <button class="btn sec" id="btnPedir" type="button">Escolher e ver a disponibilidade</button>
   <p class="msg-erro" id="erro" role="alert"></p>`);
+  $('#btnPedir').onclick=()=>telaPedidoExame(()=>telaPrevisao());
   app.querySelectorAll('button[data-r]').forEach(b=>b.onclick=async()=>{
     const r=b.dataset.r;app.querySelectorAll('button').forEach(x=>x.disabled=true);
     const x=await rpc('pmarc_responder',{p_codigo:E.codigo,p_dados:{resposta:r}});
@@ -307,9 +324,11 @@ function telaConversa(){
   <p class="sub">${esc(v.final||'A previsão vai ser vista e confirmada pela nossa equipe pelo webchat, pelo WhatsApp e por telefone.')}</p>
   <div class="conversa" id="conversa" role="log" aria-live="polite" aria-label="Mensagens"></div>
   <p class="sub" id="vazio">Nenhuma mensagem ainda. Se quiser, escreva abaixo.</p>
+  <button class="btn sec" id="btnPedir" type="button">Pedir previsão de outro exame ou consulta</button>
   <form class="compor" id="fEnviar" novalidate><label for="texto" style="position:absolute;left:-9999px">Sua mensagem</label><textarea id="texto" rows="1" maxlength="4000" placeholder="Escreva sua mensagem"></textarea><button class="btn" type="submit">Enviar</button></form>
   <p class="msg-erro" id="erro" role="alert"></p>
   <p class="rodape">Versão ${esc(VERSAO_PREVISAO)} · <a href="../privacidade.html" target="_blank" rel="noopener">Privacidade</a></p>`);
+  $('#btnPedir').onclick=()=>telaPedidoExame(()=>telaConversa());
   atualizarMsgs(true);
   E.timer=setInterval(()=>{if(!document.hidden)atualizarMsgs(false)},6000);
   const area=$('#texto');
@@ -341,6 +360,210 @@ function telaCelular(texto){
     E.v=x;
     if(texto)await rpc('pmarc_enviar',{p_codigo:E.codigo,p_texto:texto});
     telaConversa();
+  };
+}
+
+/* ===== Pedir uma previsão: escolher o exame/consulta, o turno ou horário (ou nada) e ver a disponibilidade =====
+   Nada aqui reserva ou confirma: os horários vêm da agenda da clínica como PREVISÃO e a equipe confirma (webchat, WhatsApp e telefone). */
+const ABAS=[['','Tudo'],['consulta','Consultas'],['exame','Exames'],['outro','Outros']];
+const TURNOS=[['qualquer','Sem preferência'],['manha','Manhã'],['tarde','Tarde'],['noite','Noite']];
+const NOME_TURNO={manha:'manhã',tarde:'tarde',noite:'noite'};
+const horasOpc=(vazio,sel)=>`<option value="">${vazio}</option>`+Array.from({length:31},(_,i)=>{const m=360+i*30,h=String(Math.floor(m/60)).padStart(2,'0'),v=h+':'+(m%60?'30':'00');return`<option value="${v}"${v===sel?' selected':''}>${v}</option>`}).join('');
+const hojeIso=()=>new Date(Date.now()-3*3600e3).toISOString().slice(0,10);
+const diaFmt=iso=>{const d=new Date(iso+'T12:00:00');return isNaN(d)?iso:d.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'2-digit'})};
+const voltarDaqui=()=>(E.volta||(E.codigo?()=>abrir(E.codigo):telaAchar))();
+let seqLista=0,tBusca=null;
+
+function telaPedidoExame(volta){
+  parar();if(volta)E.volta=volta;E.pe=E.pe||{};if(E.tipo===undefined)E.tipo='';
+  mostrar(`<h1>Pedir uma previsão</h1>
+  <p class="sub">Escolha o exame ou a consulta. Depois diga quando prefere — ou não escolha nada — e veja a disponibilidade.</p>
+  ${avisoHtml()}
+  <section class="card" aria-label="Escolher o exame ou a consulta">
+    <h2 style="margin-top:0">1. O que você quer?</h2>
+    <div class="chips" role="group" aria-label="Tipo">${ABAS.map(([v,t])=>`<button class="chip" type="button" data-tipo="${v}" aria-pressed="${E.tipo===v}">${t}</button>`).join('')}</div>
+    <label for="busca">Buscar pelo nome <span class="opc">(se quiser)</span></label>
+    <input id="busca" type="search" autocomplete="off" maxlength="60" placeholder="Ex.: ultrassom, ressonância, pediatria">
+    <div class="lista-proc" id="lista" role="list" aria-live="polite"></div>
+    <p class="msg-erro" id="erro" role="alert"></p>
+  </section>
+  <p class="rodape">Aqui aparece o que a clínica fez nos últimos 30 dias. Cobertura, autorização e valor dependem do seu plano ou convênio: a nossa equipe confirma com você.</p>
+  <button class="btn linha" id="naoAchei" type="button">Não achei o que procuro</button>
+  <button class="btn sec" id="voltar" type="button">Voltar</button>`,'#busca');
+  const carregar=async()=>{
+    const box=$('#lista'),meu=++seqLista;box.innerHTML='<p class="sub">Buscando…</p>';
+    const r=await rpc('pmarc_catalogo',{p_busca:$('#busca').value.trim()||null,p_tipo:E.tipo||null});
+    if(meu!==seqLista)return;
+    if(r.motivo==='desligado')return telaDesligado();
+    if(r.ok===false||!r.itens){box.innerHTML='';return void($('#erro').textContent=erroRede)}
+    $('#erro').textContent='';
+    if(!r.itens.length){box.innerHTML='<p class="sub">Nada encontrado com esse nome. Tente outra palavra ou toque em “Não achei o que procuro”.</p>';return}
+    E.lista=r.itens;
+    box.innerHTML=r.itens.map((i,n)=>{const nm=nomeExame(i.nome);return`<button class="proc" type="button" role="listitem" data-i="${n}"><span class="tag${i.tipo==='consulta'?' c':''}">${i.tipo==='consulta'?'Consulta':i.tipo==='exame'?'Exame':'Outro'}</span><b>${esc(nm.titulo)}</b>${nm.detalhe?`<small>${esc(nm.detalhe)}</small>`:''}</button>`}).join('');
+    box.querySelectorAll('button[data-i]').forEach(b=>b.onclick=()=>{const i=E.lista[+b.dataset.i];E.pe={...E.pe,proc:{id:i.id,nome:i.nome,tipo:i.tipo,agenda:!!i.agenda},texto:undefined,horario:undefined};telaQuando()});
+  };
+  app.querySelectorAll('button[data-tipo]').forEach(b=>b.onclick=()=>{E.tipo=b.dataset.tipo;app.querySelectorAll('button[data-tipo]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));carregar()});
+  $('#busca').addEventListener('input',()=>{clearTimeout(tBusca);tBusca=setTimeout(carregar,350)});
+  $('#naoAchei').onclick=()=>telaTextoLivre();
+  $('#voltar').onclick=()=>voltarDaqui();
+  carregar();
+}
+/* Não achou na lista: descreve com as próprias palavras (vale como pedido) */
+function telaTextoLivre(){
+  mostrar(`<h1>O que você procura?</h1>${avisoHtml()}
+  <form class="card" id="fLivre" novalidate>
+    <label for="livre">Escreva o exame, a consulta ou o assunto</label><input id="livre" maxlength="200" value="${esc((E.pe&&E.pe.texto)||'')}" placeholder="Ex.: exame de sangue, consulta com cardiologista">
+    <p class="msg-erro" id="erro" role="alert"></p>
+    <button class="btn" type="submit">Continuar</button>
+    <button class="btn sec" id="voltar" type="button">Voltar</button>
+  </form>`,'#livre');
+  $('#voltar').onclick=()=>telaPedidoExame();
+  $('#fLivre').onsubmit=ev=>{ev.preventDefault();const t=$('#livre').value.trim();if(!t)return void($('#erro').textContent='Escreva o que você procura.');E.pe={...E.pe,proc:null,texto:t,horario:undefined};telaQuando()};
+}
+/* Passo 2: quando? (turno, a partir de, até, até o dia, unidade) — ou nada */
+function telaQuando(){
+  const pe=E.pe,nome=pe.proc?nomeExame(pe.proc.nome).titulo:pe.texto,semAgenda=!pe.proc||!pe.proc.agenda;
+  mostrar(`<h1>Quando você prefere?</h1>
+  <p class="sub"><b>${esc(nome)}</b> · <a href="#" id="trocar">trocar</a></p>
+  ${avisoHtml()}
+  <form class="card" id="fQuando" novalidate>
+    <label>Turno</label>
+    <div class="chips" role="group" aria-label="Turno">${TURNOS.map(([v,t])=>`<button class="chip" type="button" data-turno="${v}" aria-pressed="${(pe.turno||'qualquer')===v}">${t}</button>`).join('')}</div>
+    <div class="linha2">
+      <div><label for="apos">A partir das</label><select id="apos">${horasOpc('Qualquer hora',pe.apos)}</select></div>
+      <div><label for="ate">Até as</label><select id="ate">${horasOpc('Qualquer hora',pe.ate)}</select></div>
+    </div>
+    <label for="dia">Até o dia <span class="opc">(se quiser)</span></label><input id="dia" type="date" min="${hojeIso()}" value="${esc(pe.dia||'')}">
+    <label for="unid">Unidade</label><select id="unid"><option value="">Qualquer unidade</option>${[['CSI','CSI'],['DESENVOAR','Desenvoar'],['RM/TC','CSI RM/TC']].map(([v,t])=>`<option value="${v}"${pe.unid===v?' selected':''}>${t}</option>`).join('')}</select>
+    <label for="plano">Seu plano ou convênio <span class="opc">(se souber)</span></label><input id="plano" maxlength="80" autocomplete="off" value="${esc(pe.plano||'')}" placeholder="Ex.: particular, nome do convênio">
+    <p class="sub" style="margin-top:12px">${semAgenda?'Para este item a nossa equipe olha a agenda e fala com você. Se quiser, diga quando prefere.':'Não precisa escolher nada: é só tocar em “Ver a disponibilidade”.'} Cobertura, autorização e valor dependem do plano: a equipe confirma.</p>
+    <p class="msg-erro" id="erro" role="alert"></p>
+    ${semAgenda?'':'<button class="btn" type="submit">Ver a disponibilidade</button>'}
+    <button class="btn ${semAgenda?'':'linha'}" id="pedirJa" type="button">${semAgenda?'Pedir para a equipe':'Pedir para a equipe sem ver os horários'}</button>
+    <button class="btn sec" id="voltar" type="button">Voltar</button>
+  </form>`);
+  const ler=()=>{pe.apos=$('#apos').value||undefined;pe.ate=$('#ate').value||undefined;pe.dia=$('#dia').value||undefined;pe.unid=$('#unid').value||undefined;pe.plano=$('#plano').value.trim()||undefined};
+  app.querySelectorAll('button[data-turno]').forEach(b=>b.onclick=()=>{pe.turno=b.dataset.turno;app.querySelectorAll('button[data-turno]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)))});
+  $('#trocar').onclick=ev=>{ev.preventDefault();telaPedidoExame()};
+  $('#voltar').onclick=()=>telaPedidoExame();
+  $('#pedirJa').onclick=()=>{ler();pe.horario=undefined;enviarPedido()};
+  $('#fQuando').onsubmit=ev=>{ev.preventDefault();ler();
+    if(pe.apos&&pe.ate&&pe.ate<pe.apos)return void($('#erro').textContent='O horário “até” precisa ser depois do “a partir das”.');
+    verDisponibilidade()};
+}
+/* Passo 3: a disponibilidade prevista */
+async function verDisponibilidade(){
+  const pe=E.pe;mostrar('<p class="sub">Consultando a agenda…</p>');
+  const r=await rpc('pmarc_disponibilidade',{p_procedimento:pe.proc.id,p_dados:{turno:pe.turno||'qualquer',hora_apos:pe.apos,hora_ate:pe.ate,data_ate:pe.dia,unidade:pe.unid}});
+  if(r.motivo==='desligado')return telaDesligado();
+  if(r.ok!==true){
+    const msg=r.motivo==='muitos'?'Muita gente consultando agora. Tente de novo em instantes.':erroRede;
+    return mostrar(`<div class="card"><p>${esc(msg)}</p><button class="btn" id="tentar" type="button">Tentar de novo</button><button class="btn sec" id="voltar" type="button">Voltar</button></div>`),$('#tentar').onclick=verDisponibilidade,$('#voltar').onclick=telaQuando;
+  }
+  telaDisponibilidade(r);
+}
+function filtrosTexto(pe){
+  const f=[];if(pe.turno&&pe.turno!=='qualquer')f.push('turno: '+NOME_TURNO[pe.turno]);if(pe.apos)f.push('a partir das '+pe.apos);if(pe.ate)f.push('até as '+pe.ate);
+  if(pe.dia)f.push('até '+pe.dia.split('-').reverse().join('/'));if(pe.unid)f.push(UNID[pe.unid]||pe.unid);
+  return f.length?f.join(' · '):'sem preferência (todos os horários)';
+}
+function telaDisponibilidade(r){
+  const pe=E.pe,sel=pe.horario,dias=r.dias||[];
+  const chave=(d,s)=>d+'|'+s.hora+'|'+(s.unidade||'')+'|'+(s.profissional||'');
+  mostrar(`<h1>Disponibilidade prevista</h1>
+  <p class="sub"><b>${esc(nomeExame(pe.proc.nome).titulo)}</b></p><p class="resumo-f">Seu pedido: ${esc(filtrosTexto(pe))} · <a href="#" id="mudar">mudar</a></p>
+  <div class="aviso" role="note"><b>Previsão</b>${esc(r.aviso||'Estes horários são uma PREVISÃO e ainda serão confirmados pela nossa equipe.')}</div>
+  <section class="card" aria-label="Horários previstos">${dias.length?dias.map(d=>`<div class="dia-h">${esc(diaFmt(d.data))}</div><div class="chips">${d.slots.map(s=>`<button class="chip" type="button" data-k="${esc(chave(d.data,s))}" data-d="${esc(d.data)}" aria-pressed="${!!sel&&chave(sel.data,sel)===chave(d.data,s)}" title="${esc([UNID[s.unidade]||s.unidade,s.profissional].filter(Boolean).join(' · '))}">${esc(s.hora)}${s.unidade?`<small style="display:block;font-weight:400;font-size:.7rem">${esc(UNID[s.unidade]||s.unidade)}</small>`:''}</button>`).join('')}</div>`).join('')
+    :'<p class="sub">Não achamos horário previsto com essa escolha. Você pode mudar o turno ou os horários — ou pedir assim mesmo, e a equipe procura para você.</p>'}
+    ${r.total>dias.reduce((n,d)=>n+d.slots.length,0)?`<p class="rodape">Mostrando os primeiros horários (${r.total} no total na janela até ${esc(String(r.ate).split('-').reverse().join('/'))}). Use os filtros para ver outros.</p>`:''}
+  </section>
+  ${dias.length?'<p class="sub">Se quiser, toque em um horário para a equipe saber qual você viu. Não é obrigatório.</p>':''}
+  <p class="msg-erro" id="erro" role="alert"></p>
+  <button class="btn" id="pedir" type="button">Pedir esta previsão para a equipe</button>
+  <button class="btn linha" id="mudar2" type="button">Mudar quando</button>
+  <button class="btn sec" id="outro" type="button">Escolher outro exame ou consulta</button>`);
+  app.querySelectorAll('button[data-k]').forEach(b=>b.onclick=()=>{
+    const k=b.dataset.k,ja=pe.horario&&chave(pe.horario.data,pe.horario)===k;
+    app.querySelectorAll('button[data-k]').forEach(x=>x.setAttribute('aria-pressed','false'));
+    if(ja){pe.horario=undefined;return}
+    const [data,hora,unidade,profissional]=k.split('|');pe.horario={data,hora,unidade:unidade||undefined,profissional:profissional||undefined};b.setAttribute('aria-pressed','true');
+  });
+  $('#mudar').onclick=ev=>{ev.preventDefault();telaQuando()};$('#mudar2').onclick=telaQuando;$('#outro').onclick=()=>telaPedidoExame();
+  $('#pedir').onclick=()=>enviarPedido();
+}
+/* Enviar o pedido à equipe (quem não tem link deixa nome e celular antes; nada barra) */
+function dadosPedido(){
+  const pe=E.pe;
+  return{procedimento_id:pe.proc?pe.proc.id:undefined,procedimento_texto:pe.proc?undefined:pe.texto,turno:pe.turno&&pe.turno!=='qualquer'?pe.turno:undefined,hora_apos:pe.apos,hora_ate:pe.ate,data_ate:pe.dia,unidade:pe.unid,plano:pe.plano,horario:pe.horario};
+}
+async function enviarPedido(){
+  if(!E.codigo)return telaIdentPedido();
+  const botoes=app.querySelectorAll('button');botoes.forEach(b=>b.disabled=true);
+  const x=await rpc('pmarc_pedido',{p_codigo:E.codigo,p_dados:dadosPedido()});
+  botoes.forEach(b=>b.disabled=false);
+  const er=$('#erro');
+  if(x.motivo==='desligado')return telaDesligado();
+  if(x.motivo==='codigo_invalido'){guardar('pmarc.codigo',null);E.codigo=null;return telaIdentPedido()}
+  if(x.motivo==='muitos'){const m='Você já enviou vários pedidos agora. Espere um pouco ou escreva para a equipe.';return void(er?er.textContent=m:alert(m))}
+  if(x.ok===false||x.motivo==='rede'){return void(er?er.textContent=erroRede:alert(erroRede))}
+  E.v=x;
+  if(x.sem_celular)return telaCelularPedido();
+  telaPedidoEnviado();
+}
+function telaPedidoEnviado(){
+  parar();E.pe={};E.tipo='';
+  mostrar(`<h1>Pedido enviado</h1>${avisoHtml()}
+  <section class="card"><p class="ok-linha">✓ A nossa equipe recebeu o seu pedido de previsão.</p><p class="sub">${esc((E.v&&E.v.final)||'A previsão vai ser vista e confirmada pela nossa equipe pelo webchat, pelo WhatsApp e por telefone.')}</p></section>
+  <button class="btn" id="conversa" type="button">Falar com a equipe</button>
+  <button class="btn linha" id="outro" type="button">Pedir outra previsão</button>`);
+  $('#conversa').onclick=()=>telaConversa();$('#outro').onclick=()=>telaPedidoExame(()=>telaConversa());
+}
+/* Sem link: nome e celular (nada é obrigatório além do celular, para a equipe responder) */
+function telaIdentPedido(msg){
+  parar();
+  mostrar(`<h1>Para a equipe responder</h1>${avisoHtml()}
+  <form class="card" id="fId" novalidate>
+    ${msg?`<p class="sub" role="status">${esc(msg)}</p>`:'<p class="sub">Deixe o seu celular. O resto é opcional.</p>'}
+    <label for="i-nome">Seu nome <span class="opc">(se quiser)</span></label><input id="i-nome" autocomplete="name">
+    <label for="i-cel">Celular com DDD</label><input id="i-cel" inputmode="tel" autocomplete="tel-national" placeholder="(71) 90000-0000">
+    <label for="i-nasc">Data de nascimento <span class="opc">(se quiser)</span></label><input id="i-nasc" inputmode="numeric" placeholder="dd/mm/aaaa" maxlength="10">
+    <p class="msg-erro" id="erro" role="alert"></p>
+    <button class="btn" type="submit">Enviar o pedido</button>
+    <button class="btn sec" id="voltar" type="button">Voltar</button>
+  </form>`,'#i-nome');
+  $('#i-cel').addEventListener('input',e=>{e.target.value=fmtTel(e.target.value)});
+  $('#i-nasc').addEventListener('input',e=>{const d=digits(e.target.value).slice(0,8);e.target.value=d.length>4?`${d.slice(0,2)}/${d.slice(2,4)}/${d.slice(4)}`:d.length>2?`${d.slice(0,2)}/${d.slice(2)}`:d});
+  $('#voltar').onclick=()=>E.pe&&E.pe.proc?telaQuando():telaPedidoExame();
+  $('#fId').onsubmit=async ev=>{
+    ev.preventDefault();const cel=digits($('#i-cel').value),er=$('#erro'),b=$('#fId button[type=submit]');
+    if(cel.length<10)return void(er.textContent='Precisamos do celular com DDD para a equipe poder responder.');
+    b.disabled=true;er.textContent='';
+    const r=await rpc('pmarc_novo',{p_nome:$('#i-nome').value,p_celular:cel,p_nascimento:dataIso($('#i-nasc').value)||null,p_texto:null});
+    b.disabled=false;
+    if(r.motivo==='rede')return void(er.textContent=erroRede);
+    if(r.motivo==='desligado')return telaDesligado();
+    if(r.motivo==='celular_invalido')return void(er.textContent='Confira o celular: precisa do DDD e dos números.');
+    if(r.motivo==='muitos')return void(er.textContent='Muita gente está enviando agora. Tente de novo em alguns minutos.');
+    if(!r.ok)return void(er.textContent=erroRede);
+    guardar('pmarc.codigo',r.codigo);E.codigo=r.codigo;E.v=r;
+    enviarPedido();
+  };
+}
+/* Quem tem o link mas nunca teve celular no cadastro: o pedido ficou guardado, falta o número para abrir a conversa */
+function telaCelularPedido(){
+  parar();
+  mostrar(`<h1>Qual o seu celular?</h1>${avisoHtml()}
+  <form class="card" id="fCel" novalidate><p class="sub">Guardamos o seu pedido. A equipe precisa do número para responder a você.</p>
+  <label for="c-cel">Celular com DDD</label><input id="c-cel" inputmode="tel" autocomplete="tel-national" placeholder="(71) 90000-0000">
+  <p class="msg-erro" id="erro" role="alert"></p><button class="btn" type="submit">Enviar</button></form>`,'#c-cel');
+  $('#c-cel').addEventListener('input',e=>{e.target.value=fmtTel(e.target.value)});
+  $('#fCel').onsubmit=async ev=>{
+    ev.preventDefault();const cel=digits($('#c-cel').value),er=$('#erro');
+    if(cel.length<10)return void(er.textContent='Digite o celular com DDD.');
+    const x=await rpc('pmarc_responder',{p_codigo:E.codigo,p_dados:{celular:cel}});
+    if(x.motivo==='rede'||x.ok===false||x.sem_celular)return void(er.textContent=x.sem_celular?'Confira o celular.':erroRede);
+    E.v=x;const y=await rpc('pmarc_pedido',{p_codigo:E.codigo,p_dados:dadosPedido()});
+    if(y.ok!==false)E.v=y;telaPedidoEnviado();
   };
 }
 

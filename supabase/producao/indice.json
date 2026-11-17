@@ -14752,6 +14752,25 @@
    "md5": "14e787862419505911dc9cfc01f85671"
   },
   {
+   "nome": "pmarc_catalogo",
+   "args": [
+    {
+     "nome": "p_busca",
+     "padrao": true
+    },
+    {
+     "nome": "p_tipo",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "4165c66a212cdf1c77089281e6073ee7"
+  },
+  {
    "nome": "pmarc_classificar",
    "args": [
     {
@@ -14803,6 +14822,25 @@
    "authenticated": false,
    "publico": false,
    "md5": "3672ba2048e01114f5d5c98aae335168"
+  },
+  {
+   "nome": "pmarc_disponibilidade",
+   "args": [
+    {
+     "nome": "p_procedimento",
+     "padrao": false
+    },
+    {
+     "nome": "p_dados",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "7af65f1e8c934193ffc164792104bdb6"
   },
   {
    "nome": "pmarc_enriquecer_lote",
@@ -14967,6 +15005,25 @@
    "md5": "d32ed5cd7be1e7e877e22abd3baa0399"
   },
   {
+   "nome": "pmarc_pedido",
+   "args": [
+    {
+     "nome": "p_codigo",
+     "padrao": false
+    },
+    {
+     "nome": "p_dados",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "b17da88425feb1090df4ee4f71339966"
+  },
+  {
    "nome": "pmarc_responder",
    "args": [
     {
@@ -15029,6 +15086,21 @@
    "authenticated": false,
    "publico": false,
    "md5": "4fe0e1bc7a469fa9fc3036e1e7c7f90c"
+  },
+  {
+   "nome": "pmarc_tipo_proc",
+   "args": [
+    {
+     "nome": "p_modalidade",
+     "padrao": false
+    }
+   ],
+   "definer": false,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "9ca4c476468077810204be8a5947baba"
   },
   {
    "nome": "pmarc_vigiar",
