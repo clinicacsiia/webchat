@@ -6504,6 +6504,10 @@
     {
      "nome": "p_token",
      "padrao": false
+    },
+    {
+     "nome": "p_dados",
+     "padrao": false
     }
    ],
    "definer": true,
@@ -6511,7 +6515,7 @@
    "anon": true,
    "authenticated": true,
    "publico": false,
-   "md5": "49861e1060b685ceab222ed85d5339b9"
+   "md5": "24d73381b649eb21026cedc94867de4c"
   },
   {
    "nome": "chat_medicos_disponiveis",

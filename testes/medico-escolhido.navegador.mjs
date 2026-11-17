@@ -41,15 +41,45 @@ await caso('o médico não tem horário em nenhuma janela: avisa que não há ho
   return { ok: JSON.stringify(janelas) === '[0,1,2]' && /não tem horário disponível nos próximos 45 dias\./.test(t) && /Vamos abrir uma solicitação \(previsão\) aqui no chat para a nossa equipe avaliar/.test(t) && /não é um agendamento/.test(t)
                 && b.includes('Abrir a solicitação') && b.includes('Falar com a equipe') && !/outro/i.test(b.join('|')) && !/outros médicos/.test(t) && slots.length === 0, detalhe: `botões=${b.join(' | ')}; janelas=${janelas}` };
 });
-await caso('tocar em "Abrir a solicitação" chama o banco uma vez, fecha a janela e não escolhe nenhum horário', async () => {
+await caso('tocar em "Abrir a solicitação" abre o formulário: o paciente digita o prazo ("até que dia"), escolhe os dias da semana e o turno; não pergunta por outro médico; Voltar volta ao aviso', async () => {
+  const { page, ctx } = await abrir({ nome: 'MAIANA DE TESTE SILVA' });
+  await page.waitForSelector('#folhaRodape button >> text=Abrir a solicitação', { timeout: 10000 });
+  await page.click('#folhaRodape button >> text=Abrir a solicitação');
+  await page.waitForSelector('#dispFim', { timeout: 5000 });
+  const t = await texto(page), b = await botoes(page), temOutro = await page.$('#dispOutros');
+  await page.click('#folhaRodape button >> text=Voltar');
+  await page.waitForSelector('#folhaCorpo .aviso-cal', { timeout: 5000 });
+  await ctx.close();
+  return { ok: /Informe em quais dias da semana e em que turno você consegue ir, e até que dia/.test(t) && /Maiana de Teste Silva/i.test(t) && /Até/.test(t) && /Turno|Período do dia/.test(t) && !temOutro && b.includes('Abrir a solicitação') && b.includes('Voltar'), detalhe: `botões=${b.join(' | ')}; checkbox de outro profissional=${!!temOutro}` };
+});
+await caso('o que o paciente digitou vai para o banco (data final, dias, turno) pela função do médico escolhido, uma vez; a janela fecha e nenhum horário é escolhido', async () => {
   const { mundo, page, ctx } = await abrir({ nome: 'MAIANA DE TESTE SILVA' });
   await page.waitForSelector('#folhaRodape button >> text=Abrir a solicitação', { timeout: 10000 });
   await page.click('#folhaRodape button >> text=Abrir a solicitação');
+  await page.waitForSelector('#dispFim', { timeout: 5000 });
+  const fim = new Date(Date.now() + 20 * 864e5).toISOString().slice(0, 10);
+  await page.fill('#dispFim', fim);
+  await page.click('#folhaCorpo .chip >> text=Manhã');
+  await page.click('#folhaCorpo .chip >> text=Dom'); await page.click('#folhaCorpo .chip >> text=Sáb');   // tira domingo e sábado
+  await page.click('#folhaRodape button >> text=Abrir a solicitação');
   await page.waitForFunction(() => document.querySelector('#folha').hidden, null, { timeout: 8000 });
   await new Promise((r) => setTimeout(r, 300));
-  const abertos = (mundo.medico.abertos || []).length, marcou = mundo.chamadas.some((c) => c.nome === 'chat_horario_escolher');
+  const env = (mundo.medico.abertos || []), d = env[0] && env[0].p_dados, marcou = mundo.chamadas.some((c) => c.nome === 'chat_horario_escolher' || c.nome === 'chat_disponibilidade_registrar');
   await ctx.close();
-  return { ok: abertos === 1 && !marcou, detalhe: `aberturas=${abertos}; escolheu horário=${marcou}` };
+  return { ok: env.length === 1 && d && d.data_fim === fim && d.turno === 'manha' && JSON.stringify(d.dias_semana) === '[1,2,3,4,5]' && d.aceita_outros_profissionais === false && !marcou, detalhe: `envios=${env.length}; dados=${JSON.stringify(d)}; outras chamadas=${marcou}` };
+});
+await caso('prazo antes do início: o formulário avisa e NÃO chama o banco', async () => {
+  const { mundo, page, ctx } = await abrir({ nome: 'MAIANA DE TESTE SILVA' });
+  await page.waitForSelector('#folhaRodape button >> text=Abrir a solicitação', { timeout: 10000 });
+  await page.click('#folhaRodape button >> text=Abrir a solicitação');
+  await page.waitForSelector('#dispFim', { timeout: 5000 });
+  const ini = await page.$eval('#dispIni', (n) => n.value);
+  await page.evaluate((v) => { const n = document.querySelector('#dispFim'); n.value = v; }, new Date(new Date(ini).getTime() - 864e5).toISOString().slice(0, 10));
+  await page.click('#folhaRodape button >> text=Abrir a solicitação');
+  await page.waitForFunction(() => [...document.querySelectorAll('#folhaCorpo .erro-form')].some((n) => !n.hidden && n.textContent), null, { timeout: 3000 });
+  const msg = await page.$eval('#folhaCorpo .erro-form', (n) => n.textContent);
+  await ctx.close();
+  return { ok: /a final precisa ser depois da inicial/.test(msg) && !(mundo.medico.abertos || []).length, detalhe: msg };
 });
 
 const falhou = resultados.filter((x) => !x).length;

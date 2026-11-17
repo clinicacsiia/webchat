@@ -708,7 +708,7 @@
   const CHAVE_HIST = 'webchat.historico.v1';   // as últimas conversas deste aparelho (cada uma com o seu token): dá para voltar a elas
   const MAX_HIST = 5;                          // mínimo pedido: 3
   // Muda a cada alteração do chat. Cópia de mensagens guardada por outra versão é descartada (era isso que mostrava conversa velha e travada).
-  const VERSAO_APP = '2026.11.17-1';
+  const VERSAO_APP = '2026.11.17-2';
   // Mesmas regras do banco (fluxo_nome_ok, fluxo_telefone_ok, fluxo_email_ok): o banco confere de novo, aqui é só para avisar logo.
   const LET = 'A-Za-zÀ-ÖØ-öø-ÿ';
   const nomeCompletoOk = (v) => { const t = String(v || '').trim(); return t.length >= 5 && t.length <= 120 && new RegExp(`^[${LET}][${LET}'’.-]*( +[${LET}][${LET}'’.-]*)+$`).test(t) && t.split(/ +/).filter((w) => w.replace(new RegExp(`[^${LET}]`, 'g'), '').length >= 2).length >= 2; };
@@ -2994,17 +2994,9 @@
     const corpo = $('#folhaCorpo'), rodape = $('#folhaRodape'), nome = nomeBonito(r.medico_preferido);
     corpo.replaceChildren(); rodape.replaceChildren();
     corpo.append(h('p', { class: 'aviso-cal', role: 'status' }, `${nome} não tem horário disponível nos próximos 45 dias.`),
-      h('p', { class: 'p-dica' }, `Vamos abrir uma solicitação (previsão) aqui no chat para a nossa equipe avaliar e falar com você sobre ${nome}. Isso não é um agendamento e não reserva horário.`));
-    const abrir = h('button', { class: 'btn-w', type: 'button' }, 'Abrir a solicitação');
-    abrir.addEventListener('click', async () => {
-      abrir.disabled = true; abrir.textContent = 'Abrindo…';
-      try {
-        const { error } = await db.rpc('chat_medico_sem_horario_abrir', { p_conversa: conv.id, p_token: conv.token });
-        if (error) throw error;
-        fecharFolha(); toast('Solicitação aberta. A equipe vai avaliar.'); carregar();
-      } catch (er) { abrir.disabled = false; abrir.textContent = 'Abrir a solicitação'; toast(mensagemErro(er)); }
-    });
-    rodape.append(abrir, h('button', { class: 'btn-w sec', type: 'button', onclick: () => { fecharFolha(); pedirAtendente(); } }, 'Falar com a equipe'));
+      h('p', { class: 'p-dica' }, `Vamos abrir uma solicitação (previsão) aqui no chat para a nossa equipe avaliar e falar com você sobre ${nome}. Para isso, informe os dias da semana, o turno e até que dia você pode ir. Isso não é um agendamento e não reserva horário.`));
+    rodape.append(h('button', { class: 'btn-w', type: 'button', onclick: () => abrirDisponibilidade(r) }, 'Abrir a solicitação'),
+      h('button', { class: 'btn-w sec', type: 'button', onclick: () => { fecharFolha(); pedirAtendente(); } }, 'Falar com a equipe'));
   }
 
   /* ---------- Solicitação de disponibilidade futura (substitui a antiga "previsão") ---------- */
@@ -3015,6 +3007,7 @@
     const hoje = new Date(), e = existente || {};
     const F = { ini: e.data_ini || ymd(somaDias(hoje, 1)), fim: e.data_fim || ymd(somaDias(hoje, 45)), dias: new Set((e.dias_semana && e.dias_semana.length ? e.dias_semana : [0, 1, 2, 3, 4, 5, 6])), turno: e.turno || 'qualquer',
       outras: e.aceita_outras_unidades !== false, outros: e.aceita_outros_profissionais !== false, avisar: !!e.aceita_notificacao };
+    const medicoSem = !existente && semHorarioDoMedico(r);   // abre a solicitação do médico escolhido (chat_medico_sem_horario_abrir)
     const medicoFixo = !!((r && r.medico_preferido) || (existente && existente.profissional && existente.aceita_outros_profissionais === false));   // médico escolhido: nunca se oferece outro
     const erro = h('p', { class: 'erro-form', role: 'alert', hidden: true });
     const dIni = h('input', { type: 'date', id: 'dispIni', value: F.ini, min: ymd(somaDias(hoje, 0)), 'aria-label': 'A partir de' }), dFim = h('input', { type: 'date', id: 'dispFim', value: F.fim, min: ymd(somaDias(hoje, 0)), max: ymd(somaDias(hoje, 365)), 'aria-label': 'Até' });
@@ -3027,25 +3020,28 @@
     desenharChips();
     const cbOutras = h('input', { type: 'checkbox', id: 'dispOutras', checked: F.outras }), cbOutros = h('input', { type: 'checkbox', id: 'dispOutros', checked: F.outros }), cbAvisar = h('input', { type: 'checkbox', id: 'dispAvisar', checked: F.avisar });
     corpo.append(
-      h('p', { class: 'p-dica' }, 'Diga quando você consegue ir. Se surgir uma vaga compatível (um cancelamento, uma agenda nova), avisamos. ', h('strong', {}, 'Isso não é um agendamento e não reserva horário.')),
+      medicoSem ? h('p', { class: 'p-dica' }, `Informe em quais dias da semana e em que turno você consegue ir, e até que dia. A nossa equipe avalia a agenda de ${nomeBonito(r.medico_preferido)} e fala com você. `, h('strong', {}, 'Isso não é um agendamento e não reserva horário.'))
+        : h('p', { class: 'p-dica' }, 'Diga quando você consegue ir. Se surgir uma vaga compatível (um cancelamento, uma agenda nova), avisamos. ', h('strong', {}, 'Isso não é um agendamento e não reserva horário.')),
       h('div', { class: 'campo' }, h('label', { for: 'dispIni' }, 'A partir de'), dIni), h('div', { class: 'campo' }, h('label', { for: 'dispFim' }, 'Até'), dFim),
       h('div', { class: 'campo' }, h('label', {}, 'Dias da semana em que posso ir'), chipsDias), h('div', { class: 'campo' }, h('label', {}, 'Período do dia'), chipsTurno),
       h('div', { class: 'campo' }, h('label', { for: 'dispOutras' }, cbOutras, ' Aceito outra unidade da clínica')), medicoFixo ? null : h('div', { class: 'campo' }, h('label', { for: 'dispOutros' }, cbOutros, ' Aceito outro profissional')),
       h('div', { class: 'campo' }, h('label', { for: 'dispAvisar' }, cbAvisar, ' Quero ser avisado(a) aqui no chat quando surgir uma vaga compatível'),
         h('p', { class: 'w-nota' }, 'Só usamos isso para avisar sobre esta solicitação. Você pode cancelar ou tirar o aviso quando quiser, em "Minha disponibilidade" no menu.')), erro);
-    const salvar = h('button', { class: 'btn-w', type: 'button' }, existente ? 'Salvar alterações' : 'Registrar minha disponibilidade');
+    const rotuloSalvar = existente ? 'Salvar alterações' : medicoSem ? 'Abrir a solicitação' : 'Registrar minha disponibilidade';
+    const salvar = h('button', { class: 'btn-w', type: 'button' }, rotuloSalvar);
     salvar.addEventListener('click', async () => {
       erro.hidden = true;
       if (!dIni.value || !dFim.value || dFim.value < dIni.value) { erro.textContent = 'Escolha as datas: a final precisa ser depois da inicial.'; erro.hidden = false; return; }
       if (!F.dias.size) { erro.textContent = 'Escolha pelo menos um dia da semana.'; erro.hidden = false; return; }
-      salvar.disabled = true; salvar.textContent = 'Registrando…';
+      salvar.disabled = true; salvar.textContent = medicoSem ? 'Abrindo…' : 'Registrando…';
       const dados = { data_ini: dIni.value, data_fim: dFim.value, dias_semana: [...F.dias].sort(), turno: F.turno, aceita_outras_unidades: cbOutras.checked, aceita_outros_profissionais: medicoFixo ? false : cbOutros.checked, aceita_notificacao: cbAvisar.checked, canais: cbAvisar.checked ? ['chat'] : [] };
       try {
         const { error } = existente ? await db.rpc('chat_disponibilidade_alterar', { p_conversa: conv.id, p_token: conv.token, p_id: existente.id, p_dados: dados })
+                        : medicoSem ? await db.rpc('chat_medico_sem_horario_abrir', { p_conversa: conv.id, p_token: conv.token, p_dados: dados })
                                     : await db.rpc('chat_disponibilidade_registrar', { p_conversa: conv.id, p_token: conv.token, p_dados: dados });
         if (error) throw error;
-        fecharFolha(); toast(existente ? 'Alterações salvas.' : 'Disponibilidade registrada.'); carregar();
-      } catch (er) { salvar.disabled = false; salvar.textContent = existente ? 'Salvar alterações' : 'Registrar minha disponibilidade'; erro.textContent = mensagemErro(er); erro.hidden = false; }
+        fecharFolha(); toast(existente ? 'Alterações salvas.' : medicoSem ? 'Solicitação aberta. A equipe vai avaliar.' : 'Disponibilidade registrada.'); carregar();
+      } catch (er) { salvar.disabled = false; salvar.textContent = rotuloSalvar; erro.textContent = mensagemErro(er); erro.hidden = false; }
     });
     rodape.append(salvar, h('button', { class: 'btn-w sec', type: 'button', onclick: () => { if (C && C.res) desenharCalendario(); else fecharFolha(); } }, 'Voltar'));
   }

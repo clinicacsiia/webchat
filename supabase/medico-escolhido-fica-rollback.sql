@@ -264,4 +264,5 @@ begin
   return jsonb_build_object('ok', true, 'solicitacao', v_r);
 end $function$;
 
+drop function if exists public.chat_medico_sem_horario_abrir(uuid, text, jsonb);
 drop function if exists public.chat_medico_sem_horario_abrir(uuid, text);

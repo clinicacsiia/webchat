@@ -13,7 +13,7 @@ const caso = async (nome, fn) => { try { const r = await fn(); registrar(nome, r
 const { db, falhas } = await criarBancoProducao();
 const { q, um, como, anonimo } = ajudantes(db);
 let sqlErro = null;
-for (const f of ['webchat-v2-parte1-modos', 'webchat-v2-parte2-calendario-api', 'medico-escolhido-fica-parte1', 'medico-escolhido-fica-parte2', 'medico-escolhido-fica-parte3', 'medico-escolhido-fica-parte4', 'medico-escolhido-fica-parte4b', 'medico-escolhido-fica-parte5']) {
+for (const f of ['webchat-v2-parte1-modos', 'webchat-v2-parte2-calendario-api', 'medico-escolhido-fica-parte1', 'medico-escolhido-fica-parte2', 'medico-escolhido-fica-parte3', 'medico-escolhido-fica-parte4', 'medico-escolhido-fica-parte4b', 'medico-escolhido-fica-parte5', 'medico-escolhido-fica-parte6', 'medico-escolhido-fica-parte6b']) {
   try { await db.exec(readFileSync(`${REPO}/supabase/${f}.sql`, 'utf8')); } catch (e) { sqlErro = `${f}: ${String(e.message).split('\n')[0]}`; }
 }
 registrar('o retrato da produção monta inteiro e as migrações do WebChat v2 e do médico escolhido aplicam sem erro', falhas.length === 0 && !sqlErro, sqlErro ?? '');
@@ -130,31 +130,43 @@ await caso('klingo_pode_marcar não marca sozinho com médico diferente do escol
 
 // ---------------------------------------------------------------------------------------------- C. previsão só com o médico escolhido
 let q2;
-await caso('médico sem horário: chat_medico_sem_horario_abrir abre a solicitação SÓ com ele(a) (profissional fixo, não aceita outros, sem aviso automático) e avisa o paciente', async () => {
+await caso('médico sem horário: chat_medico_sem_horario_abrir abre a solicitação SÓ com ele(a) (profissional fixo mesmo que o chat peça outro), com os dias, o turno e o prazo que o paciente digitou, e avisa o paciente', async () => {
   q2 = await ateOCalendario(telefone()); await ativar(q2); await escolheMedico(q2.c, DRA_A);
   await ofertar(q2.c, [[dia(3), '08:30', DRA_B]]); await consulta(q2.c, 'ok_com_horarios');
   await anonimo();
-  const r = await rpc('chat_medico_sem_horario_abrir', { p_conversa: q2.c, p_token: q2.t }); await como('');
-  const d = await um(`select profissional_preferido, aceita_outros_profissionais, aceita_notificacao, estado from public.disponibilidade_pedido where conversa_id = $1`, [q2.c]);
+  const r = await rpc('chat_medico_sem_horario_abrir', { p_conversa: q2.c, p_token: q2.t, p_dados: { data_ini: dia(1), data_fim: dia(30), dias_semana: [1, 3], turno: 'manha', aceita_outros_profissionais: true, profissional: DRA_B } }); await como('');
+  const d = await um(`select profissional_preferido, aceita_outros_profissionais, aceita_notificacao, estado, turno, dias_semana, data_ini::text di, data_fim::text df from public.disponibilidade_pedido where conversa_id = $1`, [q2.c]);
   const msg = await um(`select texto from public.mensagens where conversa_id = $1 and autor = 'agente' and opcoes ->> 'tipo' = 'disponibilidade_registrada' order by id desc limit 1`, [q2.c]);
   const nota = await um(`select dados -> 'notas' as n from public.conversa_fluxo where conversa_id = $1`, [q2.c]);
-  return { ok: r.ok === true && d.profissional_preferido === DRA_A && d.aceita_outros_profissionais === false && d.aceita_notificacao === false && d.estado === 'ativa'
+  return { ok: r.ok === true && d.profissional_preferido === DRA_A && d.aceita_outros_profissionais === false && d.aceita_notificacao === false && d.estado === 'ativa' && d.turno === 'manha' && JSON.stringify(d.dias_semana) === '[1,3]' && d.df === dia(30) && d.di === dia(1)
+                && /até \d{2}\/\d{2}, de manhã, seg, qua/.test(msg.texto) && /de manhã, seg, qua/.test(JSON.stringify(nota.n))
                 && /não tem horário disponível nos próximos 45 dias/.test(msg.texto) && /não vamos trocar de médico/.test(msg.texto) && /NÃO é um agendamento/.test(msg.texto) && /MÉDICO ESCOLHIDO SEM HORÁRIO/.test(JSON.stringify(nota.n)),
            detalhe: JSON.stringify(d) };
 });
 await caso('não abre quando a API TEM horário do médico escolhido (o paciente deve escolher um)', async () => {
   const x = await ateOCalendario(telefone()); await ativar(x); await escolheMedico(x.c, DRA_A);
   await ofertar(x.c, [[dia(4), '09:00', DRA_A]]); await consulta(x.c, 'ok_com_horarios');
-  await anonimo(); const e = await erroDe(() => rpc('chat_medico_sem_horario_abrir', { p_conversa: x.c, p_token: x.t })); await como('');
+  await anonimo(); const e = await erroDe(() => rpc('chat_medico_sem_horario_abrir', { p_conversa: x.c, p_token: x.t, p_dados: { data_fim: dia(30) } })); await como('');
   return { ok: e && /Há horários desse médico/.test(e.msg), detalhe: JSON.stringify(e) };
 });
 await caso('não abre sem médico escolhido, nem com token errado', async () => {
   const x = await ateOCalendario(telefone()); await ativar(x);
   await ofertar(x.c, [[dia(4), '09:00', DRA_B]]); await consulta(x.c, 'ok_com_horarios');
-  await anonimo(); const e1 = await erroDe(() => rpc('chat_medico_sem_horario_abrir', { p_conversa: x.c, p_token: x.t })); await como('');
+  await anonimo(); const e1 = await erroDe(() => rpc('chat_medico_sem_horario_abrir', { p_conversa: x.c, p_token: x.t, p_dados: { data_fim: dia(30) } })); await como('');
   await escolheMedico(x.c, DRA_A); await db.query(`delete from public.klingo_oferta where conversa_id = $1`, [x.c]);
-  await anonimo(); const e2 = await erroDe(() => rpc('chat_medico_sem_horario_abrir', { p_conversa: x.c, p_token: 'token-errado' })); await como('');
+  await anonimo(); const e2 = await erroDe(() => rpc('chat_medico_sem_horario_abrir', { p_conversa: x.c, p_token: 'token-errado', p_dados: { data_fim: dia(30) } })); await como('');
   return { ok: e1 && /não tem médico escolhido/.test(e1.msg) && e2, detalhe: `${JSON.stringify(e1)} | ${JSON.stringify(e2)}` };
+});
+await caso('sem o prazo ("até que dia") ou com o prazo antes do início, recusa e não cria nada; a função de 2 parâmetros não existe mais', async () => {
+  const x = await ateOCalendario(telefone()); await ativar(x); await escolheMedico(x.c, DRA_A);
+  await ofertar(x.c, [[dia(4), '09:00', DRA_B]]); await consulta(x.c, 'ok_com_horarios');
+  await anonimo();
+  const e1 = await erroDe(() => rpc('chat_medico_sem_horario_abrir', { p_conversa: x.c, p_token: x.t, p_dados: { turno: 'tarde' } }));
+  const e2 = await erroDe(() => rpc('chat_medico_sem_horario_abrir', { p_conversa: x.c, p_token: x.t, p_dados: { data_ini: dia(10), data_fim: dia(5) } }));
+  await como('');
+  const n = (await um(`select count(*)::int n from public.disponibilidade_pedido where conversa_id = $1`, [x.c])).n;
+  const f = (await um(`select count(*)::int n from pg_proc where proname = 'chat_medico_sem_horario_abrir'`)).n;
+  return { ok: e1 && /até que dia/.test(e1.msg) && e2 && /data final/.test(e2.msg) && n === 0 && f === 1, detalhe: `${JSON.stringify(e1)} | ${JSON.stringify(e2)} | pedidos=${n}; funções=${f}` };
 });
 await caso('o formulário de disponibilidade (registrar e alterar) também fica só com o médico escolhido, mesmo que o chat peça "aceito outros"', async () => {
   const x = await ateOCalendario(telefone()); await ativar(x); await escolheMedico(x.c, DRA_A);
