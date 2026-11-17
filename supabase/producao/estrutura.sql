@@ -1,5 +1,5 @@
 -- RETRATO DA ESTRUTURA DO BANCO DE PRODUÇÃO (projeto webchat-atendimento). GERADO: não editar à mão.
--- Atualização parcial em 2026-11-17 04:47 UTC (funções app_* e painel_app_*, tabelas app_*). Retrato inteiro tirado em 2026-11-14T20:32:54.165875+00:00 · Postgres 17.11. Só estrutura: nenhuma linha de tabela, nenhum valor de configuração.
+-- Atualização parcial em 2026-11-17 10:10 UTC 04:47 UTC (funções app_* e painel_app_*, tabelas app_*). Retrato inteiro tirado em 2026-11-14T20:32:54.165875+00:00 · Postgres 17.11. Só estrutura: nenhuma linha de tabela, nenhum valor de configuração.
 -- Serve de referência e para os testes. NÃO rodar inteiro sobre a produção. Como refazer: supabase/producao/LEIAME.md.
 
 -- ===== Extensões =====
@@ -2767,6 +2767,7 @@ create table public.primeira_consulta_liberada (
 comment on table public.primeira_consulta_liberada is 'Pacientes liberados à mão pela atendente (o Klingo não mostrou o atendimento anterior). Chave = hash de CPF+nascimento.';
 alter table public.primeira_consulta_liberada enable row level security;
 -- concessão a service_role: DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+
 
 
 -- ===== Chaves estrangeiras (depois de todas as tabelas) =====

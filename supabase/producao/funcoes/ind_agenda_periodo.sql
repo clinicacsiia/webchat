@@ -11,7 +11,6 @@ declare
   v jsonb;
 begin
   with
-  teste_m as (select 'm' || z.m as m from public.klingo_conferencia z join public.conversas c on c.id = z.conversa_id where c.teste),
   ex as (
     select e.marcacao_id,
            (e.agendado_para at time zone 'America/Sao_Paulo')::date as dia,
@@ -22,8 +21,10 @@ begin
            case e.status when 'remarcado' then 'remarcada' when 'cancelado' then 'cancelada' when 'atendido' then 'atendida' when 'faltou' then 'faltou'
                 else case when (e.agendado_para at time zone 'America/Sao_Paulo')::date >= v_hoje then 'por_vir' else 'sem_fechamento' end end as r
       from public.jornada_exame e
+      join public.klingo_conferencia kc on 'm' || kc.m = e.marcacao_id
+      join public.conversas cw on cw.id = kc.conversa_id
      where e.status <> 'pedido'
-       and (p_teste or e.marcacao_id not in (select m from teste_m))
+       and (p_teste or not cw.teste)
        and (p_un is null or public.unidade_chave(e.unidade) is null or public.unidade_chave(e.unidade) = p_un)),
   base as (select * from ex where dia between p_de and p_ate),
   ag as (
@@ -51,10 +52,9 @@ begin
              from ex where dia = v_hoje),
   prox as (select dia, count(*) filter (where r not in ('cancelada', 'remarcada')) as ficaram, count(*) filter (where r not in ('cancelada', 'remarcada') and conf) as confirmaram
              from ex where dia > v_hoje and dia <= v_hoje + 3 group by dia),
-  nov as (select coalesce(nullif(k.origem, ''), 'sem_origem') as origem, count(*) as total, count(*) filter (where k.status_klingo <> 'Cancelada') as ativas, count(*) filter (where k.ligacao is not null) as do_chat
-            from public.klingo_conferencia k left join public.conversas c on c.id = k.conversa_id
-           where k.marcado_em between p_de and p_ate and (p_teste or c.id is null or not c.teste) and (p_un is null or k.unidade is null or k.unidade = p_un)
-           group by 1),
+  nov as (select count(*) as total, count(*) filter (where k.status_klingo <> 'Cancelada') as ativas
+            from public.klingo_conferencia k join public.conversas c on c.id = k.conversa_id
+           where k.marcado_em between p_de and p_ate and (p_teste or not c.teste) and (p_un is null or k.unidade is null or k.unidade = p_un)),
   pu as (select x.conversa_id, x.pessoa from public.painel_conversa_pessoa_un() x where p_un is null or x.chaves is null or cardinality(x.chaves) = 0 or p_un = any (x.chaves)),
   site as (select count(distinct pu.pessoa) filter (where cardinality(coalesce(pa.klingo_marcacoes, '{}')) > 0) as com_marcacao,
                   count(distinct pu.pessoa) filter (where exists (select 1 from unnest(coalesce(pa.klingo_marcacoes, '{}')) u
@@ -73,7 +73,7 @@ begin
     'por_dia', coalesce((select jsonb_agg(o || jsonb_build_object('dia', chave) order by chave) from lin where grp = 'dia'), '[]'::jsonb),
     'hoje', (select to_jsonb(hoje) from hoje),
     'proximos', coalesce((select jsonb_agg(jsonb_build_object('dia', dia, 'ficaram', ficaram, 'confirmaram', confirmaram) order by dia) from prox), '[]'::jsonb),
-    'novas_por_origem', coalesce((select jsonb_agg(jsonb_build_object('origem', origem, 'total', total, 'ativas', ativas, 'do_chat', do_chat) order by total desc) from nov), '[]'::jsonb),
+    'novas', (select to_jsonb(nov) from nov),
     'site', (select to_jsonb(site) from site),
     'site_por_dia', coalesce((select jsonb_agg(jsonb_build_object('dia', dia, 'pessoas', pessoas, 'agendaram', agendaram) order by dia) from spd), '[]'::jsonb),
     'dados_desde', (select min((agendado_para at time zone 'America/Sao_Paulo')::date) from public.jornada_exame where status <> 'pedido'),
