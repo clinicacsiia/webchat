@@ -53,6 +53,9 @@ const ATENDENTES = (a) => ({ periodo: { de: a.p_de, ate: a.p_ate }, unidade: a.p
 const EXTRAS = (admin) => ({ por_hora: [], pedidos: {}, avaliacoes: admin ? { total: 10, media_atendimento: 8.5, media_site: 7.9, por_canal: { WhatsApp: 4, Instagram: 5, Google: 1 } } : null });
 const jwt = (sub) => { const b = (o) => Buffer.from(JSON.stringify(o)).toString('base64url'); return `${b({ alg: 'HS256', typ: 'JWT' })}.${b({ sub, role: 'authenticated', exp: Math.floor(Date.now() / 1000) + 86400 })}.x`; };
 
+// Respostas de painel_automacao_resumo (marcação automática pelo chat). Tudo inventado.
+const AUTOMACAO = { operacoes: { sucesso: 30, falha: 2, incerto: 1, horario_tomado: 4 }, pos: { 'cancelar:sucesso': 6, 'remarcar:sucesso': 3, 'cancelar:falha': 1 }, agendadas_sozinhas: 25, resolvidas_sem_humano: 18, tempo_medio_s: 42, motivos_falha: [{ codigo: 'horario_tomado', n: 4 }] };
+
 function servidor() {
   return new Promise((ok) => {
     const s = createServer(async (req, res) => {
@@ -135,6 +138,7 @@ async function pagina(browser, { semSql = false, admin = false, semAtend = false
     }
     else if (p.endsWith('/rpc/painel_indicadores_diretoria')) { const b = JSON.parse(req.postData() || '{}'); reg.rpcs.push(['diretoria', b]); corpo = DIRETORIA; }
     else if (p.endsWith('/rpc/painel_indicadores_plataforma')) { const b = JSON.parse(req.postData() || '{}'); reg.rpcs.push(['plataforma', b]); if (semPlat) { status = 404; corpo = { code: 'PGRST202', message: 'function not found' }; } else corpo = PLATAFORMA; }
+    else if (p.endsWith('/rpc/painel_automacao_resumo')) { const b = JSON.parse(req.postData() || '{}'); reg.rpcs.push(['automacao', b]); corpo = AUTOMACAO; }
     else if (p.endsWith('/rpc/painel_indicadores_mensal')) { const b = JSON.parse(req.postData() || '{}'); reg.rpcs.push(['mensal', b]); corpo = MENSAL; }
     else if (p.endsWith('/rpc/painel_indicadores_conferencia')) { const b = JSON.parse(req.postData() || '{}'); reg.rpcs.push(['conferencia', b]); corpo = conf ? CONFERENCIA : {}; }
     else if (p.endsWith('/rpc/paciente_avisos')) corpo = conf ? AVISOS_CONF : [];
@@ -156,7 +160,7 @@ const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePa
 const abrir = async (opc) => { const t = await pagina(browser, opc); await t.page.goto(`${base}/painel/`); await t.page.waitForSelector('#kpis .kpi', { timeout: 10000 }); return t; };
 const cartoes = (page) => page.locator('#kpis .kpi').evaluateAll((l) => Object.fromEntries(l.map((k) => [k.querySelector('small').textContent, k.querySelector('strong').textContent])));
 const esperaCartao = (page, rot, v) => page.waitForFunction(([r, x]) => [...document.querySelectorAll('#kpis .kpi')].some((k) => k.querySelector('small').textContent === r && k.querySelector('strong').textContent === x), [rot, v], { timeout: 5000 });
-const abaInd = async (t) => { await t.page.click('.nav button[data-aba=indicadores]'); await t.page.waitForSelector('.ind-dir .ind-dir-lin'); await t.page.evaluate(() => document.querySelectorAll('.ind-det, .ind-clin, .ind-plat, .ind-why, .ind-num-det').forEach((d) => { d.open = true; })); };
+const abaInd = async (t) => { await t.page.click('.nav button[data-aba=indicadores]'); await t.page.waitForSelector('.ind-kpis .ind-kpi', { timeout: 8000 }).catch((e) => { throw new Error(e.message.split('\n')[0] + ' | erros da página: ' + (t.reg.excecoes.join(' ; ') || 'nenhum')); }); await t.page.evaluate(() => document.querySelectorAll('.ind-det, .ind-num-det').forEach((d) => { d.open = true; })); };
 const ultimo = (reg, k) => reg.rpcs.filter((r) => r[0] === k).at(-1)?.[1];
 
 await caso('Cartões do topo: 5 conversas, 4 pessoas atendidas e 1 concluída hoje; a conversa de TESTE fica fora e não existe "Conversas por pessoa"', async () => {
@@ -187,43 +191,50 @@ await caso('Quadrado "Aguardando paciente" continua certo (1) e o filtro de unid
 });
 
 const textoAba = async (t) => (await t.page.locator('.pagina').first().innerText()).replace(/\n+/g, ' ');
-await caso('Aba Indicadores: período padrão é Hoje e pede só a consulta nova (uma chamada)', async () => {
+
+const kpiTxt = async (t) => t.page.locator('.ind-kpi').evaluateAll((l) => Object.fromEntries(l.map((k) => [k.querySelector('.ind-kpi-rot').textContent, [k.querySelector('b').textContent, k.querySelector('.ind-kpi-sub').textContent, k.querySelector('.ind-delta')?.textContent ?? ''].join(' | ')])));
+await caso('Aba Indicadores: período padrão é Hoje e pede só a consulta nova de cada bloco (uma chamada por bloco, sem equipe, avaliações, conferência nem gráfico mensal)', async () => {
   const t = await abrir(); await abaInd(t);
   const a = ultimo(t.reg, 'decisao'), ctrl = await t.page.locator('.ind-ctl input[type=date]').evaluateAll((l) => l.map((i) => i.value));
+  const nomes = [...new Set(t.reg.rpcs.map((r) => r[0]))].sort().join();
   await t.ctx.close();
-  return { ok: a.p_de === HOJE && a.p_ate === HOJE && a.p_unidade === null && a.p_incluir_teste === false && ctrl.join() === `${HOJE},${HOJE}` && !t.reg.excecoes.length, detalhe: JSON.stringify(a) + (t.reg.excecoes[0] ?? '') };
+  return { ok: a.p_de === HOJE && a.p_ate === HOJE && a.p_unidade === null && a.p_incluir_teste === false && ctrl.join() === `${HOJE},${HOJE}` && nomes === 'automacao,decisao,diretoria,plataforma' && !t.reg.excecoes.length, detalhe: JSON.stringify(a) + ' ' + nomes + (t.reg.excecoes[0] ?? '') };
 });
-await caso('Resumo da diretoria: veredito geral e 4 indicadores (bom, atenção ou ruim) com o número, o limite e a comparação', async () => {
+await caso('Resumo: 5 números de uso do site (procuraram, começaram pedido, agendaram, marcações no Klingo, 1ª resposta) com comparação neutra', async () => {
   const t = await abrir(); await abaInd(t);
-  const geral = (await t.page.locator('.ind-dir-geral').innerText()).replace(/\s+/g, ' ');
-  const lin = await t.page.locator('.ind-dir-lin').evaluateAll((l) => l.map((x) => ({ cls: x.className.replace('ind-dir-lin ', ''), tit: x.querySelector('.ind-dir-tit').textContent, v: x.querySelector('.ind-dir-num b').textContent, ref: x.querySelector('.ind-dir-ref').textContent, d: x.querySelector('.ind-delta')?.textContent || '' })));
+  const k = await kpiTxt(t); const neutros = await t.page.locator('.ind-delta.bom, .ind-delta.ruim').count();
   await t.ctx.close();
-  const p = (a) => lin.find((x) => x.tit.startsWith(a)) || {};
-  return { ok: /Atenção\s*O período pede atenção\.\s*1 indicador ruim\./.test(geral) && lin.length === 4
-    && p('Pessoas que agendaram').cls === 'ruim' && p('Pessoas que agendaram').v === '25%' && /▼ 15 pontos/.test(p('Pessoas que agendaram').d) && /Bom: 50% ou mais · Ruim: abaixo de 30%/.test(p('Pessoas que agendaram').ref)
-    && p('Marcações da plataforma canceladas').cls === 'bom' && p('Marcações da plataforma canceladas').v === '9%'
-    && p('Faltas das marcações').cls === 'atencao' && p('Faltas das marcações').v === '15%'
-    && p('Rapidez').cls === 'atencao' && p('Rapidez').v === '20 min', detalhe: geral + ' ' + JSON.stringify(lin) };
+  return { ok: Object.keys(k).length === 5 && k['Pessoas que procuraram o chat'].startsWith('60 |') && k['Começaram um pedido'].startsWith('45 |') && /^\d+ \| .*de quem procurou/.test(k['Agendaram pelo chat'])
+    && /^134 \| 4,8% das 2\.\d{3} da clínica/.test(k['Marcações do site no Klingo']) && k['1ª resposta da equipe'].startsWith('20 min') && neutros === 0, detalhe: JSON.stringify(k) + ' coloridos=' + neutros };
 });
-await caso('Resumo da diretoria: se foi ruim diz por quê; se foi bom diz o que melhorar; tudo com números do período', async () => {
+await caso('Sem veredito: nada de "Bom/Ruim/Atenção", "período foi bom", "o que fazer" ou "por quê"; só números', async () => {
   const t = await abrir(); await abaInd(t);
-  const txt = async (n) => (await t.page.locator('.ind-dir-lin').nth(n).locator('.ind-dir-txt').innerText()).replace(/\s+/g, ' ');
-  const conv = await txt(0), can = await txt(1), fal = await txt(2), esp = await txt(3);
+  const txt = await textoAba(t); const chips = await t.page.locator('.ind-chip, .ind-faixa, .ind-dir, .ind-why').count();
   await t.ctx.close();
-  return { ok: /Por que não foi bem/.test(conv) && /maior perda é entre "Chegaram à escolha de data" e "Escolheram o horário": 18 pessoas \(45%\)/.test(conv)
-      && /Das 40 que terminaram sem agendar: 50% paciente parou de responder; 25% só queria informação; 12,5% ninguém da equipe respondeu\./.test(conv)
-      && /Quase não agendam: plano Planserv \(0 de 10\); Consulta Neuropediatria \(6 de 60\)\./.test(conv) && /O que fazer Retomar a conversa de quem parou de responder/.test(conv)
-      && /O que dá para melhorar Confirmar presença um dia antes/.test(can) && !/Por que não foi bem/.test(can) && /Motivo mais comum das canceladas: paciente pediu para cancelar \(3 de 5\)/.test(can)
-      && /3 faltaram de 20/.test(fal) && /Na clínica toda, falta mais quem está "não respondeu à confirmação": 45,5% \(média 20%\)/.test(fal) && /Pedir confirmação de presença/.test(fal)
-      && /mediano até a primeira resposta da equipe: 20 min/.test(esp) && /5 pessoas não foram respondidas por ninguém da equipe/.test(esp), detalhe: [conv, can, fal, esp].join(' || ') };
+  return { ok: chips === 0 && !/O período (foi|pede)|Ver por quê|O que fazer|O que dá para melhorar|Poucos dados|Causa:|Melhorar:/.test(txt), detalhe: `chips=${chips} ` + (txt.match(/O período (foi|pede)|Ver por quê|O que fazer|Causa:|Melhorar:/) || [''])[0] };
+});
+await caso('Ordem da página: resumo, onde as pessoas param, onde o site mais é usado, comparação com o Klingo e autoatendimento (nada de equipe, avaliações, conferência, clínica toda ou gráfico mensal)', async () => {
+  const t = await abrir({ admin: true }); await abaInd(t);
+  const tits = await t.page.locator('.ind-pg h3.ind-sec').allInnerTexts(); const txt = await textoAba(t);
+  await t.ctx.close();
+  return { ok: tits.join('|') === 'Onde as pessoas param|Onde o site mais é usado|Comparação com o Klingo|Autoatendimento' && !/Avaliações dos pacientes|Nota média|Conferência|Para comparar: a clínica toda|Faltas por|Motivos dos cancelamentos/.test(txt), detalhe: tits.join('|') };
+});
+await caso('Funil: 6 passos, a maior queda marcada (só uma) e os dois painéis de por que pararam', async () => {
+  const t = await abrir(); await abaInd(t);
+  const rots = await t.page.locator('.ind-painel', { hasText: 'Caminho do paciente no chat' }).first().locator('.ind-rot').allInnerTexts();
+  const fortes = await t.page.locator('.ind-perda.forte').allInnerTexts();
+  const txt = await textoAba(t);
+  await t.ctx.close();
+  return { ok: rots.length === 6 && rots[0] === 'Procuraram o chat' && rots[5] === 'Agendaram' && fortes.length === 1 && /18 pessoas pararam aqui \(45%\) · maior queda/.test(fortes[0])
+    && /Último passo de quem não agendou/.test(txt) && /Escolha de data e horário/.test(txt) && /Como a conversa terminou sem agendar/.test(txt) && /Ninguém da equipe respondeu/.test(txt), detalhe: rots.join(',') + fortes.join('|') };
 });
 await caso('Por unidade: pessoas, agendaram, marcações da plataforma (consultas · exames), canceladas ou remarcadas e faltas', async () => {
   const t = await abrir(); await abaInd(t);
   const linhas = await t.page.locator('.ind-card', { has: t.page.locator('h4', { hasText: 'Por unidade' }) }).locator('tbody tr').evaluateAll((l) => l.map((r) => [...r.querySelectorAll('td')].map((c) => c.innerText.trim()).join('|')));
   await t.ctx.close();
-  return { ok: linhas.join(';') === 'CSI|43|6 (14%)|6|1 · 5|1 (16,7%)|2 de 2 (0%);CSI RM/TC|31|6 (19,4%)|6|0 · 6|2 (33,3%)|—;Desenvoar|320|112 (35%)|122|121 · 1|9 (7,4%)|3 de 18 (16,7%)'.replace('2 de 2 (0%)', '0 de 2 (0%)'), detalhe: linhas.join(';') };
+  return { ok: linhas.join(';') === 'CSI|43|6 (14%)|6|1 · 5|1 (16,7%)|0 de 2 (0%);CSI RM/TC|31|6 (19,4%)|6|0 · 6|2 (33,3%)|—;Desenvoar|320|112 (35%)|122|121 · 1|9 (7,4%)|3 de 18 (16,7%)', detalhe: linhas.join(';') };
 });
-await caso('O que mais pedem e planos: pedidos e planos com pessoas, agendaram e %; em vermelho os que quase não agendam', async () => {
+await caso('O que mais pedem e planos: pedidos e planos com pessoas, agendaram e %; os que quase não agendam ficam destacados', async () => {
   const t = await abrir(); await abaInd(t);
   const sec = t.page.locator('.ind-card', { has: t.page.locator('h4', { hasText: /^(Mais pedidos|Planos mais usados)$/ }) });
   const linhas = await sec.locator('tbody tr').evaluateAll((l) => l.map((r) => [...r.querySelectorAll('td')].map((c) => c.innerText.trim()).join('|')));
@@ -231,29 +242,29 @@ await caso('O que mais pedem e planos: pedidos e planos com pessoas, agendaram e
   await t.ctx.close();
   return { ok: linhas.join(';') === 'Consulta (sem especialidade informada)|100|45|45%;Consulta Neuropediatria|60|6|10%;Consulta Ortopediatra|25|6|24%;Unimed|50|20|40%;Bradesco Saude|40|14|35%;Planserv|10|0|0%' && baixos === 2, detalhe: linhas.join(';') + ' baixos=' + baixos };
 });
-await caso('Funil: 6 passos, a maior perda marcada, e só uma maior perda', async () => {
+await caso('Funil por tipo (recolhido): consultas e exames separados', async () => {
   const t = await abrir(); await abaInd(t);
-  const rots = await t.page.locator('.ind-painel', { hasText: 'Caminho do paciente no chat' }).first().locator('.ind-rot').allInnerTexts();
-  const fortes = await t.page.locator('.ind-perda.forte').allInnerTexts();
-  const txt = await textoAba(t);
+  const linhas = await t.page.locator('.ind-det table tbody tr').evaluateAll((l) => l.map((r) => [...r.querySelectorAll('td')].map((c) => c.innerText.trim()).join('|')));
+  const fechado = await abrir(); await fechado.page.click('.nav button[data-aba=indicadores]'); await fechado.page.waitForSelector('.ind-kpis .ind-kpi');
+  const aberto = await fechado.page.evaluate(() => document.querySelector('.ind-det').open); await fechado.ctx.close();
   await t.ctx.close();
-  return { ok: rots.length === 6 && rots[0] === 'Procuraram o chat' && rots[5] === 'Agendaram' && fortes.length === 1 && /18 pessoas pararam aqui \(45%\) · maior perda/.test(fortes[0])
-    && /Demora mediana para a primeira resposta da equipe: 20 min/.test(txt) && /Ninguém da equipe respondeu/.test(txt) && /Escolha de data e horário/.test(txt), detalhe: rots.join(',') + fortes.join('|') };
+  return { ok: linhas.join(';') === 'Começaram o pedido|42|3;Chegaram à escolha de data|38|2;Escolheram o horário|21|1;Terminaram o pedido|19|1;Agendaram|14|1' && aberto === false, detalhe: linhas.join(';') + ' aberto=' + aberto };
 });
-await caso('Faltas: painéis por confirmação, antecedência, unidade e tipo; o pior grupo fica em destaque (vermelho)', async () => {
+await caso('Comparação com o Klingo: marcações novas da clínica toda x as do site (consultas, exames, total e a parte do site) e o que aconteceu com elas', async () => {
   const t = await abrir(); await abaInd(t);
-  const txt = await textoAba(t);
-  const verm = await t.page.locator('.ind-trilho i.verm').count();
-  const pior = await t.page.locator('.ind-linha.forte', { hasText: 'Não respondeu à confirmação' }).innerText();
+  const a = ultimo(t.reg, 'plataforma');
+  const linhas = await t.page.locator('.ind-painel', { hasText: 'Site e Klingo' }).first().locator('tbody tr').evaluateAll((l) => l.map((r) => [...r.querySelectorAll('td')].map((c) => c.innerText.trim())));
+  const txt = (await t.page.locator('.ind-painel', { hasText: 'Site e Klingo' }).first().innerText()).replace(/\s+/g, ' ');
   await t.ctx.close();
-  return { ok: /Faltas por confirmação/.test(txt) && /Faltas por antecedência/.test(txt) && /Faltas por unidade/.test(txt) && /Faltas por tipo de atendimento/.test(txt)
-    && /45,5% · 25 de 55/.test(pior.replace(/\n/g, ' ')) && verm >= 2 && /Motivos dos cancelamentos/.test(txt) && /Paciente pediu para cancelar/.test(txt), detalhe: pior.replace(/\n/g, ' ') + ' verm=' + verm };
+  const por = (n) => linhas.find((l) => l[0].startsWith(n)) || [];
+  return { ok: a.p_de === HOJE && a.p_unidade === null && por('Vieram do site').join('|') === 'Vieram do site|122|12|134' && por('Klingo')[1] === '559' && Number(por('Klingo')[1].replace(/\D/g, '')) + Number(por('Klingo')[2].replace(/\D/g, '')) === Number(por('Klingo')[3].replace(/\D/g, ''))
+    && por('Parte do site').join('|') === 'Parte do site no total|21,8%|0,5%|4,8%' && /122 ativas \(17 atendidas, 3 faltaram, 102 por vir\) · 12 canceladas ou remarcadas \(9%\)/.test(txt), detalhe: JSON.stringify(linhas) + txt.slice(-160) };
 });
-await caso('Não sobrou a tabela "Por dia" nem os números antigos (reentradas, transferências, atravessaram a meia-noite)', async () => {
+await caso('Autoatendimento: tentativas, marcadas sozinhas, foram para a equipe, cancelar e remarcar pelo chat', async () => {
   const t = await abrir(); await abaInd(t);
-  const txt = await textoAba(t); const tabelas = await t.page.locator('table:not(.ind-tab-graf)').count();   // a tabela do gráfico mensal é de propósito
+  const minis = await t.page.locator('.ind-painel', { hasText: 'Marcação automática pelo chat' }).locator('.ind-mini').evaluateAll((l) => l.map((m) => m.innerText.replace(/\s+/g, ' ')));
   await t.ctx.close();
-  return { ok: tabelas === 0 && !/reentradas|transferências|meia-noite|Conversas por pessoa|Confirmaram/i.test(txt), detalhe: txt.slice(0, 80) };
+  return { ok: minis[0] === '37 tentativas' && minis[1] === '30 marcadas sozinhas' && minis[2] === '3 foram para a equipe' && minis[3] === '4 horário já ocupado' && minis[5] === '42 s tempo médio para marcar' && minis[6] === '6 cancelamentos feitos pelo chat' && minis[7] === '3 remarcações feitas pelo chat' && minis[8] === '1 cancelar ou remarcar que foram para a equipe', detalhe: minis.join(' ; ') };
 });
 await caso('Atalhos de período: Ontem, 7 dias, 30 dias, Este mês e Mês anterior pedem as datas certas', async () => {
   const t = await abrir(); await abaInd(t);
@@ -264,12 +275,13 @@ await caso('Atalhos de período: Ontem, 7 dias, 30 dias, Este mês e Mês anteri
   for (const [rot, [de, ate]] of Object.entries(esperado)) {
     await t.page.click(`.ind-atalhos .chip >> text=${rot}`);
     await t.page.waitForFunction(([r]) => document.querySelector('.ind-atalhos .chip[aria-pressed=true]')?.textContent === r, [rot]);
-    await new Promise((r) => setTimeout(r, 250));
-    const x = ultimo(t.reg, 'decisao'); if (x.p_de !== de || x.p_ate !== ate) falhas.push(`${rot}=${x.p_de}..${x.p_ate}`);
+    await t.page.waitForSelector('.ind-kpis .ind-kpi');
+    const q = ultimo(t.reg, 'decisao'); if (q.p_de !== de || q.p_ate !== ate) falhas.push(`${rot}: ${q.p_de}..${q.p_ate} (esperado ${de}..${ate})`);
   }
   await t.ctx.close();
   return { ok: !falhas.length && !t.reg.excecoes.length, detalhe: falhas.join(' | ') };
 });
+
 await caso('Período livre: "Ver período" pede esse intervalo, datas invertidas são arrumadas e os atalhos soltam', async () => {
   const t = await abrir(); await abaInd(t);
   const d1 = mais(HOJE, -20), d2 = mais(HOJE, -10);
@@ -296,18 +308,10 @@ await caso('Período livre: mudar as duas datas carrega sozinho (sem clicar) e d
 await caso('Filtro de unidade do topo vai para a consulta e os números mudam (60 → 40 pessoas)', async () => {
   const t = await abrir(); await abaInd(t);
   await t.page.selectOption('#selUnidade', 'desenvoar'); await t.page.waitForFunction(() => /Unidade Desenvoar/.test(document.querySelector('.pagina')?.innerText || ''));
-  const v = (await t.page.locator('.ind-dir-lin .ind-dir-num span').first().innerText()).replace(/\D+/g, ' ').trim();
+  const v = (await t.page.locator('.ind-kpi b').first().innerText()).trim();
   const un = ultimo(t.reg, 'decisao').p_unidade;
   await t.ctx.close();
-  return { ok: v === '10 40' && un === 'desenvoar' && !t.reg.excecoes.length, detalhe: `${v} ${un}` };
-});
-await caso('Poucas pessoas (unidade com 4): o resumo diz "poucos dados" em vez de dar veredito', async () => {
-  const t = await abrir(); await abaInd(t);
-  await t.page.selectOption('#selUnidade', 'rmtc'); await t.page.waitForFunction(() => /Unidade CSI RM\/TC/.test(document.querySelector('.pagina')?.innerText || ''));
-  await t.page.evaluate(() => document.querySelectorAll('.ind-why').forEach((d) => { d.open = true; }));
-  const txt = await textoAba(t); const cls = await t.page.locator('.ind-dir-lin').first().evaluate((x) => x.className);
-  await t.ctx.close();
-  return { ok: /sem base para comparar|Poucos dados/.test(txt) && / sem$/.test(cls) && /Ainda não há casos suficientes/.test(txt) && !/Por que não foi bem Só/.test(txt) && !t.reg.excecoes.length, detalhe: cls + ' ' + txt.slice(0, 160) };
+  return { ok: v === '40' && un === 'desenvoar' && !t.reg.excecoes.length, detalhe: `${v} ${un}` };
 });
 await caso('"Incluir conversas de teste": só o administrador vê a caixa; marcar manda p_incluir_teste = true', async () => {
   const comum = await abrir(); await abaInd(comum);
@@ -321,31 +325,6 @@ await caso('"Incluir conversas de teste": só o administrador vê a caixa; marca
   await t.ctx.close();
   return { ok: vistaComum === 0 && vistaAdm === 1 && a.p_incluir_teste === true, detalhe: `comum=${vistaComum} adm=${vistaAdm} ${a.p_incluir_teste}` };
 });
-await caso('Equipe: barras por atendente (conversas, agendamentos, nota) com o melhor em destaque e aviso de poucas avaliações', async () => {
-  const t = await abrir(); await abaInd(t);
-  const secao = t.page.locator('h3', { hasText: 'Equipe: quem atende' }); await secao.waitFor();
-  const paineis = await t.page.locator('.ind-painel').evaluateAll((l) => l.map((p) => ({ tit: p.querySelector('h4').textContent, linhas: [...p.querySelectorAll('.ind-linha')].map((x) => x.innerText.replace(/\n/g, ' ')) })));
-  const por = (t0) => paineis.find((x) => x.tit.startsWith(t0)) || { linhas: [] };
-  const forte = await t.page.locator('.ind-linha.forte', { hasText: 'Ana' }).count();
-  await t.ctx.close();
-  return { ok: por('Conversas atendidas').linhas[0].startsWith('Ana') && /40/.test(por('Conversas atendidas').linhas[0]) && por('Agendamentos feitos').linhas.map((l) => l.split(' ')[0]).join() === 'Ana,Bia,Caio'
-    && /9,4 · 8 aval\./.test(por('Nota média').linhas[0]) && /6,5 · 2 aval\. \(poucas\)/.test(por('Nota média').linhas[1]) && por('Nota média').linhas.length === 2 && forte >= 2
-    && por('Quem respondeu primeiro').linhas[0].startsWith('Ana') && /30/.test(por('Quem respondeu primeiro').linhas[0])
-    && por('Rapidez').linhas.map((l) => l.split(' ')[0]).join() === 'Ana,Caio,Bia' && /6 min · 30 conversas/.test(por('Rapidez').linhas[0]) && /45 min · 9 conversas/.test(por('Rapidez').linhas[2]), detalhe: JSON.stringify(paineis.slice(-3)) };
-});
-await caso('Avaliações dos pacientes voltaram: só o administrador vê; atendente comum não', async () => {
-  const adm = await abrir({ admin: true }); await abaInd(adm);
-  await adm.page.waitForFunction(() => /Avaliações dos pacientes/.test(document.querySelector('.pagina')?.innerText || ''));
-  const ta = await textoAba(adm); await adm.ctx.close();
-  const c = await abrir(); await abaInd(c); await new Promise((r) => setTimeout(r, 300));
-  const tc = await textoAba(c); await c.ctx.close();
-  return { ok: /10 avaliações/.test(ta) && /8,5 nota do atendimento/.test(ta) && /5 pelo Instagram/.test(ta) && !/Avaliações dos pacientes/.test(tc) && /Equipe: quem atende/.test(tc) };
-});
-await caso('Sem o SQL dos atendentes, a parte da equipe avisa qual arquivo rodar e o resto da tela funciona', async () => {
-  const t = await abrir({ semAtend: true }); await abaInd(t);
-  const txt = await textoAba(t); await t.ctx.close();
-  return { ok: /supabase\/indicadores-atendentes\.sql/.test(txt) && /por que não estão agendando/i.test(txt) && !t.reg.excecoes.length };
-});
 await caso('Sem o SQL novo no banco, mostra a mensagem com o arquivo a aplicar e não quebra', async () => {
   const t = await abrir({ semSql: true });
   await t.page.click('.nav button[data-aba=indicadores]'); await t.page.waitForSelector('.pagina .erro');
@@ -353,112 +332,12 @@ await caso('Sem o SQL novo no banco, mostra a mensagem com o arquivo a aplicar e
   await t.ctx.close();
   return { ok: /supabase\/indicadores-decisao\.sql/.test(txt) && !t.reg.excecoes.length };
 });
-
-await caso('Seção 2 (plataforma): consultas e exames separados, total = canceladas + remarcadas + ativas, e as porcentagens', async () => {
-  const t = await abrir({ conf: true }); await abaInd(t); await t.page.waitForSelector('.ind-plat table.ind-tab-graf');
-  const a = ultimo(t.reg, 'plataforma');
-  const linhas = await t.page.locator('.pagina table.ind-tab-graf').filter({ has: t.page.locator('td', { hasText: /^Remarcadas$/ }) }).first().locator('tbody tr').evaluateAll((l) => l.map((r) => [...r.querySelectorAll('td')].map((c) => c.innerText.trim())));
-  await t.ctx.close();
-  const por = (n) => linhas.find((l) => l[0].startsWith(n)) || [];
-  const soma = (k) => Number(por(k)[1]) + Number(por(k)[2]) === Number(por(k)[3]);
-  return { ok: a.p_de === HOJE && a.p_unidade === null && por('Marcações feitas')[1] === '122' && por('Marcações feitas')[2] === '12' && por('Marcações feitas')[3] === '134'
-    && por('Canceladas').join() === 'Canceladas,4,1,5' && por('Remarcadas').join() === 'Remarcadas,5,2,7' && por('Ativas').join() === 'Ativas (seguem valendo),113,9,122'
-    && soma('Marcações feitas') && soma('Canceladas') && soma('Remarcadas') && soma('Ativas') && 122 === 4 + 5 + 113 && 12 === 1 + 2 + 9
-    && por('% canceladas ou remarcadas').join('|') === '% canceladas ou remarcadas|7,4%|25%|9%' && por('% de faltas').join('|') === '% de faltas (de quem já foi)|16,7%|0%|15%'
-    && por('Parte do que a clínica').join('|') === 'Parte do que a clínica marcou no período|21,8%|0,5%|4,8%', detalhe: JSON.stringify(linhas) };
-});
-await caso('Funil por tipo: consultas e exames separados (começaram, escolheram data e horário, terminaram, agendaram)', async () => {
-  const t = await abrir(); await abaInd(t);
-  const painelTipo = t.page.locator('.ind-painel', { hasText: 'Funil por tipo' });
-  const linhas = await painelTipo.locator('tbody tr').evaluateAll((l) => l.map((r) => [...r.querySelectorAll('td')].map((c) => c.innerText.trim()).join('|')));
-  await t.ctx.close();
-  return { ok: linhas.join(';') === 'Começaram o pedido|42|3;Chegaram à escolha de data|38|2;Escolheram o horário|21|1;Terminaram o pedido|19|1;Agendaram|14|1', detalhe: linhas.join(';') };
-});
-await caso('Seção 7 (clínica toda) só para comparar: separa consultas de exames e o gráfico mensal acompanha o botão', async () => {
-  const t = await abrir(); await abaInd(t); await t.page.waitForSelector('.ind-clin .ind-graf svg');
-  const lido = async () => ({ txt: (await t.page.locator('.ind-clin').innerText()).replace(/\n+/g, ' '), nov: (await t.page.locator('.ind-graf tbody tr').last().innerText()).replace(/\s+/g, ' ') });
-  const todos = await lido();
-  await t.page.locator('.ind-clin .chip', { hasText: 'Só consultas' }).click(); const co = await lido();
-  await t.page.locator('.ind-clin .chip', { hasText: 'Só exames' }).click(); const ex = await lido();
-  await t.ctx.close();
-  return { ok: /300\s*consultas e exames no período/.test(todos.txt) && /5\.807/.test(todos.nov)
-    && /90\s*consultas no período/.test(co.txt) && /Conta: 90 = 60 atendidos \+ 10 faltaram \+ 10 cancelados \+ 5 remarcados \+ 5 por vir/.test(co.txt) && /1\.546/.test(co.nov)
-    && /210\s*exames no período/.test(ex.txt) && /Conta: 210 = 140 atendidos \+ 40 faltaram \+ 10 cancelados \+ 10 remarcados \+ 10 por vir/.test(ex.txt) && /4\.255/.test(ex.nov), detalhe: JSON.stringify({ a: todos.nov, b: co.nov, c: ex.nov }) };
-});
-await caso('Ordem da página: resumo da diretoria, por unidade, pedidos e planos, marcações da plataforma; o resto fica em "Detalhes" (recolhido)', async () => {
-  const t = await abrir({ conf: true, admin: true }); await abaInd(t); await t.page.waitForSelector('.ind-clin');
-  const tits = await t.page.locator('.pagina .ind-dir, .pagina .ind-pbi h4, .pagina h3.ind-sec, .pagina summary.ind-sec-sum').evaluateAll((l) => l.map((x) => (x.classList.contains('ind-dir') ? 'RESUMO' : x.textContent.trim())));
-  const fechado = await abrir({ conf: true }); await fechado.page.click('.nav button[data-aba=indicadores]'); await fechado.page.waitForSelector('.ind-dir .ind-dir-lin');
-  const abertoPadrao = await fechado.page.evaluate(() => document.querySelector('.ind-det').open);
-  await fechado.ctx.close(); await t.ctx.close();
-  const ord = ['RESUMO', 'Caminho do paciente no chat', 'Marcações da plataforma', 'Por unidade', 'Mais pedidos', 'Planos mais usados', 'Marcações da plataforma: consultas e exames', 'Detalhes para análise', 'Chat: por que não estão agendando?', 'Autoatendimento', 'Equipe: quem atende', 'Avaliações dos pacientes', 'Conferência Klingo', 'Para comparar: a clínica toda'];
-  const pos = ord.map((o) => tits.findIndex((x) => (o === 'Marcações da plataforma' ? x === o : x.startsWith(o))));
-  return { ok: pos.every((x, i) => x >= 0 && (i === 0 || x > pos[i - 1])) && abertoPadrao === false, detalhe: tits.join(' | ') + ' padrãoAberto=' + abertoPadrao };
-});
-await caso('Sem a função da plataforma no banco: o resumo mostra "poucos dados" nos dois indicadores dela, a seção avisa o arquivo e o resto funciona', async () => {
+await caso('Sem a função da plataforma no banco: o número vira "—", a comparação avisa o arquivo e o resto da página funciona', async () => {
   const t = await abrir({ semPlat: true }); await abaInd(t);
-  const txt = await textoAba(t); const cls = await t.page.locator('.ind-dir-lin').evaluateAll((l) => l.map((x) => x.className.replace('ind-dir-lin ', ''))); await t.ctx.close();
-  return { ok: cls.join() === 'ruim,sem,sem,atencao' && /supabase\/indicadores-plataforma\.sql/.test(txt) && /Chat: por que não estão agendando/.test(txt) && !t.reg.excecoes.length, detalhe: cls.join() + (t.reg.excecoes[0] ?? '') };
+  const txt = await textoAba(t); const k = await kpiTxt(t); await t.ctx.close();
+  return { ok: k['Marcações do site no Klingo'].startsWith('— |') && /supabase\/indicadores-plataforma\.sql/.test(txt) && /Onde as pessoas param/.test(txt) && k['Pessoas que procuraram o chat'].startsWith('60 |') && !t.reg.excecoes.length, detalhe: JSON.stringify(k) + (t.reg.excecoes[0] ?? '') };
 });
-await caso('Conferência Klingo x webchat: sem o SQL novo, a aba avisa em vez de mostrar números errados (e não quebra nada)', async () => {
-  const t = await abrir(); await abaInd(t);
-  const txt = await textoAba(t); await t.ctx.close();
-  return { ok: /Conferência Klingo × webchat/.test(txt) && /conferência ainda não está disponível/.test(txt) && !t.reg.excecoes.length, detalhe: t.reg.excecoes[0] ?? '' };
-});
-await caso('Conferência: pede o mesmo período e unidade dos outros blocos e mostra o total e as origens (WhatsApp, Telefone, Recepção, sem origem)', async () => {
-  const t = await abrir({ conf: true }); await abaInd(t); await t.page.waitForSelector('.ind-conf-passo');
-  const a = ultimo(t.reg, 'conferencia'), txt = await textoAba(t); await t.ctx.close();
-  return { ok: a.p_de === HOJE && a.p_ate === HOJE && a.p_unidade === null && /200\s*marcações no Klingo/.test(txt) && /WhatsApp/.test(txt) && /Telefone/.test(txt) && /Recepção/.test(txt) && /Sem origem \(em branco no Klingo\)/.test(txt) && /45% · 90|90 · 45%/.test(txt) && !t.reg.excecoes.length, detalhe: JSON.stringify(a) + (t.reg.excecoes[0] ?? '') };
-});
-await caso('Gráfico mensal: 5 barras por mês (total, cancelados, remarcados, atendidos, faltaram), tabela com as porcentagens, escolher meses e esconder uma barra', async () => {
-  const t = await abrir({ conf: true }); await abaInd(t); await t.page.waitForSelector('.ind-graf svg');
-  const pedido = t.reg.rpcs.find((x) => x[0] === 'mensal');
-  const barras = await t.page.locator('.ind-graf svg path').count(), leg = await t.page.locator('.ind-graf-leg button').allInnerTexts();
-  const tab = (await t.page.locator('.ind-graf table').innerText()).replace(/\s+/g, ' ');
-  await t.page.locator('.ind-graf-leg button', { hasText: 'Faltaram' }).click(); const barras4 = await t.page.locator('.ind-graf svg path').count();
-  await t.page.locator('.ind-graf .chip', { hasText: '3 meses' }).click(); const linhas3 = await t.page.locator('.ind-graf tbody tr').count();
-  await t.page.locator('.ind-graf svg .zona').last().hover(); const dica = await t.page.locator('.ind-graf-dica').innerText();
-  if (process.env.FOTO_FULL) { await t.page.setViewportSize({ width: 1440, height: 4600 }); await t.page.evaluate(() => document.querySelectorAll('*').forEach((e) => { if (e.scrollTop > 0) e.scrollTop = 0; })); await t.page.waitForTimeout(400); } if (process.env.FOTO_FULL) await t.page.locator('.pagina').first().screenshot({ path: process.env.FOTO_GRAFICO }); else await t.page.screenshot({ path: process.env.FOTO_GRAFICO || '/tmp/grafico.png' });
-  await t.ctx.close();
-  return { ok: pedido && pedido[1].p_meses === 12 && barras === 10 && barras4 === 8 && leg.length === 5 && /Novembro de 2026 5\.807 663 11,4% 711 12,2% 2\.355 451 16,1% 1\.627/i.test(tab.replace('novembro','Novembro')) && linhas3 === 3 && /novembro de 2026/.test(dica) && /5\.807/.test(dica), detalhe: JSON.stringify({ barras, barras4, leg, linhas3 }) + ' ' + tab.slice(-230) };
-});
-await caso('Conferência: explica a divergência passo a passo (200 do Klingo, 30 fora do banco, 170 no banco, 10 remarcadas, 160 no cartão)', async () => {
-  const t = await abrir({ conf: true }); await abaInd(t); await t.page.waitForSelector('.ind-conta');
-  const conta = (await t.page.locator('.ind-conta').first().innerText()).replace(/\n+/g, ' | '); await t.ctx.close();
-  return { ok: /Marcações no Klingo \| 200/.test(conta) && /depois de 30 dias[^|]*\| 30/.test(conta) && /já estão no banco \| 170/.test(conta) && /remarcadas \| 10/.test(conta) && /Marcações novas" do cartão \| 160/.test(conta), detalhe: conta };
-});
-await caso('Conferência: marcações com conversa no webchat (40), por pedido (25) e por celular e nome (15), e o que aconteceu com o exame', async () => {
-  const t = await abrir({ conf: true }); await abaInd(t); await t.page.waitForSelector('.ind-conf-passo');
-  const txt = await textoAba(t); await t.ctx.close();
-  return { ok: /40\s*marcações com conversa no chat, total \(20% do Klingo\)/.test(txt) && /25\s*ligadas pelo pedido do chat/.test(txt) && /15\s*ligadas por celular e nome/.test(txt) && /160\s*sem conversa no chat/.test(txt)
-    && /15\s*dessas, exame atendido/.test(txt) && /3\s*faltaram/.test(txt) && /18\s*por vir/.test(txt), detalhe: txt.slice(txt.indexOf('Quantas têm'), txt.indexOf('Quantas têm') + 300) };
-});
-await caso('Conferência: funil do webchat (60 procuraram, 52 atendidas pela equipe, 30 pedido pronto, 25 agendaram) e as 3 agendadas sem marcação no Klingo ficam à vista com o nome', async () => {
-  const t = await abrir({ conf: true }); await abaInd(t); await t.page.waitForSelector('.ind-conf-passo');
-  const txt = await textoAba(t); await t.ctx.close();
-  return { ok: /60\s*pessoas procuraram o chat/.test(txt) && /52\s*tiveram resposta da equipe/.test(txt) && /30\s*chegaram ao pedido pronto/.test(txt) && /25\s*tiveram o pedido agendado/.test(txt)
-    && /3\s*agendadas no chat, sem marcação no Klingo/.test(txt) && /Jose de Teste/i.test(txt), detalhe: '' };
-});
-await caso('Conferência: cadastro incompleto no Klingo (sem CPF 32%, sem e-mail 46%, sem celular 3%)', async () => {
-  const t = await abrir({ conf: true }); await abaInd(t); await t.page.waitForSelector('.ind-conf-passo');
-  const txt = await textoAba(t); await t.ctx.close();
-  return { ok: /64\s*sem CPF \(32%\)/.test(txt) && /92\s*sem e-mail \(46%\)/.test(txt) && /6\s*sem celular nem telefone \(3%\)/.test(txt), detalhe: '' };
-});
-await caso('Conferência: tabela de problemas marcação por marcação; FILHO identificado, com CPF/e-mail do responsável tratados como esperados e sem pedir CPF', async () => {
-  const t = await abrir({ conf: true }); await abaInd(t); await t.page.waitForSelector('.ind-tab');
-  const linhas = await t.page.locator('.ind-tab', { hasText: 'O que fazer' }).first().locator('tbody tr').evaluateAll((l) => l.map((r) => r.innerText.replace(/\s+/g, ' ')));
-  await t.ctx.close();
-  const maria = linhas.find((x) => x.includes('900001')) || '', pedro = linhas.find((x) => x.includes('900002')) || '';
-  return { ok: linhas.length === 2 && /Maria de Teste/i.test(maria) && /Próprio/.test(maria) && /discordam em CPF\./.test(maria) && /Falta no Klingo \(o chat tem\): e-mail/.test(maria)
-    && /Filho\(a\)/.test(pedro) && /discordam em nome \(da criança\)/.test(pedro) && /não tem celular do responsável/.test(pedro) && !/CPF/.test(pedro), detalhe: pedro };
-});
-await caso('Conferência: "Conferir uma a uma" lista as marcações do webchat e diz qual tem aviso', async () => {
-  const t = await abrir({ conf: true }); await abaInd(t); await t.page.waitForSelector('details.ind-como summary');
-  await t.page.locator('details.ind-como summary', { hasText: 'Conferir uma a uma' }).click();
-  const linhas = await t.page.locator('details.ind-como table tbody tr').evaluateAll((l) => l.map((r) => r.innerText.replace(/\s+/g, ' ')));
-  await t.ctx.close();
-  return { ok: linhas.length === 2 && /Pedido do chat/.test(linhas[0]) && /Atendido/.test(linhas[0]) && /Ver aviso/.test(linhas[0]) && /Celular e nome/.test(linhas[1]) && /Confere/.test(linhas[1]), detalhe: linhas.join(' || ') };
-});
+
 await caso('Avisos: conflito, dado faltando (adulto) e dado faltando de FILHO chegam como cartões na aba Avisos; no filho, o CPF do responsável não vai para a criança', async () => {
   const t = await abrir({ conf: true }); await t.page.click('.nav button[data-aba=avisos]'); await t.page.waitForSelector('#avisosPaciente .sug');
   const cartoes = await t.page.locator('#avisosPaciente .sug').evaluateAll((l) => l.map((c) => c.innerText.replace(/\s+/g, ' ')));
