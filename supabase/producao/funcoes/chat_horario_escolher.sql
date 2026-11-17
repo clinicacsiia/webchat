@@ -7,7 +7,7 @@ CREATE OR REPLACE FUNCTION public.chat_horario_escolher(p_conversa uuid, p_token
  SET search_path TO ''
 AS $function$
 declare
-  v_procs int[]; v_grupos jsonb; v_g jsonb; v_o public.klingo_oferta; v_escolhas jsonb; v_outros jsonb; v_novo jsonb; v_total int; v_feitos int; v_txt text; v_msg bigint; v_conf boolean := false; v_todos integer;
+  v_procs int[]; v_grupos jsonb; v_g jsonb; v_o public.klingo_oferta; v_escolhas jsonb; v_outros jsonb; v_novo jsonb; v_total int; v_feitos int; v_txt text; v_msg bigint; v_conf boolean := false; v_todos integer; v_pref text;
   v_dias text[] := array['domingo','segunda-feira','terça-feira','quarta-feira','quinta-feira','sexta-feira','sábado'];
 begin
   perform public.app_pin_exigir_leitura();   -- PIN também no servidor (config.app_pin_servidor)
@@ -42,6 +42,9 @@ begin
    order by o.id limit 1;
   if v_o.id is null then raise exception 'Esse horário acabou de ficar indisponível. Escolha outro, por favor.' using errcode = 'P0002'; end if;
   if not public.unidade_marca_auto(v_o.unidade) then raise exception '%', public.unidade_aviso_bloqueio() using errcode = 'P0001'; end if;
+  -- médico escolhido pelo paciente: o horário de outro médico nunca é gravado
+  select c.medico_preferido into v_pref from public.conversas c where c.id = p_conversa;
+  if v_pref is not null and not public.klingo_prof_confere(v_o.profissional, v_pref) then raise exception 'Este horário não é do(a) médico(a) que você escolheu. Escolha outro horário da lista.' using errcode = 'P0001'; end if;
   v_conf := public.klingo_ativo(p_conversa, 'klingo_api_marcar');
 
   v_novo := jsonb_build_object('grupo', greatest(p_grupo, 1), 'data', p_data, 'hora', v_o.hora, 'unidade', v_o.unidade, 'profissional', v_o.profissional, 'local', null, 'min', 30, 'chegada', v_o.ordem_chegada,
@@ -66,5 +69,5 @@ begin
   update public.conversas set status = case when status = 'encerrada' then 'aguardando' else status end where id = p_conversa;
   insert into public.mensagens (conversa_id, autor, texto) values (p_conversa, 'cliente', v_txt) returning id into v_msg;
   return jsonb_build_object('ok', true, 'restantes', greatest(v_total - v_feitos, 0), 'escolha', v_novo, 'mensagem_id', v_msg);
-end $function$;;
+end $function$;
 

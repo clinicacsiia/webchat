@@ -49,11 +49,9 @@ begin
   end if;
 
   if v_estado = 'com_horarios' then
-    v_med := v_pref;
-    if v_med is not null and not exists (select 1 from public.klingo_oferta o where o.conversa_id = p_conversa and not o.sombra and o.expira_em > now() and (o.data + o.hora::time) > v_agora and public.unidade_marca_auto(o.unidade)
-                                          and o.data between v_de and v_ate and public.klingo_prof_confere(o.profissional, v_med)) then
-      v_med := null; v_med_sem := true;
-    end if;
+    v_med := v_pref;   -- a escolha do paciente nunca é trocada: sem horário dele(a), a lista fica vazia e v_med_sem avisa
+    v_med_sem := v_med is not null and not exists (select 1 from public.klingo_oferta o where o.conversa_id = p_conversa and not o.sombra and o.expira_em > now() and (o.data + o.hora::time) > v_agora and public.unidade_marca_auto(o.unidade)
+                                          and o.data between v_de and v_ate and public.klingo_prof_confere(o.profissional, v_med));
     with o as (
       select o.* from public.klingo_oferta o
        where o.conversa_id = p_conversa and not o.sombra and o.expira_em > now() and o.data between v_de and v_ate and (o.data + o.hora::time) > v_agora
@@ -67,7 +65,7 @@ begin
       from (select um.data, jsonb_agg(jsonb_build_object('hora', um.hora, 'unidade', um.unidade, 'profissional', um.profissional, 'local', null, 'min', 30, 'chegada', um.ordem_chegada, 'oferta', um.chave) order by um.hora) slots
               from um group by um.data) d;
     select coalesce(jsonb_agg(distinct o.unidade), '[]'::jsonb), max(o.criado_em) into v_unid, v_meta from public.klingo_oferta o
-     where o.conversa_id = p_conversa and not o.sombra and o.expira_em > now() and o.unidade is not null and public.unidade_marca_auto(o.unidade);
+     where o.conversa_id = p_conversa and not o.sombra and o.expira_em > now() and o.unidade is not null and public.unidade_marca_auto(o.unidade) and (v_med is null or public.klingo_prof_confere(o.profissional, v_med));
     select jsonb_build_object('data', s.data, 'hora', s.hora, 'unidade', s.unidade, 'profissional', s.profissional, 'apos', pc.paciente_nome) into v_sug
     from public.conversas c join public.conversas pc on pc.id = c.irmao_de
     join public.pre_agendamentos pp on pp.conversa_id = pc.id and jsonb_typeof(pp.escolha_horario) = 'array'
@@ -88,5 +86,5 @@ begin
   return jsonb_build_object('janelas', '{}'::jsonb, 'grupos', v_grupos, 'grupo', greatest(p_grupo, 1), 'de', v_de, 'ate', v_ate, 'dias', v_dias, 'unidades', v_unid,
     'escolhas', coalesce(v_escolhas, '[]'::jsonb), 'sem_exame', v_sem, 'medico_preferido', v_pref, 'medico_filtrando', v_med is not null, 'medico_sem_horario', v_med_sem, 'sugerido', v_sug,
     'atualizado_em', v_meta, 'klingo_api', v_estado = 'com_horarios', 'estado', v_estado, 'estado_motivo', v_motivo, 'origem', case when v_estado = 'com_horarios' then 'api_klingo' else 'nenhuma' end, 'aviso', v_aviso, 'unidades_bloqueadas', v_bloq > 0);
-end $function$;;
+end $function$;
 

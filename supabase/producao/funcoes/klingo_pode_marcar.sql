@@ -32,6 +32,9 @@ begin
       'detalhe', coalesce(public.klingo_motivo_texto(p_conversa), 'o chat não recebeu horários reais do Klingo nesta conversa (o horário escolhido veio da grade)'));
   end if;
   if not public.unidade_marca_auto(o.unidade) then return jsonb_build_object('ok', false, 'motivo', 'unidade_bloqueada', 'detalhe', 'marcação automática desligada para esta unidade em Configurações'); end if;
+  if exists (select 1 from public.conversas c where c.id = p_conversa and c.medico_preferido is not null and not public.klingo_prof_confere(o.profissional, c.medico_preferido)) then
+    return jsonb_build_object('ok', false, 'motivo', 'medico_diferente', 'detalhe', 'o horário é de outro médico que não o escolhido pelo paciente: só a atendente decide');
+  end if;
   if o.procedimento is distinct from (d ->> 'procedimento')::int
      and not exists (select 1 from public.klingo_especialidade e where (d ->> 'procedimento')::int = any (e.procedimentos) and o.procedimento = any (e.procedimentos)) then
     return jsonb_build_object('ok', false, 'motivo', 'oferta_de_outro_procedimento');
