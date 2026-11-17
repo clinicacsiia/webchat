@@ -46,7 +46,6 @@ const DECISAO = (a) => {
     clinica: { novas_marcacoes: 250, novas_pelo_chat: 30, previstos: 300, atendidos: 220, faltaram: 30, cancelados: 10, remarcados: 10, por_vir: 30, falta_confirmacao: [], falta_antecedencia: [], falta_unidade: [], falta_plano: [], cancel_motivos: {} } };
   atual.clinica_consulta = { ...atual.clinica, previstos: 90, atendidos: 60, faltaram: 10, cancelados: 10, remarcados: 5, por_vir: 5, novas_marcacoes: 60 };
   atual.clinica_exame = { ...atual.clinica, previstos: 210, atendidos: 140, faltaram: 40, cancelados: 10, remarcados: 10, por_vir: 10, novas_marcacoes: 140 };
-  if (a.p_de.endsWith('-01') && a.p_ate > a.p_de) { const mm = Number(a.p_de.slice(5, 7)); atual.chat.funil.entraram = 10 * mm; atual.chat.funil.agendaram = mm; }   // gráfico mês a mês: cada mês com valor próprio
   return { periodo: { de: a.p_de, ate: a.p_ate }, anterior_periodo: { de: mais(a.p_de, -1), ate: mais(a.p_de, -1) }, unidade: un, incluir_teste: !!a.p_incluir_teste, gerado_em: agora, atual, anterior };
 };
 const ATENDENTES = (a) => ({ periodo: { de: a.p_de, ate: a.p_ate }, unidade: a.p_unidade, gerado_em: agora, nota_media_geral: 8.5,
@@ -77,6 +76,10 @@ const DIRETORIA = { unidades: {
   pedidos: [{ nome: 'CONSULTA', pessoas: 100, agendaram: 45 }, { nome: 'CONSULTA NEUROPEDIATRIA', pessoas: 60, agendaram: 6 }, { nome: 'CONSULTA ORTOPEDIATRA', pessoas: 25, agendaram: 6 }],
   planos: [{ nome: 'UNIMED', pessoas: 50, agendaram: 20 }, { nome: 'BRADESCO SAUDE', pessoas: 40, agendaram: 14 }, { nome: 'PLANSERV', pessoas: 10, agendaram: 0 }] };
 // Respostas de painel_indicadores_plataforma (marcações do chat, consulta x exame). Tudo inventado; total = canceladas + remarcadas + ativas.
+// Números de antes do programa (os mesmos guardados na config): set 30 dias e out 28 dias, por unidade.
+const BASE_ANTES = { fonte: 'Relatório #14554 do Klingo', inicio_programa: '2026-10-29', blocos: [
+  { de: '2026-09-01', ate: '2026-09-30', dias: 30, por_unidade: { csi: { abertas: 3669, canceladas: 1392 }, rmtc: { abertas: 1234, canceladas: 669 }, desenvoar: { abertas: 1132, canceladas: 452 } } },
+  { de: '2026-10-01', ate: '2026-10-28', dias: 28, por_unidade: { csi: { abertas: 3511, canceladas: 1248 }, rmtc: { abertas: 1134, canceladas: 587 }, desenvoar: { abertas: 951, canceladas: 290 } } }] };
 const PLATAFORMA = { conversas: 38, total: { total: 134, canceladas: 5, remarcadas: 7, ativas: 122, atendidas: 17, faltaram: 3, por_vir: 102, sem_dado: 0 },
   por_tipo: { consulta: { total: 122, canceladas: 4, remarcadas: 5, ativas: 113, atendidas: 15, faltaram: 3, por_vir: 95, sem_dado: 0 }, exame: { total: 12, canceladas: 1, remarcadas: 2, ativas: 9, atendidas: 2, faltaram: 0, por_vir: 7, sem_dado: 0 } },
   por_origem: { Whatsapp: 40, Telefone: 20, Webchat: 1, sem_origem: 73 }, por_ligacao: { pedido: 100, telefone_nome: 34 }, cancel_motivos: { paciente_cancelou: 3, sem_motivo: 2 }, clinica_mesmo_periodo: { consulta: 559, exame: 2215 } };
@@ -129,6 +132,7 @@ async function pagina(browser, { semSql = false, admin = false, semAtend = false
     let corpo; let status = 200;
     if (p.startsWith('/auth/v1/user')) corpo = { id: eu.id, aud: 'authenticated', role: 'authenticated', email: eu.email };
     else if (p.startsWith('/rest/v1/agentes')) corpo = url.searchParams.get('id') ? (objeto ? eu : [eu]) : [eu];
+    else if (p.startsWith('/rest/v1/conversas') && url.searchParams.get('limit') === '1' && url.searchParams.get('select') === 'criado_em') corpo = [{ criado_em: `${mais(HOJE, -70)}T15:00:00Z` }];   // 1º dia de uso = 70 dias atrás
     else if (p.startsWith('/rest/v1/conversas')) corpo = CONVERSAS;
     else if (p.startsWith('/rest/v1/conversa_grupo')) corpo = GRUPOS;
     else if (p.endsWith('/rpc/painel_indicadores_atendentes')) { const b = JSON.parse(req.postData() || '{}'); reg.rpcs.push(['atendentes', b]); if (semAtend) { status = 404; corpo = { code: 'PGRST202', message: 'function not found' }; } else corpo = ATENDENTES(b); }
@@ -138,8 +142,8 @@ async function pagina(browser, { semSql = false, admin = false, semAtend = false
       if (semSql) { status = 404; corpo = { code: 'PGRST202', message: 'Could not find the function public.painel_indicadores_decisao in the schema cache' }; } else corpo = DECISAO(b);
     }
     else if (p.endsWith('/rpc/painel_indicadores_diretoria')) { const b = JSON.parse(req.postData() || '{}'); reg.rpcs.push(['diretoria', b]); corpo = DIRETORIA; }
-    else if (p.endsWith('/rpc/painel_indicadores_plataforma')) { const b = JSON.parse(req.postData() || '{}'); reg.rpcs.push(['plataforma', b]); if (semPlat) { status = 404; corpo = { code: 'PGRST202', message: 'function not found' }; } else corpo = PLATAFORMA; }
-    else if (p.endsWith('/rpc/painel_automacao_resumo')) { const b = JSON.parse(req.postData() || '{}'); reg.rpcs.push(['automacao', b]); corpo = AUTOMACAO; }
+    else if (p.endsWith('/rpc/painel_indicadores_plataforma')) { const b = JSON.parse(req.postData() || '{}'); reg.rpcs.push(['plataforma', b]); if (semPlat) { status = 404; corpo = { code: 'PGRST202', message: 'function not found' }; } else if (b.p_de !== b.p_ate) { const dias = Math.round((Date.parse(b.p_ate) - Date.parse(b.p_de)) / 864e5) + 1; corpo = { ...PLATAFORMA, total: { total: dias * 2, ativas: dias * 2 - 6, canceladas: 4, remarcadas: 2, atendidas: 1, faltaram: 0, por_vir: 1, sem_dado: 0 }, quem_marcou: { api_sem_atendente: dias, api_com_atendente: 3, pessoa_sem_atendente: 1, pessoa_com_atendente: dias * 2 - dias - 4 }, clinica_todas: { total: dias * 10, canceladas: dias * 2 }, antes_do_programa: BASE_ANTES }; } else corpo = PLATAFORMA; }
+    else if (p.endsWith('/rpc/painel_automacao_resumo')) { const b = JSON.parse(req.postData() || '{}'); reg.rpcs.push(['automacao', b]); corpo = b.p_de !== b.p_ate ? { ...AUTOMACAO, resolvidas_sem_humano: Math.round((Date.parse(b.p_ate) - Date.parse(b.p_de)) / 864e5) + 1 } : AUTOMACAO; }
     else if (p.endsWith('/rpc/painel_indicadores_mensal')) { const b = JSON.parse(req.postData() || '{}'); reg.rpcs.push(['mensal', b]); corpo = MENSAL; }
     else if (p.endsWith('/rpc/painel_indicadores_conferencia')) { const b = JSON.parse(req.postData() || '{}'); reg.rpcs.push(['conferencia', b]); corpo = conf ? CONFERENCIA : {}; }
     else if (p.endsWith('/rpc/paciente_avisos')) corpo = conf ? AVISOS_CONF : [];
@@ -162,7 +166,8 @@ const abrir = async (opc) => { const t = await pagina(browser, opc); await t.pag
 const cartoes = (page) => page.locator('#kpis .kpi').evaluateAll((l) => Object.fromEntries(l.map((k) => [k.querySelector('small').textContent, k.querySelector('strong').textContent])));
 const esperaCartao = (page, rot, v) => page.waitForFunction(([r, x]) => [...document.querySelectorAll('#kpis .kpi')].some((k) => k.querySelector('small').textContent === r && k.querySelector('strong').textContent === x), [rot, v], { timeout: 5000 });
 const abaInd = async (t) => { await t.page.click('.nav button[data-aba=indicadores]'); await t.page.waitForSelector('.ind-kpis .ind-kpi', { timeout: 8000 }).catch((e) => { throw new Error(e.message.split('\n')[0] + ' | erros da página: ' + (t.reg.excecoes.join(' ; ') || 'nenhum')); }); await t.page.evaluate(() => document.querySelectorAll('.ind-det, .ind-num-det').forEach((d) => { d.open = true; })); };
-const ultimoD = async (t) => { const [de, ate] = await t.page.locator('.ind-ctl input[type=date]').evaluateAll((l) => l.map((i) => i.value)); return t.reg.rpcs.filter((r) => r[0] === 'decisao' && r[1].p_de === de && r[1].p_ate === ate).at(-1)?.[1]; };   // as consultas do gráfico mensal têm outras datas
+const ultimoD = async (t) => { for (let n = 0; n < 40; n++) { const v = await t.page.locator('.ind-ctl input[type=date]').evaluateAll((l) => l.map((i) => i.value)).catch(() => []); const r = v.length === 2 ? t.reg.rpcs.filter((q) => q[0] === 'decisao' && q[1].p_de === v[0] && q[1].p_ate === v[1]).at(-1)?.[1] : null; if (r) return r; await new Promise((x) => setTimeout(x, 100)); } return undefined; };   // as consultas do gráfico de 30 dias usam outras datas; espera a da tela aparecer
+const ultimoP = async (t) => { for (let n = 0; n < 40; n++) { const v = await t.page.locator('.ind-ctl input[type=date]').evaluateAll((l) => l.map((i) => i.value)).catch(() => []); const r = v.length === 2 ? t.reg.rpcs.filter((q) => q[0] === 'plataforma' && q[1].p_de === v[0] && q[1].p_ate === v[1]).at(-1)?.[1] : null; if (r) return r; await new Promise((x) => setTimeout(x, 100)); } return undefined; };   // as consultas do gráfico de 30 dias usam outras datas; espera a da tela aparecer
 const ultimo = (reg, k) => reg.rpcs.filter((r) => r[0] === k).at(-1)?.[1];
 
 await caso('Cartões do topo: 5 conversas, 4 pessoas atendidas e 1 concluída hoje; a conversa de TESTE fica fora e não existe "Conversas por pessoa"', async () => {
@@ -207,32 +212,63 @@ await caso('Resumo: 5 números de uso do site (procuraram, começaram pedido, ag
   const k = await kpiTxt(t); const neutros = await t.page.locator('.ind-delta.bom, .ind-delta.ruim').count();
   await t.ctx.close();
   return { ok: Object.keys(k).length === 5 && k['Pessoas que procuraram o chat'].startsWith('60 |') && k['Começaram um pedido'].startsWith('45 |') && /^\d+ \| .*de quem procurou/.test(k['Agendaram pelo chat'])
-    && /^134 \| 4,8% das 2\.\d{3} da clínica/.test(k['Marcações do site no Klingo']) && k['1ª resposta da equipe'].startsWith('20 min') && neutros === 0, detalhe: JSON.stringify(k) + ' coloridos=' + neutros };
+    && /^134 \| 4,8% das 2\.\d{3} da clínica/.test(k['Marcações do site no Klingo']) && k['1ª resposta da equipe'].startsWith('20 min') && neutros === 0 && !/anterior|▲|▼|sem base/.test(JSON.stringify(k)), detalhe: JSON.stringify(k) + ' coloridos=' + neutros };
 });
-await caso('Poucos casos no período anterior: mostra o número de antes em vez de só "sem base para comparar"', async () => {
-  const t = await abrir({ unidade: 'rmtc' }); await t.page.click('.nav button[data-aba=indicadores]'); await t.page.selectOption('#selUnidade', 'rmtc');
-  await t.page.waitForFunction(() => /Unidade CSI RM\/TC/.test(document.querySelector('.pagina')?.innerText || ''));
-  const k = await kpiTxt(t); await t.ctx.close();
-  return { ok: /período anterior: 3 \(poucos casos para comparar\)/.test(k['Pessoas que procuraram o chat']) && !/sem base/.test(JSON.stringify(k)), detalhe: JSON.stringify(k['Pessoas que procuraram o chat']) };
-});
-await caso('Gráfico mês a mês (SVG puro): 6 meses, total e melhor mês calculados sozinhos, tooltip ao passar o mouse e troca para "Agendaram pelo chat"', async () => {
+await caso('Evolução a cada 30 dias: blocos de 30 dias desde o 1º dia de uso, 4 barras + linha do total e tabela (sem comparação com o período anterior)', async () => {
   const t = await abrir(); await abaInd(t); await t.page.waitForSelector('.ind-area', { timeout: 8000 });
-  let [a, m] = HOJE.split('-').map(Number); const meses = []; for (let i = 0; i < 6; i++) { meses.unshift(m); m -= 1; if (m === 0) { m = 12; a -= 1; } }
-  const soma = meses.reduce((q, x) => q + 10 * x, 0), somaAg = meses.reduce((q, x) => q + x, 0), ult = meses[5];
-  const pontos = await t.page.locator('.ind-area .pt').count(), grad = await t.page.locator('.ind-area linearGradient').count(), caminhos = await t.page.locator('.ind-area path').count(), externos = await t.page.locator('script[src^="http"]:not([src*="supabase"])').count();
-  const minis = await t.page.locator('.ind-painel', { hasText: 'Mês a mês' }).locator('.ind-mini').allInnerTexts();
-  await t.page.locator('.ind-area .zona').nth(1).hover(); await t.page.waitForSelector('.ind-area-dica:not([hidden])');
+  const d0 = mais(HOJE, -70), dm = (i) => i.slice(8) + '/' + i.slice(5, 7);
+  const pedidos = t.reg.rpcs.filter((r) => r[0] === 'plataforma' && r[1].p_de !== r[1].p_ate).map((r) => `${r[1].p_de}..${r[1].p_ate}`);
+  const esperado = [`${d0}..${mais(d0, 29)}`, `${mais(d0, 30)}..${mais(d0, 59)}`, `${mais(d0, 60)}..${HOJE}`];
+  const barras = await t.page.locator('.ind-area rect.barra').count(), linhas = await t.page.locator('.ind-area path').count(), pts = await t.page.locator('.ind-area .pt').count(), zonas = await t.page.locator('.ind-area .zona').count(), grad = await t.page.locator('.ind-area linearGradient').count();
+  const tab = await t.page.locator('.ind-painel', { hasText: 'Evolução a cada 30 dias' }).locator('tbody tr').evaluateAll((l) => l.map((r) => [...r.querySelectorAll('td')].map((c) => c.innerText.replace(/\s+/g, ' ').trim())));
+  const minis = (await t.page.locator('.ind-painel', { hasText: 'Evolução a cada 30 dias' }).locator('.ind-mini').allInnerTexts()).map((x) => x.replace(/\s+/g, ' '));
+  await t.page.locator('.ind-area .zona').nth(2).hover(); await t.page.waitForSelector('.ind-area-dica:not([hidden])');
   const dica = (await t.page.locator('.ind-area-dica').innerText()).replace(/\s+/g, ' ');
-  await t.page.locator('.ind-painel .chip', { hasText: 'Agendaram pelo chat' }).click(); await t.page.waitForSelector('.ind-area');
-  const minis2 = await t.page.locator('.ind-painel', { hasText: 'Mês a mês' }).locator('.ind-mini').allInnerTexts();
-  const meses12 = (await t.page.locator('.ind-area text:not([text-anchor=end])').allInnerTexts()).length;
+  await t.page.locator('.ind-leg-chip', { hasText: 'Canceladas' }).click(); const barras3 = await t.page.locator('.ind-area rect.barra').count();
+  await t.page.locator('.ind-leg-chip', { hasText: 'Total de agendamentos' }).click(); const linhas2 = await t.page.locator('.ind-area path').count();
   await t.ctx.close();
-  return { ok: pontos === 6 && grad === 1 && caminhos === 2 && externos === 0 && minis[0].replace(/\s+/g, ' ').startsWith(`${soma.toLocaleString('pt-BR')} total nos 6 meses`) && /melhor mês \(\d+\)/.test(minis[1].replace(/\s+/g, ' ')) && minis[1].startsWith(String(['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'][ult - 1]))
-    && /de 20\d\d \d+ pessoas que procuraram o chat/.test(dica) && minis2[0].startsWith(String(somaAg)) && meses12 === 6, detalhe: JSON.stringify({ pontos, grad, caminhos, minis, dica, minis2, meses12, soma, somaAg }) };
+  const ult = tab[2] || [];
+  return { ok: pedidos.join() === esperado.join() && barras === 12 && linhas === 1 && pts === 3 && zonas === 3 && grad === 0
+    && tab.length === 3 && tab[0][0].startsWith(`${d0.slice(8)}/${d0.slice(5, 7)}/${d0.slice(0, 4)} a `) && tab[0].slice(1, 8).join('|') === '54|30|3|27|4|2|60' && tab[0].length === 8 && ult[7] === '22' && /em andamento: 11 de 30 dias/.test(ult[0])
+    && minis[0] === '142 agendamentos do site desde o 1º dia de uso' && minis[1].startsWith(`${dm(d0)} a ${dm(mais(d0, 29))}`) && /Agendadas \(seguem valendo\): 16/.test(dica) && /Total de agendamentos: 22/.test(dica) && /em andamento \(11 de 30 dias\)/.test(dica)
+    && barras3 === 9 && linhas2 === 0, detalhe: JSON.stringify({ pedidos, esperado, barras, linhas, pts, zonas, tab, minis, dica, barras3, linhas2 }) };
 });
-await caso('Gráfico mês a mês: se uma consulta falhar mostra aviso e o resto da página continua', async () => {
-  const t = await abrir({ semSql: false }); await t.page.route('**/rpc/painel_indicadores_decisao', async (r) => { const b = JSON.parse(r.request().postData() || '{}'); if (b.p_de.endsWith('-01') && b.p_ate > b.p_de && b.p_de < HOJE.slice(0, 8) + '01') return r.fulfill({ status: 500, headers: CORS, contentType: 'application/json', body: '{"message":"x"}' }); return r.fallback(); });
-  await abaInd(t); await t.page.waitForFunction(() => /Não consegui carregar o gráfico/.test(document.querySelector('.pagina')?.innerText || ''), null, { timeout: 8000 });
+await caso('Antes e depois do programa: média por 30 dias da clínica toda (set e out) x depois, barras cinza e azul, linha da média, tabela e cuidados de leitura', async () => {
+  const t = await abrir(); await abaInd(t); await t.page.waitForSelector('.barra-ad', { timeout: 8000 });
+  const p = t.page.locator('.ind-painel', { hasText: 'Antes e depois do programa' });
+  const resumo = (await p.locator('.ind-resumo').innerText()).replace(/\s+/g, ' '), minis = (await p.locator('.ind-mini').allInnerTexts()).map((x) => x.replace(/\s+/g, ' '));
+  const barras = await p.locator('rect.barra-ad').count(), antes = await p.locator('rect.barra-ad.antes').count(), depois = await p.locator('rect.barra-ad.depois').count(), media = await p.locator('line.linha-media').count();
+  const linhas = await p.locator('tbody tr').evaluateAll((l) => l.map((r) => [...r.querySelectorAll('td')].map((c) => c.innerText.replace(/\s+/g, ' ').trim())));
+  const txt = await p.innerText();
+  await t.ctx.close();
+  return { ok: barras === 5 && antes === 2 && depois === 3 && media === 1 && linhas.length === 5
+    && /01\/09\/2026 a 28\/10\/2026, 58 dias\): 8\.415 marcações por 30 dias/.test(resumo) && /por 30 dias \(−96%\)/.test(resumo)
+    && minis[0].startsWith('281 por dia') && /16\.269 marcações em 58 dias/.test(minis[0]) && minis[1].startsWith('10 por dia') && minis[2].startsWith('−96%') && minis[3].startsWith('28,5% → 20%')
+    && linhas[0].slice(0, 6).join('|') === 'Antes|01/09/2026 a 30/09/2026|30|8.548|285|8.548' && linhas[1][3] === '7.721' && linhas[2][0] === 'Depois' && linhas[2][3] === '300' && /em andamento: 11 de 30 dias/.test(linhas[4][1]) && linhas[4][7].startsWith('22 (20%)')
+    && /carga inicial/.test(txt) && /ainda vão ser canceladas/.test(txt) && /não prova sozinha/.test(txt), detalhe: JSON.stringify({ barras, antes, depois, media, resumo, minis, linhas: linhas.slice(0, 3) }) };
+});
+await caso('Antes e depois do programa: com a unidade escolhida usa só os números dessa unidade (Desenvoar: 1.584 e 1.241 marcações antes)', async () => {
+  const t = await abrir(); await abaInd(t); await t.page.selectOption('#selUnidade', 'desenvoar'); await t.page.waitForFunction(() => /Unidade Desenvoar/.test(document.querySelector('.pagina')?.innerText || ''));
+  await t.page.waitForSelector('.barra-ad', { timeout: 8000 });
+  const linhas = await t.page.locator('.ind-painel', { hasText: 'Antes e depois do programa' }).locator('tbody tr').evaluateAll((l) => l.map((r) => [...r.querySelectorAll('td')].map((c) => c.innerText.replace(/\s+/g, ' ').trim())));
+  await t.ctx.close();
+  return { ok: linhas[0][3] === '1.584' && linhas[1][3] === '1.241', detalhe: JSON.stringify(linhas.slice(0, 2)) };
+});
+await caso('Antes e depois do programa: se o banco não devolver o total da clínica ou os números de antes, mostra aviso e o resto continua', async () => {
+  const t = await abrir(); await t.page.route('**/rpc/painel_indicadores_plataforma', async (r) => { const b = JSON.parse(r.request().postData() || '{}'); if (b.p_de === b.p_ate) return r.fallback(); const dias = Math.round((Date.parse(b.p_ate) - Date.parse(b.p_de)) / 864e5) + 1;
+    return r.fulfill({ status: 200, headers: CORS, contentType: 'application/json', body: JSON.stringify({ ...PLATAFORMA, total: { total: dias, ativas: dias, canceladas: 0, remarcadas: 0 }, antes_do_programa: BASE_ANTES }) }); });
+  await abaInd(t); await t.page.waitForSelector('.ind-area', { timeout: 8000 });
+  const txt = (await t.page.locator('.ind-painel', { hasText: 'Antes e depois do programa' }).innerText()).replace(/\s+/g, ' ');
+  await t.ctx.close();
+  const t2 = await abrir(); await t2.page.route('**/rpc/painel_indicadores_plataforma', async (r) => { const b = JSON.parse(r.request().postData() || '{}'); if (b.p_de === b.p_ate) return r.fallback(); const dias = Math.round((Date.parse(b.p_ate) - Date.parse(b.p_de)) / 864e5) + 1;
+    return r.fulfill({ status: 200, headers: CORS, contentType: 'application/json', body: JSON.stringify({ ...PLATAFORMA, total: { total: dias, ativas: dias, canceladas: 0, remarcadas: 0 }, clinica_todas: { total: dias, canceladas: 0 }, antes_do_programa: null }) }); });
+  await abaInd(t2); await t2.page.waitForSelector('.ind-area', { timeout: 8000 });
+  const txt2 = (await t2.page.locator('.ind-painel', { hasText: 'Antes e depois do programa' }).innerText()).replace(/\s+/g, ' '); await t2.ctx.close();
+  return { ok: /indicadores-antes-do-programa-parte2\.sql/.test(txt) && /base_antes_programa/.test(txt2), detalhe: txt.slice(0, 120) + ' | ' + txt2.slice(0, 120) };
+});
+await caso('Evolução a cada 30 dias: se uma consulta falhar mostra aviso e o resto da página continua', async () => {
+  const t = await abrir(); await t.page.route('**/rpc/painel_indicadores_plataforma', async (r) => { const b = JSON.parse(r.request().postData() || '{}'); if (b.p_de !== b.p_ate) return r.fulfill({ status: 500, headers: CORS, contentType: 'application/json', body: '{"message":"x"}' }); return r.fallback(); });
+  await abaInd(t); await t.page.waitForFunction(() => /Não consegui carregar a evolução/.test(document.querySelector('.pagina')?.innerText || ''), null, { timeout: 8000 });
   const k = await kpiTxt(t); await t.ctx.close();
   return { ok: k['Pessoas que procuraram o chat'].startsWith('60 |'), detalhe: JSON.stringify(k) };
 });
@@ -246,7 +282,7 @@ await caso('Ordem da página: resumo, onde as pessoas param, onde o site mais é
   const t = await abrir({ admin: true }); await abaInd(t);
   const tits = await t.page.locator('.ind-pg h3.ind-sec').allInnerTexts(); const txt = await textoAba(t);
   await t.ctx.close();
-  return { ok: tits.join('|') === 'Mês a mês|Onde as pessoas param|Onde o site mais é usado|Comparação com o Klingo|Autoatendimento' && !/Avaliações dos pacientes|Nota média|Conferência|Para comparar: a clínica toda|Faltas por|Motivos dos cancelamentos/.test(txt), detalhe: tits.join('|') };
+  return { ok: tits.join('|') === 'Evolução a cada 30 dias|Onde as pessoas param|Onde o site mais é usado|Comparação com o Klingo|Autoatendimento' && !/Avaliações dos pacientes|Nota média|Conferência|Para comparar: a clínica toda|Faltas por|Motivos dos cancelamentos/.test(txt), detalhe: tits.join('|') };
 });
 await caso('Funil: 6 passos, a maior queda marcada (só uma) e os dois painéis de por que pararam', async () => {
   const t = await abrir(); await abaInd(t);
@@ -281,7 +317,7 @@ await caso('Funil por tipo (recolhido): consultas e exames separados', async () 
 });
 await caso('Comparação com o Klingo: marcações novas da clínica toda x as do site (consultas, exames, total e a parte do site) e o que aconteceu com elas', async () => {
   const t = await abrir(); await abaInd(t);
-  const a = ultimo(t.reg, 'plataforma');
+  const a = await ultimoP(t);
   const linhas = await t.page.locator('.ind-painel', { hasText: 'Site e Klingo' }).first().locator('tbody tr').evaluateAll((l) => l.map((r) => [...r.querySelectorAll('td')].map((c) => c.innerText.trim())));
   const txt = (await t.page.locator('.ind-painel', { hasText: 'Site e Klingo' }).first().innerText()).replace(/\s+/g, ' ');
   await t.ctx.close();
@@ -295,7 +331,7 @@ await caso('Autoatendimento: frase "30 de 37 deram certo", barra por situação,
   const resumo = (await p.locator('.ind-resumo').innerText()).replace(/\s+/g, ' '), minis = await p.locator('.ind-mini').evaluateAll((l) => l.map((m) => m.innerText.replace(/\s+/g, ' ')));
   const leg = (await p.locator('.ind-leg').innerText()).replace(/\s+/g, ' '), motivos = await p.locator('.ind-rot').allInnerTexts(); const txt = await p.innerText();
   await t.ctx.close();
-  return { ok: /30 de 37 tentativas deram certo \(81,1%\)/.test(resumo) && /Marcadas sozinhas 30/.test(leg) && /Foram para a equipe 3/.test(leg) && /Horário já ocupado 4/.test(leg) && minis[0] === '42 s tempo médio para marcar' && minis[1] === '18 marcadas sem nenhum atendente na conversa' && minis[2].startsWith('9 cancelados ou remarcados pelo chat (6 e 3)')
+  return { ok: /30 de 37 tentativas pela API deram certo \(81,1%\)/.test(resumo) && /Marcadas pela API 30/.test(leg) && /Foram para a equipe 3/.test(leg) && /Horário já ocupado 4/.test(leg) && minis[0] === '42 s tempo médio para marcar' && minis[1] === '18 marcadas pelo cliente, sem nenhum atendente na conversa' && minis[2].startsWith('9 cancelados ou remarcados pelo chat (6 e 3)')
     && motivos.join('|') === 'Horário já foi ocupado por outra pessoa' && !/horario_tomado|divergencia_/.test(txt), detalhe: resumo + ' | ' + leg + ' | ' + minis.join(' ; ') + ' | ' + motivos.join('|') };
 });
 await caso('Atalhos de período: Ontem, 7 dias, 30 dias, Este mês e Mês anterior pedem as datas certas', async () => {

@@ -1,0 +1,7 @@
+-- FLUXOGRAMA: o dono quer comparar as marcações da clínica ANTES do programa com as de DEPOIS -> os números de antes (relatório #14554 do Klingo, "Agendado em", 01/09 a 28/10/2026) ficam numa chave de config -> `painel_indicadores_plataforma` devolve `clinica_todas` (todas as marcações do período, todos os canais) e `antes_do_programa` -> a tela compara por dia e por 30 dias
+-- Versão 1.0 — 17/11/2026 / Mudança: chave `base_antes_programa` na tabela `config` com as marcações de setembro e de 01 a 28/10/2026 por unidade (só contagens).
+-- Aplicar nesta ordem (parte1, parte2). Teste: `cd testes && npm run test:antes-programa-sql`.
+
+insert into public.config (chave, valor) values ('base_antes_programa', $json${"fonte":"Relatório #14554 do Klingo (data Agendado em), lido em 17/11/2026. Marcações = Aberta + Cancelada (Bloqueada fica de fora). A carga inicial do Klingo (29 a 31/08/2026, cerca de 4.000 marcações em 3 dias) não é movimento normal e fica de fora.","inicio_programa":"2026-10-29","blocos":[{"de":"2026-09-01","ate":"2026-09-30","dias":30,"por_unidade":{"csi":{"abertas":3669,"canceladas":1392},"rmtc":{"abertas":1234,"canceladas":669},"desenvoar":{"abertas":1132,"canceladas":452}}},{"de":"2026-10-01","ate":"2026-10-28","dias":28,"por_unidade":{"csi":{"abertas":3511,"canceladas":1248},"rmtc":{"abertas":1134,"canceladas":587},"desenvoar":{"abertas":951,"canceladas":290}}}]}$json$) on conflict (chave) do nothing;
+
+-- ROLLBACK da parte 1: delete from public.config where chave = 'base_antes_programa';

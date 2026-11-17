@@ -1,4 +1,5 @@
 // FLUXOGRAMA: entrada (linhas do relatório #14554 do Klingo: marcações pela data em que foram marcadas) -> validação (id numérico e data de marcação válida; o resto é opcional) -> lógica (CPF, e-mail e telefone viram marca SHA-256 de dado + segredo da clínica; nascimento só como data; campo vazio vira só o nome do campo) -> saída (linhas enxutas {m,em,para,o,s,u,pl,n,fh,fh2,nasc,cpfh,emh,vz} para `klingo_conferir_lote`)
+// Versão 1.1 — 17/11/2026 / Mudança: `a` = a marcação foi feita pela API do chat (responsável `biclinicacsi` no Klingo, col5). Só sim/não: o nome do responsável nunca sai daqui.
 // Versão 1.0 — 13/11/2026 / Mudança: Implementação inicial (conferência Klingo x webchat)
 //
 // Tudo aqui é função pura (sem rede, sem banco), para testar sem Klingo. As linhas trazem CPF, telefone, e-mail e nascimento de pacientes:
@@ -9,7 +10,7 @@
 // col12 CPF, col13 Telefone, col14 e-mail, col15 Nascimento, col16 Celular.
 
 export type Row = Record<string, unknown>;
-export type LinhaConf = { m: string; em: string; para: string; o: string; s: string; u: string; pl: string; n: string; fh: string; fh2: string; nasc: string; cpfh: string; emh: string; vz: string[] };
+export type LinhaConf = { m: string; em: string; para: string; o: string; s: string; u: string; pl: string; n: string; fh: string; fh2: string; nasc: string; cpfh: string; emh: string; vz: string[]; a: boolean };
 
 const ISO = /^\d{4}-\d{2}-\d{2}/;
 export const txt = (v: unknown, max = 200): string => String(v ?? "").trim().slice(0, max);
@@ -37,6 +38,10 @@ export async function hashEmail(v: unknown, sal: string): Promise<string> {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e) ? sha256Hex(e + sal) : "";
 }
 
+// Responsável das marcações feitas pela API do chat (conferido no relatório #14554 em 17/11/2026). Ignora maiúsculas e espaços.
+export const RESPONSAVEL_API = "biclinicacsi";
+export const viaApi = (v: unknown): boolean => txt(v, 80).toLowerCase() === RESPONSAVEL_API;
+
 export const dataIso = (v: unknown): string => { const t = txt(v, 40); return ISO.test(t) ? t.slice(0, 10) : ""; };
 
 // Uma linha do relatório -> uma linha enxuta para o banco. null = sem id numérico ou sem data de marcação (não serve).
@@ -48,7 +53,7 @@ export async function mapearLinha(r: Row, sal: string): Promise<LinhaConf | null
   if (!cpfh) vz.push("cpf");
   if (!emh) vz.push("email");
   if (!fh && !fh2) vz.push("celular");
-  return { m, em, para: dataIso(r.col2), o: txt(r.col3, 40), s: txt(r.col11, 20), u: txt(r.col9, 120), pl: txt(r.col8, 120), n: txt(r.col10, 120), fh, fh2, nasc: dataIso(r.col15), cpfh, emh, vz };
+  return { m, em, para: dataIso(r.col2), o: txt(r.col3, 40), s: txt(r.col11, 20), u: txt(r.col9, 120), pl: txt(r.col8, 120), n: txt(r.col10, 120), fh, fh2, nasc: dataIso(r.col15), cpfh, emh, vz, a: viaApi(r.col5) };
 }
 
 export async function prepararLinhas(linhas: Row[], sal: string): Promise<{ linhas: LinhaConf[]; descartadas: number }> {

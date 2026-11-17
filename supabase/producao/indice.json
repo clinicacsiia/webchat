@@ -1187,28 +1187,6 @@
    "politicas": 0
   },
   {
-   "nome": "klingo_conferencia",
-   "colunas": [
-    "m",
-    "marcado_em",
-    "exame_em",
-    "origem",
-    "status_klingo",
-    "unidade",
-    "plano",
-    "conversa_id",
-    "ligacao",
-    "paciente_tipo",
-    "conflito",
-    "responsavel_diferente",
-    "falta_no_klingo",
-    "vazios",
-    "lido_em"
-   ],
-   "rls": true,
-   "politicas": 0
-  },
-  {
    "nome": "klingo_consulta",
    "colunas": [
     "id",
@@ -2323,6 +2301,29 @@
    ],
    "rls": true,
    "politicas": 0
+  },
+  {
+   "nome": "klingo_conferencia",
+   "colunas": [
+    "m",
+    "marcado_em",
+    "exame_em",
+    "origem",
+    "status_klingo",
+    "unidade",
+    "plano",
+    "conversa_id",
+    "ligacao",
+    "paciente_tipo",
+    "conflito",
+    "responsavel_diferente",
+    "falta_no_klingo",
+    "vazios",
+    "lido_em",
+    "via_api"
+   ],
+   "rls": true,
+   "politicas": 0
   }
  ],
  "visoes": [
@@ -2652,6 +2653,7 @@
   "autoencerrar_horas",
   "autoencerrar_modo",
   "avaliacao_ativa",
+  "base_antes_programa",
   "boas_vindas",
   "cadastro_equipe_sem_convite",
   "catalogo_csi",
@@ -11017,7 +11019,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "27bcd8991a5822d372e340c3b3d6d1a3"
+   "md5": "21deaefe5054d2aebf707990a33f455a"
   },
   {
    "nome": "klingo_consulta_registrar",
@@ -13491,7 +13493,7 @@
    "anon": false,
    "authenticated": true,
    "publico": false,
-   "md5": "5f98f7b3219050b926af0d3a96f51fc6"
+   "md5": "5c41481da865f63e5abb451bf9d6be4a"
   },
   {
    "nome": "painel_indicadores_equipe",

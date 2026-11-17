@@ -18,7 +18,7 @@ begin
     select x ->> 'm' as m, (x ->> 'em')::date as em, public.data_ou_nula(x ->> 'para') as para,
            coalesce(nullif(btrim(x ->> 'o'), ''), 'sem_origem') as o, nullif(btrim(x ->> 's'), '') as s, x ->> 'u' as u, x ->> 'pl' as pl, nullif(btrim(x ->> 'n'), '') as n,
            nullif(x ->> 'fh', '') as fh, nullif(x ->> 'fh2', '') as fh2, public.data_ou_nula(x ->> 'nasc') as nasc,
-           nullif(x ->> 'cpfh', '') as cpfh, nullif(x ->> 'emh', '') as emh,
+           nullif(x ->> 'cpfh', '') as cpfh, nullif(x ->> 'emh', '') as emh, coalesce((x ->> 'a') = 'true', false) as a,
            coalesce(array(select jsonb_array_elements_text(x -> 'vz')), '{}'::text[]) as vz
       from jsonb_array_elements(p_linhas) x
      where coalesce(x ->> 'm', '') ~ '^\d{1,12}$' and coalesce(x ->> 'em', '') ~ '^\d{4}-\d{2}-\d{2}$'),
@@ -72,7 +72,7 @@ begin
            case when b.conversa_id is null then null when b.emh is null or b.cemail is null then 'sem_dado'
                 when b.emh = encode(sha256(convert_to(b.cemail || v_sal, 'UTF8')), 'hex') then 'igual' else 'diferente' end as r_mail
       from base b)
-  insert into public.klingo_conferencia as k (m, marcado_em, exame_em, origem, status_klingo, unidade, plano, conversa_id, ligacao, paciente_tipo, conflito, responsavel_diferente, falta_no_klingo, vazios, lido_em)
+  insert into public.klingo_conferencia as k (m, marcado_em, exame_em, origem, status_klingo, unidade, plano, conversa_id, ligacao, paciente_tipo, conflito, responsavel_diferente, falta_no_klingo, vazios, lido_em, via_api)
   select r.m, r.em, r.para, r.o, r.s, public.unidade_chave(r.u), case when coalesce(r.pl, '') ilike '%partic%' then 'particular' else 'convenio' end,
          r.conversa_id, r.ligacao, case when r.conversa_id is not null then r.tipo end,
          array_remove(array[case when r.r_nome = 'diferente' then 'nome' end, case when r.r_nasc = 'diferente' then 'nascimento' end,
@@ -84,11 +84,11 @@ begin
               case when 'celular' = any (r.vz) and cardinality(r.ccel) > 0 then 'celular' end,
               case when 'email' = any (r.vz) and r.cemail is not null then 'email' end,
               case when 'cpf' = any (r.vz) and r.ccpfh is not null then 'cpf' end]::text[], null) end,
-         r.vz, now()
+         r.vz, now(), r.a
     from r
   on conflict (m) do update set marcado_em = excluded.marcado_em, exame_em = excluded.exame_em, origem = excluded.origem, status_klingo = excluded.status_klingo,
       unidade = excluded.unidade, plano = excluded.plano, conversa_id = excluded.conversa_id, ligacao = excluded.ligacao, paciente_tipo = excluded.paciente_tipo,
-      conflito = excluded.conflito, responsavel_diferente = excluded.responsavel_diferente, falta_no_klingo = excluded.falta_no_klingo, vazios = excluded.vazios, lido_em = now();
+      conflito = excluded.conflito, responsavel_diferente = excluded.responsavel_diferente, falta_no_klingo = excluded.falta_no_klingo, vazios = excluded.vazios, lido_em = now(), via_api = excluded.via_api;
   get diagnostics n = row_count;
   return jsonb_build_object('lidas', n, 'recebidas', jsonb_array_length(p_linhas));
 end $function$;
