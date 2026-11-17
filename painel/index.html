@@ -4732,7 +4732,8 @@ h1.longo { font-size: 14mm; }
   const pTxt = (v) => (v == null ? '—' : (Math.round(v * 10) / 10).toString().replace('.', ',') + '%');
   // Compara com o período anterior. cont = contagem (muda em %); senão taxa (muda em pontos). bom = "subir é bom?". Base pequena não compara.
   function delta(atual, ant, { cont = false, bomSobe = true, base = 0, minBase = 8, neutro = false } = {}) {
-    if (atual == null || ant == null || base < minBase) return h('span', { class: 'ind-delta neutro' }, 'sem base para comparar');
+    if (atual == null || ant == null) return h('span', { class: 'ind-delta neutro' }, 'sem base para comparar');
+    if (base < minBase) return h('span', { class: 'ind-delta neutro' }, neutro ? `período anterior: ${nf(ant)} (poucos casos para comparar)` : 'sem base para comparar');
     const dif = cont ? (ant ? ((atual - ant) / ant) * 100 : null) : atual - ant;
     if (dif == null) return h('span', { class: 'ind-delta neutro' }, 'antes: 0');
     const igual = cont ? Math.abs(dif) < 3 : Math.abs(dif) < 1;
