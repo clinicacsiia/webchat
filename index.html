@@ -382,6 +382,8 @@
   #porta img { height: 44px; width: auto; }
   #porta[hidden] { display: none; }
   #porta p { margin: 0; padding: 0 28px; text-align: center; }
+  #porta .porta-bv { font-size: 30px; line-height: 1.15; color: var(--csi-sidebar-bg); }
+  #porta #portaSub { font-weight: 400; font-size: 18px; color: var(--csi-text-secondary); }
   #porta .porta-dica { font-weight: 400; font-size: 14px; color: var(--csi-text-secondary); }
   #porta .porta-btn { display: inline-block; min-height: 48px; padding: 13px 26px; border-radius: 14px; background: var(--csi-primary-strong); color: #fff; text-decoration: none; font-weight: 700; }
   #porta .porta-btn:hover { background: var(--csi-primary-strong-hover); }
@@ -565,8 +567,11 @@
 </style>
 </head>
 <body>
-<div id="porta" hidden role="status" aria-live="polite"><img src="img/logo-csi-simbolo.svg" alt="" width="89" height="30"><p>Abrindo com segurança…</p></div>
-<script>try { if (localStorage.getItem('csi_porta_v1') === '1') document.getElementById('porta').hidden = false; } catch (e) {}</script>
+<div id="porta" hidden role="status" aria-live="polite"><img src="img/logo-csi-simbolo.svg" alt="" width="89" height="30"><p class="porta-bv" id="portaBv">Abrindo com segurança…</p><p id="portaSub" hidden>Abrindo o chat…</p></div>
+<script>try { if (localStorage.getItem('csi_porta_v1') === '1') { document.getElementById('porta').hidden = false;
+  var st = JSON.parse(localStorage.getItem('csi_acesso_v2') || 'null');   // mesmo nome da tela de boas-vindas do /acesso/: a pessoa vê a continuidade em vez de uma tela em branco
+  if (st && typeof st.nome1 === 'string' && st.nome1) { document.getElementById('portaBv').textContent = 'Bem-vindo(a), ' + st.nome1 + '!'; document.getElementById('portaSub').hidden = false; }
+} } catch (e) {}</script>
 <div class="app" id="app">
   <header class="topo">
     <button class="btn-menu btn-voltar" id="btnVoltarInicio" type="button" aria-label="Voltar ao início" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M12 5l-7 7 7 7"/></svg></button>
@@ -712,7 +717,7 @@
   const CHAVE_HIST = 'webchat.historico.v1';   // as últimas conversas deste aparelho (cada uma com o seu token): dá para voltar a elas
   const MAX_HIST = 5;                          // mínimo pedido: 3
   // Muda a cada alteração do chat. Cópia de mensagens guardada por outra versão é descartada (era isso que mostrava conversa velha e travada).
-  const VERSAO_APP = '2026.11.17-3';
+  const VERSAO_APP = '2026.11.17-4';
   // Mesmas regras do banco (fluxo_nome_ok, fluxo_telefone_ok, fluxo_email_ok): o banco confere de novo, aqui é só para avisar logo.
   const LET = 'A-Za-zÀ-ÖØ-öø-ÿ';
   const nomeCompletoOk = (v) => { const t = String(v || '').trim(); return t.length >= 5 && t.length <= 120 && new RegExp(`^[${LET}][${LET}'’.-]*( +[${LET}][${LET}'’.-]*)+$`).test(t) && t.split(/ +/).filter((w) => w.replace(new RegExp(`[^${LET}]`, 'g'), '').length >= 2).length >= 2; };
@@ -732,7 +737,7 @@
     let o = opcoes || {};
     if (dev) { const hs = new Headers(o.headers || {}); hs.set('x-acesso', dev); o = { ...o, headers: hs }; }
     const r = await fetch(url, o);
-    if (!r.ok && r.status < 500) { try { if ((await r.clone().text()).includes('pin_obrigatorio')) setTimeout(() => { try { irParaPorta(); } catch { /* ignora */ } }, 0); } catch { /* ignora */ } }
+    if (!r.ok && r.status < 500) { try { if ((await r.clone().text()).includes('pin_obrigatorio')) setTimeout(() => { try { pinVenceu('bloqueado'); } catch { /* ignora */ } }, 0); } catch { /* ignora */ } }
     return r;
   };
   const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { global: { fetch: fetchComAparelho }, auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, storageKey: 'csi-paciente-auth' } });
@@ -3310,11 +3315,13 @@
     acessoPerfil = null; acessoTrava = false; acessoPend = 0; acessoRede = false;
     const dev = acessoDev();
     if (!acessoAtivo || !dev) return;
+    // perfil e pendências andam juntos (antes eram em fila e a entrada no chat demorava mais)
+    const pendP = db.rpc('app_pendencias', { p_token: dev }).then((p) => (p.data && p.data.ok ? (p.data.pendencias || []).filter((x) => !x.opcional).length : 0), () => 0);   // quantas informações obrigatórias ainda faltam
     const { data, error } = await db.rpc('app_perfil', { p_token: dev });
     if (error || !data) { acessoRede = true; return; }
     if (data.ok) {
       acessoPerfil = data.perfil;
-      try { const p = await db.rpc('app_pendencias', { p_token: dev }); acessoPend = p.data && p.data.ok ? (p.data.pendencias || []).filter((x) => !x.opcional).length : 0; } catch { acessoPend = 0; }   // quantas informações obrigatórias ainda faltam
+      acessoPend = await pendP;
     }
     else if (data.erro === 'bloqueado') acessoTrava = true;      // falta digitar o PIN
     else if (data.erro === 'sessao') apagarLocal(ACESSO_CHAVE);   // aparelho desconhecido pelo servidor
@@ -3396,7 +3403,8 @@
      Qualquer outra situação leva à página /acesso/, que pede o PIN, completa o cadastro (CPF) ou cria o PIN, e devolve para cá.
      Sem rede, sem resposta ou com a função ainda não aplicada, o chat abre como antes (a porta nunca tranca o paciente por falha técnica). */
   const CHAVE_PORTA = 'csi_porta_v1';
-  let atividadeEm = Date.now(), renovouEm = 0;
+  let renovouEm = 0;
+  const pinFolhaAberta = () => !$('#folha').hidden && $('#folhaTitulo').textContent === 'Digite seu PIN';   // o teclado do PIN já está na tela
   function portaMostrar(on) { const p = $('#porta'); if (p) p.hidden = !on; }
   function irParaPorta() {
     let t = null; try { t = JSON.parse(sessionStorage.getItem('csi_porta_tent') || 'null'); } catch { t = null; }
@@ -3417,18 +3425,28 @@
       h('a', { class: 'porta-btn', id: 'portaTentar', href: portaRaiz() + 'acesso/?voltar=chat', onclick: () => { try { sessionStorage.removeItem('csi_porta_tent'); } catch { /* ignora */ } } }, 'Tentar de novo'),
       h('p', { class: 'porta-dica' }, 'Se continuar, ligue para (71) 3181-7666 ou chame no WhatsApp (71) 99980-3806.'));
   }
-  async function renovarPin() {   // renova os 30 minutos no servidor enquanto a pessoa usa; se o PIN já venceu, volta para a porta
-    const dev = acessoDev(); if (!dev || !acessoPorta || !acessoPorta.obrigatorio) return;
+  /* SESSÃO ATIVA ENQUANTO O CHAT ESTÁ ABERTO (17/11/2026): antes o servidor só renovava os 30 minutos quando a pessoa tocava na tela, então quem ficava esperando a
+     atendente sem tocar era mandada de volta ao PIN no meio da conversa. Agora a página renova sozinha a cada 3 minutos (e ao voltar para a tela), mesmo sem toque.
+     O PIN continua obrigatório para quem ABRE o chat depois que os 30 minutos venceram (portaBarrar). Se vencer com a conversa aberta (celular dormiu), o PIN é pedido
+     aqui mesmo, sem sair da conversa. */
+  const BATIDA_PIN_MS = 3 * 60000;
+  function pinVenceu(erro) {
+    if (erro === 'bloqueado' && conv && conv.id && acessoDev()) {   // conversa aberta: não sai da tela, pede o PIN em cima dela
+      acessoPerfil = null; acessoTrava = true;
+      if (!pinFolhaAberta()) { try { acessoPedirPin(); } catch { irParaPorta(); } }
+      return;
+    }
+    irParaPorta();
+  }
+  async function renovarPin() {
+    const dev = acessoDev(); if (!dev || !acessoPorta || !acessoPorta.obrigatorio || pinFolhaAberta()) return;
     renovouEm = Date.now();
-    try { const { data } = await db.rpc('app_perfil', { p_token: dev }); if (data && (data.erro === 'bloqueado' || data.erro === 'sessao')) irParaPorta(); } catch { /* sem rede: tenta depois */ }
+    try { const { data } = await db.rpc('app_perfil', { p_token: dev }); if (data && (data.erro === 'bloqueado' || data.erro === 'sessao')) pinVenceu(data.erro); } catch { /* sem rede: tenta depois */ }
   }
   function portaVigiar() {
     if (portaVigiar.ligado) return; portaVigiar.ligado = true;
-    const marca = () => { atividadeEm = Date.now(); if (Date.now() - renovouEm > 240000) renovarPin(); };
-    ['pointerdown', 'keydown', 'touchstart', 'scroll'].forEach((ev) => addEventListener(ev, marca, { passive: true, capture: true }));
-    const vencido = () => acessoPorta && acessoPorta.obrigatorio && Date.now() - atividadeEm > 30 * 60000;
-    setInterval(() => { if (vencido()) irParaPorta(); }, 30000);
-    document.addEventListener('visibilitychange', () => { if (document.hidden) return; if (vencido()) irParaPorta(); else renovarPin(); });   // voltou depois de 30 minutos: pede o PIN de novo
+    setInterval(renovarPin, BATIDA_PIN_MS);   // roda também com a tela apagada ou sem toque (espera pela atendente)
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) renovarPin(); });
   }
   function portaBarrar() {   // true = mandou a pessoa para a porta (a página vai trocar)
     try { localStorage.setItem(CHAVE_PORTA, acessoPorta && acessoPorta.obrigatorio ? '1' : '0'); } catch { /* ignora */ }
@@ -3478,7 +3496,7 @@
       try {
         const { data, error } = await db.rpc('app_desbloquear', { p_token: dev, p_pin: buf });
         if (error || !data) { msg.textContent = 'Não foi possível conferir agora. Tente de novo.'; return; }
-        if (data.ok) { acessoPerfil = data.perfil; acessoTrava = false; fecharFolha(); atualizarAcessoUI(); acessoVincular().then(() => acessoContar(), () => {}); return; }
+        if (data.ok) { acessoPerfil = data.perfil; acessoTrava = false; renovouEm = Date.now(); fecharFolha(); atualizarAcessoUI(); acessoVincular().then(() => acessoContar(), () => {}); return; }
         if (data.erro === 'sessao') { apagarLocal(ACESSO_CHAVE); fecharFolha(); atualizarAcessoUI(); return; }
         msg.textContent = data.mensagem || 'PIN incorreto.';
       } catch { msg.textContent = 'Sem conexão. Tente de novo.'; }
