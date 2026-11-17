@@ -156,7 +156,7 @@ const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePa
 const abrir = async (opc) => { const t = await pagina(browser, opc); await t.page.goto(`${base}/painel/`); await t.page.waitForSelector('#kpis .kpi', { timeout: 10000 }); return t; };
 const cartoes = (page) => page.locator('#kpis .kpi').evaluateAll((l) => Object.fromEntries(l.map((k) => [k.querySelector('small').textContent, k.querySelector('strong').textContent])));
 const esperaCartao = (page, rot, v) => page.waitForFunction(([r, x]) => [...document.querySelectorAll('#kpis .kpi')].some((k) => k.querySelector('small').textContent === r && k.querySelector('strong').textContent === x), [rot, v], { timeout: 5000 });
-const abaInd = async (t) => { await t.page.click('.nav button[data-aba=indicadores]'); await t.page.waitForSelector('.ind-dir .ind-dir-lin'); await t.page.evaluate(() => document.querySelectorAll('.ind-det, .ind-clin').forEach((d) => { d.open = true; })); };
+const abaInd = async (t) => { await t.page.click('.nav button[data-aba=indicadores]'); await t.page.waitForSelector('.ind-dir .ind-dir-lin'); await t.page.evaluate(() => document.querySelectorAll('.ind-det, .ind-clin, .ind-plat, .ind-why, .ind-num-det').forEach((d) => { d.open = true; })); };
 const ultimo = (reg, k) => reg.rpcs.filter((r) => r[0] === k).at(-1)?.[1];
 
 await caso('Cartões do topo: 5 conversas, 4 pessoas atendidas e 1 concluída hoje; a conversa de TESTE fica fora e não existe "Conversas por pessoa"', async () => {
@@ -219,13 +219,13 @@ await caso('Resumo da diretoria: se foi ruim diz por quê; se foi bom diz o que 
 });
 await caso('Por unidade: pessoas, agendaram, marcações da plataforma (consultas · exames), canceladas ou remarcadas e faltas', async () => {
   const t = await abrir(); await abaInd(t);
-  const linhas = await t.page.locator('h3:has-text("Por unidade")').locator('xpath=..').locator('tbody tr').evaluateAll((l) => l.map((r) => [...r.querySelectorAll('td')].map((c) => c.innerText.trim()).join('|')));
+  const linhas = await t.page.locator('.ind-card', { has: t.page.locator('h4', { hasText: 'Por unidade' }) }).locator('tbody tr').evaluateAll((l) => l.map((r) => [...r.querySelectorAll('td')].map((c) => c.innerText.trim()).join('|')));
   await t.ctx.close();
   return { ok: linhas.join(';') === 'CSI|43|6 (14%)|6|1 · 5|1 (16,7%)|2 de 2 (0%);CSI RM/TC|31|6 (19,4%)|6|0 · 6|2 (33,3%)|—;Desenvoar|320|112 (35%)|122|121 · 1|9 (7,4%)|3 de 18 (16,7%)'.replace('2 de 2 (0%)', '0 de 2 (0%)'), detalhe: linhas.join(';') };
 });
 await caso('O que mais pedem e planos: pedidos e planos com pessoas, agendaram e %; em vermelho os que quase não agendam', async () => {
   const t = await abrir(); await abaInd(t);
-  const sec = t.page.locator('h3:has-text("O que mais pedem e quais planos")').locator('xpath=..');
+  const sec = t.page.locator('.ind-card', { has: t.page.locator('h4', { hasText: /^(Mais pedidos|Planos mais usados)$/ }) });
   const linhas = await sec.locator('tbody tr').evaluateAll((l) => l.map((r) => [...r.querySelectorAll('td')].map((c) => c.innerText.trim()).join('|')));
   const baixos = await sec.locator('tr.ind-baixo').count();
   await t.ctx.close();
@@ -304,6 +304,7 @@ await caso('Filtro de unidade do topo vai para a consulta e os números mudam (6
 await caso('Poucas pessoas (unidade com 4): o resumo diz "poucos dados" em vez de dar veredito', async () => {
   const t = await abrir(); await abaInd(t);
   await t.page.selectOption('#selUnidade', 'rmtc'); await t.page.waitForFunction(() => /Unidade CSI RM\/TC/.test(document.querySelector('.pagina')?.innerText || ''));
+  await t.page.evaluate(() => document.querySelectorAll('.ind-why').forEach((d) => { d.open = true; }));
   const txt = await textoAba(t); const cls = await t.page.locator('.ind-dir-lin').first().evaluate((x) => x.className);
   await t.ctx.close();
   return { ok: /sem base para comparar|Poucos dados/.test(txt) && / sem$/.test(cls) && /Ainda não há casos suficientes/.test(txt) && !/Por que não foi bem Só/.test(txt) && !t.reg.excecoes.length, detalhe: cls + ' ' + txt.slice(0, 160) };
@@ -354,7 +355,7 @@ await caso('Sem o SQL novo no banco, mostra a mensagem com o arquivo a aplicar e
 });
 
 await caso('Seção 2 (plataforma): consultas e exames separados, total = canceladas + remarcadas + ativas, e as porcentagens', async () => {
-  const t = await abrir({ conf: true }); await abaInd(t); await t.page.waitForSelector('h3:has-text("Marcações da plataforma: consultas e exames")');
+  const t = await abrir({ conf: true }); await abaInd(t); await t.page.waitForSelector('.ind-plat table.ind-tab-graf');
   const a = ultimo(t.reg, 'plataforma');
   const linhas = await t.page.locator('.pagina table.ind-tab-graf').filter({ has: t.page.locator('td', { hasText: /^Remarcadas$/ }) }).first().locator('tbody tr').evaluateAll((l) => l.map((r) => [...r.querySelectorAll('td')].map((c) => c.innerText.trim())));
   await t.ctx.close();
@@ -386,12 +387,12 @@ await caso('Seção 7 (clínica toda) só para comparar: separa consultas de exa
 });
 await caso('Ordem da página: resumo da diretoria, por unidade, pedidos e planos, marcações da plataforma; o resto fica em "Detalhes" (recolhido)', async () => {
   const t = await abrir({ conf: true, admin: true }); await abaInd(t); await t.page.waitForSelector('.ind-clin');
-  const tits = await t.page.locator('.pagina .ind-dir, .pagina h3.ind-sec, .pagina summary.ind-sec-sum').evaluateAll((l) => l.map((x) => (x.classList.contains('ind-dir') ? 'RESUMO' : x.textContent.trim())));
+  const tits = await t.page.locator('.pagina .ind-dir, .pagina .ind-pbi h4, .pagina h3.ind-sec, .pagina summary.ind-sec-sum').evaluateAll((l) => l.map((x) => (x.classList.contains('ind-dir') ? 'RESUMO' : x.textContent.trim())));
   const fechado = await abrir({ conf: true }); await fechado.page.click('.nav button[data-aba=indicadores]'); await fechado.page.waitForSelector('.ind-dir .ind-dir-lin');
   const abertoPadrao = await fechado.page.evaluate(() => document.querySelector('.ind-det').open);
   await fechado.ctx.close(); await t.ctx.close();
-  const ord = ['RESUMO', 'Por unidade', 'O que mais pedem e quais planos', 'Marcações da plataforma: consultas e exames', 'Detalhes para análise', 'Chat: por que não estão agendando?', 'Autoatendimento', 'Equipe: quem atende', 'Avaliações dos pacientes', 'Conferência Klingo', 'Para comparar: a clínica toda'];
-  const pos = ord.map((o) => tits.findIndex((x) => x.startsWith(o)));
+  const ord = ['RESUMO', 'Caminho do paciente no chat', 'Marcações da plataforma', 'Por unidade', 'Mais pedidos', 'Planos mais usados', 'Marcações da plataforma: consultas e exames', 'Detalhes para análise', 'Chat: por que não estão agendando?', 'Autoatendimento', 'Equipe: quem atende', 'Avaliações dos pacientes', 'Conferência Klingo', 'Para comparar: a clínica toda'];
+  const pos = ord.map((o) => tits.findIndex((x) => (o === 'Marcações da plataforma' ? x === o : x.startsWith(o))));
   return { ok: pos.every((x, i) => x >= 0 && (i === 0 || x > pos[i - 1])) && abertoPadrao === false, detalhe: tits.join(' | ') + ' padrãoAberto=' + abertoPadrao };
 });
 await caso('Sem a função da plataforma no banco: o resumo mostra "poucos dados" nos dois indicadores dela, a seção avisa o arquivo e o resto funciona', async () => {
