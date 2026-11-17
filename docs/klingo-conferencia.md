@@ -44,3 +44,17 @@ Dois tipos novos em `paciente_aviso`: `klingo_conflito` e `klingo_dado_faltando`
 2. **Apagar a Edge Function temporária `klingo-comparar-14554`** (conferência manual feita em 13/11/2026; hoje só devolve "desativada"): https://supabase.com/dashboard/project/nrvuynjwcgwpjdptkiay/functions
 3. O retrato da produção estava sem `chat_saude` e a tabela da "saúde da API" (migração `saude_api_parte1`, de outra sessão): `npm run test:retrato` acusa isso desde antes desta mudança.
 4. Decisão do dono: "atendido" vale mesmo quando a marcação está cancelada no Klingo? (14 casos em 09 a 12/11.)
+
+## Total, canceladas e ativas (16/11/2026)
+Versão 1.1 — 16/11/2026 / Mudança: todo bloco que conta marcações do Klingo mostra **total**, **canceladas** e **ativas** (total menos canceladas). `supabase/indicadores-klingo-totais.sql` (aplicado em 3 partes: `indicadores_klingo_totais_parte1..3`):
+- `painel_indicadores_conferencia`: novos `canceladas`, `ativas` e `webchat.marcacoes_ligadas_canceladas`.
+- `painel_indicadores_atendentes`: novo `agendados_cancelados` por atendente (pedido cujas marcações estão todas canceladas no Klingo).
+- `painel_automacao_resumo`: **cadastros agora respeitam o período** (antes somavam a tabela inteira: 65/98/25 era acumulado) e novo `marcar_canceladas_no_klingo`.
+- Tela: origens vêm dos dados (inclui Webchat, a soma fecha com o total); alerta "Faltam mais" só com taxa maior que 0%; seções numeradas 1 a 5; rótulos dizem se contam pessoas, conversas ou marcações.
+- Conferido em 16/11 (326/327 do dia em andamento): 327 marcações = 309 ativas + 18 canceladas; origens 24+90+78+1+134 = 327. Das 11 marcações certas do chat, 4 estão canceladas.
+- Pendência de dado (não é código): a conversa da marcação 27474 (TESTE DO SISTEMA) não está marcada como teste, então entra nos números. Marcar a conversa como teste a tira.
+- O Klingo não tem campo de origem na marcação pela API: o chat não consegue gravar "Webchat"; é pedido ao suporte do Klingo.
+- Nenhum indicador depende do webhook do Klingo (`klingo_webhook`, desligado).
+
+## Gráfico mensal (16/11/2026)
+Aba Indicadores, logo abaixo dos cartões: barras agrupadas por mês do exame com **total, cancelados, remarcados, atendidos e faltaram** (ordem e cores fixas), com 3, 6 ou 12 meses, legenda que esconde/mostra cada barra, dica ao passar o mouse e a tabela com os números e as porcentagens (% cancelados, % remarcados, % faltas). Função nova `painel_indicadores_mensal` (`supabase/indicadores-mensal.sql`, migração `indicadores_mensal_parte1`), lê `jornada_exame` e respeita o filtro de unidade. Conferido: em novembro/2026 2.355 + 451 + 663 + 711 + 1.627 (por vir) = 5.807. O histórico do banco começa em outubro/2026; meses antes aparecem com zero. `klingo_conferencia` só tem novembro, por isso o gráfico não usa a data de marcação.

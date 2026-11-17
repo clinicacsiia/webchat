@@ -384,7 +384,21 @@
   .num span { color: var(--suave); font-size: 13px; }
   /* Aba Indicadores (decisão, 11/11/2026) */
   .ind-pg { max-width: 1180px; margin: 0 auto; width: 100%; }
-  .ind-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; margin: 14px 0 6px; }
+  /* Gráfico mensal (cores da paleta validada, ordem fixa; ver docs/klingo-conferencia.md) */
+  .ind-graf { --g1: #2a78d6; --g2: #eb6834; --g3: #1baf7a; --g4: #eda100; --g5: #e87ba4; margin: 8px 0 4px; position: relative; }
+  .ind-graf-leg { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+  .ind-graf-leg button { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--linha); background: var(--papel); color: var(--texto); border-radius: 999px; padding: 4px 10px; font-size: 13px; cursor: pointer; }
+  .ind-graf-leg button[aria-pressed=false] { opacity: .45; text-decoration: line-through; }
+  .ind-graf-leg i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+  .ind-graf-rolagem { overflow-x: auto; }
+  .ind-graf svg { display: block; }
+  .ind-graf svg text { fill: var(--suave); font-size: 12px; }
+  .ind-graf .grade { stroke: var(--linha); stroke-width: 1; }
+  .ind-graf .zona:hover { fill: rgba(0,0,0,.04); }
+  .ind-graf-dica { position: absolute; z-index: 5; pointer-events: none; background: var(--papel); border: 1px solid var(--linha); border-radius: 8px; padding: 8px 10px; font-size: 13px; box-shadow: 0 4px 14px rgba(0,0,0,.14); min-width: 190px; }
+  .ind-graf-dica b { display: block; margin-bottom: 4px; }
+  .ind-graf-dica div { display: flex; justify-content: space-between; gap: 14px; }
+  .ind-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin: 14px 0 6px; }
   .ind-kpi { background: var(--csi-surface); border: 1px solid var(--csi-border); border-radius: var(--radius-md); box-shadow: var(--shadow-sm); padding: 14px 16px; display: flex; flex-direction: column; gap: 2px; }
   .ind-kpi-rot { font-size: 13px; font-weight: 600; color: var(--suave); }
   .ind-kpi b { font-size: 34px; line-height: 1.1; }
@@ -418,10 +432,10 @@
   .ind-mini b { display: block; font-size: 22px; line-height: 1.15; } .ind-mini span { font-size: 12.5px; color: var(--suave); }
   .ind-conf-passo { margin: 14px 0 4px; font-size: 15px; } .ind-conf-passo span { display: inline-block; min-width: 22px; height: 22px; line-height: 22px; text-align: center; border-radius: 11px; background: var(--csi-primary-soft, #e6efff); color: var(--csi-primary, #1d4ed8); font-size: 13px; margin-right: 6px; }
   .ind-conta { display: grid; grid-template-columns: 1fr auto; gap: 2px 14px; max-width: 560px; font-size: 14px; } .ind-conta b { text-align: right; font-variant-numeric: tabular-nums; } .ind-conta .tot { border-top: 1px solid var(--csi-border); padding-top: 4px; font-weight: 700; }
-  .ind-tab { width: 100%; border-collapse: collapse; font-size: 13px; } .ind-tab th, .ind-tab td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--csi-border); vertical-align: top; } .ind-tab th { color: var(--suave); font-weight: 600; }
+  .ind-tab, .ind-tab-graf { width: 100%; border-collapse: collapse; font-size: 13px; } .ind-tab th, .ind-tab td, .ind-tab-graf th, .ind-tab-graf td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--csi-border); vertical-align: top; } .ind-tab th, .ind-tab-graf th { color: var(--suave); font-weight: 600; }
   .ind-tab-rolagem { max-height: 420px; overflow: auto; border: 1px solid var(--csi-border); border-radius: var(--radius-md); background: var(--csi-surface); }
   .ind-tag { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 12px; background: var(--csi-border); } .ind-tag.alerta { background: var(--csi-warning-soft); color: var(--csi-warning-strong); } .ind-tag.filho { background: #e8f1ff; color: #1e40af; }
-  .ind-como { margin: 20px 0 8px; font-size: 14px; color: var(--suave); } .ind-como summary { cursor: pointer; font-weight: 600; }
+  .ind-como, .ind-como-graf { margin: 20px 0 8px; font-size: 14px; color: var(--suave); } .ind-como summary, .ind-como-graf summary { cursor: pointer; font-weight: 600; }
   @media (max-width: 640px) { .ind-grade { grid-template-columns: 1fr; } .ind-linha { grid-template-columns: 1fr auto; } .ind-linha .ind-trilho { grid-column: 1 / -1; order: 3; } }
   .barras-h { display: flex; align-items: flex-end; gap: 6px; padding: 10px 12px; background: var(--csi-surface); border: 1px solid var(--csi-border); border-radius: var(--radius-md); box-shadow: var(--shadow-sm); overflow-x: auto; }
   .barras-h .bh { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 2px; min-width: 34px; flex: 1; }
@@ -4773,7 +4787,7 @@ h1.longo { font-size: 14mm; }
       add(tF >= 20 ? 'ruim' : tF >= 10 ? 'atencao' : 'bom', `${pTxt(tF)} dos pacientes com exame marcado faltaram (${nf(K.faltaram)} de ${nf(nF)})${dif != null && Math.abs(dif) >= 1 ? `, ${dif > 0 ? 'subiu' : 'caiu'} ${(Math.round(Math.abs(dif) * 10) / 10).toString().replace('.', ',')} pontos percentuais em relação ao período anterior` : ''}.`);
       const dims = [['confirmação', K.falta_confirmacao, (x) => ROT_CONFIRMA[x] || x], ['antecedência', K.falta_antecedencia, (x) => x], ['unidade', K.falta_unidade, (x) => x], ['tipo de atendimento', K.falta_plano, (x) => x]];
       const achados = [];
-      for (const [dim, gr, rot] of dims) for (const g of gr || []) { const n = g.atendidos + g.faltaram, t = taxa(g.faltaram, n); if (n >= 20 && t >= tF * 1.25) achados.push({ dim, nome: rot(g.nome), t, n, f: g.faltaram, r: t / tF }); }
+      for (const [dim, gr, rot] of dims) for (const g of gr || []) { const n = g.atendidos + g.faltaram, t = taxa(g.faltaram, n); if (n >= 20 && t > 0 && t >= tF * 1.25) achados.push({ dim, nome: rot(g.nome), t, n, f: g.faltaram, r: t / tF }); }
       achados.sort((x, y) => y.r - x.r).slice(0, 2).forEach((x) => add('atencao', `Faltam mais: ${x.dim} "${x.nome}" tem ${pTxt(x.t)} de falta (a média é ${pTxt(tF)}; ${nf(x.f)} de ${nf(x.n)}).`));
     }
     const ordem = { ruim: 0, atencao: 1, bom: 2 };
@@ -4781,7 +4795,7 @@ h1.longo { font-size: 14mm; }
   }
   // Seção 3: cada atendente, com barras para ver quem atendeu/agendou mais e quem tem a melhor nota.
   function secaoEquipe(eq) {
-    const cab = [h('h3', { class: 'ind-sec' }, '3. Equipe: quem atende e agenda mais'),
+    const cab = [h('h3', { class: 'ind-sec' }, '4. Equipe: quem atende e agenda mais'),
       h('p', { class: 'dica' }, 'Cada atendente no período. "Agendou" conta o que a pessoa marcou como agendado e também o que o sistema confirmou sozinho com o Klingo, creditado a quem atendia a conversa (o dono dela; se não tinha dono, quem mais escreveu). Sem nenhum atendente na conversa, não é creditado a ninguém. A nota é a das avaliações dos pacientes nas conversas em que a pessoa mais escreveu.')];
     const E = !eq.error && eq.data && Array.isArray(eq.data.pessoas) ? eq.data : null;
     if (!E) return h('div', {}, ...cab, h('p', { class: 'dica' }, 'Para ver esta parte falta rodar o SQL supabase/indicadores-atendentes.sql.'));
@@ -4801,36 +4815,104 @@ h1.longo { font-size: 14mm; }
       comEspera.length ? comEspera.map((x, i) => barra(x.nome, Number(x.espera_mediana_min), maxEsp, `${nf(x.espera_mediana_min)} min · ${nf(x.primeiras)} conversa${x.primeiras === 1 ? '' : 's'}`, Number(x.espera_mediana_min) > 30 ? 'verm' : i === 0 ? 'verde' : 'azul', i === 0)) : h('p', { class: 'dica' }, 'Ninguém respondeu primeiro em conversas abertas neste período.'));
     return h('div', {}, ...cab, h('div', { class: 'ind-grade' },
       bloco('Conversas atendidas', 'Conversas em que a pessoa escreveu no período.', 'conversas'),
-      bloco('Agendamentos feitos', 'Marcados pela pessoa ou confirmados sozinhos com o Klingo nas conversas dela.', 'agendados'),
-      bloco('Quem respondeu primeiro', 'Conversas abertas no período em que a pessoa deu a primeira resposta.', 'primeiras'), rapidez, notas));
+      (() => { const l = rank('agendados'), max = Math.max(1, ...l.map((x) => x.agendados || 0));
+        return painel('Agendamentos feitos', 'Pedidos marcados pela pessoa ou confirmados sozinhos com o Klingo nas conversas dela. O número maior é o total; entre parênteses, quantos já estão cancelados no Klingo.',
+          l.map((x, i) => barra(x.nome, x.agendados || 0, max, `${nf(x.agendados)}${x.agendados_cancelados ? ` (${nf(x.agendados_cancelados)} cancelados)` : ''}`, i === 0 && (x.agendados || 0) > 0 ? 'verde' : 'azul', i === 0 && (x.agendados || 0) > 0)),
+          h('p', { class: 'dica' }, `Total: ${nf(l.reduce((s, x) => s + (x.agendados || 0), 0))} agendamentos, ${nf(l.reduce((s, x) => s + (x.agendados_cancelados || 0), 0))} cancelados, ${nf(l.reduce((s, x) => s + (x.agendados || 0) - (x.agendados_cancelados || 0), 0))} ativos.`)); })(),
+      bloco('Quem respondeu primeiro', 'Conversas (não pessoas) abertas no período em que a pessoa deu a primeira resposta. Uma pessoa com duas conversas conta duas vezes.', 'primeiras'), rapidez, notas));
   }
   // Seção 4: avaliações dos pacientes (só administrador; a consulta já devolve vazio para os outros).
   function secaoAvaliacoes(ext) {
     const av = !ext.error && ext.data ? ext.data.avaliacoes : null;
     if (!av || !ehAdmin()) return null;
     const pc = av.por_canal || {}, num = (v) => (v == null ? '—' : String(v).replace('.', ','));
-    return h('div', {}, h('h3', { class: 'ind-sec' }, '4. Avaliações dos pacientes'),
+    return h('div', {}, h('h3', { class: 'ind-sec' }, '5. Avaliações dos pacientes'),
       h('div', { class: 'ind-minis' }, h('div', { class: 'ind-mini' }, h('b', {}, nf(av.total)), h('span', {}, 'avaliações')), h('div', { class: 'ind-mini' }, h('b', {}, num(av.media_atendimento)), h('span', {}, 'nota do atendimento (0 a 10)')),
         h('div', { class: 'ind-mini' }, h('b', {}, num(av.media_site)), h('span', {}, 'nota do site (0 a 10)')), h('div', { class: 'ind-mini' }, h('b', {}, nf(pc.WhatsApp)), h('span', {}, 'conheceram pelo WhatsApp')),
         h('div', { class: 'ind-mini' }, h('b', {}, nf(pc.Instagram)), h('span', {}, 'pelo Instagram')), h('div', { class: 'ind-mini' }, h('b', {}, nf(pc.Google)), h('span', {}, 'pelo Google'))));
   }
+  /* Gráfico mensal agrupado (supabase/indicadores-mensal: painel_indicadores_mensal). Barras: total, cancelados, remarcados, atendidos e faltaram, por mês do exame. */
+  const SERIES_MES = [['total', 'Total de exames', 'g1'], ['cancelados', 'Cancelados', 'g2'], ['remarcados', 'Remarcados', 'g3'], ['atendidos', 'Atendidos', 'g4'], ['faltaram', 'Faltaram', 'g5']];
+  const MESES_PT = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'], MESES_LONGO = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+  const rotMes = (ym) => { const [a, m] = ym.split('-'); return `${MESES_PT[+m - 1]}/${a.slice(2)}`; };
+  const rotMesLongo = (ym) => { const [a, m] = ym.split('-'); return `${MESES_LONGO[+m - 1]} de ${a}`; };
+  const GRAF = { meses: 6, ocultas: new Set() };
+  const svgEl = (tag, attrs, ...kids) => { const e = document.createElementNS('http://www.w3.org/2000/svg', tag); for (const [k, v] of Object.entries(attrs || {})) e.setAttribute(k, v); kids.flat().forEach((c) => c != null && e.append(c.nodeType ? c : document.createTextNode(String(c)))); return e; };
+  const topoArredondado = (x, y, w, hh, r) => { const rr = Math.min(r, w / 2, hh); return `M${x},${y + hh} L${x},${y + rr} Q${x},${y} ${x + rr},${y} L${x + w - rr},${y} Q${x + w},${y} ${x + w},${y + rr} L${x + w},${y + hh} Z`; };
+  function blocoMensal(resp) {
+    const dados = resp && !resp.error && resp.data && Array.isArray(resp.data.meses) ? resp.data.meses : null;
+    const tit = h('h3', { class: 'ind-sec' }, 'Visão mensal: total, cancelados, remarcados e mais');
+    if (!dados) return h('div', {}, tit, h('p', { class: 'dica' }, 'O gráfico mensal ainda não está disponível (falta aplicar supabase/indicadores-mensal.sql).'));
+    const cx = h('div', { class: 'ind-graf' });
+    const desenhar = () => {
+      const meses = dados.slice(-GRAF.meses), vis = SERIES_MES.filter(([k]) => !GRAF.ocultas.has(k));
+      const maxV = Math.max(1, ...meses.flatMap((m) => vis.map(([k]) => Number(m[k]) || 0)));
+      const passo = (() => { const bruto = maxV / 4, pot = Math.pow(10, Math.floor(Math.log10(bruto))), f = bruto / pot; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * pot; })();
+      const topo = Math.ceil(maxV / passo) * passo, ESQ = 52, DIR = 12, ALT = 250, PT = 12, PB = 34, BAR = 20, GAP = 2;
+      const gw = Math.max(vis.length, 1) * (BAR + GAP) - GAP, grupo = Math.max(gw + 36, Math.floor((1000 - ESQ - DIR) / meses.length)), W = ESQ + DIR + grupo * meses.length, areaH = ALT - PT - PB;
+      const y = (v) => PT + areaH - (v / topo) * areaH;
+      const dica = h('div', { class: 'ind-graf-dica', hidden: true });
+      const svg = svgEl('svg', { width: W, height: ALT, viewBox: `0 0 ${W} ${ALT}`, role: 'img', 'aria-label': 'Gráfico de barras agrupadas por mês: ' + vis.map(([, r]) => r).join(', ') });
+      for (let v = 0; v <= topo; v += passo) { svg.append(svgEl('line', { class: 'grade', x1: ESQ, x2: W - DIR, y1: y(v), y2: y(v) }), svgEl('text', { x: ESQ - 8, y: y(v) + 4, 'text-anchor': 'end' }, nf(v))); }
+      meses.forEach((m, i) => {
+        const x0 = ESQ + i * grupo + (grupo - gw) / 2;
+        vis.forEach(([k, , cor], j) => { const v = Number(m[k]) || 0, hh = (v / topo) * areaH; if (v > 0) svg.append(svgEl('path', { d: topoArredondado(x0 + j * (BAR + GAP), y(v), BAR, Math.max(hh, 1), 4), fill: `var(--${cor})` })); });
+        svg.append(svgEl('text', { x: x0 + gw / 2, y: ALT - 12, 'text-anchor': 'middle' }, rotMes(m.mes)));
+        const zona = svgEl('rect', { class: 'zona', x: ESQ + i * grupo, y: PT, width: grupo, height: areaH + PB, fill: 'transparent' });
+        const mostrar = () => {
+          dica.replaceChildren(h('b', {}, rotMesLongo(m.mes)), ...SERIES_MES.map(([k, rot, cor]) => h('div', {}, h('span', {}, h('i', { style: `display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;background:var(--${cor})` }), rot), h('b', { style: 'margin:0' }, nf(m[k])))));
+          dica.hidden = false; const lado = ESQ + i * grupo + grupo + 8; dica.style.left = Math.max(4, Math.min(lado, cx.clientWidth - 210)) + 'px'; dica.style.top = '40px';
+        };
+        zona.addEventListener('pointerenter', mostrar); zona.addEventListener('pointerleave', () => { dica.hidden = true; });
+        svg.append(zona);
+      });
+      const leg = h('div', { class: 'ind-graf-leg', role: 'group', 'aria-label': 'Escolher o que aparece no gráfico' }, SERIES_MES.map(([k, rot, cor]) =>
+        h('button', { type: 'button', 'aria-pressed': String(!GRAF.ocultas.has(k)), onclick: () => { if (GRAF.ocultas.has(k)) GRAF.ocultas.delete(k); else if (vis.length > 1) GRAF.ocultas.add(k); desenhar(); } }, h('i', { style: `background:var(--${cor})` }), rot)));
+      const chips = h('div', { class: 'chips', role: 'group', 'aria-label': 'Quantos meses' }, [[3, 'Últimos 3 meses'], [6, 'Últimos 6 meses'], [12, 'Últimos 12 meses']].map(([n, t]) =>
+        h('button', { class: 'chip', type: 'button', 'aria-pressed': String(GRAF.meses === n), onclick: () => { GRAF.meses = n; desenhar(); } }, t)));
+      const pc = (a, b) => (b > 0 ? pTxt(taxa(a, b)) : '—');
+      const tabela = h('details', { class: 'ind-como-graf', open: true }, h('summary', {}, 'Ver os números do gráfico'),
+        h('div', { class: 'ind-tab-rolagem' }, h('table', { class: 'ind-tab-graf' },
+          h('thead', {}, h('tr', {}, ['Mês', 'Total de exames', 'Cancelados', '% cancelados', 'Remarcados', '% remarcados', 'Atendidos', 'Faltaram', '% faltas', 'Ainda por vir'].map((t) => h('th', {}, t)))),
+          h('tbody', {}, meses.map((m) => h('tr', {}, h('td', {}, rotMesLongo(m.mes)), h('td', {}, nf(m.total)), h('td', {}, nf(m.cancelados)), h('td', {}, pc(m.cancelados, m.total)), h('td', {}, nf(m.remarcados)), h('td', {}, pc(m.remarcados, m.total)),
+            h('td', {}, nf(m.atendidos)), h('td', {}, nf(m.faltaram)), h('td', {}, pc(m.faltaram, (m.atendidos || 0) + (m.faltaram || 0))), h('td', {}, nf(m.por_vir))))))));
+      cx.replaceChildren(chips, leg, h('div', { class: 'ind-graf-rolagem' }, svg), dica, tabela);
+    };
+    desenhar();
+    return h('div', {}, tit,
+      h('p', { class: 'dica' }, 'Cada mês mostra os exames pela data em que acontecem (todos os canais do Klingo). Total = cancelados + remarcados + atendidos + faltaram + ainda por vir. "% faltas" é faltaram ÷ (atendidos + faltaram). O mês atual ainda está em andamento. O histórico do banco começa em outubro de 2026, por isso meses antigos aparecem vazios. Clique no nome de uma barra para escondê-la e comparar as outras.'),
+      cx);
+  }
   /* Autoatendimento com a API do Klingo (planejamento de 12/11/2026): só números, nenhum dado de paciente. */
   function blocoAutoatendimento(d) {
     if (!d) return null;
-    const op = d.operacoes || {}, cad = d.cadastros || {}, ha = d.horarios_api || {}, pos = d.pos || {};   // v2.1: pos = cancelar/remarcar/ver marcações ("tipo:estado" → quantidade)
-    const mini2 = (n, rot) => h('div', { class: 'ind-mini' }, h('b', {}, String(n ?? 0)), h('span', {}, rot));
+    const op = d.operacoes || {}, cad = d.cadastros || {}, ha = d.horarios_api || {}, pos = d.pos || {};
+    const mini2 = (n, rot, cls) => h('div', { class: 'ind-mini' + (cls ? ' ' + cls : '') }, h('b', {}, nf(n)), h('span', {}, rot));
+    const tentativas = Object.values(op).reduce((s, x) => s + Number(x || 0), 0);
+    const feitas = op.sucesso || 0, canc = Math.min(d.marcar_canceladas_no_klingo || 0, feitas), ativas = feitas - canc;
+    const equipe = (op.incerto || 0) + (op.falha || 0);
+    const cadTotal = Object.values(cad).reduce((s, x) => s + Number(x || 0), 0);
+    const posEquipe = (pos['cancelar:incerto'] || 0) + (pos['cancelar:falha'] || 0) + (pos['remarcar:incerto'] || 0) + (pos['remarcar:falha'] || 0);
     return h('div', { class: 'ind-auto' },
-      h('h3', { class: 'ind-sec' }, 'Autoatendimento (marcação automática pelo Klingo)'),
-      h('p', { class: 'dica' }, 'O autoatendimento com o Klingo fica sempre ligado para todos os pacientes: horários reais da agenda, marcar, ver, cancelar e remarcar sozinho. Quando algo não conclui, a conversa vai para a equipe com o motivo. Não há mais interruptor de liberação (desde 14/11/2026); a página pública de agendamento segue com os limites de segurança.'),
-      h('div', { class: 'ind-minis' }, mini2(d.agendadas_sozinhas, 'agendadas sozinhas'), mini2(d.resolvidas_sem_humano, 'resolvidas sem atendente'), mini2(op.sucesso, 'marcações certas'),
-        mini2((op.incerto || 0) + (op.falha || 0), 'foram para a equipe'), mini2(op.horario_tomado, 'horário já ocupado'), mini2(d.tempo_medio_s != null ? d.tempo_medio_s + ' s' : '–', 'tempo médio para marcar')),
-      h('div', { class: 'ind-minis' }, mini2(pos['ler_vouchers:sucesso'], 'consultas de marcações'), mini2(pos['cancelar:sucesso'], 'cancelamentos confirmados pelo Klingo'), mini2(pos['remarcar:sucesso'], 'remarcações confirmadas'),
-        mini2((pos['cancelar:incerto'] || 0) + (pos['cancelar:falha'] || 0) + (pos['remarcar:incerto'] || 0) + (pos['remarcar:falha'] || 0), 'cancelar/remarcar que foram para a equipe')),
-      h('p', { class: 'dica' }, `Cadastros conferidos no Klingo: ${cad.confere || 0} encontrados · ${cad.nao_encontrado || 0} pacientes novos · ${cad.divergente || 0} com nascimento diferente (a equipe confere). Convênios traduzidos: ${(d.convenios || {}).traduzidos || 0} · sem tradução: ${(d.convenios || {}).sem_traducao || 0}. Consultas à agenda do Klingo no período: ${ha.ok || 0} certas, ${(ha.erro || 0) + (ha.limite || 0)} com problema.`),
+      h('h3', { class: 'ind-sec' }, 'Autoatendimento: marcações feitas pelo chat'),
+      h('p', { class: 'dica' }, 'O chat marca sozinho no Klingo (horários reais). Quando algo não conclui, a conversa vai para a equipe com o motivo. Conta só o que o chat tentou no período; marcação feita pela recepção ou pelo telefone não entra aqui. "Canceladas" são as que o chat marcou e que hoje estão canceladas no Klingo (por quem for: paciente, recepção ou o próprio chat).'),
+      h('h4', { class: 'ind-conf-passo' }, 'Marcações que o chat tentou fazer'),
+      h('div', { class: 'ind-minis' }, mini2(tentativas, 'tentativas no total'), mini2(feitas, 'marcadas com sucesso'), mini2(canc, 'dessas, canceladas no Klingo'), mini2(ativas, 'dessas, ativas'),
+        mini2(equipe, 'foram para a equipe'), mini2(op.horario_tomado, 'horário já ocupado')),
+      h('p', { class: 'dica' }, `Conta: ${nf(tentativas)} tentativas = ${nf(feitas)} com sucesso + ${nf(equipe)} para a equipe + ${nf(op.horario_tomado)} horário ocupado${tentativas - feitas - equipe - (op.horario_tomado || 0) ? ` + ${nf(tentativas - feitas - equipe - (op.horario_tomado || 0))} em outra situação` : ''}. Das ${nf(feitas)} com sucesso, ${nf(canc)} estão canceladas e ${nf(ativas)} ativas.`),
+      h('div', { class: 'ind-minis' }, mini2(d.agendadas_sozinhas, 'pedidos agendados sozinhos pelo chat'), mini2(d.resolvidas_sem_humano, 'resolvidos sem nenhum atendente'),
+        mini2(d.tempo_medio_s != null ? d.tempo_medio_s + ' s' : '–', 'tempo médio para marcar')),
+      h('h4', { class: 'ind-conf-passo' }, 'Cancelar e remarcar pelo chat'),
+      h('div', { class: 'ind-minis' }, mini2(pos['ler_vouchers:sucesso'], 'consultas de "minhas marcações"'), mini2(pos['cancelar:sucesso'], 'cancelamentos confirmados pelo Klingo'), mini2(pos['remarcar:sucesso'], 'remarcações confirmadas pelo Klingo'),
+        mini2(posEquipe, 'cancelar ou remarcar que foram para a equipe')),
+      h('h4', { class: 'ind-conf-passo' }, 'Cadastros conferidos no Klingo neste período'),
+      h('div', { class: 'ind-minis' }, mini2(cadTotal, 'cadastros conferidos no total'), mini2(cad.confere, 'já tinham cadastro e conferiram'), mini2(cad.nao_encontrado, 'pacientes novos (sem cadastro)'),
+        mini2(cad.divergente, 'nascimento diferente (a equipe confere)'), mini2(cad.pre_cadastro, 'pré-cadastro')),
+      h('p', { class: 'dica' }, `Convênios traduzidos: ${nf((d.convenios || {}).traduzidos)} · sem tradução: ${nf((d.convenios || {}).sem_traducao)}. Consultas à agenda do Klingo no período: ${nf(ha.ok)} certas, ${nf((ha.erro || 0) + (ha.limite || 0))} com problema.`),
       (d.motivos_falha || []).length ? h('p', { class: 'dica' }, 'O que mandou para a equipe: ' + d.motivos_falha.map((x) => `${x.codigo} (${x.n})`).join(', ') + '.') : null);
   }
   /* Conferência Klingo x webchat (supabase/klingo-conferencia.sql, relatório #14554): explica a divergência dos números e lista, marcação por marcação, o que precisa de atenção. Só números e códigos. */
-  const ROT_ORIGEM = { Whatsapp: 'WhatsApp', Telefone: 'Telefone', 'Recepção': 'Recepção', sem_origem: 'Sem origem (em branco no Klingo)' };
+  const ROT_ORIGEM = { Whatsapp: 'WhatsApp', Telefone: 'Telefone', 'Recepção': 'Recepção', Webchat: 'Webchat', sem_origem: 'Sem origem (em branco no Klingo)' };
   const ROT_CAMPO_CONF = { nome: 'nome', nascimento: 'nascimento', cpf: 'CPF', celular: 'celular', email: 'e-mail' };
   const campoTxt = (xs) => listaPt((xs || []).map((x) => ROT_CAMPO_CONF[x] || x));
   function textoProblema(x) {
@@ -4846,7 +4928,10 @@ h1.longo { font-size: 14mm; }
     if (!d || d.total == null) return h('div', {}, tit, intro, h('p', { class: 'ind-aviso' }, 'A conferência ainda não está disponível (falta aplicar o SQL supabase/klingo-conferencia.sql ou ligar a leitura do relatório #14554).'));
     const T = d.total || 0, E = d.explicacao || {}, W = d.webchat || {}, X = W.exames || {}, Q = d.qualidade_klingo || {}, P = d.problemas || {};
     const semLeitura = (d.dias_sem_leitura || []);
-    const origens = ['Whatsapp', 'Telefone', 'Recepção', 'sem_origem'].map((k) => [k, (d.por_origem || {})[k] || 0]);
+    // Todas as origens que vieram do Klingo (inclusive Webchat e as que ainda não conhecemos), sem lista fixa: assim a soma das barras fecha com o total.
+    const ordemOrigem = ['Whatsapp', 'Telefone', 'Recepção', 'Webchat'], todasOrigens = d.por_origem || {};
+    const chavesOrigem = [...ordemOrigem, ...Object.keys(todasOrigens).filter((k) => !ordemOrigem.includes(k) && k !== 'sem_origem'), 'sem_origem'];
+    const origens = chavesOrigem.map((k) => [k, todasOrigens[k] || 0]);
     const maxO = Math.max(1, ...origens.map((x) => x[1]));
     const passo = (n, t) => h('h4', { class: 'ind-conf-passo' }, h('span', {}, String(n)), t);
     const conta = (linhas) => h('div', { class: 'ind-conta' }, linhas.map(([rot, v, cls]) => [h('span', { class: cls || '' }, rot), h('b', { class: cls || '' }, nf(v))]).flat());
@@ -4868,18 +4953,21 @@ h1.longo { font-size: 14mm; }
       semLeitura.length ? h('p', { class: 'ind-aviso' }, `Sem leitura do Klingo em ${semLeitura.length === 1 ? 'um dia' : semLeitura.length + ' dias'} deste período (${semLeitura.slice(0, 6).map(dmy).join(', ')}${semLeitura.length > 6 ? '…' : ''}): os números destes dias estão incompletos, não são zero.`) : null,
       passo(1, 'Quantas marcações o Klingo tem, e por onde chegaram'),
       h('div', { class: 'ind-grade' },
-        painel('Marcações feitas no período', 'Origem registrada no Klingo na hora de marcar.', h('div', { class: 'ind-minis' }, h('div', { class: 'ind-mini' }, h('b', {}, nf(T)), h('span', {}, 'marcações no Klingo'))),
-          origens.map(([k, v]) => barra(ROT_ORIGEM[k], v, maxO, `${nf(v)} · ${pTxt(taxa(v, T))}`, k === 'sem_origem' ? 'cinza' : 'azul'))),
+        painel('Marcações feitas no período', 'Origem registrada no Klingo na hora de marcar. As barras somam o total (inclui as canceladas).', h('div', { class: 'ind-minis' }, h('div', { class: 'ind-mini' }, h('b', {}, nf(T)), h('span', {}, 'marcações no Klingo (total)')),
+            h('div', { class: 'ind-mini' }, h('b', {}, nf(d.canceladas)), h('span', {}, `canceladas (${pTxt(taxa(d.canceladas || 0, T))})`)), h('div', { class: 'ind-mini' }, h('b', {}, nf(d.ativas)), h('span', {}, 'ativas (total menos canceladas)'))),
+          origens.map(([k, v]) => barra(ROT_ORIGEM[k] || k, v, maxO, `${nf(v)} · ${pTxt(taxa(v, T))}`, k === 'sem_origem' ? 'cinza' : 'azul'))),
         painel('Por que o cartão "Marcações novas" mostra menos', 'Do total do Klingo até o número do cartão do topo.', conta([
           ['Marcações no Klingo', T], ['− exame marcado para depois de 30 dias (ainda não entra no banco)', E.fora_do_banco || 0], ['= já estão no banco', E.no_banco || 0, 'tot'],
           ['− marcações remarcadas', E.remarcadas || 0], ['= "Marcações novas" do cartão', E.novas_marcacoes_indicador || 0, 'tot']]),
           h('p', { class: 'dica' }, `Das ${nf(T)}, ${nf(E.canceladas_no_klingo || 0)} estão canceladas no Klingo. As marcações para depois de 30 dias entram no banco quando o exame chega perto.`))),
       passo(2, 'Quantas têm conversa no webchat'),
       h('div', { class: 'ind-minis' },
-        h('div', { class: 'ind-mini' }, h('b', {}, nf(W.marcacoes_ligadas)), h('span', {}, `marcações com conversa no chat (${pTxt(taxa(W.marcacoes_ligadas || 0, T))})`)),
+        h('div', { class: 'ind-mini' }, h('b', {}, nf(W.marcacoes_ligadas)), h('span', {}, `marcações com conversa no chat, total (${pTxt(taxa(W.marcacoes_ligadas || 0, T))} do Klingo)`)),
+        h('div', { class: 'ind-mini' }, h('b', {}, nf(W.marcacoes_ligadas_canceladas)), h('span', {}, 'dessas, canceladas no Klingo')),
+        h('div', { class: 'ind-mini' }, h('b', {}, nf((W.marcacoes_ligadas || 0) - (W.marcacoes_ligadas_canceladas || 0))), h('span', {}, 'dessas, ativas')),
         h('div', { class: 'ind-mini' }, h('b', {}, nf((W.por_ligacao || {}).pedido)), h('span', {}, 'ligadas pelo pedido do chat')),
         h('div', { class: 'ind-mini' }, h('b', {}, nf((W.por_ligacao || {}).telefone_nome)), h('span', {}, 'ligadas por celular e nome')),
-        h('div', { class: 'ind-mini' }, h('b', {}, nf(T - (W.marcacoes_ligadas || 0))), h('span', {}, 'sem conversa no chat')),
+        h('div', { class: 'ind-mini' }, h('b', {}, nf(T - (W.marcacoes_ligadas || 0))), h('span', {}, 'sem conversa no chat (recepção, telefone, WhatsApp)')),
         h('div', { class: 'ind-mini' }, h('b', {}, nf(X.atendido)), h('span', {}, 'dessas, exame atendido')),
         h('div', { class: 'ind-mini' }, h('b', {}, nf(X.faltou)), h('span', {}, 'faltaram')),
         h('div', { class: 'ind-mini' }, h('b', {}, nf(X.por_vir)), h('span', {}, 'por vir')),
@@ -4889,9 +4977,9 @@ h1.longo { font-size: 14mm; }
       passo(3, 'O que aconteceu com quem procurou o webchat no período'),
       h('div', { class: 'ind-minis' },
         h('div', { class: 'ind-mini' }, h('b', {}, nf(W.pessoas_que_procuraram)), h('span', {}, 'pessoas procuraram o chat')),
-        h('div', { class: 'ind-mini' }, h('b', {}, nf(W.atendidas_pela_equipe)), h('span', {}, 'foram atendidas pela equipe')),
-        h('div', { class: 'ind-mini' }, h('b', {}, nf(W.com_pedido_pronto)), h('span', {}, 'chegaram ao pedido pronto')),
-        h('div', { class: 'ind-mini' }, h('b', {}, nf(W.agendaram_no_chat)), h('span', {}, 'geraram agendamento')),
+        h('div', { class: 'ind-mini' }, h('b', {}, nf(W.atendidas_pela_equipe)), h('span', {}, 'tiveram resposta da equipe (pessoas)')),
+        h('div', { class: 'ind-mini' }, h('b', {}, nf(W.com_pedido_pronto)), h('span', {}, 'chegaram ao pedido pronto (pronto ou já agendado)')),
+        h('div', { class: 'ind-mini' }, h('b', {}, nf(W.agendaram_no_chat)), h('span', {}, 'tiveram o pedido agendado (pessoas, não marcações)')),
         h('div', { class: 'ind-mini' }, h('b', {}, nf(W.agendaram_e_ligadas_ao_klingo)), h('span', {}, 'agendamentos já ligados a uma marcação do Klingo')),
         h('div', { class: 'ind-mini' }, h('b', {}, nf(W.agendadas_sem_marcacao_no_klingo)), h('span', {}, 'agendadas no chat, sem marcação no Klingo'))),
       (W.agendadas_sem_marcacao_no_klingo || 0) > 0 ? h('div', {}, h('p', { class: 'ind-aviso' }, 'Estas pessoas aparecem como agendadas no chat, mas nenhuma marcação do Klingo foi ligada a elas. Confira se a marcação foi feita, em outro nome ou celular, ou se a pessoa se perdeu.'),
@@ -4918,16 +5006,18 @@ h1.longo { font-size: 14mm; }
     const minha = viewIndicadores.seq = (viewIndicadores.seq || 0) + 1;   // só a última escolha pinta a tela
     const un = UN.sel || null;
     const args = { p_de: IND.de, p_ate: IND.ate, p_unidade: un, p_incluir_teste: IND.teste };
-    const [r, eq, ext, au, cf] = await Promise.all([db.rpc('painel_indicadores_decisao', args),
+    const [r, eq, ext, au, cf, mensal] = await Promise.all([db.rpc('painel_indicadores_decisao', args),
       Promise.resolve(db.rpc('painel_indicadores_atendentes', args)).then((x) => x, () => ({ error: true, data: null })),
       Promise.resolve(db.rpc('painel_indicadores_extras_v2', args)).then((x) => x, () => ({ error: true, data: null })),
       Promise.resolve(db.rpc('painel_automacao_resumo', { p_de: IND.de, p_ate: IND.ate })).then((x) => x, () => ({ error: true, data: null })),
-      Promise.resolve(db.rpc('painel_indicadores_conferencia', args)).then((x) => x, () => ({ error: true, data: null }))]);
+      Promise.resolve(db.rpc('painel_indicadores_conferencia', args)).then((x) => x, () => ({ error: true, data: null })),
+      Promise.resolve(db.rpc('painel_indicadores_mensal', { p_meses: 12, p_unidade: un })).then((x) => x, () => ({ error: true, data: null }))]);
     if (S.aba !== 'indicadores' || minha !== viewIndicadores.seq) return;
     if (r.error || !r.data) {
       c.replaceChildren(h('div', { class: 'pagina' }, titulo, h('p', { class: 'erro' }, msgErro(r.error || { message: 'Sem resposta do banco.' })),
         h('p', { class: 'dica' }, 'Se a mensagem fala de função inexistente, falta rodar o SQL supabase/indicadores-decisao.sql.'))); return;
     }
+    const CF = cf && !cf.error && cf.data && cf.data.total != null ? cf.data : null;
     const R = r.data, A = R.atual || {}, B = R.anterior || {}, CA = A.chat || {}, CB = B.chat || {}, KA = A.clinica || {}, KB = B.clinica || {}, FA = CA.funil || {};
     const hojeISO = isoSP();
     const atalhos = h('div', { class: 'chips ind-atalhos', role: 'group', 'aria-label': 'Período' },
@@ -4958,6 +5048,7 @@ h1.longo { font-size: 14mm; }
       kpi('Pessoas que procuraram o chat', nf(entA), 'abriram conversa no período', delta(entA, entB, { cont: true, base: entB }), 'Cada pessoa conta uma vez, mesmo que tenha aberto mais de uma conversa.'),
       kpi('Agendaram pelo chat', pTxt(tAgA), `${nf(agA)} de ${nf(entA)} pessoas`, delta(tAgA, tAgB, { base: Math.min(entA, entB) }), 'Das pessoas que procuraram o chat, quantas terminaram com exame agendado (pelo sistema ou pela equipe).'),
       kpi('Marcações novas na clínica', nf(KA.novas_marcacoes), `${nf(KA.novas_pelo_chat)} vieram do chat · todos os canais (Klingo)`, delta(KA.novas_marcacoes, KB.novas_marcacoes, { cont: true, base: KB.novas_marcacoes || 0 }), 'Exames marcados no Klingo no período, por qualquer canal (recepção, telefone, WhatsApp, chat), sem contar remarcações.'),
+      CF ? kpi('Marcações no Klingo (relatório)', nf(CF.total), `${nf(CF.canceladas)} canceladas · ${nf(CF.ativas)} ativas`, null, 'Todas as marcações do Klingo feitas no período (relatório #14554), por qualquer canal. Ativas = total menos canceladas. Detalhe na seção 3.') : null,
       kpi('Faltas', pTxt(tFA), `${nf(KA.faltaram)} faltaram de ${nf(nFA)} exames que já aconteceram`, delta(tFA, tFB, { bomSobe: false, base: Math.min(nFA, nFB) }), 'Faltou ÷ (atendidos + faltaram), pela data do exame.'));
 
     // ----- Funil do chat -----
@@ -4994,6 +5085,7 @@ h1.longo { font-size: 14mm; }
       h('div', { class: 'ind-destaques' }, h('h3', {}, 'O que chama atenção'),
         lista.length ? h('ul', {}, lista.map((d) => h('li', { class: d.nivel }, d.txt))) : h('p', { class: 'dica' }, 'Ainda não há dados suficientes neste período para destacar algo. Tente um período maior.')),
       cartoes,
+      blocoMensal(mensal),
       blocoAutoatendimento(au && au.data),
 
       h('h3', { class: 'ind-sec' }, '1. Por que não estão agendando?'),

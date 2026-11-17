@@ -78,3 +78,5 @@ Depois: `cd testes && npm run test:retrato && npm run test:producao-sql && npm r
 **Só no repositório (8, esperado):** `avisar_n8n_mensagem`, `ia_catalogo`, `ia_contexto`, `ia_responder`, `ia_responder_v2` (apagadas com a saída do n8n) e `fila_avisar_link`, `fila_n8n_autorizado`, `fila_segredo_do_cabecalho` (versão 2 da biometria, nunca aplicada).
 
 Isto resolve a pendência antiga "G1: versionar o módulo Jornada", que estava aberta desde 01/11/2026.
+
+Versão 1.5 — 16/11/2026 / Mudança: indicadores com total, canceladas e ativas (migrações `indicadores_klingo_totais_parte1..3`, arquivo `supabase/indicadores-klingo-totais.sql`: `painel_automacao_resumo`, `painel_indicadores_conferencia`, `painel_indicadores_atendentes`) e função nova `painel_indicadores_mensal` (migração `indicadores_mensal_parte1`, arquivo `supabase/indicadores-mensal.sql`). Atualização incremental: só estas 4 funções e o `indice.json` (md5 conferido na produção).

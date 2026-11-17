@@ -62,6 +62,11 @@ function servidor() {
 }
 
 
+// Respostas de painel_indicadores_mensal (gráfico mensal). Tudo inventado; total = atendidos + faltaram + cancelados + remarcados + por vir.
+const MENSAL = { de: '2026-06-01', ate: '2026-11-01', meses: [
+  { mes: '2026-06', total: 0, atendidos: 0, faltaram: 0, cancelados: 0, remarcados: 0, por_vir: 0 }, { mes: '2026-07', total: 0, atendidos: 0, faltaram: 0, cancelados: 0, remarcados: 0, por_vir: 0 },
+  { mes: '2026-08', total: 0, atendidos: 0, faltaram: 0, cancelados: 0, remarcados: 0, por_vir: 0 }, { mes: '2026-09', total: 0, atendidos: 0, faltaram: 0, cancelados: 0, remarcados: 0, por_vir: 0 },
+  { mes: '2026-10', total: 432, atendidos: 273, faltaram: 59, cancelados: 62, remarcados: 38, por_vir: 0 }, { mes: '2026-11', total: 5807, atendidos: 2355, faltaram: 451, cancelados: 663, remarcados: 711, por_vir: 1627 }] };
 // Respostas de painel_indicadores_conferencia (supabase/klingo-conferencia.sql) e de paciente_avisos com os dois tipos novos. Tudo inventado.
 const CONFERENCIA = {
   periodo: { de: HOJE, ate: HOJE }, ultima_leitura: `${HOJE}T15:00:00Z`, dias_sem_leitura: [], total: 200,
@@ -114,6 +119,7 @@ async function pagina(browser, { semSql = false, admin = false, semAtend = false
       const b = JSON.parse(req.postData() || '{}'); reg.rpcs.push(['decisao', b]);
       if (semSql) { status = 404; corpo = { code: 'PGRST202', message: 'Could not find the function public.painel_indicadores_decisao in the schema cache' }; } else corpo = DECISAO(b);
     }
+    else if (p.endsWith('/rpc/painel_indicadores_mensal')) { const b = JSON.parse(req.postData() || '{}'); reg.rpcs.push(['mensal', b]); corpo = MENSAL; }
     else if (p.endsWith('/rpc/painel_indicadores_conferencia')) { const b = JSON.parse(req.postData() || '{}'); reg.rpcs.push(['conferencia', b]); corpo = conf ? CONFERENCIA : {}; }
     else if (p.endsWith('/rpc/paciente_avisos')) corpo = conf ? AVISOS_CONF : [];
     else if (p.startsWith('/rest/v1/rpc/')) corpo = {};
@@ -213,7 +219,7 @@ await caso('Faltas: painéis por confirmação, antecedência, unidade e tipo; o
 });
 await caso('Não sobrou a tabela "Por dia" nem os números antigos (reentradas, transferências, atravessaram a meia-noite)', async () => {
   const t = await abrir(); await abaInd(t);
-  const txt = await textoAba(t); const tabelas = await t.page.locator('table').count();
+  const txt = await textoAba(t); const tabelas = await t.page.locator('table:not(.ind-tab-graf)').count();   // a tabela do gráfico mensal é de propósito
   await t.ctx.close();
   return { ok: tabelas === 0 && !/reentradas|transferências|meia-noite|Conversas por pessoa|Confirmaram/i.test(txt), detalhe: txt.slice(0, 80) };
 });
@@ -284,7 +290,7 @@ await caso('"Incluir conversas de teste": só o administrador vê a caixa; marca
 });
 await caso('Equipe: barras por atendente (conversas, agendamentos, nota) com o melhor em destaque e aviso de poucas avaliações', async () => {
   const t = await abrir(); await abaInd(t);
-  const secao = t.page.locator('h3', { hasText: '3. Equipe' }); await secao.waitFor();
+  const secao = t.page.locator('h3', { hasText: '4. Equipe' }); await secao.waitFor();
   const paineis = await t.page.locator('.ind-painel').evaluateAll((l) => l.map((p) => ({ tit: p.querySelector('h4').textContent, linhas: [...p.querySelectorAll('.ind-linha')].map((x) => x.innerText.replace(/\n/g, ' ')) })));
   const por = (t0) => paineis.find((x) => x.tit.startsWith(t0)) || { linhas: [] };
   const forte = await t.page.locator('.ind-linha.forte', { hasText: 'Ana' }).count();
@@ -296,11 +302,11 @@ await caso('Equipe: barras por atendente (conversas, agendamentos, nota) com o m
 });
 await caso('Avaliações dos pacientes voltaram: só o administrador vê; atendente comum não', async () => {
   const adm = await abrir({ admin: true }); await abaInd(adm);
-  await adm.page.waitForFunction(() => /4\. Avaliações dos pacientes/.test(document.querySelector('.pagina')?.innerText || ''));
+  await adm.page.waitForFunction(() => /5\. Avaliações dos pacientes/.test(document.querySelector('.pagina')?.innerText || ''));
   const ta = await textoAba(adm); await adm.ctx.close();
   const c = await abrir(); await abaInd(c); await new Promise((r) => setTimeout(r, 300));
   const tc = await textoAba(c); await c.ctx.close();
-  return { ok: /10 avaliações/.test(ta) && /8,5 nota do atendimento/.test(ta) && /5 pelo Instagram/.test(ta) && !/Avaliações dos pacientes/.test(tc) && /3\. Equipe/.test(tc) };
+  return { ok: /10 avaliações/.test(ta) && /8,5 nota do atendimento/.test(ta) && /5 pelo Instagram/.test(ta) && !/Avaliações dos pacientes/.test(tc) && /4\. Equipe/.test(tc) };
 });
 await caso('Sem o SQL dos atendentes, a parte da equipe avisa qual arquivo rodar e o resto da tela funciona', async () => {
   const t = await abrir({ semAtend: true }); await abaInd(t);
@@ -325,6 +331,18 @@ await caso('Conferência: pede o mesmo período e unidade dos outros blocos e mo
   const a = ultimo(t.reg, 'conferencia'), txt = await textoAba(t); await t.ctx.close();
   return { ok: a.p_de === HOJE && a.p_ate === HOJE && a.p_unidade === null && /200\s*marcações no Klingo/.test(txt) && /WhatsApp/.test(txt) && /Telefone/.test(txt) && /Recepção/.test(txt) && /Sem origem \(em branco no Klingo\)/.test(txt) && /45% · 90|90 · 45%/.test(txt) && !t.reg.excecoes.length, detalhe: JSON.stringify(a) + (t.reg.excecoes[0] ?? '') };
 });
+await caso('Gráfico mensal: 5 barras por mês (total, cancelados, remarcados, atendidos, faltaram), tabela com as porcentagens, escolher meses e esconder uma barra', async () => {
+  const t = await abrir({ conf: true }); await abaInd(t); await t.page.waitForSelector('.ind-graf svg');
+  const pedido = t.reg.rpcs.find((x) => x[0] === 'mensal');
+  const barras = await t.page.locator('.ind-graf svg path').count(), leg = await t.page.locator('.ind-graf-leg button').allInnerTexts();
+  const tab = (await t.page.locator('.ind-graf table').innerText()).replace(/\s+/g, ' ');
+  await t.page.locator('.ind-graf-leg button', { hasText: 'Faltaram' }).click(); const barras4 = await t.page.locator('.ind-graf svg path').count();
+  await t.page.locator('.ind-graf .chip', { hasText: '3 meses' }).click(); const linhas3 = await t.page.locator('.ind-graf tbody tr').count();
+  await t.page.locator('.ind-graf svg .zona').last().hover(); const dica = await t.page.locator('.ind-graf-dica').innerText();
+  await t.page.screenshot({ path: process.env.FOTO_GRAFICO || '/tmp/grafico.png', fullPage: false });
+  await t.ctx.close();
+  return { ok: pedido && pedido[1].p_meses === 12 && barras === 10 && barras4 === 8 && leg.length === 5 && /Novembro de 2026 5\.807 663 11,4% 711 12,2% 2\.355 451 16,1% 1\.627/i.test(tab.replace('novembro','Novembro')) && linhas3 === 3 && /novembro de 2026/.test(dica) && /5\.807/.test(dica), detalhe: JSON.stringify({ barras, barras4, leg, linhas3 }) + ' ' + tab.slice(-230) };
+});
 await caso('Conferência: explica a divergência passo a passo (200 do Klingo, 30 fora do banco, 170 no banco, 10 remarcadas, 160 no cartão)', async () => {
   const t = await abrir({ conf: true }); await abaInd(t); await t.page.waitForSelector('.ind-conta');
   const conta = (await t.page.locator('.ind-conta').first().innerText()).replace(/\n+/g, ' | '); await t.ctx.close();
@@ -333,13 +351,13 @@ await caso('Conferência: explica a divergência passo a passo (200 do Klingo, 3
 await caso('Conferência: marcações com conversa no webchat (40), por pedido (25) e por celular e nome (15), e o que aconteceu com o exame', async () => {
   const t = await abrir({ conf: true }); await abaInd(t); await t.page.waitForSelector('.ind-conf-passo');
   const txt = await textoAba(t); await t.ctx.close();
-  return { ok: /40\s*marcações com conversa no chat \(20%\)/.test(txt) && /25\s*ligadas pelo pedido do chat/.test(txt) && /15\s*ligadas por celular e nome/.test(txt) && /160\s*sem conversa no chat/.test(txt)
+  return { ok: /40\s*marcações com conversa no chat, total \(20% do Klingo\)/.test(txt) && /25\s*ligadas pelo pedido do chat/.test(txt) && /15\s*ligadas por celular e nome/.test(txt) && /160\s*sem conversa no chat/.test(txt)
     && /15\s*dessas, exame atendido/.test(txt) && /3\s*faltaram/.test(txt) && /18\s*por vir/.test(txt), detalhe: txt.slice(txt.indexOf('Quantas têm'), txt.indexOf('Quantas têm') + 300) };
 });
 await caso('Conferência: funil do webchat (60 procuraram, 52 atendidas pela equipe, 30 pedido pronto, 25 agendaram) e as 3 agendadas sem marcação no Klingo ficam à vista com o nome', async () => {
   const t = await abrir({ conf: true }); await abaInd(t); await t.page.waitForSelector('.ind-conf-passo');
   const txt = await textoAba(t); await t.ctx.close();
-  return { ok: /60\s*pessoas procuraram o chat/.test(txt) && /52\s*foram atendidas pela equipe/.test(txt) && /30\s*chegaram ao pedido pronto/.test(txt) && /25\s*geraram agendamento/.test(txt)
+  return { ok: /60\s*pessoas procuraram o chat/.test(txt) && /52\s*tiveram resposta da equipe/.test(txt) && /30\s*chegaram ao pedido pronto/.test(txt) && /25\s*tiveram o pedido agendado/.test(txt)
     && /3\s*agendadas no chat, sem marcação no Klingo/.test(txt) && /Jose de Teste/i.test(txt), detalhe: '' };
 });
 await caso('Conferência: cadastro incompleto no Klingo (sem CPF 32%, sem e-mail 46%, sem celular 3%)', async () => {

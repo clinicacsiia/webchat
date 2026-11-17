@@ -41,6 +41,8 @@ begin
     'ultima_leitura', (select max(lido_em) from k),
     'dias_sem_leitura', coalesce((select jsonb_agg(d.d order by d.d) from dias d where not exists (select 1 from k where k.marcado_em = d.d)), '[]'::jsonb),
     'total', (select count(*) from k),
+    'canceladas', (select count(*) from k where status_klingo = 'Cancelada'),
+    'ativas', (select count(*) from k where status_klingo is distinct from 'Cancelada'),
     'por_origem', coalesce((select jsonb_object_agg(o, n) from (select origem as o, count(*) as n from k group by 1) q), '{}'::jsonb),
     'por_status', coalesce((select jsonb_object_agg(coalesce(s, 'sem_status'), n) from (select status_klingo as s, count(*) as n from k group by 1) q), '{}'::jsonb),
     'explicacao', (select jsonb_build_object(
@@ -52,6 +54,7 @@ begin
     'webchat', jsonb_build_object(
         'marcacoes_ligadas', (select count(*) from k where tem_conversa),
         'conversas_ligadas', (select count(distinct conversa_id) from k where tem_conversa),
+        'marcacoes_ligadas_canceladas', (select count(*) from k where tem_conversa and status_klingo = 'Cancelada'),
         'por_ligacao', coalesce((select jsonb_object_agg(ligacao, n) from (select ligacao, count(*) as n from k where tem_conversa group by 1) q), '{}'::jsonb),
         'por_origem', coalesce((select jsonb_object_agg(o, n) from (select origem as o, count(*) as n from k where tem_conversa group by 1) q), '{}'::jsonb),
         'exames', (select jsonb_build_object(
@@ -87,4 +90,3 @@ begin
   ) into v_out;
   return v_out;
 end $function$;
-
