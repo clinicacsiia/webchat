@@ -260,11 +260,14 @@ await caso('Comparação com o Klingo: marcações novas da clínica toda x as d
   return { ok: a.p_de === HOJE && a.p_unidade === null && por('Vieram do site').join('|') === 'Vieram do site|122|12|134' && por('Klingo')[1] === '559' && Number(por('Klingo')[1].replace(/\D/g, '')) + Number(por('Klingo')[2].replace(/\D/g, '')) === Number(por('Klingo')[3].replace(/\D/g, ''))
     && por('Parte do site').join('|') === 'Parte do site no total|21,8%|0,5%|4,8%' && /122 ativas \(17 atendidas, 3 faltaram, 102 por vir\) · 12 canceladas ou remarcadas \(9%\)/.test(txt), detalhe: JSON.stringify(linhas) + txt.slice(-160) };
 });
-await caso('Autoatendimento: tentativas, marcadas sozinhas, foram para a equipe, cancelar e remarcar pelo chat', async () => {
+await caso('Autoatendimento: frase "30 de 37 deram certo", barra por situação, tempo médio, sem atendente e motivos em português (sem código técnico)', async () => {
   const t = await abrir(); await abaInd(t);
-  const minis = await t.page.locator('.ind-painel', { hasText: 'Marcação automática pelo chat' }).locator('.ind-mini').evaluateAll((l) => l.map((m) => m.innerText.replace(/\s+/g, ' ')));
+  const p = t.page.locator('.ind-painel', { hasText: 'Marcação automática pelo chat' });
+  const resumo = (await p.locator('.ind-resumo').innerText()).replace(/\s+/g, ' '), minis = await p.locator('.ind-mini').evaluateAll((l) => l.map((m) => m.innerText.replace(/\s+/g, ' ')));
+  const leg = (await p.locator('.ind-leg').innerText()).replace(/\s+/g, ' '), motivos = await p.locator('.ind-rot').allInnerTexts(); const txt = await p.innerText();
   await t.ctx.close();
-  return { ok: minis[0] === '37 tentativas' && minis[1] === '30 marcadas sozinhas' && minis[2] === '3 foram para a equipe' && minis[3] === '4 horário já ocupado' && minis[5] === '42 s tempo médio para marcar' && minis[6] === '6 cancelamentos feitos pelo chat' && minis[7] === '3 remarcações feitas pelo chat' && minis[8] === '1 cancelar ou remarcar que foram para a equipe', detalhe: minis.join(' ; ') };
+  return { ok: /30 de 37 tentativas deram certo \(81,1%\)/.test(resumo) && /Marcadas sozinhas 30/.test(leg) && /Foram para a equipe 3/.test(leg) && /Horário já ocupado 4/.test(leg) && minis[0] === '42 s tempo médio para marcar' && minis[1] === '18 marcadas sem nenhum atendente na conversa' && minis[2].startsWith('9 cancelados ou remarcados pelo chat (6 e 3)')
+    && motivos.join('|') === 'Horário já foi ocupado por outra pessoa' && !/horario_tomado|divergencia_/.test(txt), detalhe: resumo + ' | ' + leg + ' | ' + minis.join(' ; ') + ' | ' + motivos.join('|') };
 });
 await caso('Atalhos de período: Ontem, 7 dias, 30 dias, Este mês e Mês anterior pedem as datas certas', async () => {
   const t = await abrir(); await abaInd(t);
