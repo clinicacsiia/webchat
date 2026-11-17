@@ -1,4 +1,4 @@
--- public.pmarc_catalogo(p_busca text, p_tipo text)
+-- public.pmarc_catalogo(p_busca text DEFAULT NULL::text, p_tipo text DEFAULT NULL::text)
 -- Pode executar: anon, authenticated, service_role
 CREATE OR REPLACE FUNCTION public.pmarc_catalogo(p_busca text DEFAULT NULL::text, p_tipo text DEFAULT NULL::text)
  RETURNS jsonb
@@ -15,7 +15,8 @@ begin
     select public.norm_nome(e.procedimento) as n, count(*) as c from public.jornada_exame e
      where e.status = 'atendido' and e.agendado_para >= now() - interval '30 days' and e.agendado_para < now() group by 1
   ), com_agenda as (
-    select distinct a.procedimento_id from public.catalogo_agenda a where a.vig_fim >= current_date and a.profissional !~* 'teste'
+    select distinct a.procedimento_id from public.catalogo_agenda a join public.unidade_config u on u.catalogo = a.unidade and u.ativo
+     where a.vig_fim >= current_date and a.profissional !~* 'teste'
   ), k as (
     select p.id, p.modalidade, public.pmarc_tipo_proc(p.modalidade) as tipo, coalesce(p.demanda_90d, 0) as demanda,
       case when p.modalidade = 'CONSULTA' and public.norm_nome(p.nome) in ('CONSULTA', 'CONSULTA MEDICA') then btrim('Consulta ' || coalesce(initcap(lower(p.especialidade)), '')) else p.nome end as nome,

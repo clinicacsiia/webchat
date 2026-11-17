@@ -1,5 +1,6 @@
 # Webchat de Previsão de marcação (17/11/2026)
 
+Versão 1.2 — 17/11/2026 / Mudança: **a unidade depende do exame e respeita os catálogos do chat** (`pmarc_unidades`; `pmarc_disponibilidade` e `pmarc_catalogo` só olham unidades com catálogo ligado).
 Versão 1.1 — 17/11/2026 / Mudança: **tela "Pedir uma previsão"** (escolher o exame ou a consulta, turno / a partir de / até / até o dia, ou não escolher e ver a disponibilidade; funções `pmarc_catalogo`, `pmarc_disponibilidade`, `pmarc_pedido`).
 Versão 1.0 — 17/11/2026 / Mudança: primeira versão. Segundo webchat, separado do chat de marcação: registra TODA pessoa com marcação aberta no Klingo, mostra a ela a PREVISÃO e abre uma conversa que a equipe responde no painel.
 
@@ -59,6 +60,13 @@ A página só mostrava as marcações que já existiam. Agora, em **três lugare
 - **Segurança:** `pmarc_catalogo` e `pmarc_disponibilidade` não trazem dado de paciente; a disponibilidade tem limite global de 120 consultas por minuto. `pmarc_pedido` usa o código do link e aceita no máximo 10 pedidos por hora por pessoa. Nada barra a pessoa por conteúdo.
 - **Arquivos:** `supabase/previsao-marcacao-parte5-escolha.sql` (rollback: `parte5-rollback.sql`), `previsao/index.html` (versão 2026.11.17-2), testes `npm run test:previsao-escolha` (17 casos) e `test:previsao-escolha-pagina` (13 casos); página versão 2026.11.17-3. Não precisa trocar `sw.js` (a página `previsao/` não passa pelo cache do chat).
 - Nenhum relatório do Klingo novo ou editado.
+
+## Unidade: depende do exame e respeita o catálogo (17/11/2026)
+Pedido do dono: o seletor **Unidade** da tela "Quando você prefere?" mostrava sempre CSI, Desenvoar e CSI RM/TC. Agora:
+- **Depende do exame escolhido:** a página chama `pmarc_unidades(exame)` e só oferece as unidades em que o exame tem agenda (`catalogo_agenda`, vigente, sem profissional "teste"). Com **uma** unidade só, não há seletor: aparece "Unidade: X". Com **nenhuma**, a tela trata como item sem agenda ("Pedir para a equipe"). Texto livre (sem exame) mostra todas as unidades ligadas.
+- **Respeita o catálogo:** só entram unidades com o catálogo **ligado** em Configurações > Catálogos do chat (`unidade_config.ativo`, a mesma chave `catalogo_<chave>` do chat). `pmarc_disponibilidade` só devolve horários dessas unidades (mesmo se alguém pedir a unidade desligada à força) e `pmarc_catalogo` só marca `agenda` se a grade está numa unidade ligada. Consequência: consulta que só tem agenda numa unidade desligada **sai da lista**; exame continua na lista, sem "Ver a disponibilidade".
+- Em 17/11/2026 só o catálogo **Desenvoar** estava ligado: a lista foi de 216 para 209 itens e de 214 para 23 com agenda.
+- Arquivos: `supabase/previsao-marcacao-parte6-unidades.sql` (rollback: `parte6-rollback.sql`; aplicada como `pmarc_parte6a_unidades`, `6b_disponibilidade`, `6c_catalogo`), `previsao/index.html` (versão 2026.11.17-4), testes `test:previsao-escolha` (22 casos) e `test:previsao-escolha-pagina` (14 casos). Sem `sw.js` novo (a página `previsao/` não passa pelo cache do chat). Nenhum relatório do Klingo novo ou editado.
 
 ## Ligar e desligar
 - Chave **`previsao_marcacao_modo`** (`sim`/`nao`). `nao`: a leitura do Klingo não grava, as 6 funções do paciente respondem "desligado" e o painel avisa.

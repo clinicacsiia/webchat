@@ -96,7 +96,7 @@ button{font:inherit;cursor:pointer}
    as tabelas são fechadas e a credencial é o código secreto do link (ou celular + nascimento, com limite de tentativas). */
 const SUPABASE_URL='https://nrvuynjwcgwpjdptkiay.supabase.co';
 const SUPABASE_KEY='sb_publishable_e2GK1YGEj06STa_ESCevow_nvtATB-y';
-const VERSAO_PREVISAO='2026.11.17-3';
+const VERSAO_PREVISAO='2026.11.17-4';
 async function rpc(nome,args){
   const ctl=new AbortController(),t=setTimeout(()=>ctl.abort(),20000);
   try{
@@ -421,8 +421,18 @@ function telaTextoLivre(){
   $('#fLivre').onsubmit=ev=>{ev.preventDefault();const t=$('#livre').value.trim();if(!t)return void($('#erro').textContent='Escreva o que você procura.');E.pe={...E.pe,proc:null,texto:t,horario:undefined};telaQuando()};
 }
 /* Passo 2: quando? (turno, a partir de, até, até o dia, unidade) — ou nada */
-function telaQuando(){
-  const pe=E.pe,nome=pe.proc?nomeExame(pe.proc.nome).titulo:pe.texto,semAgenda=!pe.proc||!pe.proc.agenda;
+async function telaQuando(){
+  const pe=E.pe;
+  // 17/11/2026: a unidade depende do exame escolhido e respeita os catálogos ligados em Configurações (pmarc_unidades). Sem resposta (rede), não mostra o seletor: o banco filtra do mesmo jeito.
+  mostrar('<p class="sub">Carregando…</p>');
+  const ru=await rpc('pmarc_unidades',{p_procedimento:pe.proc?pe.proc.id:null});
+  if(ru.motivo==='desligado')return telaDesligado();
+  const un=ru.ok===true&&Array.isArray(ru.unidades)?ru.unidades:null;
+  if(un&&pe.unid&&!un.some(u=>u.chave===pe.unid))pe.unid=undefined;
+  if(!un||un.length<2)pe.unid=undefined;
+  const nome=pe.proc?nomeExame(pe.proc.nome).titulo:pe.texto,semAgenda=!pe.proc||!pe.proc.agenda||(!!un&&!!pe.proc&&un.length===0);
+  const unidHtml=un&&un.length>1?`<label for="unid">Unidade</label><select id="unid"><option value="">Qualquer unidade</option>${un.map(u=>`<option value="${esc(u.chave)}"${pe.unid===u.chave?' selected':''}>${esc(u.rotulo)}</option>`).join('')}</select>`
+    :un&&un.length===1?`<p class="sub">Unidade: <b>${esc(un[0].rotulo)}</b></p>`:'';
   mostrar(`<h1>Quando você prefere?</h1>
   <p class="sub"><b>${esc(nome)}</b> · <a href="#" id="trocar">trocar</a></p>
   ${avisoHtml()}
@@ -434,7 +444,7 @@ function telaQuando(){
       <div><label for="ate">Até as</label><select id="ate">${horasOpc('Qualquer hora',pe.ate)}</select></div>
     </div>
     <label for="dia">Até o dia <span class="opc">(se quiser)</span></label><input id="dia" type="date" min="${hojeIso()}" value="${esc(pe.dia||'')}">
-    <label for="unid">Unidade</label><select id="unid"><option value="">Qualquer unidade</option>${[['CSI','CSI'],['DESENVOAR','Desenvoar'],['RM/TC','CSI RM/TC']].map(([v,t])=>`<option value="${v}"${pe.unid===v?' selected':''}>${t}</option>`).join('')}</select>
+    ${unidHtml}
     <label for="plano">Seu plano ou convênio <span class="opc">(se souber)</span></label><input id="plano" maxlength="80" autocomplete="off" value="${esc(pe.plano||'')}" placeholder="Ex.: particular, nome do convênio">
     <p class="sub" style="margin-top:12px">${semAgenda?'Para este item a nossa equipe olha a agenda e fala com você. Se quiser, diga quando prefere.':'Não precisa escolher nada: é só tocar em “Ver a disponibilidade”.'} Cobertura, autorização e valor dependem do plano: a equipe confirma.</p>
     <p class="msg-erro" id="erro" role="alert"></p>
@@ -442,7 +452,7 @@ function telaQuando(){
     <button class="btn ${semAgenda?'':'linha'}" id="pedirJa" type="button">${semAgenda?'Pedir para a equipe':'Pedir para a equipe sem ver os horários'}</button>
     <button class="btn sec" id="voltar" type="button">Voltar</button>
   </form>`);
-  const ler=()=>{pe.apos=$('#apos').value||undefined;pe.ate=$('#ate').value||undefined;pe.dia=$('#dia').value||undefined;pe.unid=$('#unid').value||undefined;pe.plano=$('#plano').value.trim()||undefined};
+  const ler=()=>{pe.apos=$('#apos').value||undefined;pe.ate=$('#ate').value||undefined;pe.dia=$('#dia').value||undefined;pe.unid=$('#unid')?$('#unid').value||undefined:undefined;pe.plano=$('#plano').value.trim()||undefined};
   app.querySelectorAll('button[data-turno]').forEach(b=>b.onclick=()=>{pe.turno=b.dataset.turno;app.querySelectorAll('button[data-turno]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)))});
   $('#trocar').onclick=ev=>{ev.preventDefault();telaPedidoExame()};
   $('#voltar').onclick=()=>telaPedidoExame();
