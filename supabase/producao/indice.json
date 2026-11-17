@@ -9863,6 +9863,33 @@
    "md5": "ad661ca384ddddf9546f435c4a04ab1e"
   },
   {
+   "nome": "ind_agenda_periodo",
+   "args": [
+    {
+     "nome": "p_de",
+     "padrao": false
+    },
+    {
+     "nome": "p_ate",
+     "padrao": false
+    },
+    {
+     "nome": "p_un",
+     "padrao": false
+    },
+    {
+     "nome": "p_teste",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "c7ae2373ba8a2975035ffec2327ee30a"
+  },
+  {
    "nome": "ind_calc_conclusoes",
    "args": [
     {
@@ -13342,6 +13369,33 @@
    "authenticated": true,
    "publico": false,
    "md5": "c36c4c77f8772f87143e3335605eb75e"
+  },
+  {
+   "nome": "painel_indicadores_agenda",
+   "args": [
+    {
+     "nome": "p_de",
+     "padrao": true
+    },
+    {
+     "nome": "p_ate",
+     "padrao": true
+    },
+    {
+     "nome": "p_unidade",
+     "padrao": true
+    },
+    {
+     "nome": "p_incluir_teste",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "f879c54ec4c4196182f0de18cad5e218"
   },
   {
    "nome": "painel_indicadores_atendentes",

@@ -84,3 +84,12 @@ Banco: nada mudou. A tela chama só `painel_indicadores_decisao`, `painel_indica
 
 ### Gráfico mês a mês (17/11/2026)
 Logo abaixo do resumo há um gráfico de área dos últimos 6 meses (SVG puro com `linearGradient` e `path`, sem biblioteca). Mostra "Pessoas que procuraram o chat" ou "Agendaram pelo chat" (botões), o total dos 6 meses e o melhor mês, tudo calculado do array `dados`; passar o mouse (ou tocar) num mês mostra o valor exato. O último mês é parcial e a dica avisa. Sem mudança no banco: a tela faz uma consulta a `painel_indicadores_decisao` por mês, em paralelo, e o filtro de unidade do topo vale. Painel `sw.js` v53. Teste: `npm run test:indicadores` (25 verificações).
+
+
+## Aba refeita como história da agenda (17/11/2026, v2)
+
+A aba voltou a mostrar a **agenda da clínica (Klingo)** na ordem em que as coisas acontecem, antes do chat do site. Fonte: `jornada_exame` (relatório #14359), pela data do exame. Auditoria completa e números reais: [`auditoria-indicadores-2026-11-17.md`](auditoria-indicadores-2026-11-17.md).
+
+Ordem: 5 números do período; **Hoje e próximos dias** (quanto falta confirmar); história (agendados → saíram → ficaram → confirmaram → atendidos → faltaram); "Confirmar adianta?"; por onde as marcações novas entram; dia a dia (colunas empilhadas em SVG puro); consultas, exames e unidades; por atendente (`painel_indicadores_atendentes`); chat do site (resumo, gráfico por dia, funil, onde param, unidade/pedido/plano, chat × Klingo, marcação automática).
+
+Banco: `supabase/indicadores-agenda.sql` (`ind_agenda_periodo` só servidor e `painel_indicadores_agenda` admin/atendente; aplicado como `indicadores_agenda_parte1..5`; rollback no cabeçalho do arquivo). O gráfico mês a mês saiu (os dados só começam em 29/10). Painel `sw.js` v54. Teste: `cd testes && npm run test:indicadores` (33 verificações, com contagens reais por dia de 03 a 16/11/2026).
