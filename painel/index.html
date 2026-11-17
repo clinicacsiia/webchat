@@ -405,8 +405,6 @@
   .ind-kpi-rot { font-size: 13px; font-weight: 600; color: var(--suave); }
   .ind-kpi b { font-size: 34px; line-height: 1.1; }
   .ind-kpi-sub { font-size: 13px; color: var(--suave); }
-  .ind-delta { font-size: 13px; font-weight: 700; margin-top: 4px; }
-  .ind-delta.bom { color: var(--csi-success-strong); } .ind-delta.ruim { color: var(--csi-danger-strong); } .ind-delta.neutro { color: var(--suave); font-weight: 500; }
   .ind-aviso { background: var(--csi-warning-soft); color: var(--csi-warning-strong); border-radius: var(--radius-sm); padding: 8px 12px; margin: 8px 0; font-size: 14px; }
   .ind-sec { margin: 26px 0 2px; font-size: 20px; }
   .ind-grade { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 14px; margin: 12px 0; align-items: start; }
@@ -4739,18 +4737,6 @@ h1.longo { font-size: 14mm; }
   const nf = (n) => Number(n || 0).toLocaleString('pt-BR');
   const taxa = (a, b) => (b > 0 ? (a / b) * 100 : null);
   const pTxt = (v) => (v == null ? '—' : (Math.round(v * 10) / 10).toString().replace('.', ',') + '%');
-  // Compara com o período anterior. cont = contagem (muda em %); senão taxa (muda em pontos). bom = "subir é bom?". Base pequena não compara.
-  function delta(atual, ant, { cont = false, bomSobe = true, base = 0, minBase = 8, neutro = false } = {}) {
-    if (atual == null || ant == null) return h('span', { class: 'ind-delta neutro' }, 'sem base para comparar');
-    if (base < minBase) return h('span', { class: 'ind-delta neutro' }, neutro ? `período anterior: ${nf(ant)} (poucos casos para comparar)` : 'sem base para comparar');
-    const dif = cont ? (ant ? ((atual - ant) / ant) * 100 : null) : atual - ant;
-    if (dif == null) return h('span', { class: 'ind-delta neutro' }, 'antes: 0');
-    const igual = cont ? Math.abs(dif) < 3 : Math.abs(dif) < 1;
-    if (igual) return h('span', { class: 'ind-delta neutro' }, '≈ igual ao período anterior');
-    const sobe = dif > 0, bom = sobe === bomSobe;
-    const txt = cont ? Math.round(Math.abs(dif)) + '%' : (Math.round(Math.abs(dif) * 10) / 10).toString().replace('.', ',') + ' pontos';
-    return h('span', { class: 'ind-delta ' + (neutro ? 'neutro' : bom ? 'bom' : 'ruim') }, (sobe ? '▲ ' : '▼ ') + txt + ' vs período anterior');
-  }
   const kpi = (rot, valor, sub, d, dica) => h('div', { class: 'ind-kpi', title: dica || '' }, h('span', { class: 'ind-kpi-rot' }, rot), h('b', {}, valor), h('span', { class: 'ind-kpi-sub' }, sub), d || null);
   const barra = (rot, v, max, texto, cor = 'azul', forte = false) => h('div', { class: 'ind-linha' + (forte ? ' forte' : '') },
     h('span', { class: 'ind-rot' }, rot), h('span', { class: 'ind-trilho' }, h('i', { class: cor, style: `width:${max > 0 ? Math.max(v > 0 ? 2 : 0, Math.round((v / max) * 100)) : 0}%` })), h('span', { class: 'ind-val' }, texto));
@@ -4891,16 +4877,15 @@ h1.longo { font-size: 14mm; }
     const desenhar = () => {
       const chip = (k, r, cor, linha) => h('button', { class: 'chip ind-leg-chip', type: 'button', 'aria-pressed': String(!GRAF_BL.ocultas.has(k)), onclick: () => { GRAF_BL.ocultas.has(k) ? GRAF_BL.ocultas.delete(k) : GRAF_BL.ocultas.add(k); desenhar(); } }, h('i', { class: linha ? 'lin' : '', style: `background:${cor}` }), r);
       const legenda = h('div', { class: 'chips', role: 'group', 'aria-label': 'O que aparece no gráfico' }, SERIES_BL.map(([k, r, cor]) => chip(k, r + ' (barra)', cor, false)), chip('total', 'Total de agendamentos do site (linha)', COR_LINHA, true));
-      const linhas = dados.map((d, i) => { const ant = i ? dados[i - 1] : null, v = ant && ant.total > 0 && !d.parcial ? Math.round(((d.total - ant.total) / ant.total) * 100) : null;
-        return h('tr', {}, h('td', {}, `${dmy(d.de)} a ${dmy(d.ate)}`, d.parcial ? h('div', { class: 'dica' }, `em andamento: ${d.dias} de 30 dias`) : null), h('td', {}, nf(d.ativas)), h('td', {}, nf(d.sozinhas)), h('td', {}, d.apiCom == null ? '—' : nf(d.apiCom)), h('td', {}, d.pessoa == null ? '—' : nf(d.pessoa)), h('td', {}, nf(d.canceladas)), h('td', {}, nf(d.remarcadas)), h('td', {}, h('b', {}, nf(d.total))),
-          h('td', {}, !i ? '—' : d.parcial ? 'em andamento' : v == null ? '—' : (v > 0 ? '▲ ' : v < 0 ? '▼ ' : '') + Math.abs(v) + '%')); });
+      const linhas = dados.map((d) => {
+        return h('tr', {}, h('td', {}, `${dmy(d.de)} a ${dmy(d.ate)}`, d.parcial ? h('div', { class: 'dica' }, `em andamento: ${d.dias} de 30 dias`) : null), h('td', {}, nf(d.ativas)), h('td', {}, nf(d.sozinhas)), h('td', {}, d.apiCom == null ? '—' : nf(d.apiCom)), h('td', {}, d.pessoa == null ? '—' : nf(d.pessoa)), h('td', {}, nf(d.canceladas)), h('td', {}, nf(d.remarcadas)), h('td', {}, h('b', {}, nf(d.total)))); });
       box.replaceChildren(
         h('p', { class: 'ind-resumo' }, 'Cada grupo é um período de ', h('b', {}, '30 dias'), ` contado desde o 1º dia de uso (${dmy(d0)}). `, dados.length === 1 ? `Ainda há só 1 período, em andamento (${ultimo.dias} de 30 dias); a comparação com o seguinte começa em ${dmy(isoMais(d0, 30))}.` : `A linha é o total de agendamentos do site no período; as barras mostram de que ele é feito.`),
         h('div', { class: 'ind-minis' }, h('div', { class: 'ind-mini' }, h('b', {}, nf(total)), h('span', {}, 'agendamentos do site desde o 1º dia de uso')),
           h('div', { class: 'ind-mini' }, h('b', {}, melhor ? rotBloco(melhor) : '—'), h('span', {}, melhor ? `período com mais agendamentos (${nf(melhor.total)})` : 'período com mais agendamentos'))),
         legenda, graficoBlocos(dados),
         h('details', { class: 'ind-num-det', open: true }, h('summary', {}, 'Ver os números de cada período'), h('div', { class: 'ind-tab-rolagem' }, h('table', { class: 'ind-tab-graf' },
-          h('thead', {}, h('tr', {}, ['Período de 30 dias', 'Agendadas (seguem valendo)', 'Marcadas pela API, sem atendente', 'Pela API, com atendente na conversa', 'Por uma pessoa no Klingo', 'Canceladas', 'Remarcadas', 'Total', 'Total x período anterior'].map((t) => h('th', {}, t)))), h('tbody', {}, linhas)))),
+          h('thead', {}, h('tr', {}, ['Período de 30 dias', 'Agendadas (seguem valendo)', 'Marcadas pela API, sem atendente', 'Pela API, com atendente na conversa', 'Por uma pessoa no Klingo', 'Canceladas', 'Remarcadas', 'Total'].map((t) => h('th', {}, t)))), h('tbody', {}, linhas)))),
         h('p', { class: 'dica' }, 'Total = agendadas que seguem valendo + canceladas + remarcadas (marcações do Klingo que vieram de uma conversa do chat, pela data em que foram marcadas, a coluna "Agendado em" do Klingo). Quem marcou vem do Klingo: o responsável `biclinicacsi` é a API do chat. "Marcadas pela API, sem atendente" = marcou a API e ninguém da equipe escreveu na conversa (a barra verde). "Pela API, com atendente" = a API marcou, mas houve conversa com atendente. "Por uma pessoa" = alguém da equipe marcou no Klingo. Essas três colunas somam o total e incluem as que depois foram canceladas ou remarcadas.' + (semUnidadeAuto ? ' Esta versão do banco ainda não separa quem marcou; a barra verde vem de outra fonte e mostra todas as unidades.' : '')));
     };
     desenhar();
@@ -5009,11 +4994,10 @@ h1.longo { font-size: 14mm; }
     const entA = FA.entraram || 0, entB = FB.entraram || 0, pedA = FA.pedido || 0, pedB = FB.pedido || 0, agA = FA.agendaram || 0, agB = FB.agendaram || 0;
     const esp = CA.espera_mediana_min;
     const mpl = PLd ? PLd.total.total : null, kl = PLd ? ((PLd.clinica_mesmo_periodo || {}).consulta || 0) + ((PLd.clinica_mesmo_periodo || {}).exame || 0) : 0;
-    const dC = (a, b, base) => delta(a, b, { cont: true, base, neutro: true });
     const kpis = h('div', { class: 'ind-kpis' },
-      kpi('Pessoas que procuraram o chat', nf(entA), 'cada pessoa conta uma vez', dC(entA, entB, Math.min(entA, entB))),
-      kpi('Começaram um pedido', nf(pedA), `${pTxt(taxa(pedA, entA))} de quem procurou`, dC(pedA, pedB, Math.min(pedA, pedB))),
-      kpi('Agendaram pelo chat', nf(agA), `${pTxt(taxa(agA, entA))} de quem procurou`, dC(agA, agB, Math.min(agA, agB))),
+      kpi('Pessoas que procuraram o chat', nf(entA), 'cada pessoa conta uma vez'),
+      kpi('Começaram um pedido', nf(pedA), `${pTxt(taxa(pedA, entA))} de quem procurou`),
+      kpi('Agendaram pelo chat', nf(agA), `${pTxt(taxa(agA, entA))} de quem procurou`),
       kpi('Marcações do site no Klingo', mpl == null ? '—' : nf(mpl), mpl == null ? 'sem dado' : `${pTxt(taxa(mpl, kl))} das ${nf(kl)} da clínica`),
       kpi('1ª resposta da equipe', esp != null ? nf(esp) + ' min' : '—', 'tempo mediano'));
 
@@ -5038,7 +5022,7 @@ h1.longo { font-size: 14mm; }
 
     const lugarMensal = h('div', {}, h('p', { class: 'dica' }, 'Carregando a evolução a cada 30 dias…'));
     c.replaceChildren(h('div', { class: 'pagina ind-pg' }, titulo,
-      h('p', { class: 'sub' }, `Período: ${nomePer(R.periodo)}. Comparado com ${nomePer(R.anterior_periodo)}. ${R.gerado_em ? 'Atualizado às ' + fmtDataHora(R.gerado_em) + '. ' : ''}Só números, nenhum dado de paciente. ${escopo}`),
+      h('p', { class: 'sub' }, `Período: ${nomePer(R.periodo)}. ${R.gerado_em ? 'Atualizado às ' + fmtDataHora(R.gerado_em) + '. ' : ''}Só números, nenhum dado de paciente. ${escopo}`),
       atalhos,
       h('div', { class: 'ind-ctl' }, h('label', {}, 'De ', campoDe), h('label', {}, ' até ', campoAte), h('button', { class: 'btn', type: 'button', onclick: verPeriodo }, 'Ver período'),
         h('button', { class: 'btn', type: 'button', onclick: () => viewIndicadores(c, true) }, 'Atualizar agora'), caixaTeste),
@@ -5062,7 +5046,6 @@ h1.longo { font-size: 14mm; }
         h('ul', {},
           h('li', {}, 'Cada pessoa conta uma vez, mesmo que tenha aberto mais de uma conversa. Conversas de teste da TI ficam de fora.'),
           h('li', {}, '"Agendaram" inclui o agendamento feito pelo sistema e o marcado pela equipe (ou conversa encerrada como "agendado").'),
-          h('li', {}, 'As setas comparam com o período anterior de mesmo tamanho. Com poucos casos (menos de 8) o painel avisa em vez de comparar.'),
           h('li', {}, 'O Klingo entra só como referência: o total de marcações novas da clínica no mesmo período, para ver quanto vem do site. Consulta é o que o Klingo chama de "CONSULTA"; todo o resto é exame.'),
           h('li', {}, 'O dia de hoje ainda está em andamento: os números de hoje ainda crescem.')))));
     carregarEvolucaoSite(lugarMensal, un, IND.teste, minha, hojeISO);

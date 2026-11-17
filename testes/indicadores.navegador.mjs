@@ -212,15 +212,9 @@ await caso('Resumo: 5 números de uso do site (procuraram, começaram pedido, ag
   const k = await kpiTxt(t); const neutros = await t.page.locator('.ind-delta.bom, .ind-delta.ruim').count();
   await t.ctx.close();
   return { ok: Object.keys(k).length === 5 && k['Pessoas que procuraram o chat'].startsWith('60 |') && k['Começaram um pedido'].startsWith('45 |') && /^\d+ \| .*de quem procurou/.test(k['Agendaram pelo chat'])
-    && /^134 \| 4,8% das 2\.\d{3} da clínica/.test(k['Marcações do site no Klingo']) && k['1ª resposta da equipe'].startsWith('20 min') && neutros === 0, detalhe: JSON.stringify(k) + ' coloridos=' + neutros };
+    && /^134 \| 4,8% das 2\.\d{3} da clínica/.test(k['Marcações do site no Klingo']) && k['1ª resposta da equipe'].startsWith('20 min') && neutros === 0 && !/anterior|▲|▼|sem base/.test(JSON.stringify(k)), detalhe: JSON.stringify(k) + ' coloridos=' + neutros };
 });
-await caso('Poucos casos no período anterior: mostra o número de antes em vez de só "sem base para comparar"', async () => {
-  const t = await abrir({ unidade: 'rmtc' }); await t.page.click('.nav button[data-aba=indicadores]'); await t.page.selectOption('#selUnidade', 'rmtc');
-  await t.page.waitForFunction(() => /Unidade CSI RM\/TC/.test(document.querySelector('.pagina')?.innerText || ''));
-  const k = await kpiTxt(t); await t.ctx.close();
-  return { ok: /período anterior: 3 \(poucos casos para comparar\)/.test(k['Pessoas que procuraram o chat']) && !/sem base/.test(JSON.stringify(k)), detalhe: JSON.stringify(k['Pessoas que procuraram o chat']) };
-});
-await caso('Evolução a cada 30 dias: blocos de 30 dias desde o 1º dia de uso, 4 barras + linha do total, tabela e comparação com o período anterior', async () => {
+await caso('Evolução a cada 30 dias: blocos de 30 dias desde o 1º dia de uso, 4 barras + linha do total e tabela (sem comparação com o período anterior)', async () => {
   const t = await abrir(); await abaInd(t); await t.page.waitForSelector('.ind-area', { timeout: 8000 });
   const d0 = mais(HOJE, -70), dm = (i) => i.slice(8) + '/' + i.slice(5, 7);
   const pedidos = t.reg.rpcs.filter((r) => r[0] === 'plataforma' && r[1].p_de !== r[1].p_ate).map((r) => `${r[1].p_de}..${r[1].p_ate}`);
@@ -235,7 +229,7 @@ await caso('Evolução a cada 30 dias: blocos de 30 dias desde o 1º dia de uso,
   await t.ctx.close();
   const ult = tab[2] || [];
   return { ok: pedidos.join() === esperado.join() && barras === 12 && linhas === 1 && pts === 3 && zonas === 3 && grad === 0
-    && tab.length === 3 && tab[0][0].startsWith(`${d0.slice(8)}/${d0.slice(5, 7)}/${d0.slice(0, 4)} a `) && tab[0].slice(1, 8).join('|') === '54|30|3|27|4|2|60' && tab[0][8] === '—' && tab[1][8] === '0%' && ult[7] === '22' && ult[8] === 'em andamento' && /em andamento: 11 de 30 dias/.test(ult[0])
+    && tab.length === 3 && tab[0][0].startsWith(`${d0.slice(8)}/${d0.slice(5, 7)}/${d0.slice(0, 4)} a `) && tab[0].slice(1, 8).join('|') === '54|30|3|27|4|2|60' && tab[0].length === 8 && ult[7] === '22' && /em andamento: 11 de 30 dias/.test(ult[0])
     && minis[0] === '142 agendamentos do site desde o 1º dia de uso' && minis[1].startsWith(`${dm(d0)} a ${dm(mais(d0, 29))}`) && /Agendadas \(seguem valendo\): 16/.test(dica) && /Total de agendamentos: 22/.test(dica) && /em andamento \(11 de 30 dias\)/.test(dica)
     && barras3 === 9 && linhas2 === 0, detalhe: JSON.stringify({ pedidos, esperado, barras, linhas, pts, zonas, tab, minis, dica, barras3, linhas2 }) };
 });
