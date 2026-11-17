@@ -1,5 +1,6 @@
 # Webchat de Previsão de marcação (17/11/2026)
 
+Versão 1.1 — 17/11/2026 / Mudança: **tela "Pedir uma previsão"** (escolher o exame ou a consulta, turno / a partir de / até / até o dia, ou não escolher e ver a disponibilidade; funções `pmarc_catalogo`, `pmarc_disponibilidade`, `pmarc_pedido`).
 Versão 1.0 — 17/11/2026 / Mudança: primeira versão. Segundo webchat, separado do chat de marcação: registra TODA pessoa com marcação aberta no Klingo, mostra a ela a PREVISÃO e abre uma conversa que a equipe responde no painel.
 
 ## O que o dono pediu
@@ -47,6 +48,16 @@ Em **Configurações > Entrada do paciente (Continuar ou Previsão)** há duas c
 | **desligado** | ligada | **some o Começar** (e o formulário); só o botão Previsão, que leva a `previsao/` |
 | desligado | desligada | não vale: o painel recusa salvar e, se vier assim do banco, o webchat volta sozinho |
 O chat lê as chaves por `chat_config()` ao abrir; sem rede ou sem a chave, abre só o webchat. Conversa já aberta no aparelho continua abrindo direto. Teste: `npm run test:entrada-previsao` (7 casos) e um caso no teste do painel. O botão do formulário continua com o texto "Começar" (o nome atual no chat).
+
+## Pedir uma previsão: escolher o exame e o horário, ou só ver a disponibilidade (17/11/2026)
+A página só mostrava as marcações que já existiam. Agora, em **três lugares** (primeira tela sem link, tela da previsão e conversa) há o botão **Escolher e ver a disponibilidade**:
+1. **O que você quer?** Lista de exames, consultas e outros **que têm agenda** (abas Tudo / Consultas / Exames / Outros, busca pelo nome). "Não achei o que procuro" aceita texto livre.
+2. **Quando você prefere?** Turno (manhã, tarde, noite ou sem preferência), "a partir das", "até as", "até o dia" e unidade. **Nada é obrigatório**: dá para tocar direto em "Ver a disponibilidade".
+3. **Disponibilidade prevista:** até 10 dias com até 8 horários cada. A pessoa pode tocar num horário (opcional) e **Pedir esta previsão para a equipe**. Quem não tem link deixa só o celular. O pedido vira mensagem na conversa com a equipe (robô desligado), com o horário que a pessoa viu, marcado "previsão, não reservado".
+- **De onde vêm os horários:** a conta antiga de previsão do banco (`agenda_horarios`): grade do Klingo (`catalogo_agenda`, relatório #13984) menos a ocupação lida dos relatórios #7 e #47 (`agenda_ocupacao`), com 2 h de antecedência. **Não chama a API do Klingo** (ela exige CPF, nascimento e convênio) e **não reserva nada**. Pode divergir da agenda real; por isso o aviso em toda tela e a confirmação da equipe.
+- **Segurança:** `pmarc_catalogo` e `pmarc_disponibilidade` não trazem dado de paciente; a disponibilidade tem limite global de 120 consultas por minuto. `pmarc_pedido` usa o código do link e aceita no máximo 10 pedidos por hora por pessoa. Nada barra a pessoa por conteúdo.
+- **Arquivos:** `supabase/previsao-marcacao-parte5-escolha.sql` (rollback: `parte5-rollback.sql`), `previsao/index.html` (versão 2026.11.17-2), testes `npm run test:previsao-escolha` (17 casos) e `test:previsao-escolha-pagina` (12 casos). Não precisa trocar `sw.js` (a página `previsao/` não passa pelo cache do chat).
+- Nenhum relatório do Klingo novo ou editado.
 
 ## Ligar e desligar
 - Chave **`previsao_marcacao_modo`** (`sim`/`nao`). `nao`: a leitura do Klingo não grava, as 6 funções do paciente respondem "desligado" e o painel avisa.
