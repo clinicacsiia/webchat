@@ -428,8 +428,12 @@
   .ind-area-caixa { position: relative; margin-top: 8px; } .ind-area { width: 100%; height: auto; display: block; }
   .ind-area text { fill: var(--suave); font-size: 12px; } .ind-area .grade { stroke: var(--linha); stroke-width: 1; }
   .ind-area .pt { fill: var(--papel); stroke: #2a78d6; stroke-width: 2; } .ind-area .pt.melhor { fill: #2a78d6; } .ind-area .pt.on { r: 7; fill: #2a78d6; }
+  .ind-area .rot-bl { font-size: 11.5px; } .ind-area .pt { stroke: #1b2733; } .ind-area .pt.on { fill: #1b2733; }
+  .ind-area-dica i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; } .ind-area-dica i.lin, .ind-leg-chip i.lin { height: 3px; width: 14px; border-radius: 2px; }
+  .ind-leg-chip, .ind-leg-chip[aria-pressed=true] { display: inline-flex; align-items: center; gap: 6px; background: var(--papel); color: var(--texto); border: 1px solid var(--csi-border-strong, var(--linha)); } .ind-leg-chip i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; }
+  .ind-leg-chip[aria-pressed=false] { opacity: .5; text-decoration: line-through; }
   .ind-area .zona { outline: none; cursor: pointer; } .ind-area .zona:focus-visible { fill: rgba(42,120,214,.08); }
-  .ind-area-dica { position: absolute; top: 0; transform: translateX(-50%); pointer-events: none; background: var(--papel); border: 1px solid var(--linha); border-radius: 8px; padding: 8px 10px; font-size: 13px; box-shadow: 0 4px 14px rgba(0,0,0,.14); white-space: nowrap; z-index: 5; } .ind-area-dica b { display: block; margin-bottom: 2px; }
+  .ind-area-dica { position: absolute; top: 0; transform: translateX(-50%); pointer-events: none; background: var(--papel); border: 1px solid var(--linha); border-radius: 8px; padding: 8px 10px; font-size: 13px; box-shadow: 0 4px 14px rgba(0,0,0,.14); white-space: nowrap; z-index: 5; } .ind-area-dica > b { display: block; margin-bottom: 2px; }
   .ind-resumo { font-size: 16px; margin: 4px 0 2px; } .ind-resumo b { font-size: 26px; }
   .ind-conf-passo { margin: 14px 0 4px; font-size: 15px; } .ind-conf-passo span { display: inline-block; min-width: 22px; height: 22px; line-height: 22px; text-align: center; border-radius: 11px; background: var(--csi-primary-soft, #e6efff); color: var(--csi-primary, #1d4ed8); font-size: 13px; margin-right: 6px; }
   .ind-conta { display: grid; grid-template-columns: 1fr auto; gap: 2px 14px; max-width: 560px; font-size: 14px; } .ind-conta b { text-align: right; font-variant-numeric: tabular-nums; } .ind-conta .tot { border-top: 1px solid var(--csi-border); padding-top: 4px; font-weight: 700; }
@@ -4836,74 +4840,86 @@ h1.longo { font-size: 14mm; }
       pilhaVisual([{ v: T.ativas || 0, cor: COR_ST.ativas, rot: 'Ativas' }, { v: T.remarcadas || 0, cor: COR_ST.remarcadas, rot: 'Remarcadas' }, { v: T.canceladas || 0, cor: COR_ST.canceladas, rot: 'Canceladas' }]),
       h('p', { class: 'dica' }, `${nf(T.ativas)} ativas (${nf(T.atendidas)} atendidas, ${nf(T.faltaram)} faltaram, ${nf(T.por_vir)} por vir) · ${nf(perdidas)} canceladas ou remarcadas (${pc(perdidas, T.total)}).`));
   }
-  /* ---------- Gráfico mês a mês do uso do site (17/11/2026): SVG puro (linearGradient + path), sem biblioteca. ----------
-     Alimentado pelo array `dados` = [{ mes: 'AAAA-MM', procuraram, agendaram, parcial }]. Total, melhor mês e escala saem dele sozinhos. */
+  /* ---------- Evolução a cada 30 dias (17/11/2026): blocos de 30 dias contados do 1º dia de uso. Barras = agendadas, marcadas sozinhas, canceladas e remarcadas; linha = total de agendamentos do site. SVG puro. ---------- */
   const SVGNS = 'http://www.w3.org/2000/svg';
   const svgEl = (tag, attrs, ...kids) => { const e = document.createElementNS(SVGNS, tag); for (const [k, v] of Object.entries(attrs || {})) e.setAttribute(k, v); kids.forEach((x) => e.append(x)); return e; };
-  const MESES_ABR = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
-  const MESES_EXT = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
-  const rotMesAbr = (ym) => { const [a, m] = ym.split('-'); return `${MESES_ABR[+m - 1]}/${a.slice(2)}`; };
-  const rotMesExt = (ym) => { const [a, m] = ym.split('-'); return `${MESES_EXT[+m - 1]} de ${a}`; };
-  let _gradSeq = 0;
-  function graficoArea(dados, chave, rotulo) {
-    const W = 760, H = 240, ESQ = 44, DIR = 34, TOPO = 16, BAIXO = 34, aw = W - ESQ - DIR, ah = H - TOPO - BAIXO;
-    const vals = dados.map((d) => Number(d[chave]) || 0), total = vals.reduce((q, x) => q + x, 0);
-    let melhor = -1; vals.forEach((v, i) => { if (v > 0 && (melhor < 0 || v > vals[melhor])) melhor = i; });
-    const max = Math.max(1, ...vals), passo = max <= 5 ? 1 : max <= 20 ? 5 : max <= 100 ? 20 : max <= 500 ? 100 : Math.pow(10, Math.floor(Math.log10(max))), topo = Math.ceil(max / passo) * passo;
-    const x = (i) => ESQ + (dados.length === 1 ? aw / 2 : (i / (dados.length - 1)) * aw), y = (v) => TOPO + ah - (v / topo) * ah;
-    const id = 'gradArea' + (++_gradSeq);
-    const linha = vals.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
-    const area = `${linha} L${x(vals.length - 1).toFixed(1)},${TOPO + ah} L${x(0).toFixed(1)},${TOPO + ah} Z`;
-    const svg = svgEl('svg', { viewBox: `0 0 ${W} ${H}`, class: 'ind-area', role: 'img', 'aria-label': `${rotulo} por mês: ` + dados.map((d, i) => `${rotMesAbr(d.mes)} ${vals[i]}`).join(', ') },
-      svgEl('defs', {}, svgEl('linearGradient', { id, x1: 0, y1: 0, x2: 0, y2: 1 }, svgEl('stop', { offset: '0%', 'stop-color': '#2a78d6', 'stop-opacity': '.38' }), svgEl('stop', { offset: '100%', 'stop-color': '#2a78d6', 'stop-opacity': '0' }))));
-    for (let v = 0; v <= topo; v += passo) { svg.append(svgEl('line', { class: 'grade', x1: ESQ, x2: W - DIR, y1: y(v), y2: y(v) }), svgEl('text', { x: ESQ - 8, y: y(v) + 4, 'text-anchor': 'end' }, String(v))); }
-    svg.append(svgEl('path', { d: area, fill: `url(#${id})` }), svgEl('path', { d: linha, fill: 'none', stroke: '#2a78d6', 'stroke-width': 2.5, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }));
-    const dica = h('div', { class: 'ind-area-dica', hidden: true });
-    const caixa = h('div', { class: 'ind-area-caixa' }, svg, dica);
+  const dmCurto = (iso) => { const [, m, d] = iso.split('-'); return `${d}/${m}`; };
+  const rotBloco = (b) => `${dmCurto(b.de)} a ${dmCurto(b.ate)}`;
+  const SERIES_BL = [['ativas', 'Agendadas (seguem valendo)', '#2a78d6'], ['sozinhas', 'Marcadas sozinhas pelo chat', '#1baf7a'], ['canceladas', 'Canceladas', '#d03a2f'], ['remarcadas', 'Remarcadas', '#d98a00']];
+  const COR_LINHA = '#1b2733';
+  const GRAF_BL = { ocultas: new Set() };
+  function graficoBlocos(dados) {
+    const W = 760, H = 290, ESQ = 44, DIR = 20, TOPO = 16, BAIXO = 40, aw = W - ESQ - DIR, ah = H - TOPO - BAIXO, oc = GRAF_BL.ocultas;
+    const vis = SERIES_BL.filter(([k]) => !oc.has(k)), comLinha = !oc.has('total');
+    const max = Math.max(1, ...dados.map((d) => Math.max(0, ...vis.map(([k]) => d[k] || 0), comLinha ? d.total : 0)));
+    const passo = max <= 5 ? 1 : max <= 20 ? 5 : max <= 100 ? 20 : max <= 500 ? 100 : Math.pow(10, Math.floor(Math.log10(max))), topo = Math.ceil(max / passo) * passo;
+    const gw = aw / dados.length, cx = (i) => ESQ + gw * i + gw / 2, y = (v) => TOPO + ah - (v / topo) * ah;
+    const bw = Math.min(36, (gw * 0.78) / Math.max(1, vis.length)), gW = bw * vis.length;
+    const svg = svgEl('svg', { viewBox: `0 0 ${W} ${H}`, class: 'ind-area', role: 'img', 'aria-label': 'Agendamentos do site a cada 30 dias: ' + dados.map((d) => `${rotBloco(d)}, total ${d.total}`).join('; ') });
+    for (let v = 0; v <= topo; v += passo) svg.append(svgEl('line', { class: 'grade', x1: ESQ, x2: W - DIR, y1: y(v), y2: y(v) }), svgEl('text', { x: ESQ - 8, y: y(v) + 4, 'text-anchor': 'end' }, String(v)));
+    const dica = h('div', { class: 'ind-area-dica', hidden: true }), caixa = h('div', { class: 'ind-area-caixa' }, svg, dica);
     const mostrar = (i) => {
+      const d = dados[i];
+      dica.hidden = false;
+      dica.replaceChildren(...[h('b', {}, `${dmy(d.de)} a ${dmy(d.ate)}`), d.parcial ? h('div', { class: 'dica' }, `em andamento (${d.dias} de 30 dias)`) : null,
+        ...SERIES_BL.map(([k, r, cor]) => h('div', {}, h('i', { style: `background:${cor}` }), `${r}: `, h('b', {}, nf(d[k])))),
+        h('div', {}, h('i', { class: 'lin', style: `background:${COR_LINHA}` }), 'Total de agendamentos: ', h('b', {}, nf(d.total)))].filter(Boolean));
+      dica.style.left = Math.min(Math.max((cx(i) / W) * caixa.clientWidth, 120), caixa.clientWidth - 120) + 'px';
       svg.querySelectorAll('.pt').forEach((p, k) => p.classList.toggle('on', k === i));
-      dica.hidden = false; dica.replaceChildren(...[h('b', {}, rotMesExt(dados[i].mes)), h('div', {}, nf(vals[i]) + ' ' + rotulo.toLowerCase()), dados[i].parcial ? h('div', { class: 'dica' }, 'mês em andamento') : null].filter(Boolean));
-      const px = (x(i) / W) * caixa.clientWidth; dica.style.left = Math.min(Math.max(px, 70), caixa.clientWidth - 70) + 'px';
     };
     const esconder = () => { dica.hidden = true; svg.querySelectorAll('.pt').forEach((p) => p.classList.remove('on')); };
     dados.forEach((d, i) => {
-      svg.append(svgEl('circle', { class: 'pt' + (i === melhor ? ' melhor' : ''), cx: x(i), cy: y(vals[i]), r: i === melhor ? 5.5 : 4 }),
-        svgEl('text', { x: x(i), y: H - 12, 'text-anchor': 'middle' }, rotMesAbr(d.mes)));
-      const larg = dados.length === 1 ? aw : aw / (dados.length - 1);
-      const zona = svgEl('rect', { class: 'zona', x: x(i) - larg / 2, y: TOPO, width: larg, height: ah + BAIXO, fill: 'transparent', tabindex: 0, 'aria-label': `${rotMesExt(d.mes)}: ${vals[i]}` });
+      vis.forEach(([k, , cor], j) => { const v = d[k] || 0; if (v > 0) svg.append(svgEl('rect', { class: 'barra', x: cx(i) - gW / 2 + j * bw + 1, y: y(v), width: Math.max(bw - 2, 1), height: (v / topo) * ah, rx: 3, fill: cor })); });
+      svg.append(svgEl('text', { x: cx(i), y: H - 16, 'text-anchor': 'middle', class: 'rot-bl' }, dados.length > 6 ? dmCurto(d.de) : rotBloco(d) + (d.parcial ? '*' : '')));
+    });
+    if (comLinha) {
+      svg.append(svgEl('path', { d: dados.map((d, i) => `${i ? 'L' : 'M'}${cx(i).toFixed(1)},${y(d.total).toFixed(1)}`).join(' '), fill: 'none', stroke: COR_LINHA, 'stroke-width': 2.5, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }));
+      dados.forEach((d, i) => svg.append(svgEl('circle', { class: 'pt', cx: cx(i), cy: y(d.total), r: 4.5 })));
+    }
+    dados.forEach((d, i) => {
+      const zona = svgEl('rect', { class: 'zona', x: ESQ + gw * i, y: TOPO, width: gw, height: ah + BAIXO, fill: 'transparent', tabindex: 0, 'aria-label': `${rotBloco(d)}: total ${d.total}` });
       zona.addEventListener('pointerenter', () => mostrar(i)); zona.addEventListener('pointerdown', () => mostrar(i)); zona.addEventListener('focus', () => mostrar(i)); zona.addEventListener('blur', esconder);
       svg.append(zona);
     });
     caixa.addEventListener('pointerleave', esconder);
-    return { caixa, total, melhor: melhor < 0 ? null : dados[melhor], melhorValor: melhor < 0 ? 0 : vals[melhor] };
+    return caixa;
   }
-  const GRAF_SITE = { chave: 'procuraram' };
-  function blocoMensalSite(dados) {
+  function blocoEvolucao(dados, d0, semUnidadeAuto) {
     const box = h('div', {});
-    const SERIES = [['procuraram', 'Pessoas que procuraram o chat'], ['agendaram', 'Agendaram pelo chat']];
+    const total = dados.reduce((q, d) => q + d.total, 0); let melhor = null; dados.forEach((d) => { if (d.total > 0 && (!melhor || d.total > melhor.total)) melhor = d; });
+    const ultimo = dados[dados.length - 1];
     const desenhar = () => {
-      const [chave, rot] = SERIES.find((s) => s[0] === GRAF_SITE.chave) || SERIES[0];
-      const g = graficoArea(dados, chave, rot);
-      const chips = h('div', { class: 'chips', role: 'group', 'aria-label': 'O que mostrar no gráfico' }, SERIES.map(([k, r]) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(GRAF_SITE.chave === k), onclick: () => { GRAF_SITE.chave = k; desenhar(); } }, r)));
-      box.replaceChildren(chips,
-        h('div', { class: 'ind-minis' }, h('div', { class: 'ind-mini' }, h('b', {}, nf(g.total)), h('span', {}, `total nos ${dados.length} meses`)),
-          h('div', { class: 'ind-mini' }, h('b', {}, g.melhor ? rotMesAbr(g.melhor.mes) : '—'), h('span', {}, g.melhor ? `melhor mês (${nf(g.melhorValor)})` : 'melhor mês'))),
-        g.caixa);
+      const chip = (k, r, cor, linha) => h('button', { class: 'chip ind-leg-chip', type: 'button', 'aria-pressed': String(!GRAF_BL.ocultas.has(k)), onclick: () => { GRAF_BL.ocultas.has(k) ? GRAF_BL.ocultas.delete(k) : GRAF_BL.ocultas.add(k); desenhar(); } }, h('i', { class: linha ? 'lin' : '', style: `background:${cor}` }), r);
+      const legenda = h('div', { class: 'chips', role: 'group', 'aria-label': 'O que aparece no gráfico' }, SERIES_BL.map(([k, r, cor]) => chip(k, r + ' (barra)', cor, false)), chip('total', 'Total de agendamentos do site (linha)', COR_LINHA, true));
+      const linhas = dados.map((d, i) => { const ant = i ? dados[i - 1] : null, v = ant && ant.total > 0 && !d.parcial ? Math.round(((d.total - ant.total) / ant.total) * 100) : null;
+        return h('tr', {}, h('td', {}, `${dmy(d.de)} a ${dmy(d.ate)}`, d.parcial ? h('div', { class: 'dica' }, `em andamento: ${d.dias} de 30 dias`) : null), h('td', {}, nf(d.ativas)), h('td', {}, nf(d.sozinhas)), h('td', {}, nf(d.canceladas)), h('td', {}, nf(d.remarcadas)), h('td', {}, h('b', {}, nf(d.total))),
+          h('td', {}, !i ? '—' : d.parcial ? 'em andamento' : v == null ? '—' : (v > 0 ? '▲ ' : v < 0 ? '▼ ' : '') + Math.abs(v) + '%')); });
+      box.replaceChildren(
+        h('p', { class: 'ind-resumo' }, 'Cada grupo é um período de ', h('b', {}, '30 dias'), ` contado desde o 1º dia de uso (${dmy(d0)}). `, dados.length === 1 ? `Ainda há só 1 período, em andamento (${ultimo.dias} de 30 dias); a comparação com o seguinte começa em ${dmy(isoMais(d0, 30))}.` : `A linha é o total de agendamentos do site no período; as barras mostram de que ele é feito.`),
+        h('div', { class: 'ind-minis' }, h('div', { class: 'ind-mini' }, h('b', {}, nf(total)), h('span', {}, 'agendamentos do site desde o 1º dia de uso')),
+          h('div', { class: 'ind-mini' }, h('b', {}, melhor ? rotBloco(melhor) : '—'), h('span', {}, melhor ? `período com mais agendamentos (${nf(melhor.total)})` : 'período com mais agendamentos'))),
+        legenda, graficoBlocos(dados),
+        h('details', { class: 'ind-num-det', open: true }, h('summary', {}, 'Ver os números de cada período'), h('div', { class: 'ind-tab-rolagem' }, h('table', { class: 'ind-tab-graf' },
+          h('thead', {}, h('tr', {}, ['Período de 30 dias', 'Agendadas (seguem valendo)', 'Marcadas sozinhas', 'Canceladas', 'Remarcadas', 'Total', 'Total x período anterior'].map((t) => h('th', {}, t)))), h('tbody', {}, linhas)))),
+        h('p', { class: 'dica' }, 'Total = agendadas que seguem valendo + canceladas + remarcadas (marcações do Klingo que vieram de uma conversa do chat, pela data em que foram marcadas). "Marcadas sozinhas" é o que o chat marcou sem ninguém da equipe e já está contada dentro das agendadas; vem de outra fonte e não separa por unidade' + (semUnidadeAuto ? ', por isso, com a unidade escolhida, esta barra mostra todas as unidades.' : '.')));
     };
     desenhar();
-    return painel('Mês a mês', 'Passe o mouse (ou toque) em cada mês para ver o número exato. O último mês ainda está em andamento. O filtro de unidade do topo vale aqui.', box);
+    return painel('Evolução a cada 30 dias', 'Passe o mouse (ou toque) em um período para ver o detalhe. O período em andamento é marcado com * e ainda cresce.', box);
   }
-  // Busca cada mês (uma consulta por mês, em paralelo) sem mexer no banco e pinta o gráfico quando chegar.
-  async function carregarMensalSite(lugar, un, teste, seq, hojeISO) {
-    const meses = []; let [a, m] = hojeISO.split('-').map(Number);
-    for (let i = 0; i < 6; i++) { meses.unshift(`${a}-${String(m).padStart(2, '0')}`); m -= 1; if (m === 0) { m = 12; a -= 1; } }
-    const res = await Promise.all(meses.map((ym) => {
-      const [aa, mm] = ym.split('-').map(Number), ult = new Date(Date.UTC(aa, mm, 0)).toISOString().slice(0, 10), ate = ult > hojeISO ? hojeISO : ult;
-      return Promise.resolve(db.rpc('painel_indicadores_decisao', { p_de: `${ym}-01`, p_ate: ate, p_unidade: un, p_incluir_teste: teste })).then((r) => ({ ym, r, parcial: ult > hojeISO }), () => ({ ym, r: { error: true } }));
-    }));
+  // Acha o 1º dia de uso (1ª conversa real), monta os blocos de 30 dias e busca cada um (2 consultas por bloco, em paralelo). Sem mexer no banco.
+  async function carregarEvolucaoSite(lugar, un, teste, seq, hojeISO) {
+    let d0 = null;
+    try { let q = db.from('conversas').select('criado_em'); if (!teste) q = q.eq('teste', false); const r = await q.order('criado_em', { ascending: true }).limit(1); const v = r && r.data && r.data[0] && r.data[0].criado_em; if (v) d0 = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(new Date(v)); } catch (e) { /* cai para a data padrão */ }
+    if (!d0) d0 = '2026-10-29'; if (d0 > hojeISO) d0 = hojeISO;
+    const blocos = [];
+    for (let ini = d0; ini <= hojeISO && blocos.length < 40; ini = isoMais(ini, 30)) { const fim = isoMais(ini, 29), ate = fim > hojeISO ? hojeISO : fim; blocos.push({ de: ini, ate, parcial: fim > hojeISO, dias: Math.round((Date.parse(ate) - Date.parse(ini)) / 864e5) + 1 }); }
+    const res = await Promise.all(blocos.map((b) => Promise.all([
+      Promise.resolve(db.rpc('painel_indicadores_plataforma', { p_de: b.de, p_ate: b.ate, p_unidade: un, p_incluir_teste: teste })).then((x) => x, () => ({ error: true })),
+      Promise.resolve(db.rpc('painel_automacao_resumo', { p_de: b.de, p_ate: b.ate })).then((x) => x, () => ({ error: true }))])));
     if (S.aba !== 'indicadores' || seq !== viewIndicadores.seq) return;
-    if (res.some((x) => x.r.error || !x.r.data)) { lugar.replaceChildren(h('p', { class: 'dica' }, 'Não consegui carregar o gráfico mês a mês agora. Use "Atualizar agora" para tentar de novo.')); return; }
-    lugar.replaceChildren(blocoMensalSite(res.map((x) => { const F = (((x.r.data || {}).atual || {}).chat || {}).funil || {}; return { mes: x.ym, procuraram: F.entraram || 0, agendaram: F.agendaram || 0, parcial: !!x.parcial }; })));
+    if (res.some(([p]) => p.error || !p.data || !p.data.total)) { lugar.replaceChildren(h('p', { class: 'dica' }, 'Não consegui carregar a evolução a cada 30 dias agora. Use "Atualizar agora" para tentar de novo (se continuar, falta aplicar supabase/indicadores-plataforma.sql).')); return; }
+    const dados = blocos.map((b, i) => { const T = res[i][0].data.total, A = (res[i][1] && res[i][1].data) || {}; return { ...b, ativas: T.ativas || 0, canceladas: T.canceladas || 0, remarcadas: T.remarcadas || 0, total: T.total || 0, sozinhas: Number(A.agendadas_sozinhas) || 0 }; });
+    lugar.replaceChildren(blocoEvolucao(dados, d0, !!un));
   }
   async function viewIndicadores(c, silencioso = false) {
     if (IND.preset !== 'livre') [IND.de, IND.ate] = periodoDe(IND.preset);
@@ -4976,14 +4992,14 @@ h1.longo { font-size: 14mm; }
     const tabTipo = h('table', { class: 'ind-tab-graf' }, h('thead', {}, h('tr', {}, ['Passo do pedido', 'Consultas', 'Exames', temSemTipo ? 'Sem tipo definido' : null].filter(Boolean).map((t) => h('th', {}, t)))),
       h('tbody', {}, passosTipo.map(([k, rot]) => h('tr', {}, h('td', {}, rot), h('td', {}, nf((PTF.consulta || {})[k])), h('td', {}, nf((PTF.exame || {})[k])), temSemTipo ? h('td', {}, nf((PTF.sem_tipo || {})[k])) : null))));
 
-    const lugarMensal = h('div', {}, h('p', { class: 'dica' }, 'Carregando o gráfico mês a mês…'));
+    const lugarMensal = h('div', {}, h('p', { class: 'dica' }, 'Carregando a evolução a cada 30 dias…'));
     c.replaceChildren(h('div', { class: 'pagina ind-pg' }, titulo,
       h('p', { class: 'sub' }, `Período: ${nomePer(R.periodo)}. Comparado com ${nomePer(R.anterior_periodo)}. ${R.gerado_em ? 'Atualizado às ' + fmtDataHora(R.gerado_em) + '. ' : ''}Só números, nenhum dado de paciente. ${escopo}`),
       atalhos,
       h('div', { class: 'ind-ctl' }, h('label', {}, 'De ', campoDe), h('label', {}, ' até ', campoAte), h('button', { class: 'btn', type: 'button', onclick: verPeriodo }, 'Ver período'),
         h('button', { class: 'btn', type: 'button', onclick: () => viewIndicadores(c, true) }, 'Atualizar agora'), caixaTeste),
       kpis,
-      h('h3', { class: 'ind-sec' }, 'Mês a mês'),
+      h('h3', { class: 'ind-sec' }, 'Evolução a cada 30 dias'),
       lugarMensal,
       h('h3', { class: 'ind-sec' }, 'Onde as pessoas param'),
       h('div', { class: 'ind-grade' },
@@ -5005,7 +5021,7 @@ h1.longo { font-size: 14mm; }
           h('li', {}, 'As setas comparam com o período anterior de mesmo tamanho. Com poucos casos (menos de 8) o painel avisa em vez de comparar.'),
           h('li', {}, 'O Klingo entra só como referência: o total de marcações novas da clínica no mesmo período, para ver quanto vem do site. Consulta é o que o Klingo chama de "CONSULTA"; todo o resto é exame.'),
           h('li', {}, 'O dia de hoje ainda está em andamento: os números de hoje ainda crescem.')))));
-    carregarMensalSite(lugarMensal, un, IND.teste, minha, hojeISO);
+    carregarEvolucaoSite(lugarMensal, un, IND.teste, minha, hojeISO);
     clearTimeout(IND.t);
     IND.t = setTimeout(() => { if (S.aba === 'indicadores' && !document.hidden) viewIndicadores(c, true); }, 120000);
   }
