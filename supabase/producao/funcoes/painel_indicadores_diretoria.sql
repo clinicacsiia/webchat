@@ -17,7 +17,7 @@ begin
   v_ate := least(coalesce(p_ate, v_hoje), v_hoje);
   v_de := greatest(coalesce(p_de, v_ate - 6), v_ate - 400);
   if v_de > v_ate then v_de := v_ate; end if;
-  foreach v_u in array array['csi', 'rmtc', 'desenvoar'] loop
+  foreach v_u in array array['csi', 'rmtc', 'desenvoar', 'sem'] loop
     d := public.ind_decisao_periodo(v_de, v_ate, v_u, v_teste) -> 'chat';
     pl := public.painel_indicadores_plataforma(v_de, v_ate, v_u, v_teste);
     v_un := v_un || jsonb_build_object(v_u, jsonb_build_object('pessoas', d -> 'funil' -> 'entraram', 'agendaram', d -> 'funil' -> 'agendaram',
@@ -40,3 +40,4 @@ begin
     into v_ped, v_pla;
   return jsonb_build_object('periodo', jsonb_build_object('de', v_de, 'ate', v_ate), 'gerado_em', now(), 'unidades', v_un, 'pedidos', v_ped, 'planos', v_pla);
 end $function$;
+

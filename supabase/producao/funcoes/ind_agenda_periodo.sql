@@ -26,7 +26,7 @@ begin
       join public.conversas cw on cw.id = kc.conversa_id
      where e.status <> 'pedido'
        and (p_teste or not cw.teste)
-       and (p_un is null or public.unidade_chave(e.unidade) is null or public.unidade_chave(e.unidade) = p_un)),
+       and (p_un is null or coalesce(public.unidade_chave(e.unidade), 'sem') = p_un)),
   base as (select * from ex where dia between p_de and p_ate),
   ag as (
     select g.grp, g.chave,
@@ -56,7 +56,7 @@ begin
   nov as (select count(*) as total, count(*) filter (where r = 'cancelada') as canceladas, count(*) filter (where r = 'remarcada') as remarcadas,
                  count(*) filter (where r not in ('cancelada', 'remarcada')) as ativas
             from ex where marcado between p_de and p_ate),
-  pu as (select x.conversa_id, x.pessoa from public.painel_conversa_pessoa_un() x where p_un is null or x.chaves is null or cardinality(x.chaves) = 0 or p_un = any (x.chaves)),
+  pu as (select x.conversa_id, x.pessoa from public.painel_conversa_pessoa_un() x where p_un is null or (p_un = 'sem' and (x.chaves is null or cardinality(x.chaves) = 0)) or (p_un <> 'sem' and p_un = any (x.chaves))),
   site as (select count(distinct pu.pessoa) filter (where cardinality(coalesce(pa.klingo_marcacoes, '{}')) > 0) as com_marcacao,
                   count(distinct pu.pessoa) filter (where exists (select 1 from unnest(coalesce(pa.klingo_marcacoes, '{}')) u
                                                                     where exists (select 1 from public.klingo_conferencia z where z.m = u::text and z.status_klingo <> 'Cancelada'))) as com_marcacao_ativa

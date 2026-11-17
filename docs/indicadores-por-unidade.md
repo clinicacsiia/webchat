@@ -8,7 +8,7 @@ Por que os números pareciam divergir (09/11/2026): o cartão do topo contava **
 - **Conversas por pessoa** = conversas ÷ pessoas.
 - **Encerradas hoje / Finalizadas** = das conversas que começaram no período, quantas já estão encerradas.
 - **Dia** = dia de calendário no fuso de São Paulo. Período "Hoje" = hoje; "7 dias" = hoje e os 6 anteriores.
-- **Filtro de unidade do topo** vale nos cartões e em toda a aba Indicadores (pedidos, horários, motivos de encerramento e avaliações). Unidade da pessoa: 1) pedido já agendado e aberto; 2) cartão da Jornada; 3) unidade escolhida no formulário do chat. Sem nenhuma, a pessoa aparece em **todas** as unidades.
+- **Filtro de unidade do topo** vale nos cartões e em toda a aba Indicadores (pedidos, horários, motivos de encerramento e avaliações). Unidade da pessoa: 1) pedido já agendado e aberto; 2) cartão da Jornada; 3) unidade escolhida no formulário do chat. Sem nenhuma, a pessoa fica em **"Sem unidade definida"** (desde 17/11/2026; antes aparecia em todas as unidades, regra trocada na revisão abaixo).
 
 ## O que tem a mais na aba Indicadores
 
@@ -102,3 +102,14 @@ Pedido do dono: no topo, **pessoas que procuraram o chat, pessoas atendidas, vir
 
 ### Gráfico de procura e agendamento por tipo (17/11/2026, v5)
 Logo abaixo dos 6 números: colunas lado a lado, **Consultas** e **Exames** (e "Pedido sem tipo definido" quando houver), cada uma com quem procurou (começou um pedido desse tipo) e quantos agendaram, mais a porcentagem. Sem mudança no banco: usa `por_tipo` de `painel_indicadores_decisao`. Medido de 03 a 16/11: consultas 279 → 106 agendaram (38%); exames 7 → 2 (29%); pedidos sem tipo 11 → 6. O chat é quase todo consulta. Painel `sw.js` v57, teste com 31 verificações.
+
+
+## Revisão dos 3 erros reais (17/11/2026, à tarde)
+
+Arquivo: `supabase/indicadores-erros-reais.sql` (aplicado em partes; seis funções, só `create or replace`). Teste: `cd testes && npm run test:indicadores-erros-reais` (11 verificações no clone) e `npm run test:indicadores` (33 na tela).
+
+1. **Unidade.** Quem não tem unidade definida contava em CSI, CSI RM/TC e Desenvoar ao mesmo tempo. Agora conta só em **"Sem unidade definida"** (`unidades.sem` em `painel_indicadores_diretoria`; `ind_decisao_periodo`, `ind_agenda_periodo` e `painel_indicadores_plataforma` aceitam a unidade `sem`). Vale também para o filtro de unidade do topo (`painel_indicadores_decisao`, `_agenda`, `_atendentes`): ele deixa de incluir quem não tem unidade. Marcação do Klingo sem unidade idem. Medido em 17/11/2026: 34 pessoas no total = CSI 0 + RM/TC 0 + Desenvoar 28 + sem unidade 6; agendaram 8 = 7 + 1 (antes: 10).
+2. **Funil.** Quem foi encerrado como "Agendado" mas tem o pedido ainda em rascunho (`pre_agendamentos.status` diferente de `agendado`) contava em todas as etapas. Agora as etapas do meio (data, horário, pedido pronto) usam o andamento **real** do pedido; essa pessoa conta só em "Agendaram". `funil.agendaram_so_pelo_motivo` diz quantas são e a tela escreve uma nota. Medido: 8 → 6 → 6 (antes 8 → 8 → 8 nas duas últimas etapas).
+3. **Agendamentos por atendente.** O Klingo não informa quem marcou, e `agendado_por` só vem do botão do painel (1 em 96 nos últimos 9 dias). Por isso a tela agora separa **"Marcou à mão"** (`agendado_por`) de **"Com ajuda (sistema)"** (o sistema confirmou com o Klingo numa conversa em que a pessoa **escreveu**; o dono da conversa só conta se escreveu). Dono que não escreveu nada deixa de ganhar crédito; marcação **cancelada de verdade** não conta (remarcada continua contando); a função devolve `agendados_a_mao` e `agendados_cancelados`. A frase da tela deixou de dizer "os que ela marcou". Hoje: 12 agendados, 1 cancelado, 2 remarcados, 0 à mão, todos os outros com ajuda de quem escreveu.
+
+Ressalvas tratadas só na tela (painel `sw.js` v61): "de cada 100" agora usa só quem ficou na agenda e já teve desfecho (atendido ou falta), diz "Sem dados" quando não há, e avisa quantas estão sem fechamento no Klingo; cancelados e remarcados do topo dizem "pelo dia do agendamento" e a história "pela data do exame"; "Viraram agendamento" mostra quantas têm marcação no Klingo; aviso quando o período inclui hoje (as setas comparam com período inteiro); Mais pedidos e Planos explicam que contam só pedido com status agendado; 1ª resposta explica que conta desde a abertura da conversa; "já atendidos" de hoje avisa que depende do registro da recepção.

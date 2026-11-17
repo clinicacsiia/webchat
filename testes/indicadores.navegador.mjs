@@ -34,7 +34,7 @@ const GRUPOS = [{ conversa_id: 'c1', grupo_id: 'g1', sinais: ['nome'], origem: '
 // Respostas de painel_indicadores_decisao (supabase/indicadores-decisao.sql). Por unidade: "desenvoar" = 40 pessoas; "rmtc" = poucas pessoas (4 agora, 3 antes).
 const DECISAO = (a) => {
   const un = a.p_unidade, pequeno = un === 'rmtc', ent = pequeno ? 4 : un === 'desenvoar' ? 40 : 60;
-  const atual = { chat: { entraram: ent, funil: { entraram: ent, pedido: pequeno ? 3 : 45, data_hora: pequeno ? 2 : 40, horario: pequeno ? 2 : 22, completo: pequeno ? 1 : 20, agendaram: pequeno ? 1 : un === 'desenvoar' ? 10 : 15 },
+  const atual = { chat: { entraram: ent, funil: { entraram: ent, pedido: pequeno ? 3 : 45, data_hora: pequeno ? 2 : 40, horario: pequeno ? 2 : 22, completo: pequeno ? 1 : 20, agendaram: pequeno ? 1 : un === 'desenvoar' ? 10 : 15, agendaram_so_pelo_motivo: pequeno ? 0 : 2 },
       parou_em: { conversou: 15, exame: 2, plano: 1, preferencias: 0, data_hora: 18, dados: 2, pronto: 5 }, sem_agendar_motivo: { nao_respondido: 20, sem_equipe: 5, apenas_informacoes: 10, desistiu: 3, outro: 2, em_andamento: 5 }, espera_mediana_min: 20,
       por_tipo: { consulta: { pedido: 42, data_hora: 38, horario: 21, completo: 19, agendaram: 14 }, exame: { pedido: 3, data_hora: 2, horario: 1, completo: 1, agendaram: 1 } } },
     clinica: { novas_marcacoes: 200, novas_pelo_chat: 15, previstos: 300, atendidos: 200, faltaram: 50, cancelados: 20, remarcados: 15, por_vir: 15,
@@ -50,7 +50,7 @@ const DECISAO = (a) => {
   return { periodo: { de: a.p_de, ate: a.p_ate }, anterior_periodo: { de: mais(a.p_de, -1), ate: mais(a.p_de, -1) }, unidade: un, incluir_teste: !!a.p_incluir_teste, gerado_em: agora, atual, anterior };
 };
 const ATENDENTES = (a) => ({ periodo: { de: a.p_de, ate: a.p_ate }, unidade: a.p_unidade, gerado_em: agora, nota_media_geral: 8.5,
-  pessoas: [{ nome: 'Ana', conversas: 40, agendados: 12, avaliacoes: 8, nota_media: 9.4, primeiras: 30, espera_mediana_min: 6 }, { nome: 'Bia', conversas: 25, agendados: 3, avaliacoes: 2, nota_media: 6.5, primeiras: 9, espera_mediana_min: 45 }, { nome: 'Caio', conversas: 10, agendados: 0, avaliacoes: 0, nota_media: null, primeiras: 1, espera_mediana_min: 12 }] });
+  pessoas: [{ nome: 'Ana', conversas: 40, agendados: 12, agendados_a_mao: 4, agendados_automaticos: 8, avaliacoes: 8, nota_media: 9.4, primeiras: 30, espera_mediana_min: 6 }, { nome: 'Bia', conversas: 25, agendados: 3, agendados_a_mao: 0, agendados_automaticos: 3, avaliacoes: 2, nota_media: 6.5, primeiras: 9, espera_mediana_min: 45 }, { nome: 'Caio', conversas: 10, agendados: 0, avaliacoes: 0, nota_media: null, primeiras: 1, espera_mediana_min: 12 }] });
 const EXTRAS = (admin) => ({ por_hora: [], pedidos: {}, avaliacoes: admin ? { total: 10, media_atendimento: 8.5, media_site: 7.9, por_canal: { WhatsApp: 4, Instagram: 5, Google: 1 } } : null });
 const jwt = (sub) => { const b = (o) => Buffer.from(JSON.stringify(o)).toString('base64url'); return `${b({ alg: 'HS256', typ: 'JWT' })}.${b({ sub, role: 'authenticated', exp: Math.floor(Date.now() / 1000) + 86400 })}.x`; };
 
@@ -73,7 +73,8 @@ function servidor() {
 const DIRETORIA = { unidades: {
     csi: { pessoas: 43, agendaram: 6, marcacoes: { total: 6, canceladas: 1, remarcadas: 0, ativas: 5, atendidas: 2, faltaram: 0, por_vir: 3 }, por_tipo: { consulta: { total: 1 }, exame: { total: 5 } } },
     rmtc: { pessoas: 31, agendaram: 6, marcacoes: { total: 6, canceladas: 0, remarcadas: 2, ativas: 4, atendidas: 0, faltaram: 0, por_vir: 4 }, por_tipo: { exame: { total: 6 } } },
-    desenvoar: { pessoas: 320, agendaram: 112, marcacoes: { total: 122, canceladas: 4, remarcadas: 5, ativas: 113, atendidas: 15, faltaram: 3, por_vir: 95 }, por_tipo: { consulta: { total: 121 }, exame: { total: 1 } } } },
+    desenvoar: { pessoas: 320, agendaram: 112, marcacoes: { total: 122, canceladas: 4, remarcadas: 5, ativas: 113, atendidas: 15, faltaram: 3, por_vir: 95 }, por_tipo: { consulta: { total: 121 }, exame: { total: 1 } } },
+    sem: { pessoas: 6, agendaram: 1, marcacoes: { total: 0, canceladas: 0, remarcadas: 0, ativas: 0, atendidas: 0, faltaram: 0, por_vir: 0 }, por_tipo: {} } },
   pedidos: [{ nome: 'CONSULTA', pessoas: 100, agendaram: 45 }, { nome: 'CONSULTA NEUROPEDIATRIA', pessoas: 60, agendaram: 6 }, { nome: 'CONSULTA ORTOPEDIATRA', pessoas: 25, agendaram: 6 }],
   planos: [{ nome: 'UNIMED', pessoas: 50, agendaram: 20 }, { nome: 'BRADESCO SAUDE', pessoas: 40, agendaram: 14 }, { nome: 'PLANSERV', pessoas: 10, agendaram: 0 }] };
 
@@ -232,9 +233,9 @@ await caso('Topo: os 6 números pedidos (procuraram, atendidas, viraram agendame
   const k = await kpiTxt(t); const topo = await t.page.locator('.ind-kpis').first().locator('.ind-kpi-rot').allInnerTexts(); const coloridos = await t.page.locator('.ind-kpis').first().locator('.ind-delta.bom, .ind-delta.ruim').count();
   const ordem = await t.page.locator('.ind-pg h3.ind-sec').first().innerText();
   await t.ctx.close();
-  return { ok: topo.join('|') === 'Pessoas que procuraram o chat|Pessoas atendidas|Viraram agendamento|Agendaram sem ajuda de ninguém|Cancelados|Remarcados' && ordem === 'O chat em números'
-    && k['Pessoas que procuraram o chat'].startsWith('60 | cada pessoa conta uma vez | ▲ 20%') && k['Pessoas atendidas'].startsWith('57 | 95% de quem procurou') && k['Viraram agendamento'].startsWith('15 | 25% de quem procurou')
-    && k['Agendaram sem ajuda de ninguém'].startsWith('3 | 20% dos que agendaram · nenhum atendente na conversa') && k['Cancelados'].startsWith('4 | de 135 marcações do chat agendadas neste período (3%)') && k['Remarcados'].startsWith('7 | de 135 marcações do chat agendadas neste período (5,2%)') && coloridos === 0, detalhe: JSON.stringify(k) + ' ' + topo.join(',') };
+  return { ok: topo.join('|') === 'Pessoas que procuraram o chat|Pessoas atendidas|Viraram agendamento|Agendaram sem ajuda de ninguém|Cancelados (pelo dia do agendamento)|Remarcados (pelo dia do agendamento)' && ordem === 'O chat em números'
+    && k['Pessoas que procuraram o chat'].startsWith('60 | cada pessoa conta uma vez | ▲ 20%') && k['Pessoas atendidas'].startsWith('57 | 95% de quem procurou') && k['Viraram agendamento'].startsWith('15 | 25% de quem procurou · 82 com marcação no Klingo')
+    && k['Agendaram sem ajuda de ninguém'].startsWith('3 | 20% dos que agendaram · nenhum atendente na conversa') && k['Cancelados (pelo dia do agendamento)'].startsWith('4 | de 135 marcações do chat agendadas neste período (3%)') && k['Remarcados (pelo dia do agendamento)'].startsWith('7 | de 135 marcações do chat agendadas neste período (5,2%)') && coloridos === 0, detalhe: JSON.stringify(k) + ' ' + topo.join(',') };
 });
 await caso('Gráfico "Procura e agendamento": consultas e exames, cada um com a procura (começaram um pedido) e quantos agendaram, e a porcentagem', async () => {
   const t = await abrir(); await abaInd(t);
@@ -254,13 +255,13 @@ await caso('Chat do site: começaram pedido, com marcação no Klingo (confere o
 
 await caso('Marcações do chat: a história em ordem (agendados, saíram, ficaram, confirmaram, atendidos, faltaram) e a frase "de cada 100 marcações que já passaram"', async () => {
   const t = await abrir(); await abaInd(t);
-  const p = t.page.locator('.ind-painel', { hasText: 'A história das marcações' }).first();
+  const p = t.page.locator('.ind-painel', { hasText: 'A história das marcações (pela data do exame)' }).first();
   const rots = await p.locator('.ind-rot').allInnerTexts(), frase = (await p.locator('.ind-resumo').first().innerText()).replace(/\s+/g, ' '), perda = (await p.locator('.ind-perda').first().innerText()).replace(/\s+/g, ' ');
   const leg = (await p.locator('.ind-leg').innerText()).replace(/\s+/g, ' ');
   await t.ctx.close();
-  const T = TOTAL_AG, esperado = Math.round((T.atendidas / (T.agendados - T.sem_fechamento)) * 100);
+  const T = TOTAL_AG, esperado = Math.round((T.atendidas / (T.atendidas + T.faltaram)) * 100);   // só quem ficou na agenda e já teve desfecho
   return { ok: rots.slice(0, 5).join('|') === '1. Agendados|2. Ficaram na agenda|3. Confirmaram (dos que ficaram)|4. Vieram e foram atendidos|5. Faltaram' && rots.some((x) => /Klingo ainda não fechou/.test(x))
-    && frase === `De cada 100 marcações que já passaram, ${esperado} viraram atendimento.` && /4 saíram da agenda: 0 cancelados e 4 remarcados/.test(perda) && /Atendidos 18/.test(leg) && /Faltaram 3/.test(leg), detalhe: rots.join('|') + ' || ' + frase + ' || ' + perda + ' || ' + leg };
+    && frase.startsWith(`De cada 100 marcações que ficaram na agenda e já tiveram desfecho, ${esperado} viraram atendimento.`) && /ainda sem fechamento no Klingo ficam fora desta conta/.test(frase) && /4 saíram da agenda: 0 cancelados e 4 remarcados/.test(perda) && /Atendidos 18/.test(leg) && /Faltaram 3/.test(leg), detalhe: rots.join('|') + ' || ' + frase + ' || ' + perda + ' || ' + leg };
 });
 await caso('Marcações do chat: "Confirmar adianta?" avisa quando há poucas marcações passadas para comparar (menos de 20 de cada lado)', async () => {
   const t = await abrir(); await abaInd(t);
@@ -298,7 +299,7 @@ await caso('Equipe de atendimento: barra de agendamentos por atendente e tabela 
   const p = t.page.locator('.ind-painel', { hasText: 'Por atendente' }).first();
   const rots = await p.locator('.ind-rot').allInnerTexts(), linhas = await p.locator('tbody tr').evaluateAll((l) => l.map((r) => [...r.querySelectorAll('td')].map((c) => c.innerText.trim()).join('|')));
   await t.ctx.close();
-  return { ok: rots[0] === 'Ana' && linhas[0] === 'Ana|40|12|6 min|9,4' && /^Bia\|25\|3\|/.test(linhas[1]), detalhe: rots.join(',') + ' || ' + linhas.join(' ; ') };
+  return { ok: rots[0] === 'Ana' && linhas[0] === 'Ana|40|4|8|6 min|9,4' && /^Bia\|25\|0\|3\|/.test(linhas[1]), detalhe: rots.join(',') + ' || ' + linhas.join(' ; ') };
 });
 await caso('Sem a função da agenda no banco: avisa o arquivo a aplicar e o resto da página (funil do chat) continua', async () => {
   const t = await abrir({ semAgenda: true }); await abaInd(t);
@@ -349,7 +350,20 @@ await caso('Por unidade: pessoas, agendaram, marcações da plataforma (consulta
   const t = await abrir(); await abaInd(t);
   const linhas = await t.page.locator('.ind-card', { has: t.page.locator('h4', { hasText: 'Por unidade' }) }).locator('tbody tr').evaluateAll((l) => l.map((r) => [...r.querySelectorAll('td')].map((c) => c.innerText.trim()).join('|')));
   await t.ctx.close();
-  return { ok: linhas.join(';') === 'CSI|43|6 (14%)|6|1 · 5|1 (16,7%)|0 de 2 (0%);CSI RM/TC|31|6 (19,4%)|6|0 · 6|2 (33,3%)|—;Desenvoar|320|112 (35%)|122|121 · 1|9 (7,4%)|3 de 18 (16,7%)', detalhe: linhas.join(';') };
+  return { ok: linhas.join(';') === 'CSI|43|6 (14%)|6|1 · 5|1 (16,7%)|0 de 2 (0%);CSI RM/TC|31|6 (19,4%)|6|0 · 6|2 (33,3%)|—;Desenvoar|320|112 (35%)|122|121 · 1|9 (7,4%)|3 de 18 (16,7%);Sem unidade definida|6|1 (16,7%)|0|0 · 0|0 (—)|—', detalhe: linhas.join(';') };
+});
+await caso('Por unidade: quem não escolheu unidade fica em "Sem unidade definida" (não repete em todas) e as linhas somam o total de pessoas', async () => {
+  const t = await abrir(); await abaInd(t);
+  const cartao = t.page.locator('.ind-card', { has: t.page.locator('h4', { hasText: 'Por unidade' }) });
+  const rots = await cartao.locator('.ind-bd-rot').allInnerTexts(), total = (await cartao.innerText()).match(/Total: (\d+) pessoas/);
+  await t.ctx.close();
+  return { ok: rots.join('|') === 'CSI|CSI RM/TC|Desenvoar|Sem unidade definida' && total && total[1] === '400', detalhe: rots.join('|') + ' ' + (total ? total[0] : 'sem total') };
+});
+await caso('Funil: a pessoa encerrada como "Agendado" sem pedido agendado aparece em nota (conta em Agendaram, não nas etapas do meio)', async () => {
+  const t = await abrir(); await abaInd(t);
+  const txt = (await t.page.locator('.ind-painel', { hasText: 'Caminho do paciente no chat' }).first().innerText()).replace(/\s+/g, ' ');
+  await t.ctx.close();
+  return { ok: /2 pessoas foram encerradas como "Agendado", mas o pedido não está agendado/.test(txt), detalhe: txt.slice(-260) };
 });
 await caso('O que mais pedem e planos: pedidos e planos com pessoas, agendaram e %; os que quase não agendam ficam destacados', async () => {
   const t = await abrir(); await abaInd(t);

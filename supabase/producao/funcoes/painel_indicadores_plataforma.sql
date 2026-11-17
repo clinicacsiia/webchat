@@ -9,7 +9,7 @@ AS $function$
 declare
   v_hoje date := (now() at time zone 'America/Sao_Paulo')::date;
   v_ate date; v_de date; v_out jsonb;
-  v_un text := case when lower(coalesce(p_unidade, '')) in ('csi', 'rmtc', 'desenvoar') then lower(p_unidade) end;
+  v_un text := case when lower(coalesce(p_unidade, '')) in ('csi', 'rmtc', 'desenvoar', 'sem') then lower(p_unidade) end;
 begin
   if coalesce((select public.papel_atual()), '') not in ('admin', 'atendente') then
     raise exception 'Somente administrador e atendente veem os indicadores.' using errcode = '42501';
@@ -27,7 +27,7 @@ begin
       join public.conversas c on c.id = k.conversa_id
       left join public.jornada_exame je on je.marcacao_id = 'm' || k.m
      where k.marcado_em between v_de and v_ate and (p_incluir_teste or not c.teste)
-       and (v_un is null or k.unidade is null or k.unidade = v_un)),
+       and (v_un is null or coalesce(k.unidade, 'sem') = v_un)),
   p as (select b.*, case when b.st = 'remarcado' then 'remarcada'
                          when b.status_klingo = 'Cancelada' or b.st = 'cancelado' then 'cancelada'
                          when b.st = 'atendido' then 'atendida' when b.st = 'faltou' then 'faltou'
@@ -35,7 +35,7 @@ begin
                coalesce(b.tipo, 'sem_tipo') as t from base b),
   clin as (select case when je.procedimento ~* '^consulta' then 'consulta' else 'exame' end as t, count(*) as n
              from public.klingo_conferencia k left join public.conversas c on c.id = k.conversa_id left join public.jornada_exame je on je.marcacao_id = 'm' || k.m
-            where k.marcado_em between v_de and v_ate and (p_incluir_teste or c.id is null or not c.teste) and (v_un is null or k.unidade is null or k.unidade = v_un) and je.procedimento is not null group by 1),
+            where k.marcado_em between v_de and v_ate and (p_incluir_teste or c.id is null or not c.teste) and (v_un is null or coalesce(k.unidade, 'sem') = v_un) and je.procedimento is not null group by 1),
   cc as (select case
            when mot = '' or mot ~ '^[^[:alnum:]]*$' or length(mot) < 3 then 'sem_motivo'
            when mot ~ 'duplic|dupli|erro|errad|eror|correç|corrig|unificad|lançamento|lancamento|teste' then 'erro_duplicidade'
@@ -63,3 +63,4 @@ begin
   ) into v_out;
   return v_out;
 end $function$;
+

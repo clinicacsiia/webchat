@@ -27,13 +27,16 @@ begin
              where e.tipo = 'assumida' and e.em >= v_de and e.em < v_ate and e.para_agente is not null group by e.para_agente),
   enc as (select ce.por as agente_id, count(*) as n from public.conversa_encerramento ce join cv on cv.id = ce.conversa_id
            where ce.encerrada_em >= v_de and ce.encerrada_em < v_ate and ce.por is not null group by ce.por),
-  -- Mesma regra do painel_indicadores_atendentes: quem marcou à mão; senão o dono da conversa; senão quem mais escreveu nela.
+  -- Mesma regra do painel_indicadores_atendentes (v1.1, 17/11/2026): quem marcou à mão; senão quem escreveu na conversa (o dono, se escreveu); marcação cancelada de verdade no Klingo não conta (remarcada continua contando).
   agd as (select x.agente_id, count(*) as n
-            from (select coalesce(p.agendado_por, c.agente_id, (select m.agente_id from public.mensagens m where m.conversa_id = p.conversa_id and m.autor = 'agente' and m.agente_id is not null
-                                                                  group by m.agente_id order by count(*) desc, m.agente_id limit 1)) as agente_id
+            from (select coalesce(p.agendado_por, (select m.agente_id from public.mensagens m where m.conversa_id = p.conversa_id and m.autor = 'agente' and m.agente_id is not null
+                                       group by m.agente_id order by (m.agente_id = c.agente_id) desc, count(*) desc, m.agente_id limit 1)) as agente_id,
+                         (coalesce(cardinality(p.klingo_marcacoes), 0) > 0 and not exists (select 1 from unnest(p.klingo_marcacoes) u
+                            where not exists (select 1 from public.klingo_conferencia z where z.m = u::text and z.status_klingo = 'Cancelada'))
+                         and not exists (select 1 from unnest(p.klingo_marcacoes) u2 join public.jornada_exame je on je.marcacao_id = 'm' || u2 where je.status = 'remarcado')) as cancelado
                     from public.pre_agendamentos p join cv on cv.id = p.conversa_id join public.conversas c on c.id = p.conversa_id
                    where coalesce(p.agendado_em, p.agendado_auto_em) >= v_de and coalesce(p.agendado_em, p.agendado_auto_em) < v_ate) x
-           where x.agente_id is not null group by x.agente_id),
+           where x.agente_id is not null and not x.cancelado group by x.agente_id),
   tf as (select e.por as agente_id, count(*) as n from public.conversa_evento e join cv on cv.id = e.conversa_id
           where e.tipo = 'transferencia' and e.em >= v_de and e.em < v_ate and e.por is not null group by e.por),
   tr as (select e.para_agente as agente_id, count(*) as n from public.conversa_evento e join cv on cv.id = e.conversa_id

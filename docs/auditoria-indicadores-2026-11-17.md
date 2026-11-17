@@ -49,3 +49,6 @@ Conclusão: **a agenda da clínica vem do Klingo**; o chat só entra como "quant
 5. Consultas, exames e unidades.
 6. Por atendente (só quem a pessoa pode ver).
 7. O chat do site (como antes, mais o gráfico por dia e "Com marcação no Klingo").
+
+## 7. Revisão à tarde: 3 erros reais corrigidos (17/11/2026)
+Detalhes, números e arquivos em [`indicadores-por-unidade.md`](indicadores-por-unidade.md) (seção "Revisão dos 3 erros reais"). Resumo: pessoas sem unidade deixaram de contar em todas as unidades (46 → 34), o funil deixou de empurrar quem foi encerrado "Agendado" sem pedido agendado para todas as etapas (8 → 6 → 6) e "Por atendente" separa "marcou à mão" de "com ajuda do sistema", sem creditar dono que não escreveu nem marcação cancelada.
