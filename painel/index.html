@@ -258,6 +258,11 @@
   dialog.largo { width: min(640px, calc(100% - 24px)); max-height: calc(100% - 24px); overflow-y: auto; }
   .cab-acoes { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; } .cab-acoes .btn { display: inline-flex; align-items: center; gap: 8px; } .cab-acoes .btn .ic-svg svg { width: 18px; height: 18px; }
   dialog.equipe { width: min(980px, calc(100% - 24px)); max-height: calc(100% - 24px); overflow-y: auto; }
+  #tabPrevMarc td, #tabPrevMarc th { text-align: left; vertical-align: top; }
+  #tabPrevMarc td > div { margin-bottom: 4px; }
+  .pm-acoes { display: flex; flex-direction: column; gap: 6px; align-items: stretch; min-width: 150px; }
+  .pm-acoes .btn { text-align: center; text-decoration: none; }
+  .aviso-pm { background: var(--csi-warning-soft); color: var(--aviso); border: 1px solid currentColor; border-radius: 10px; padding: 8px 12px; font-weight: 600; }
   .eq-rolagem { overflow-x: auto; }
   .eq-tab { width: 100%; border-collapse: collapse; font-size: 14px; }
   .eq-tab th, .eq-tab td { padding: 9px 6px; border-bottom: 1px solid var(--csi-border); text-align: center; vertical-align: middle; }
@@ -2017,6 +2022,108 @@
     const t = setInterval(() => { if (!dlg.open || dlg.dataset.pendencias !== '1') { clearInterval(t); return; } if (PEND.aba === 'codigos') carregarPendencias(true); }, 15000);
     dlg.addEventListener('close', () => { delete dlg.dataset.pendencias; clearInterval(t); carregarSeloPendencias(); }, { once: true });
   }
+  /* ---------- Previsão de marcação (17/11/2026) ----------
+     Segundo webchat (previsao/index.html): registra TODA pessoa com marcação aberta no Klingo (relatórios #14359 e #14554) e abre uma conversa que a equipe responde aqui, na lista normal.
+     A janela mostra quem foi registrado, o que cada um respondeu ("não sei" vale como resposta), copia o link pessoal, abre o WhatsApp com o texto pronto e abre a conversa.
+     Dados: painel_pmarc_* (admin e atendente). A previsão NÃO é confirmação: a equipe vê e confirma. */
+  const PM = { filtro: 'todos', busca: '', lista: [], fim: false, resumo: null, estado: null, erro: null, carregando: false, seq: 0 };
+  const PM_FILTROS = [['todos', 'Todos'], ['sem_link', 'Sem link enviado'], ['sem_resposta', 'Sem resposta'], ['respondeu', 'Responderam'], ['nao_sei', 'Não sei'], ['conversa', 'Com conversa']];
+  const PM_RESP = { sim: 'Disse que está certo', nao: 'Disse que tem algo diferente', nao_sei: 'Não sabe / pode seguir' };
+  const PM_UNID = { CSI: 'CSI', DESENVOAR: 'Desenvoar', 'RM/TC': 'CSI RM/TC' };
+  const pmLink = (codigo) => new URL('../previsao/?c=' + encodeURIComponent(codigo), location.href).href;
+  const pmPrimeiro = (nome) => { const p = String(nome || '').trim().split(/\s+/)[0] || ''; return p ? p.charAt(0).toUpperCase() + p.slice(1).toLowerCase() : ''; };
+  const pmTextoZap = (l) => `Olá${pmPrimeiro(l.nome) ? ', ' + pmPrimeiro(l.nome) : ''}! Aqui é a CSI. Veja a PREVISÃO da sua marcação e responda por este link (ela ainda será vista e confirmada pela nossa equipe, por aqui, pelo WhatsApp e por telefone): ${pmLink(l.codigo)}`;
+  const pmZap = (l) => { const d = String(l.celular || '').replace(/\D/g, ''); return d.length >= 10 ? 'https://wa.me/55' + d + '?text=' + encodeURIComponent(pmTextoZap(l)) : null; };
+  const pmQuando = (iso) => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' }).replace('.', ''); };
+  const pmNum = (v) => Number(v) || 0;
+  async function pmMarcarEnviado(l) { try { await db.rpc('painel_pmarc_link_enviado', { p_id: l.id }); l.link_enviado_em = new Date().toISOString(); } catch { /* o link já foi usado; marcar é só conveniência */ } }
+  function pmCard(l) {
+    const itens = l.itens || [];
+    const zap = pmZap(l);
+    const botoes = [
+      h('button', { class: 'btn', type: 'button', 'data-pm': 'copiar', onclick: async (ev) => {
+        const b = ev.currentTarget; const link = pmLink(l.codigo);
+        try { await navigator.clipboard.writeText(link); toast('Link copiado.'); } catch { window.prompt('Copie o link:', link); }
+        await pmMarcarEnviado(l); renderPrevMarcCorpo(); } }, 'Copiar link'),
+      zap ? h('a', { class: 'btn', 'data-pm': 'zap', href: zap, target: '_blank', rel: 'noopener noreferrer', onclick: () => { pmMarcarEnviado(l).then(renderPrevMarcCorpo); } }, 'WhatsApp com o link')
+          : h('span', { class: 'dica', 'data-pm': 'sem-celular' }, 'Sem celular: anote por telefone'),
+      h('button', { class: 'btn sec', type: 'button', 'data-pm': 'conversa', disabled: !zap && !l.conversa_id, onclick: async (ev) => {
+        const b = ev.currentTarget; b.disabled = true;
+        try {
+          const { data, error } = await db.rpc('painel_pmarc_conversa', { p_id: l.id });
+          if (error) throw error;
+          dlg.close(); await carregarConversas(); abrirConversaDoAviso(data);
+        } catch (e) { b.disabled = false; toast(/Sem celular/.test(String(e && e.message)) ? 'Sem celular para abrir a conversa. Anote por telefone.' : 'Não foi possível abrir agora. Tente de novo.'); }
+      } }, l.conversa_id ? 'Abrir conversa' : 'Iniciar conversa')];
+    const situacao = [
+      l.resposta ? h('div', {}, h('b', {}, PM_RESP[l.resposta] || l.resposta), l.respondeu_em ? h('span', { class: 'dica' }, ' · ' + dispQuando(l.respondeu_em)) : null) : h('div', { class: 'dica' }, 'Ainda não respondeu'),
+      l.primeiro_acesso_em ? h('div', { class: 'dica' }, 'Abriu o link: ' + dispQuando(l.primeiro_acesso_em)) : h('div', { class: 'dica' }, 'Não abriu o link'),
+      l.link_enviado_em ? h('div', { class: 'dica' }, 'Link enviado: ' + dispQuando(l.link_enviado_em)) : null,
+      l.observacao ? h('div', {}, h('span', { class: 'dica' }, 'Observação: '), l.observacao) : null,
+      l.revisar ? h('div', {}, h('b', { class: 'dica' }, 'Dados digitados para conferir (e-mail, CPF, celular ou nascimento)')) : null];
+    return h('tr', { 'data-pm-id': l.id },
+      h('th', { scope: 'row' }, l.nome, l.origem === 'espontaneo' ? h('span', { class: 'dica' }, ' · chegou sozinho(a)') : null,
+        h('div', { class: 'dica' }, [l.celular ? l.celular : 'sem celular', l.nascimento ? 'nasc. ' + dataPrev(l.nascimento) : '', l.email || '', l.tem_cpf || l.cpf_informado ? 'CPF informado' : 'sem CPF', l.primeira_vez ? 'primeira vez' : ''].filter(Boolean).join(' · '))),
+      h('td', {}, itens.length ? [...itens.map((i) => h('div', {}, h('b', {}, pmQuando(i.quando)), ' ', i.tipo === 'consulta' ? 'Consulta: ' : '', i.procedimento, h('span', { class: 'dica' }, ' · ' + (PM_UNID[i.unidade] || i.unidade || '')))),
+        pmNum(l.n_itens) > itens.length ? h('div', { class: 'dica' }, `+ ${pmNum(l.n_itens) - itens.length} marcação(ões)`) : null]
+        : h('span', { class: 'dica' }, 'Sem marcação aberta no Klingo')),
+      h('td', {}, situacao),
+      h('td', {}, h('div', { class: 'pm-acoes' }, botoes)));
+  }
+  function renderPrevMarcCorpo() {
+    const box = document.getElementById('pmCorpo'); if (!box) return;
+    const r = PM.resumo || {}, e = PM.estado;
+    const topo = [];
+    if (PM.resumo && r.ligado === false) topo.push(h('p', { class: 'aviso-pm', role: 'alert', 'data-pm': 'desligado' }, 'O registro está DESLIGADO (nada é lido do Klingo e o link do paciente responde "não disponível"). Para ligar: Configurações > chave previsao_marcacao_modo = sim.'));
+    topo.push(h('p', { class: 'dica', 'data-pm': 'resumo' }, PM.resumo
+      ? `${pmNum(r.total)} pessoa(s) registrada(s) · ${pmNum(r.link_enviado)} com link enviado · ${pmNum(r.abriram)} abriram · ${pmNum(r.responderam)} responderam (${pmNum(r.nao_sei)} "não sei") · ${pmNum(r.com_conversa)} com conversa · ${pmNum(r.sem_celular)} sem celular`
+      : 'Carregando…'));
+    if (e) topo.push(h('p', { class: 'dica', 'data-pm': 'estado' }, e.erro ? 'A última leitura do Klingo deu erro: ' + e.erro : 'Última leitura do Klingo: ' + (e.rapido_em ? dispQuando(e.rapido_em) : 'ainda não houve') + (e.completo_em ? ' · leitura completa: ' + dispQuando(e.completo_em) : '')));
+    let lista;
+    if (PM.erro) lista = h('p', { class: 'dica', role: 'alert' }, PM.erro);
+    else if (PM.carregando && !PM.lista.length) lista = h('p', { class: 'dica' }, 'Carregando…');
+    else if (!PM.lista.length) lista = h('p', { class: 'dica', 'data-pm': 'vazio' }, PM.busca ? 'Ninguém encontrado.' : 'Ninguém nesta lista ainda.');
+    else lista = h('div', { class: 'eq-rolagem' }, h('table', { class: 'tab eq-tab', id: 'tabPrevMarc' },
+      h('thead', {}, h('tr', {}, ['Pessoa', 'Previsão (do Klingo)', 'Situação', ''].map((t) => h('th', { scope: 'col' }, t)))),
+      h('tbody', {}, PM.lista.map(pmCard))));
+    const mais = !PM.fim && PM.lista.length ? h('button', { class: 'btn', type: 'button', id: 'pmMais', disabled: PM.carregando, onclick: () => carregarPrevMarc(true) }, PM.carregando ? 'Carregando…' : 'Mostrar mais') : null;
+    box.replaceChildren(...[...topo, lista, mais].filter(Boolean));
+  }
+  async function carregarPrevMarc(mais) {
+    if (PM.carregando) return;
+    const seq = ++PM.seq; PM.carregando = true; PM.erro = null;
+    if (!mais) { PM.lista = []; PM.fim = false; }
+    renderPrevMarcCorpo();
+    try {
+      const [lista, resumo, estado] = await Promise.all([
+        db.rpc('painel_pmarc_lista', { p_filtro: PM.filtro, p_busca: PM.busca || null, p_limite: 50, p_pular: mais ? PM.lista.length : 0 }),
+        db.rpc('painel_pmarc_resumo'), db.rpc('painel_pmarc_estado')]);
+      if (seq !== PM.seq) return;
+      if (lista.error) throw lista.error;
+      const novos = Array.isArray(lista.data) ? lista.data : [];
+      PM.lista = mais ? PM.lista.concat(novos) : novos; PM.fim = novos.length < 50;
+      if (resumo.data) PM.resumo = resumo.data;
+      if (estado.data) PM.estado = estado.data;
+    } catch { if (seq === PM.seq) PM.erro = 'Não foi possível carregar agora. Tente de novo em instantes.'; }
+    if (seq === PM.seq) { PM.carregando = false; renderPrevMarcCorpo(); }
+  }
+  function abrirPrevMarc() {
+    if (!podeAtender()) return;
+    dlg.className = 'equipe'; dlg.dataset.prevmarc = '1';
+    Object.assign(PM, { filtro: 'todos', busca: '', lista: [], fim: false, erro: null, carregando: false });
+    const busca = h('input', { type: 'search', id: 'pmBusca', placeholder: 'Buscar por nome ou celular', 'aria-label': 'Buscar por nome ou celular', maxlength: '60', style: 'max-width:320px' });
+    let t = null;
+    busca.addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => { PM.busca = busca.value.trim(); PM.seq++; PM.carregando = false; carregarPrevMarc(false); }, 400); });
+    const chips = h('div', { class: 'chips', role: 'group', 'aria-label': 'Filtro da previsão' }, PM_FILTROS.map(([id, rot]) => h('button', { class: 'chip', type: 'button', 'data-pm-filtro': id, 'aria-pressed': String(PM.filtro === id),
+      onclick: () => { PM.filtro = id; chips.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.pmFiltro === id))); PM.seq++; PM.carregando = false; carregarPrevMarc(false); } }, rot)));
+    dlg.replaceChildren(h('h3', {}, 'Previsão de marcação'),
+      h('p', { class: 'dica', style: 'margin:-8px 0 10px' }, 'Quem tem marcação aberta no Klingo e já foi registrado aqui. É uma PREVISÃO, não uma confirmação: envie o link, veja o que a pessoa respondeu e confirme pela conversa (webchat, WhatsApp ou telefone). "Não sei" vale como resposta: nada bloqueia a pessoa.'),
+      chips, busca, h('div', { id: 'pmCorpo' }),
+      h('div', { class: 'rodape' }, h('button', { class: 'btn', type: 'button', onclick: () => dlg.close() }, 'Fechar')));
+    if (!dlg.open) dlg.showModal();
+    dlg.addEventListener('close', () => { delete dlg.dataset.prevmarc; PM.seq++; }, { once: true });
+    carregarPrevMarc(false);
+  }
   function abrirEquipe() {
     if (!ehChefia()) return;
     dlg.className = 'equipe'; dlg.dataset.equipe = '1';
@@ -2679,6 +2786,7 @@
         h('div', {}, h('h2', {}, icone('fone'), 'Painel de atendimento'), h('p', { class: 'sub' }, 'Acompanhe as conversas do dia, o que está em espera e os alertas.')),
         h('div', { class: 'cab-acoes' },
           podeAtender() ? h('button', { class: 'btn', type: 'button', id: 'btnPrevisao', title: 'Pacientes que pediram aviso quando surgir vaga compatível (não é agendamento nem reserva)', onclick: abrirPrevisao }, icone('calendario'), 'Disponibilidade futura') : null,
+          podeAtender() ? h('button', { class: 'btn', type: 'button', id: 'btnPrevMarc', title: 'Quem tem marcação aberta no Klingo, o que respondeu à previsão e o link para enviar (previsão não é confirmação)', onclick: abrirPrevMarc }, icone('calendario'), 'Previsão de marcação') : null,
           podeAtender() ? h('button', { class: 'btn', type: 'button', id: 'btnPendencias', title: 'O que espera a equipe: solicitações do acesso rápido, cadastros para conferir e contas antigas sem PIN', onclick: abrirPendencias },
             icone('lista'), 'Pendências', h('span', { class: 'selo', id: 'seloPendencias', hidden: true }, '0')) : null,
           ehChefia() ? h('button', { class: 'btn', type: 'button', id: 'btnEquipe', title: 'Quanto cada atendente está atendendo agora (só TI, gerência e supervisão)', onclick: abrirEquipe }, icone('pessoas'), 'Equipe agora') : null,
@@ -3809,6 +3917,10 @@
       { k: 'motor', tipo: 'escolha', rot: 'Motor', opcoes: [['fluxo', 'Fluxo guiado (sem IA)'], ['ia', 'Inteligência artificial']], dica: 'Fluxo guiado segue um roteiro fixo; IA conversa livremente.' },
       { k: 'motor_telefones_teste', tipo: 'texto', rot: 'Telefones de teste', dica: 'Só esses números usam o motor novo (separe por vírgula). Vazio = ninguém em teste.' },
     ] },
+    { id: 'entrada', icone: 'fone', titulo: 'Entrada do paciente (Continuar ou Previsão)', desc: 'O que o paciente vê na primeira tela do chat. Os dois ligados: aparecem o botão Começar (webchat de marcação) e o botão Previsão de marcação. Webchat desligado e Previsão ligada: some o Começar e o paciente só segue pela Previsão. Os dois desligados não vale: o webchat volta sozinho.', campos: [
+      { k: 'entrada_webchat_modo', tipo: 'sim', rot: 'Botão Começar (webchat de marcação)', dica: 'Desligado: o formulário e o botão Começar somem da primeira tela. Conversa já aberta no aparelho continua abrindo.' },
+      { k: 'entrada_previsao_modo', tipo: 'sim', rot: 'Botão Previsão de marcação', dica: 'Ligado: aparece o botão que leva à página de previsão (a pessoa vê o que está marcado e fala com a equipe).' },
+    ] },
     { id: 'catalogos', icone: 'pin', titulo: 'Catálogos do chat (unidades)', desc: 'Cada catálogo é uma porta de entrada do chat (consultas, exames e médicos próprios). Desligar um tira o botão dele da primeira tela do chat; conversas que já estão abertas nele continuam normalmente. Sempre fica pelo menos um ligado.', campos: [
       { k: 'catalogo_desenvoar', tipo: 'sim', rot: 'Desenvoar (atendimento pediátrico)', dica: 'Desligado: a Desenvoar some da escolha de unidade no começo do chat.' },
       { k: 'catalogo_csi', tipo: 'sim', rot: 'CSI (exames e consultas)', dica: 'Desligado: a CSI some da escolha de unidade no começo do chat.' },
@@ -4141,6 +4253,10 @@ h1.longo { font-size: 14mm; }
     salvar.addEventListener('click', async () => {
       salvar.disabled = true;
       try {
+        // Entrada do paciente: pelo menos um dos dois botões precisa ficar ligado (senão o paciente não consegue seguir).
+        if (lidos.entrada_webchat_modo && lidos.entrada_previsao_modo && lidos.entrada_webchat_modo.ler() === 'nao' && lidos.entrada_previsao_modo.ler() === 'nao') {
+          toast('Deixe pelo menos um botão ligado em "Entrada do paciente": senão o paciente não consegue seguir.'); return;
+        }
         let n = 0;
         for (const [chave, { ler, inicial }] of Object.entries(lidos)) {
           const novo = ler(); if (novo === inicial) continue;

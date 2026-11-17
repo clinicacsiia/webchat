@@ -1,5 +1,5 @@
 -- public.chat_config()
--- Pode executar: anon, authenticated, service_role
+-- Pode executar: anon, authenticated
 CREATE OR REPLACE FUNCTION public.chat_config()
  RETURNS jsonb
  LANGUAGE sql
@@ -7,6 +7,6 @@ CREATE OR REPLACE FUNCTION public.chat_config()
  SET search_path TO ''
 AS $function$
   select coalesce(jsonb_object_agg(chave, valor), '{}'::jsonb)
-  from public.config where chave in ('nome_empresa', 'boas_vindas')
+  from public.config where chave in ('nome_empresa', 'boas_vindas', 'entrada_webchat_modo', 'entrada_previsao_modo')
 $function$;
 
