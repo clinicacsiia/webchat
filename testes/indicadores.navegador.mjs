@@ -139,7 +139,7 @@ async function pagina(browser, { semSql = false, admin = false, semAtend = false
     }
     else if (p.endsWith('/rpc/painel_indicadores_diretoria')) { const b = JSON.parse(req.postData() || '{}'); reg.rpcs.push(['diretoria', b]); corpo = DIRETORIA; }
     else if (p.endsWith('/rpc/painel_indicadores_plataforma')) { const b = JSON.parse(req.postData() || '{}'); reg.rpcs.push(['plataforma', b]); if (semPlat) { status = 404; corpo = { code: 'PGRST202', message: 'function not found' }; } else if (b.p_de !== b.p_ate) { const dias = Math.round((Date.parse(b.p_ate) - Date.parse(b.p_de)) / 864e5) + 1; corpo = { ...PLATAFORMA, total: { total: dias * 2, ativas: dias * 2 - 6, canceladas: 4, remarcadas: 2, atendidas: 1, faltaram: 0, por_vir: 1, sem_dado: 0 } }; } else corpo = PLATAFORMA; }
-    else if (p.endsWith('/rpc/painel_automacao_resumo')) { const b = JSON.parse(req.postData() || '{}'); reg.rpcs.push(['automacao', b]); corpo = b.p_de !== b.p_ate ? { ...AUTOMACAO, agendadas_sozinhas: Math.round((Date.parse(b.p_ate) - Date.parse(b.p_de)) / 864e5) + 1 } : AUTOMACAO; }
+    else if (p.endsWith('/rpc/painel_automacao_resumo')) { const b = JSON.parse(req.postData() || '{}'); reg.rpcs.push(['automacao', b]); corpo = b.p_de !== b.p_ate ? { ...AUTOMACAO, resolvidas_sem_humano: Math.round((Date.parse(b.p_ate) - Date.parse(b.p_de)) / 864e5) + 1 } : AUTOMACAO; }
     else if (p.endsWith('/rpc/painel_indicadores_mensal')) { const b = JSON.parse(req.postData() || '{}'); reg.rpcs.push(['mensal', b]); corpo = MENSAL; }
     else if (p.endsWith('/rpc/painel_indicadores_conferencia')) { const b = JSON.parse(req.postData() || '{}'); reg.rpcs.push(['conferencia', b]); corpo = conf ? CONFERENCIA : {}; }
     else if (p.endsWith('/rpc/paciente_avisos')) corpo = conf ? AVISOS_CONF : [];
@@ -162,7 +162,8 @@ const abrir = async (opc) => { const t = await pagina(browser, opc); await t.pag
 const cartoes = (page) => page.locator('#kpis .kpi').evaluateAll((l) => Object.fromEntries(l.map((k) => [k.querySelector('small').textContent, k.querySelector('strong').textContent])));
 const esperaCartao = (page, rot, v) => page.waitForFunction(([r, x]) => [...document.querySelectorAll('#kpis .kpi')].some((k) => k.querySelector('small').textContent === r && k.querySelector('strong').textContent === x), [rot, v], { timeout: 5000 });
 const abaInd = async (t) => { await t.page.click('.nav button[data-aba=indicadores]'); await t.page.waitForSelector('.ind-kpis .ind-kpi', { timeout: 8000 }).catch((e) => { throw new Error(e.message.split('\n')[0] + ' | erros da página: ' + (t.reg.excecoes.join(' ; ') || 'nenhum')); }); await t.page.evaluate(() => document.querySelectorAll('.ind-det, .ind-num-det').forEach((d) => { d.open = true; })); };
-const ultimoD = async (t) => { const [de, ate] = await t.page.locator('.ind-ctl input[type=date]').evaluateAll((l) => l.map((i) => i.value)); return t.reg.rpcs.filter((r) => r[0] === 'decisao' && r[1].p_de === de && r[1].p_ate === ate).at(-1)?.[1]; };   // as consultas do gráfico mensal têm outras datas
+const ultimoD = async (t) => { for (let n = 0; n < 40; n++) { const v = await t.page.locator('.ind-ctl input[type=date]').evaluateAll((l) => l.map((i) => i.value)).catch(() => []); const r = v.length === 2 ? t.reg.rpcs.filter((q) => q[0] === 'decisao' && q[1].p_de === v[0] && q[1].p_ate === v[1]).at(-1)?.[1] : null; if (r) return r; await new Promise((x) => setTimeout(x, 100)); } return undefined; };   // as consultas do gráfico de 30 dias usam outras datas; espera a da tela aparecer
+const ultimoP = async (t) => { for (let n = 0; n < 40; n++) { const v = await t.page.locator('.ind-ctl input[type=date]').evaluateAll((l) => l.map((i) => i.value)).catch(() => []); const r = v.length === 2 ? t.reg.rpcs.filter((q) => q[0] === 'plataforma' && q[1].p_de === v[0] && q[1].p_ate === v[1]).at(-1)?.[1] : null; if (r) return r; await new Promise((x) => setTimeout(x, 100)); } return undefined; };   // as consultas do gráfico de 30 dias usam outras datas; espera a da tela aparecer
 const ultimo = (reg, k) => reg.rpcs.filter((r) => r[0] === k).at(-1)?.[1];
 
 await caso('Cartões do topo: 5 conversas, 4 pessoas atendidas e 1 concluída hoje; a conversa de TESTE fica fora e não existe "Conversas por pessoa"', async () => {
@@ -285,7 +286,7 @@ await caso('Funil por tipo (recolhido): consultas e exames separados', async () 
 });
 await caso('Comparação com o Klingo: marcações novas da clínica toda x as do site (consultas, exames, total e a parte do site) e o que aconteceu com elas', async () => {
   const t = await abrir(); await abaInd(t);
-  const a = ultimo(t.reg, 'plataforma');
+  const a = await ultimoP(t);
   const linhas = await t.page.locator('.ind-painel', { hasText: 'Site e Klingo' }).first().locator('tbody tr').evaluateAll((l) => l.map((r) => [...r.querySelectorAll('td')].map((c) => c.innerText.trim())));
   const txt = (await t.page.locator('.ind-painel', { hasText: 'Site e Klingo' }).first().innerText()).replace(/\s+/g, ' ');
   await t.ctx.close();
@@ -299,7 +300,7 @@ await caso('Autoatendimento: frase "30 de 37 deram certo", barra por situação,
   const resumo = (await p.locator('.ind-resumo').innerText()).replace(/\s+/g, ' '), minis = await p.locator('.ind-mini').evaluateAll((l) => l.map((m) => m.innerText.replace(/\s+/g, ' ')));
   const leg = (await p.locator('.ind-leg').innerText()).replace(/\s+/g, ' '), motivos = await p.locator('.ind-rot').allInnerTexts(); const txt = await p.innerText();
   await t.ctx.close();
-  return { ok: /30 de 37 tentativas deram certo \(81,1%\)/.test(resumo) && /Marcadas sozinhas 30/.test(leg) && /Foram para a equipe 3/.test(leg) && /Horário já ocupado 4/.test(leg) && minis[0] === '42 s tempo médio para marcar' && minis[1] === '18 marcadas sem nenhum atendente na conversa' && minis[2].startsWith('9 cancelados ou remarcados pelo chat (6 e 3)')
+  return { ok: /30 de 37 tentativas pela API deram certo \(81,1%\)/.test(resumo) && /Marcadas pela API 30/.test(leg) && /Foram para a equipe 3/.test(leg) && /Horário já ocupado 4/.test(leg) && minis[0] === '42 s tempo médio para marcar' && minis[1] === '18 marcadas pelo cliente, sem nenhum atendente na conversa' && minis[2].startsWith('9 cancelados ou remarcados pelo chat (6 e 3)')
     && motivos.join('|') === 'Horário já foi ocupado por outra pessoa' && !/horario_tomado|divergencia_/.test(txt), detalhe: resumo + ' | ' + leg + ' | ' + minis.join(' ; ') + ' | ' + motivos.join('|') };
 });
 await caso('Atalhos de período: Ontem, 7 dias, 30 dias, Este mês e Mês anterior pedem as datas certas', async () => {

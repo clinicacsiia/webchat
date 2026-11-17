@@ -4769,11 +4769,11 @@ h1.longo { font-size: 14mm; }
     if (!tentativas) return painel('Marcação automática pelo chat', null, h('p', { class: 'dica' }, 'O chat não tentou marcar nenhum horário sozinho neste período.'));
     const motivos = (d.motivos_falha || []).map((x) => [rotFalhaAuto(x.codigo), Number(x.n || 0)]), maxM = Math.max(1, ...motivos.map((x) => x[1]));
     const cancel = pos['cancelar:sucesso'] || 0, remarc = pos['remarcar:sucesso'] || 0;
-    return painel('Marcação automática pelo chat', 'Quando o paciente escolhe o horário, o chat tenta marcar sozinho no Klingo. O que não conclui vai para a equipe. Marcação feita pela recepção ou pelo telefone não entra.',
-      h('p', { class: 'ind-resumo' }, h('b', {}, nf(feitas)), ` de ${nf(tentativas)} tentativas deram certo (${pTxt(taxa(feitas, tentativas))}).`),
-      pilhaVisual([{ v: feitas, cor: COR_ST.ativas, rot: 'Marcadas sozinhas' }, { v: equipe, cor: COR_ST.remarcadas, rot: 'Foram para a equipe' }, { v: ocupado, cor: COR_ST.canceladas, rot: 'Horário já ocupado' }, { v: outras, cor: '#8a94a0', rot: 'Outra situação' }]),
+    return painel('Marcação automática pelo chat', 'Tentativas de marcar no Klingo pela API, feitas pelo chat ou pela equipe pelo painel. O que não conclui vai para a equipe. Marcação feita direto no Klingo, pela recepção ou pelo telefone, não entra. O número "marcadas sem nenhum atendente na conversa" é o que o cliente fez sozinho.',
+      h('p', { class: 'ind-resumo' }, h('b', {}, nf(feitas)), ` de ${nf(tentativas)} tentativas pela API deram certo (${pTxt(taxa(feitas, tentativas))}).`),
+      pilhaVisual([{ v: feitas, cor: COR_ST.ativas, rot: 'Marcadas pela API' }, { v: equipe, cor: COR_ST.remarcadas, rot: 'Foram para a equipe' }, { v: ocupado, cor: COR_ST.canceladas, rot: 'Horário já ocupado' }, { v: outras, cor: '#8a94a0', rot: 'Outra situação' }]),
       h('div', { class: 'ind-minis' }, mini2(d.tempo_medio_s != null ? d.tempo_medio_s + ' s' : '–', 'tempo médio para marcar'),
-        mini2(d.resolvidas_sem_humano, 'marcadas sem nenhum atendente na conversa'),
+        mini2(d.resolvidas_sem_humano, 'marcadas pelo cliente, sem nenhum atendente na conversa'),
         cancel || remarc ? mini2(cancel + remarc, `cancelados ou remarcados pelo chat (${nf(cancel)} e ${nf(remarc)})`) : null),
       motivos.length ? h('div', {}, h('h4', { class: 'ind-conf-passo' }, 'Por que foram para a equipe'), motivos.map(([r, v]) => barra(r, v, maxM, nf(v), 'azul'))) : null);
   }
@@ -4845,7 +4845,7 @@ h1.longo { font-size: 14mm; }
   const svgEl = (tag, attrs, ...kids) => { const e = document.createElementNS(SVGNS, tag); for (const [k, v] of Object.entries(attrs || {})) e.setAttribute(k, v); kids.forEach((x) => e.append(x)); return e; };
   const dmCurto = (iso) => { const [, m, d] = iso.split('-'); return `${d}/${m}`; };
   const rotBloco = (b) => `${dmCurto(b.de)} a ${dmCurto(b.ate)}`;
-  const SERIES_BL = [['ativas', 'Agendadas (seguem valendo)', '#2a78d6'], ['sozinhas', 'Marcadas sozinhas pelo chat', '#1baf7a'], ['canceladas', 'Canceladas', '#d03a2f'], ['remarcadas', 'Remarcadas', '#d98a00']];
+  const SERIES_BL = [['ativas', 'Agendadas (seguem valendo)', '#2a78d6'], ['sozinhas', 'Marcadas pelo chat, sem atendente', '#1baf7a'], ['canceladas', 'Canceladas', '#d03a2f'], ['remarcadas', 'Remarcadas', '#d98a00']];
   const COR_LINHA = '#1b2733';
   const GRAF_BL = { ocultas: new Set() };
   function graficoBlocos(dados) {
@@ -4900,8 +4900,8 @@ h1.longo { font-size: 14mm; }
           h('div', { class: 'ind-mini' }, h('b', {}, melhor ? rotBloco(melhor) : '—'), h('span', {}, melhor ? `período com mais agendamentos (${nf(melhor.total)})` : 'período com mais agendamentos'))),
         legenda, graficoBlocos(dados),
         h('details', { class: 'ind-num-det', open: true }, h('summary', {}, 'Ver os números de cada período'), h('div', { class: 'ind-tab-rolagem' }, h('table', { class: 'ind-tab-graf' },
-          h('thead', {}, h('tr', {}, ['Período de 30 dias', 'Agendadas (seguem valendo)', 'Marcadas sozinhas', 'Canceladas', 'Remarcadas', 'Total', 'Total x período anterior'].map((t) => h('th', {}, t)))), h('tbody', {}, linhas)))),
-        h('p', { class: 'dica' }, 'Total = agendadas que seguem valendo + canceladas + remarcadas (marcações do Klingo que vieram de uma conversa do chat, pela data em que foram marcadas). "Marcadas sozinhas" é o que o chat marcou sem ninguém da equipe e já está contada dentro das agendadas; vem de outra fonte e não separa por unidade' + (semUnidadeAuto ? ', por isso, com a unidade escolhida, esta barra mostra todas as unidades.' : '.')));
+          h('thead', {}, h('tr', {}, ['Período de 30 dias', 'Agendadas (seguem valendo)', 'Marcadas pelo chat, sem atendente', 'Canceladas', 'Remarcadas', 'Total', 'Total x período anterior'].map((t) => h('th', {}, t)))), h('tbody', {}, linhas)))),
+        h('p', { class: 'dica' }, 'Total = agendadas que seguem valendo + canceladas + remarcadas (marcações do Klingo que vieram de uma conversa do chat, pela data em que foram marcadas). "Marcadas pelo chat, sem atendente" são as agendadas em que o cliente marcou pela API no próprio chat e ninguém da equipe participou da conversa; já estão contadas dentro das agendadas; vem de outra fonte e não separa por unidade' + (semUnidadeAuto ? ', por isso, com a unidade escolhida, esta barra mostra todas as unidades.' : '.')));
     };
     desenhar();
     return painel('Evolução a cada 30 dias', 'Passe o mouse (ou toque) em um período para ver o detalhe. O período em andamento é marcado com * e ainda cresce.', box);
@@ -4918,7 +4918,7 @@ h1.longo { font-size: 14mm; }
       Promise.resolve(db.rpc('painel_automacao_resumo', { p_de: b.de, p_ate: b.ate })).then((x) => x, () => ({ error: true }))])));
     if (S.aba !== 'indicadores' || seq !== viewIndicadores.seq) return;
     if (res.some(([p]) => p.error || !p.data || !p.data.total)) { lugar.replaceChildren(h('p', { class: 'dica' }, 'Não consegui carregar a evolução a cada 30 dias agora. Use "Atualizar agora" para tentar de novo (se continuar, falta aplicar supabase/indicadores-plataforma.sql).')); return; }
-    const dados = blocos.map((b, i) => { const T = res[i][0].data.total, A = (res[i][1] && res[i][1].data) || {}; return { ...b, ativas: T.ativas || 0, canceladas: T.canceladas || 0, remarcadas: T.remarcadas || 0, total: T.total || 0, sozinhas: Number(A.agendadas_sozinhas) || 0 }; });
+    const dados = blocos.map((b, i) => { const T = res[i][0].data.total, A = (res[i][1] && res[i][1].data) || {}; return { ...b, ativas: T.ativas || 0, canceladas: T.canceladas || 0, remarcadas: T.remarcadas || 0, total: T.total || 0, sozinhas: Number(A.resolvidas_sem_humano) || 0 }; });
     lugar.replaceChildren(blocoEvolucao(dados, d0, !!un));
   }
   async function viewIndicadores(c, silencioso = false) {
