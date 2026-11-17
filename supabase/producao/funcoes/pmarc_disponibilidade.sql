@@ -1,4 +1,4 @@
--- public.pmarc_disponibilidade(p_procedimento integer, p_dados jsonb)
+-- public.pmarc_disponibilidade(p_procedimento integer, p_dados jsonb DEFAULT '{}'::jsonb)
 -- Pode executar: anon, authenticated, service_role
 CREATE OR REPLACE FUNCTION public.pmarc_disponibilidade(p_procedimento integer, p_dados jsonb DEFAULT '{}'::jsonb)
  RETURNS jsonb
@@ -34,7 +34,8 @@ begin
   with h as materialized (
     select h.data, h.hora, case when public.norm_nome(h.unidade) like '%RM TC' then 'RM/TC' when public.norm_nome(h.unidade) like '%CSI' then 'CSI' when public.norm_nome(h.unidade) = 'DESENVOAR' then 'DESENVOAR' else h.unidade end as unidade, h.profissional
     from public.agenda_horarios(array[p_procedimento], v_hoje, v_ate_dia, v_unid, null, null, '[]'::jsonb, 120) h
-    where (v_turno = 'qualquer' or (v_turno = 'manha' and h.hora < '12:00') or (v_turno = 'tarde' and h.hora >= '12:00' and h.hora < '18:00') or (v_turno = 'noite' and h.hora >= '18:00'))
+    where public.unidade_chave(h.unidade) in (select u.chave from public.unidade_config u where u.ativo)
+      and (v_turno = 'qualquer' or (v_turno = 'manha' and h.hora < '12:00') or (v_turno = 'tarde' and h.hora >= '12:00' and h.hora < '18:00') or (v_turno = 'noite' and h.hora >= '18:00'))
       and (v_apos is null or h.hora::time >= v_apos) and (v_ate is null or h.hora::time <= v_ate)
   ), dias as (select distinct h.data from h order by h.data limit 10)
   select (select count(*) from h),

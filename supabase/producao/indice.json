@@ -14768,7 +14768,7 @@
    "anon": true,
    "authenticated": true,
    "publico": false,
-   "md5": "4165c66a212cdf1c77089281e6073ee7"
+   "md5": "6556c3e433d65a0c53727eab5e952e67"
   },
   {
    "nome": "pmarc_classificar",
@@ -14840,7 +14840,7 @@
    "anon": true,
    "authenticated": true,
    "publico": false,
-   "md5": "7af65f1e8c934193ffc164792104bdb6"
+   "md5": "ad095d7e0eb92f755ff309243b378d20"
   },
   {
    "nome": "pmarc_enriquecer_lote",
@@ -15101,6 +15101,21 @@
    "authenticated": false,
    "publico": false,
    "md5": "9ca4c476468077810204be8a5947baba"
+  },
+  {
+   "nome": "pmarc_unidades",
+   "args": [
+    {
+     "nome": "p_procedimento",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": true,
+   "authenticated": true,
+   "publico": false,
+   "md5": "6a0b5a515402d9a4d4c674409017ccd9"
   },
   {
    "nome": "pmarc_vigiar",

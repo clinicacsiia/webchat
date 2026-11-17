@@ -1,4 +1,4 @@
-// FLUXOGRAMA: entrada (clone da produção + supabase/previsao-marcacao-parte1..5.sql; catálogo, grade e pessoas INVENTADOS)
+// FLUXOGRAMA: entrada (clone da produção + supabase/previsao-marcacao-parte1..6.sql; catálogo, grade e pessoas INVENTADOS)
 //   -> validação (desligado; exame inexistente; horário e turno fora do padrão viram "sem filtro", nada barra; limite global)
 //   -> lógica (lista só do que tem agenda; disponibilidade = grade menos ocupação, com filtro de turno / a partir de / até / até o dia / unidade; pedido vira mensagem para a equipe, robô desligado)
 //   -> saída (PASS/FAIL por caso) | ROLLBACK: previsao-marcacao-parte5-rollback.sql
@@ -14,8 +14,13 @@ const { db, falhas } = await criarBancoProducao();
 const { q, um, anonimo } = ajudantes(db);
 registrar('o retrato da produção monta inteiro', falhas.length === 0, `${falhas.length} falhas`);
 
-const partes = ['parte1-tabelas', 'parte2-paciente', 'parte3-painel', 'parte4-carga', 'parte5-escolha'].map((n) => readFileSync(`${REPO}/supabase/previsao-marcacao-${n}.sql`, 'utf8'));
-await caso('as 5 partes aplicam duas vezes sem erro (idempotente)', async () => { for (const s of [...partes, ...partes]) await db.exec(s); return { ok: true }; });
+const partes = ['parte1-tabelas', 'parte2-paciente', 'parte3-painel', 'parte4-carga', 'parte5-escolha', 'parte6-unidades'].map((n) => readFileSync(`${REPO}/supabase/previsao-marcacao-${n}.sql`, 'utf8'));
+await caso('as 6 partes aplicam duas vezes sem erro (idempotente)', async () => { for (const s of [...partes, ...partes]) await db.exec(s); return { ok: true }; });
+// catálogos do chat (unidade_config): no clone a tabela nasce vazia; liga os três como estavam antes do dono desligar algum
+await db.exec(`insert into public.unidade_config (chave, catalogo, rotulo, descricao, fluxo, instrucao, ordem, ativo) values
+  ('desenvoar', 'DESENVOAR', 'Desenvoar', 'x', 'pediatria', 'x', 1, true),
+  ('csi', 'CLÍNICA DE SAÚDE E IMAGEM - CSI', 'CSI', 'x', 'exame_consulta', 'x', 2, true),
+  ('rmtc', 'CLÍNICA DE SAÚDE E IMAGEM - RM/TC', 'CSI RM/TC', 'x', 'exame_consulta', 'x', 3, true) on conflict (chave) do update set ativo = true`);
 await db.exec(`insert into public.config (chave, valor) values ('ia_segredo', 'segredo-de-teste') on conflict (chave) do update set valor = excluded.valor`);
 const ligar = (v) => db.exec(`update public.config set valor = '${v}' where chave = 'previsao_marcacao_modo'`);
 const chamar = async (fn, args = []) => {
@@ -164,6 +169,34 @@ await caso('permissões: as 3 funções novas abertas ao anon; a auxiliar só do
   const f = await q(`select p.proname, has_function_privilege('anon', p.oid, 'execute') anon from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname in ('pmarc_catalogo','pmarc_disponibilidade','pmarc_pedido','pmarc_tipo_proc') order by 1`);
   const m = Object.fromEntries(f.map((x) => [x.proname, x.anon]));
   return { ok: m.pmarc_catalogo && m.pmarc_disponibilidade && m.pmarc_pedido && m.pmarc_tipo_proc === false, detalhe: JSON.stringify(m) };
+});
+
+// ---- unidades: dependem do exame escolhido e respeitam o catálogo ligado/desligado (parte 6) ----
+const chaves = (r) => (r.unidades || []).map((u) => u.chave).sort().join(',');
+await caso('unidade depende do exame: 9101 tem agenda na CSI e na Desenvoar; 9102 só na CSI; sem exame, todas as ligadas', async () => {
+  const a = await chamar('pmarc_unidades', [9101]), b = await chamar('pmarc_unidades', [9102]), c = await chamar('pmarc_unidades', [null]), d = await chamar('pmarc_unidades', [9103]);
+  return { ok: chaves(a) === 'CSI,DESENVOAR' && chaves(b) === 'CSI' && chaves(c) === 'CSI,DESENVOAR,RM/TC' && chaves(d) === '' && a.unidades[0].rotulo === 'Desenvoar', detalhe: JSON.stringify({ a: chaves(a), b: chaves(b), c: chaves(c), d: chaves(d) }) };
+});
+await db.exec(`update public.unidade_config set ativo = false where chave = 'csi'`);
+await caso('catálogo CSI desligado: some do seletor; a disponibilidade só traz as unidades ligadas; pedir a CSI à força não devolve horário', async () => {
+  const a = await chamar('pmarc_unidades', [9101]), b = await chamar('pmarc_unidades', [9102]), c = await chamar('pmarc_unidades', [null]);
+  const sem = todos(await chamar('pmarc_disponibilidade', [9101, '{}'])), csi = await chamar('pmarc_disponibilidade', [9101, '{"unidade":"CSI"}']), des = todos(await chamar('pmarc_disponibilidade', [9101, '{"unidade":"DESENVOAR"}']));
+  return { ok: chaves(a) === 'DESENVOAR' && chaves(b) === '' && chaves(c) === 'DESENVOAR,RM/TC' && sem.length > 0 && sem.every((x) => x.unidade === 'DESENVOAR') && csi.ok === true && csi.total === 0 && des.length > 0,
+    detalhe: JSON.stringify({ a: chaves(a), b: chaves(b), c: chaves(c), sem: sem.length, csiTotal: csi.total, des: des.length }) };
+});
+await caso('catálogo CSI desligado: a consulta que só tem agenda na CSI sai da lista; o exame fica, sem "Ver a disponibilidade" na CSI', async () => {
+  const l = await chamar('pmarc_catalogo', [null, null]); const m = Object.fromEntries(l.itens.map((i) => [i.id, i.agenda]));
+  return { ok: !(9102 in m) && m[9101] === true && m[9103] === false, detalhe: JSON.stringify(m) };
+});
+await db.exec(`update public.unidade_config set ativo = true where chave = 'csi'`);
+await caso('catálogo CSI ligado de novo: tudo volta', async () => {
+  const a = await chamar('pmarc_unidades', [9101]), sem = todos(await chamar('pmarc_disponibilidade', [9101, '{}']));
+  return { ok: chaves(a) === 'CSI,DESENVOAR' && sem.some((x) => x.unidade === 'CSI'), detalhe: chaves(a) };
+});
+await caso('permissão: pmarc_unidades aberta ao anon e desligada junto com a Previsão', async () => {
+  const f = (await q(`select has_function_privilege('anon', p.oid, 'execute') anon from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'pmarc_unidades'`))[0];
+  await ligar('nao'); const off = await chamar('pmarc_unidades', [9101]); await ligar('sim');
+  return { ok: f.anon === true && off.motivo === 'desligado', detalhe: JSON.stringify({ anon: f.anon, off: off.motivo }) };
 });
 
 const falhasN = resultados.filter((x) => !x).length;

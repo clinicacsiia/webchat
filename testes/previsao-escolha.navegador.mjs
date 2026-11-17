@@ -1,4 +1,4 @@
-// FLUXOGRAMA: entrada (previsao/index.html num Chromium de celular; a API do Supabase vai para o banco de teste com o retrato da produção + previsao-marcacao-parte1..5.sql; catálogo, grade e pessoas INVENTADOS)
+// FLUXOGRAMA: entrada (previsao/index.html num Chromium de celular; a API do Supabase vai para o banco de teste com o retrato da produção + previsao-marcacao-parte1..6.sql; catálogo, grade e pessoas INVENTADOS)
 //   -> validação (faixa de horário invertida avisa; nada barra: escolher nada, não achar na lista e quem não tem link também enviam)
 //   -> lógica (lista de exames/consultas com busca e abas; turno / a partir de / até; disponibilidade prevista; o pedido vira mensagem para a equipe)
 //   -> saída (PASS/FAIL por caso) | ROLLBACK: apagar a pasta previsao/
@@ -13,7 +13,11 @@ const caso = async (nome, fn) => { try { const r = await fn(); registrar(nome, r
 
 const { db } = await criarBancoProducao();
 const { q } = ajudantes(db);
-for (const n of ['parte1-tabelas', 'parte2-paciente', 'parte3-painel', 'parte4-carga', 'parte5-escolha']) await db.exec(readFileSync(`${REPO}/supabase/previsao-marcacao-${n}.sql`, 'utf8'));
+for (const n of ['parte1-tabelas', 'parte2-paciente', 'parte3-painel', 'parte4-carga', 'parte5-escolha', 'parte6-unidades']) await db.exec(readFileSync(`${REPO}/supabase/previsao-marcacao-${n}.sql`, 'utf8'));
+await db.exec(`insert into public.unidade_config (chave, catalogo, rotulo, descricao, fluxo, instrucao, ordem, ativo) values
+  ('desenvoar', 'DESENVOAR', 'Desenvoar', 'x', 'pediatria', 'x', 1, true),
+  ('csi', 'CLÍNICA DE SAÚDE E IMAGEM - CSI', 'CSI', 'x', 'exame_consulta', 'x', 2, true),
+  ('rmtc', 'CLÍNICA DE SAÚDE E IMAGEM - RM/TC', 'CSI RM/TC', 'x', 'exame_consulta', 'x', 3, true) on conflict (chave) do update set ativo = true`);
 await db.exec(`
   insert into public.config (chave, valor) values ('ia_segredo', 'segredo-de-teste') on conflict (chave) do update set valor = excluded.valor;
   update public.config set valor = 'sim' where chave = 'previsao_marcacao_modo';
@@ -32,8 +36,10 @@ await db.exec(`
     (9101, 'ULTRASSONOGRAFIA ABDOME TOTAL', 'ULTRASSONOGRAFIA', to_tsvector('simple', 'ultrassonografia abdome total'), true, 50),
     (9102, 'CONSULTA PEDIATRIA', 'CONSULTAS', to_tsvector('simple', 'consulta pediatria'), true, 80);
   insert into public.catalogo_agenda (unidade, local, profissional, procedimento_id, procedimento, dia_num, hora_ini, hora_fim, duracao_min, vig_ini, vig_fim)
-    select 'CSI', 'SALA 1', 'DR FULANO', pid, pnome, dn, '07:00', '19:00', 30, current_date - 1, current_date + 60
+    select 'CLÍNICA DE SAÚDE E IMAGEM - CSI', 'SALA 1', 'DR FULANO', pid, pnome, dn, '07:00', '19:00', 30, current_date - 1, current_date + 60
     from (values (9101, 'ULTRASSONOGRAFIA ABDOME TOTAL'), (9102, 'CONSULTA PEDIATRIA')) p(pid, pnome), generate_series(0, 6) dn;
+  insert into public.catalogo_agenda (unidade, local, profissional, procedimento_id, procedimento, dia_num, hora_ini, hora_fim, duracao_min, vig_ini, vig_fim)
+    select 'DESENVOAR', 'SALA 9', 'DRA CICRANA', 9101, 'ULTRASSONOGRAFIA ABDOME TOTAL', dn, '14:00', '16:00', 30, current_date - 1, current_date + 60 from generate_series(0, 6) dn;
 `);
 
 await db.exec(`
@@ -135,6 +141,17 @@ await caso('escolher o exame abre "Quando você prefere?" com turno, a partir da
   const t = await texto(a.page);
   return { ok: /Abdome/i.test(t) && /Manhã/.test(t) && /Tarde/.test(t) && /Noite/.test(t) && /Sem preferência/.test(t) && /A partir das/.test(t) && /Até as/.test(t) && /Até o dia/.test(t) && /Unidade/.test(t) && /Ver a disponibilidade/.test(t) && temAvisoCompleto(t) };
 });
+await caso('a unidade depende do exame (só CSI e Desenvoar têm agenda do ultrassom) e respeita o catálogo: com a CSI desligada, só aparece a Desenvoar, sem seletor', async () => {
+  const ops = await a.page.locator('#unid option').evaluateAll((o) => o.map((x) => x.value).join(','));
+  await db.exec(`update public.unidade_config set ativo = false where chave = 'csi'`);
+  await a.page.click('#voltar'); await esperaTexto(a.page, /1\. O que você quer/); await esperaTexto(a.page, /[Aa]bdome/);
+  await a.page.locator('#lista button.proc', { hasText: /Abdome/i }).first().click(); await esperaTexto(a.page, /Quando você prefere/);
+  const t = await texto(a.page); const sem = (await a.page.locator('#unid').count()) === 0;
+  await db.exec(`update public.unidade_config set ativo = true where chave = 'csi'`);
+  await a.page.click('#voltar'); await esperaTexto(a.page, /1\. O que você quer/); await esperaTexto(a.page, /[Aa]bdome/);
+  await a.page.locator('#lista button.proc', { hasText: /Abdome/i }).first().click(); await esperaTexto(a.page, /Quando você prefere/);
+  return { ok: ops === ',DESENVOAR,CSI' && sem && /Unidade:\s*Desenvoar/.test(t), detalhe: JSON.stringify({ ops, sem }) };
+});
 await caso('faixa invertida (até antes de a partir) avisa e não consulta', async () => {
   await a.page.selectOption('#apos', '14:00'); await a.page.selectOption('#ate', '09:00'); await a.page.click('#fQuando button[type=submit]');
   await esperaTexto(a.page, /precisa ser depois/);
@@ -209,7 +226,7 @@ await b.ctx.close();
 await caso('só chamou funções pmarc_* com a chave pública e sem erro de JavaScript', async () => {
   const fora = chamadasRede.filter((x) => !/^pmarc_/.test(x.nome)).map((x) => x.nome);
   const novas = new Set(chamadasRede.map((x) => x.nome));
-  return { ok: fora.length === 0 && ['pmarc_catalogo', 'pmarc_disponibilidade', 'pmarc_pedido'].every((n) => novas.has(n)) && erros.length === 0, detalhe: JSON.stringify({ fora, erros }) };
+  return { ok: fora.length === 0 && ['pmarc_catalogo', 'pmarc_disponibilidade', 'pmarc_pedido', 'pmarc_unidades'].every((n) => novas.has(n)) && erros.length === 0, detalhe: JSON.stringify({ fora, erros }) };
 });
 
 await browser.close();
