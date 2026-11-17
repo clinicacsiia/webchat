@@ -4845,7 +4845,7 @@ h1.longo { font-size: 14mm; }
   const svgEl = (tag, attrs, ...kids) => { const e = document.createElementNS(SVGNS, tag); for (const [k, v] of Object.entries(attrs || {})) e.setAttribute(k, v); kids.forEach((x) => e.append(x)); return e; };
   const dmCurto = (iso) => { const [, m, d] = iso.split('-'); return `${d}/${m}`; };
   const rotBloco = (b) => `${dmCurto(b.de)} a ${dmCurto(b.ate)}`;
-  const SERIES_BL = [['ativas', 'Agendadas (seguem valendo)', '#2a78d6'], ['sozinhas', 'Marcadas pelo chat, sem atendente', '#1baf7a'], ['canceladas', 'Canceladas', '#d03a2f'], ['remarcadas', 'Remarcadas', '#d98a00']];
+  const SERIES_BL = [['ativas', 'Agendadas (seguem valendo)', '#2a78d6'], ['sozinhas', 'Marcadas pela API, sem atendente', '#1baf7a'], ['canceladas', 'Canceladas', '#d03a2f'], ['remarcadas', 'Remarcadas', '#d98a00']];
   const COR_LINHA = '#1b2733';
   const GRAF_BL = { ocultas: new Set() };
   function graficoBlocos(dados) {
@@ -4892,7 +4892,7 @@ h1.longo { font-size: 14mm; }
       const chip = (k, r, cor, linha) => h('button', { class: 'chip ind-leg-chip', type: 'button', 'aria-pressed': String(!GRAF_BL.ocultas.has(k)), onclick: () => { GRAF_BL.ocultas.has(k) ? GRAF_BL.ocultas.delete(k) : GRAF_BL.ocultas.add(k); desenhar(); } }, h('i', { class: linha ? 'lin' : '', style: `background:${cor}` }), r);
       const legenda = h('div', { class: 'chips', role: 'group', 'aria-label': 'O que aparece no gráfico' }, SERIES_BL.map(([k, r, cor]) => chip(k, r + ' (barra)', cor, false)), chip('total', 'Total de agendamentos do site (linha)', COR_LINHA, true));
       const linhas = dados.map((d, i) => { const ant = i ? dados[i - 1] : null, v = ant && ant.total > 0 && !d.parcial ? Math.round(((d.total - ant.total) / ant.total) * 100) : null;
-        return h('tr', {}, h('td', {}, `${dmy(d.de)} a ${dmy(d.ate)}`, d.parcial ? h('div', { class: 'dica' }, `em andamento: ${d.dias} de 30 dias`) : null), h('td', {}, nf(d.ativas)), h('td', {}, nf(d.sozinhas)), h('td', {}, nf(d.canceladas)), h('td', {}, nf(d.remarcadas)), h('td', {}, h('b', {}, nf(d.total))),
+        return h('tr', {}, h('td', {}, `${dmy(d.de)} a ${dmy(d.ate)}`, d.parcial ? h('div', { class: 'dica' }, `em andamento: ${d.dias} de 30 dias`) : null), h('td', {}, nf(d.ativas)), h('td', {}, nf(d.sozinhas)), h('td', {}, d.apiCom == null ? '—' : nf(d.apiCom)), h('td', {}, d.pessoa == null ? '—' : nf(d.pessoa)), h('td', {}, nf(d.canceladas)), h('td', {}, nf(d.remarcadas)), h('td', {}, h('b', {}, nf(d.total))),
           h('td', {}, !i ? '—' : d.parcial ? 'em andamento' : v == null ? '—' : (v > 0 ? '▲ ' : v < 0 ? '▼ ' : '') + Math.abs(v) + '%')); });
       box.replaceChildren(
         h('p', { class: 'ind-resumo' }, 'Cada grupo é um período de ', h('b', {}, '30 dias'), ` contado desde o 1º dia de uso (${dmy(d0)}). `, dados.length === 1 ? `Ainda há só 1 período, em andamento (${ultimo.dias} de 30 dias); a comparação com o seguinte começa em ${dmy(isoMais(d0, 30))}.` : `A linha é o total de agendamentos do site no período; as barras mostram de que ele é feito.`),
@@ -4900,8 +4900,8 @@ h1.longo { font-size: 14mm; }
           h('div', { class: 'ind-mini' }, h('b', {}, melhor ? rotBloco(melhor) : '—'), h('span', {}, melhor ? `período com mais agendamentos (${nf(melhor.total)})` : 'período com mais agendamentos'))),
         legenda, graficoBlocos(dados),
         h('details', { class: 'ind-num-det', open: true }, h('summary', {}, 'Ver os números de cada período'), h('div', { class: 'ind-tab-rolagem' }, h('table', { class: 'ind-tab-graf' },
-          h('thead', {}, h('tr', {}, ['Período de 30 dias', 'Agendadas (seguem valendo)', 'Marcadas pelo chat, sem atendente', 'Canceladas', 'Remarcadas', 'Total', 'Total x período anterior'].map((t) => h('th', {}, t)))), h('tbody', {}, linhas)))),
-        h('p', { class: 'dica' }, 'Total = agendadas que seguem valendo + canceladas + remarcadas (marcações do Klingo que vieram de uma conversa do chat, pela data em que foram marcadas). "Marcadas pelo chat, sem atendente" são as agendadas em que o cliente marcou pela API no próprio chat e ninguém da equipe participou da conversa; já estão contadas dentro das agendadas; vem de outra fonte e não separa por unidade' + (semUnidadeAuto ? ', por isso, com a unidade escolhida, esta barra mostra todas as unidades.' : '.')));
+          h('thead', {}, h('tr', {}, ['Período de 30 dias', 'Agendadas (seguem valendo)', 'Marcadas pela API, sem atendente', 'Pela API, com atendente na conversa', 'Por uma pessoa no Klingo', 'Canceladas', 'Remarcadas', 'Total', 'Total x período anterior'].map((t) => h('th', {}, t)))), h('tbody', {}, linhas)))),
+        h('p', { class: 'dica' }, 'Total = agendadas que seguem valendo + canceladas + remarcadas (marcações do Klingo que vieram de uma conversa do chat, pela data em que foram marcadas, a coluna "Agendado em" do Klingo). Quem marcou vem do Klingo: o responsável `biclinicacsi` é a API do chat. "Marcadas pela API, sem atendente" = marcou a API e ninguém da equipe escreveu na conversa (a barra verde). "Pela API, com atendente" = a API marcou, mas houve conversa com atendente. "Por uma pessoa" = alguém da equipe marcou no Klingo. Essas três colunas somam o total e incluem as que depois foram canceladas ou remarcadas.' + (semUnidadeAuto ? ' Esta versão do banco ainda não separa quem marcou; a barra verde vem de outra fonte e mostra todas as unidades.' : '')));
     };
     desenhar();
     return painel('Evolução a cada 30 dias', 'Passe o mouse (ou toque) em um período para ver o detalhe. O período em andamento é marcado com * e ainda cresce.', box);
@@ -4918,8 +4918,8 @@ h1.longo { font-size: 14mm; }
       Promise.resolve(db.rpc('painel_automacao_resumo', { p_de: b.de, p_ate: b.ate })).then((x) => x, () => ({ error: true }))])));
     if (S.aba !== 'indicadores' || seq !== viewIndicadores.seq) return;
     if (res.some(([p]) => p.error || !p.data || !p.data.total)) { lugar.replaceChildren(h('p', { class: 'dica' }, 'Não consegui carregar a evolução a cada 30 dias agora. Use "Atualizar agora" para tentar de novo (se continuar, falta aplicar supabase/indicadores-plataforma.sql).')); return; }
-    const dados = blocos.map((b, i) => { const T = res[i][0].data.total, A = (res[i][1] && res[i][1].data) || {}; return { ...b, ativas: T.ativas || 0, canceladas: T.canceladas || 0, remarcadas: T.remarcadas || 0, total: T.total || 0, sozinhas: Number(A.resolvidas_sem_humano) || 0 }; });
-    lugar.replaceChildren(blocoEvolucao(dados, d0, !!un));
+    const dados = blocos.map((b, i) => { const T = res[i][0].data.total, Q = res[i][0].data.quem_marcou || null, A = (res[i][1] && res[i][1].data) || {}; return { ...b, ativas: T.ativas || 0, canceladas: T.canceladas || 0, remarcadas: T.remarcadas || 0, total: T.total || 0, sozinhas: Q ? Number(Q.api_sem_atendente) || 0 : Number(A.resolvidas_sem_humano) || 0, apiCom: Q ? Number(Q.api_com_atendente) || 0 : null, pessoa: Q ? (Number(Q.pessoa_sem_atendente) || 0) + (Number(Q.pessoa_com_atendente) || 0) : null }; });
+    lugar.replaceChildren(blocoEvolucao(dados, d0, dados.some((d) => d.apiCom == null)));
   }
   async function viewIndicadores(c, silencioso = false) {
     if (IND.preset !== 'livre') [IND.de, IND.ate] = periodoDe(IND.preset);

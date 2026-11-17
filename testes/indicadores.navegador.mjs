@@ -138,7 +138,7 @@ async function pagina(browser, { semSql = false, admin = false, semAtend = false
       if (semSql) { status = 404; corpo = { code: 'PGRST202', message: 'Could not find the function public.painel_indicadores_decisao in the schema cache' }; } else corpo = DECISAO(b);
     }
     else if (p.endsWith('/rpc/painel_indicadores_diretoria')) { const b = JSON.parse(req.postData() || '{}'); reg.rpcs.push(['diretoria', b]); corpo = DIRETORIA; }
-    else if (p.endsWith('/rpc/painel_indicadores_plataforma')) { const b = JSON.parse(req.postData() || '{}'); reg.rpcs.push(['plataforma', b]); if (semPlat) { status = 404; corpo = { code: 'PGRST202', message: 'function not found' }; } else if (b.p_de !== b.p_ate) { const dias = Math.round((Date.parse(b.p_ate) - Date.parse(b.p_de)) / 864e5) + 1; corpo = { ...PLATAFORMA, total: { total: dias * 2, ativas: dias * 2 - 6, canceladas: 4, remarcadas: 2, atendidas: 1, faltaram: 0, por_vir: 1, sem_dado: 0 } }; } else corpo = PLATAFORMA; }
+    else if (p.endsWith('/rpc/painel_indicadores_plataforma')) { const b = JSON.parse(req.postData() || '{}'); reg.rpcs.push(['plataforma', b]); if (semPlat) { status = 404; corpo = { code: 'PGRST202', message: 'function not found' }; } else if (b.p_de !== b.p_ate) { const dias = Math.round((Date.parse(b.p_ate) - Date.parse(b.p_de)) / 864e5) + 1; corpo = { ...PLATAFORMA, total: { total: dias * 2, ativas: dias * 2 - 6, canceladas: 4, remarcadas: 2, atendidas: 1, faltaram: 0, por_vir: 1, sem_dado: 0 }, quem_marcou: { api_sem_atendente: dias, api_com_atendente: 3, pessoa_sem_atendente: 1, pessoa_com_atendente: dias * 2 - dias - 4 } }; } else corpo = PLATAFORMA; }
     else if (p.endsWith('/rpc/painel_automacao_resumo')) { const b = JSON.parse(req.postData() || '{}'); reg.rpcs.push(['automacao', b]); corpo = b.p_de !== b.p_ate ? { ...AUTOMACAO, resolvidas_sem_humano: Math.round((Date.parse(b.p_ate) - Date.parse(b.p_de)) / 864e5) + 1 } : AUTOMACAO; }
     else if (p.endsWith('/rpc/painel_indicadores_mensal')) { const b = JSON.parse(req.postData() || '{}'); reg.rpcs.push(['mensal', b]); corpo = MENSAL; }
     else if (p.endsWith('/rpc/painel_indicadores_conferencia')) { const b = JSON.parse(req.postData() || '{}'); reg.rpcs.push(['conferencia', b]); corpo = conf ? CONFERENCIA : {}; }
@@ -231,7 +231,7 @@ await caso('Evolução a cada 30 dias: blocos de 30 dias desde o 1º dia de uso,
   await t.ctx.close();
   const ult = tab[2] || [];
   return { ok: pedidos.join() === esperado.join() && barras === 12 && linhas === 1 && pts === 3 && zonas === 3 && grad === 0
-    && tab.length === 3 && tab[0][0].startsWith(`${d0.slice(8)}/${d0.slice(5, 7)}/${d0.slice(0, 4)} a `) && tab[0].slice(1, 6).join('|') === '54|30|4|2|60' && tab[0][6] === '—' && tab[1][6] === '0%' && ult[5] === '22' && ult[6] === 'em andamento' && /em andamento: 11 de 30 dias/.test(ult[0])
+    && tab.length === 3 && tab[0][0].startsWith(`${d0.slice(8)}/${d0.slice(5, 7)}/${d0.slice(0, 4)} a `) && tab[0].slice(1, 8).join('|') === '54|30|3|27|4|2|60' && tab[0][8] === '—' && tab[1][8] === '0%' && ult[7] === '22' && ult[8] === 'em andamento' && /em andamento: 11 de 30 dias/.test(ult[0])
     && minis[0] === '142 agendamentos do site desde o 1º dia de uso' && minis[1].startsWith(`${dm(d0)} a ${dm(mais(d0, 29))}`) && /Agendadas \(seguem valendo\): 16/.test(dica) && /Total de agendamentos: 22/.test(dica) && /em andamento \(11 de 30 dias\)/.test(dica)
     && barras3 === 9 && linhas2 === 0, detalhe: JSON.stringify({ pedidos, esperado, barras, linhas, pts, zonas, tab, minis, dica, barras3, linhas2 }) };
 });

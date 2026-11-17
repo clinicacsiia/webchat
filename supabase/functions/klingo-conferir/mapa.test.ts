@@ -1,7 +1,7 @@
 // Testes com dados INVENTADOS (nenhum paciente real).
 import test from "node:test";
 import assert from "node:assert/strict";
-import { hashCpf, hashEmail, hashFone, janelaLeitura, mapearLinha, prepararLinhas, emLotes } from "./mapa.ts";
+import { hashCpf, hashEmail, hashFone, janelaLeitura, mapearLinha, prepararLinhas, emLotes, viaApi } from "./mapa.ts";
 
 const SAL = "segredo-de-teste";
 const R = (o: Record<string, unknown> = {}) => ({
@@ -53,3 +53,11 @@ test("janela: dias para trás contando hoje, limitada a 31; de/até só se váli
   assert.deepEqual(janelaLeitura({ de: "2026-11-09", ate: "2027-01-01" }, "2026-11-13"), { de: "2026-11-10", ate: "2026-11-13" });
 });
 test("lotes", () => { assert.deepEqual(emLotes([1, 2, 3, 4, 5], 2), [[1, 2], [3, 4], [5]]); });
+
+test("via API: só o responsável biclinicacsi (sem diferenciar maiúsculas) e o nome nunca vai para a linha", async () => {
+  assert.equal(viaApi("biclinicacsi"), true); assert.equal(viaApi("  BiClinicaCSI "), true);
+  assert.equal(viaApi("lucas.dejesus"), false); assert.equal(viaApi(""), false); assert.equal(viaApi(undefined), false); assert.equal(viaApi("biclinicacsi2"), false);
+  const api = (await mapearLinha(R({ col5: "biclinicacsi" }), SAL))!, pessoa = (await mapearLinha(R({ col5: "lucas.dejesus" }), SAL))!, sem = (await mapearLinha(R(), SAL))!;
+  assert.equal(api.a, true); assert.equal(pessoa.a, false); assert.equal(sem.a, false);
+  assert.equal(JSON.stringify(pessoa).includes("lucas"), false, "o nome do responsável vazou");
+});

@@ -1,5 +1,5 @@
 -- RETRATO DA ESTRUTURA DO BANCO DE PRODUÇÃO (projeto webchat-atendimento). GERADO: não editar à mão.
--- Atualização parcial em 2026-11-16T19:50:00Z (funções app_* e painel_app_*, tabelas app_*). Retrato inteiro tirado em 2026-11-14T20:32:54.165875+00:00 · Postgres 17.11. Só estrutura: nenhuma linha de tabela, nenhum valor de configuração.
+-- Atualização parcial em 2026-11-17 04:15:26.809573+00 (funções app_* e painel_app_*, tabelas app_*). Retrato inteiro tirado em 2026-11-14T20:32:54.165875+00:00 · Postgres 17.11. Só estrutura: nenhuma linha de tabela, nenhum valor de configuração.
 -- Serve de referência e para os testes. NÃO rodar inteiro sobre a produção. Como refazer: supabase/producao/LEIAME.md.
 
 -- ===== Extensões =====
@@ -1439,32 +1439,6 @@ create table public.klingo_catalogo_cru (
 comment on table public.klingo_catalogo_cru is 'Resposta bruta (só catálogo: unidades, profissionais, exames, regiões; nenhum dado de paciente) dos GET da API do Klingo, para montar as listas do chat. Escrita só pela função klingo-catalogo-api.';
 alter table public.klingo_catalogo_cru enable row level security;
 
-create table public.klingo_conferencia (
-  m text not null,
-  marcado_em date not null,
-  exame_em date,
-  origem text default 'sem_origem'::text not null,
-  status_klingo text,
-  unidade text,
-  plano text,
-  conversa_id uuid,
-  ligacao text,
-  paciente_tipo text,
-  conflito text[] default '{}'::text[] not null,
-  responsavel_diferente text[] default '{}'::text[] not null,
-  falta_no_klingo text[] default '{}'::text[] not null,
-  vazios text[] default '{}'::text[] not null,
-  lido_em timestamp with time zone default now() not null,
-  constraint klingo_conferencia_ligacao_check CHECK ((ligacao = ANY (ARRAY['pedido'::text, 'telefone_nome'::text]))),
-  constraint klingo_conferencia_pkey PRIMARY KEY (m)
-);
-comment on table public.klingo_conferencia is 'Uma linha por marcação do relatório #14554 do Klingo: origem, status, ligação com a conversa do webchat e QUAIS campos divergem ou faltam. Nunca guarda CPF, e-mail, telefone nem nascimento.';
-CREATE INDEX klingo_conferencia_conversa_idx ON public.klingo_conferencia USING btree (conversa_id) WHERE (conversa_id IS NOT NULL);
-CREATE INDEX klingo_conferencia_marcado_idx ON public.klingo_conferencia USING btree (marcado_em);
-alter table public.klingo_conferencia enable row level security;
--- concessão a anon: DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
--- concessão a authenticated: DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
-
 create table public.klingo_consulta (
   id bigint generated always as identity not null,
   em timestamp with time zone default now() not null,
@@ -2768,6 +2742,34 @@ comment on table public.primeira_consulta_liberada is 'Pacientes liberados à m�
 alter table public.primeira_consulta_liberada enable row level security;
 -- concessão a service_role: DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
 
+
+create table public.klingo_conferencia (
+  m text not null,
+  marcado_em date not null,
+  exame_em date,
+  origem text default 'sem_origem'::text not null,
+  status_klingo text,
+  unidade text,
+  plano text,
+  conversa_id uuid,
+  ligacao text,
+  paciente_tipo text,
+  conflito text[] default '{}'::text[] not null,
+  responsavel_diferente text[] default '{}'::text[] not null,
+  falta_no_klingo text[] default '{}'::text[] not null,
+  vazios text[] default '{}'::text[] not null,
+  lido_em timestamp with time zone default now() not null,
+  via_api boolean default false not null,
+  constraint klingo_conferencia_ligacao_check CHECK ((ligacao = ANY (ARRAY['pedido'::text, 'telefone_nome'::text]))),
+  constraint klingo_conferencia_pkey PRIMARY KEY (m)
+);
+comment on table public.klingo_conferencia is 'Uma linha por marcação do relatório #14554 do Klingo: origem, status, ligação com a conversa do webchat e QUAIS campos divergem ou faltam. Nunca guarda CPF, e-mail, telefone nem nascimento.';
+CREATE INDEX klingo_conferencia_conversa_idx ON public.klingo_conferencia USING btree (conversa_id) WHERE (conversa_id IS NOT NULL);
+CREATE INDEX klingo_conferencia_marcado_idx ON public.klingo_conferencia USING btree (marcado_em);
+alter table public.klingo_conferencia enable row level security;
+-- concessão a anon: DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+-- concessão a authenticated: DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+
 -- ===== Chaves estrangeiras (depois de todas as tabelas) =====
 alter table public.agendamento_fechamento add constraint agendamento_fechamento_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE CASCADE;
 alter table public.agendamento_fechamento add constraint agendamento_fechamento_por_fkey FOREIGN KEY (por) REFERENCES agentes(id) ON DELETE SET NULL;
@@ -2826,7 +2828,6 @@ alter table public.jornada_mensagem add constraint jornada_mensagem_card_id_fkey
 alter table public.jornada_tarefa add constraint jornada_tarefa_card_id_fkey FOREIGN KEY (card_id) REFERENCES jornada_card(id);
 alter table public.jornada_transicao add constraint jornada_transicao_de_fkey FOREIGN KEY (de) REFERENCES jornada_coluna(id);
 alter table public.jornada_transicao add constraint jornada_transicao_para_fkey FOREIGN KEY (para) REFERENCES jornada_coluna(id);
-alter table public.klingo_conferencia add constraint klingo_conferencia_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE SET NULL;
 alter table public.klingo_conversa_ident add constraint klingo_conversa_ident_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE CASCADE;
 alter table public.klingo_horarios_falha add constraint klingo_horarios_falha_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE CASCADE;
 alter table public.klingo_oferta add constraint klingo_oferta_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE CASCADE;
@@ -2877,6 +2878,7 @@ alter table public.jornada_exame add constraint jornada_exame_card_id_fkey FOREI
 alter table public.app_laudo add constraint app_laudo_paciente_id_fkey FOREIGN KEY (paciente_id) REFERENCES public.app_paciente(id) ON DELETE CASCADE;
 alter table public.app_laudo_pessoa add constraint app_laudo_pessoa_paciente_id_fkey FOREIGN KEY (paciente_id) REFERENCES public.app_paciente(id) ON DELETE CASCADE;
 alter table public.painel_oferta add constraint painel_oferta_conversa_fk FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE CASCADE;
+alter table public.klingo_conferencia add constraint klingo_conferencia_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE SET NULL;
 
 -- ===== Visões (5) =====
 

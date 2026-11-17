@@ -19,7 +19,7 @@ begin
   if v_de > v_ate then v_de := v_ate; end if;
   with
   base as (
-    select k.m, k.origem, k.ligacao, k.conversa_id, k.status_klingo, k.unidade, k.marcado_em, je.status as st, je.procedimento,
+    select k.m, k.origem, k.ligacao, k.conversa_id, k.status_klingo, k.unidade, k.marcado_em, k.via_api, (c.primeiro_humano_em is not null) as com_atendente, je.status as st, je.procedimento,
            lower(btrim(coalesce(je.cancelamento_motivo, ''))) as mot,
            case when je.procedimento is not null then (case when je.procedimento ~* '^consulta' then 'consulta' else 'exame' end)
                 else (select case x.tipo when 'consulta' then 'consulta' when 'exame' then 'exame' end from public.pre_agendamentos x where x.conversa_id = k.conversa_id order by x.criado_em desc limit 1) end as tipo
@@ -59,7 +59,11 @@ begin
     'por_origem', coalesce((select jsonb_object_agg(o, n) from (select origem as o, count(*) as n from p group by 1) q), '{}'::jsonb),
     'por_ligacao', coalesce((select jsonb_object_agg(l, n) from (select ligacao as l, count(*) as n from p group by 1) q), '{}'::jsonb),
     'cancel_motivos', coalesce((select jsonb_object_agg(x.cat, x.n) from (select cat, count(*) as n from cc group by cat) x), '{}'::jsonb),
-    'clinica_mesmo_periodo', coalesce((select jsonb_object_agg(t, n) from clin), '{}'::jsonb)
+    'clinica_mesmo_periodo', coalesce((select jsonb_object_agg(t, n) from clin), '{}'::jsonb),
+    'quem_marcou', (select jsonb_build_object(
+        'api_sem_atendente', count(*) filter (where via_api and not com_atendente), 'api_com_atendente', count(*) filter (where via_api and com_atendente),
+        'pessoa_sem_atendente', count(*) filter (where not via_api and not com_atendente), 'pessoa_com_atendente', count(*) filter (where not via_api and com_atendente)) from p)
   ) into v_out;
   return v_out;
 end $function$;
+
