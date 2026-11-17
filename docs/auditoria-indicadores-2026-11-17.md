@@ -1,5 +1,7 @@
 # Auditoria dos indicadores (17/11/2026)
 
+> **Mudança de escopo (17/11/2026, pedido do dono): a aba mostra só o que tem a ver com o webchat.** A agenda da clínica toda saiu da tela (e a comparação "o site é X% da clínica"). A seção de marcações passou a contar **só as marcações do Klingo ligadas a uma conversa do chat** (143 hoje, 7 de teste ficam fora), com as mesmas contas. Os números de clínica toda nas seções 1 a 3 abaixo seguem aqui só como prova de que o Klingo é a fonte confiável. Números do chat de 03 a 16/11 (exame nesse período): 30 marcações, 4 remarcadas, 26 ficaram, 24 confirmaram, 18 atendidas, 3 faltaram, 5 ainda sem fechamento; marcadas no período: 135 (123 ativas). A amostra é pequena porque o chat é novo e as consultas são marcadas para datas futuras. "Confirmar adianta?" só compara com 20 ou mais marcações passadas de cada lado.
+
 Pedido do dono: usar só dado real (nada de teste), conferir todo número e toda conta, descobrir qual fonte é mais fiel, e refazer a aba para **contar uma história** (agendados → confirmaram → vieram → faltaram), sem jargão, com o que a supervisão usa no dia a dia e fala na reunião.
 
 Tudo abaixo foi medido na produção em 17/11/2026 (só contagens; nenhum dado de paciente saiu do banco). Funções novas: `supabase/indicadores-agenda.sql` (migrações `indicadores_agenda_parte1..5`).
