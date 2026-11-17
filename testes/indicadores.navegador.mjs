@@ -236,6 +236,16 @@ await caso('Topo: os 6 números pedidos (procuraram, atendidas, viraram agendame
     && k['Pessoas que procuraram o chat'].startsWith('60 | cada pessoa conta uma vez | ▲ 20%') && k['Pessoas atendidas'].startsWith('57 | 95% de quem procurou') && k['Viraram agendamento'].startsWith('15 | 25% de quem procurou')
     && k['Agendaram sem ajuda de ninguém'].startsWith('3 | 20% dos que agendaram · nenhum atendente na conversa') && k['Cancelados'].startsWith('4 | de 135 marcações do chat agendadas neste período (3%)') && k['Remarcados'].startsWith('7 | de 135 marcações do chat agendadas neste período (5,2%)') && coloridos === 0, detalhe: JSON.stringify(k) + ' ' + topo.join(',') };
 });
+await caso('Gráfico "Procura e agendamento": consultas e exames, cada um com a procura (começaram um pedido) e quantos agendaram, e a porcentagem', async () => {
+  const t = await abrir(); await abaInd(t);
+  const p = t.page.locator('.ind-painel', { hasText: 'Procura e agendamento' }).first();
+  const grupos = await p.locator('svg .rot').allTextContents(), pcts = await p.locator('svg .pct').allTextContents(), vals = await p.locator('svg .val').allTextContents(), barras = await p.locator('svg rect').count();
+  const leg = (await p.locator('.ind-leg').innerText()).replace(/\s+/g, ' '), titulos = await p.locator('svg rect title').allTextContents();
+  const posicao = await t.page.locator('.ind-pg h3.ind-sec, .ind-pg .ind-painel h4').allInnerTexts();
+  await t.ctx.close();
+  return { ok: grupos.join('|') === 'Consultas|Exames' && vals.join('|') === '42|14|3|1' && pcts.join('|') === '33,3% agendaram|33,3% agendaram' && barras === 4 && /Procuraram \(começaram um pedido\) 45/.test(leg) && /Agendaram 15/.test(leg)
+    && titulos[0] === 'Consultas: 42 procuraram' && titulos[1] === 'Consultas: 14 agendaram' && posicao.indexOf('Procura e agendamento: consultas e exames') < posicao.indexOf('O que acontece com as marcações do chat'), detalhe: JSON.stringify({ grupos, vals, pcts, barras, leg, titulos }) };
+});
 await caso('Chat do site: começaram pedido, com marcação no Klingo (confere o que o chat diz) e 1ª resposta', async () => {
   const t = await abrir(); await abaInd(t);
   const k = await kpiTxt(t); await t.ctx.close();

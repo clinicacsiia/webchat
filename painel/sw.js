@@ -1,5 +1,5 @@
 // Service worker do painel: rede primeiro, cache só como reserva offline.
-const VERSAO = 'webchat-painel-v56';
+const VERSAO = 'webchat-painel-v57';
 const BASE = ['./', 'index.html', 'icon-192.png'];
 
 self.addEventListener('install', (e) => {

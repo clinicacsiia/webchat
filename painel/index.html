@@ -432,6 +432,7 @@
   .ind-area-dica { position: absolute; top: 0; transform: translateX(-50%); pointer-events: none; background: var(--papel); border: 1px solid var(--linha); border-radius: 8px; padding: 8px 10px; font-size: 13px; box-shadow: 0 4px 14px rgba(0,0,0,.14); white-space: nowrap; z-index: 5; } .ind-area-dica b { display: block; margin-bottom: 2px; }
   .ind-resumo { font-size: 16px; margin: 4px 0 2px; } .ind-resumo b { font-size: 26px; }
   .ind-mini-sub { display: block; margin-top: 2px; }
+  .ind-procura .val { fill: var(--texto); font-size: 14px; font-weight: 700; } .ind-procura .rot { fill: var(--texto); font-size: 15px; font-weight: 650; } .ind-procura .pct { fill: var(--suave); font-size: 13px; }
   .ind-kpis6 { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
   .ind-pt { display: inline-block; width: 9px; height: 9px; border-radius: 3px; margin-right: 6px; }
   .ind-colunas .zona.on { fill: rgba(42,120,214,.10); }
@@ -4892,6 +4893,28 @@ h1.longo { font-size: 14mm; }
     return h('div', {}, caixa, legendaPontos(series.map((s) => ({ cor: s.cor, rot: s.rot, v: dados.reduce((q, d) => q + (Number(d[s.k]) || 0), 0) }))));
   }
 
+  // Procura x agendados por tipo (17/11/2026): pares de colunas. grupos = [{ rot, procuraram, agendaram }].
+  function graficoProcura(grupos) {
+    const W = 760, H = 270, ESQ = 40, DIR = 10, TOPO = 24, BAIXO = 58, aw = W - ESQ - DIR, ah = H - TOPO - BAIXO, n = grupos.length;
+    const { passo, topo } = escalaY(Math.max(1, ...grupos.map((g) => g.procuraram))), larg = aw / n, bw = Math.min(70, larg * 0.28), y = (v) => TOPO + ah - (v / topo) * ah;
+    const svg = svgEl('svg', { viewBox: `0 0 ${W} ${H}`, class: 'ind-area ind-procura', role: 'img', 'aria-label': 'Procura e agendados: ' + grupos.map((g) => `${g.rot}: ${g.procuraram} procuraram, ${g.agendaram} agendaram`).join('; ') });
+    for (let v = 0; v <= topo; v += passo) svg.append(svgEl('line', { class: 'grade', x1: ESQ, x2: W - DIR, y1: y(v), y2: y(v) }), svgEl('text', { x: ESQ - 8, y: y(v) + 4, 'text-anchor': 'end' }, String(v)));
+    grupos.forEach((g, i) => {
+      const cx = ESQ + larg * i + larg / 2;
+      [[g.procuraram, '#9cc3ee', cx - bw - 3, 'Procuraram'], [g.agendaram, '#1f9d55', cx + 3, 'Agendaram']].forEach(([v, cor, x, rot]) => {
+        const r = svgEl('rect', { x, y: y(v), width: bw, height: Math.max(v > 0 ? 2 : 0, y(0) - y(v)), fill: cor, rx: 3 }); r.append(svgEl('title', {}, `${g.rot}: ${nf(v)} ${rot.toLowerCase()}`)); svg.append(r);
+        svg.append(svgEl('text', { class: 'val', x: x + bw / 2, y: y(v) - 6, 'text-anchor': 'middle' }, nf(v)));
+      });
+      svg.append(svgEl('text', { class: 'rot', x: cx, y: H - 32, 'text-anchor': 'middle' }, g.rot), svgEl('text', { class: 'pct', x: cx, y: H - 12, 'text-anchor': 'middle' }, g.procuraram ? `${pTxt(taxa(g.agendaram, g.procuraram))} agendaram` : 'ninguém procurou'));
+    });
+    return h('div', {}, svg, legendaPontos([{ cor: '#9cc3ee', rot: 'Procuraram (começaram um pedido)', v: grupos.reduce((q, g) => q + g.procuraram, 0) }, { cor: '#1f9d55', rot: 'Agendaram', v: grupos.reduce((q, g) => q + g.agendaram, 0) }]));
+  }
+  function blocoProcura(PTF) {
+    const g = (k, rot) => ({ rot, procuraram: ((PTF || {})[k] || {}).pedido || 0, agendaram: ((PTF || {})[k] || {}).agendaram || 0 });
+    const grupos = [g('consulta', 'Consultas'), g('exame', 'Exames')]; const st = g('sem_tipo', 'Pedido sem tipo definido'); if (st.procuraram) grupos.push(st);
+    if (!grupos.some((x) => x.procuraram)) return painel('Procura e agendamento: consultas e exames', null, h('p', { class: 'dica' }, 'Ninguém começou um pedido neste período.'));
+    return painel('Procura e agendamento: consultas e exames', 'Procura = pessoas que começaram um pedido desse tipo no chat. Agendaram = dessas, quantas viraram agendamento (equipe ou sistema). Cada pessoa conta uma vez por tipo.', graficoProcura(grupos));
+  }
   /* ---------- A história da agenda (17/11/2026): fonte = Klingo (relatório #14359), pela data do exame ---------- */
   const COR_AG = { atendidas: '#1f9d55', faltaram: '#d03a2f', saiu: '#8a94a0', por_vir: '#2a78d6' };
   const porC = (a, b) => (b > 0 ? pTxt(taxa(a, b)) : '—');
@@ -5089,6 +5112,7 @@ h1.longo { font-size: 14mm; }
       h('h3', { class: 'ind-sec' }, 'O chat em números'),
       h('p', { class: 'dica' }, 'Pessoas: pelo dia em que abriram o chat. Cancelados e remarcados: marcações do chat contadas pelo dia em que foram agendadas ("Agendado em" do Klingo).'),
       kpisTopo,
+      blocoProcura(CA.por_tipo),
       h('h3', { class: 'ind-sec' }, 'O que acontece com as marcações do chat'),
       h('p', { class: 'dica' }, 'Só as marcações do Klingo que vieram de uma conversa do chat (ligadas pelo pedido, ou por celular e nome), contadas aqui pela data do exame ou da consulta. Marcação feita só pela recepção ou pelo telefone não entra.'),
       ...secAgenda,
