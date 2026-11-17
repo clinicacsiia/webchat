@@ -2734,6 +2734,8 @@
   "disponibilidade_max_avisos_total",
   "encerramento_exige_motivo",
   "encerramento_valida_agendado",
+  "entrada_previsao_modo",
+  "entrada_webchat_modo",
   "equipe_push_url",
   "fila_autochegada",
   "fila_aviso_antes",
@@ -5980,7 +5982,7 @@
    "anon": true,
    "authenticated": true,
    "publico": false,
-   "md5": "84eaf0ad0177edebdd5842cf7cd1fdc0"
+   "md5": "14e056dc4921d5c93d3b5414fb20bc4d"
   },
   {
    "nome": "chat_consulta_salvar",

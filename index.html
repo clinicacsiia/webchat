@@ -187,6 +187,8 @@
   }
   .btn-primario:hover { background: var(--csi-primary-strong-hover); }
   .btn-primario:disabled { opacity: .6; cursor: default; }
+  a.btn-previsao-entrada { display: block; box-sizing: border-box; width: 100%; text-align: center; text-decoration: none; margin-top: 10px; }
+  a.btn-previsao-entrada[hidden], #dicaPrevisaoEntrada[hidden] { display: none; }
   .erro-form { color: var(--erro); font-size: calc(15.5px * var(--esc)); margin: 0 0 12px; min-height: 0; }
   /* conta do paciente (login opcional) */
   .conta-faixa { display: flex; flex-wrap: wrap; gap: 0 12px; align-items: center; justify-content: space-between; padding: 0; margin: 0 0 12px; font-size: calc(14.5px * var(--esc)); color: var(--texto-suave); }
@@ -650,6 +652,8 @@
       <p class="erro-form" id="erroForm" role="alert"></p>
       <button class="btn-primario" id="btnIniciar" type="submit">Começar</button>
     </form>
+    <a class="btn-primario btn-previsao-entrada" id="btnPrevisaoEntrada" href="previsao/" hidden>Previsão de marcação</a>
+    <p class="dica-campo" id="dicaPrevisaoEntrada" hidden>Veja o que está previsto para você, responda se está certo e fale com a nossa equipe.</p>
     <a class="acompanhar-grande" id="linkAcompanhar" href="minha-vez/?acompanhar=1" hidden><span class="ac-icone" aria-hidden="true">📋</span><span class="ac-txt">Acompanhe seus pedidos<small>Status, remarcar, cancelar e laudos em PDF</small></span><span class="ac-seta" aria-hidden="true">›</span><span class="balao" id="balaoAcompanhar" hidden role="status"></span></a>
     <button type="button" class="acompanhar-grande" id="btnHistoricoForm" hidden><span class="ac-icone" aria-hidden="true">💬</span><span class="ac-txt">Ver conversas anteriores<small>Continue de onde parou</small></span><span class="ac-seta" aria-hidden="true">›</span></button>
     <details class="inst-clinica" open>
@@ -708,7 +712,7 @@
   const CHAVE_HIST = 'webchat.historico.v1';   // as últimas conversas deste aparelho (cada uma com o seu token): dá para voltar a elas
   const MAX_HIST = 5;                          // mínimo pedido: 3
   // Muda a cada alteração do chat. Cópia de mensagens guardada por outra versão é descartada (era isso que mostrava conversa velha e travada).
-  const VERSAO_APP = '2026.11.17-2';
+  const VERSAO_APP = '2026.11.17-3';
   // Mesmas regras do banco (fluxo_nome_ok, fluxo_telefone_ok, fluxo_email_ok): o banco confere de novo, aqui é só para avisar logo.
   const LET = 'A-Za-zÀ-ÖØ-öø-ÿ';
   const nomeCompletoOk = (v) => { const t = String(v || '').trim(); return t.length >= 5 && t.length <= 120 && new RegExp(`^[${LET}][${LET}'’.-]*( +[${LET}][${LET}'’.-]*)+$`).test(t) && t.split(/ +/).filter((w) => w.replace(new RegExp(`[^${LET}]`, 'g'), '').length >= 2).length >= 2; };
@@ -3685,6 +3689,18 @@
     tela();
   }
 
+  /* ---------- entrada: webchat padrão e/ou Previsão de marcação (Configurações > Entrada do paciente; 17/11/2026) ----------
+     entrada_webchat_modo = 'nao' esconde o formulário e o botão "Começar"; entrada_previsao_modo = 'sim' mostra o botão "Previsão de marcação" (leva a previsao/).
+     Sem a chave, erro de rede ou os dois desligados: tudo como era antes (só o webchat). Conversa já aberta no aparelho continua abrindo direto. */
+  function aplicarEntrada() {
+    const prev = config.entrada_previsao_modo === 'sim';
+    const web = config.entrada_webchat_modo !== 'nao' || !prev;   // os dois desligados = o webchat volta sozinho
+    el.form.hidden = !web;
+    const b = $('#btnPrevisaoEntrada'), d = $('#dicaPrevisaoEntrada');
+    if (b) b.hidden = !prev;
+    if (d) d.hidden = !prev || web;   // a explicação só aparece quando é o único caminho
+  }
+
   /* ---------- início ---------- */
   async function init() {
     try {
@@ -3696,6 +3712,7 @@
     document.title = config.nome_empresa;
     el.empresa.textContent = config.nome_empresa === NOME_CLINICA ? 'CSI · Clínica de Saúde e Imagem' : config.nome_empresa;
     if (config.boas_vindas && config.boas_vindas.length <= 90) el.boasForm.textContent = config.boas_vindas;
+    aplicarEntrada();
     iniciarSentinela();
     if (conv && conv.id && conv.token) { registrarHistorico(conv); abrirChat(); } else mostrarForm();   // registrar: conversa de antes desta versão entra na lista
     iniciarConta();   // sem esperar: o formulário já está na tela; a conta (se existir) refaz o formulário quando chegar

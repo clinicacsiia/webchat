@@ -38,6 +38,16 @@ Jornada (jornada_exame, 30 s) ─────┴→ as marcações abertas de ca
 
 Os nomes começam com `pmarc_` porque `previsao_vigiar`, `previsao_responder` e `painel_previsao_lista` **já existem** na produção (motor da disponibilidade futura): o teste no clone pegou a colisão antes de aplicar.
 
+## Entrada do paciente: Começar e/ou Previsão (Configurações)
+Em **Configurações > Entrada do paciente (Continuar ou Previsão)** há duas chaves (`entrada_webchat_modo`, `entrada_previsao_modo`; `supabase/entrada-previsao.sql`):
+| Começar (webchat) | Previsão | O que o paciente vê na primeira tela do chat |
+|---|---|---|
+| ligado | desligada | como sempre (padrão de hoje) |
+| ligado | ligada | botão **Começar** e botão **Previsão de marcação** |
+| **desligado** | ligada | **some o Começar** (e o formulário); só o botão Previsão, que leva a `previsao/` |
+| desligado | desligada | não vale: o painel recusa salvar e, se vier assim do banco, o webchat volta sozinho |
+O chat lê as chaves por `chat_config()` ao abrir; sem rede ou sem a chave, abre só o webchat. Conversa já aberta no aparelho continua abrindo direto. Teste: `npm run test:entrada-previsao` (7 casos) e um caso no teste do painel. O botão do formulário continua com o texto "Começar" (o nome atual no chat).
+
 ## Ligar e desligar
 - Chave **`previsao_marcacao_modo`** (`sim`/`nao`). `nao`: a leitura do Klingo não grava, as 6 funções do paciente respondem "desligado" e o painel avisa.
 - Rollback total: `supabase/previsao-marcacao-rollback.sql`.

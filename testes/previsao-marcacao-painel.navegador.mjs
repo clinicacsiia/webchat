@@ -62,8 +62,8 @@ function servidor() {
   });
 }
 
-async function pagina(browser, { nivel = 'supervisor', marcouFalha = false, pmarc = () => ({}), papel = 'atendente' } = {}) {
-  const opcoes = { pmarc };
+async function pagina(browser, { nivel = 'supervisor', marcouFalha = false, pmarc = () => ({}), papel = 'atendente', config = [] } = {}) {
+  const opcoes = { pmarc, config };
   const ctx = await browser.newContext();
   await ctx.addInitScript(([id, token, email]) => {
     localStorage.setItem('sb-nrvuynjwcgwpjdptkiay-auth-token', JSON.stringify({ access_token: token, refresh_token: 'x', token_type: 'bearer', expires_in: 86400, expires_at: Math.floor(Date.now() / 1000) + 86400,
@@ -89,6 +89,7 @@ async function pagina(browser, { nivel = 'supervisor', marcouFalha = false, pmar
     else if (p.startsWith('/rest/v1/jornada_transicao')) corpo = [];
     else if (p.startsWith('/rest/v1/v_jornada_quadro')) corpo = [];
     else if (p.endsWith('/rpc/org_nivel')) corpo = nivel;
+    else if (p.startsWith('/rest/v1/config')) { if (req.method() === 'GET') corpo = opcoes.config || []; else { reg.escritas = reg.escritas || []; reg.escritas.push({ metodo: req.method(), url: p + url.search, corpo: req.postData() }); corpo = []; } }
     else if (p.includes('/rpc/painel_pmarc_')) { const nome = p.split('/rpc/')[1]; const corpo2 = JSON.parse(req.postData() || '{}'); reg.rpcs.push({ nome, ...corpo2 }); corpo = opcoes.pmarc(nome, corpo2, reg); if (corpo && corpo.__erro) { status = 400; corpo = { message: corpo.__erro }; } }
     else if (p.endsWith('/rpc/painel_indicadores_atendentes')) { reg.rpcs.push(JSON.parse(req.postData() || '{}')); if (marcouFalha) { status = 500; corpo = { message: 'falhou' }; } else corpo = { pessoas: [{ nome: 'Outra Pessoa', agendados: 3 }, { nome: 'Atendente de Teste', agendados: 1 }] }; }
     else if (p.startsWith('/rest/v1/rpc/')) corpo = {};
@@ -219,6 +220,23 @@ await caso('erro ao carregar não trava: mostra aviso e a janela fecha normalmen
   const aberto = await page.locator('dialog[open]').count();
   await ctx.close();
   return { ok: /Não foi possível carregar agora/.test(t) && aberto === 0 };
+});
+
+await caso('Configurações: grupo "Entrada do paciente" com as duas chaves; desligar as duas é recusado sem gravar nada; desligar só o Começar grava', async () => {
+  const cfg = [{ chave: 'entrada_webchat_modo', valor: 'sim' }, { chave: 'entrada_previsao_modo', valor: 'nao' }];
+  const { page, ctx, reg } = await abrir({ pmarc: mock(), papel: 'admin', config: cfg });
+  await page.click('button[data-aba="config"]'); await page.waitForSelector('#cfg-entrada');
+  const t = await page.locator('#cfg-entrada').innerText();
+  // desliga as duas e tenta salvar
+  await page.locator('#cfg_entrada_webchat_modo').uncheck();
+  await page.click('.cfg-salvar .btn.prim'); await espera(500);
+  const recusou = !(reg.escritas || []).length && /pelo menos um botão ligado/i.test(await page.locator('body').innerText());
+  // liga a previsão e salva: só o Começar muda para nao e a previsão para sim
+  await page.locator('#cfg_entrada_previsao_modo').check();
+  await page.click('.cfg-salvar .btn.prim'); await espera(700);
+  const esc = (reg.escritas || []).map((e) => e.metodo + ' ' + decodeURIComponent(e.url) + ' ' + e.corpo);
+  await ctx.close();
+  return { ok: /Botão Começar/.test(t) && /Botão Previsão de marcação/.test(t) && recusou && esc.length === 2 && esc.some((x) => /entrada_webchat_modo/.test(x) && /"nao"/.test(x)) && esc.some((x) => /entrada_previsao_modo/.test(x) && /"sim"/.test(x)), detalhe: JSON.stringify({ recusou, esc }) };
 });
 
 await browser.close(); srv.close();

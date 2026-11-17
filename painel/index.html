@@ -3917,6 +3917,10 @@
       { k: 'motor', tipo: 'escolha', rot: 'Motor', opcoes: [['fluxo', 'Fluxo guiado (sem IA)'], ['ia', 'Inteligência artificial']], dica: 'Fluxo guiado segue um roteiro fixo; IA conversa livremente.' },
       { k: 'motor_telefones_teste', tipo: 'texto', rot: 'Telefones de teste', dica: 'Só esses números usam o motor novo (separe por vírgula). Vazio = ninguém em teste.' },
     ] },
+    { id: 'entrada', icone: 'fone', titulo: 'Entrada do paciente (Continuar ou Previsão)', desc: 'O que o paciente vê na primeira tela do chat. Os dois ligados: aparecem o botão Começar (webchat de marcação) e o botão Previsão de marcação. Webchat desligado e Previsão ligada: some o Começar e o paciente só segue pela Previsão. Os dois desligados não vale: o webchat volta sozinho.', campos: [
+      { k: 'entrada_webchat_modo', tipo: 'sim', rot: 'Botão Começar (webchat de marcação)', dica: 'Desligado: o formulário e o botão Começar somem da primeira tela. Conversa já aberta no aparelho continua abrindo.' },
+      { k: 'entrada_previsao_modo', tipo: 'sim', rot: 'Botão Previsão de marcação', dica: 'Ligado: aparece o botão que leva à página de previsão (a pessoa vê o que está marcado e fala com a equipe).' },
+    ] },
     { id: 'catalogos', icone: 'pin', titulo: 'Catálogos do chat (unidades)', desc: 'Cada catálogo é uma porta de entrada do chat (consultas, exames e médicos próprios). Desligar um tira o botão dele da primeira tela do chat; conversas que já estão abertas nele continuam normalmente. Sempre fica pelo menos um ligado.', campos: [
       { k: 'catalogo_desenvoar', tipo: 'sim', rot: 'Desenvoar (atendimento pediátrico)', dica: 'Desligado: a Desenvoar some da escolha de unidade no começo do chat.' },
       { k: 'catalogo_csi', tipo: 'sim', rot: 'CSI (exames e consultas)', dica: 'Desligado: a CSI some da escolha de unidade no começo do chat.' },
@@ -4249,6 +4253,10 @@ h1.longo { font-size: 14mm; }
     salvar.addEventListener('click', async () => {
       salvar.disabled = true;
       try {
+        // Entrada do paciente: pelo menos um dos dois botões precisa ficar ligado (senão o paciente não consegue seguir).
+        if (lidos.entrada_webchat_modo && lidos.entrada_previsao_modo && lidos.entrada_webchat_modo.ler() === 'nao' && lidos.entrada_previsao_modo.ler() === 'nao') {
+          toast('Deixe pelo menos um botão ligado em "Entrada do paciente": senão o paciente não consegue seguir.'); return;
+        }
         let n = 0;
         for (const [chave, { ler, inicial }] of Object.entries(lidos)) {
           const novo = ler(); if (novo === inicial) continue;
