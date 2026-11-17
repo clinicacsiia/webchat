@@ -85,17 +85,18 @@ const linhaAg = (r) => ({ dia: r[0], agendados: r[1], canceladas: r[2], remarcad
 const somaAg = (ls) => { const t = { agendados: 0, canceladas: 0, remarcadas: 0, ficaram: 0, confirmaram: 0, atendidas: 0, faltaram: 0, por_vir: 0, sem_fechamento: 0, chegaram: 0, conf_atendidas: 0, conf_faltaram: 0, nconf_atendidas: 0, nconf_faltaram: 0 }; for (const l of ls) for (const k of Object.keys(t)) t[k] += l[k] || 0; return t; };
 const POR_DIA = DIAS_REAIS.map(linhaAg), TOTAL_AG = somaAg(POR_DIA);
 const AGENDA = (a) => {
-  const pequeno = a.p_unidade === 'rmtc';
+  const pequeno = a.p_unidade === 'rmtc', ent = pequeno ? 4 : a.p_unidade === 'desenvoar' ? 40 : 60;
   const un = (f) => { const o = {}; for (const k of Object.keys(TOTAL_AG)) o[k] = Math.round(TOTAL_AG[k] * f); return o; };
   const bloco = (agendados, canceladas, remarcadas, ficaram, confirmaram, atendidas, faltaram, sem_fechamento, chegaram, conf_atendidas, conf_faltaram, nconf_atendidas, nconf_faltaram) => ({ agendados, canceladas, remarcadas, ficaram, confirmaram, atendidas, faltaram, por_vir: 0, sem_fechamento, chegaram, conf_atendidas, conf_faltaram, nconf_atendidas, nconf_faltaram });
   const atual = { total: TOTAL_AG, por_dia: POR_DIA, por_tipo: { consulta: bloco(25, 0, 3, 22, 20, 15, 3, 4, 3, 13, 3, 2, 0), exame: bloco(5, 0, 1, 4, 4, 3, 0, 1, 0, 3, 0, 0, 0) },
     por_unidade: { csi: un(0.2), rmtc: un(0.1), desenvoar: un(0.7), sem: { ...un(0), agendados: 0 } },
     hoje: { agendados: 11, saiu: 4, ficaram: 7, confirmaram: 6, chegaram: 0, atendidas: 0 },
     proximos: [{ dia: mais(HOJE, 1), ficaram: 13, confirmaram: 7 }, { dia: mais(HOJE, 2), ficaram: 6, confirmaram: 0 }],
-    novas: { total: 135, ativas: 123 },
+    novas: { total: 135, ativas: 124, canceladas: 4, remarcadas: 7 },
+    pessoas: { procuraram: ent, atendidas: Math.round(ent * 0.95), agendaram: Math.round(ent / 4), sem_ajuda: 3 },
     site: { com_marcacao: 82, com_marcacao_ativa: 76 }, site_por_dia: [0, 1, 2, 3, 4, 5, 6].map((i) => ({ dia: mais(a.p_ate, -i), pessoas: 10 + i, agendaram: 3 + (i % 3) })).filter((x) => x.dia >= a.p_de),
     dados_desde: '2026-10-30', checkin_desde: '2026-11-16' };
-  const anterior = { ...atual, total: somaAg([]), por_dia: [], por_tipo: {}, por_unidade: {}, novas: { total: 0, ativas: 0 }, site: { com_marcacao: 0, com_marcacao_ativa: 0 }, site_por_dia: [] };
+  const anterior = { ...atual, total: somaAg([]), por_dia: [], por_tipo: {}, por_unidade: {}, novas: { total: 100, ativas: 90, canceladas: 8, remarcadas: 4 }, pessoas: { procuraram: pequeno ? 3 : 50, atendidas: pequeno ? 3 : 45, agendaram: pequeno ? 1 : 20, sem_ajuda: 1 }, site: { com_marcacao: 0, com_marcacao_ativa: 0 }, site_por_dia: [] };
   return { periodo: { de: a.p_de, ate: a.p_ate }, anterior_periodo: { de: mais(a.p_de, -1), ate: mais(a.p_de, -1) }, unidade: a.p_unidade, gerado_em: agora, atual, anterior: pequeno ? anterior : { ...anterior, total: somaAg(POR_DIA.slice(0, 3)) } };
 };
 // Respostas de painel_indicadores_plataforma (marcações do chat, consulta x exame). Tudo inventado; total = canceladas + remarcadas + ativas.
@@ -226,21 +227,21 @@ await caso('Aba Indicadores: período padrão é Hoje e cada bloco pede só a su
   await t.ctx.close();
   return { ok: a.p_de === HOJE && a.p_ate === HOJE && a.p_unidade === null && a.p_incluir_teste === false && ctrl.join() === `${HOJE},${HOJE}` && nomes === 'agenda,atendentes,automacao,decisao,diretoria' && ag.p_incluir_teste === false && !t.reg.excecoes.length, detalhe: JSON.stringify(a) + ' ' + nomes + (t.reg.excecoes[0] ?? '') };
 });
-await caso('Resumo do chat: 5 números de uso do site com comparação neutra; "Com marcação no Klingo" confere o que o chat diz', async () => {
+await caso('Topo: os 6 números pedidos (procuraram, atendidas, viraram agendamento, sem ajuda de ninguém, cancelados, remarcados) com comparação neutra', async () => {
   const t = await abrir(); await abaInd(t);
-  const k = await kpiTxt(t); const neutros = await t.page.locator('.ind-kpis').nth(1).locator('.ind-delta.bom, .ind-delta.ruim').count();
+  const k = await kpiTxt(t); const topo = await t.page.locator('.ind-kpis').first().locator('.ind-kpi-rot').allInnerTexts(); const coloridos = await t.page.locator('.ind-kpis').first().locator('.ind-delta.bom, .ind-delta.ruim').count();
+  const ordem = await t.page.locator('.ind-pg h3.ind-sec').first().innerText();
   await t.ctx.close();
-  return { ok: k['Pessoas que procuraram o chat'].startsWith('60 |') && k['Começaram um pedido'].startsWith('45 |') && /^\d+ \| .*de quem procurou/.test(k['Agendaram pelo chat'])
-    && /^82 \| 76 ainda ativas · .* de quem o chat diz que agendou/.test(k['Com marcação no Klingo']) && k['1ª resposta da equipe'].startsWith('20 min') && neutros === 0, detalhe: JSON.stringify(k) + ' coloridos=' + neutros };
+  return { ok: topo.join('|') === 'Pessoas que procuraram o chat|Pessoas atendidas|Viraram agendamento|Agendaram sem ajuda de ninguém|Cancelados|Remarcados' && ordem === 'O chat em números'
+    && k['Pessoas que procuraram o chat'].startsWith('60 | cada pessoa conta uma vez | ▲ 20%') && k['Pessoas atendidas'].startsWith('57 | 95% de quem procurou') && k['Viraram agendamento'].startsWith('15 | 25% de quem procurou')
+    && k['Agendaram sem ajuda de ninguém'].startsWith('3 | 20% dos que agendaram · nenhum atendente na conversa') && k['Cancelados'].startsWith('4 | de 135 marcações do chat agendadas neste período (3%)') && k['Remarcados'].startsWith('7 | de 135 marcações do chat agendadas neste período (5,2%)') && coloridos === 0, detalhe: JSON.stringify(k) + ' ' + topo.join(',') };
 });
-await caso('Marcações do chat: 6 números em cima (marcadas pelo chat, com data no período, atendidos, faltaram, cancelados e remarcados, confirmaram) batendo com os dados reais', async () => {
+await caso('Chat do site: começaram pedido, com marcação no Klingo (confere o que o chat diz) e 1ª resposta', async () => {
   const t = await abrir(); await abaInd(t);
   const k = await kpiTxt(t); await t.ctx.close();
-  const T = TOTAL_AG, fech = T.agendados - T.sem_fechamento;
-  const pc = (a, b) => (Math.round((a / b) * 1000) / 10).toString().replace('.', ',') + '%';
-  return { ok: T.agendados === 30 && T.atendidas === 18 && k['Marcadas pelo chat'].startsWith('135 | 123 ainda ativas') && k['Com data neste período'].startsWith('30 |') && k['Atendidos'].startsWith('18 | ' + pc(T.atendidas, fech))
-    && k['Faltaram'].startsWith(pc(T.faltaram, T.atendidas + T.faltaram) + ' |') && k['Cancelados e remarcados'].startsWith(pc(T.canceladas + T.remarcadas, T.agendados) + ' |') && k['Confirmaram'].startsWith(pc(T.confirmaram, T.ficaram) + ' |') && !/clínica toda/i.test(JSON.stringify(k)), detalhe: JSON.stringify(k) };
+  return { ok: k['Começaram um pedido'].startsWith('45 |') && /^82 \| 76 ainda ativas · .* de quem o chat diz que agendou/.test(k['Com marcação no Klingo']) && k['1ª resposta da equipe'].startsWith('20 min'), detalhe: JSON.stringify(k) };
 });
+
 await caso('Marcações do chat: a história em ordem (agendados, saíram, ficaram, confirmaram, atendidos, faltaram) e a frase "de cada 100 marcações que já passaram"', async () => {
   const t = await abrir(); await abaInd(t);
   const p = t.page.locator('.ind-painel', { hasText: 'A história das marcações' }).first();
@@ -289,10 +290,10 @@ await caso('Equipe de atendimento: barra de agendamentos por atendente e tabela 
   await t.ctx.close();
   return { ok: rots[0] === 'Ana' && linhas[0] === 'Ana|40|12|6 min|9,4' && /^Bia\|25\|3\|/.test(linhas[1]), detalhe: rots.join(',') + ' || ' + linhas.join(' ; ') };
 });
-await caso('Sem a função da agenda no banco: avisa o arquivo a aplicar e o resto da página (chat) continua', async () => {
+await caso('Sem a função da agenda no banco: avisa o arquivo a aplicar e o resto da página (funil do chat) continua', async () => {
   const t = await abrir({ semAgenda: true }); await abaInd(t);
-  const txt = await textoAba(t); const k = await kpiTxt(t); await t.ctx.close();
-  return { ok: /supabase\/indicadores-agenda\.sql/.test(txt) && k['Pessoas que procuraram o chat'].startsWith('60 |') && !t.reg.excecoes.length, detalhe: txt.slice(0, 200) + (t.reg.excecoes[0] ?? '') };
+  const txt = await textoAba(t); await t.ctx.close();
+  return { ok: /supabase\/indicadores-agenda\.sql/.test(txt) && /Caminho do paciente no chat/.test(txt) && /Sem os números do chat agora/.test(txt) && !t.reg.excecoes.length, detalhe: txt.slice(0, 200) + (t.reg.excecoes[0] ?? '') };
 });
 await caso('Poucos casos no período anterior: mostra o número de antes em vez de só "sem base para comparar"', async () => {
   const t = await abrir({ unidade: 'rmtc' }); await t.page.click('.nav button[data-aba=indicadores]'); await t.page.selectOption('#selUnidade', 'rmtc');
@@ -319,11 +320,11 @@ await caso('Sem veredito: nada de "Bom/Ruim/Atenção", "período foi bom", "o q
   await t.ctx.close();
   return { ok: chips === 0 && !/O período (foi|pede)|Ver por quê|O que fazer|O que dá para melhorar|Poucos dados|Causa:|Melhorar:/.test(txt), detalhe: `chips=${chips} ` + (txt.match(/O período (foi|pede)|Ver por quê|O que fazer|Causa:|Melhorar:/) || [''])[0] };
 });
-await caso('Ordem da página: marcações do chat, equipe, chat do site, onde o chat é usado e marcação automática (nada de clínica toda, avaliações, conferência nem gráfico mensal)', async () => {
+await caso('Ordem da página: números do chat, marcações do chat, equipe, chat do site, onde o chat é usado e marcação automática (nada de clínica toda, avaliações, conferência nem gráfico mensal)', async () => {
   const t = await abrir({ admin: true }); await abaInd(t);
   const tits = await t.page.locator('.ind-pg h3.ind-sec').allInnerTexts(); const txt = await textoAba(t);
   await t.ctx.close();
-  return { ok: tits.join('|') === 'O que acontece com as marcações do chat|A equipe de atendimento|O chat do site|Onde o chat mais é usado|Marcação automática pelo chat' && !/Avaliações dos pacientes|Nota média|Conferência|Para comparar: a clínica toda|Faltas por|Motivos dos cancelamentos/.test(txt), detalhe: tits.join('|') };
+  return { ok: tits.join('|') === 'O chat em números|O que acontece com as marcações do chat|A equipe de atendimento|O chat do site|Onde o chat mais é usado|Marcação automática pelo chat' && !/Avaliações dos pacientes|Nota média|Conferência|Para comparar: a clínica toda|Faltas por|Motivos dos cancelamentos/.test(txt), detalhe: tits.join('|') };
 });
 await caso('Funil: 6 passos, a maior queda marcada (só uma) e os dois painéis de por que pararam', async () => {
   const t = await abrir(); await abaInd(t);

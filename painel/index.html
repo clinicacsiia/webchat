@@ -432,6 +432,7 @@
   .ind-area-dica { position: absolute; top: 0; transform: translateX(-50%); pointer-events: none; background: var(--papel); border: 1px solid var(--linha); border-radius: 8px; padding: 8px 10px; font-size: 13px; box-shadow: 0 4px 14px rgba(0,0,0,.14); white-space: nowrap; z-index: 5; } .ind-area-dica b { display: block; margin-bottom: 2px; }
   .ind-resumo { font-size: 16px; margin: 4px 0 2px; } .ind-resumo b { font-size: 26px; }
   .ind-mini-sub { display: block; margin-top: 2px; }
+  .ind-kpis6 { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
   .ind-pt { display: inline-block; width: 9px; height: 9px; border-radius: 3px; margin-right: 6px; }
   .ind-colunas .zona.on { fill: rgba(42,120,214,.10); }
   .ind-aviso { margin: 10px 0 0; }
@@ -4897,17 +4898,16 @@ h1.longo { font-size: 14mm; }
   const nsr = (T) => (T.canceladas || 0) + (T.remarcadas || 0);
   const passados = (T) => (T.atendidas || 0) + (T.faltaram || 0);
   const mini = (n, rot, sub) => h('div', { class: 'ind-mini' }, h('b', {}, typeof n === 'string' ? n : nf(n)), h('span', {}, rot), sub ? h('span', { class: 'ind-mini-sub' }, sub) : null);
-  function kpisAgenda(T, TA, comBase, novas) {
-    const dB = (a, b, ba, bb, bomSobe, cont = true) => (comBase ? delta(a, b, { cont, bomSobe, base: Math.min(ba, bb), neutro: bomSobe === null, minBase: cont ? 8 : 30 }) : h('span', { class: 'ind-delta neutro' }, 'sem período anterior com dados'));
-    const falta = taxa(T.faltaram, passados(T)), faltaA = taxa(TA.faltaram, passados(TA));
-    const saiu = taxa(nsr(T), T.agendados), saiuA = taxa(nsr(TA), TA.agendados);
-    return h('div', { class: 'ind-kpis' },
-      novas ? kpi('Marcadas pelo chat', nf(novas.total), `${nf(novas.ativas)} ainda ativas · feitas neste período, para qualquer data`, null, 'Marcações novas no Klingo que vieram de uma conversa do chat, pelo dia em que foram marcadas.') : null,
-      kpi('Com data neste período', nf(T.agendados), 'marcações do chat com exame ou consulta no período', dB(T.agendados, TA.agendados, T.agendados, TA.agendados, null)),
-      kpi('Atendidos', nf(T.atendidas), `${porC(T.atendidas, T.agendados - (T.por_vir || 0) - (T.sem_fechamento || 0))} das marcações que já passaram`, dB(T.atendidas, TA.atendidas, T.atendidas, TA.atendidas, true)),
-      kpi('Faltaram', porC(T.faltaram, passados(T)), `${nf(T.faltaram)} de ${nf(passados(T))} que já deviam ter vindo`, dB(falta, faltaA, passados(T), passados(TA), false, false)),
-      kpi('Cancelados e remarcados', porC(nsr(T), T.agendados), `${nf(nsr(T))} saíram da agenda`, dB(saiu, saiuA, T.agendados, TA.agendados, false, false)),
-      kpi('Confirmaram', porC(T.confirmaram, T.ficaram), `${nf(T.confirmaram)} dos ${nf(T.ficaram)} que ficaram na agenda`, dB(taxa(T.confirmaram, T.ficaram), taxa(TA.confirmaram, TA.ficaram), T.ficaram, TA.ficaram, true, false)));
+  // Os 6 números do topo (17/11/2026): pessoas pelo dia em que abriram o chat; cancelados e remarcados pelo dia em que foi AGENDADO (Agendado Em no Klingo).
+  function kpisChat(P, N, PA, NA, comBase) {
+    const dC = (a, b) => (comBase ? delta(a, b, { cont: true, base: Math.min(a, b), neutro: true }) : h('span', { class: 'ind-delta neutro' }, 'sem período anterior com dados'));
+    return h('div', { class: 'ind-kpis ind-kpis6' },
+      kpi('Pessoas que procuraram o chat', nf(P.procuraram), 'cada pessoa conta uma vez', dC(P.procuraram, PA.procuraram)),
+      kpi('Pessoas atendidas', nf(P.atendidas), `${porC(P.atendidas, P.procuraram)} de quem procurou · um atendente escreveu`, dC(P.atendidas, PA.atendidas)),
+      kpi('Viraram agendamento', nf(P.agendaram), `${porC(P.agendaram, P.procuraram)} de quem procurou`, dC(P.agendaram, PA.agendaram), 'Inclui o que a equipe marcou e o que o sistema marcou. Veja "Com marcação no Klingo" mais abaixo para a prova.'),
+      kpi('Agendaram sem ajuda de ninguém', nf(P.sem_ajuda), `${porC(P.sem_ajuda, P.agendaram)} dos que agendaram · nenhum atendente na conversa`, dC(P.sem_ajuda, PA.sem_ajuda)),
+      kpi('Cancelados', nf(N.canceladas), `de ${nf(N.total)} marcações do chat agendadas neste período (${porC(N.canceladas, N.total)})`, dC(N.canceladas, NA.canceladas), 'Pela data em que foi agendado, não pela data do exame.'),
+      kpi('Remarcados', nf(N.remarcadas), `de ${nf(N.total)} marcações do chat agendadas neste período (${porC(N.remarcadas, N.total)})`, dC(N.remarcadas, NA.remarcadas), 'Pela data em que foi agendado, não pela data do exame. Remarcado = trocado por outra data (o Klingo mostra como cancelado).'))
   }
   function blocoHoje(H, prox, dadosDesdeOk) {
     if (!H) return painel('Hoje e próximos dias', null, h('p', { class: 'dica' }, 'Sem dados de hoje.'));
@@ -5043,8 +5043,8 @@ h1.longo { font-size: 14mm; }
     const TA = AGD ? AGD.atual : null, TB = AGD ? AGD.anterior : null;
     const desde = TA ? TA.dados_desde : null;
     const comBase = !!(AGD && desde && AGD.anterior_periodo.de >= desde);
+    const kpisTopo = AGD ? kpisChat(TA.pessoas, TA.novas, TB.pessoas, TB.novas, comBase) : h('p', { class: 'dica' }, 'Sem os números do chat agora.');
     const secAgenda = AGD ? [
-      kpisAgenda(TA.total, TB.total, comBase, TA.novas),
       blocoHoje(TA.hoje, TA.proximos),
       h('div', { class: 'ind-grade' }, blocoHistoria(TA.total), h('div', { class: 'ind-col' }, blocoConfirmar(TA.total))),
       blocoDia(TA.por_dia, hojeISO),
@@ -5054,13 +5054,11 @@ h1.longo { font-size: 14mm; }
     const blocoEq = blocoEquipeAtend(eq && !eq.error ? eq.data : null);
 
     // ----- Parte 3: o chat (site) -----
-    const entA = FA.entraram || 0, entB = FB.entraram || 0, pedA = FA.pedido || 0, pedB = FB.pedido || 0, agA = FA.agendaram || 0, agB = FB.agendaram || 0;
+    const entA = FA.entraram || 0, entB = FB.entraram || 0, pedA = FA.pedido || 0, pedB = FB.pedido || 0, agA = FA.agendaram || 0;
     const esp = CA.espera_mediana_min, S2 = AGD ? TA.site : null;
     const dC = (a, b, base) => delta(a, b, { cont: true, base, neutro: true });
     const kpis = h('div', { class: 'ind-kpis' },
-      kpi('Pessoas que procuraram o chat', nf(entA), 'cada pessoa conta uma vez', dC(entA, entB, Math.min(entA, entB))),
       kpi('Começaram um pedido', nf(pedA), `${pTxt(taxa(pedA, entA))} de quem procurou`, dC(pedA, pedB, Math.min(pedA, pedB))),
-      kpi('Agendaram pelo chat', nf(agA), `${pTxt(taxa(agA, entA))} de quem procurou`, dC(agA, agB, Math.min(agA, agB)), 'Inclui o agendamento feito pelo sistema e o marcado pela equipe (ou conversa encerrada como "agendado").'),
       S2 ? kpi('Com marcação no Klingo', nf(S2.com_marcacao), `${nf(S2.com_marcacao_ativa)} ainda ativas · ${porC(S2.com_marcacao, agA)} de quem o chat diz que agendou`, null, 'Pessoas do chat cujo pedido tem uma marcação encontrada no Klingo (relatório de marcações).') : null,
       kpi('1ª resposta da equipe', esp != null ? nf(esp) + ' min' : '—', 'tempo mediano'));
     const maxFun = Math.max(1, entA);
@@ -5088,8 +5086,11 @@ h1.longo { font-size: 14mm; }
       h('div', { class: 'ind-ctl' }, h('label', {}, 'De ', campoDe), h('label', {}, ' até ', campoAte), h('button', { class: 'btn', type: 'button', onclick: verPeriodo }, 'Ver período'),
         h('button', { class: 'btn', type: 'button', onclick: () => viewIndicadores(c, true) }, 'Atualizar agora'), caixaTeste),
       avisoDados,
+      h('h3', { class: 'ind-sec' }, 'O chat em números'),
+      h('p', { class: 'dica' }, 'Pessoas: pelo dia em que abriram o chat. Cancelados e remarcados: marcações do chat contadas pelo dia em que foram agendadas ("Agendado em" do Klingo).'),
+      kpisTopo,
       h('h3', { class: 'ind-sec' }, 'O que acontece com as marcações do chat'),
-      h('p', { class: 'dica' }, 'Só as marcações do Klingo que vieram de uma conversa do chat (ligadas pelo pedido, ou por celular e nome), contadas pela data do exame ou da consulta. Marcação feita só pela recepção ou pelo telefone não entra.'),
+      h('p', { class: 'dica' }, 'Só as marcações do Klingo que vieram de uma conversa do chat (ligadas pelo pedido, ou por celular e nome), contadas aqui pela data do exame ou da consulta. Marcação feita só pela recepção ou pelo telefone não entra.'),
       ...secAgenda,
       blocoEq ? h('h3', { class: 'ind-sec' }, 'A equipe de atendimento') : null, blocoEq,
       h('h3', { class: 'ind-sec' }, 'O chat do site'),

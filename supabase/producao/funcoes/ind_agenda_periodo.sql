@@ -14,6 +14,7 @@ begin
   ex as (
     select e.marcacao_id,
            (e.agendado_para at time zone 'America/Sao_Paulo')::date as dia,
+           (e.agendado_em at time zone 'America/Sao_Paulo')::date as marcado,
            case when e.procedimento ~* '^consulta' then 'consulta' else 'exame' end as tipo,
            coalesce(public.unidade_chave(e.unidade), 'sem') as un,
            (coalesce(e.confirm_status, '') ilike 'confirmad%') as conf,
@@ -52,15 +53,20 @@ begin
              from ex where dia = v_hoje),
   prox as (select dia, count(*) filter (where r not in ('cancelada', 'remarcada')) as ficaram, count(*) filter (where r not in ('cancelada', 'remarcada') and conf) as confirmaram
              from ex where dia > v_hoje and dia <= v_hoje + 3 group by dia),
-  nov as (select count(*) as total, count(*) filter (where k.status_klingo <> 'Cancelada') as ativas
-            from public.klingo_conferencia k join public.conversas c on c.id = k.conversa_id
-           where k.marcado_em between p_de and p_ate and (p_teste or not c.teste) and (p_un is null or k.unidade is null or k.unidade = p_un)),
+  nov as (select count(*) as total, count(*) filter (where r = 'cancelada') as canceladas, count(*) filter (where r = 'remarcada') as remarcadas,
+                 count(*) filter (where r not in ('cancelada', 'remarcada')) as ativas
+            from ex where marcado between p_de and p_ate),
   pu as (select x.conversa_id, x.pessoa from public.painel_conversa_pessoa_un() x where p_un is null or x.chaves is null or cardinality(x.chaves) = 0 or p_un = any (x.chaves)),
   site as (select count(distinct pu.pessoa) filter (where cardinality(coalesce(pa.klingo_marcacoes, '{}')) > 0) as com_marcacao,
                   count(distinct pu.pessoa) filter (where exists (select 1 from unnest(coalesce(pa.klingo_marcacoes, '{}')) u
                                                                     where exists (select 1 from public.klingo_conferencia z where z.m = u::text and z.status_klingo <> 'Cancelada'))) as com_marcacao_ativa
              from public.conversas c join pu on pu.conversa_id = c.id join public.pre_agendamentos pa on pa.conversa_id = c.id
             where (p_teste or not c.teste) and (c.criado_em at time zone 'America/Sao_Paulo')::date between p_de and p_ate),
+  pes as (select pu.pessoa, bool_or(c.primeiro_humano_em is not null) as humano,
+                 bool_or(c.motivo_encerramento = 'agendado' or exists (select 1 from public.pre_agendamentos pa where pa.conversa_id = c.id and pa.status = 'agendado')) as agendou
+            from public.conversas c join pu on pu.conversa_id = c.id
+           where (p_teste or not c.teste) and (c.criado_em at time zone 'America/Sao_Paulo')::date between p_de and p_ate group by pu.pessoa),
+  pesa as (select count(*) as procuraram, count(*) filter (where humano) as atendidas, count(*) filter (where agendou) as agendaram, count(*) filter (where agendou and not humano) as sem_ajuda from pes),
   spd as (select (c.criado_em at time zone 'America/Sao_Paulo')::date as dia, count(distinct pu.pessoa) as pessoas,
                  count(distinct pu.pessoa) filter (where c.motivo_encerramento = 'agendado' or exists (select 1 from public.pre_agendamentos pa where pa.conversa_id = c.id and pa.status = 'agendado')) as agendaram
             from public.conversas c join pu on pu.conversa_id = c.id
@@ -74,6 +80,7 @@ begin
     'hoje', (select to_jsonb(hoje) from hoje),
     'proximos', coalesce((select jsonb_agg(jsonb_build_object('dia', dia, 'ficaram', ficaram, 'confirmaram', confirmaram) order by dia) from prox), '[]'::jsonb),
     'novas', (select to_jsonb(nov) from nov),
+    'pessoas', (select to_jsonb(pesa) from pesa),
     'site', (select to_jsonb(site) from site),
     'site_por_dia', coalesce((select jsonb_agg(jsonb_build_object('dia', dia, 'pessoas', pessoas, 'agendaram', agendaram) order by dia) from spd), '[]'::jsonb),
     'dados_desde', (select min((agendado_para at time zone 'America/Sao_Paulo')::date) from public.jornada_exame where status <> 'pedido'),
