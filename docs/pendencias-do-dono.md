@@ -187,6 +187,7 @@ O paciente baixa o PDF no cartão **Meus laudos** (`laudos-no-app.md`); o sistem
 
 ## 2.21 Webchat de Previsão de marcação (17/11/2026): banco e leitura **no ar e LIGADOS**; telas esperam a PR
 Detalhes em [`previsao-marcacao.md`](previsao-marcacao.md). Estado conferido na produção em 17/11/2026: banco aplicado (24 funções, 3 tabelas, rotina de 10 min), Edge Function `pmarc-cadastrar` publicada, **`previsao_marcacao_modo = sim`** e **2.388 pessoas já registradas** (todas com telefone; 99% com nascimento). **A página `previsao/` e o botão do painel só aparecem depois que você juntar a PR** (as duas são arquivos do site). Nenhuma mensagem sai sozinha para o paciente.
+- **18/11/2026:** a lista do painel passou a mostrar **só quem abriu a página de previsão** ou apertou o botão no WebChat (6 pessoas na hora da mudança); as ~2.900 registradas pelo Klingo continuam no banco, escondidas da lista (ver `previsao-marcacao.md`).
 - [ ] **Juntar a PR** (abre a página e o botão **Atendimento > Previsão de marcação**).
 - [ ] **Decidir como o link chega ao paciente:** hoje a atendente copia o link ou abre o WhatsApp com o texto pronto (botões na janela). Se quiser envio em massa, diga: é outra etapa (e pede cuidado com o WhatsApp e com a política de privacidade).
 - [ ] **Aprovar os dois textos que o paciente lê** (aviso de previsão e aviso final), editáveis em Configurações: chaves `previsao_marcacao_aviso` e `previsao_marcacao_final`.

@@ -144,7 +144,7 @@ await caso('a janela mostra o resumo, a previsão de cada pessoa e o que ela res
   const t = await page.locator('dialog').innerText();
   if (process.env.FOTO) await page.screenshot({ path: process.env.FOTO });
   await ctx.close();
-  return { ok: /PREVISÃO, não uma confirmação/.test(t) && /2 pessoa\(s\) registrada\(s\)/.test(t) && /MARIA TESTE DA SILVA/.test(t) && /Consulta: CONSULTA CARDIOLOGIA/.test(t) && /\+ 6 marcação\(ões\)/.test(t)
+  return { ok: /PREVISÃO, não uma confirmação/.test(t) && /2 pessoa\(s\) na lista/.test(t) && /MARIA TESTE DA SILVA/.test(t) && /Consulta: CONSULTA CARDIOLOGIA/.test(t) && /\+ 6 marcação\(ões\)/.test(t)
     && /Não sabe \/ pode seguir/.test(t) && /Prefiro de manhã/.test(t) && /conferir/.test(t) && /Sem celular: anote por telefone/.test(t) && /Ainda não respondeu/.test(t) && /Não abriu o link/.test(t) && !reg.excecoes.length,
     detalhe: reg.excecoes[0] ?? t.slice(0, 200).replace(/\n/g, ' | ') };
 });

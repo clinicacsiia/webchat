@@ -2023,8 +2023,8 @@
     dlg.addEventListener('close', () => { delete dlg.dataset.pendencias; clearInterval(t); carregarSeloPendencias(); }, { once: true });
   }
   /* ---------- Previsão de marcação (17/11/2026) ----------
-     Segundo webchat (previsao/index.html): registra TODA pessoa com marcação aberta no Klingo (relatórios #14359 e #14554) e abre uma conversa que a equipe responde aqui, na lista normal.
-     A janela mostra quem foi registrado, o que cada um respondeu ("não sei" vale como resposta), copia o link pessoal, abre o WhatsApp com o texto pronto e abre a conversa.
+     Segundo webchat (previsao/index.html): o banco registra TODA pessoa com marcação aberta no Klingo (relatórios #14359 e #14554), mas esta janela (18/11/2026) mostra SÓ quem abriu a página ou apertou o botão no WebChat, ou já tem conversa.
+     A janela mostra quem abriu, o que cada um respondeu ("não sei" vale como resposta), copia o link pessoal, abre o WhatsApp com o texto pronto e abre a conversa.
      Dados: painel_pmarc_* (admin e atendente). A previsão NÃO é confirmação: a equipe vê e confirma. */
   const PM = { filtro: 'todos', busca: '', lista: [], fim: false, resumo: null, estado: null, erro: null, carregando: false, seq: 0 };
   const PM_FILTROS = [['todos', 'Todos'], ['sem_link', 'Sem link enviado'], ['sem_resposta', 'Sem resposta'], ['respondeu', 'Responderam'], ['nao_sei', 'Não sei'], ['conversa', 'Com conversa']];
@@ -2084,13 +2084,13 @@
     const topo = [];
     if (PM.resumo && r.ligado === false) topo.push(h('p', { class: 'aviso-pm', role: 'alert', 'data-pm': 'desligado' }, 'O registro está DESLIGADO (nada é lido do Klingo e o link do paciente responde "não disponível"). Para ligar, peça a mudança da chave previsao_marcacao_modo para sim (ela não fica na tela Configurações).'));
     topo.push(h('p', { class: 'dica', 'data-pm': 'resumo' }, PM.resumo
-      ? `${pmNum(r.total)} pessoa(s) registrada(s) · ${pmNum(r.link_enviado)} com link enviado · ${pmNum(r.abriram)} abriram · ${pmNum(r.responderam)} responderam (${pmNum(r.nao_sei)} "não sei") · ${pmNum(r.com_conversa)} com conversa · ${pmNum(r.sem_celular)} sem celular`
+      ? `${pmNum(r.total)} pessoa(s) na lista (abriram a previsão) · ${pmNum(r.link_enviado)} com link enviado · ${pmNum(r.abriram)} abriram · ${pmNum(r.responderam)} responderam (${pmNum(r.nao_sei)} "não sei") · ${pmNum(r.com_conversa)} com conversa · ${pmNum(r.sem_celular)} sem celular`
       : 'Carregando…'));
     if (e) topo.push(h('p', { class: 'dica', 'data-pm': 'estado' }, e.erro ? 'A última leitura do Klingo deu erro: ' + e.erro : 'Última leitura do Klingo: ' + (e.rapido_em ? dispQuando(e.rapido_em) : 'ainda não houve') + (e.completo_em ? ' · leitura completa: ' + dispQuando(e.completo_em) : '')));
     let lista;
     if (PM.erro) lista = h('p', { class: 'dica', role: 'alert' }, PM.erro);
     else if (PM.carregando && !PM.lista.length) lista = h('p', { class: 'dica' }, 'Carregando…');
-    else if (!PM.lista.length) lista = h('p', { class: 'dica', 'data-pm': 'vazio' }, PM.busca ? 'Ninguém encontrado.' : 'Ninguém nesta lista ainda.');
+    else if (!PM.lista.length) lista = h('p', { class: 'dica', 'data-pm': 'vazio' }, PM.busca ? 'Ninguém encontrado.' : 'Ninguém nesta lista ainda. Só aparece quem abre a página de previsão ou aperta o botão no WebChat.');
     else lista = h('div', { class: 'eq-rolagem' }, h('table', { class: 'tab eq-tab', id: 'tabPrevMarc' },
       h('thead', {}, h('tr', {}, ['Pessoa', 'Previsão (do Klingo)', 'Situação', ''].map((t) => h('th', { scope: 'col' }, t)))),
       h('tbody', {}, PM.lista.map(pmCard))));
@@ -2125,7 +2125,7 @@
     const chips = h('div', { class: 'chips', role: 'group', 'aria-label': 'Filtro da previsão' }, PM_FILTROS.map(([id, rot]) => h('button', { class: 'chip', type: 'button', 'data-pm-filtro': id, 'aria-pressed': String(PM.filtro === id),
       onclick: () => { PM.filtro = id; chips.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.pmFiltro === id))); PM.seq++; PM.carregando = false; carregarPrevMarc(false); } }, rot)));
     dlg.replaceChildren(h('h3', {}, 'Previsão de marcação'),
-      h('p', { class: 'dica', style: 'margin:-8px 0 10px' }, 'Quem tem marcação aberta no Klingo e já foi registrado aqui. É uma PREVISÃO, não uma confirmação: envie o link, veja o que a pessoa respondeu e confirme pela conversa (webchat, WhatsApp ou telefone). "Não sei" vale como resposta: nada bloqueia a pessoa.'),
+      h('p', { class: 'dica', style: 'margin:-8px 0 10px' }, 'Só aparece quem abriu a página de Previsão ou apertou o botão Previsão de marcação no WebChat (quem apenas está registrado no Klingo e nunca abriu não entra aqui). É uma PREVISÃO, não uma confirmação: veja o que a pessoa respondeu e confirme pela conversa (webchat, WhatsApp ou telefone). "Não sei" vale como resposta: nada bloqueia a pessoa.'),
       chips, busca, h('div', { id: 'pmCorpo' }),
       h('div', { class: 'rodape' }, h('button', { class: 'btn', type: 'button', onclick: () => dlg.close() }, 'Fechar')));
     if (!dlg.open) dlg.showModal();
@@ -2808,7 +2808,7 @@
         h('div', {}, h('h2', {}, icone('fone'), 'Painel de atendimento'), h('p', { class: 'sub' }, 'Acompanhe as conversas do dia, o que está em espera e os alertas.')),
         h('div', { class: 'cab-acoes' },
           podeAtender() ? h('button', { class: 'btn', type: 'button', id: 'btnPrevisao', title: 'Pacientes que pediram aviso quando surgir vaga compatível (não é agendamento nem reserva)', onclick: abrirPrevisao }, icone('calendario'), 'Disponibilidade futura') : null,
-          podeAtender() ? h('button', { class: 'btn', type: 'button', id: 'btnPrevMarc', title: 'Quem tem marcação aberta no Klingo, o que respondeu à previsão e o link para enviar (previsão não é confirmação)', onclick: abrirPrevMarc }, icone('calendario'), 'Previsão de marcação') : null,
+          podeAtender() ? h('button', { class: 'btn', type: 'button', id: 'btnPrevMarc', title: 'Quem abriu a página de previsão ou apertou o botão no WebChat, o que respondeu e a conversa (previsão não é confirmação)', onclick: abrirPrevMarc }, icone('calendario'), 'Previsão de marcação') : null,
           podeAtender() ? h('button', { class: 'btn', type: 'button', id: 'btnPendencias', title: 'O que espera a equipe: solicitações do acesso rápido, cadastros para conferir e contas antigas sem PIN', onclick: abrirPendencias },
             icone('lista'), 'Pendências', h('span', { class: 'selo', id: 'seloPendencias', hidden: true }, '0')) : null,
           ehChefia() ? h('button', { class: 'btn', type: 'button', id: 'btnEquipe', title: 'Quanto cada atendente está atendendo agora (só TI, gerência e supervisão)', onclick: abrirEquipe }, icone('pessoas'), 'Equipe agora') : null,
