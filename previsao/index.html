@@ -96,7 +96,7 @@ button{font:inherit;cursor:pointer}
    as tabelas são fechadas e a credencial é o código secreto do link (ou celular + nascimento, com limite de tentativas). */
 const SUPABASE_URL='https://nrvuynjwcgwpjdptkiay.supabase.co';
 const SUPABASE_KEY='sb_publishable_e2GK1YGEj06STa_ESCevow_nvtATB-y';
-const VERSAO_PREVISAO='2026.11.17-3';
+const VERSAO_PREVISAO='2026.11.18-1';
 async function rpc(nome,args){
   const ctl=new AbortController(),t=setTimeout(()=>ctl.abort(),20000);
   try{
@@ -228,6 +228,7 @@ async function abrir(codigo){
   if(r.motivo==='desligado')return telaDesligado();
   if(!r.ok)return telaCodigoInvalido();
   guardar('pmarc.codigo',codigo);E.v=r;E.resposta=r.resposta;
+  limparEndereco();
   // quem já respondeu volta direto para a conversa
   if(r.respondeu||r.conversa)return telaConversa();
   telaPrevisao();
@@ -305,6 +306,10 @@ function telaDados(resposta){
 function bolhaHtml(m){const eu=m.autor==='cliente';
   return`<div class="bolha ${eu?'eu':'eles'}">${esc(m.texto)}<small>${eu?'Você':esc(m.agente||'CSI')} · ${esc(horaMsg(m.criado_em))}</small></div>`}
 function parar(){if(E.timer){clearInterval(E.timer);E.timer=null}}
+// O link pessoal (?c=) não deve ficar no endereço nem no histórico do navegador depois de aceito.
+function limparEndereco(){try{const u=new URL(location.href);if(u.searchParams.has('c')){u.searchParams.delete('c');history.replaceState(null,'',u.pathname+(u.search||'')+u.hash)}}catch(e){}}
+// Aparelho de outra pessoa: esquece o código guardado e volta para a tela de achar a previsão.
+function sairDoAparelho(){parar();guardar('pmarc.codigo',null);E.codigo=null;E.v=null;E.resposta=null;E.msgs=[];E.ultimaMsg=0;limparEndereco();telaAchar()}
 async function atualizarMsgs(primeira){
   const r=await rpc('pmarc_mensagens',{p_codigo:E.codigo,p_apos:E.ultimaMsg});
   if(!r.ok||!r.mensagens)return;
@@ -327,8 +332,10 @@ function telaConversa(){
   <button class="btn sec" id="btnPedir" type="button">Pedir previsão de outro exame ou consulta</button>
   <form class="compor" id="fEnviar" novalidate><label for="texto" style="position:absolute;left:-9999px">Sua mensagem</label><textarea id="texto" rows="1" maxlength="4000" placeholder="Escreva sua mensagem"></textarea><button class="btn" type="submit">Enviar</button></form>
   <p class="msg-erro" id="erro" role="alert"></p>
+  <button class="btn sec" id="btnSair" type="button">Sair deste aparelho</button>
   <p class="rodape">Versão ${esc(VERSAO_PREVISAO)} · <a href="../privacidade.html" target="_blank" rel="noopener">Privacidade</a></p>`);
   $('#btnPedir').onclick=()=>telaPedidoExame(()=>telaConversa());
+  $('#btnSair').onclick=sairDoAparelho;
   atualizarMsgs(true);
   E.timer=setInterval(()=>{if(!document.hidden)atualizarMsgs(false)},6000);
   const area=$('#texto');

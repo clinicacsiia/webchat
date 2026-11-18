@@ -24,6 +24,7 @@ const TELAS = [
   { arquivo: 'minha-vez/index.html', nome: 'minha-vez' },
   { arquivo: 'simulacao/integration.mjs', nome: 'painel' },   // simulação da clínica (15/11/2026): só a equipe logada; chama painel_simulacao_dia e painel_simulacao_indicadores
   { arquivo: 'acesso/index.html', nome: 'acesso' },   // acesso rápido do paciente (celular + PIN): só chama funções app_*
+  { arquivo: 'previsao/index.html', nome: 'acesso' },   // Previsão de marcação (sem login, sem PIN): só chama funções pmarc_*; entrou na conferência em 18/11/2026
 ];
 // Chamadas feitas com o nome numa variável (não aparecem como texto ao lado de "rpc("): declaradas aqui para não ficarem sem conferência.
 const INDIRETAS = [{ tela: 'painel', nome: 'convenio_suspender', chaves: null }, { tela: 'painel', nome: 'convenio_reativar', chaves: null }, { tela: 'acesso', nome: 'app_pin_criar', chaves: null }];   // app_pin_criar: o acesso escolhe entre app_cadastrar e app_pin_criar pelo interruptor
