@@ -370,7 +370,7 @@ await caso('Funil: 6 passos, a maior queda marcada (só uma) e os dois painéis 
   const fortes = await t.page.locator('.ind-perda.forte').allInnerTexts();
   const txt = await textoAba(t);
   await t.ctx.close();
-  return { ok: rots.length === 6 && rots[0] === 'Abriram o chat' && rots[5] === 'Pedido marcado' && fortes.length === 1 && /18 pessoas pararam aqui \(45%\) · maior queda/.test(fortes[0])
+  return { ok: rots.length === 6 && rots[0] === 'Abriram o chat' && rots[5] === 'Chat deu como agendado' && fortes.length === 1 && /18 pessoas pararam aqui \(45%\) · maior queda/.test(fortes[0])
     && /Último passo de quem não agendou/.test(txt) && /Escolha de data e horário/.test(txt) && /Como a conversa terminou sem agendar/.test(txt) && /Ninguém da equipe respondeu/.test(txt), detalhe: rots.join(',') + fortes.join('|') };
 });
 await caso('Por unidade: pessoas, agendaram, marcações da plataforma (consultas · exames), canceladas ou remarcadas e faltas', async () => {
@@ -390,7 +390,7 @@ await caso('Funil: a pessoa encerrada como "Agendado" sem pedido agendado aparec
   const t = await abrir(); await abaInd(t);
   const txt = (await t.page.locator('.ind-painel', { hasText: 'Caminho do paciente no chat' }).first().innerText()).replace(/\s+/g, ' ');
   await t.ctx.close();
-  return { ok: /2 pessoas foram encerradas como "Agendado", mas o pedido não está agendado/.test(txt), detalhe: txt.slice(-260) };
+  return { ok: /2 pessoas foram encerradas como "Agendado", mas o pedido não está agendado/.test(txt) && /Chat deu como agendado/.test(txt) && /\d+ confirmados no Klingo · \d+ sem confirmação/.test(txt), detalhe: txt.slice(-260) };
 });
 await caso('O que mais pedem e planos: pedidos e planos com pessoas, agendaram e %; os que quase não agendam ficam destacados', async () => {
   const t = await abrir(); await abaInd(t);
