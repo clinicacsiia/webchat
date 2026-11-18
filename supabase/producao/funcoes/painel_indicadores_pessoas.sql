@@ -1,0 +1,27 @@
+-- public.painel_indicadores_pessoas(p_de date, p_ate date, p_unidade text, p_incluir_teste boolean, p_tipo text)
+-- Pode executar: authenticated, service_role
+CREATE OR REPLACE FUNCTION public.painel_indicadores_pessoas(p_de date DEFAULT NULL::date, p_ate date DEFAULT NULL::date, p_unidade text DEFAULT NULL::text, p_incluir_teste boolean DEFAULT false, p_tipo text DEFAULT NULL::text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  v_hoje date := (now() at time zone 'America/Sao_Paulo')::date;
+  v_ate date; v_de date; v_len integer;
+  v_un text := case when lower(coalesce(p_unidade, '')) in ('csi', 'rmtc', 'desenvoar') then lower(p_unidade) end;
+  v_tipo text := case when lower(coalesce(p_tipo, '')) in ('exame', 'consulta') then lower(p_tipo) end;
+begin
+  if coalesce((select public.papel_atual()), '') not in ('admin', 'atendente') then
+    raise exception 'Somente administrador e atendente veem os indicadores.' using errcode = '42501';
+  end if;
+  v_ate := least(coalesce(p_ate, v_hoje), v_hoje);
+  v_de := greatest(coalesce(p_de, v_ate - 6), v_ate - 400);
+  if v_de > v_ate then v_de := v_ate; end if;
+  v_len := v_ate - v_de + 1;
+  return jsonb_build_object('periodo', jsonb_build_object('de', v_de, 'ate', v_ate), 'anterior_periodo', jsonb_build_object('de', v_de - v_len, 'ate', v_de - 1),
+    'unidade', v_un, 'tipo', v_tipo, 'gerado_em', now(),
+    'atual', public.ind_pessoas_periodo(v_de, v_ate, v_un, coalesce(p_incluir_teste, false), v_tipo),
+    'anterior', public.ind_pessoas_periodo(v_de - v_len, v_de - 1, v_un, coalesce(p_incluir_teste, false), v_tipo));
+end $function$;
+
