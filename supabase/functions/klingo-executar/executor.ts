@@ -246,7 +246,12 @@ export async function executarMarcacao(api: KlingoApi, rpc: Rpc, p: Pegar, esps:
     // v1.1: depois da marcação (ou da dúvida), olha o voucher ANTIGO (só na remarcação): ficou ativo, foi cancelado ou não deu para ver
     const olharAntigo = async (): Promise<"ativo" | "cancelado" | "desconhecido" | undefined> => {
       if (!remarcacao) return undefined;
-      try { const l = await api.vouchers(token); return (Array.isArray(l) ? l : []).some((x) => String(x.id) === remarcacao) ? "ativo" : "cancelado"; } catch { return "desconhecido"; }
+      try {
+        const lista = await api.vouchers(token);
+        if (!Array.isArray(lista)) return "desconhecido";
+        if (lista.some((v) => String(v?.id) === remarcacao)) return "ativo";
+        return lista.every((v) => /^\d+$/.test(String(v?.id))) ? "cancelado" : "desconhecido";
+      } catch { return "desconhecido"; }
     };
     let v: Record<string, unknown> | null = null;
     try { v = await api.marcar(token, remarcacao ? { ...m, remarcacao } : m); } catch (e) {

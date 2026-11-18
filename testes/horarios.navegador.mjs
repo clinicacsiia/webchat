@@ -104,7 +104,7 @@ const abrir = async (opcoes) => { const t = await pagina(browser, opcoes); await
 
 const COM = { ok: true, estado: 'com_horarios', tipo: 'consulta', janela: 0, de: '2026-11-17', ate: '2026-12-01', total: 4, cortado: false,
   dias: [{ data: '2026-11-17', itens: [{ hora: '08:00', profissional: 'Dra. Teste', unidade: 'CLÍNICA DE SAÚDE E IMAGEM - DESENVOAR', ordem_chegada: false }, { hora: '08:30', profissional: 'Dra. Teste', unidade: 'DESENVOAR', ordem_chegada: false }] },
-    { data: '2026-11-18', itens: [{ hora: '14:00', profissional: 'Dr. Outro', unidade: 'DESENVOAR', ordem_chegada: true }, { hora: '14:30', profissional: 'Dr. Outro', unidade: 'DESENVOAR', ordem_chegada: false }] }] };
+    { data: '2026-11-18', itens: [{ hora: '14:00', profissional: 'Dr. Outro', unidade: 'DESENVOAR', ordem_chegada: true }, { hora: '14:30', profissional: 'Dr. Outro', unidade: 'CSI', ordem_chegada: false }] }] };
 const abrirConversaJoao = async (opcoes) => { const t = await abrir(opcoes); await t.page.click('.chip:has-text("Meus")'); await t.page.click('.item:has-text("João Lima")'); await t.page.waitForSelector('#chatTopo'); return t; };
 
 await caso('Atendente vê "Ver horários" na conversa aberta; sem conversa aberta não há botão', async () => {
@@ -123,11 +123,12 @@ await caso('Lista os horários por dia, marca dois e insere o texto na resposta 
   const n = await page.locator('.hor-item').count();
   const desabilitado = await page.locator('dialog button:has-text("Inserir na resposta")').isDisabled();
   await page.locator('.hor-item:has-text("08:00") input').check(); await page.locator('.hor-item:has-text("08:30") input').check(); await page.locator('.hor-item:has-text("14:00") input').check();
-  await page.click('dialog button:has-text("Inserir 3 na resposta")'); await espera(500);
+  await page.locator('.hor-item:has-text("14:30") input').check();
+  await page.click('dialog button:has-text("Inserir 4 na resposta")'); await espera(500);
   const caixa = await page.inputValue('#caixa');
   const enviou = reg.pedidos.filter((x) => /\/rest\/v1\/mensagens/.test(x) && false).length;
   await ctx.close();
-  const ok = n === 4 && desabilitado && /• ter 17\/11 às 08:00, 08:30 — Dra\. Teste/.test(caixa) && /• qua 18\/11 às 14:00 — Dr\. Outro \(ordem de chegada\)/.test(caixa) && /Qual fica melhor/.test(caixa)
+  const ok = n === 4 && desabilitado && /• ter 17\/11 às 08:00, 08:30 — Dra\. Teste/.test(caixa) && /• qua 18\/11 às 14:00 — Dr\. Outro \(ordem de chegada\) — DESENVOAR/.test(caixa) && /14:30 — Dr\. Outro — CSI/.test(caixa) && /Qual fica melhor/.test(caixa)
     && reg.chamadas.length >= 1 && reg.chamadas.at(-1).conversa === 'c2' && reg.chamadas.at(-1).janela === 0 && !reg.excecoes.length;
   return { ok, detalhe: reg.excecoes[0] ?? caixa.replace(/\n/g, ' | ') + ' ' + JSON.stringify(reg.chamadas) };
 });

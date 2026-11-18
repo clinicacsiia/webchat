@@ -160,16 +160,22 @@ await caso('o filtro "Não sei" e a busca pedem ao banco só o que é preciso (e
   return { ok: linhasFiltro === 1 && ult.p_filtro === 'nao_sei' && ult.p_busca === 'maria' && ult.p_limite === 50 && ult.p_pular === 0, detalhe: JSON.stringify({ linhasFiltro, ult }) };
 });
 
-await caso('"Copiar link" copia o link pessoal e marca como enviado', async () => {
-  const { page, ctx, reg } = await abrir({ pmarc: mock() });
+await caso('"Copiar link" só registra o envio depois da confirmação explícita', async () => {
+  let enviado = false;
+  const { page, ctx, reg } = await abrir({ pmarc: mock({
+    painel_pmarc_link_enviado: () => { enviado = true; return 1; },
+    painel_pmarc_lista: () => PESSOAS.map((p) => p.id === 'p1' && enviado ? { ...p, link_enviado_em: agora } : p),
+  }) });
   await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: base });
   await page.click('#btnPrevMarc'); await page.waitForSelector('#tabPrevMarc tbody tr');
   await page.click('tr[data-pm-id="p1"] button[data-pm="copiar"]'); await espera(500);
   const copiado = await page.evaluate(() => navigator.clipboard.readText()).catch(() => '');
+  const antes = rpcs(reg, 'painel_pmarc_link_enviado').length;
+  await page.click('tr[data-pm-id="p1"] button[data-pm="confirmar-envio"]'); await espera(500);
   const marcou = rpcs(reg, 'painel_pmarc_link_enviado');
   const t = await page.locator('dialog').innerText();
   await ctx.close();
-  return { ok: copiado === `${base}/previsao/?c=abc123abc123abc123abc123` && marcou.length === 1 && marcou[0].p_id === 'p1' && /Link enviado:/.test(t), detalhe: JSON.stringify({ copiado, marcou }) };
+  return { ok: copiado === `${base}/previsao/?c=abc123abc123abc123abc123` && marcou.length === 1 && marcou[0].p_id === 'p1' && antes === 0 && /Link enviado:/.test(t), detalhe: JSON.stringify({ copiado, marcou }) };
 });
 
 await caso('"WhatsApp com o link" abre wa.me com o texto pronto (e avisa que é previsão); sem celular não tem WhatsApp', async () => {

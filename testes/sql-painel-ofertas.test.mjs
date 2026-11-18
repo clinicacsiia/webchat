@@ -12,7 +12,7 @@ const { db, falhas } = await criarBancoProducao();
 const { q, um, como, anonimo } = ajudantes(db);
 await db.exec(`insert into vault.secrets_tbl (name, secret) values ('klingo_hash_sal', 'sal-de-teste'), ('klingo_interno_segredo', 'interno-de-teste')`);
 let sqlErro = null;
-for (const f of ['webchat-v2-parte1-modos', 'webchat-v2-parte2-calendario-api', 'webchat-v2-parte3-disponibilidade-futura', 'painel-ofertas']) {
+for (const f of ['webchat-v2-parte1-modos', 'webchat-v2-parte2-calendario-api', 'webchat-v2-parte3-disponibilidade-futura', 'painel-ofertas', 'oferta-ao-enviar']) {
   try { await db.exec(readFileSync(`${REPO}/supabase/${f}.sql`, 'utf8')); } catch (e) { sqlErro = `${f}: ${String(e.message).split('\n')[0]}`; }
 }
 registrar('o retrato da produção monta inteiro e as partes 1 a 3 do WebChat v2 e a painel-ofertas aplicam sem erro', falhas.length === 0 && !sqlErro, sqlErro ?? '');
@@ -154,6 +154,19 @@ await caso('Disponibilidade futura pela equipe: com pedido completo cadastra com
   const sem = await erroDe(() => comoEquipe(NAOEQUIPE, () => rpc('painel_disponibilidade_registrar', { p_conversa: p.c, p_dados: {} })));
   return { ok: r.ok === true && !!r.id && ped?.aceita_notificacao === true && (ped.canais || []).includes('chat') && ev.length === 1 && ev[0].origem === 'equipe' && ev[0].detalhe.agente === ATEND && v.disponibilidade?.estado === 'aceito' && sem?.code === '42501',
     detalhe: JSON.stringify([r, ped, ev, v, sem?.code]) };
+});
+
+await caso('o envio grava a oferta junto com a mensagem e uma recusa impede ambos', async () => {
+  const c = await conversaSimples();
+  const enviar = (texto = 'Qual horário prefere?') => comoEquipe(ATEND, () => um(`insert into public.mensagens(conversa_id,autor,agente_id,texto,opcoes)
+    values ($1,'agente',$2,$3, '{"oferta":"horario"}') returning id,opcoes`, [c, ATEND, texto]));
+  const invalida = await erroDe(() => enviar(''));
+  const antes = await ver(ATEND, [c]);
+  const m = await enviar(), v = await ver(ATEND, [c]);
+  await ofertar(ATEND, c, 'horario', 'recusado');
+  const erro = await erroDe(enviar);
+  const cont = await um(`select count(*)::int n from public.mensagens where conversa_id=$1 and texto='Qual horário prefere?'`, [c]);
+  return { ok: invalida?.code === '23514' && !antes.horario && !!m.id && m.opcoes === null && v.horario.estado === 'oferecido' && /recusada/.test(erro?.msg) && cont.n === 1 };
 });
 
 await db.close?.();
