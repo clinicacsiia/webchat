@@ -59,6 +59,8 @@ function servidor() {
 
 async function pagina(browser, { nivel = 'supervisor', marcouFalha = false, horarios = null, papel = 'atendente', bd = { horario: null, disponibilidade: null } } = {}) {
   const ctx = await browser.newContext();
+  // Notificação já concedida: com a permissão em "default" o painel refaz a tela inteira quando o navegador responde (apaga o texto da caixa de resposta no meio do teste).
+  await ctx.grantPermissions(['notifications'], { origin: `http://127.0.0.1:${srv.address().port}` });
   await ctx.addInitScript(([id, token, email]) => {
     localStorage.setItem('sb-nrvuynjwcgwpjdptkiay-auth-token', JSON.stringify({ access_token: token, refresh_token: 'x', token_type: 'bearer', expires_in: 86400, expires_at: Math.floor(Date.now() / 1000) + 86400,
       user: { id, aud: 'authenticated', role: 'authenticated', email, app_metadata: {}, user_metadata: {} } }));
