@@ -62,13 +62,15 @@ begin
              || E'\n\nChegue com 15 minutos de antecedência, com documento com foto' || case when public.norm_nome(pa.plano) = 'PARTICULAR' then '.' else ' e a carteirinha do convênio.' end
              || E' Se precisar remarcar ou cancelar, é só tocar em um dos botões abaixo.';
     if v_rem then
-      update public.pre_agendamentos set conferencia_status = 'remarcado', conferencia_detalhe = left('Remarcado pelo chat (conversa ' || op.conversa_id::text || ') em ' || to_char(now() at time zone 'America/Bahia', 'DD/MM HH24:MI'), 200), conferencia_em = now()
-       where id <> pa.id and klingo_marcacoes @> array[op.detalhe ->> 'remarcacao'] and status = 'agendado';
-      update public.klingo_marcacao set situacao = 'remarcada' where voucher = op.detalhe ->> 'remarcacao' and situacao = 'ativa';
+      if p_r ->> 'antigo' = 'cancelado' then
+        update public.pre_agendamentos set conferencia_status = 'remarcado', conferencia_detalhe = left('Remarcado pelo chat (conversa ' || op.conversa_id::text || ') em ' || to_char(now() at time zone 'America/Bahia', 'DD/MM HH24:MI'), 200), conferencia_em = now()
+         where id <> pa.id and klingo_marcacoes @> array[op.detalhe ->> 'remarcacao'] and status = 'agendado';
+        update public.klingo_marcacao set situacao = 'remarcada' where voucher = op.detalhe ->> 'remarcacao' and situacao = 'ativa';
+      end if;
       if p_r ->> 'antigo' = 'ativo' then
         perform public.fluxo_nota(op.conversa_id, 'ATENÇÃO: remarcação feita (voucher novo ' || (v ->> 'id') || '), mas o agendamento ANTIGO (voucher ' || coalesce(op.detalhe ->> 'remarcacao', '?') || ') continua ATIVO no Klingo: há DOIS agendamentos. Cancelar o antigo no Klingo e conferir com o paciente.');
         v_txt := v_txt || E'\n\nAtenção: o sistema ainda mostra o horário anterior como ativo. Já avisei a nossa equipe para cancelar o anterior e conferir tudo com você.';
-      elsif p_r ->> 'antigo' = 'desconhecido' then
+      elsif p_r ->> 'antigo' is distinct from 'cancelado' then
         perform public.fluxo_nota(op.conversa_id, 'Remarcação feita (voucher novo ' || (v ->> 'id') || '). Não foi possível conferir se o agendamento antigo (voucher ' || coalesce(op.detalhe ->> 'remarcacao', '?') || ') foi cancelado: conferir no Klingo.');
       end if;
     end if;

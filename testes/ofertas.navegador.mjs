@@ -96,6 +96,14 @@ async function pagina(browser, { nivel = 'supervisor', marcouFalha = false, hora
       { id: 'r1', atalho: 'LISTA-DE-ESPERA', texto: 'A agenda do(a) Dr(a). {medico} está completa no momento. Podemos deixar o nome do paciente em nossa lista de espera?' },
       { id: 'r2', atalho: 'ACEITOU-LISTA-DE-ESPERA', texto: 'Prontinho! O paciente foi incluído em nossa lista de espera.' },
       { id: 'r3', atalho: 'DEMORA-DE-RESPONDER-HORARIO-OFERTADO', texto: 'Passando para saber se conseguiu verificar as opções de horários que enviamos.' }];
+    else if (p === '/rest/v1/mensagens' && req.method() === 'POST') {
+      const m = req.postDataJSON();
+      if (m.opcoes?.oferta) {
+        bd[m.opcoes.oferta] = 'oferecido';
+        reg.regs.push({ p_tipo: m.opcoes.oferta, p_estado: 'oferecido' });
+      }
+      corpo = { ...m, id: 1, opcoes: null, criado_em: agora };
+    }
     else if (p.startsWith('/rest/v1/rpc/')) corpo = {};
     else if (p.startsWith('/rest/v1/')) corpo = objeto ? null : [];
     else corpo = {};
@@ -135,9 +143,11 @@ await caso('Sem vaga: NÃO oferece horário; propõe a Disponibilidade futura e,
   await page.waitForSelector('#ofertas .of-card');
   const c = await cartoes(page);
   await page.click('#ofertas button:has-text("Oferecer Disponibilidade futura")'); await espera(600);
-  const caixa = await page.inputValue('#caixa'), depois = await cartoes(page);
+  const caixa = await page.inputValue('#caixa'), rascunho = reg.regs.length === 0;
+  await page.click('#btnEnviar'); await page.waitForSelector('#ofertas button:has-text("Aceitou")');
+  const depois = await cartoes(page);
   await ctx.close();
-  return { ok: c.length === 1 && c[0].titulo === 'Sem vaga agora' && !c[0].botoes.includes('Oferecer') && reg.regs.some((r) => r.p_tipo === 'disponibilidade' && r.p_estado === 'oferecido') && /lista de espera/.test(caixa)
+  return { ok: rascunho && c.length === 1 && c[0].titulo === 'Sem vaga agora' && !c[0].botoes.includes('Oferecer') && reg.regs.some((r) => r.p_tipo === 'disponibilidade' && r.p_estado === 'oferecido') && /lista de espera/.test(caixa)
     && depois[0].titulo === 'Disponibilidade futura oferecida' && depois[0].botoes.join('|') === 'Aceitou: cadastrar|Recusou', detalhe: JSON.stringify([c, depois, reg.regs]) };
 });
 
@@ -145,11 +155,13 @@ await caso('Oferecer horários pelo diálogo registra "oferecido"; "Recusou" reg
   const { page, ctx, reg } = await abrirJoao({ horarios: COM });
   await page.waitForSelector('#ofertas .of-card'); await page.click('#ofertas button:has-text("Oferecer")'); await page.waitForSelector('.hor-item');
   await page.locator('.hor-item:has-text("08:00") input').check(); await page.click('dialog button:has-text("Inserir 1 na resposta")'); await espera(500);
-  const c1 = await cartoes(page), caixa = await page.inputValue('#caixa');
+  const caixa = await page.inputValue('#caixa'), rascunho = reg.regs.length === 0;
+  await page.click('#btnEnviar'); await page.waitForSelector('#ofertas button:has-text("Recusou")');
+  const c1 = await cartoes(page);
   await page.click('#ofertas button:has-text("Recusou")'); await espera(500);
   const c2 = await cartoes(page);
   await ctx.close();
-  return { ok: reg.regs[0]?.p_estado === 'oferecido' && /ter 17\/11 às 08:00/.test(caixa) && c1[0].titulo === 'Horários oferecidos' && c1[0].botoes.join('|') === 'Aceitou|Recusou|Cobrar resposta'
+  return { ok: rascunho && reg.regs[0]?.p_estado === 'oferecido' && /ter 17\/11 às 08:00/.test(caixa) && c1[0].titulo === 'Horários oferecidos' && c1[0].botoes.join('|') === 'Aceitou|Recusou|Cobrar resposta'
     && reg.regs[1]?.p_estado === 'recusado' && c2.length === 1 && c2[0].titulo === 'Recusou os horários' && !c2[0].botoes.includes('Oferecer') && c2[0].botoes.includes('Oferecer Disponibilidade futura'), detalhe: JSON.stringify([c1, c2, reg.regs]) };
 });
 

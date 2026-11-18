@@ -12,7 +12,7 @@ const { db, falhas } = await criarBancoProducao();
 const { q, um, como, anonimo } = ajudantes(db);
 await db.exec(`insert into vault.secrets_tbl (name, secret) values ('klingo_hash_sal', 'sal-de-teste'), ('klingo_interno_segredo', 'interno-de-teste')`);
 let sqlErro = null;
-for (const f of ['webchat-v2-parte1-modos', 'webchat-v2-parte2-calendario-api', 'webchat-v2-parte5-pos-agendamento']) { try { await db.exec(readFileSync(`${REPO}/supabase/${f}.sql`, 'utf8')); } catch (e) { sqlErro = `${f}: ${String(e.message).split('\n')[0]}`; } }
+for (const f of ['webchat-v2-parte1-modos', 'webchat-v2-parte2-calendario-api', 'webchat-v2-parte5-pos-agendamento', 'remarcacao-voucher-anterior']) { try { await db.exec(readFileSync(`${REPO}/supabase/${f}.sql`, 'utf8')); } catch (e) { sqlErro = `${f}: ${String(e.message).split('\n')[0]}`; } }
 registrar('o retrato da produção monta inteiro e as partes 1, 2 e 5 aplicam sem erro', falhas.length === 0 && !sqlErro, sqlErro ?? '');
 
 const UNIDADE = 'CLÍNICA DE SAÚDE E IMAGEM - CSI', TESTE = '71900000001';
@@ -72,7 +72,7 @@ async function novo(nasc = nascUnico(), tel = telefone()) {
 }
 const ateMarcando = async (p) => { await andar(p, (o) => false, p.nasc); await como(''); return p; };   // anda até o fim; se marcar, o último passo é "marcando"
 const opDe = (c) => q(`select id, estado, tipo, chave_idem, tentativas, voucher_id, codigo from public.klingo_operacao where conversa_id = $1 order by criado_em`, [c]);
-const pedidoDe = (c) => um(`select status, agendado_origem, klingo_marcacoes, escolha_horario from public.pre_agendamentos where conversa_id = $1`, [c]);
+const pedidoDe = (c) => um(`select status, conferencia_status, agendado_origem, klingo_marcacoes, escolha_horario from public.pre_agendamentos where conversa_id = $1`, [c]);
 const conversaDe = (c) => um(`select status, ia_ativa, primeiro_humano_em from public.conversas where id = $1`, [c]);
 const chamadasExecutor = async () => (await um(`select count(*)::int n from net.chamadas where url like '%klingo-executar'`)).n;
 const sucessoApi = (c, extra = {}) => JSON.stringify({ voucher: { id: String(26000 + Math.floor(Math.random() * 999)), status: 'agendado', data: dia(3), hora: '09:00', procedimento: 'RM JOELHO', unidade: 'CSI', profissional: 'DRA EXEMPLO IMAGEM', ...extra } });
@@ -282,7 +282,18 @@ await caso('REMARCAÇÃO FEITA mas o ANTIGO CONTINUA ATIVO no Klingo: o paciente
   await executor(o.id, 'sucesso', JSON.stringify({ voucher: { id: '27902', status: 'agendado', data: dia(9), hora: '11:30', procedimento: 'RM JOELHO', unidade: 'CSI', profissional: 'DRA EXEMPLO IMAGEM' }, antigo: 'ativo' }));
   const n = await nota(X.B.c), msg = await um(`select texto from public.mensagens where conversa_id = $1 and opcoes ->> 'tipo' = 'marcado' order by id desc limit 1`, [X.B.c]);
   const notas = await q(`select texto from public.mensagens where conversa_id = $1 and autor = 'sistema' or (conversa_id = $1 and texto ilike '%ANTIGO%continua%ATIVO%')`, [X.B.c]);
-  return { ok: n.ia_ativa === false && n.u === 'alta' && /ainda mostra o horário anterior como ativo/.test(msg.texto) && /27902/.test(n.t + JSON.stringify(notas)) || (n.ia_ativa === false && n.u === 'alta'), detalhe: `urgência=${n.u}; equipe=${!n.ia_ativa}; aviso=${/anterior como ativo/.test(msg?.texto ?? '')}` };
+  const anterior = (await retrato(X.B.c)).find((m) => m.voucher === X.vou);
+  const pre = await pedidoDe(X.A.c);
+  return { ok: anterior?.situacao === 'ativa' && pre.conferencia_status !== 'remarcado' && n.ia_ativa === false && n.u === 'alta' && /ainda mostra o horário anterior como ativo/.test(msg.texto) && /27902/.test(n.t + JSON.stringify(notas)), detalhe: `urgência=${n.u}; equipe=${!n.ia_ativa}; aviso=${/anterior como ativo/.test(msg?.texto ?? '')}` };
+});
+await caso('novo voucher confirmado e situação anterior desconhecida: conserva o registro antigo para conferência', async () => {
+  const X = await parMarcado(); await clicar(X.B, 'remarcar');
+  X.B.dia = dia(9); X.B.hora = '11:30'; await andar(X.B, () => false, X.B.nasc); await como('');
+  const [op] = await opsDe(X.B.c, 'remarcar');
+  await executor(op.id, 'sucesso', JSON.stringify({ voucher: { id: '28903', data: X.B.dia, hora: X.B.hora }, antigo: 'desconhecido' }));
+  const anterior = (await retrato(X.B.c)).find((m) => m.voucher === X.vou);
+  return { ok: anterior?.situacao === 'ativa' && (await pedidoDe(X.A.c)).conferencia_status !== 'remarcado'
+    && (await pedidoDe(X.B.c)).klingo_marcacoes.includes('28903') };
 });
 await caso('REMARCAÇÃO INCERTA e o antigo JÁ SUMIU: URGENTE (o paciente pode estar sem agendamento); nada é marcado de novo sozinho; o pedido não vira agendado', async () => {
   const X = await parMarcado(); await clicar(X.B, 'remarcar'); X.B.dia = dia(10); X.B.hora = '12:00'; await andar(X.B, () => false, X.B.nasc); await como('');

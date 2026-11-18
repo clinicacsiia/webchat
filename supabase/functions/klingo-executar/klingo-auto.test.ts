@@ -402,6 +402,15 @@ test("REMARCAR: depois da nova, confere o antigo — ainda ativo (duplicidade), 
   const f1 = async (u: string, i?: RequestInit) => { if (String(u).includes("/vouchers") && ++n === 2) return new Response("[]", { status: 200, headers: { "content-type": "application/json" } }); return k.f(u, i); };
   r = await executar(new KlingoApi("clinicacsi:s", f1 as any, semEspera), rpcDe().rpc, opDe("remarcar", { chave: CHAVE, remarcacao: "26700" }), ESPS);
   assert.equal(r.estado, "sucesso"); assert.equal(r.antigo, "cancelado");
+  for (const invalido of [{}, [{ status: "ativo" }]]) {
+    let leituras = 0;
+    const fetchInvalido = async (url: string, init?: RequestInit) => {
+      if (url.includes("/vouchers") && ++leituras === 2) return Response.json(invalido);
+      return k.f(url, init);
+    };
+    r = await executar(new KlingoApi("clinicacsi:s", fetchInvalido, semEspera), rpcDe().rpc, opDe("remarcar", { chave: CHAVE, remarcacao: "26700" }), ESPS);
+    assert.equal(r.antigo, "desconhecido");
+  }
   const k2 = klingo({ paciente: PAC, vouchers: [V26700] }); let m = 0;                  // a leitura final falha
   const f2 = async (u: string, i?: RequestInit) => { if (String(u).includes("/vouchers") && ++m === 2) return new Response("<html>x</html>", { status: 502, headers: { "content-type": "text/html" } }); return k2.f(u, i); };
   r = await executar(new KlingoApi("clinicacsi:s", f2 as any, semEspera), rpcDe().rpc, opDe("remarcar", { chave: CHAVE, remarcacao: "26700" }), ESPS);

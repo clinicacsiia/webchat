@@ -2036,17 +2036,25 @@
   const pmZap = (l) => { const d = String(l.celular || '').replace(/\D/g, ''); return d.length >= 10 ? 'https://wa.me/55' + d + '?text=' + encodeURIComponent(pmTextoZap(l)) : null; };
   const pmQuando = (iso) => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' }).replace('.', ''); };
   const pmNum = (v) => Number(v) || 0;
-  async function pmMarcarEnviado(l) { try { await db.rpc('painel_pmarc_link_enviado', { p_id: l.id }); l.link_enviado_em = new Date().toISOString(); } catch { /* o link já foi usado; marcar é só conveniência */ } }
   function pmCard(l) {
     const itens = l.itens || [];
     const zap = pmZap(l);
     const botoes = [
-      h('button', { class: 'btn', type: 'button', 'data-pm': 'copiar', onclick: async (ev) => {
-        const b = ev.currentTarget; const link = pmLink(l.codigo);
+      h('button', { class: 'btn', type: 'button', 'data-pm': 'copiar', onclick: async () => {
+        const link = pmLink(l.codigo);
         try { await navigator.clipboard.writeText(link); toast('Link copiado.'); } catch { window.prompt('Copie o link:', link); }
-        await pmMarcarEnviado(l); renderPrevMarcCorpo(); } }, 'Copiar link'),
-      zap ? h('a', { class: 'btn', 'data-pm': 'zap', href: zap, target: '_blank', rel: 'noopener noreferrer', onclick: () => { pmMarcarEnviado(l).then(renderPrevMarcCorpo); } }, 'WhatsApp com o link')
+      } }, 'Copiar link'),
+      zap ? h('a', { class: 'btn', 'data-pm': 'zap', href: zap, target: '_blank', rel: 'noopener noreferrer' }, 'WhatsApp com o link')
           : h('span', { class: 'dica', 'data-pm': 'sem-celular' }, 'Sem celular: anote por telefone'),
+      !l.link_enviado_em ? h('button', { class: 'btn', type: 'button', 'data-pm': 'confirmar-envio', onclick: async (ev) => {
+        const b = ev.currentTarget; b.disabled = true;
+        try {
+          const { data, error } = await db.rpc('painel_pmarc_link_enviado', { p_id: l.id });
+          if (error || data !== 1) throw new Error();
+          await carregarPrevMarc();
+        } catch { toast('Não foi possível registrar o envio. Tente novamente.'); }
+        finally { b.disabled = false; }
+      } }, 'Confirmar que enviei') : null,
       h('button', { class: 'btn sec', type: 'button', 'data-pm': 'conversa', disabled: !zap && !l.conversa_id, onclick: async (ev) => {
         const b = ev.currentTarget; b.disabled = true;
         try {
@@ -2150,16 +2158,25 @@
     await carregarOfertas();
     return data;
   }
-  function inserirNaCaixa(texto) {
+  function inserirNaCaixa(texto, oferta) {
     const area = document.getElementById('caixa'); if (!area) return;
+    if (oferta && area.dataset.oferta && oferta !== area.dataset.oferta) {
+      toast('Envie ou apague a oferta em edição antes de preparar outra.'); return false;
+    }
     area.value = (area.value ? area.value.replace(/\s+$/, '') + '\n\n' : '') + texto;
-    area.dispatchEvent(new Event('input', { bubbles: true })); area.focus();
+    if (oferta) {
+      area.dataset.oferta = oferta;
+      document.getElementById('btnEnviar').textContent = 'Enviar oferta';
+    }
+    area.dispatchEvent(new Event('input', { bubbles: true })); area.focus(); return true;
   }
-  async function inserirAtalho(nome, extra) {
+  async function inserirAtalho(nome, extra, oferta) {
+    const caixa = document.getElementById('caixa');
     try {
       const r = (await carregarAtalhos()).find((x) => String(x.atalho).toLowerCase() === nome.toLowerCase());
       if (!r) { toast('Não achei o atalho ' + nome + '. Escreva a mensagem à mão.'); return false; }
-      inserirNaCaixa(aplicarVariaveis(r.texto) + (extra || '')); return true;
+      if (caixa !== document.getElementById('caixa')) return false;
+      return inserirNaCaixa(aplicarVariaveis(r.texto) + (extra || ''), oferta);
     } catch { toast('Não consegui carregar os atalhos agora.'); return false; }
   }
   async function sondarVaga(forcar) {
@@ -2198,7 +2215,7 @@
       }, 'prim'), bt('Recusou', () => ofertaRegistrar('disponibilidade', 'recusado'))));
     } else if (!ds && (hs === 'recusado' || (!hs && semVaga))) {
       out.push(cartao(hs === 'recusado' ? 'Recusou os horários' : 'Sem vaga agora', hs === 'recusado' ? 'ofereça avisar quando surgir vaga' : 'antes, veja outros dias ou médicos; se não servir, ofereça avisar quando surgir vaga',
-        bt('Oferecer Disponibilidade futura', async () => { const r = await ofertaRegistrar('disponibilidade', 'oferecido'); if (r && r.ok) await inserirAtalho('LISTA-DE-ESPERA'); }, 'prim'),
+        bt('Oferecer Disponibilidade futura', () => inserirAtalho('LISTA-DE-ESPERA', '', 'disponibilidade'), 'prim'),
         !hs ? bt('Ver outros dias', () => abrirHorarios(1)) : null, bt('Dispensar', () => ofertaRegistrar('disponibilidade', 'dispensado'))));
     }
     box.replaceChildren(...out);
@@ -2295,8 +2312,12 @@
   };
   const textoHorarios = (sel) => {
     const por = new Map();
-    for (const x of sel) { const k = x.data + '|' + (x.profissional || ''); if (!por.has(k)) por.set(k, { data: x.data, prof: x.profissional, horas: [] }); por.get(k).horas.push(x); }
-    const linhas = [...por.values()].map((g) => `• ${diaCurto(g.data)} às ${g.horas.map((x) => x.hora).join(', ')}${g.prof ? ' — ' + g.prof : ''}${g.horas.some((x) => x.ordem_chegada) ? ' (ordem de chegada)' : ''}`);
+    for (const x of sel) {
+      const k = JSON.stringify([x.data, x.profissional, x.unidade, x.ordem_chegada]);
+      if (!por.has(k)) por.set(k, { data: x.data, prof: x.profissional, unidade: x.unidade, chegada: x.ordem_chegada, horas: [] });
+      por.get(k).horas.push(x.hora);
+    }
+    const linhas = [...por.values()].map((g) => `• ${diaCurto(g.data)} às ${g.horas.join(', ')}${g.prof ? ' — ' + g.prof : ''}${g.chegada ? ' (ordem de chegada)' : ''}${g.unidade ? ' — ' + g.unidade : ''}`);
     return 'Tenho estas opções de horário:\n' + linhas.join('\n') + '\nQual fica melhor para você?';
   };
   async function abrirHorarios(janela = 0) {
@@ -2325,13 +2346,14 @@
     const marcados = new Set(), todos = [];
     const botIns = h('button', { class: 'btn prim', type: 'button', disabled: true, onclick: async () => {
       const sel = todos.filter((x, i) => marcados.has(i)); if (!sel.length) return;
-      const reg = await ofertaRegistrar('horario', 'oferecido'); if (!reg || reg.bloqueado) return;   // recusou antes: o banco não deixa oferecer de novo
-      dlg.close(); inserirNaCaixa(textoHorarios(sel)); toast('Texto inserido na resposta. Revise e envie.');
+      if (conversaAberta()?.id !== c.id) return;
+      if (!inserirNaCaixa(textoHorarios(sel), 'horario')) return;
+      dlg.close(); toast('Texto inserido na resposta. Revise e envie.');
     } }, 'Inserir na resposta');
     const atualizar = () => { botIns.disabled = marcados.size === 0; botIns.textContent = marcados.size ? `Inserir ${marcados.size} na resposta` : 'Inserir na resposta'; };
     const dias = (r.dias || []).map((d) => h('div', { class: 'hor-dia' }, h('b', {}, diaCurto(d.data)),
       h('div', { class: 'hor-lista' }, d.itens.map((it) => {
-        const i = todos.push({ data: d.data, hora: it.hora, profissional: it.profissional, ordem_chegada: it.ordem_chegada }) - 1;
+        const i = todos.push({ data: d.data, hora: it.hora, profissional: it.profissional, unidade: curtaUnidade(it.unidade), ordem_chegada: it.ordem_chegada }) - 1;
         return h('label', { class: 'hor-item', title: [it.profissional, curtaUnidade(it.unidade)].filter(Boolean).join(' · ') },
           h('input', { type: 'checkbox', onchange: (e) => { if (e.target.checked) marcados.add(i); else marcados.delete(i); atualizar(); } }),
           h('span', {}, it.hora + (it.ordem_chegada ? ' (chegada)' : '')), it.profissional ? h('small', {}, it.profissional) : null);
@@ -3092,7 +3114,14 @@
     const enviar = h('button', { class: 'btn prim', type: 'button', id: 'btnEnviar', onclick: enviarMsg }, 'Enviar');
     const arq = h('input', { type: 'file', id: 'arquivoEnviar', accept: 'image/jpeg,image/png,image/webp,application/pdf,.pdf', hidden: true, onchange: (e) => { const f = e.target.files[0]; e.target.value = ''; if (f) enviarArquivo(f); } });
     const clipe = h('button', { class: 'btn', type: 'button', id: 'btnAnexar', title: 'Enviar foto ou PDF ao paciente', 'aria-label': 'Anexar foto ou PDF', onclick: () => arq.click() }, '📎');
-    area.addEventListener('input', () => { area.style.height = 'auto'; area.style.height = Math.min(area.scrollHeight, 140) + 'px'; });
+    area.addEventListener('beforeinput', () => {
+      if (area.selectionStart === 0 && area.selectionEnd === area.value.length) {
+        delete area.dataset.oferta; enviar.textContent = 'Enviar';
+      }
+    });
+    area.addEventListener('input', () => {
+      if (!area.value.trim()) { delete area.dataset.oferta; enviar.textContent = 'Enviar'; }
+      area.style.height = 'auto'; area.style.height = Math.min(area.scrollHeight, 140) + 'px'; });
     area.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); enviarMsg(); } });
     box.replaceChildren(h('div', { class: 'chat-topo', id: 'chatTopo' }), h('div', { id: 'proximo', 'aria-live': 'polite' }), h('div', { id: 'acoes' }, h('div', { id: 'ofertas' }), h('div', { id: 'exameAberto' }), h('div', { id: 'alertaPreco' })),
       h('button', { type: 'button', id: 'ctxToggle', 'aria-expanded': 'false', 'aria-controls': 'contexto', onclick: () => { abrirContexto(!S.ctxAberto); try { localStorage.setItem('painel.ctx', S.ctxAberto ? '1' : '0'); } catch {} } }),
@@ -3489,14 +3518,18 @@
   }
   async function enviarMsg() {
     const caixa = document.getElementById('caixa'), btn = document.getElementById('btnEnviar');
-    const texto = caixa.value.trim(); const c = conversaAberta(); if (!texto || !c) return;
+    const texto = caixa.value.trim(); const c = conversaAberta(); if (!texto || !c || btn.disabled) return;
+    const destino = alvoResposta(), oferta = caixa.dataset.oferta;
     btn.disabled = true;
     try {
       if (c.status !== 'em_atendimento' || !c.agente_id) { if (!(await assumir())) return; }
-      const { data, error } = await db.from('mensagens').insert({ conversa_id: alvoResposta(), autor: 'agente', agente_id: S.me.id, texto })
+      const { data, error } = await db.from('mensagens').insert({ conversa_id: destino, autor: 'agente', agente_id: S.me.id, texto, ...(oferta ? { opcoes: { oferta } } : {}) })
         .select('id,conversa_id,autor,agente_id,texto,criado_em,opcoes,editada_em,excluida_em').single();
       if (error) throw error;
-      caixa.value = ''; caixa.style.height = 'auto';
+      if (caixa.value.trim() === texto) { caixa.value = ''; caixa.dispatchEvent(new Event('input')); }
+      if (S.abertaId !== c.id) return;
+      if (oferta) await carregarOfertas();
+      if (S.abertaId !== c.id) return;
       if (!S.vistos.has(data.id)) { S.vistos.add(data.id); S.msgs.push(data); desenharMsgs(true); }
     } catch (e) { toast(msgErro(e)); }
     finally { btn.disabled = false; caixa.focus(); }
