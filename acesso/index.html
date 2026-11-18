@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!--
 FLUXOGRAMA: entrada (celular + PIN de 4 dígitos; no primeiro acesso, cadastro único em 5 passos) -> validação (a página confere o formato; quem decide é o servidor: funções app_* do Supabase, supabase/acesso-rapido-paciente.sql) -> lógica (o aparelho guarda só um código de acesso e o primeiro nome; PIN, filhos, números de confiança e marcações ficam no banco; o PIN é pedido de novo depois de 5 minutos em segundo plano) -> saída (tela inicial com Eu / cada filho / Todos juntos; solicitações de marcação; quem confia em você)
-Versão 3.1 — 16/11/2026 / Mudança: **confirmação por e-mail** (supabase/acesso-codigo-email.sql, chave `app_codigo_email`, nasce desligada): celular novo (primeiro acesso) e "esqueci o PIN" passam por um código de 6 números enviado ao e-mail; quem não recebe (spam, e-mail errado, falha no envio, cadastro sem e-mail) pede o código à atendente, que o vê no painel (Pendências > Códigos). Telas novas c4e, c4c e esqc. Versão 3.0 — 15/11/2026 / Mudança: quem já tem PIN e entra pela conta antiga (e-mail e senha) agora tem as duas JUNTAS (`app_conta_antiga_unir`: senha + PIN, só se for a mesma pessoa; traz as conversas da conta); antes a sessão antiga era descartada sem ligar nada. Versão 2.9 — 15/11/2026 / Mudança: apagada a tela inicial do acesso rápido ("Quem vai ser atendido?", "Marcar pelo chat", "Deixar uma solicitação (sem chat)", "Suas solicitações"): era cópia do chat (o botão só abria o chat), a solicitação sem chat nunca foi usada (0 na produção) e o chat já tem "Meus dados" e "Sair"; depois do PIN a pessoa vai direto ao chat. Versão 2.8 — 15/11/2026 / Mudança: o botão "Meus dados" do chat (?ir=dados) abre direto em Meus dados quando o PIN dos últimos 30 minutos ainda vale (antes pedia o PIN de novo e caía na tela inicial); o site (acesso e Minha vez) deixou de mudar para o tema escuro do celular e segue sempre o visual claro do chat. Versão 2.7 — 15/11/2026 / Mudança: quem tem conta de e-mail E já criou o PIN pelo celular (cadastro separado, sem ligação com a conta) não cai mais em "Confira os seus dados": a página pergunta ao servidor se o celular já tem PIN (app_pre_cadastro, só leitura) e leva direto para digitar o PIN, tanto ao abrir pelo chat quanto ao tocar em Continuar. Versão 2.6 — 15/11/2026 / Mudança: visual do site (cabeçalho com a logo da CSI, cores e fonte do chat, tema escuro); CPF conferido na hora, com os dígitos verificadores, em todas as telas que pedem CPF; o que a pessoa já digitou no cadastro (nome, nascimento, filho, CPF, contato) não se perde ao voltar, ao trocar Sim/Não ou ao ser mandada de volta por um erro do servidor. Versão 2.5 — 15/11/2026 / Mudança: some o cartão "Falta pouco" da tela inicial e de Meus dados (o que falta só é pedido na entrada, com o PIN obrigatório). Versão 2.4 — 15/11/2026 / Mudança: PIN OBRIGATÓRIO (quando config.app_pin_obrigatorio = sim): o primeiro acesso pede também o CPF (só o que o banco ainda não sabe) antes do PIN, quem entra com cadastro incompleto é obrigado a completar antes de seguir, e cada entrada é registrada (aparelho e, com permissão, a posição) (supabase/acesso-rapido-pin-obrigatorio.sql). Versão 2.3 — 15/11/2026 / Mudança: filhos da conta antiga (lista do histórico para conferir), filho com o nome do responsável (é ela mesma ou confirma), filho repetido (supabase/acesso-rapido-filhos.sql). Versão 2.2 — 15/11/2026 / Mudança: cartão "Falta pouco" (CPF dela e dos filhos, e-mail) para TODO paciente (supabase/acesso-rapido-pendencias.sql). Versão 2.1 — 15/11/2026 / Mudança: quem tem conta antiga (e-mail e senha) entra uma última vez, confere os dados que já temos e cria o PIN (supabase/acesso-rapido-conta-antiga.sql); "Meus dados" mais claro. Versão 2.0 — 14/11/2026 / Mudança: ligado ao Supabase (versão 1 guardava tudo só no celular)
+Versão 3.2 — 17/11/2026 / Mudança: depois do PIN aparece na hora a tela grande "Bem-vindo(a), nome!" (cobre o teclado, a pessoa não digita o PIN de novo); a conferência do cadastro e o registro do acesso saem em paralelo e a espera pela posição caiu de 5 para 2,5 segundos (a entrada demorava). Versão 3.1 — 16/11/2026 / Mudança: **confirmação por e-mail** (supabase/acesso-codigo-email.sql, chave `app_codigo_email`, nasce desligada): celular novo (primeiro acesso) e "esqueci o PIN" passam por um código de 6 números enviado ao e-mail; quem não recebe (spam, e-mail errado, falha no envio, cadastro sem e-mail) pede o código à atendente, que o vê no painel (Pendências > Códigos). Telas novas c4e, c4c e esqc. Versão 3.0 — 15/11/2026 / Mudança: quem já tem PIN e entra pela conta antiga (e-mail e senha) agora tem as duas JUNTAS (`app_conta_antiga_unir`: senha + PIN, só se for a mesma pessoa; traz as conversas da conta); antes a sessão antiga era descartada sem ligar nada. Versão 2.9 — 15/11/2026 / Mudança: apagada a tela inicial do acesso rápido ("Quem vai ser atendido?", "Marcar pelo chat", "Deixar uma solicitação (sem chat)", "Suas solicitações"): era cópia do chat (o botão só abria o chat), a solicitação sem chat nunca foi usada (0 na produção) e o chat já tem "Meus dados" e "Sair"; depois do PIN a pessoa vai direto ao chat. Versão 2.8 — 15/11/2026 / Mudança: o botão "Meus dados" do chat (?ir=dados) abre direto em Meus dados quando o PIN dos últimos 30 minutos ainda vale (antes pedia o PIN de novo e caía na tela inicial); o site (acesso e Minha vez) deixou de mudar para o tema escuro do celular e segue sempre o visual claro do chat. Versão 2.7 — 15/11/2026 / Mudança: quem tem conta de e-mail E já criou o PIN pelo celular (cadastro separado, sem ligação com a conta) não cai mais em "Confira os seus dados": a página pergunta ao servidor se o celular já tem PIN (app_pre_cadastro, só leitura) e leva direto para digitar o PIN, tanto ao abrir pelo chat quanto ao tocar em Continuar. Versão 2.6 — 15/11/2026 / Mudança: visual do site (cabeçalho com a logo da CSI, cores e fonte do chat, tema escuro); CPF conferido na hora, com os dígitos verificadores, em todas as telas que pedem CPF; o que a pessoa já digitou no cadastro (nome, nascimento, filho, CPF, contato) não se perde ao voltar, ao trocar Sim/Não ou ao ser mandada de volta por um erro do servidor. Versão 2.5 — 15/11/2026 / Mudança: some o cartão "Falta pouco" da tela inicial e de Meus dados (o que falta só é pedido na entrada, com o PIN obrigatório). Versão 2.4 — 15/11/2026 / Mudança: PIN OBRIGATÓRIO (quando config.app_pin_obrigatorio = sim): o primeiro acesso pede também o CPF (só o que o banco ainda não sabe) antes do PIN, quem entra com cadastro incompleto é obrigado a completar antes de seguir, e cada entrada é registrada (aparelho e, com permissão, a posição) (supabase/acesso-rapido-pin-obrigatorio.sql). Versão 2.3 — 15/11/2026 / Mudança: filhos da conta antiga (lista do histórico para conferir), filho com o nome do responsável (é ela mesma ou confirma), filho repetido (supabase/acesso-rapido-filhos.sql). Versão 2.2 — 15/11/2026 / Mudança: cartão "Falta pouco" (CPF dela e dos filhos, e-mail) para TODO paciente (supabase/acesso-rapido-pendencias.sql). Versão 2.1 — 15/11/2026 / Mudança: quem tem conta antiga (e-mail e senha) entra uma última vez, confere os dados que já temos e cria o PIN (supabase/acesso-rapido-conta-antiga.sql); "Meus dados" mais claro. Versão 2.0 — 14/11/2026 / Mudança: ligado ao Supabase (versão 1 guardava tudo só no celular)
 -->
 <html lang="pt-BR">
 <head>
@@ -69,7 +69,15 @@ button{font:inherit;cursor:pointer}
 .top{display:flex;justify-content:space-between;align-items:center}
 .sheet{position:fixed;inset:0;background:rgba(10,30,28,.5);display:flex;align-items:flex-end;justify-content:center;z-index:9}
 .sheet>div{background:var(--card);width:100%;max-width:480px;border-radius:20px 20px 0 0;padding:18px 16px max(20px,env(safe-area-inset-bottom));max-height:90vh;overflow:auto}
-.toast{position:fixed;left:50%;bottom:max(24px,env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--csi-sidebar-bg);color:#fff;padding:12px 18px;border-radius:12px;z-index:20;font-size:.95rem;max-width:90vw;text-align:center}
+/* Tela de boas-vindas depois do PIN: cobre tudo (nenhum toque vai para o teclado) enquanto o chat abre */
+.bv{position:fixed;inset:0;z-index:50;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;padding:24px;border-top:3px solid var(--csi-primary)}
+.bv img{height:44px;width:auto}
+.bv h1{font-size:2rem;line-height:1.15;margin:.4rem 0 0;color:var(--pri2)}
+.bv p{color:var(--mut);font-size:1.1rem;margin:0}
+.bv i{width:34px;height:34px;border-radius:50%;border:4px solid var(--bd);border-top-color:var(--pri);animation:bvgira .8s linear infinite}
+@keyframes bvgira{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.bv i{animation-duration:2.4s}}
+.toast{position:fixed;left:50%;bottom:max(24px,env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--csi-sidebar-bg);color:#fff;padding:12px 18px;border-radius:12px;z-index:60;font-size:.95rem;max-width:90vw;text-align:center}
 .codigo{font-size:1.6rem;letter-spacing:.25em;font-weight:800;color:var(--pri2);margin:6px 0}
 .busy{cursor:progress}
 /* CPF conferido na hora, enquanto a pessoa digita */
@@ -132,9 +140,28 @@ const VOLTAR_CHAT=VOLTAR_PARAM==='chat'||VOLTAR_PARAM==='acompanhar';
 const IR_DADOS=new URLSearchParams(location.search).get('ir')==='dados';
 /* voltar=chat leva ao chat; voltar=acompanhar leva ao "Acompanhe seus pedidos" (check-in), já logado */
 /* Depois de entrar (PIN certo): com o PIN obrigatório, o cadastro tem de estar completo (CPF dela e dos filhos) antes de seguir; depois registra o acesso e vai ao destino. */
+/* Tela grande de boas-vindas: aparece NA HORA em que o PIN é aceito e cobre o teclado, para a pessoa não achar que o PIN não entrou e digitar de novo. */
+function bemVindo(){
+  if($('#bv'))return;
+  const st=store.get(),nome=(S.perfil&&primeiro(S.perfil.nome))||(st&&st.nome1)||'';
+  const d=document.createElement('div');d.id='bv';d.className='bv';d.setAttribute('role','status');d.setAttribute('aria-live','polite');
+  d.innerHTML=`<img src="../img/logo-csi-simbolo.svg" alt="" width="89" height="30"><h1>Bem-vindo(a)${nome?', '+esc(nome):''}!</h1><p>Abrindo o chat…</p><i aria-hidden="true"></i>`;
+  document.body.appendChild(d);
+}
+function bemVindoOcultar(){const d=$('#bv');if(d)d.remove()}
+addEventListener('pageshow',e=>{if(e.persisted)bemVindoOcultar()});   // voltou pelo histórico: não deixa a tela de boas-vindas presa
+/* Depois de entrar (PIN certo): com o PIN obrigatório, o cadastro tem de estar completo (CPF dela e dos filhos) antes de seguir; depois registra o acesso e vai ao destino.
+   A conferência do cadastro e o registro do acesso (com a posição) andam JUNTOS: antes eram em fila e a posição sozinha podia esperar 5 segundos. */
 async function aposEntrar(evento){
   S.evento=evento||'login';
-  if(S.porta&&S.porta.obrigatorio&&await exigirCompleto())return;
+  bemVindo();
+  const ev=S.evento;
+  const [falta]=await Promise.all([
+    S.porta&&S.porta.obrigatorio?exigirCompleto():Promise.resolve(false),
+    registrarAcesso(ev)
+  ]);
+  S.evento=null;   // já registrado
+  if(falta){bemVindoOcultar();return}
   await concluirEntrada();
 }
 async function exigirCompleto(){
@@ -147,7 +174,7 @@ async function exigirCompleto(){
 }
 async function concluirEntrada(){
   if(S.evento){const ev=S.evento;S.evento=null;await registrarAcesso(ev)}
-  if(S.soHome){S.soHome=false;go('dados');return}
+  if(S.soHome){S.soHome=false;bemVindoOcultar();go('dados');return}
   if(VOLTAR_PARAM==='acompanhar'){location.replace('../minha-vez/?acompanhar=1');return}
   if(VOLTAR_CHAT){location.replace('../');return}
   go('home');
@@ -159,12 +186,12 @@ async function carregarPorta(){
     return r&&typeof r==='object'&&r.ativo!==undefined&&!r.erro?r:null;
   }catch(e){return null}
 }
-/* Posição (só se o servidor ligou e a pessoa permitir): espera no máximo 5 s e nunca trava a entrada. */
+/* Posição (só se o servidor ligou e a pessoa permitir): espera no máximo 2,5 s (era 5 s) e nunca trava a entrada. */
 function posicao(){
   return new Promise(res=>{
     if(!navigator.geolocation)return res(null);
-    const t=setTimeout(()=>res(null),5000);
-    try{navigator.geolocation.getCurrentPosition(p=>{clearTimeout(t);res({lat:p.coords.latitude,lng:p.coords.longitude,precisao:p.coords.accuracy})},e=>{clearTimeout(t);res(e&&e.code===1?{negado:true}:null)},{enableHighAccuracy:false,timeout:4500,maximumAge:600000})}catch(e){clearTimeout(t);res(null)}
+    const t=setTimeout(()=>res(null),2500);
+    try{navigator.geolocation.getCurrentPosition(p=>{clearTimeout(t);res({lat:p.coords.latitude,lng:p.coords.longitude,precisao:p.coords.accuracy})},e=>{clearTimeout(t);res(e&&e.code===1?{negado:true}:null)},{enableHighAccuracy:false,timeout:2300,maximumAge:600000})}catch(e){clearTimeout(t);res(null)}
   });
 }
 /* Cada entrada fica registrada (aparelho, horário, IP no servidor e a posição se permitida). O servidor responde se a pessoa está na clínica e se tem exame hoje; o chat usa isso para oferecer o check-in. */
@@ -267,7 +294,7 @@ async function onPin(pin){
   }
   if(m==='login'){
     ocupado(true);const r=await rpc('app_login',{p_telefone:S.tel,p_pin:pin,p_aparelho:aparelho()});ocupado(false);
-    if(r.ok){entrou(r);if(S.uniao)await unirContaAntiga(r.token);else toast('Que bom ter você de volta');aposEntrar('login');return}
+    if(r.ok){entrou(r);if(S.uniao)await unirContaAntiga(r.token);aposEntrar('login');return}
     if(r.erro==='indisponivel'){go('indisp');return}
     erro(r.mensagem);return;
   }

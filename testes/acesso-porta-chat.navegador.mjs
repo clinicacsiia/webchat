@@ -142,16 +142,9 @@ await caso('LIGADO e cadastro incompleto: depois do PIN, "Falta pouco" obriga o 
   const faltam = (await q(`select (select count(*) from public.app_paciente where cpf is null)::int + (select count(*) from public.app_filho where cpf is null)::int n`))[0].n;
   await ctx.close(); return { ok: /CPF/.test(t) && !/Agora não/.test(t) && n === 3 && faltam === 0 && noChat(page), detalhe: `${n} campos; faltam ${faltam}; ${page.url()}; ${/CPF/.test(t)} ${!/Agora não/.test(t)}` };
 });
-await caso('30 minutos sem usar o chat: a tela volta ao teclado do PIN', async () => {
-  await completa(); await destrava();
-  const { page, ctx } = await abrir({ clock: true });
-  await page.waitForSelector('#formInicio', { state: 'visible', timeout: 10000 }); await aguardaTexto(page, /Olá, Ana!/);
-  const antes = noChat(page);
-  await page.clock.fastForward('31:00');
-  await page.waitForURL(/\/acesso\//, { timeout: 8000 });
-  await ctx.close(); return { ok: antes && naPorta(page), detalhe: page.url() };
-});
-await caso('usando o chat (toques) o prazo recomeça: 20 minutos + toque + 20 minutos não pede o PIN', async () => {
+// 17/11/2026: o caso "30 minutos sem usar o chat volta ao PIN" foi retirado de propósito. O dono pediu que a conversa aberta NUNCA seja bloqueada por falta de toque (nem na espera pela atendente):
+// agora a página renova o PIN sozinha a cada 3 minutos. O comportamento novo é testado em acesso-sessao-aberta.navegador.mjs (npm run test:acesso-sessao).
+await caso('20 minutos + toque + 20 minutos não pede o PIN', async () => {
   await completa(); await destrava();
   const { page, ctx } = await abrir({ clock: true });
   await page.waitForSelector('#formInicio', { state: 'visible', timeout: 10000 }); await aguardaTexto(page, /Olá, Ana!/);
