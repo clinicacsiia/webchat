@@ -1,5 +1,6 @@
 # Webchat de Previsão de marcação (17/11/2026)
 
+Versão 1.2 — 18/11/2026 / Mudança: **a lista do painel mostra só quem abriu a página** (`supabase/previsao-marcacao-so-quem-abriu.sql`; `painel_pmarc_lista` e `painel_pmarc_resumo`). O registro a partir do Klingo continua por trás.
 Versão 1.1 — 17/11/2026 / Mudança: **tela "Pedir uma previsão"** (escolher o exame ou a consulta, turno / a partir de / até / até o dia, ou não escolher e ver a disponibilidade; funções `pmarc_catalogo`, `pmarc_disponibilidade`, `pmarc_pedido`).
 Versão 1.0 — 17/11/2026 / Mudança: primeira versão. Segundo webchat, separado do chat de marcação: registra TODA pessoa com marcação aberta no Klingo, mostra a ela a PREVISÃO e abre uma conversa que a equipe responde no painel.
 
@@ -26,6 +27,9 @@ Jornada (jornada_exame, 30 s) ─────┴→ as marcações abertas de ca
 - **Aviso em toda tela:** o texto vem de `config` (`previsao_marcacao_aviso`, `previsao_marcacao_final`): "…PREVISÃO… vista e confirmada pela nossa equipe, pelo webchat, pelo WhatsApp e por telefone".
 - **Conversa:** `pmarc_conversa_garantir` cria o contato (origem `previsao`) e a conversa com `ia_ativa = false` (o motor do chat não responde). Só nasce quando a pessoa responde/escreve ou a atendente clica **Iniciar conversa**. O pré-cadastro sozinho **não** vira contato (o marketing exporta contatos).
 - **Sem o link:** celular + nascimento (8 erros por hora por celular travam e oferecem "falar com a equipe"); quem não acha entra assim mesmo (`pmarc_novo`, "chegou sozinho(a)").
+
+## Quem aparece na lista do painel (18/11/2026)
+A janela **Atendimento > Previsão de marcação** mostra **só** quem: abriu a página ou o link de previsão (`primeiro_acesso_em`), chegou sozinho(a) pelo botão (`origem = espontaneo`) ou já tem conversa. Quem foi apenas registrado a partir do Klingo e nunca abriu **não aparece** (eram 2.906 de 2.912 em 18/11/2026; a lista passou de 2.912 para 6). **Nada foi apagado**: a leitura do Klingo continua registrando, porque a Jornada, o link pessoal e o botão **Escolher e ver a disponibilidade** dependem desse cadastro. O resumo do topo conta só quem aparece. Voltar atrás: `supabase/previsao-marcacao-so-quem-abriu-rollback.sql` (só `create or replace`). Para apagar de vez o pré-cadastro do Klingo seria outra decisão (não feita).
 
 ## Arquivos
 | Arquivo | O quê |

@@ -15,7 +15,8 @@ const { q, um, como, anonimo } = ajudantes(db);
 registrar('o retrato da produção monta inteiro', falhas.length === 0, `${falhas.length} falhas`);
 
 const partes = ['parte1-tabelas', 'parte2-paciente', 'parte3-painel', 'parte4-carga'].map((n) => readFileSync(`${REPO}/supabase/previsao-marcacao-${n}.sql`, 'utf8'));
-await caso('as 4 partes aplicam duas vezes sem erro (idempotente)', async () => { for (const s of [...partes, ...partes]) await db.exec(s); return { ok: true }; });
+const soQuemAbriu = readFileSync(`${REPO}/supabase/previsao-marcacao-so-quem-abriu.sql`, 'utf8');
+await caso('as 4 partes e a mudança "só quem abriu" aplicam duas vezes sem erro (idempotente)', async () => { for (const s of [...partes, soQuemAbriu, ...partes, soQuemAbriu]) await db.exec(s); return { ok: true }; });
 
 const ADM = '00000000-0000-4000-8000-0000000000a1', ATE = '00000000-0000-4000-8000-0000000000a2', MKT = '00000000-0000-4000-8000-0000000000a3';
 await db.exec(`
@@ -244,8 +245,29 @@ await caso('painel: sem celular não abre conversa e explica', async () => {
   await db.query(`insert into public.jornada_exame (card_id, marcacao_id, procedimento, unidade, agendado_para, status) values ($1, 'm1005', 'ECOCARDIOGRAMA', 'CSI', $2, 'agendado')`, [await card('9005', 'CSI'), amanha]);
   const id = (await um(`select id from public.pmarc_pessoa where chave = '9005'`)).id;
   const r = await chamar('painel_pmarc_conversa', [id], ATE);
+  const antes = await chamar('painel_pmarc_lista', ['todos', 'fábio', 50, 0], ATE);
+  const codigo = (await um(`select codigo from public.pmarc_pessoa where id = $1`, [id])).codigo;
+  await chamar('pmarc_abrir', [codigo]);
   const lista = await chamar('painel_pmarc_lista', ['todos', 'fábio', 50, 0], ATE);
-  return { ok: /Sem celular/.test(r.erro || '') && lista.length === 1 && lista[0].celular === null, detalhe: JSON.stringify({ r: r.erro, n: lista.length }) };
+  return { ok: /Sem celular/.test(r.erro || '') && antes.length === 0 && lista.length === 1 && lista[0].celular === null, detalhe: JSON.stringify({ r: r.erro, antes: antes.length, n: lista.length }) };
+});
+await caso('painel: quem só foi registrado pelo Klingo e nunca abriu NÃO aparece na lista nem no resumo; ao abrir o link passa a aparecer', async () => {
+  await chamar('pmarc_lote', [JSON.stringify([{ p: '9006', n: 'GIL TESTE', c: '71933332222' }])], 'sistema');
+  await db.query(`insert into public.jornada_card (paciente_chave, data_ref, unidade, coluna) values ('9006', (now() + interval '1 day')::date, 'CSI', 'agendado')`);
+  await db.query(`insert into public.jornada_exame (card_id, marcacao_id, procedimento, unidade, agendado_para, status) values ($1, 'm1006', 'TOMOGRAFIA CRANIO', 'CSI', $2, 'agendado')`, [await card('9006', 'CSI'), amanha]);
+  const nome = async (f) => (await chamar('painel_pmarc_lista', [f, 'gil', 50, 0], ATE)).length;
+  const todosAntes = await chamar('painel_pmarc_lista', ['todos', null, 200, 0], ATE);
+  const resAntes = await chamar('painel_pmarc_resumo', [], ATE);
+  const cadastrados = Number((await um(`select count(*) n from public.pmarc_pessoa`)).n);
+  const antes = await nome('todos');
+  const codigo = (await um(`select codigo from public.pmarc_pessoa where chave = '9006'`)).codigo;
+  await chamar('pmarc_abrir', [codigo]);
+  const depois = await nome('todos');
+  const resDepois = await chamar('painel_pmarc_resumo', [], ATE);
+  const gil = (await chamar('painel_pmarc_lista', ['todos', 'gil', 50, 0], ATE))[0];
+  const ainda = await um(`select count(*) n from public.pmarc_pessoa where chave = '9006'`);
+  return { ok: antes === 0 && depois === 1 && gil.n_itens === 1 && gil.primeiro_acesso_em && Number(ainda.n) === 1 && resDepois.total === resAntes.total + 1 && resAntes.total < cadastrados && todosAntes.length === resAntes.total && resDepois.abriram === resAntes.abriram + 1,
+    detalhe: JSON.stringify({ antes, depois, resAntes: resAntes.total, resDepois: resDepois.total, cadastrados, lista: todosAntes.length }) };
 });
 
 // ---- permissões: o público não lê tabela nenhuma ----

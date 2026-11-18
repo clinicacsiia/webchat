@@ -29,7 +29,7 @@ begin
         (it -> 0 ->> 'quando')::timestamptz as proximo_em, coalesce(nullif(btrim(x.informado ->> 'nome'), ''), x.nome, '') as nome
       from public.pmarc_pessoa x
       cross join lateral (select public.pmarc_itens(x.chave) as it) i
-      where (x.origem = 'espontaneo' or x.conversa_id is not null or jsonb_array_length(it) > 0)
+      where (x.origem = 'espontaneo' or x.conversa_id is not null or x.primeiro_acesso_em is not null)
         and case coalesce(p_filtro, 'todos')
               when 'sem_link' then x.link_enviado_em is null and x.primeiro_acesso_em is null
               when 'sem_resposta' then x.resposta is null
