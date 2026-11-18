@@ -4910,27 +4910,6 @@ h1.longo { font-size: 14mm; }
     h('span', { class: 'ind-rot' }, rot), h('span', { class: 'ind-trilho' }, h('i', { class: cor, style: `width:${max > 0 ? Math.max(v > 0 ? 2 : 0, Math.round((v / max) * 100)) : 0}%` })), h('span', { class: 'ind-val' }, texto));
   const painel = (tit, dica, ...corpo) => h('div', { class: 'ind-painel' }, h('h4', {}, tit), dica ? h('p', { class: 'dica' }, dica) : null, ...corpo);
   /* ---------- Indicadores de uso do site (17/11/2026): só o que o site/chat produz, comparado com o Klingo. Sem veredito bom/ruim: números, onde as pessoas param e a comparação. ---------- */
-  // Códigos técnicos de quem o chat mandou para a equipe, em português simples.
-  const ROT_FALHA_AUTO = { horario_tomado: 'Horário já foi ocupado por outra pessoa', sem_codigo: 'Motivo não registrado', divergencia_clinica: 'Cadastro diferente do Klingo (a equipe confere)' };
-  const ROT_CAMPO_DIV = { email: 'e-mail', sexo: 'sexo', cpf: 'CPF', nascimento: 'data de nascimento', celular: 'celular', nome: 'nome', mae: 'nome da mãe' };
-  const rotFalhaAuto = (cod) => { const m = /^divergencia_\d:(.+)$/.exec(cod || ''); return ROT_FALHA_AUTO[cod] || (m ? `Cadastro diferente do Klingo: ${ROT_CAMPO_DIV[m[1]] || m[1]} (a equipe confere)` : cod); };
-  function blocoAutoatendimento(d) {
-    if (!d) return null;
-    const op = d.operacoes || {}, pos = d.pos || {};
-    const tentativas = Object.values(op).reduce((q, x) => q + Number(x || 0), 0);
-    const feitas = op.sucesso || 0, equipe = (op.incerto || 0) + (op.falha || 0), ocupado = op.horario_tomado || 0, outras = Math.max(0, tentativas - feitas - equipe - ocupado);
-    const mini2 = (n, rot) => h('div', { class: 'ind-mini' }, h('b', {}, typeof n === 'string' ? n : nf(n)), h('span', {}, rot));
-    if (!tentativas) return painel('Marcação automática pelo chat', null, h('p', { class: 'dica' }, 'O chat não tentou marcar nenhum horário sozinho neste período.'));
-    const motivos = (d.motivos_falha || []).map((x) => [rotFalhaAuto(x.codigo), Number(x.n || 0)]), maxM = Math.max(1, ...motivos.map((x) => x[1]));
-    const cancel = pos['cancelar:sucesso'] || 0, remarc = pos['remarcar:sucesso'] || 0;
-    return painel('Marcação automática pelo chat', 'Quando o paciente escolhe o horário, o chat tenta marcar sozinho no Klingo. O que não conclui vai para a equipe. Marcação feita pela recepção ou pelo telefone não entra. Aqui a conta é por tentativa, pelo dia em que o chat tentou marcar (não pelo dia em que a pessoa abriu o chat), então pode diferir de "Desses, o robô marcou sozinho" no topo.',
-      h('p', { class: 'ind-resumo' }, h('b', {}, nf(feitas)), ` de ${nf(tentativas)} tentativas deram certo (${pTxt(taxa(feitas, tentativas))}).`),
-      pilhaVisual([{ v: feitas, cor: COR_ST.ativas, rot: 'Marcadas sozinhas' }, { v: equipe, cor: COR_ST.remarcadas, rot: 'Foram para a equipe' }, { v: ocupado, cor: COR_ST.canceladas, rot: 'Horário já ocupado' }, { v: outras, cor: '#8a94a0', rot: 'Outra situação' }]),
-      h('div', { class: 'ind-minis' }, mini2(d.tempo_medio_s != null ? d.tempo_medio_s + ' s' : '–', 'tempo médio para marcar'),
-        mini2(d.resolvidas_sem_humano, 'marcadas sem nenhum atendente na conversa'),
-        cancel || remarc ? mini2(cancel + remarc, `cancelados ou remarcados pelo chat (${nf(cancel)} e ${nf(remarc)})`) : null),
-      motivos.length ? h('div', {}, h('h4', { class: 'ind-conf-passo' }, 'Por que foram para a equipe'), motivos.map(([r, v]) => barra(r, v, maxM, nf(v), 'azul'))) : null);
-  }
   /* Conferência Klingo x webchat (supabase/klingo-conferencia.sql, relatório #14554): explica a divergência dos números e lista, marcação por marcação, o que precisa de atenção. Só números e códigos. */
   const ROT_CAMPO_CONF = { nome: 'nome', nascimento: 'nascimento', cpf: 'CPF', celular: 'celular', email: 'e-mail' };
   const campoTxt = (xs) => listaPt((xs || []).map((x) => ROT_CAMPO_CONF[x] || x));
@@ -5198,8 +5177,7 @@ h1.longo { font-size: 14mm; }
     const un = UN.sel || null;
     const args = { p_de: IND.de, p_ate: IND.ate, p_unidade: un, p_incluir_teste: IND.teste };
     const mole = (p) => Promise.resolve(p).then((x) => x, () => ({ error: true, data: null }));
-    const [r, au, dir, ag, eq, pes] = await Promise.all([db.rpc('painel_indicadores_decisao', args),
-      mole(db.rpc('painel_automacao_resumo', { p_de: IND.de, p_ate: IND.ate })),
+    const [r, dir, ag, eq, pes] = await Promise.all([db.rpc('painel_indicadores_decisao', args),
       mole(db.rpc('painel_indicadores_diretoria', { p_de: IND.de, p_ate: IND.ate, p_incluir_teste: IND.teste })),
       mole(db.rpc('painel_indicadores_agenda', args)), mole(db.rpc('painel_indicadores_atendentes', args)),
       mole(db.rpc('painel_indicadores_pessoas', { ...args, p_tipo: IND.tipo }))]);
@@ -5308,8 +5286,6 @@ h1.longo { font-size: 14mm; }
       h('details', { class: 'ind-det' }, h('summary', { class: 'ind-sec-sum' }, 'Caminho separado por consulta e exame'), h('div', { class: 'ind-tab-rolagem' }, tabTipo)),
       h('h3', { class: 'ind-sec' }, 'Onde o chat mais é usado'),
       h('div', { class: 'ind-pbi' }, cartaoUnidades(D), ...cartoesPedidosPlanos(D)),
-      h('h3', { class: 'ind-sec' }, 'Marcação automática pelo chat'),
-      blocoAutoatendimento(au && !au.error ? au.data : null) || h('p', { class: 'dica' }, 'Sem dados de autoatendimento neste período.'),
       h('details', { class: 'ind-como' }, h('summary', {}, 'Como ler estes números'),
         h('ul', {},
           h('li', {}, 'Os 5 números do topo: pessoas, pelo dia em que abriram o chat. Atendidos = um atendente assumiu ou respondeu. Agendaram = tem marcação encontrada no Klingo. Robô sozinho = o sistema fez a marcação pela API. Faltaram ou cancelaram = entre quem agendou, a marcação foi cancelada (remarcar não conta) ou a pessoa faltou.'),

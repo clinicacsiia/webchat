@@ -231,13 +231,13 @@ await caso('Quadrado "Aguardando paciente" continua certo (1) e o filtro de unid
 const textoAba = async (t) => (await t.page.locator('.pagina').first().innerText()).replace(/\n+/g, ' ');
 
 const kpiTxt = async (t) => t.page.locator('.ind-kpi').evaluateAll((l) => Object.fromEntries(l.map((k) => [k.querySelector('.ind-kpi-rot').textContent, [k.querySelector('b').textContent, k.querySelector('.ind-kpi-sub').textContent, k.querySelector('.ind-delta')?.textContent ?? ''].join(' | ')])));
-await caso('Aba Indicadores: período padrão é Hoje e cada bloco pede só a sua consulta (marcações do chat, equipe, chat, diretoria, autoatendimento; sem avaliações, conferência nem gráfico mensal)', async () => {
+await caso('Aba Indicadores: período padrão é Hoje e cada bloco pede só a sua consulta (marcações do chat, equipe, chat, diretoria; sem avaliações, conferência nem gráfico mensal)', async () => {
   const t = await abrir(); await abaInd(t);
   const a = await ultimoD(t), ctrl = await t.page.locator('.ind-ctl input[type=date]').evaluateAll((l) => l.map((i) => i.value));
   const nomes = [...new Set(t.reg.rpcs.map((r) => r[0]))].sort().join();
   const ag = ultimo(t.reg, 'agenda');
   await t.ctx.close();
-  return { ok: a.p_de === HOJE && a.p_ate === HOJE && a.p_unidade === null && a.p_incluir_teste === false && ctrl.join() === `${HOJE},${HOJE}` && nomes === 'agenda,atendentes,automacao,decisao,diretoria,pessoas' && ag.p_incluir_teste === false && !t.reg.excecoes.length, detalhe: JSON.stringify(a) + ' ' + nomes + (t.reg.excecoes[0] ?? '') };
+  return { ok: a.p_de === HOJE && a.p_ate === HOJE && a.p_unidade === null && a.p_incluir_teste === false && ctrl.join() === `${HOJE},${HOJE}` && nomes === 'agenda,atendentes,decisao,diretoria,pessoas' && ag.p_incluir_teste === false && !t.reg.excecoes.length, detalhe: JSON.stringify(a) + ' ' + nomes + (t.reg.excecoes[0] ?? '') };
 });
 await caso('Topo: só os 5 números pedidos (procuraram, atendidos, agendaram no Klingo, robô sozinho, faltaram ou cancelaram), todos na mesma base, com comparação neutra e nomes que não se repetem', async () => {
   const t = await abrir(); await abaInd(t);
@@ -362,7 +362,7 @@ await caso('Ordem da página: números do chat, marcações do chat, equipe, cha
   const t = await abrir({ admin: true }); await abaInd(t);
   const tits = await t.page.locator('.ind-pg h3.ind-sec').allInnerTexts(); const txt = await textoAba(t);
   await t.ctx.close();
-  return { ok: tits.join('|') === 'Visão da agenda (marcações)|A equipe de atendimento|O chat do site|Onde o chat mais é usado|Marcação automática pelo chat' && !/Avaliações dos pacientes|Nota média|Conferência|Para comparar: a clínica toda|Faltas por|Motivos dos cancelamentos/.test(txt), detalhe: tits.join('|') };
+  return { ok: tits.join('|') === 'Visão da agenda (marcações)|A equipe de atendimento|O chat do site|Onde o chat mais é usado' && !/Avaliações dos pacientes|Nota média|Conferência|Para comparar: a clínica toda|Faltas por|Motivos dos cancelamentos/.test(txt), detalhe: tits.join('|') };
 });
 await caso('Funil: 6 passos, a maior queda marcada (só uma) e os dois painéis de por que pararam', async () => {
   const t = await abrir(); await abaInd(t);
@@ -409,15 +409,6 @@ await caso('Funil por tipo (recolhido): consultas e exames separados', async () 
   return { ok: linhas.join(';') === 'Começaram o pedido|42|3;Chegaram à escolha de data|38|2;Escolheram o horário|21|1;Terminaram o pedido|19|1;Pedido marcado|14|1' && aberto === false, detalhe: linhas.join(';') + ' aberto=' + aberto };
 });
 
-await caso('Autoatendimento: frase "30 de 37 deram certo", barra por situação, tempo médio, sem atendente e motivos em português (sem código técnico)', async () => {
-  const t = await abrir(); await abaInd(t);
-  const p = t.page.locator('.ind-painel', { hasText: 'Marcação automática pelo chat' });
-  const resumo = (await p.locator('.ind-resumo').innerText()).replace(/\s+/g, ' '), minis = await p.locator('.ind-mini').evaluateAll((l) => l.map((m) => m.innerText.replace(/\s+/g, ' ')));
-  const leg = (await p.locator('.ind-leg').innerText()).replace(/\s+/g, ' '), motivos = await p.locator('.ind-rot').allInnerTexts(); const txt = await p.innerText();
-  await t.ctx.close();
-  return { ok: /30 de 37 tentativas deram certo \(81,1%\)/.test(resumo) && /Marcadas sozinhas 30/.test(leg) && /Foram para a equipe 3/.test(leg) && /Horário já ocupado 4/.test(leg) && minis[0] === '42 s tempo médio para marcar' && minis[1] === '18 marcadas sem nenhum atendente na conversa' && minis[2].startsWith('9 cancelados ou remarcados pelo chat (6 e 3)')
-    && motivos.join('|') === 'Horário já foi ocupado por outra pessoa' && !/horario_tomado|divergencia_/.test(txt), detalhe: resumo + ' | ' + leg + ' | ' + minis.join(' ; ') + ' | ' + motivos.join('|') };
-});
 await caso('Atalhos de período: Ontem, 7 dias, 30 dias, Este mês e Mês anterior pedem as datas certas', async () => {
   const t = await abrir(); await abaInd(t);
   const [a, m] = HOJE.split('-').map(Number), p2 = (x) => String(x).padStart(2, '0');
