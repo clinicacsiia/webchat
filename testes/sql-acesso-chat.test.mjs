@@ -12,8 +12,10 @@ const { db, falhas } = await criarBancoProducao();
 const { q, um, anonimo } = ajudantes(db);
 await db.exec(readFileSync(`${REPO}/supabase/acesso-rapido-paciente.sql`, 'utf8'));
 const sqlChat = readFileSync(`${REPO}/supabase/acesso-rapido-chat.sql`, 'utf8');
+const sqlMensagem = readFileSync(`${REPO}/supabase/acesso-rapido-chat-dados-na-mensagem.sql`, 'utf8');   // 18/11/2026: a mensagem mostra nome, CPF mascarado e nascimento
 await caso('o clone da produção monta sem falhas', async () => ({ ok: falhas.length === 0, detalhe: `${falhas.length} falhas` }));
 await caso('acesso-rapido-chat.sql aplica duas vezes sem erro (idempotente)', async () => { await db.exec(sqlChat); await db.exec(sqlChat); return { ok: true }; });
+await caso('acesso-rapido-chat-dados-na-mensagem.sql aplica duas vezes sem erro (idempotente)', async () => { await db.exec(sqlMensagem); await db.exec(sqlMensagem); return { ok: true }; });
 await db.exec(`update public.config set valor = 'sim' where chave = 'app_acesso_modo'`);
 
 const rpc = async (nome, args) => {   // como o supabase-js: parâmetros nomeados, como anon
@@ -85,6 +87,11 @@ await caso('o motor recebeu CPF e nascimento como se tivessem sido digitados (a 
   const f = (await dono(`select dados -> 'digitado' as dg from public.conversa_fluxo where conversa_id = $1`, [c2.c]))[0].dg;
   return { ok: pa.cpf === CPF_ANA && String(pa.dt_nasc).startsWith('1988-04-12') && msg.length >= 1 && msg.every((m) => !/529|52998/.test(m.texto)) && /dados salvos/.test(msg[0].texto) && f.cpf === CPF_ANA,
     detalhe: JSON.stringify(msg.map((m) => m.texto)) };
+});
+await caso('a mensagem do paciente mostra os dados dele: nome, CPF só mascarado e nascimento', async () => {
+  const msg = await dono(`select texto from public.mensagens where conversa_id = $1 and autor = 'cliente' order by id`, [c2.c]);
+  const t = msg[0].texto;
+  return { ok: /Nome: Ana Souza Teste/.test(t) && /CPF: \*\*\*\.\*\*\*\.\*\*\*-25/.test(t) && /Nascimento: 12\/04\/1988/.test(t) && !/52998224725|529\.982/.test(t), detalhe: JSON.stringify(t) };
 });
 await caso('chamar de novo na mesma conversa não repete nada (a pergunta já foi respondida)', async () => {
   const antes = await passoDe(c2);
