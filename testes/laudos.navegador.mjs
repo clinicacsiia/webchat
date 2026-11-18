@@ -120,6 +120,16 @@ await caso('exame com 2 laudos: não dispara 2 downloads de uma vez; mostra um l
   await ctx.close();
   return { ok: antes === 0 && links.length === 2 && /laudo 1 de 2/.test(links[0]) && /laudo 2 de 2/.test(links[1]) && dl.suggestedFilename() === 'laudo-b-2.pdf', detalhe: JSON.stringify({ antes, links, nome: dl.suggestedFilename() }) };
 });
+await caso('o link "Abrir o laudo" não guarda endereço velho (blob) e baixa de novo a cada toque, mesmo muito depois do primeiro download (18/11/2026)', async () => {
+  const { page, ctx } = await abrirPortal();
+  await Promise.all([page.waitForEvent('download', { timeout: 5000 }), page.click('button[data-laudo="501"]')]);
+  await espera(900);
+  const href = await page.$eval('#laudos a.abrir-laudo', (a) => a.getAttribute('href'));
+  const nomes = [];
+  for (let i = 0; i < 2; i++) { const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 5000 }), page.click('#laudos a.abrir-laudo')]); nomes.push(dl.suggestedFilename()); }
+  await ctx.close();
+  return { ok: !/^blob:/.test(href || '') && nomes.length === 2 && nomes.every((n) => n === 'laudo-rm-joelho.pdf'), detalhe: JSON.stringify({ href, nomes }) };
+});
 await caso('baixar quantas vezes quiser: cada toque faz uma nova conferência com a clínica (3 toques = 3 chamadas) e 3 downloads', async () => {
   const { page, ctx, estado } = await abrirPortal();
   let baixados = 0;

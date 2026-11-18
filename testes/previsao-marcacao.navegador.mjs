@@ -132,6 +132,21 @@ await caso('voltar sem o link abre direto na conversa (o aparelho lembra)', asyn
   await esperaTexto(a.page, /Fale com a equipe/);
   return { ok: /Sexta às 9h/.test(await texto(a.page)) };
 });
+await caso('o link pessoal (?c=) sai do endereço depois de aceito, e o código continua guardado só neste aparelho (18/11/2026)', async () => {
+  await a.page.goto(`${ORIGEM}/previsao/?c=${CODIGO}`);
+  await esperaTexto(a.page, /Fale com a equipe/);
+  const r = await a.page.evaluate(() => ({ url: location.href, guardado: localStorage.getItem('pmarc.codigo') }));
+  return { ok: !/[?&]c=/.test(r.url) && r.guardado === CODIGO, detalhe: JSON.stringify(r) };
+});
+await caso('"Sair deste aparelho" esquece o código e volta para a tela de achar a previsão; ao recarregar não reabre a conversa (18/11/2026)', async () => {
+  await a.page.click('#btnSair');
+  await esperaTexto(a.page, /Ache a sua previsão/);
+  const guardado = await a.page.evaluate(() => localStorage.getItem('pmarc.codigo'));
+  await a.page.goto(`${ORIGEM}/previsao/`);
+  await esperaTexto(a.page, /Ache a sua previsão/);
+  const t = await texto(a.page);
+  return { ok: guardado === null && !/Sexta às 9h/.test(t) && !/Fale com a equipe/.test(t), detalhe: String(guardado) };
+});
 await a.ctx.close();
 
 // ---------- 2) sem link: celular + nascimento ----------

@@ -280,6 +280,28 @@ await caso('tela inicial: o aviso é curto (família e "pessoa da equipe confirm
   return { ok: d.cabe && /família/.test(d.aviso) && /pessoa da equipe confirmar/.test(d.aviso) && d.tam < 260, detalhe: `cabe=${d.cabe} tam=${d.tam}` };
 });
 
+await caso('"Sair (não sou eu)" também sai do acesso rápido: o aparelho é esquecido e a próxima pessoa não vê "Olá, Ana!" nem os filhos (18/11/2026)', async () => {
+  await q(`update public.app_aparelho set desbloqueada_ate = now() + interval '20 minutes'`);
+  const { page, ctx } = await abrir();
+  await page.waitForSelector('#acessoSair', { timeout: 8000 });
+  await aguardaTexto(page, /Olá, Ana!/);
+  await page.click('#fQuem .unidade >> text=Para mim');   // o menu ⋮ (e o "Sair") só aparece depois que a conversa começa
+  if (await page.isVisible('#fEmail')) await page.fill('#fEmail', 'ana@exemplo.invalid');
+  await aceites(page);
+  await page.click('#btnIniciar');
+  await page.waitForSelector('#msgs .widget', { timeout: 10000 });
+  page.on('dialog', (d) => d.accept());
+  await page.click('#btnMenu'); await page.click('#btnSair');
+  await page.waitForFunction(() => localStorage.getItem('csi_acesso_v2') === null, null, { timeout: 8000 });
+  await espera(500);
+  const t = await texto(page);
+  const guardado = await page.evaluate(() => ({ acesso: localStorage.getItem('csi_acesso_v2'), perfil: localStorage.getItem('webchat.perfil.v1'), hist: localStorage.getItem('webchat.historico.v1') }));
+  const aparelhos = (await q(`select count(*)::int n from public.app_aparelho`))[0].n;
+  await ctx.close();
+  return { ok: guardado.acesso === null && guardado.perfil === null && guardado.hist === null && !/Olá, Ana|Leo|Lia/.test(t) && aparelhos === 0, detalhe: JSON.stringify({ guardado, aparelhos }) };
+});
+await rpcSql('app_cadastrar', { p_telefone: '71991230001', p_nome: 'Ana Souza Teste', p_nascimento: '1988-04-12', p_pin: '1357', p_filhos: [] }).catch(() => null);   // a saída apagou o aparelho; o próximo caso só precisa de um aparelho inexistente
+
 await caso('PIN de outro aparelho/código inválido: o chat apaga o código local e volta ao convite', async () => {
   await q(`delete from public.app_aparelho`);
   const { page, ctx } = await abrir();

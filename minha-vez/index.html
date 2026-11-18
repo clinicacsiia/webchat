@@ -780,11 +780,14 @@
     laudos.carregando = false;
     if (!document.querySelector('.folha')) redesenhar();
   }
+  // O endereço do arquivo só nasce no toque (e morre logo depois): guardar um endereço velho deixava o link "Abrir o laudo" quebrado depois de 5 minutos.
   function laudoArquivo(a) {
-    const bytes = Uint8Array.from(atob(a.base64), (c) => c.charCodeAt(0));
-    const url = URL.createObjectURL(new Blob([bytes], { type: a.mime || 'application/pdf' }));
-    setTimeout(() => URL.revokeObjectURL(url), 5 * 60000);
-    return { url, nome: a.nome || 'laudo.pdf' };
+    return { bytes: Uint8Array.from(atob(a.base64), (c) => c.charCodeAt(0)), mime: a.mime || 'application/pdf', nome: a.nome || 'laudo.pdf' };
+  }
+  function laudoSalvar(a) {
+    const url = URL.createObjectURL(new Blob([a.bytes], { type: a.mime }));
+    try { const l = h('a', { href: url, download: a.nome }); document.body.append(l); l.click(); l.remove(); }
+    finally { setTimeout(() => URL.revokeObjectURL(url), 60000); }
   }
   async function laudoBaixar(it, btn) {
     if (laudos.baixando.has(it.id)) return;
@@ -797,7 +800,7 @@
         if (r && r.erro === 'indisponivel') { laudos.baixando.delete(it.id); laudos.carregando = false; await laudosCarregar(false); }
       } else {
         const arqs = r.arquivos.map(laudoArquivo); laudos.abertos[it.id] = arqs;
-        if (arqs.length === 1) { try { const l = h('a', { href: arqs[0].url, download: arqs[0].nome }); document.body.append(l); l.click(); l.remove(); } catch { /* o link "Abrir o laudo" abaixo serve de reserva */ } }   // vários laudos no mesmo exame: um link para cada (o navegador bloqueia vários downloads de uma vez)
+        if (arqs.length === 1) { try { laudoSalvar(arqs[0]); } catch { /* o link "Abrir o laudo" abaixo serve de reserva */ } }   // vários laudos no mesmo exame: um link para cada (o navegador bloqueia vários downloads de uma vez)
         redesenhar();
       }
     } catch { avisoTela('Sem conexão. Tente de novo.'); }
@@ -822,7 +825,7 @@
         filhos.push(h('button', { class: 'principal', type: 'button', 'data-laudo': it.id, disabled: ocupado, onclick: (ev) => laudoBaixar(it, ev.currentTarget) }, ocupado ? 'Conferindo com a clínica…' : '📄 Baixar laudo (PDF)'));
         const abertos = laudos.abertos[it.id] || [];
         if (abertos.length > 1) filhos.push(h('p', { class: 'suave', style: 'margin:8px 0 0' }, 'Este exame tem ' + abertos.length + ' laudos. Toque em cada um para baixar.'));
-        abertos.forEach((a, n) => filhos.push(h('a', { class: 'abrir-laudo', href: a.url, download: a.nome, target: '_blank', rel: 'noopener', style: 'display:block;margin-top:8px' }, abertos.length > 1 ? '↓ Baixar o laudo ' + (n + 1) + ' de ' + abertos.length : '↗ Abrir o laudo baixado')));
+        abertos.forEach((a, n) => filhos.push(h('a', { class: 'abrir-laudo', href: '#', onclick: (ev) => { ev.preventDefault(); try { laudoSalvar(a); } catch { avisoTela('Não foi possível salvar o laudo agora. Tente baixar de novo.'); } }, style: 'display:block;margin-top:8px' }, abertos.length > 1 ? '↓ Baixar o laudo ' + (n + 1) + ' de ' + abertos.length : '↗ Abrir o laudo baixado')));
       } else if (it.estado === 'em_revisao') filhos.push(h('div', { class: 'res-box', 'data-estado': 'em_revisao' }, '⚠️ Este laudo está em revisão pela equipe e não pode ser baixado agora. Ele volta a aparecer aqui assim que for liberado.'));
       else filhos.push(h('div', { class: 'res-box', 'data-estado': 'aguardando' }, 'Aguardando a liberação do laudo. Quando estiver pronto, ele aparece aqui.'));
       return h('div', { class: 'exame', 'data-id': it.id }, filhos);

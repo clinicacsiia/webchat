@@ -717,7 +717,7 @@
   const CHAVE_HIST = 'webchat.historico.v1';   // as últimas conversas deste aparelho (cada uma com o seu token): dá para voltar a elas
   const MAX_HIST = 5;                          // mínimo pedido: 3
   // Muda a cada alteração do chat. Cópia de mensagens guardada por outra versão é descartada (era isso que mostrava conversa velha e travada).
-  const VERSAO_APP = '2026.11.18-1';
+  const VERSAO_APP = '2026.11.18-2';
   // Mesmas regras do banco (fluxo_nome_ok, fluxo_telefone_ok, fluxo_email_ok): o banco confere de novo, aqui é só para avisar logo.
   const LET = 'A-Za-zÀ-ÖØ-öø-ÿ';
   const nomeCompletoOk = (v) => { const t = String(v || '').trim(); return t.length >= 5 && t.length <= 120 && new RegExp(`^[${LET}][${LET}'’.-]*( +[${LET}][${LET}'’.-]*)+$`).test(t) && t.split(/ +/).filter((w) => w.replace(new RegExp(`[^${LET}]`, 'g'), '').length >= 2).length >= 2; };
@@ -1602,6 +1602,7 @@
     fecharMenu();
     if (!confirm(conta ? 'Sair da sua conta neste aparelho? Seus dados continuam salvos na conta; é só entrar de novo.' : 'Sair deste aparelho? Seus dados deixam de aparecer aqui; a conversa fica guardada com a equipe.')) return;
     if (conta) { try { await db.auth.signOut(); } catch { /* sem rede: o aparelho é limpo mesmo assim */ } conta = null; atualizarContaUI(true); }
+    if (acessoDev()) await acessoSair();   // o acesso rápido também sai: senão a próxima pessoa veria "Olá, nome!" e os filhos de quem saiu
     naoSouEu();
   }
   // "Voltar e corrigir": só nas perguntas depois da primeira, enquanto o assistente conduz (a pergunta "Está tudo certo?" também).
