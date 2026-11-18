@@ -1,5 +1,5 @@
 -- RETRATO DA ESTRUTURA DO BANCO DE PRODUÇÃO (projeto webchat-atendimento). GERADO: não editar à mão.
--- Atualização parcial em 2026-11-17T19:00:00Z 11:24 UTC 10:18 UTC 10:10 UTC 04:47 UTC (funções app_* e painel_app_*, tabelas app_*). Retrato inteiro tirado em 2026-11-14T20:32:54.165875+00:00 · Postgres 17.11. Só estrutura: nenhuma linha de tabela, nenhum valor de configuração.
+-- Atualização parcial em 2026-11-18 (remarcações e ofertas no painel). Retrato inteiro tirado em 2026-11-14T20:32:54.165875+00:00 · Postgres 17.11. Só estrutura: nenhuma linha de tabela, nenhum valor de configuração.
 -- Serve de referência e para os testes. NÃO rodar inteiro sobre a produção. Como refazer: supabase/producao/LEIAME.md.
 
 -- ===== Extensões =====
@@ -3187,6 +3187,7 @@ CREATE TRIGGER jornada_exame_tr_ins AFTER INSERT ON public.jornada_exame REFEREN
 CREATE TRIGGER jornada_exame_tr_upd AFTER UPDATE ON public.jornada_exame REFERENCING OLD TABLE AS o NEW TABLE AS n FOR EACH STATEMENT EXECUTE FUNCTION jornada_avisar_exame_upd();
 CREATE TRIGGER jornada_mensagem_imutavel BEFORE UPDATE ON public.jornada_mensagem FOR EACH ROW EXECUTE FUNCTION jornada_imutavel();
 CREATE TRIGGER mensagem_aguarda_paciente AFTER INSERT ON public.mensagens FOR EACH ROW EXECUTE FUNCTION mensagem_aguarda_paciente_trg();
+CREATE TRIGGER mensagem_oferta_enviada BEFORE INSERT ON public.mensagens FOR EACH ROW WHEN (((new.autor = 'agente'::text) AND (new.opcoes ? 'oferta'::text) AND (new.agente_id IS NOT NULL))) EXECUTE FUNCTION mensagem_oferta_enviada();
 CREATE TRIGGER mensagens_apos_insert AFTER INSERT ON public.mensagens FOR EACH ROW EXECUTE FUNCTION mensagem_inserida();
 CREATE TRIGGER mensagens_chat_push AFTER INSERT ON public.mensagens FOR EACH ROW EXECUTE FUNCTION chat_push_trg();
 CREATE TRIGGER mensagens_conferir_preco AFTER INSERT ON public.mensagens FOR EACH ROW EXECUTE FUNCTION mensagens_conferir_preco_trg();
