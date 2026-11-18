@@ -169,13 +169,13 @@ await caso('filtro "Desativados" esconde os ativos', async () => {
   return { ok: visiveis === 'AMIL', detalhe: visiveis };
 });
 
-await caso('conversa com foto: tag na lista, aviso de anexo, botão abre as fotos e a pendência do Klingo se confere', async () => {
+await caso('conversa com foto: ação "Conferir pedido" na lista, aviso de anexo, botão abre as fotos e a pendência do Klingo se confere', async () => {
   const { page, ctx, reg } = await pagina(browser);
   await page.goto(`${base}/painel/`);
   await page.waitForSelector('.nav button[data-aba=atendimento]');
   await page.click('.nav button[data-aba=atendimento]');
   await page.waitForSelector('.item');
-  await page.waitForFunction(() => /Anexo: 2 fotos/.test(document.querySelector('.item')?.innerText || ''), null, { timeout: 5000 });
+  await page.waitForFunction(() => /Conferir pedido \(2\)/.test(document.querySelector('.item')?.innerText || ''), null, { timeout: 5000 });
   await page.locator('.item:has-text("Maria Souza")').click();
   await page.waitForSelector('.anexo-aviso');
   const aviso = await page.locator('.anexo-aviso').innerText();
