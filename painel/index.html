@@ -1799,9 +1799,12 @@
     const temNovos = S.conversas.length ? ('primeiro_humano_em' in S.conversas[0]) : true;
     const reais = (p) => p.membros.filter((m) => !m.teste);
     const abriuHoje = (p) => reais(p).filter((m) => hoje(m.criado_em));
-    const nHoje = todas.filter((p) => abriuHoje(p).length > 0).length;
-    const nAtend = todas.filter((p) => abriuHoje(p).some((m) => (temNovos ? !!m.primeiro_humano_em : true))).length;
-    const nFim = todas.filter((p) => abriuHoje(p).some((m) => m.status === 'encerrada')).length;
+    // Com unidade escolhida no topo, estes três cartões usam a MESMA regra dos Indicadores: quem não tem unidade definida não entra em nenhuma unidade (a lista do Atendimento continua mostrando essa gente em todas, para ninguém ficar sem atendimento).
+    const dessaUnidade = (p) => !UN.sel || unidadesPessoa(p).includes(UN.sel);
+    const doDia = todas.filter((p) => dessaUnidade(p) && abriuHoje(p).length > 0);
+    const nHoje = doDia.length;
+    const nAtend = doDia.filter((p) => abriuHoje(p).some((m) => (temNovos ? !!m.primeiro_humano_em : true))).length;
+    const nFim = doDia.filter((p) => abriuHoje(p).some((m) => m.status === 'encerrada')).length;
     const nEspera = todas.filter((p) => statusPessoa(p) === 'aguardando').length;
     const nAguardaPac = todas.filter(aguardaPaciente).length;
     const nAlerta = (typeof J !== 'undefined' && J.nAtencao) || 0;
@@ -1809,12 +1812,13 @@
     if (!box) return;
     const k = (cls, ic, rot, n, dica) => h('div', { class: 'kpi', title: dica }, h('div', { class: 'ic-k ' + cls }, icone(ic)), h('div', {}, h('small', {}, rot), h('strong', {}, String(n))));
     const un = UN.sel ? ' Só da unidade escolhida no topo (quem não tem unidade conhecida aparece em todas).' : '';
+    const unDia = UN.sel ? ' Só da unidade escolhida no topo; quem ainda não tem unidade definida só aparece em "Todas as unidades" (mesma regra dos Indicadores).' : '';
     box.replaceChildren(
-      k('az', 'lista', 'Procuraram o chat hoje', nHoje, 'Pessoas que abriram o chat hoje (cada pessoa conta uma vez, sem as conversas de teste da TI). É o mesmo número de "Procuraram o chat" em Indicadores, no período Hoje.' + un),
-      k('az', 'pessoas', 'Foram atendidos', nAtend, 'Dessas pessoas, quantas a equipe assumiu ou respondeu. É o mesmo número de "Foram atendidos" em Indicadores, no período Hoje.' + un),
+      k('az', 'lista', 'Procuraram o chat hoje', nHoje, 'Pessoas que abriram o chat hoje (cada pessoa conta uma vez, sem as conversas de teste da TI). É o mesmo número de "Procuraram o chat" em Indicadores, no período Hoje.' + unDia),
+      k('az', 'pessoas', 'Foram atendidos', nAtend, 'Dessas pessoas, quantas a equipe assumiu ou respondeu. É o mesmo número de "Foram atendidos" em Indicadores, no período Hoje.' + unDia),
       k('la', 'ampulheta', 'Em espera', nEspera, 'Agora, de qualquer dia: esperando alguém da equipe assumir.' + un),
       k('az', 'relogio', 'Aguardando paciente', nAguardaPac, 'Agora, de qualquer dia: conversas abertas em que a equipe já respondeu e o paciente ainda não retornou. Sai daqui quando o paciente responde ou a conversa é encerrada.' + un),
-      k('ve', 'ok', 'Já encerradas', nFim, 'Das pessoas que procuraram o chat hoje, quantas já tiveram a conversa encerrada. Não conta conversas de outros dias encerradas hoje.' + un),
+      k('ve', 'ok', 'Já encerradas', nFim, 'Das pessoas que procuraram o chat hoje, quantas já tiveram a conversa encerrada. Não conta conversas de outros dias encerradas hoje.' + unDia),
       k('vm', 'alerta', 'Alertas', nAlerta, 'Pacientes que precisam de atenção na Jornada.' + un));
     renderEquipe();
   }

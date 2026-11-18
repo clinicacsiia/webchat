@@ -25,7 +25,7 @@ const conversa = (id, nome, status, unidade, extra = {}) => ({ id, status, agent
   triagem_resumo: null, triagem_urgencia: null, alerta_agenda: null, nome_informado: nome, email_informado: null, unidade_inicial: unidade, cliente_aguarda_desde: null, aguarda_paciente_desde: null,
   teste: false, primeiro_humano_em: null, encerrada_em: null, contatos: { id: 'ct-' + id, nome, telefone: '7190000' + id.slice(1), email: null }, ...extra });
 // c1 e c2 são a mesma pessoa (c1 ainda sem ninguém, c2 atendida); c4 é da CSI; c5 foi encerrada hoje; c6 é conversa de TESTE da TI.
-const CONVERSAS = [conversa('c1', 'Maria Souza', 'aguardando', 'desenvoar'), conversa('c2', 'Maria Souza', 'em_atendimento', 'desenvoar', { primeiro_humano_em: agora }),
+const CONVERSAS = [conversa('c7', 'Sem Unidade Teste', 'em_atendimento', null), conversa('c1', 'Maria Souza', 'aguardando', 'desenvoar'), conversa('c2', 'Maria Souza', 'em_atendimento', 'desenvoar', { primeiro_humano_em: agora }),
   conversa('c3', 'Ana Paula', 'em_atendimento', 'desenvoar', { primeiro_humano_em: agora }), conversa('c4', 'Pedro Alves', 'em_atendimento', 'csi', { primeiro_humano_em: agora }),
   conversa('c5', 'Lia Nunes', 'encerrada', 'desenvoar', { primeiro_humano_em: agora, encerrada_em: agora }), conversa('c6', 'Teste da TI', 'em_atendimento', 'desenvoar', { teste: true, primeiro_humano_em: agora })];
 const antes = new Date(Date.now() - 3600e3).toISOString();
@@ -201,11 +201,11 @@ const abaInd = async (t) => { await t.page.click('.nav button[data-aba=indicador
 const ultimoD = async (t) => { const [de, ate] = await t.page.locator('.ind-ctl input[type=date]').evaluateAll((l) => l.map((i) => i.value)); return t.reg.rpcs.filter((r) => r[0] === 'decisao' && r[1].p_de === de && r[1].p_ate === ate).at(-1)?.[1]; };   // as consultas do gráfico mensal têm outras datas
 const ultimo = (reg, k) => reg.rpcs.filter((r) => r[0] === k).at(-1)?.[1];
 
-await caso('Cartões do topo (mesma base dos Indicadores: pessoas pelo dia em que abriram o chat): 4 procuraram, 4 atendidas e 1 encerrada; a conversa de TESTE fica fora e duas conversas da mesma pessoa contam uma vez', async () => {
+await caso('Cartões do topo (mesma base dos Indicadores: pessoas pelo dia em que abriram o chat): 5 procuraram (uma sem unidade), 4 atendidas e 1 encerrada; a conversa de TESTE fica fora e duas conversas da mesma pessoa contam uma vez', async () => {
   const { page, ctx, reg } = await abrir(); await esperaCartao(page, 'Foram atendidos', '4');
   const k = await cartoes(page);
   await ctx.close();
-  return { ok: k['Procuraram o chat hoje'] === '4' && k['Foram atendidos'] === '4' && k['Já encerradas'] === '1' && !('Conversas hoje' in k) && !('Conversas por pessoa' in k) && !reg.excecoes.length, detalhe: JSON.stringify(k) + (reg.excecoes[0] ?? '') };
+  return { ok: k['Procuraram o chat hoje'] === '5' && k['Foram atendidos'] === '4' && k['Já encerradas'] === '1' && !('Conversas hoje' in k) && !('Conversas por pessoa' in k) && !reg.excecoes.length, detalhe: JSON.stringify(k) + (reg.excecoes[0] ?? '') };
 });
 await caso('A conversa de teste aparece na lista com o selo "Teste"', async () => {
   const { page, ctx } = await abrir(); await esperaCartao(page, 'Foram atendidos', '4');
@@ -215,7 +215,7 @@ await caso('A conversa de teste aparece na lista com o selo "Teste"', async () =
   await ctx.close();
   return { ok: selos.includes('Teste'), detalhe: selos.join(',') };
 });
-await caso('Filtro de unidade Desenvoar vale para os cartões do topo (3 pessoas procuraram, 3 atendidas, 1 encerrada)', async () => {
+await caso('Filtro de unidade Desenvoar vale para os cartões do topo (3 pessoas procuraram, 3 atendidas, 1 encerrada; quem não tem unidade fica de fora, como nos Indicadores)', async () => {
   const { page, ctx } = await abrir(); await esperaCartao(page, 'Foram atendidos', '4');
   await page.selectOption('#selUnidade', 'desenvoar'); await esperaCartao(page, 'Foram atendidos', '3');
   const k = await cartoes(page); await ctx.close();
