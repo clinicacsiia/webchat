@@ -102,12 +102,12 @@ export const CONFIG_PRODUCAO = {
   agenda_ao_vivo: 'sim', agenda_ao_vivo_max_dias: '14', agenda_ao_vivo_trava_s: '40', agenda_ao_vivo_validade_s: '15', agendado_conferir_prazo_min: '120',
   agendamento_reconhecer: 'sim', agendamento_reconhecer_msg_encerradas: 'nao', autoencerrar_horas: '24', autoencerrar_modo: 'ligado', avaliacao_ativa: 'sim',
   cadastro_equipe_sem_convite: 'nao', checkin_sem_login_max_dia: '300', despedida_configurada: 'sim', despedida_inatividade_ativa: 'sim', despedida_versao_atual: '3',
-  encerramento_exige_motivo: 'sim', encerramento_valida_agendado: 'sim', fila_autochegada: 'sim', fila_aviso_antes: '2', ia_ativa: 'sim', indicadores_fechar: 'sim',
-  jornada_identidade_klingo: 'sim', jornada_relatorio_filtro: 'exame', jornada_relatorio_id: '14359', login_paciente: 'sim', motor: 'fluxo', motor_telefones_teste: '',
+  encerramento_exige_motivo: 'sim', encerramento_valida_agendado: 'sim', fila_autochegada: 'sim', fila_aviso_antes: '2', indicadores_fechar: 'sim',
+  jornada_identidade_klingo: 'sim', jornada_relatorio_filtro: 'exame', jornada_relatorio_id: '14359', login_paciente: 'sim',
   nome_empresa: 'Atendimento', permissao_modo: 'observacao', reabrir_dias: '2', reaproveitar_cadastro_convidado: 'nao', vinculo_manual_quem: 'equipe',
   // de mentira (na produção são segredo, endereço ou texto):
   ia_segredo: 'segredo-de-teste', boas_vindas: 'Olá! Este é o chat de teste.', despedida_inatividade_texto: 'Encerramos por falta de resposta. Quando quiser, é só voltar.',
-  convenio_suspenso_texto: 'O convênio {convenio} está temporariamente suspenso.', previsao_texto: 'Os horários são uma previsão; a equipe confirma.',
+  convenio_suspenso_texto: 'O convênio {convenio} está temporariamente suspenso.',
   horario_trabalho: '', chat_push_url: '', equipe_push_url: '', fila_push_url: '', klingo_paciente_url: '', teste_agentes: '', teste_marcadores: '', fila_vapid_publica: '',
 };
 

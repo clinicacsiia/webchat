@@ -131,6 +131,7 @@
     "test:simulacao-hora-real-sql": "node sql-simulacao-hora-real.test.mjs",
     "test:simulacao-nav": "node simulacao.navegador.mjs",
     "test:producao-sql": "node sql-producao.test.mjs",
+    "test:limpeza-config": "node sql-limpeza-config.test.mjs",
     "test:ponta-a-ponta": "node sql-ponta-a-ponta.test.mjs",
     "test:sem-duplicata": "node sql-sem-duplicata.test.mjs",
     "test:marcado": "node marcado.navegador.mjs",

@@ -2082,7 +2082,7 @@
     const box = document.getElementById('pmCorpo'); if (!box) return;
     const r = PM.resumo || {}, e = PM.estado;
     const topo = [];
-    if (PM.resumo && r.ligado === false) topo.push(h('p', { class: 'aviso-pm', role: 'alert', 'data-pm': 'desligado' }, 'O registro está DESLIGADO (nada é lido do Klingo e o link do paciente responde "não disponível"). Para ligar: Configurações > chave previsao_marcacao_modo = sim.'));
+    if (PM.resumo && r.ligado === false) topo.push(h('p', { class: 'aviso-pm', role: 'alert', 'data-pm': 'desligado' }, 'O registro está DESLIGADO (nada é lido do Klingo e o link do paciente responde "não disponível"). Para ligar, peça a mudança da chave previsao_marcacao_modo para sim (ela não fica na tela Configurações).'));
     topo.push(h('p', { class: 'dica', 'data-pm': 'resumo' }, PM.resumo
       ? `${pmNum(r.total)} pessoa(s) registrada(s) · ${pmNum(r.link_enviado)} com link enviado · ${pmNum(r.abriram)} abriram · ${pmNum(r.responderam)} responderam (${pmNum(r.nao_sei)} "não sei") · ${pmNum(r.com_conversa)} com conversa · ${pmNum(r.sem_celular)} sem celular`
       : 'Carregando…'));
@@ -2225,7 +2225,7 @@
   // Usa a mesma Edge Function do chat (klingo-executar): ela confere a identidade do paciente e só cancela marcação ATIVA dele. O paciente NÃO recebe mensagem: quem avisa é a atendente.
   // Cancelar não tem volta pelo painel, então a confirmação mostra data, hora e exame por extenso. Remarcar ainda não existe aqui (cancelar e escolher outro horário em "Ver horários").
   const MARC_MOTIVO = {
-    desligado: () => 'Esta função está desligada para esta conversa (chaves do Klingo em Configurações).',
+    desligado: () => 'Esta função está desligada para esta conversa.',
     unidade_bloqueada: () => 'A marcação automática está desligada para esta unidade (Configurações > Marcação automática por unidade).',
     dados_incompletos: (r) => `Ainda faltam no pedido: ${(r.faltando || []).join(', ') || 'dados do paciente'}.`,
     paciente_vendo: () => 'O paciente está vendo as marcações no chat agora. Tente de novo em instantes.',
@@ -3944,11 +3944,6 @@
     { id: 'chat', icone: 'fone', titulo: 'Chat do cliente', desc: 'Como o chat aparece e se comporta.', campos: [
       { k: 'nome_empresa', tipo: 'texto', rot: 'Nome exibido no chat', max: 60, padrao: 'Atendimento' },
       { k: 'boas_vindas', tipo: 'area', rot: 'Mensagem de boas-vindas', max: 300 },
-      { k: 'ia_ativa', tipo: 'sim', rot: 'Assistente automático ligado', dica: 'Desligado: todas as conversas vão direto para a equipe.' },
-    ] },
-    { id: 'motor', icone: 'livro', titulo: 'Motor de atendimento', desc: 'Quem conduz a conversa com o paciente.', campos: [
-      { k: 'motor', tipo: 'escolha', rot: 'Motor', opcoes: [['fluxo', 'Fluxo guiado (sem IA)'], ['ia', 'Inteligência artificial']], dica: 'Fluxo guiado segue um roteiro fixo; IA conversa livremente.' },
-      { k: 'motor_telefones_teste', tipo: 'texto', rot: 'Telefones de teste', dica: 'Só esses números usam o motor novo (separe por vírgula). Vazio = ninguém em teste.' },
     ] },
     { id: 'entrada', icone: 'fone', titulo: 'Entrada do paciente (Continuar ou Previsão)', desc: 'O que o paciente vê na primeira tela do chat. Os dois ligados: aparecem o botão Começar (webchat de marcação) e o botão Previsão de marcação. Webchat desligado e Previsão ligada: some o Começar e o paciente só segue pela Previsão. Os dois desligados não vale: o webchat volta sozinho.', campos: [
       { k: 'entrada_webchat_modo', tipo: 'sim', rot: 'Botão Começar (webchat de marcação)', dica: 'Desligado: o formulário e o botão Começar somem da primeira tela. Conversa já aberta no aparelho continua abrindo.' },

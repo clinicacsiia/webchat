@@ -26,7 +26,7 @@ const ADMIN = '00000000-0000-4000-8000-0000000000a1', ATEND = '00000000-0000-400
 await db.exec(`
   insert into auth.users (id, email) values ('${ADMIN}', 'admin@exemplo.invalid'), ('${ATEND}', 'atendente@exemplo.invalid'), ('${PACIENTE}', 'paciente@exemplo.invalid');
   insert into public.agentes (id, nome, email, papel, ativo) values ('${ADMIN}', 'Admin Teste', 'admin@exemplo.invalid', 'admin', true), ('${ATEND}', 'Atendente Teste', 'atendente@exemplo.invalid', 'atendente', true);
-  insert into public.config (chave, valor) values ('ia_segredo', 'segredo-de-teste'), ('encerramento_valida_agendado', 'sim'), ('motor', 'fluxo')
+  insert into public.config (chave, valor) values ('ia_segredo', 'segredo-de-teste'), ('encerramento_valida_agendado', 'sim')
     on conflict (chave) do update set valor = excluded.valor;
   insert into public.jornada_coluna (id, nome, ordem, etapa, origem, sla_min) values
     ('contato', 'Contato', 1, 'antes', 'manual', 60), ('orcamento', 'Orçamento', 2, 'antes', 'manual', 120), ('autorizacao', 'Autorização', 3, 'antes', 'manual', null),

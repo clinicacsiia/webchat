@@ -14,8 +14,7 @@ begin
   end if;
   v_ate := least(coalesce(p_ate, v_hoje), v_hoje); v_de := greatest(coalesce(p_de, v_ate - 6), v_ate - 400); if v_de > v_ate then v_de := v_ate; end if; v_dias := greatest(v_ate - v_de + 1, 1);
   return jsonb_build_object(
-    'modos', jsonb_build_object('mestre', public.klingo_mestre(), 'horarios', public.klingo_cfg('klingo_api_horarios', 'nao'), 'marcar', public.klingo_cfg('klingo_api_marcar', 'nao'), 'percentual', public.klingo_cfg('klingo_api_percentual', '100'),
-                                'pre_cadastro', public.klingo_cfg('klingo_api_pre_cadastro', 'nao'), 'webhook', public.klingo_cfg('klingo_webhook', 'nao'), 'autogestao', public.klingo_cfg('klingo_autogestao', 'sim')),
+    'modos', jsonb_build_object('mestre', 'sim', 'horarios', 'sim', 'marcar', 'sim', 'pre_cadastro', 'sim', 'webhook', public.klingo_cfg('klingo_webhook', 'nao')),
     'operacoes', (select coalesce(jsonb_object_agg(estado, n), '{}'::jsonb) from (select estado, count(*) n from public.klingo_operacao where (conversa_id is null or conversa_id not in (select id from public.conversas where teste)) and tipo = 'marcar'
                     and (criado_em at time zone 'America/Sao_Paulo')::date between v_de and v_ate group by estado) x),
     'agendadas_sozinhas', (select count(*) from public.pre_agendamentos pa join public.conversas c on c.id = pa.conversa_id
