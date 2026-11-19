@@ -199,7 +199,8 @@ const cartoes = (page) => page.locator('#kpis .kpi').evaluateAll((l) => Object.f
 const esperaCartao = (page, rot, v) => page.waitForFunction(([r, x]) => [...document.querySelectorAll('#kpis .kpi')].some((k) => k.querySelector('small').textContent === r && k.querySelector('strong').textContent === x), [rot, v], { timeout: 5000 });
 const abaInd = async (t) => { await t.page.click('.nav button[data-aba=indicadores]'); await t.page.waitForSelector('.ind-kpis .ind-kpi', { timeout: 8000 }).catch((e) => { throw new Error(e.message.split('\n')[0] + ' | erros da página: ' + (t.reg.excecoes.join(' ; ') || 'nenhum')); }); await t.page.evaluate(() => document.querySelectorAll('.ind-det, .ind-num-det').forEach((d) => { d.open = true; })); };
 const ultimoD = async (t) => { const [de, ate] = await t.page.locator('.ind-ctl input[type=date]').evaluateAll((l) => l.map((i) => i.value)); return t.reg.rpcs.filter((r) => r[0] === 'decisao' && r[1].p_de === de && r[1].p_ate === ate).at(-1)?.[1]; };   // as consultas do gráfico mensal têm outras datas
-const ultimo = (reg, k) => reg.rpcs.filter((r) => r[0] === k).at(-1)?.[1];
+// 'pessoas': com o painel sem filtro de unidade há também uma chamada por unidade (quadros do topo); a do conjunto todo é a de p_unidade nulo.
+const ultimo = (reg, k) => { const l = reg.rpcs.filter((r) => r[0] === k); return (k === 'pessoas' ? l.filter((r) => r[1].p_unidade === null).at(-1) ?? l.at(-1) : l.at(-1))?.[1]; };
 
 await caso('Cartões do topo (mesma base dos Indicadores: pessoas pelo dia em que abriram o chat): 5 procuraram (uma sem unidade), 4 atendidas e 1 encerrada; a conversa de TESTE fica fora e duas conversas da mesma pessoa contam uma vez', async () => {
   const { page, ctx, reg } = await abrir(); await esperaCartao(page, 'Foram atendidos', '4');
@@ -250,6 +251,16 @@ await caso('Topo: só os 5 números pedidos (procuraram, atendidos, agendaram no
     && k['Procuraram o chat'].startsWith('60 | pessoas, pelo dia em que abriram o chat; cada uma conta uma vez | ▲ 20%') && k['Foram atendidos'].startsWith('57 | 95% de quem procurou') && k['Agendaram, confirmado no Klingo'].startsWith('15 | 25% de quem procurou')
     && k['Desses, o robô marcou sozinho'].startsWith('5 | 33,3% dos que agendaram · 3 sem nenhum atendente na conversa') && k['Faltaram ou cancelaram'].startsWith('3 | 20% dos que agendaram · 2 faltaram · 1 cancelaram') && coloridos === 0
     && ped.p_tipo === null && ped.p_incluir_teste === false, detalhe: JSON.stringify(k) + ' ' + topo.join(',') };
+});
+await caso('Quadros do topo: cada um mostra a quantidade por unidade (CSI, CSI RM/TC, Desenvoar e Sem unidade definida); com a unidade escolhida no topo a lista some', async () => {
+  const t = await abrir(); await abaInd(t);
+  const lin = () => t.page.locator('.ind-kpis5 .ind-kpi').evaluateAll((l) => l.map((k) => [...k.querySelectorAll('.ind-kpi-un > div')].map((d) => d.innerText.replace(/\s+/g, ' ').trim())));
+  const todas = await lin(); const un = [...new Set(t.reg.rpcs.filter((r) => r[0] === 'pessoas').map((r) => r[1].p_unidade))].filter(Boolean).sort().join();
+  await t.page.selectOption('#selUnidade', 'desenvoar'); await t.page.waitForFunction(() => /Unidade Desenvoar/.test(document.querySelector('.pagina')?.innerText || ''));
+  const uma = await lin();
+  await t.ctx.close();
+  return { ok: todas.length === 5 && todas.every((q) => q.length === 4) && todas[0].join('|') === 'CSI 60|CSI RM/TC 4|Desenvoar 40|Sem unidade definida 60' && todas[2][2] === 'Desenvoar 10' && un === 'csi,desenvoar,rmtc,sem'
+    && uma.every((q) => q.length === 0) && !t.reg.excecoes.length, detalhe: JSON.stringify(todas) + ' ' + un + ' ' + JSON.stringify(uma) + (t.reg.excecoes[0] ?? '') };
 });
 await caso('Filtro "Só exames": os 5 números e a história das marcações passam a ser só de exames', async () => {
   const t = await abrir(); await abaInd(t);

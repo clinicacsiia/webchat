@@ -443,6 +443,8 @@
   .ind-procura .val { fill: var(--texto); font-size: 14px; font-weight: 700; } .ind-procura .rot { fill: var(--texto); font-size: 15px; font-weight: 650; } .ind-procura .pct { fill: var(--suave); font-size: 13px; }
   .ind-kpis6 { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
   .ind-kpis5 { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+  .ind-kpi-un { margin: 8px 0 2px; padding-top: 6px; border-top: 1px solid var(--csi-border); display: grid; gap: 2px; font-size: 13px; }
+  .ind-kpi-un > div { display: flex; justify-content: space-between; gap: 8px; } .ind-kpi-un > div > span { color: var(--suave); } .ind-kpi-un > div > strong { font-variant-numeric: tabular-nums; }
   .ind-tipo-leg { font-size: 13px; color: var(--suave); margin-right: 4px; }
   .ind-pt { display: inline-block; width: 9px; height: 9px; border-radius: 3px; margin-right: 6px; }
   .ind-colunas .zona.on { fill: rgba(42,120,214,.10); }
@@ -4934,7 +4936,7 @@ h1.longo { font-size: 14mm; }
     const txt = cont ? Math.round(Math.abs(dif)) + '%' : (Math.round(Math.abs(dif) * 10) / 10).toString().replace('.', ',') + ' pontos';
     return h('span', { class: 'ind-delta ' + (neutro ? 'neutro' : bom ? 'bom' : 'ruim') }, (sobe ? '▲ ' : '▼ ') + txt + ' vs período anterior');
   }
-  const kpi = (rot, valor, sub, d, dica) => h('div', { class: 'ind-kpi', title: dica || '' }, h('span', { class: 'ind-kpi-rot' }, rot), h('b', {}, valor), h('span', { class: 'ind-kpi-sub' }, sub), d || null);
+  const kpi = (rot, valor, sub, d, dica, porUn) => h('div', { class: 'ind-kpi', title: dica || '' }, h('span', { class: 'ind-kpi-rot' }, rot), h('b', {}, valor), h('span', { class: 'ind-kpi-sub' }, sub), porUn || null, d || null);
   const barra = (rot, v, max, texto, cor = 'azul', forte = false) => h('div', { class: 'ind-linha' + (forte ? ' forte' : '') },
     h('span', { class: 'ind-rot' }, rot), h('span', { class: 'ind-trilho' }, h('i', { class: cor, style: `width:${max > 0 ? Math.max(v > 0 ? 2 : 0, Math.round((v / max) * 100)) : 0}%` })), h('span', { class: 'ind-val' }, texto));
   const painel = (tit, dica, ...corpo) => h('div', { class: 'ind-painel' }, h('h4', {}, tit), dica ? h('p', { class: 'dica' }, dica) : null, ...corpo);
@@ -5087,15 +5089,17 @@ h1.longo { font-size: 14mm; }
   const passados = (T) => (T.atendidas || 0) + (T.faltaram || 0);
   const mini = (n, rot, sub) => h('div', { class: 'ind-mini' }, h('b', {}, typeof n === 'string' ? n : nf(n)), h('span', {}, rot), sub ? h('span', { class: 'ind-mini-sub' }, sub) : null);
   // Os 5 números do topo (18/11/2026): TODOS em pessoas, pelo dia em que abriram o chat (painel_indicadores_pessoas). Nomes que não se repetem em outro lugar da aba.
-  function kpisCinco(A, B, comBase, tipo) {
+  // 19/11/2026: cada quadro mostra a quantidade por unidade (PU = [[rótulo, atual da unidade]]; vazio quando o filtro de unidade do topo já está escolhido).
+  function kpisCinco(A, B, comBase, tipo, PU) {
+    const un = (campo) => (PU && PU.length ? h('div', { class: 'ind-kpi-un', 'aria-label': 'Por unidade' }, PU.map(([rot, u]) => h('div', {}, h('span', {}, rot), h('strong', {}, nf((u || {})[campo] || 0))))) : null);
     const dC = (a, b, ok = true) => (ok ? delta(a, b, { cont: true, base: Math.min(a, b), neutro: true }) : h('span', { class: 'ind-delta neutro' }, 'sem período anterior com dados'));
     const de = tipo === 'exame' ? 'de exame' : tipo === 'consulta' ? 'de consulta' : '';
     return h('div', { class: 'ind-kpis ind-kpis5' },
-      kpi('Procuraram o chat', nf(A.procuraram), tipo ? `pessoas que começaram um pedido ${de}` : 'pessoas, pelo dia em que abriram o chat; cada uma conta uma vez', dC(A.procuraram, B.procuraram), 'Base de todos os números: pessoas que abriram o chat no período (conversas de teste ficam fora).'),
-      kpi('Foram atendidos', nf(A.atendidos), `${porC(A.atendidos, A.procuraram)} de quem procurou · um atendente assumiu ou respondeu`, dC(A.atendidos, B.atendidos)),
-      kpi('Agendaram, confirmado no Klingo', nf(A.agendaram), `${porC(A.agendaram, A.procuraram)} de quem procurou · a marcação foi encontrada no Klingo`, dC(A.agendaram, B.agendaram, comBase), 'Só conta quem tem marcação confirmada no Klingo. Conversa encerrada como "Agendado" sem marcação no Klingo não entra.'),
-      kpi('Desses, o robô marcou sozinho', nf(A.robo), `${porC(A.robo, A.agendaram)} dos que agendaram · ${nf(A.robo_sem_atendente)} sem nenhum atendente na conversa · ${nf(A.robo - A.robo_sem_atendente)} com`, dC(A.robo, B.robo, comBase), 'O próprio sistema fez a marcação no Klingo pela API (no Klingo aparece como "Marcado pelo chat (autoatendimento)"), mesmo que depois um atendente tenha falado com a pessoa. As outras foram marcadas pela equipe ou reconhecidas no Klingo.'),
-      kpi('Faltaram ou cancelaram', nf(A.faltaram_ou_cancelaram), `${porC(A.faltaram_ou_cancelaram, A.agendaram)} dos que agendaram · ${nf(A.faltaram)} faltaram · ${nf(A.cancelaram)} cancelaram`, dC(A.faltaram_ou_cancelaram, B.faltaram_ou_cancelaram, comBase), 'Entre quem agendou: a marcação foi cancelada ou a pessoa faltou. Remarcar (trocar a data) não conta. Falta só existe para marcação cuja data já passou; marcação futura ainda pode faltar.'));
+      kpi('Procuraram o chat', nf(A.procuraram), tipo ? `pessoas que começaram um pedido ${de}` : 'pessoas, pelo dia em que abriram o chat; cada uma conta uma vez', dC(A.procuraram, B.procuraram), 'Base de todos os números: pessoas que abriram o chat no período (conversas de teste ficam fora).', un('procuraram')),
+      kpi('Foram atendidos', nf(A.atendidos), `${porC(A.atendidos, A.procuraram)} de quem procurou · um atendente assumiu ou respondeu`, dC(A.atendidos, B.atendidos), null, un('atendidos')),
+      kpi('Agendaram, confirmado no Klingo', nf(A.agendaram), `${porC(A.agendaram, A.procuraram)} de quem procurou · a marcação foi encontrada no Klingo`, dC(A.agendaram, B.agendaram, comBase), 'Só conta quem tem marcação confirmada no Klingo. Conversa encerrada como "Agendado" sem marcação no Klingo não entra.', un('agendaram')),
+      kpi('Desses, o robô marcou sozinho', nf(A.robo), `${porC(A.robo, A.agendaram)} dos que agendaram · ${nf(A.robo_sem_atendente)} sem nenhum atendente na conversa · ${nf(A.robo - A.robo_sem_atendente)} com`, dC(A.robo, B.robo, comBase), 'O próprio sistema fez a marcação no Klingo pela API (no Klingo aparece como "Marcado pelo chat (autoatendimento)"), mesmo que depois um atendente tenha falado com a pessoa. As outras foram marcadas pela equipe ou reconhecidas no Klingo.', un('robo')),
+      kpi('Faltaram ou cancelaram', nf(A.faltaram_ou_cancelaram), `${porC(A.faltaram_ou_cancelaram, A.agendaram)} dos que agendaram · ${nf(A.faltaram)} faltaram · ${nf(A.cancelaram)} cancelaram`, dC(A.faltaram_ou_cancelaram, B.faltaram_ou_cancelaram, comBase), 'Entre quem agendou: a marcação foi cancelada ou a pessoa faltou. Remarcar (trocar a data) não conta. Falta só existe para marcação cuja data já passou; marcação futura ainda pode faltar.', un('faltaram_ou_cancelaram')));
   }
   // Marcações novas no período, pelo dia em que foram AGENDADAS (Agendado em no Klingo): fica na seção da agenda, longe dos números por pessoa.
   function blocoNovas(N, NA, comBase) {
@@ -5206,10 +5210,13 @@ h1.longo { font-size: 14mm; }
     const un = UN.sel || null;
     const args = { p_de: IND.de, p_ate: IND.ate, p_unidade: un, p_incluir_teste: IND.teste };
     const mole = (p) => Promise.resolve(p).then((x) => x, () => ({ error: true, data: null }));
-    const [r, dir, ag, eq, pes] = await Promise.all([db.rpc('painel_indicadores_decisao', args),
+    // Quantidade por unidade nos 5 quadros (19/11/2026): a mesma função, uma vez por unidade, junto com as outras consultas. Com a unidade já escolhida no topo não precisa.
+    const UN_QUADROS = [...UNIDADES_PAINEL, ['sem', 'Sem unidade definida']];
+    const [r, dir, ag, eq, pes, ...porUn] = await Promise.all([db.rpc('painel_indicadores_decisao', args),
       mole(db.rpc('painel_indicadores_diretoria', { p_de: IND.de, p_ate: IND.ate, p_incluir_teste: IND.teste })),
       mole(db.rpc('painel_indicadores_agenda', args)), mole(db.rpc('painel_indicadores_atendentes', args)),
-      mole(db.rpc('painel_indicadores_pessoas', { ...args, p_tipo: IND.tipo }))]);
+      mole(db.rpc('painel_indicadores_pessoas', { ...args, p_tipo: IND.tipo })),
+      ...(un ? [] : UN_QUADROS.map(([k]) => mole(db.rpc('painel_indicadores_pessoas', { ...args, p_unidade: k, p_tipo: IND.tipo }))))]);
     if (S.aba !== 'indicadores' || minha !== viewIndicadores.seq) return;
     if (r.error || !r.data) {
       c.replaceChildren(h('div', { class: 'pagina' }, titulo, h('p', { class: 'erro' }, msgErro(r.error || { message: 'Sem resposta do banco.' })),
@@ -5247,7 +5254,8 @@ h1.longo { font-size: 14mm; }
     const TA = AGD ? AGD.atual : null, TB = AGD ? AGD.anterior : null;
     const desde = TA ? TA.dados_desde : null;
     const comBase = !!(AGD && desde && AGD.anterior_periodo.de >= desde);
-    const kpisTopo = PES ? kpisCinco(PES.atual, PES.anterior, comBase, IND.tipo) : h('p', { class: 'erro' }, 'Não consegui carregar os números do topo agora. Use "Atualizar agora" para tentar de novo. Se a mensagem fala de função inexistente, falta rodar o SQL supabase/indicadores-cinco-numeros.sql.');
+    const PU = porUn.length && porUn.every((x) => x && !x.error && x.data && x.data.atual) ? UN_QUADROS.map(([k, rot], i) => [rot, porUn[i].data.atual]).filter(([, u], i, l) => i < UNIDADES_PAINEL.length || (l[l.length - 1][1].procuraram || 0) > 0) : null;
+    const kpisTopo = PES ? kpisCinco(PES.atual, PES.anterior, comBase, IND.tipo, PU) : h('p', { class: 'erro' }, 'Não consegui carregar os números do topo agora. Use "Atualizar agora" para tentar de novo. Se a mensagem fala de função inexistente, falta rodar o SQL supabase/indicadores-cinco-numeros.sql.');
     // Com o filtro "Só exames" / "Só consultas", a história e o "confirmar adianta?" usam só aquele tipo. "Hoje" e "dia a dia" continuam com todas as marcações.
     const TT = TA ? (IND.tipo ? ((TA.por_tipo || {})[IND.tipo] || {}) : TA.total) : null;
     const rotTipo = IND.tipo === 'exame' ? 'exames' : IND.tipo === 'consulta' ? 'consultas' : '';
@@ -5298,7 +5306,7 @@ h1.longo { font-size: 14mm; }
       chipsTipo,
       R.periodo && R.periodo.ate === hojeISO ? h('p', { class: 'dica' }, 'O período inclui hoje, que ainda não terminou (e há conversas abertas): as setas comparam com um período inteiro e tendem a mostrar queda.') : null,
       kpisTopo,
-      h('p', { class: 'dica' }, 'Os 5 números usam a mesma base: pessoas, pelo dia em que abriram o chat. Cada pessoa conta uma vez. Quem não tem marcação no Klingo não entra em "Agendaram", mesmo que a conversa tenha sido encerrada como "Agendado".'),
+      h('p', { class: 'dica' }, 'Os 5 números usam a mesma base: pessoas, pelo dia em que abriram o chat. Cada pessoa conta uma vez. Quem não tem marcação no Klingo não entra em "Agendaram", mesmo que a conversa tenha sido encerrada como "Agendado".' + (PU ? ' Dentro de cada quadro, a lista mostra a quantidade por unidade (quem ainda não escolheu a unidade fica em "Sem unidade definida"; em raros casos uma pessoa que mudou de unidade aparece em duas e a soma passa do total).' : '')),
       blocoProcura(CA.por_tipo),
       h('h3', { class: 'ind-sec' }, 'Visão da agenda (marcações)'),
       h('p', { class: 'dica' }, 'Aqui a conta é por marcação e pela data do exame ou da consulta (não pelo dia em que a pessoa abriu o chat). Só entram as marcações do Klingo que vieram de uma conversa do chat (ligadas pelo pedido, ou por celular e nome). Marcação feita só pela recepção ou pelo telefone não entra.'),
