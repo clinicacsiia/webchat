@@ -91,3 +91,6 @@ Medido na primeira leitura: sem o 2º filtro de período do #14359 (**"marcado e
 - O envio do link é manual (botão do painel); nenhuma mensagem sai sozinha para o paciente.
 - Quem não tem celular em nenhum dos dois relatórios só é alcançado por telefone ou pelo próprio link; a página pede o celular na primeira mensagem.
 - O #14554 só enriquece quem já existe no #14359; o passado se completa com o modo `enriquecer` (`select public.pmarc_disparar('enriquecer', '{"de":"2026-10-01","ate":"2026-10-31"}');`).
+
+## Conversa aberta pela atendente não vai para a conta de paciente dela (19/11/2026)
+O gatilho `conversas_conta` grava na conversa o login de quem a criou. Quando a atendente (que também tem conta de paciente, com o mesmo login) tocava em **Iniciar conversa**, a conversa da paciente ficava na conta pessoal dela e, ao criar o acesso rápido, aparecia no app dela com o nome da paciente. Agora `pmarc_conversa_garantir` solta a conversa da conta quando quem abriu é a atendente. A conversa que o paciente abre pelo próprio chat continua na conta dele. Arquivo: `supabase/previsao-conversa-sem-conta-da-atendente.sql`; teste: `npm run test:previsao-sem-conta-atendente`.
