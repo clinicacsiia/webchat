@@ -20,6 +20,8 @@ await db.exec(`
   insert into public.agentes (id, nome, email, papel, ativo) values ('${ADMIN}', 'Admin Teste', 'admin@exemplo.invalid', 'admin', true), ('${ATEND}', 'Ana Atendente', 'atendente@exemplo.invalid', 'atendente', true);
   insert into public.config (chave, valor) values ('ia_segredo', 'segredo-de-teste'), ('motor', 'fluxo'), ('nome_empresa', 'Clínica de Teste'), ('boas_vindas', 'Olá!'), ('reabrir_dias', '2')
     on conflict (chave) do update set valor = excluded.valor;
+  -- 19/11/2026: a consulta de adulto só segue em unidade autorizada (supabase/unidade-so-desenvoar-whatsapp.sql); o clone precisa de uma unidade ativa de adulto
+  insert into public.unidade_config (chave, catalogo, rotulo, descricao, fluxo, instrucao, ordem, ativo) values ('csi', '${UNIDADE}', 'CSI', 'x', 'exame_consulta', 'x', 1, true) on conflict (chave) do update set ativo = true, catalogo = excluded.catalogo, fluxo = excluded.fluxo;
   insert into public.catalogo_regiao (codigo, nome, padrao, tem_lado, grupo, ordem) values ('joelho', 'Joelho', 'JOELHO', true, 'perna', 1), ('abdome', 'Abdome', 'ABDOME', false, 'tronco', 2);
   insert into public.catalogo_procedimento (id, nome, classe, ativo, demanda_90d, busca) values
     (201, 'RESSONANCIA MAGNETICA DO JOELHO (UNILATERAL)', 'RESSONANCIA MAGNETICA', true, 9, ''), (202, 'ULTRASSONOGRAFIA DE ABDOME TOTAL', 'ULTRASSONOGRAFIA', true, 7, ''),

@@ -717,7 +717,7 @@
   const CHAVE_HIST = 'webchat.historico.v1';   // as últimas conversas deste aparelho (cada uma com o seu token): dá para voltar a elas
   const MAX_HIST = 5;                          // mínimo pedido: 3
   // Muda a cada alteração do chat. Cópia de mensagens guardada por outra versão é descartada (era isso que mostrava conversa velha e travada).
-  const VERSAO_APP = '2026.11.18-1';
+  const VERSAO_APP = '2026.11.19-1';
   // Mesmas regras do banco (fluxo_nome_ok, fluxo_telefone_ok, fluxo_email_ok): o banco confere de novo, aqui é só para avisar logo.
   const LET = 'A-Za-zÀ-ÖØ-öø-ÿ';
   const nomeCompletoOk = (v) => { const t = String(v || '').trim(); return t.length >= 5 && t.length <= 120 && new RegExp(`^[${LET}][${LET}'’.-]*( +[${LET}][${LET}'’.-]*)+$`).test(t) && t.split(/ +/).filter((w) => w.replace(new RegExp(`[^${LET}]`, 'g'), '').length >= 2).length >= 2; };
@@ -2081,6 +2081,7 @@
       const { data, error } = await db.rpc('chat_consultas', { p_conversa: conv.id, p_token: conv.token });
       if (error) throw error;
       if (!conv || conv.id !== minha) return;
+      if (data && data.sem_unidade_autorizada) { blocoWhatsapp(f.corpo, f.rodape, data.aviso); return; }
       const lista = (data && data.consultas) || [];
       const salvar = async (c, botao) => {
         botao.disabled = true;
@@ -2970,8 +2971,21 @@
   /* ---------- Sem horário da API: três saídas claras (v2.0, 14/11/2026) ----------
      Quatro estados vêm do banco (chat_horarios.estado): sem_horarios (a API respondeu e não há vaga), indisponivel (a consulta falhou: NÃO é falta de vaga),
      nao_integrado (o atendimento é da equipe: sem horário automático), sem_consulta (ainda não consultou). A grade nunca vira horário na tela. */
+  /* ---------- Unidade não autorizada no chat: volta para o WhatsApp (19/11/2026) ----------
+     Só a Desenvoar marca pelo chat (Configurações > Marcação automática por unidade). Quem cai em outra unidade (consulta de adulto, exame de CSI ou RM/TC) não segue:
+     o chat explica e leva ao WhatsApp. O toque também chama a equipe na própria conversa (responder com acao 'atendente'), sem mandar dado pessoal no link. */
+  const WHATS_CLINICA = '5571999803806';
+  function blocoWhatsapp(corpo, rodape, aviso) {
+    const link = `https://wa.me/${WHATS_CLINICA}?text=${encodeURIComponent('Olá! Estava no chat do site e preciso de ajuda para agendar.')}`;
+    corpo.replaceChildren(h('p', { class: 'aviso-cal', role: 'status' }, aviso || 'No momento, o agendamento automático está disponível só para a Desenvoar. Para as outras unidades, a nossa equipe faz o agendamento com você.'),
+      h('p', { class: 'p-dica' }, 'Para este atendimento, continue pelo WhatsApp. A nossa equipe agenda com você.'));
+    rodape.replaceChildren(
+      h('a', { class: 'btn-w', href: link, target: '_blank', rel: 'noopener', style: 'display:block;text-align:center;text-decoration:none', onclick: () => { setTimeout(() => { fecharFolha(); pedirAtendente(); }, 300); } }, 'Continuar pelo WhatsApp'),
+      h('button', { class: 'btn-w sec', type: 'button', onclick: () => { fecharFolha(); pedirAtendente(); } }, 'Prefiro esperar a equipe aqui no chat'));
+  }
   function desenharSemHorarios(r) {
     const corpo = $('#folhaCorpo'), rodape = $('#folhaRodape'), est = r.estado;
+    if (est === 'sem_horarios' && r.unidades_bloqueadas) { blocoWhatsapp(corpo, rodape, r.aviso); return; }
     corpo.replaceChildren(); rodape.replaceChildren();
     const falhou = est === 'indisponivel' || est === 'sem_consulta';
     corpo.append(h('p', { class: 'aviso-cal', role: 'status' }, est === 'sem_horarios' ? (r.unidades_bloqueadas && r.aviso ? r.aviso : 'Não encontramos horários disponíveis para esse atendimento no momento.')

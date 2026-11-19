@@ -18,6 +18,7 @@ begin
   end if;
   select u.catalogo, c.medico_preferido into v_cat, v_med
   from public.conversas c left join public.unidade_config u on u.chave = c.unidade_inicial where c.id = p_conversa;
+  if v_cat is null or not public.unidade_marca_auto(v_cat) then raise exception '%', public.unidade_aviso_bloqueio() using errcode = 'P0001'; end if;
   select x.id, x.rotulo into v_c from public.consultas_da_unidade(v_cat) x where x.id = p_procedimento_id;
   if v_c.id is null then raise exception 'Consulta não encontrada para esta unidade.' using errcode = '22023'; end if;
   select p.nome into v_proc from public.catalogo_procedimento p where p.id = v_c.id;
@@ -38,4 +39,3 @@ begin
   insert into public.mensagens (conversa_id, autor, texto) values (p_conversa, 'cliente', v_txt) returning id into v_msg;
   return jsonb_build_object('ok', true, 'mensagem_id', v_msg);
 end $function$;
-

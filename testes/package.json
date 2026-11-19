@@ -64,6 +64,7 @@
     "test:particular-valor": "node sql-particular-valor.test.mjs",
     "test:particular-valor-tela": "node particular-valor.navegador.mjs",
     "test:marcacao-por-unidade": "node sql-marcacao-por-unidade.test.mjs",
+    "test:unidade-so-desenvoar": "node sql-unidade-so-desenvoar.test.mjs",
     "test:medico-escolhido": "node sql-medico-escolhido-fica.test.mjs",
     "test:medico-escolhido-nav": "node medico-escolhido.navegador.mjs",
     "test:primeira-consulta": "node sql-primeira-consulta.test.mjs",
