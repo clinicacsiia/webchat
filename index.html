@@ -717,7 +717,7 @@
   const CHAVE_HIST = 'webchat.historico.v1';   // as últimas conversas deste aparelho (cada uma com o seu token): dá para voltar a elas
   const MAX_HIST = 5;                          // mínimo pedido: 3
   // Muda a cada alteração do chat. Cópia de mensagens guardada por outra versão é descartada (era isso que mostrava conversa velha e travada).
-  const VERSAO_APP = '2026.11.19-2';
+  const VERSAO_APP = '2026.11.19-3';
   // Mesmas regras do banco (fluxo_nome_ok, fluxo_telefone_ok, fluxo_email_ok): o banco confere de novo, aqui é só para avisar logo.
   const LET = 'A-Za-zÀ-ÖØ-öø-ÿ';
   const nomeCompletoOk = (v) => { const t = String(v || '').trim(); return t.length >= 5 && t.length <= 120 && new RegExp(`^[${LET}][${LET}'’.-]*( +[${LET}][${LET}'’.-]*)+$`).test(t) && t.split(/ +/).filter((w) => w.replace(new RegExp(`[^${LET}]`, 'g'), '').length >= 2).length >= 2; };
@@ -2298,12 +2298,12 @@
     const semResposta = grupos.some((g) => g.certeza === 'duvida' && ![...e.itens.values()].some((v) => v.grupo === g.chave));
     if (e.modo === 'foto') {
       const semLeitura = !n && e.fotos > 0 && !semResposta;
-      e.rodape.replaceChildren(
+      e.rodape.replaceChildren(...[
         e.fotos ? h('p', { class: 'w-nota' }, `📎 ${e.fotos} ${e.fotos === 1 ? 'foto enviada' : 'fotos enviadas'} ao atendente.`) : null,
         semLeitura
           ? h('button', { class: 'btn-w', type: 'button', onclick: () => { e.itens.set('foto', { texto: 'Exame do pedido médico enviado em foto', nome: 'Exame do pedido médico' }); fotoParaPedido(); } }, 'Seguir só com a foto: o atendente confere')
           : h('button', { class: 'btn-w', type: 'button', disabled: !n || falta || semResposta, onclick: fotoParaPedido },
-            semResposta ? 'Responda qual é o exame acima' : !e.fotos && !n ? 'Envie a foto do pedido' : !n ? 'Marque o exame' : falta ? 'Escolha o lado do exame' : `Continuar (${n} ${n === 1 ? 'exame' : 'exames'})`));
+            semResposta ? 'Responda qual é o exame acima' : !e.fotos && !n ? 'Envie a foto do pedido' : !n ? 'Marque o exame' : falta ? 'Escolha o lado do exame' : `Continuar (${n} ${n === 1 ? 'exame' : 'exames'})`)].filter(Boolean));
       return;
     }
     e.rodape.replaceChildren(h('button', { class: 'btn-w', type: 'button', disabled: !n || falta || semResposta, onclick: enviarBusca },
