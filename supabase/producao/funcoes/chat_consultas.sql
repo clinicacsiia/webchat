@@ -12,9 +12,11 @@ begin
   perform public.chat_valida(p_conversa, p_token);
   select u.catalogo, c.medico_preferido into v_cat, v_med
   from public.conversas c left join public.unidade_config u on u.chave = c.unidade_inicial where c.id = p_conversa;
+  if v_cat is null or not public.unidade_marca_auto(v_cat) then
+    return jsonb_build_object('medico_preferido', v_med, 'consultas', '[]'::jsonb, 'sem_unidade_autorizada', true, 'aviso', public.unidade_aviso_bloqueio());
+  end if;
   return jsonb_build_object('medico_preferido', v_med, 'consultas', coalesce((
     select jsonb_agg(jsonb_build_object('id', x.id, 'rotulo', x.rotulo, 'do_medico', coalesce(v_med = any(x.medicos), false))
                      order by coalesce(v_med = any(x.medicos), false) desc, x.profissionais desc, x.rotulo)
     from (select * from public.consultas_da_unidade(v_cat) cu where public.klingo_liberado(p_conversa, cu.id, 'consulta') limit 24) x), '[]'::jsonb));
 end $function$;
-

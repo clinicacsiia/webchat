@@ -38,6 +38,7 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // Nomes REAIS do catálogo do Klingo (lidos da produção em 31/10/2026), com a caixa alta, o "(UNILATERAL)" e os parênteses cortados.
 const nomes = (lista, uni) => lista.map((nome, i) => ({ id: 1000 + i, nome, unilateral: uni && /UNILATERAL/.test(nome), bilateral: /BILATERAL/.test(nome) }));
+const AVISO_UNIDADE = 'No momento, o agendamento automático está disponível só para Desenvoar. Para as outras unidades, a nossa equipe faz o agendamento com você.';
 export const EXAMES = {
   punho_mao: nomes(['RM ARTICULAR (POR ARTICULAÇÃO)', 'RM DE MÃO E PUNHO - INCLUI ARTRO-RESSONÂNCIA (UNILATERAL)', 'RM MÃO (NÃO INCLUI PUNHO)', 'RM PUNHO (INCLUI ARTRO-RESSONÂNCIA) UNILATERAL'], true),
   torax: nomes(['RM DE TÓRAX', 'TC ARTICULAÇÃO (ESTERNOCLAVICULAR OU OMBRO OU COTOVELO OU PUNHO OU SACROILÍACA OU COXOFEMORAL OU JOELHO OU TORNOZELO) UNILATERAL', 'RM MAMA BILATERAL'], true),
@@ -153,8 +154,9 @@ export function criarMundo(opcoes = {}) {
         const med = m.medico ? { medico_preferido: m.medico.nome, medico_filtrando: true, medico_sem_horario: !(m.medico.achaNaJanela != null && jMax >= m.medico.achaNaJanela) } : {};
         const mostra = ok && !med.medico_sem_horario;
         return { body: { janelas, grupos: [{ indice: 1, procs: [1], nomes: ['CONSULTA'] }], grupo: 1, de: corpo.p_de, ate: corpo.p_ate, dias: mostra ? dias : [],
-          unidades: ['CLÍNICA DE SAÚDE E IMAGEM - CSI'], escolhas: [], sem_exame: 0, atualizado_em: agora(), aviso: null, estado: m.api.estado, klingo_api: ok, origem: ok ? 'api_klingo' : 'nenhuma', ...med } };
+          unidades: ['CLÍNICA DE SAÚDE E IMAGEM - CSI'], escolhas: [], sem_exame: 0, atualizado_em: agora(), aviso: m.api.bloqueada ? AVISO_UNIDADE : null, unidades_bloqueadas: !!m.api.bloqueada, estado: m.api.estado, klingo_api: ok, origem: ok ? 'api_klingo' : 'nenhuma', ...med } };
       }
+      case 'chat_consultas': return { body: m.consultas || { medico_preferido: null, consultas: [{ id: 301, rotulo: 'Consulta de Pediatria', do_medico: false }] } };
       case 'chat_medico_sem_horario_abrir': { (m.medico.abertos = m.medico.abertos || []).push(corpo); return { body: { ok: true, solicitacao: { id: 'sol-med', estado: 'ativa' } } }; }
       case 'chat_disponibilidade_registrar': { m.disp.registros.push(corpo.p_dados); return { body: { ok: true, solicitacao: { id: 'sol-1', estado: 'ativa', ...corpo.p_dados } } }; }
       case 'chat_disponibilidade_ver': return { body: { solicitacoes: m.disp.lista } };
