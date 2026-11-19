@@ -65,7 +65,7 @@ begin
     v_med := public.fluxo_medicos(p_conversa);
     select coalesce(jsonb_agg(jsonb_build_object('valor', m, 'rotulo', initcap(lower(m))) order by m), '[]'::jsonb) into v_it from unnest(v_med) m;
     select lower(x2.rotulo) into x from public.pre_agendamento_itens i
-      cross join lateral public.consultas_da_unidade((select u.catalogo from public.unidade_config u where u.chave = c.unidade_inicial)) x2
+      cross join lateral public.consultas_da_unidade_antigas((select u.catalogo from public.unidade_config u where u.chave = c.unidade_inicial)) x2
       where i.conversa_id = p_conversa and i.ativo and i.modalidade = 'CONSULTA' and x2.id = i.procedimento_id limit 1;
     v_txt := public.fluxo_t('medico', ctx || jsonb_build_object('consulta', coalesce(x, 'a consulta')));
     v_op := public.fluxo_escolha(p_passo, jsonb_build_array(jsonb_build_object('valor', '', 'rotulo', 'Tanto faz (qualquer médico)')) || v_it);

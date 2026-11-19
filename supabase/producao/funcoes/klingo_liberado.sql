@@ -6,7 +6,11 @@ as $function$
 declare d jsonb; v_nasc date; v_idade integer; v_sexo text; pr record; v_cbos text;
 begin
   if public.klingo_cfg('klingo_so_liberados', 'nao') <> 'sim' then return true; end if;
-  if p_proc is null or not public.klingo_automatizavel(p_proc, p_tipo) then return false; end if;
+  if p_proc is null then return false; end if;
+  if not public.klingo_automatizavel(p_proc, p_tipo)
+     and not (p_tipo = 'consulta' and p_proc::text = any (string_to_array(replace(public.klingo_cfg('consultas_sem_api', ''), ' ', ''), ','))) then
+    return false;
+  end if;
   d := public.klingo_dados_conversa(p_conversa);
   v_nasc := nullif(d ->> 'nascimento', '')::date;
   v_idade := case when v_nasc is null then null else extract(year from age((now() at time zone 'America/Bahia')::date, v_nasc))::integer end;
