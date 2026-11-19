@@ -169,3 +169,5 @@ Ver `pendencias-do-dono.md`, seção "Autoatendimento Klingo": primeiro teste re
 
 **Pendente (decisão do dono):** o duplicado já criado para o caso de 19/11 precisa ser juntado pela recepção no Klingo; e 42 de 168 filhos com CPF no app têm o CPF igual ao do responsável (candidatos a repetir o problema).
 Testes: `supabase/functions/klingo-executar/klingo-auto.test.ts` (54, com 8 novos), `npm run test:edge`, `npm run test:retrato`.
+
+**v1.6 (19/11/2026, no código; publicar na produção depende do OK do dono).** Segundo caso real: a mãe digitou o nome da filha **sem o último sobrenome** ("Ana Louise Liborio" para "Ana Louise Liborio Borges") e o CPF também não foi achado. A v1.5 recusaria o nome e criaria outro duplicado. Agora `nomeConfere` aceita o nome digitado quando ele é o **começo** do nome do Klingo (ou o contrário); "Ana Lis Liborio" (irmã) continua sendo recusada. Se o telefone + nascimento acham um cadastro definitivo mas o **nome não confere**, o pré-cadastro é criado como antes e a nota diz "PROVÁVEL DUPLICADO, conferir e juntar na recepção". O chat só exige nome e sobrenome (2 palavras), então não dá para obrigar o nome inteiro no formulário.

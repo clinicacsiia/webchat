@@ -14,6 +14,7 @@
 // Versão 1.5 — 19/11/2026 / Mudança: ANTES de criar pré-cadastro (CPF não achado), procura o cadastro por TELEFONE + NASCIMENTO (POST /paciente/identificar) e só o usa se o nome também
 //   conferir. Corrige o caso da criança cadastrada no chat com o CPF do responsável: o Klingo não achava o CPF e o chat criava um pré-cadastro duplicado. Só vale para MARCAR (nunca para
 //   ver, cancelar ou remarcar, que continuam só por CPF ou pré-cadastro guardado). O resultado diz de onde veio o cadastro (campo "cadastro") para a equipe ver na conversa.
+// Versão 1.6 — 19/11/2026 / Mudança: nome digitado incompleto (sem o último sobrenome) também confere; se houver cadastro com o mesmo telefone e nascimento mas nome diferente, avisa "provável duplicado".
 // Cancelar e remarcar (etapa 4): mesma identidade e mesma sessão conferida; só mexem em voucher que está entre as marcações ATIVAS da sessão do próprio paciente.
 import { cadastroParaComparar, camposDivergentes, type Horario, type KlingoApi, KlingoErro, nomeConfere, resumoPaciente, resumoVoucher, semAcento, dataIso } from "./klingo-api.ts";
 
@@ -37,8 +38,8 @@ export type Resultado = {
   resultados?: Array<{ id: string | null; procedimento: string | null; data: string | null; pronto: boolean | null }>;
   /** v1.1: só em "remarcar": situação do voucher ANTIGO depois da marcação nova. */
   antigo?: "ativo" | "cancelado" | "desconhecido";
-  /** v1.5: só em marcar/remarcar. achado_telefone = cadastro existente achado por telefone + nascimento + nome; pre_novo = criou pré-cadastro novo. */
-  cadastro?: "achado_telefone" | "pre_novo";
+  /** v1.5: só em marcar/remarcar. achado_telefone = cadastro existente achado por telefone + nascimento + nome; pre_novo = criou pré-cadastro novo; pre_novo_conferir (v1.6) = criou pré-cadastro novo MAS existe cadastro com o mesmo telefone e nascimento e nome diferente (provável duplicado). */
+  cadastro?: "achado_telefone" | "pre_novo" | "pre_novo_conferir";
 };
 
 const falha = (codigo: string, e?: unknown): Resultado => ({ estado: "falha", codigo, ...(e instanceof KlingoErro ? { http_status: e.status, caminho: e.caminho } : {}) });
@@ -62,20 +63,22 @@ export function acharVoucher(lista: Array<Record<string, unknown>>, opId: string
   return porHorario.length === 1 ? porHorario[0].r : null;
 }
 
-type Sessao = { token: string; idLogin: string; tipoId: "definitivo" | "pre"; planoCadastro: number | null; cadastro?: "achado_telefone" | "pre_novo" };
+type Sessao = { token: string; idLogin: string; tipoId: "definitivo" | "pre"; planoCadastro: number | null; cadastro?: "achado_telefone" | "pre_novo" | "pre_novo_conferir" };
 
 /**
  * v1.5: acha o cadastro DEFINITIVO por telefone + nascimento e só aceita se o nome do cadastro também conferir (três provas, não uma).
- * Devolve o id exato do Klingo ("P…") ou null. Erro de rede/limite sobe (quem chama para a marcação em vez de arriscar um duplicado).
+ * v1.6: devolve { id } quando acha e confere; { duplicado: true } quando existe cadastro definitivo com o MESMO telefone e nascimento mas nome que não confere
+ * (a equipe é avisada de provável duplicado, e nada é usado); null quando não há nada.
+ * Erro de rede/limite sobe (quem chama para a marcação em vez de arriscar um duplicado).
  */
-export async function procurarCadastroPorTelefone(api: KlingoApi, d: Pegar["dados"]): Promise<string | null> {
+export async function procurarCadastroPorTelefone(api: KlingoApi, d: Pegar["dados"]): Promise<{ id: string } | { duplicado: true } | null> {
   const tel = String(d.celular ?? "").replace(/\D/g, "");
   if (tel.length < 10 || !d.nome || !d.nascimento || semAcento(d.nome).split(" ").filter(Boolean).length < 2) return null;
   const r = await api.pacientePorTelefone(tel, d.nascimento);
   if (!r) return null;
   const id = String(r.user.id ?? "");
-  if (!/^P\d+$/.test(id) || dataIso(r.user.nascimento) !== d.nascimento || !nomeConfere(r.user.nome, d.nome)) return null;
-  return id;
+  if (!/^P\d+$/.test(id) || dataIso(r.user.nascimento) !== d.nascimento) return null;
+  return nomeConfere(r.user.nome, d.nome) ? { id } : { duplicado: true };
 }
 
 /**
@@ -125,11 +128,11 @@ async function abrirSessao(api: KlingoApi, rpc: Rpc, p: Pegar, o: { planoDaOfert
     if (!liberado) return falha("paciente_novo_nao_liberado");
     if (!d.nome || !d.sexo) return falha("dados_incompletos");
     // v1.5: antes de criar paciente novo, procura quem já é da clínica por telefone + nascimento (só se ainda não há pré-cadastro guardado para este CPF + nascimento)
-    let achado: string | null = null;
+    let achado: Awaited<ReturnType<typeof procurarCadastroPorTelefone>> = null;
     if (o.liberarNovo !== false && !(await preGuardado())) {
       try { achado = await procurarCadastroPorTelefone(api, d); } catch (e) { return falha("busca_cadastro_falhou", e); }
     }
-    if (achado) { idLogin = achado; tipoId = "definitivo"; cadastro = "achado_telefone"; }
+    if (achado && "id" in achado) { idLogin = achado.id; tipoId = "definitivo"; cadastro = "achado_telefone"; }
     else {
     const r = dado<{ acao: string; klingo_id?: string }>(await rpc("klingo_pre_reservar", { p_op: op.id, p_cpf: d.cpf, p_nasc: d.nascimento }));
     if (r.acao === "existente" && r.klingo_id) { idLogin = r.klingo_id; tipoId = "pre"; }
@@ -143,7 +146,7 @@ async function abrirSessao(api: KlingoApi, rpc: Rpc, p: Pegar, o: { planoDaOfert
         return falha("registro_falhou", e);
       }
       await rpc("klingo_pre_gravar", { p_op: op.id, p_cpf: d.cpf, p_nasc: d.nascimento, p_klingo_id: novo.id });
-      idLogin = novo.id; tipoId = "pre"; cadastro = "pre_novo";
+      idLogin = novo.id; tipoId = "pre"; cadastro = achado ? "pre_novo_conferir" : "pre_novo";
     } else return { estado: "incerto", codigo: "registro_em_andamento_ou_incerto" };
     }
     }
@@ -230,6 +233,8 @@ export async function executar(api: KlingoApi, rpc: Rpc, p: Pegar, esps: Esp[]):
 export function notaDoCadastro(cadastro: Resultado["cadastro"], estado: Resultado["estado"]): string | null {
   if (cadastro === "achado_telefone" && (estado === "sucesso" || estado === "incerto"))
     return "Klingo: o CPF informado não foi achado, mas o paciente já tem cadastro (achado por telefone, nascimento e nome). A marcação foi feita no cadastro existente; nenhum pré-cadastro novo foi criado.";
+  if (cadastro === "pre_novo_conferir")
+    return "Klingo: criado pré-cadastro NOVO, mas já existe cadastro com o MESMO telefone e nascimento e nome diferente do digitado: PROVÁVEL DUPLICADO. Conferir no Klingo e juntar na recepção.";
   if (cadastro === "pre_novo")
     return "Klingo: criado pré-cadastro NOVO (o CPF e telefone + nascimento não acharam cadastro existente). Se o paciente já for da clínica, conferir duplicado e juntar na recepção.";
   return null;

@@ -477,7 +477,7 @@ test("TELEFONE: CPF não achado, mas telefone + nascimento + nome conferem: marc
 test("TELEFONE: nome diferente, nascimento diferente ou id que não é definitivo: NÃO usa o cadastro achado e cria o pré-cadastro como antes", async () => {
   for (const t of ["outro_nome", "outra_data", "id_pre", "recusa_400"] as const) {
     const a = apiDe({ paciente: null, identificarTel: t }); const r = await executarMarcacao(a.api, rpcDe({ preCadastro: true }).rpc, pegar(), ESPS);
-    assert.equal(r.estado, "sucesso", t); assert.equal(r.cadastro, "pre_novo", t);
+    assert.equal(r.estado, "sucesso", t); assert.equal(r.cadastro, t === "outro_nome" ? "pre_novo_conferir" : "pre_novo", t);
     assert.equal(a.k.chamadas.filter((c) => c === "POST /externo/register").length, 1, t);
     assert.notEqual(a.k.corpos.find((c) => c.rota === "POST /externo/login")!.corpo.id, "P777", t);
   }
@@ -515,6 +515,10 @@ test("TELEFONE: nomeConfere exige nome completo (2+ nomes) e tolera acento, caix
   assert.ok(nomeConfere("MARIA ANA SOUZA", "Maria Souza"));   // curto dentro do longo, mesmo 1º e último
   assert.equal(nomeConfere("MARIA ANA SOUZA", "Maria Clara Souza"), false);
   assert.equal(nomeConfere("ANALU FONSECA SERRA", "Luanne Fonseca Silva"), false);
+  // nome digitado incompleto (sem o último sobrenome) confere; irmã com nome parecido não
+  assert.ok(nomeConfere("ANA LOUISE LIBORIO BORGES", "Ana Louise liborio"));
+  assert.ok(nomeConfere("ANALU FONSECA SERRA", "Analu Fonseca"));
+  assert.equal(nomeConfere("ANA LOUISE LIBORIO BORGES", "Ana Lis Liborio"), false);
   assert.equal(nomeConfere("ANALU", "Analu"), false); assert.equal(nomeConfere("", ""), false); assert.equal(nomeConfere(null, "Maria Teste"), false);
 });
 test("TELEFONE: celular curto ou nome de um só termo não consulta o Klingo", async () => {
@@ -522,5 +526,18 @@ test("TELEFONE: celular curto ou nome de um só termo não consulta o Klingo", a
   assert.equal(await procurarCadastroPorTelefone(a.api, pegar({ celular: "999990001" }).dados), null);
   assert.equal(await procurarCadastroPorTelefone(a.api, pegar({ nome: "Maria" }).dados), null);
   assert.ok(!a.k.chamadas.includes("POST /paciente/identificar"), "celular curto e nome de um termo não chamam o Klingo");
-  assert.ok(await procurarCadastroPorTelefone(a.api, pegar().dados) === "P777");
+  assert.deepEqual(await procurarCadastroPorTelefone(a.api, pegar().dados), { id: "P777" });
+});
+
+test("TELEFONE: nome digitado sem o último sobrenome usa o cadastro existente; nome diferente avisa provável duplicado na nota", async () => {
+  const k = klingo({ paciente: null, identificarTel: "achou" });
+  const api = new KlingoApi("clinicacsi:segredo", async (u, i) => {
+    const rota = `${i?.method ?? "GET"} ${new URL(u).pathname.replace("/api", "")}`;
+    if (rota === "POST /paciente/identificar") return new Response(JSON.stringify({ access_token: "t", user: { id: "P888", nome: "MARIA TESTE SOUZA", nascimento: NASC } }), { status: 200, headers: { "content-type": "application/json" } });
+    if (rota === "POST /externo/login") return new Response(JSON.stringify({ access_token: "tok", user: { id: "P888", nome: "MARIA TESTE SOUZA", nascimento: NASC, id_paciente: "1" } }), { status: 200, headers: { "content-type": "application/json" } });
+    return k.f(u, i);
+  }, semEspera);
+  const r = await executarMarcacao(api, rpcDe({ preCadastro: true }).rpc, pegar({ nome: "Maria Teste" }), ESPS);
+  assert.equal(r.cadastro, "achado_telefone"); assert.equal(r.estado, "sucesso");
+  assert.match(notaDoCadastro("pre_novo_conferir", "sucesso")!, /PROV\u00c1VEL DUPLICADO/);
 });
