@@ -141,6 +141,9 @@
   .filtros { display: flex; gap: 6px; padding: 10px; border-bottom: 1px solid var(--linha); flex-wrap: wrap; }
   .chip { border: 1px solid var(--csi-border-strong); background: var(--papel); border-radius: 999px; padding: 5px 12px; font-size: 13px; font-weight: 600; cursor: pointer; transition: background-color var(--csi-ease), border-color var(--csi-ease), color var(--csi-ease); }
   .chip:hover { border-color: var(--csi-primary); background: var(--csi-primary-soft); }
+  .chip.pequeno { padding: 3px 10px; font-size: 12px; font-weight: 500; }
+  .chip.discreto { margin-left: auto; border-color: transparent; background: transparent; color: var(--csi-primary); font-weight: 500; text-decoration: underline; }
+  .filtros-sub { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 6px; padding-top: 6px; border-top: 1px dashed var(--linha); }
   .chip[aria-pressed=true] { background: var(--verde); border-color: var(--verde); color: #fff; }
   .itens { overflow-y: auto; flex: 1; }
   .item { display: block; width: 100%; text-align: left; background: none; border: 0; border-bottom: 1px solid var(--linha); padding: 12px 16px; cursor: pointer; }
@@ -748,9 +751,19 @@
   const ROTULO_STATUS = { aguardando: 'Aguardando', em_atendimento: 'Em atendimento', encerrada: 'Encerrada' };
   const ROTULO_PAPEL = { admin: 'Administrador', atendente: 'Atendente', marketing: 'Marketing' };
 
+  // Filtros da lista (v4.2): 4 botões na linha principal; "Abertas" abre uma 2ª linha com quem conduz a conversa.
+  // O último filtro é lembrado só no mesmo dia; em outro dia o painel abre em "Aguardando".
+  const FILTROS_VALIDOS = ['aguardando', 'meus', 'abertas', 'assistente', 'agendado_api', 'com_atendente', 'encerradas'];
+  const FILTROS_DE_ABERTAS = ['abertas', 'assistente', 'agendado_api', 'com_atendente'];
+  const hojeChave = () => new Date().toLocaleDateString('sv-SE');   // AAAA-MM-DD no fuso do aparelho
+  function lerFiltroLembrado() {
+    try { const v = JSON.parse(localStorage.getItem('painel.filtro') || 'null'); if (v && v.dia === hojeChave() && FILTROS_VALIDOS.includes(v.filtro)) return v.filtro; } catch { /* sem armazenamento: abre em Aguardando */ }
+    return 'aguardando';
+  }
+
   /* ---------- estado ---------- */
   const S = {
-    me: null, agentes: new Map(), conversas: [], filtro: 'aguardando', abertaId: null, msgs: [], vistos: new Set(),
+    me: null, agentes: new Map(), conversas: [], filtro: lerFiltroLembrado(), abertaId: null, msgs: [], vistos: new Set(),
     aba: 'atendimento', canal: null, ao_vivo: false, contatos: [], mudo: localStorage.getItem('painel.mudo') === '1',
     buscaContatos: '', busca: '', periodo: 'todos', tagFiltro: '', pre: null, gruposFechados: new Set(),
     modo: (() => { try { return localStorage.getItem('painel.modo') === 'quadro' ? 'quadro' : 'lista'; } catch { return 'lista'; } })(),
@@ -2825,6 +2838,11 @@
     c.append(cab, inbox); atualizarKpis(); renderLista(); renderChat(); carregarSeloPendencias();
     if (S.modo === 'quadro') { renderQuadro(); carregarQuadro(); }
   }
+  function definirFiltro(id) {
+    S.filtro = id;
+    try { localStorage.setItem('painel.filtro', JSON.stringify({ dia: hojeChave(), filtro: id })); } catch { /* sem armazenamento: só não lembra */ }
+    renderLista();
+  }
   function renderLista() {
     const f = document.getElementById('filtros'), it = document.getElementById('itens'); if (!f || !it) return;
     const todas = pessoas();
@@ -2832,9 +2850,16 @@
       abertas: (p) => statusPessoa(p) !== 'encerrada', encerradas: (p) => statusPessoa(p) === 'encerrada',
       assistente: (p) => quemConduz(p) === 'assistente', agendado_api: (p) => quemConduz(p) === 'agendado_api', com_atendente: (p) => quemConduz(p) === 'com_atendente' };
     const cont = (g) => todas.filter(g).length;
-    const defs = [['aguardando', 'Aguardando', cont(fn.aguardando)], ['meus', 'Meus', cont(fn.meus)], ['abertas', 'Abertas', cont(fn.abertas)], ['assistente', 'Com o assistente', cont(fn.assistente)], ['agendado_api', 'Agendado pela API', cont(fn.agendado_api)], ['com_atendente', 'Com atendente', cont(fn.com_atendente)], ['encerradas', 'Encerradas', null]];
-    f.replaceChildren(seletorModo(), ...defs.map(([id, rot, n]) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(S.filtro === id), onclick: () => { S.filtro = id; renderLista(); } }, n != null ? `${rot} (${n})` : rot)),
-      h('button', { class: 'chip', type: 'button', id: 'btnLote', title: 'Transferir várias conversas de uma vez', onclick: abrirLote }, 'Transferir em lote'));
+    const noGrupoAbertas = FILTROS_DE_ABERTAS.includes(S.filtro);
+    const chip = (id, rot, n, ativo, extra = '') => h('button', { class: 'chip' + extra, type: 'button', 'data-filtro': id, 'aria-pressed': String(ativo), onclick: () => definirFiltro(id) }, n != null ? `${rot} (${n})` : rot);
+    const principais = [['aguardando', 'Aguardando', cont(fn.aguardando)], ['meus', 'Meus', cont(fn.meus)], ['abertas', 'Abertas', cont(fn.abertas)], ['encerradas', 'Encerradas', null]]
+      .map(([id, rot, n]) => chip(id, rot, n, id === 'abertas' ? noGrupoAbertas : S.filtro === id));
+    const sub = noGrupoAbertas ? h('div', { class: 'filtros-sub', id: 'filtrosSub', role: 'group', 'aria-label': 'Quem está conduzindo as conversas abertas' },
+      ...[['abertas', 'Todas', cont(fn.abertas)], ['assistente', 'Com o assistente', cont(fn.assistente)], ['agendado_api', 'Agendado pela API', cont(fn.agendado_api)], ['com_atendente', 'Com atendente', cont(fn.com_atendente)]]
+        .map(([id, rot, n]) => chip(id, rot, n, S.filtro === id, ' pequeno'))) : null;
+    f.replaceChildren(seletorModo(), ...principais,
+      h('button', { class: 'chip discreto', type: 'button', id: 'btnLote', title: 'Transferir várias conversas de uma vez', onclick: abrirLote }, 'Transferir em lote'),
+      ...(sub ? [sub] : []));
     const buscando = S.busca.trim() !== '';
     const lista = buscando ? todas.filter(combinaBusca) : todas.filter(fn[S.filtro]);   // com busca, procura em todas as conversas
     const sug = renderSugestoes();
