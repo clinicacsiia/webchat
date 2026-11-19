@@ -152,3 +152,20 @@ Diferença em relação ao planejamento: a tradução de convênio está em **`k
 ## 9. O que ainda depende de decisão ou de terceiros
 
 Ver `pendencias-do-dono.md`, seção "Autoatendimento Klingo": primeiro teste real, perguntas ao suporte do Klingo (URL do webhook, limite de chamadas, mais especialidades na API, plano da ASSEFAZ, agenda de teste), revisão da política de privacidade para citar a marcação automática, e o canal de código (SMS/e-mail) para liberar resultado de exame.
+
+## 10. Criança com CPF do responsável: não criar pré-cadastro duplicado (19/11/2026)
+
+**O problema (caso real de 19/11/2026).** Uma criança que já era paciente foi cadastrada no app com o **CPF da mãe** (o chat aceita o CPF do responsável quando a criança não tem CPF). O Klingo não achou esse CPF, o chat concluiu "paciente novo" e **criou um pré-cadastro duplicado**. O selo do painel ("Paciente novo: validar no Klingo") vinha só da nossa base local (a configuração `reaproveitar_cadastro_convidado` está em `nao`, então conversa sem login sempre sai "novo": 254 de 259 pedidos dos últimos 7 dias).
+
+**A correção (`klingo-executar` v1.5, no ar em 19/11/2026).** Antes de criar o pré-cadastro, a marcação procura o cadastro **definitivo** por **telefone + nascimento** (`POST /paciente/identificar`, rota do Klingo feita para o WhatsApp) e só aceita se o **nome** também conferir (`nomeConfere`: nome completo, sem acento, caixa ou ligação) e o id for definitivo (`P…`). Regras:
+- Vale **só para marcar**. Ver marcações, cancelar e remarcar continuam só por CPF ou pré-cadastro guardado (telefone + nome + nascimento é prova mais fraca que o CPF, e essas ações mostram dados do paciente).
+- Se já existe pré-cadastro guardado para o CPF + nascimento, segue o caminho de antes.
+- A busca devolveu 4xx (inclui "não achou"): segue como antes e cria o pré-cadastro. Queda, erro 5xx ou limite: a marcação **para** com o código `busca_cadastro_falhou` (a equipe marca), em vez de arriscar outro duplicado.
+- A equipe vê uma nota no resumo da conversa: "achado por telefone, nascimento e nome… nenhum pré-cadastro novo foi criado" ou "criado pré-cadastro NOVO… conferir duplicado e juntar na recepção". Nenhum dado pessoal vai na nota.
+- Limite conhecido: quem foi achado por telefone **não** consegue ver/cancelar/remarcar pelo chat (cai para a equipe), porque essas ações ainda dependem do CPF.
+- **Ainda não provado com o Klingo real:** o formato do telefone aceito pela rota (mandamos só dígitos com DDD). Se o Klingo recusar, o comportamento é o de antes (cria pré-cadastro) e a nota "pré-cadastro NOVO" aparece.
+
+**Painel.** O selo `nova` agora diz "Não achamos este paciente na nossa base. Isso não prova que seja novo: conferir no Klingo por nome e nascimento (o CPF informado pode ser do responsável)" (`painel/index.html`, service worker `webchat-painel-v74`).
+
+**Pendente (decisão do dono):** o duplicado já criado para o caso de 19/11 precisa ser juntado pela recepção no Klingo; e 42 de 168 filhos com CPF no app têm o CPF igual ao do responsável (candidatos a repetir o problema).
+Testes: `supabase/functions/klingo-executar/klingo-auto.test.ts` (54, com 8 novos), `npm run test:edge`, `npm run test:retrato`.

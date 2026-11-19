@@ -7,10 +7,11 @@
 // pelo banco (klingo_pode_marcar) e lê o resto de lá. Não há modo diagnóstico e o segredo NÃO é o x-sync-key (é um segredo próprio do cofre).
 // Nunca registra nome, CPF, telefone nem o corpo de erro do Klingo. Secret: KLINGO_APP_TOKEN.
 // Versão 1.1 — 14/11/2026 / Mudança: operação "ler_vouchers" (ver minhas marcações) e conferência do voucher antigo na remarcação; o resultado leva marcacoes e antigo ao banco.
+// Versão 1.5 — 19/11/2026 / Mudança: acha cadastro existente por telefone + nascimento + nome antes de criar pré-cadastro e deixa uma nota na conversa (ver executor.ts).
 // Versões 1.2 a 1.4 — 14/11/2026 / Mudança: cancelar, remarcar e ver marcações para quem tem só PRÉ-CADASTRO (ver executor.ts).
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { cotaGlobal, KlingoApi } from "./klingo-api.ts";
-import { executar, type Esp, type Pegar } from "./executor.ts";
+import { executar, notaDoCadastro, type Esp, type Pegar } from "./executor.ts";
 
 const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { "Content-Type": "application/json" } });
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -45,6 +46,9 @@ Deno.serve(async (req: Request) => {
     const { data: esps } = await supabase.from("klingo_especialidade").select("cbos, procedimentos");
     const r = await executar(api, rpc, pegar as unknown as Pegar, (esps ?? []) as Esp[]);
     await concluir(r.estado, { voucher: r.voucher ?? null, codigo: r.codigo ?? null, http_status: r.http_status ?? null, caminho: r.caminho ?? null, marcacoes: r.marcacoes ?? null, resultados: r.resultados ?? null, antigo: r.antigo ?? null });   // v1.1: lista de marcações (ler_vouchers) e situação do voucher antigo (remarcar)
+    // v1.5: a equipe vê, no resumo da conversa, de onde veio o cadastro (sem nome, CPF nem telefone). Falhar aqui nunca desfaz a marcação.
+    const nota = notaDoCadastro(r.cadastro, r.estado);
+    if (nota) await supabase.rpc("fluxo_nota", { p_conversa: (pegar as unknown as Pegar).operacao.conversa_id, p_nota: nota }).then(() => {}, () => {});
     return json({ ok: true, estado: r.estado });
   } catch {
     await concluir("incerto", { codigo: "erro_no_executor" });   // se algo escapou, o seguro é a equipe conferir antes de marcar de novo

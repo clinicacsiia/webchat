@@ -11,8 +11,11 @@
 //   4) o horário ainda existe? (GET /agenda/horarios do dia com a sessão); se não, "horário tomado"
 //   5) reservar -> marcar (id_externo = id da operação); se o resultado for incerto, reconcilia por GET /vouchers; se não achar, INCERTO (a equipe confere ANTES de marcar de novo)
 // Versões 1.2 a 1.4 — 14/11/2026: pré-cadastro guardado para cancelar/remarcar/ver marcações; nome só conferido se informado; consulta de horário refeita sem sessão no 403.
+// Versão 1.5 — 19/11/2026 / Mudança: ANTES de criar pré-cadastro (CPF não achado), procura o cadastro por TELEFONE + NASCIMENTO (POST /paciente/identificar) e só o usa se o nome também
+//   conferir. Corrige o caso da criança cadastrada no chat com o CPF do responsável: o Klingo não achava o CPF e o chat criava um pré-cadastro duplicado. Só vale para MARCAR (nunca para
+//   ver, cancelar ou remarcar, que continuam só por CPF ou pré-cadastro guardado). O resultado diz de onde veio o cadastro (campo "cadastro") para a equipe ver na conversa.
 // Cancelar e remarcar (etapa 4): mesma identidade e mesma sessão conferida; só mexem em voucher que está entre as marcações ATIVAS da sessão do próprio paciente.
-import { cadastroParaComparar, camposDivergentes, type Horario, type KlingoApi, KlingoErro, resumoPaciente, resumoVoucher, semAcento, dataIso } from "./klingo-api.ts";
+import { cadastroParaComparar, camposDivergentes, type Horario, type KlingoApi, KlingoErro, nomeConfere, resumoPaciente, resumoVoucher, semAcento, dataIso } from "./klingo-api.ts";
 
 export type Rpc = (nome: string, args: Record<string, unknown>) => PromiseLike<{ data: unknown; error?: unknown }>;
 export type Pegar = {
@@ -34,6 +37,8 @@ export type Resultado = {
   resultados?: Array<{ id: string | null; procedimento: string | null; data: string | null; pronto: boolean | null }>;
   /** v1.1: só em "remarcar": situação do voucher ANTIGO depois da marcação nova. */
   antigo?: "ativo" | "cancelado" | "desconhecido";
+  /** v1.5: só em marcar/remarcar. achado_telefone = cadastro existente achado por telefone + nascimento + nome; pre_novo = criou pré-cadastro novo. */
+  cadastro?: "achado_telefone" | "pre_novo";
 };
 
 const falha = (codigo: string, e?: unknown): Resultado => ({ estado: "falha", codigo, ...(e instanceof KlingoErro ? { http_status: e.status, caminho: e.caminho } : {}) });
@@ -57,7 +62,21 @@ export function acharVoucher(lista: Array<Record<string, unknown>>, opId: string
   return porHorario.length === 1 ? porHorario[0].r : null;
 }
 
-type Sessao = { token: string; idLogin: string; tipoId: "definitivo" | "pre"; planoCadastro: number | null };
+type Sessao = { token: string; idLogin: string; tipoId: "definitivo" | "pre"; planoCadastro: number | null; cadastro?: "achado_telefone" | "pre_novo" };
+
+/**
+ * v1.5: acha o cadastro DEFINITIVO por telefone + nascimento e só aceita se o nome do cadastro também conferir (três provas, não uma).
+ * Devolve o id exato do Klingo ("P…") ou null. Erro de rede/limite sobe (quem chama para a marcação em vez de arriscar um duplicado).
+ */
+export async function procurarCadastroPorTelefone(api: KlingoApi, d: Pegar["dados"]): Promise<string | null> {
+  const tel = String(d.celular ?? "").replace(/\D/g, "");
+  if (tel.length < 10 || !d.nome || !d.nascimento || semAcento(d.nome).split(" ").filter(Boolean).length < 2) return null;
+  const r = await api.pacientePorTelefone(tel, d.nascimento);
+  if (!r) return null;
+  const id = String(r.user.id ?? "");
+  if (!/^P\d+$/.test(id) || dataIso(r.user.nascimento) !== d.nascimento || !nomeConfere(r.user.nome, d.nome)) return null;
+  return id;
+}
 
 /**
  * Passos comuns a toda operação em nome do paciente: identidade na API, plano (se exigido) e sessão conferida.
@@ -67,6 +86,7 @@ async function abrirSessao(api: KlingoApi, rpc: Rpc, p: Pegar, o: { planoDaOfert
   const d = p.dados, op = p.operacao;
   let idLogin: string, tipoId: "definitivo" | "pre", planoCadastro: number | null = null;
   let pac: Record<string, unknown> | null = null;
+  let cadastro: Sessao["cadastro"];
   try { pac = await api.pacientePorCpf(d.cpf!) as Record<string, unknown> | null; } catch (e) {
     if (!(e instanceof KlingoErro && e.tipo === "paciente_nao_identificado")) throw e;
   }
@@ -104,6 +124,13 @@ async function abrirSessao(api: KlingoApi, rpc: Rpc, p: Pegar, o: { planoDaOfert
     const liberado = dado<boolean>(await rpc("klingo_ativo", { p_conversa: op.conversa_id, p_chave: "klingo_api_pre_cadastro" }));
     if (!liberado) return falha("paciente_novo_nao_liberado");
     if (!d.nome || !d.sexo) return falha("dados_incompletos");
+    // v1.5: antes de criar paciente novo, procura quem já é da clínica por telefone + nascimento (só se ainda não há pré-cadastro guardado para este CPF + nascimento)
+    let achado: string | null = null;
+    if (o.liberarNovo !== false && !(await preGuardado())) {
+      try { achado = await procurarCadastroPorTelefone(api, d); } catch (e) { return falha("busca_cadastro_falhou", e); }
+    }
+    if (achado) { idLogin = achado; tipoId = "definitivo"; cadastro = "achado_telefone"; }
+    else {
     const r = dado<{ acao: string; klingo_id?: string }>(await rpc("klingo_pre_reservar", { p_op: op.id, p_cpf: d.cpf, p_nasc: d.nascimento }));
     if (r.acao === "existente" && r.klingo_id) { idLogin = r.klingo_id; tipoId = "pre"; }
     else if (r.acao === "criar") {
@@ -116,8 +143,9 @@ async function abrirSessao(api: KlingoApi, rpc: Rpc, p: Pegar, o: { planoDaOfert
         return falha("registro_falhou", e);
       }
       await rpc("klingo_pre_gravar", { p_op: op.id, p_cpf: d.cpf, p_nasc: d.nascimento, p_klingo_id: novo.id });
-      idLogin = novo.id; tipoId = "pre";
+      idLogin = novo.id; tipoId = "pre"; cadastro = "pre_novo";
     } else return { estado: "incerto", codigo: "registro_em_andamento_ou_incerto" };
+    }
     }
   }
   if (o.planoDaOferta !== undefined) {
@@ -131,7 +159,7 @@ async function abrirSessao(api: KlingoApi, rpc: Rpc, p: Pegar, o: { planoDaOfert
   const mesmoNome = tipoId === "definitivo" || !d.nome || semAcento(user.nome) === semAcento(d.nome);
   if (String(user.id ?? "") !== idLogin || dataIso(user.nascimento) !== d.nascimento || !mesmoNome) return falha("sessao_nao_confere");
   if (tipoId === "pre" && user.id_paciente) return falha("pre_cadastro_ja_definitivo");
-  return { token, idLogin, tipoId, planoCadastro };
+  return { token, idLogin, tipoId, planoCadastro, ...(cadastro ? { cadastro } : {}) };
 }
 
 const ehResultado = (x: Sessao | Resultado): x is Resultado => "estado" in x;
@@ -198,7 +226,22 @@ export async function executar(api: KlingoApi, rpc: Rpc, p: Pegar, esps: Esp[]):
   return falha("tipo_nao_suportado");
 }
 
+/** v1.5: nota para a equipe sobre a origem do cadastro (nunca dado do paciente). null = nada a avisar. */
+export function notaDoCadastro(cadastro: Resultado["cadastro"], estado: Resultado["estado"]): string | null {
+  if (cadastro === "achado_telefone" && (estado === "sucesso" || estado === "incerto"))
+    return "Klingo: o CPF informado não foi achado, mas o paciente já tem cadastro (achado por telefone, nascimento e nome). A marcação foi feita no cadastro existente; nenhum pré-cadastro novo foi criado.";
+  if (cadastro === "pre_novo")
+    return "Klingo: criado pré-cadastro NOVO (o CPF e telefone + nascimento não acharam cadastro existente). Se o paciente já for da clínica, conferir duplicado e juntar na recepção.";
+  return null;
+}
+
 export async function executarMarcacao(api: KlingoApi, rpc: Rpc, p: Pegar, esps: Esp[]): Promise<Resultado> {
+  const ctx: { cadastro?: Resultado["cadastro"] } = {};
+  const r = await marcarInterno(api, rpc, p, esps, ctx);
+  return ctx.cadastro ? { ...r, cadastro: ctx.cadastro } : r;
+}
+
+async function marcarInterno(api: KlingoApi, rpc: Rpc, p: Pegar, esps: Esp[], ctx: { cadastro?: Resultado["cadastro"] }): Promise<Resultado> {
   const d = p.dados, o = p.oferta, op = p.operacao;
   if (!d.cpf || !d.nascimento || !o || !d.procedimento) return falha("dados_incompletos");
   const remarcacao = op.tipo === "remarcar" ? String(op.detalhe?.remarcacao ?? "") : "";
@@ -208,6 +251,7 @@ export async function executarMarcacao(api: KlingoApi, rpc: Rpc, p: Pegar, esps:
     // 1 a 3) identidade, plano e sessão conferida
     const s = await abrirSessao(api, rpc, p, { planoDaOferta: o.plano, liberarNovo: op.tipo !== "remarcar" });
     if (ehResultado(s)) return s;
+    ctx.cadastro = s.cadastro;
     const token = s.token, plano = o.plano;
 
     // remarcar: o voucher antigo precisa estar entre as marcações ATIVAS desta mesma sessão
