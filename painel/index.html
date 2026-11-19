@@ -3175,9 +3175,10 @@
     ctx.classList.toggle('aberto', S.ctxAberto);
     tg.setAttribute('aria-expanded', String(S.ctxAberto));
     const n = S.ctxN || 0;
-    tg.replaceChildren(h('span', { class: 'rot' }, S.ctxAberto ? 'Esconder detalhes e avisos' : 'Ver detalhes, avisos e fotos desta conversa'),
+    // replaceChildren escreve "null" na tela se receber null: por isso a lista passa pelo filter.
+    tg.replaceChildren(...[h('span', { class: 'rot' }, S.ctxAberto ? 'Esconder detalhes e avisos' : 'Ver detalhes, avisos e fotos desta conversa'),
       n ? h('span', { class: 'ctx-n', role: 'status', 'aria-label': n + ' aviso(s) para conferir' }, n + (n === 1 ? ' aviso' : ' avisos')) : null,
-      h('span', { class: 'seta', 'aria-hidden': 'true' }, '▾'));
+      h('span', { class: 'seta', 'aria-hidden': 'true' }, '▾')].filter(Boolean));
   }
   // "Próximo passo": escolhe, pela ordem do que é mais urgente, a única decisão que falta e leva o atendente até ela.
   // Só lê o que a tela já carregou; não grava nada. Os outros pontos continuam logo abaixo, na área de apoio.
@@ -4860,10 +4861,10 @@ h1.longo { font-size: 14mm; }
             toast(ev.target.checked ? 'Atendimento 100% particular. Convênios não veem este médico no chat.' : 'Voltou a aceitar os convênios marcados.'); recarregarDetalhe().then((ok) => { if (ok) pintarConvenios(); });
           } }), h('b', {}, 'Atendimento 100% particular'));
         desenhar();
-        abas.conv.replaceChildren(
+        abas.conv.replaceChildren(...[
           h('p', { class: 'dica' }, 'Chave ligada = o médico aceita o convênio. Cada clique já vale para os próximos agendamentos pelo chat. Para aceitar o convênio em geral mas não em um exame, use "Não aceitar neste exame". Quem escolhe Particular sempre vê o médico.'),
           temCob ? h('p', { class: 'dica' }, 'Os filtros "Deste médico" e "Da unidade" mostram os convênios que têm preço no Klingo para algum exame do médico (ou da unidade). É um palpite pelas tabelas de preço, não a lista oficial de cobertura. O convênio que você já ajustou aparece sempre. Faltou algum? Use "Todos os convênios".') : null,
-          part, busca, barra, resumo, lista);
+          part, busca, barra, resumo, lista].filter(Boolean));
       }
 
       /* --- C. Folgas e bloqueios por data --- */

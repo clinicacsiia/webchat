@@ -38,7 +38,8 @@ begin
   insert into public.conversa_segredo (conversa_id) values (v_conv);
   if p_por is not null then
     -- aberta pela atendente: já fica com ela e ninguém está esperando resposta
-    update public.conversas set status = 'em_atendimento', agente_id = p_por, cliente_aguarda_desde = null where id = v_conv;
+    update public.conversas set status = 'em_atendimento', agente_id = p_por, cliente_aguarda_desde = null, conta_id = null where id = v_conv;
+    -- 19/11/2026: o gatilho conversas_conta grava no INSERT o login de quem criou; quando é a atendente, a conversa NÃO é da conta de paciente dela (era isso que levava o paciente para o app da atendente).
   end if;
   update public.pmarc_pessoa set conversa_id = v_conv, contato_id = v_contato, atualizado_em = now() where id = p.id;
   return v_conv;
