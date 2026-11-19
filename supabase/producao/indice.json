@@ -10057,6 +10057,56 @@
    "md5": "6858fcf27397e10f78eaa656e7073a37"
   },
   {
+   "nome": "ind_recorrencia_base",
+   "args": [
+    {
+     "nome": "p_ate",
+     "padrao": false
+    },
+    {
+     "nome": "p_teste",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "8131c747f23ca25d4902916c6ab5f7bf"
+  },
+  {
+   "nome": "ind_recorrencia_periodo",
+   "args": [
+    {
+     "nome": "p_de",
+     "padrao": false
+    },
+    {
+     "nome": "p_ate",
+     "padrao": false
+    },
+    {
+     "nome": "p_un",
+     "padrao": false
+    },
+    {
+     "nome": "p_teste",
+     "padrao": false
+    },
+    {
+     "nome": "p_dias",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "45a10c32fe2fdcd4523d5b51887c8a44"
+  },
+  {
    "nome": "jornada_acordar",
    "args": [],
    "definer": true,
@@ -13700,6 +13750,33 @@
    "authenticated": true,
    "publico": false,
    "md5": "55daa897c4ebd347e7047fedb74b3166"
+  },
+  {
+   "nome": "painel_indicadores_recorrencia",
+   "args": [
+    {
+     "nome": "p_de",
+     "padrao": true
+    },
+    {
+     "nome": "p_ate",
+     "padrao": true
+    },
+    {
+     "nome": "p_unidade",
+     "padrao": true
+    },
+    {
+     "nome": "p_incluir_teste",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "3d3eae73989f5b3eef01afe54c5fe5d6"
   },
   {
    "nome": "painel_indicadores_unidade",

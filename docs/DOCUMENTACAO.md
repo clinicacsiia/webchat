@@ -86,7 +86,7 @@ Três ideias que explicam quase tudo:
 | Fila | Fila de chegada da recepção | admin e atendente |
 | Disponibilidade futura (antiga Lista de previsão) | Solicitações de pacientes que pediram aviso quando surgir vaga (NÃO é agendamento nem reserva), com filtros por situação, histórico e "Precisa de pessoa" | admin e atendente |
 | Avisos | "Mesma pessoa?", data de nascimento diferente, paciente × Klingo, pedidos de acesso | admin e atendente |
-| Indicadores | Topo: 5 números em pessoas (pelo dia em que abriram o chat), com filtro de exames e consultas. Depois: "Visão da agenda (marcações)" (pela data do exame: história, confirmar adianta, hoje e próximos dias, dia a dia), por atendente, e o uso do chat do site (funil, onde param) | admin e atendente |
+| Indicadores | Topo: 5 números em pessoas (pelo dia em que abriram o chat), com filtro de exames e consultas. Logo abaixo, **"Quem usa o chat: primeira vez e quem volta"** (19/11/2026, [`indicadores-recorrencia.md`](indicadores-recorrencia.md)): pessoas que usaram, primeira vez, já tinham usado, pessoas cadastradas, acesso rápido e gráfico por dia. Depois: "Visão da agenda (marcações)" (pela data do exame: história, confirmar adianta, hoje e próximos dias, dia a dia), por atendente, e o uso do chat do site (funil, onde param) | admin e atendente |
 | Contatos | Busca e etiquetas (a exportação CSV foi retirada em 19/11/2026, LGPD) | todos (inclusive marketing) |
 | Equipe (com Estrutura) | Contas, convites, equipes/unidades, modo das permissões | admin |
 | Convênios, Médicos, Catálogo, Aprendizado, Configurações | Regras por convênio, turnos e bloqueios de médicos, preços e limpeza do catálogo, incidentes da Sentinela, textos e chaves | admin |
@@ -139,7 +139,7 @@ Números de 11/11/2026 (fim do dia): 101 tabelas, 5 visões, 425 funções, 56 g
 | Convênios e médicos | `convenio_config`, `medico_*`, `profissional_bloqueio` | `convenio_*`, `medico_*` |
 | Jornada (Klingo) | `jornada_paciente`, `jornada_card`, `jornada_exame`, `jornada_evento`, `jornada_tarefa` | `jornada_*` |
 | Equipe e permissões | `agentes`, `org_equipe`, `org_membro`, `permissao_observacao`, `equipe_notificacao` | `org_*`, `equipe_*`, `papel_atual` |
-| Indicadores | `ind_fechamento`, `ind_pessoa_dia`, `ind_conclusao_dia`, `ind_semhumano_dia` | `painel_indicadores_*`, `ind_*` |
+| Indicadores | `ind_fechamento`, `ind_pessoa_dia`, `ind_conclusao_dia`, `ind_semhumano_dia` | `painel_indicadores_*`, `ind_*` (recorrência: `painel_indicadores_recorrencia`, internas `ind_recorrencia_periodo` e `ind_recorrencia_base`) |
 | Conferência Klingo × webchat | `klingo_conferencia` (uma linha por marcação do relatório #14554: origem, ligação com a conversa, campos que divergem ou faltam; sem dado pessoal) | `klingo_conferir_lote`, `klingo_conferir_avisos`, `klingo_conferencia_agendar`, `painel_indicadores_conferencia`; Edge Function `klingo-conferir`; avisos `klingo_conflito` e `klingo_dado_faltando` |
 | Fila de chegada | `fila_chegada`, `fila_aviso`, `push_inscricao` | `fila_*`, `checkin_publico` |
 | Diagnóstico | `incidente_chat` (códigos da Sentinela), `autoencerramento_execucao` | `chat_incidente`, `painel_incidentes` |

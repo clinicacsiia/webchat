@@ -1,5 +1,5 @@
 -- RETRATO DA ESTRUTURA DO BANCO DE PRODUÇÃO (projeto webchat-atendimento). GERADO: não editar à mão.
--- Atualização parcial em 2026-11-19T16:00:26+00:00 (remarcações e ofertas no painel). Retrato inteiro tirado em 2026-11-14T20:32:54.165875+00:00 · Postgres 17.11. Só estrutura: nenhuma linha de tabela, nenhum valor de configuração.
+-- Atualização parcial em 2026-11-19T21:00:00+00:00 (remarcações e ofertas no painel). Retrato inteiro tirado em 2026-11-14T20:32:54.165875+00:00 · Postgres 17.11. Só estrutura: nenhuma linha de tabela, nenhum valor de configuração.
 -- Serve de referência e para os testes. NÃO rodar inteiro sobre a produção. Como refazer: supabase/producao/LEIAME.md.
 
 -- ===== Extensões =====
@@ -2805,6 +2805,7 @@ create policy pacientes_update on public.pacientes as permissive for update to p
 -- concessão a anon: DELETE,INSERT,REFERENCES,TRIGGER,TRUNCATE
 -- concessão a authenticated: DELETE,INSERT,REFERENCES,TRIGGER,TRUNCATE
 -- concessão a service_role: DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+
 
 -- ===== Chaves estrangeiras (depois de todas as tabelas) =====
 alter table public.agendamento_fechamento add constraint agendamento_fechamento_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE CASCADE;
