@@ -11,6 +11,8 @@
 --
 -- BASE: cópia da função que está na PRODUÇÃO (supabase/producao/funcoes/app_chat_dados.sql, 18/11/2026), não do arquivo acesso-rapido-chat.sql (que está mais antigo).
 --
+-- NOTA: o texto da mensagem é montado em v_texto (só os campos que o passo respondeu; CPF mascarado). Aplicada na produção em 19/11/2026 (migração acesso_rapido_chat_dados_na_mensagem); o corpo é idêntico ao do banco.
+--
 -- ROLLBACK: reaplicar supabase/producao/funcoes/app_chat_dados.sql (texto fixo "Usei os dados salvos no meu acesso rápido.").
 -- Pode ser aplicado mais de uma vez (create or replace; sem drop, sem confirmação da ferramenta de migração).
 
@@ -61,7 +63,6 @@ begin
       when v_passo = 'identidade' and v_nasc is not null then jsonb_build_object('dt_nasc', to_char(v_nasc, 'DD/MM/YYYY'))
     end;
     exit when v_valor is null;
-    -- Texto da mensagem do paciente: o que foi usado, com o CPF escondido (mesmo formato do passo dados_ident). Só os campos que este passo respondeu.
     v_texto := concat_ws(E'\n', 'Usei os dados salvos no meu acesso rápido.',
                          case when nullif(btrim(coalesce(v_nome, '')), '') is not null then 'Nome: ' || left(btrim(v_nome), 120) end,
                          case when v_valor ? 'cpf' then 'CPF: ' || public.app_cpf_mascara(v_cpf) end,
