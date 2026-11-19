@@ -251,6 +251,24 @@
     padding: 10px 16px; border-radius: 10px; font-size: calc(15.5px * var(--esc)); z-index: 30; max-width: calc(100% - 32px); text-align: center;
   }
 
+  /* Faixa do topo: instalar o app e ativar os avisos (aparece a cada acesso enquanto faltar) */
+  .faixa-app { flex: none; display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; background: var(--csi-primary-soft); border-bottom: 1px solid #c4e3f3; }
+  .faixa-app[hidden] { display: none; }
+  .faixa-linha { display: flex; align-items: center; gap: 8px; }
+  .faixa-linha[hidden] { display: none; }
+  .faixa-linha .txt { flex: 1; min-width: 0; font-size: calc(15px * var(--esc)); line-height: 1.3; color: var(--csi-sidebar-bg); }
+  .faixa-linha .faixa-btn { flex: none; min-height: 44px; padding: 8px 14px; border: 0; border-radius: 12px; background: var(--csi-primary-strong); color: #fff; font-weight: 700; cursor: pointer; font-size: calc(15px * var(--esc)); }
+  .faixa-linha .faixa-btn:active { background: var(--csi-primary-strong-hover); }
+  .faixa-linha .faixa-x { flex: none; width: 36px; height: 44px; border: 0; background: none; color: var(--texto-suave); font-size: 24px; line-height: 1; cursor: pointer; }
+  .dica-app { position: fixed; inset: 0; z-index: 40; background: rgba(15,42,74,.45); display: flex; align-items: flex-end; justify-content: center; padding: 16px; }
+  .dica-app[hidden] { display: none; }
+  .dica-caixa { background: var(--papel); border-radius: 16px; max-width: 460px; width: 100%; max-height: 85dvh; overflow-y: auto; padding: 18px 18px calc(18px + env(safe-area-inset-bottom)); box-shadow: 0 8px 30px rgba(15,42,74,.3); }
+  .dica-caixa h2 { margin: 0 0 10px; font-size: calc(20px * var(--esc)); color: var(--csi-sidebar-bg); }
+  .dica-caixa ol { margin: 0 0 14px; padding-left: 22px; }
+  .dica-caixa li { margin: 0 0 10px; }
+  .dica-caixa p { margin: 0 0 12px; color: var(--texto-suave); }
+  .dica-caixa .btn-primario { width: 100%; }
+
   /* Widgets dentro das mensagens */
   .aval { margin-top: 10px; }
   .aval-grupo { border: 0; padding: 0; margin: 0 0 14px; min-width: 0; }
@@ -572,6 +590,11 @@
   var st = JSON.parse(localStorage.getItem('csi_acesso_v2') || 'null');   // mesmo nome da tela de boas-vindas do /acesso/: a pessoa vê a continuidade em vez de uma tela em branco
   if (st && typeof st.nome1 === 'string' && st.nome1) { document.getElementById('portaBv').textContent = 'Bem-vindo(a), ' + st.nome1 + '!'; document.getElementById('portaSub').hidden = false; }
 } } catch (e) {}</script>
+<script>
+  // Android/Chrome: guarda o convite de instalação para o botão "Instalar" da faixa (sem a barrinha automática do navegador).
+  window.__csiInstalar = null;
+  addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); window.__csiInstalar = e; document.dispatchEvent(new Event('csi-instalavel')); });
+</script>
 <div class="app" id="app">
   <header class="topo">
     <button class="btn-menu btn-voltar" id="btnVoltarInicio" type="button" aria-label="Voltar ao início" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M12 5l-7 7 7 7"/></svg></button>
@@ -586,6 +609,7 @@
     <button type="button" id="btnAtendente" hidden>Falar com um atendente</button>
     <button type="button" id="btnAcompanhar" hidden>Acompanhe seus pedidos<span class="balao" id="balaoMenu" hidden></span></button>
     <button type="button" id="btnSino" hidden></button>
+    <button type="button" id="btnInstalarMenu" hidden>📲 Instalar o app no celular</button>
     <button type="button" id="btnOutroFilho" hidden>Agendar para outro filho(a)</button>
     <button type="button" id="btnDisponibilidade">Minha disponibilidade</button>
     <button type="button" id="btnLetra">Letra maior</button>
@@ -595,6 +619,19 @@
     <button type="button" id="btnNova">Fazer um novo pedido</button>
     <button type="button" id="btnPrivacidade">Privacidade e termos</button>
     <button type="button" id="btnSair">Sair (não sou eu)</button>
+  </div>
+  <!-- Faixa do topo: instalar o app e ativar os avisos. Volta a cada acesso enquanto o app não estiver instalado ou os avisos não estiverem ligados. -->
+  <div class="faixa-app" id="faixaApp" hidden>
+    <div class="faixa-linha" id="faixaInstalar" hidden>
+      <span class="txt" id="faixaInstalarTxt">📲 Instale o app da CSI no seu celular.</span>
+      <button type="button" class="faixa-btn" id="btnInstalar">Instalar</button>
+      <button type="button" class="faixa-x" id="faixaInstalarX" aria-label="Fechar por agora">&times;</button>
+    </div>
+    <div class="faixa-linha" id="faixaAvisos" hidden>
+      <span class="txt" id="faixaAvisosTxt">🔔 Ative os avisos para saber na hora quando a clínica responder.</span>
+      <button type="button" class="faixa-btn" id="btnAtivarAvisos">Ativar avisos</button>
+      <button type="button" class="faixa-x" id="faixaAvisosX" aria-label="Fechar por agora">&times;</button>
+    </div>
   </div>
 
   <!-- Tela 1: dados iniciais -->
@@ -701,6 +738,13 @@
   </div>
 </div>
 <div class="toast" id="toast" role="status" hidden></div>
+<div class="dica-app" id="dicaApp" hidden>
+  <div class="dica-caixa" role="dialog" aria-modal="true" aria-labelledby="dicaAppTitulo">
+    <h2 id="dicaAppTitulo"></h2>
+    <div id="dicaAppCorpo"></div>
+    <button type="button" class="btn-primario" id="dicaAppOk">Entendi</button>
+  </div>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="sentinela.js"></script>
@@ -717,7 +761,7 @@
   const CHAVE_HIST = 'webchat.historico.v1';   // as últimas conversas deste aparelho (cada uma com o seu token): dá para voltar a elas
   const MAX_HIST = 5;                          // mínimo pedido: 3
   // Muda a cada alteração do chat. Cópia de mensagens guardada por outra versão é descartada (era isso que mostrava conversa velha e travada).
-  const VERSAO_APP = '2026.11.19-3';
+  const VERSAO_APP = '2026.11.19-4';
   // Mesmas regras do banco (fluxo_nome_ok, fluxo_telefone_ok, fluxo_email_ok): o banco confere de novo, aqui é só para avisar logo.
   const LET = 'A-Za-zÀ-ÖØ-öø-ÿ';
   const nomeCompletoOk = (v) => { const t = String(v || '').trim(); return t.length >= 5 && t.length <= 120 && new RegExp(`^[${LET}][${LET}'’.-]*( +[${LET}][${LET}'’.-]*)+$`).test(t) && t.split(/ +/).filter((w) => w.replace(new RegExp(`[^${LET}]`, 'g'), '').length >= 2).length >= 2; };
@@ -1322,9 +1366,144 @@
   }
   // Pede a permissão logo que a conversa começa (o toque em "Começar" vale como gesto, exigido por Safari/iPhone) e já inscreve o aparelho.
   // Tem que ser chamado direto no toque (antes de qualquer espera); devolve uma promessa que termina quando a pessoa responde.
+  // Um pedido de cada vez: o primeiro toque da tela e o botão podem chamar juntos; os dois esperam a mesma resposta.
+  let pedidoAvisos = null;
   function pedirAvisos() {
     if (!pushPossivel() || Notification.permission !== 'default') return Promise.resolve();
-    try { return Promise.resolve(Notification.requestPermission()).catch(() => {}); } catch { return Promise.resolve(); }
+    if (pedidoAvisos) return pedidoAvisos;
+    try { pedidoAvisos = Promise.resolve(Notification.requestPermission()).catch(() => {}).finally(() => { pedidoAvisos = null; }); return pedidoAvisos; } catch { return Promise.resolve(); }
+  }
+
+  /* ---------- instalar o app e ativar os avisos: a faixa do topo volta a cada acesso enquanto faltar ----------
+     Android/Chrome: o botão "Instalar" abre o convite do próprio navegador; sem convite (Samsung, Firefox, já recusado), mostra o passo a passo.
+     iPhone: não existe convite; o botão mostra o passo a passo (Compartilhar > Adicionar à Tela de Início). No iPhone os avisos só existem com o app instalado.
+     Avisos: a cada acesso (abrir, voltar para a página, fechar e abrir o navegador) sem permissão, a faixa aparece e o primeiro toque na tela pede a permissão.
+     Bloqueado no aparelho: o navegador não deixa pedir de novo; a faixa mostra como liberar. */
+  const UA = navigator.userAgent || '';
+  const ehIOS = /iphone|ipad|ipod/i.test(UA) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const ehAndroid = /android/i.test(UA);
+  const ehCelular = ehIOS || ehAndroid || /mobile/i.test(UA);
+  const navDeOutroApp = /FBAN|FBAV|FB_IAB|Instagram|Line\/|TikTok|; wv\)/i.test(UA);   // navegador de dentro do Instagram/Facebook: não instala
+  function appInstalado() {
+    try { if (matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: fullscreen)').matches || matchMedia('(display-mode: minimal-ui)').matches) return true; } catch { /* ignora */ }
+    return navigator.standalone === true;
+  }
+  const fechadoAgora = { instalar: false, avisos: false };   // o "×" esconde só até o próximo acesso
+  let pedidoNesteAcesso = false, escondidaEm = 0;
+  function estadoAvisos() {
+    if (!pushPossivel()) return null;
+    const p = Notification.permission;
+    return p === 'granted' ? null : p === 'denied' ? 'bloqueado' : 'pedir';
+  }
+  function atualizarFaixaApp() {
+    const fx = $('#faixaApp'); if (!fx) return;
+    const instalado = appInstalado(), podeInstalar = !instalado && (!!window.__csiInstalar || ehCelular);
+    $('#faixaInstalarTxt').textContent = ehIOS && !instalado ? '📲 Instale o app da CSI. No iPhone, os avisos só chegam com o app instalado.' : '📲 Instale o app da CSI no seu celular.';
+    $('#faixaInstalar').hidden = !podeInstalar || fechadoAgora.instalar;
+    $('#btnInstalarMenu').hidden = !podeInstalar;
+    const av = estadoAvisos(), linha = $('#faixaAvisos');
+    linha.dataset.estado = av || '';
+    $('#faixaAvisosTxt').textContent = av === 'bloqueado' ? '🔕 Os avisos estão bloqueados neste celular. Libere para saber quando a clínica responder.' : '🔔 Ative os avisos para saber na hora quando a clínica responder.';
+    $('#btnAtivarAvisos').textContent = av === 'bloqueado' ? 'Como liberar' : 'Ativar avisos';
+    linha.hidden = !av || fechadoAgora.avisos;
+    fx.hidden = $('#faixaInstalar').hidden && linha.hidden;
+  }
+  function depoisDosAvisos() {
+    if (pushPossivel() && Notification.permission === 'granted') assinarPush();
+    atualizarFaixaApp(); atualizarSino();
+  }
+  async function ativarAvisos() {
+    if (estadoAvisos() === 'bloqueado') return mostrarDica('liberar');
+    await pedirAvisos();
+    const p = pushPossivel() ? Notification.permission : '';
+    if (p === 'granted') toast('Avisos ligados.');
+    else if (p === 'denied') mostrarDica('liberar');
+    else toast('Os avisos ainda não foram ligados. Toque em "Ativar avisos" para ligar.');
+    depoisDosAvisos();
+  }
+  // Primeiro toque de cada acesso: pede a permissão (o navegador só deixa pedir depois de um toque). Links e a própria faixa ficam de fora.
+  function pedirNoPrimeiroToque(e) {
+    if (pedidoNesteAcesso || estadoAvisos() !== 'pedir') return;
+    const alvo = e.target && e.target.closest ? e.target : null;
+    if (alvo && alvo.closest('a, #faixaApp, #dicaApp, input[type="file"], #btnAnexo')) return;
+    pedidoNesteAcesso = true;
+    pedirAvisos().then(depoisDosAvisos);
+  }
+  async function instalarApp() {
+    fecharMenu();
+    const ev = window.__csiInstalar;
+    if (!ev) return mostrarDica('instalar');
+    window.__csiInstalar = null;   // o convite só vale uma vez; o navegador manda outro no próximo acesso
+    try {
+      await ev.prompt();
+      const r = await ev.userChoice;
+      if (r && r.outcome === 'accepted') { fechadoAgora.instalar = true; toast('Pronto! O app da CSI vai aparecer na tela do seu celular.'); }
+    } catch { mostrarDica('instalar'); }
+    atualizarFaixaApp();
+  }
+  function mostrarDica(tipo) {
+    const b = (t) => h('b', null, t), corpo = [];
+    let titulo;
+    if (tipo === 'liberar') {
+      titulo = 'Como liberar os avisos';
+      if (ehIOS) corpo.push(h('ol', null,
+        h('li', null, 'Abra os ', b('Ajustes'), ' do iPhone.'),
+        h('li', null, 'Toque em ', b('Notificações'), ' e depois em ', b('CSI'), '.'),
+        h('li', null, 'Ligue ', b('Permitir Notificações'), ' e volte para o app.')));
+      else if (appInstalado()) corpo.push(h('ol', null,
+        h('li', null, 'Toque e segure o ícone da ', b('CSI'), ' na tela do celular.'),
+        h('li', null, 'Toque em ', b('Informações do app'), ' (ⓘ) e depois em ', b('Notificações'), '.'),
+        h('li', null, 'Ligue ', b('Permitir notificações'), ' e volte para o app.')));
+      else corpo.push(h('ol', null,
+        h('li', null, 'Toque no ', b('cadeado'), ' (ou no ícone ao lado do endereço do site, lá em cima).'),
+        h('li', null, 'Toque em ', b('Permissões'), ' ou ', b('Configurações do site'), '.'),
+        h('li', null, 'Em ', b('Notificações'), ', escolha ', b('Permitir'), ' e volte para cá.')));
+    } else if (ehIOS) {
+      titulo = 'Instalar no iPhone';
+      corpo.push(h('ol', null,
+        h('li', null, 'Se abriu pelo WhatsApp, Instagram ou outro app, toque primeiro em ', b('⋯'), ' ou na ', b('bússola'), ' e escolha ', b('Abrir no Safari'), '.'),
+        h('li', null, 'Toque no botão ', b('Compartilhar'), ' (o quadrado com a seta para cima ⬆️). No Safari fica na barra de baixo (ou dentro do ', b('⋯'), '); no Chrome, no alto à direita.'),
+        h('li', null, 'Role a lista e toque em ', b('Adicionar à Tela de Início'), '.'),
+        h('li', null, 'Toque em ', b('Adicionar'), '. O ícone da CSI aparece na tela do iPhone.'),
+        h('li', null, 'Abra a CSI ', b('pelo ícone'), ' e toque em ', b('Ativar avisos'), '.')));
+    } else {
+      titulo = 'Instalar no celular';
+      corpo.push(h('ol', null,
+        navDeOutroApp ? h('li', null, 'Toque nos ', b('três pontinhos (⋮)'), ' e escolha ', b('Abrir no Chrome'), ' (ou no navegador).') : null,
+        h('li', null, 'Toque nos ', b('três pontinhos (⋮)'), ' no canto de cima do navegador.'),
+        h('li', null, 'Escolha ', b('Instalar app'), ' ou ', b('Adicionar à tela inicial'), '.'),
+        h('li', null, 'Confirme em ', b('Instalar'), '. Depois abra a CSI pelo ícone na tela do celular.')),
+        h('p', null, 'Se o app já está instalado, é só abrir pelo ícone da CSI.'));
+    }
+    $('#dicaAppTitulo').textContent = titulo;
+    $('#dicaAppCorpo').replaceChildren(...corpo);
+    $('#dicaApp').hidden = false;
+    $('#dicaAppOk').focus();
+  }
+  function fecharDica() { $('#dicaApp').hidden = true; }
+  // Volta a valer como "novo acesso": página reaberta da memória do navegador ou de volta depois de ficar escondida.
+  function novoAcessoApp() { fechadoAgora.avisos = false; pedidoNesteAcesso = false; atualizarFaixaApp(); }
+  function iniciarFaixaApp() {
+    $('#btnInstalar').addEventListener('click', instalarApp);
+    $('#btnInstalarMenu').addEventListener('click', instalarApp);
+    $('#btnAtivarAvisos').addEventListener('click', ativarAvisos);
+    $('#faixaInstalarX').addEventListener('click', () => { fechadoAgora.instalar = true; atualizarFaixaApp(); });
+    $('#faixaAvisosX').addEventListener('click', () => { fechadoAgora.avisos = true; atualizarFaixaApp(); });
+    $('#dicaAppOk').addEventListener('click', fecharDica);
+    $('#dicaApp').addEventListener('click', (e) => { if (e.target.id === 'dicaApp') fecharDica(); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('#dicaApp').hidden) fecharDica(); });
+    document.addEventListener('click', pedirNoPrimeiroToque, true);
+    document.addEventListener('csi-instalavel', atualizarFaixaApp);
+    addEventListener('appinstalled', () => { window.__csiInstalar = null; fechadoAgora.instalar = true; atualizarFaixaApp(); });
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) { escondidaEm = Date.now(); return; }
+      if (escondidaEm && Date.now() - escondidaEm > 5000) novoAcessoApp(); else atualizarFaixaApp();   // 5 s: a câmera e a janela de permissão não contam como sair
+    });
+    addEventListener('pageshow', (e) => { if (e.persisted) novoAcessoApp(); });
+    try {
+      if (navigator.permissions && navigator.permissions.query) navigator.permissions.query({ name: 'notifications' }).then((st) => { st.onchange = depoisDosAvisos; }).catch(() => {});
+    } catch { /* ignora */ }
+    atualizarFaixaApp();
   }
 
   /* ---------- ações ---------- */
@@ -3738,6 +3917,7 @@
     el.empresa.textContent = config.nome_empresa === NOME_CLINICA ? 'CSI · Clínica de Saúde e Imagem' : config.nome_empresa;
     if (config.boas_vindas && config.boas_vindas.length <= 90) el.boasForm.textContent = config.boas_vindas;
     aplicarEntrada();
+    iniciarFaixaApp();
     iniciarSentinela();
     if (conv && conv.id && conv.token) { registrarHistorico(conv); abrirChat(); } else mostrarForm();   // registrar: conversa de antes desta versão entra na lista
     iniciarConta();   // sem esperar: o formulário já está na tela; a conta (se existir) refaz o formulário quando chegar
