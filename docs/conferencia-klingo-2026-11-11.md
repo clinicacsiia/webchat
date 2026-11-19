@@ -14,3 +14,8 @@ Correção: quando o prontuário já foi conferido (CPF + nascimento), a marcaç
 - "Ao vivo" de verdade depende do que o Klingo permite: ele só deixa ler por relatório, então a leitura é a cada 30 s (reconhecer e Jornada) e a conferência a cada 15 s. Não há aviso do Klingo para o nosso sistema.
 - Paciente que chama no chat **sem** informar CPF e nascimento só é reconhecido pelo nome completo + exame, e só para marcação feita depois da conversa.
 - Publicar as duas Edge Functions no Supabase (`sync-catalogo-klingo` e `klingo-reconhecer`).
+
+## Causa 3: aviso falso de "remarcada" entre irmãs (19/11/2026)
+Duas filhas da mesma mãe, mesmo celular, mesmo médico, mesmo dia: a atendente lançou uma às 07:45 e o chat lançou a outra às 08:00. A conferência reconhecia o paciente **só pelo telefone**, então achou a marcação da irmã e avisou "Marcação remarcada no Klingo", como se fosse a mesma criança.
+**Correção** (`sync-catalogo-klingo/conferencia.ts`): o aviso de divergência ("remarcada" / "outro exame") agora só vale quando o **nome também confere** (ou quando o Klingo veio sem nome). Telefone igual com nome diferente não gera aviso. A **confirmação** do horário (verde) continua aceitando telefone, como antes. Testes novos em `conferencia.test.ts` (24 passam). **Falta publicar a Edge Function `sync-catalogo-klingo`** (arquivos `index.ts`, `conferencia.ts`, `precos.ts`).
+Efeito colateral aceito: se a atendente digitar o nome com erro grave no Klingo, em vez de "remarcada" o chat avisa "sumiu"/"não apareceu" (também alerta).

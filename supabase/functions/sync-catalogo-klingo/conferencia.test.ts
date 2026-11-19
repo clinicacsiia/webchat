@@ -86,6 +86,23 @@ test("paciente com o mesmo exame em outro horário: divergência com data e sala
   assert.match(r.div ?? "", /06\/11 14:30 \(Dr Joao Lima, CLÍNICA DE SAÚDE E IMAGEM - UNIDADE A\)/);
 });
 
+test("irmã com o mesmo telefone em outro horário NÃO gera aviso de remarcação (caso das duas filhas)", () => {
+  // Pedido da Ana Maria às 10:00; a atendente marcou OUTRA pessoa do mesmo telefone (nome diferente) às 10:15 com o mesmo exame.
+  const irma = linha({ Data_Atendimento: "2026-11-06T10:15:00", Paciente: "Ana Luiza Souza" });
+  const r = avaliar(alvo(), [irma]);
+  assert.equal(r.div, null);
+  assert.equal(r.slots[0].r, "livre");
+  // também na janela dos próximos dias
+  assert.equal(avaliar(alvo(), [], [linha({ Data_Atendimento: "2026-11-20T10:15:00", Paciente: "Ana Luiza Souza" })]).div, null);
+  // e outro exame da irmã no mesmo horário não vira "outro exame"
+  assert.equal(avaliar(alvo(), [linha({ Paciente: "Ana Luiza Souza", Procedimento: "ULTRASSONOGRAFIA DE ABDOME" })]).div, null);
+});
+
+test("mesma pessoa (nome igual) em outro horário continua gerando aviso; telefone sem nome no Klingo também", () => {
+  assert.match(avaliar(alvo(), [linha({ Data_Atendimento: "2026-11-06T10:15:00" })]).div ?? "", /06\/11 10:15/);
+  assert.match(avaliar(alvo(), [linha({ Data_Atendimento: "2026-11-06T10:15:00", Paciente: "" })]).div ?? "", /06\/11 10:15/);
+});
+
 test("ordem de chegada: qualquer hora do dia vale e nunca é 'outro'", () => {
   const a = alvo({ slots: [{ idx: 0, data: "2026-11-06", hora: "07:00", prof: "DR JOAO LIMA", unidade: "CLINICA DE SAUDE E IMAGEM UNIDADE A", chegada: true, min: 5 }] });
   assert.equal(avaliar(a, [linha({ Data_Atendimento: "2026-11-06T09:20:00" })]).slots[0].r, "ok");

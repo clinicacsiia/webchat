@@ -63,6 +63,12 @@ export function avaliar(alvo: Alvo, linhas: Linha[], janela: Linha[] = []): Resu
     const nomeLinha = normNome(l.nome);
     return nomeLinha && alvo.procs.length > 0 && alvo.nomes.some((x) => normNome(x) === nomeLinha) ? "nome" : null;
   };
+  // Aviso de divergência ("remarcada", "outro exame") é um alarme para a equipe: só vale para a MESMA pessoa. Telefone igual com nome
+  // diferente costuma ser irmão/irmã ou o próprio responsável (mesmo celular), então não gera aviso. Se o Klingo veio sem nome, vale o telefone.
+  const mesmaPessoa = (l: Linha): boolean => {
+    const v = paciente(l);
+    return v === "ambos" || v === "nome" || (v === "telefone" && !normNome(l.nome));
+  };
   // Horário reconhecido direto do Klingo (origem 'klingo', relatório #13825) não traz médico e a unidade vem com nome curto ("DESENVOAR"),
   // diferente do #7. Médico ou unidade vazios não restringem; unidade igual ou contida no outro nome vale (antes isso gerava "sumiu do Klingo" falso).
   const unidadeBate = (a: string, b: string) => !a || !b || a === b || a.includes(b) || b.includes(a);
@@ -84,7 +90,7 @@ export function avaliar(alvo: Alvo, linhas: Linha[], janela: Linha[] = []): Resu
   let div: string | null = null;
   if (alvo.procs.length > 0) {
     for (const l of [...linhas].sort((a, b) => (a.ini < b.ini ? -1 : 1))) {
-      if (!paciente(l)) continue;
+      if (!mesmaPessoa(l)) continue;
       const pos = alvo.slots.some((s) => naPosicao(l, s));
       const procOk = procBate(l);
       if (pos && !procOk) { div = `No horário escolhido, a marcação deste paciente é de outro exame: ${l.proc || "não informado"}.`; break; }
@@ -99,7 +105,7 @@ export function avaliar(alvo: Alvo, linhas: Linha[], janela: Linha[] = []): Resu
   if (!div && alvo.procs.length > 0 && slots.some((x) => x.r !== "ok")) {
     for (const l of [...janela].sort((a, b) => (a.ini < b.ini ? -1 : 1))) {
       const v = paciente(l);
-      if (!v || !procBate(l) || (v === "nome" && !procExato(l))) continue;
+      if (!v || !mesmaPessoa(l) || !procBate(l) || (v === "nome" && !procExato(l))) continue;
       if (alvo.slots.some((s) => naPosicao(l, s))) continue;
       div = `Este paciente tem ${l.proc || "o exame"} marcado em ${dataBR(l.ini)} (${l.profOrig}, ${l.unidadeOrig}), em outra data ou hora que a escolhida no chat.`;
       break;
