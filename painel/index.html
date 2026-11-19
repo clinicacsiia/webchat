@@ -5277,8 +5277,8 @@ h1.longo { font-size: 14mm; }
       return h('div', {},
         i && perda > 0 ? h('div', { class: 'ind-perda' + (i === piorI ? ' forte' : '') }, `↓ ${nf(perda)} pessoa${perda === 1 ? '' : 's'} pararam aqui (${pTxt(taxa(perda, ant))})${i === piorI ? ' · maior queda' : ''}`) : null,
         barra(rot, v, maxFun, `${nf(v)} · ${pTxt(taxa(v, entA))}`, i === PASSOS_FUNIL.length - 1 ? 'verde' : 'azul'),
-        // 18/11/2026: o último passo é "o chat deu como agendado" (sem prova do Klingo); abaixo, quantos têm a marcação confirmada no Klingo (mesmo número do cartão "Agendaram, confirmado no Klingo").
-        i === PASSOS_FUNIL.length - 1 && PES ? h('p', { class: 'dica ind-funil-klingo' }, `${nf(Math.min(PES.atual.agendaram || 0, v))} confirmados no Klingo · ${nf(Math.max(v - (PES.atual.agendaram || 0), 0))} sem confirmação`) : null);
+        // 18/11/2026: o último passo é "o chat deu como agendado" (sem prova do Klingo); abaixo, quantos têm a marcação confirmada no Klingo (mesmo número do cartão "Agendaram, confirmado no Klingo"). Some quando o filtro "Só consultas/Só exames" está ligado: o funil é de todos os tipos e o cartão seria só de um.
+        i === PASSOS_FUNIL.length - 1 && PES && !IND.tipo ? h('p', { class: 'dica ind-funil-klingo' }, `${nf(Math.min(PES.atual.agendaram || 0, v))} confirmados no Klingo · ${nf(Math.max(v - (PES.atual.agendaram || 0), 0))} sem confirmação`) : null);
     }).concat((FA.agendaram_so_pelo_motivo || 0) > 0 ? [h('p', { class: 'dica' }, `${nf(FA.agendaram_so_pelo_motivo)} pessoa${FA.agendaram_so_pelo_motivo === 1 ? ' foi encerrada' : 's foram encerradas'} como "Agendado", mas o pedido não está agendado (ficou em rascunho). ${FA.agendaram_so_pelo_motivo === 1 ? 'Ela conta' : 'Elas contam'} em "Chat deu como agendado" e não nas etapas do meio, por isso esse passo pode passar do anterior.`)] : []));
     const etapas = ETAPAS_PAROU.map(([k, rot]) => [rot, (CA.parou_em || {})[k] || 0]);
     const maxEt = Math.max(1, ...etapas.map((x) => x[1])), totEt = etapas.reduce((s, x) => s + x[1], 0);

@@ -256,8 +256,9 @@ await caso('Filtro "Só exames": os 5 números e a história das marcações pas
   await t.page.click('.ind-tipo .chip >> text=Só exames'); await t.page.waitForFunction(() => [...document.querySelectorAll('.ind-kpi')].find((x) => x.querySelector('.ind-kpi-rot').textContent === 'Procuraram o chat')?.querySelector('b').textContent === '8');
   const k = await kpiTxt(t); const ped = ultimo(t.reg, 'pessoas'); const txt = await textoAba(t);
   const hist = await t.page.locator('.ind-painel', { hasText: 'A história das marcações' }).first().locator('.ind-rot').allInnerTexts();
+  const funilTxt = await t.page.locator('.ind-painel', { hasText: 'Caminho do paciente no chat' }).first().innerText();
   await t.ctx.close();
-  return { ok: ped.p_tipo === 'exame' && k['Procuraram o chat'].startsWith('8 | pessoas que começaram um pedido de exame') && k['Agendaram, confirmado no Klingo'].startsWith('1 |') && /Filtro "Só exames"/.test(txt) && hist[0] === '1. Agendados', detalhe: JSON.stringify(k['Procuraram o chat']) + ' ' + hist.join(',') };
+  return { ok: !/confirmados no Klingo/.test(funilTxt) && ped.p_tipo === 'exame' && k['Procuraram o chat'].startsWith('8 | pessoas que começaram um pedido de exame') && k['Agendaram, confirmado no Klingo'].startsWith('1 |') && /Filtro "Só exames"/.test(txt) && hist[0] === '1. Agendados', detalhe: JSON.stringify(k['Procuraram o chat']) + ' ' + hist.join(',') };
 });
 await caso('Sem a função dos 5 números no banco: avisa o arquivo a aplicar e o resto da aba continua', async () => {
   const t = await abrir({ semPessoas: true }); await abaInd(t);
