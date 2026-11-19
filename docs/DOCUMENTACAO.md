@@ -70,6 +70,7 @@ Três ideias que explicam quase tudo:
 | `manifest.webmanifest`, `icon-*.png`, `img/` | Instalação como aplicativo e logos. |
 | `LEIAME.md` | Porta de entrada do repositório (resumo e histórico). |
 | `CLAUDE.md` | Preferências do dono para quem trabalha no projeto. **Ler antes de qualquer tarefa.** |
+| `docs/lgpd.md` | LGPD: decisões de 19/11/2026, como atender um pedido de eliminação, resposta a incidente, RIPD resumido e o que falta. |
 | `pendencias.md`, `pendencias_ui_csi.md` | Listas antigas de conformidade (LGPD, acessibilidade) e de interface. O que ainda vale está em `docs/pendencias-do-dono.md`. |
 
 ### 3.2 `painel/`
@@ -86,7 +87,7 @@ Três ideias que explicam quase tudo:
 | Disponibilidade futura (antiga Lista de previsão) | Solicitações de pacientes que pediram aviso quando surgir vaga (NÃO é agendamento nem reserva), com filtros por situação, histórico e "Precisa de pessoa" | admin e atendente |
 | Avisos | "Mesma pessoa?", data de nascimento diferente, paciente × Klingo, pedidos de acesso | admin e atendente |
 | Indicadores | Topo: 5 números em pessoas (pelo dia em que abriram o chat), com filtro de exames e consultas. Depois: "Visão da agenda (marcações)" (pela data do exame: história, confirmar adianta, hoje e próximos dias, dia a dia), por atendente, e o uso do chat do site (funil, onde param) | admin e atendente |
-| Contatos | Busca, etiquetas, exportação CSV | todos (inclusive marketing) |
+| Contatos | Busca e etiquetas (a exportação CSV foi retirada em 19/11/2026, LGPD) | todos (inclusive marketing) |
 | Equipe (com Estrutura) | Contas, convites, equipes/unidades, modo das permissões | admin |
 | Convênios, Médicos, Catálogo, Aprendizado, Configurações | Regras por convênio, turnos e bloqueios de médicos, preços e limpeza do catálogo, incidentes da Sentinela, textos e chaves | admin |
 

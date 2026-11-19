@@ -138,20 +138,6 @@
    "politicas": 1
   },
   {
-   "nome": "assinatura_tentativas",
-   "colunas": [
-    "id",
-    "atendimento_id",
-    "numero",
-    "score_similaridade",
-    "ip_origem",
-    "user_agent",
-    "created_at"
-   ],
-   "rls": true,
-   "politicas": 1
-  },
-  {
    "nome": "atendimento_tipo",
    "colunas": [
     "chave",
@@ -1711,31 +1697,6 @@
    "politicas": 0
   },
   {
-   "nome": "pacientes",
-   "colunas": [
-    "id",
-    "nome",
-    "nome_norm",
-    "telefones",
-    "email",
-    "dt_nasc",
-    "cpf",
-    "dados",
-    "validado",
-    "validado_em",
-    "revisar",
-    "origem_conversa",
-    "criado_em",
-    "atualizado_em",
-    "ultima_visita_em",
-    "email_cadastro",
-    "perfil_biometrico_historico",
-    "assinatura_papel_path"
-   ],
-   "rls": true,
-   "politicas": 2
-  },
-  {
    "nome": "pedido_previsao",
    "colunas": [
     "conversa_id",
@@ -1893,25 +1854,6 @@
    ],
    "rls": true,
    "politicas": 0
-  },
-  {
-   "nome": "registro_assinaturas",
-   "colunas": [
-    "id",
-    "atendimento_id",
-    "email_confirmado_transacao",
-    "hash_documento",
-    "consentimento_biometrico",
-    "tipo_validacao",
-    "score_similaridade",
-    "vetor_traco_bruto",
-    "caracteristicas",
-    "ip_origem",
-    "user_agent",
-    "created_at"
-   ],
-   "rls": true,
-   "politicas": 1
   },
   {
    "nome": "respostas_prontas",
@@ -2377,6 +2319,42 @@
    ],
    "rls": true,
    "politicas": 0
+  },
+  {
+   "nome": "lgpd_pedido",
+   "colunas": [
+    "id",
+    "criado_em",
+    "tipo",
+    "ident_hash",
+    "por",
+    "resumo"
+   ],
+   "rls": true,
+   "politicas": 0
+  },
+  {
+   "nome": "pacientes",
+   "colunas": [
+    "id",
+    "nome",
+    "nome_norm",
+    "telefones",
+    "email",
+    "dt_nasc",
+    "cpf",
+    "dados",
+    "validado",
+    "validado_em",
+    "revisar",
+    "origem_conversa",
+    "criado_em",
+    "atualizado_em",
+    "ultima_visita_em",
+    "email_cadastro"
+   ],
+   "rls": true,
+   "politicas": 2
   }
  ],
  "visoes": [
@@ -2610,8 +2588,6 @@
   "CREATE TRIGGER agendamento_remarcacao_feita AFTER UPDATE OF status ON public.pre_agendamentos FOR EACH ROW EXECUTE FUNCTION agendamento_remarcacao_feita_trg()",
   "CREATE TRIGGER app_resultado_arquivo_trg AFTER INSERT ON public.conversa_anexo FOR EACH ROW EXECUTE FUNCTION public.app_resultado_entregar_trg()",
   "CREATE TRIGGER app_resultado_mensagem_trg AFTER INSERT ON public.mensagens FOR EACH ROW EXECUTE FUNCTION public.app_resultado_entregar_trg()",
-  "CREATE TRIGGER assinatura_tentativas_imutavel BEFORE DELETE OR UPDATE ON public.assinatura_tentativas FOR EACH ROW EXECUTE FUNCTION registro_imutavel_trg()",
-  "CREATE TRIGGER assinatura_tentativas_sem_truncate BEFORE TRUNCATE ON public.assinatura_tentativas FOR EACH STATEMENT EXECUTE FUNCTION registro_imutavel_trg()",
   "CREATE TRIGGER atendimentos_fila_avisar AFTER INSERT OR DELETE OR UPDATE OF status, bloqueado_em ON public.atendimentos FOR EACH ROW EXECUTE FUNCTION fila_avisar_trg()",
   "CREATE TRIGGER atendimentos_transicao BEFORE UPDATE ON public.atendimentos FOR EACH ROW EXECUTE FUNCTION atendimentos_transicao_trg()",
   "CREATE TRIGGER catalogo_agenda_hash BEFORE INSERT ON public.catalogo_agenda FOR EACH ROW EXECUTE FUNCTION catalogo_agenda_hash_trg()",
@@ -2673,8 +2649,6 @@
   "CREATE TRIGGER pre_agendamento_valida_paciente AFTER UPDATE ON public.pre_agendamentos FOR EACH ROW EXECUTE FUNCTION pre_agendamento_valida_paciente_trg()",
   "CREATE TRIGGER pre_agendamento_vincula_conta AFTER INSERT OR UPDATE OF paciente_id ON public.pre_agendamentos FOR EACH ROW EXECUTE FUNCTION pre_agendamento_vincula_conta_trg()",
   "CREATE TRIGGER pre_agendamentos_zz_autoria BEFORE UPDATE OF status ON public.pre_agendamentos FOR EACH ROW EXECUTE FUNCTION pre_agendamento_autoria_trg()",
-  "CREATE TRIGGER registro_assinaturas_imutavel BEFORE DELETE OR UPDATE ON public.registro_assinaturas FOR EACH ROW EXECUTE FUNCTION registro_imutavel_trg()",
-  "CREATE TRIGGER registro_assinaturas_sem_truncate BEFORE TRUNCATE ON public.registro_assinaturas FOR EACH STATEMENT EXECUTE FUNCTION registro_imutavel_trg()",
   "CREATE TRIGGER vinculo_log_imutavel BEFORE DELETE OR UPDATE ON public.vinculo_log FOR EACH ROW EXECUTE FUNCTION org_log_imutavel_trg()"
  ],
  "tempo_real": [
@@ -5334,68 +5308,6 @@
    "authenticated": true,
    "publico": false,
    "md5": "4d20b2a7aa5e729af3e9b8e1107c9223"
-  },
-  {
-   "nome": "assinatura_contexto",
-   "args": [
-    {
-     "nome": "p_segredo",
-     "padrao": false
-    },
-    {
-     "nome": "p_token",
-     "padrao": false
-    },
-    {
-     "nome": "p_hash",
-     "padrao": false
-    }
-   ],
-   "definer": true,
-   "gatilho": false,
-   "anon": true,
-   "authenticated": true,
-   "publico": false,
-   "md5": "2badbbf8a84b6155e578c03e2bb8d5be"
-  },
-  {
-   "nome": "assinatura_registrar",
-   "args": [
-    {
-     "nome": "p_segredo",
-     "padrao": false
-    },
-    {
-     "nome": "p_token",
-     "padrao": false
-    },
-    {
-     "nome": "p_hash",
-     "padrao": false
-    },
-    {
-     "nome": "p_resultado",
-     "padrao": false
-    },
-    {
-     "nome": "p_pontos",
-     "padrao": false
-    },
-    {
-     "nome": "p_ip",
-     "padrao": false
-    },
-    {
-     "nome": "p_user_agent",
-     "padrao": false
-    }
-   ],
-   "definer": true,
-   "gatilho": false,
-   "anon": true,
-   "authenticated": true,
-   "publico": false,
-   "md5": "65313208de1c672803ace8f29b359c93"
   },
   {
    "nome": "atendimento_hora_gravar",
@@ -8416,40 +8328,6 @@
    "authenticated": false,
    "publico": false,
    "md5": "7da980d045f18b5355f1bf76c60e596b"
-  },
-  {
-   "nome": "fila_cancelar_assinatura",
-   "args": [
-    {
-     "nome": "p_atendimento",
-     "padrao": false
-    }
-   ],
-   "definer": true,
-   "gatilho": false,
-   "anon": false,
-   "authenticated": true,
-   "publico": false,
-   "md5": "5b0e7f6a72210365f9bb73e094ae51b6"
-  },
-  {
-   "nome": "fila_chamar_assinatura",
-   "args": [
-    {
-     "nome": "p_atendimento",
-     "padrao": false
-    },
-    {
-     "nome": "p_texto",
-     "padrao": false
-    }
-   ],
-   "definer": true,
-   "gatilho": false,
-   "anon": false,
-   "authenticated": true,
-   "publico": false,
-   "md5": "239efbedc2f0b6cd82418ddcd678a65f"
   },
   {
    "nome": "fila_chamar_proximo",
@@ -13868,6 +13746,43 @@
    "authenticated": true,
    "publico": false,
    "md5": "a79094ec68dc9d95f4283644ea279dd3"
+  },
+  {
+   "nome": "painel_lgpd_eliminar",
+   "args": [
+    {
+     "nome": "p_telefone",
+     "padrao": true
+    },
+    {
+     "nome": "p_cpf",
+     "padrao": true
+    },
+    {
+     "nome": "p_email",
+     "padrao": true
+    },
+    {
+     "nome": "p_confirmar",
+     "padrao": true
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "b5a3f8eab0b51632b935a79d50738a38"
+  },
+  {
+   "nome": "painel_lgpd_pedidos",
+   "args": [],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": true,
+   "publico": false,
+   "md5": "643d50d110f307d2f63458916ad61066"
   },
   {
    "nome": "painel_marcacao_cancelar",

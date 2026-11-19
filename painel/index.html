@@ -3726,13 +3726,13 @@
     const tagSel = h('select', { 'aria-label': 'Filtrar por tag', onchange: (e) => { S.tagFiltro = e.target.value; renderTabelaContatos(); } },
       h('option', { value: '' }, 'Todas as tags'), todasTags.map((t) => h('option', { value: t, selected: S.tagFiltro === t }, t)));
     c.replaceChildren(h('div', { class: 'pagina' },
-      h('h2', {}, 'Contatos'), h('p', { class: 'sub' }, 'Quem já conversou com a gente. Exporte a lista para campanhas e acompanhamento.'),
+      h('h2', {}, 'Contatos'), h('p', { class: 'sub' }, 'Quem já conversou com a gente. Os dados servem só para o atendimento e para conferência.'),
       h('div', { class: 'numeros' },
         h('div', { class: 'num' }, h('b', {}, S.contatos.length), h('span', {}, 'contatos no total')),
         h('div', { class: 'num' }, h('b', {}, novosHoje), h('span', {}, 'novos hoje')),
         h('div', { class: 'num' }, h('b', {}, novos7), h('span', {}, 'novos em 7 dias'))),
       h('div', { class: 'barra' }, busca, per, tagSel, h('span', { class: 'espaco' }), h('span', { id: 'contagem', class: 'dica' }),
-        h('button', { class: 'btn prim', type: 'button', onclick: exportarCsv }, 'Exportar CSV')),
+        ehAdmin() ? h('button', { class: 'btn', type: 'button', onclick: abrirEliminacao }, 'Pedido de eliminação (LGPD)') : null),
       h('div', { class: 'tabela-wrap', id: 'tabContatos' })));
     renderTabelaContatos();
   }
@@ -3752,7 +3752,7 @@
         h('td', {}, h('div', { class: 'tags' }, (x.tags || []).map((t) => h('span', { class: 'tag' }, t)))),
         h('td', {}, fmtDataHora(x.ultimo_contato_em)),
         h('td', {}, h('button', { class: 'btn', type: 'button', onclick: () => editarContato(x) }, 'Editar')))))),
-      lista.length > mostrar.length ? h('div', { class: 'dica', style: 'padding:10px 12px' }, `Mostrando ${mostrar.length} de ${lista.length}. Use a busca ou exporte o CSV para ver todos.`) : null);
+      lista.length > mostrar.length ? h('div', { class: 'dica', style: 'padding:10px 12px' }, `Mostrando ${mostrar.length} de ${lista.length}. Use a busca para achar quem você procura.`) : null);
   }
   function editarContato(x) {
     const nome = h('input', { type: 'text', value: x.nome, maxlength: '120', id: 'eNome' });
@@ -3787,18 +3787,53 @@
         h('button', { class: 'btn', type: 'button', onclick: () => dlg.close() }, 'Cancelar'), salvar));
     dlg.showModal();
   }
-  function exportarCsv() {
-    const lista = contatosFiltrados();
-    if (!lista.length) { toast('Não há contatos para exportar com esses filtros.'); return; }
-    const cel = (v) => { let s = String(v ?? ''); if (/^[=+\-@\t\r]/.test(s)) s = "'" + s; return '"' + s.replace(/"/g, '""') + '"'; };
-    const linhas = [['Nome', 'Telefone', 'E-mail', 'Origem', 'Tags', 'Observações', 'Primeiro contato', 'Última conversa'].map(cel).join(';')];
-    lista.forEach((x) => linhas.push([x.nome, fmtTel(x.telefone), x.email, x.origem, (x.tags || []).join(', '), x.observacoes, fmtDataHora(x.criado_em), fmtDataHora(x.ultimo_contato_em)].map(cel).join(';')));
-    const blob = new Blob(['﻿' + linhas.join('\r\n')], { type: 'text/csv;charset=utf-8' });
-    const a = h('a', { href: URL.createObjectURL(blob), download: `contatos-${new Date().toISOString().slice(0, 10)}.csv` });
-    document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-    toast(`${lista.length} contatos exportados.`);
+  /* ---------- eliminação de dados a pedido do titular (LGPD art. 18) ---------- */
+  const ROTULOS_ELIM = { contas_do_chat: 'Conta de login do chat', contatos: 'Contatos', conversas: 'Conversas', mensagens: 'Mensagens', fotos_e_arquivos: 'Fotos e arquivos',
+    pedidos_de_agendamento: 'Pedidos de agendamento', acesso_rapido: 'Acesso rápido (celular e PIN)', filhos: 'Filhos cadastrados', pessoas_de_confianca: 'Pessoas de confiança',
+    codigos_por_email: 'Códigos enviados por e-mail', previsao_de_marcacao: 'Previsão de marcação', cadastro_do_chat: 'Cadastro de paciente do chat', chegadas_na_fila: 'Chegadas na fila' };
+  function abrirEliminacao() {
+    const tel = h('input', { type: 'tel', id: 'lgTel', placeholder: 'DDD + número', maxlength: '20', autocomplete: 'off' });
+    const cpf = h('input', { type: 'text', id: 'lgCpf', placeholder: '11 números', maxlength: '14', autocomplete: 'off', inputmode: 'numeric' });
+    const mail = h('input', { type: 'email', id: 'lgMail', placeholder: 'nome@exemplo.com', maxlength: '200', autocomplete: 'off' });
+    const erro = h('p', { class: 'erro', role: 'alert' });
+    const saida = h('div', {});
+    const conferir = h('button', { class: 'btn prim', type: 'button' }, 'Conferir o que existe');
+    const apagar = h('button', { class: 'btn perigo', type: 'button', disabled: true }, 'Apagar tudo isso');
+    const args = (confirmar) => ({ p_telefone: tel.value.trim() || null, p_cpf: cpf.value.trim() || null, p_email: mail.value.trim() || null, p_confirmar: confirmar });
+    const tabela = (apagado) => {
+      const linhas = Object.entries(ROTULOS_ELIM).map(([k, r]) => [r, Number(apagado[k] || 0)]).filter(([, n]) => n > 0);
+      return linhas.length ? h('table', { class: 'tabela' }, h('tbody', {}, linhas.map(([r, n]) => h('tr', {}, h('td', {}, r), h('td', {}, String(n)))))) : h('p', { class: 'dica' }, 'Não achei nada deste titular no chat, no acesso rápido nem na previsão de marcação.');
+    };
+    conferir.addEventListener('click', async () => {
+      erro.textContent = ''; saida.replaceChildren(); apagar.disabled = true; conferir.disabled = true;
+      const { data, error } = await db.rpc('painel_lgpd_eliminar', args(false));
+      conferir.disabled = false;
+      if (error) { erro.textContent = msgErro(error); return; }
+      const total = Object.values(data.apagado || {}).reduce((a, b) => a + Number(b || 0), 0);
+      saida.replaceChildren(h('p', { class: 'dica' }, 'Ainda NADA foi apagado. Isto é o que seria apagado:'), tabela(data.apagado || {}),
+        h('p', { class: 'dica' }, 'A lei manda manter (não será apagado): ' + (data.mantido || []).join('; ') + '.'));
+      apagar.disabled = total === 0;
+    });
+    apagar.addEventListener('click', async () => {
+      if (!confirm('Apagar para sempre tudo o que foi listado? Não dá para desfazer. Confirme só se o titular pediu e você conferiu quem é.')) return;
+      apagar.disabled = true; conferir.disabled = true;
+      const { data, error } = await db.rpc('painel_lgpd_eliminar', args(true));
+      conferir.disabled = false;
+      if (error) { erro.textContent = msgErro(error); apagar.disabled = false; return; }
+      S.contatos = []; try { S.contatos = await buscarTodos('contatos', 'id,nome,telefone,email,origem,tags,observacoes,aceitou_lgpd_em,criado_em,ultimo_contato_em', 'ultimo_contato_em'); } catch { /* a lista recarrega ao abrir a aba */ }
+      saida.replaceChildren(h('p', { class: 'ok' }, 'Pronto: apagado. O pedido ficou registrado (sem os dados da pessoa).'), tabela(data.apagado || {}),
+        h('p', { class: 'dica' }, 'Responda ao titular em até 15 dias e diga o que a lei manda manter: ' + (data.mantido || []).join('; ') + '.'));
+      if (S.aba === 'contatos') renderContatos(document.getElementById('conteudo'));
+      toast('Dados eliminados.');
+    });
+    dlg.replaceChildren(h('h3', {}, 'Pedido de eliminação de dados (LGPD)'),
+      h('p', { class: 'dica', style: 'margin:-8px 0 12px' }, 'Preencha pelo menos um dado de quem pediu. Primeiro confira o que existe; só depois apague.'),
+      h('div', { class: 'campo' }, h('label', { class: 'rot', for: 'lgTel' }, 'Telefone'), tel),
+      h('div', { class: 'campo' }, h('label', { class: 'rot', for: 'lgCpf' }, 'CPF'), cpf),
+      h('div', { class: 'campo' }, h('label', { class: 'rot', for: 'lgMail' }, 'E-mail'), mail), erro, saida,
+      h('div', { class: 'rodape' }, h('button', { class: 'btn', type: 'button', onclick: () => dlg.close() }, 'Fechar'), conferir, apagar));
+    dlg.showModal();
   }
-
   /* ---------- equipe ---------- */
   async function viewEquipe(c) {
     c.append(h('div', { class: 'pagina' }, h('h2', {}, 'Equipe'), h('p', { class: 'sub' }, 'Carregando…')));

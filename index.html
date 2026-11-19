@@ -717,7 +717,7 @@
   const CHAVE_HIST = 'webchat.historico.v1';   // as últimas conversas deste aparelho (cada uma com o seu token): dá para voltar a elas
   const MAX_HIST = 5;                          // mínimo pedido: 3
   // Muda a cada alteração do chat. Cópia de mensagens guardada por outra versão é descartada (era isso que mostrava conversa velha e travada).
-  const VERSAO_APP = '2026.11.19-1';
+  const VERSAO_APP = '2026.11.19-2';
   // Mesmas regras do banco (fluxo_nome_ok, fluxo_telefone_ok, fluxo_email_ok): o banco confere de novo, aqui é só para avisar logo.
   const LET = 'A-Za-zÀ-ÖØ-öø-ÿ';
   const nomeCompletoOk = (v) => { const t = String(v || '').trim(); return t.length >= 5 && t.length <= 120 && new RegExp(`^[${LET}][${LET}'’.-]*( +[${LET}][${LET}'’.-]*)+$`).test(t) && t.split(/ +/).filter((w) => w.replace(new RegExp(`[^${LET}]`, 'g'), '').length >= 2).length >= 2; };
@@ -2104,9 +2104,9 @@
   }
 
   /* ---------- busca do exame: pelo nome ou pela foto do pedido médico ---------- */
-  // A foto é lida de dois jeitos ao mesmo tempo: no celular (Tesseract, texto impresso, resultado em segundos) e pela IA
-  // no servidor (letra de médico; função ler-pedido). Cada exame do pedido vira um cartão: certo (já marcado), parecido
-  // (marcado, com "Não é este?") ou em dúvida (o paciente escolhe entre exames diferentes, ou deixa para o atendente).
+  // A foto é lida só no celular do paciente (Tesseract, texto impresso, resultado em segundos): nada é enviado a serviço de IA.
+  // Cada exame do pedido vira um cartão: certo (já marcado), parecido (marcado, com "Não é este?") ou em dúvida (o paciente
+  // escolhe entre exames diferentes, ou deixa para o atendente).
   // O que o paciente tocou nunca é desfeito por uma leitura que chega depois.
   let B = null;
   // A foto do pedido médico é dado de saúde (LGPD, art. 11): antes de tirar ou escolher a foto, o paciente autoriza o uso de forma específica.
@@ -2243,7 +2243,7 @@
     };
     if (g.certeza === 'nenhum') {
       const noPedido = e.itens.has(g.chave + ':t');
-      caixa.append(h('p', { class: 'g-aviso' }, g.origem === 'ia' && !g.explicacao ? 'Não consegui ler este exame.' : 'Não encontrei este exame na lista da clínica.',
+      caixa.append(h('p', { class: 'g-aviso' }, 'Não encontrei este exame na lista da clínica.',
         noPedido ? ' O atendente vai conferir pela foto. Ele já está no seu pedido.' : ' Ele ficou fora do pedido.'),
         h('button', { type: 'button', class: 'link-add', onclick: () => {
           g.fora = noPedido;
@@ -2338,7 +2338,6 @@
   function aplicarLeitura(e, anexo, r, foto) {
     const grupos = (r && Array.isArray(r.grupos) ? r.grupos : []).filter((g) => g.certeza === 'nenhum' || (Array.isArray(g.opcoes) && g.opcoes.length));
     const antes = e.leituras.find((l) => l.anexo === anexo);
-    if (antes && antes.origem === 'ia' && r.origem !== 'ia') return;
     const nova = { anexo, origem: r.origem, total: r.total || 0, e_pedido: r.e_pedido, grupos: grupos.map((g, i) => ({ ...g, opcoes: [...(g.opcoes || [])],
       chave: anexo + ':' + r.origem + ':' + i, recorte: g.caixa && foto ? recortar(foto, g.caixa) : null })) };
     const idsNovos = new Set(nova.grupos.flatMap((g) => g.certeza === 'duvida' ? [] : g.opcoes.map((op) => op.exame.id)));
@@ -2402,19 +2401,13 @@
       anexo = data && data.id;
       if (anexo) { e.fotos = (e.fotos || 0) + 1; desenharResultados(); }
     } catch (err) { toast(mensagemErro(err)); }
-    let iaPronta = false, celularPronto = false;
     const fim = () => {
       if (B !== e) return;
       const l = e.leituras.find((x) => x.anexo === anexo);
-      if (l && l.grupos.length) status(e, l.origem === 'ia' || iaPronta ? 'Pedido lido e foto enviada ao atendente.' : 'Já li a parte impressa. Ainda estou lendo a letra do médico…', !(l.origem === 'ia' || iaPronta));
-      else if (iaPronta && celularPronto && l) status(e, 'Li o pedido, mas não reconheci os exames. A foto foi enviada ao atendente, que confere. Você também pode procurar o exame pelo nome.');
-      else if (iaPronta && celularPronto) status(e, anexo ? 'Não consegui ler o pedido, mas a foto foi enviada ao atendente. Procure o exame pelo nome ou toque em "Não encontrei meu exame".' : 'Não consegui ler o pedido. Procure o exame pelo nome.');
+      if (l && l.grupos.length) status(e, 'Pedido lido e foto enviada ao atendente.');
+      else if (l) status(e, 'Li o pedido, mas não reconheci os exames. A foto foi enviada ao atendente, que confere. Você também pode procurar o exame pelo nome.');
+      else status(e, anexo ? 'Não consegui ler o pedido, mas a foto foi enviada ao atendente. Procure o exame pelo nome ou toque em "Não encontrei meu exame".' : 'Não consegui ler o pedido. Procure o exame pelo nome.');
     };
-    if (anexo) {
-      comLimite(db.functions.invoke('ler-pedido', { body: { conversa: conv.id, token: conv.token, anexo } }), 75000)
-        .then(({ data }) => { if (B === e && data && data.ok) aplicarLeitura(e, anexo, { ...data, origem: 'ia' }, foto); })
-        .catch(() => {}).finally(() => { iaPronta = true; fim(); });
-    } else iaPronta = true;
     try {
       const r = await lerTexto(foto);
       if (B === e && r.texto.replace(/\s/g, '').length >= 4) {
@@ -2425,7 +2418,7 @@
         else if (!e.leituras.length) await buscarExame(r.texto, true); // banco sem a Fase 8 ou foto não guardada: a busca antiga pelo texto
       }
     } catch { /* a leitura do celular é só uma ajuda */ }
-    celularPronto = true; fim();
+    fim();
   }
   const comLimite = (p, ms) => Promise.race([p, new Promise((_, f) => setTimeout(() => f(new Error('tempo')), ms))]);
   function abrirFoto(arq, max) {

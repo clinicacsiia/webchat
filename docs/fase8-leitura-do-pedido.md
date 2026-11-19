@@ -1,3 +1,5 @@
+> **19/11/2026 (LGPD):** a parte de **IA no servidor** (função `ler-pedido`) foi **apagada**. Vale só a leitura no celular (Tesseract). O texto abaixo é histórico.
+
 # Fase 8: leitura do pedido médico (letra de médico, dúvida explicada ao paciente e memória que aprende)
 
 Data: 31/10/2026. SQL em `supabase/fase8-leitura-pedido.sql` (aplicado no projeto em 31/10/2026). Função nova: `supabase/functions/ler-pedido` (**ainda não publicada**). Chat: `index.html`. Painel: `painel/index.html`.

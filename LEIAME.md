@@ -89,7 +89,6 @@ Desde 03/11/2026 nada passa pelo n8n. O que ele deveria fazer agora é feito por
 |---|---|---|
 | `avisar-equipe` | Web Push à equipe (painel fechado) quando uma conversa passa para uma pessoa; sem nome nem dado de saúde | `config.equipe_push_url` |
 | `fila-emitir-link` | E-mail com o link da assinatura da fila (precisa dos segredos `EMAIL_API_KEY` e `EMAIL_REMETENTE`) | `config.fila_link_url` |
-| `fila-validar-assinatura` | Valida a assinatura (algoritmo em TypeScript, igual ao Python de referência); pública, quem prova é o token | chamada pela tela da fila |
 
 Vazio na configuração = desligado. Como se liga cada uma: `docs/plano-sair-do-n8n.md`.
 
@@ -99,7 +98,7 @@ Vazio na configuração = desligado. Como se liga cada uma: `docs/plano-sair-do-
 |---|---|---|
 | Administrador | Tudo | Atende, gerencia equipe, edita configurações, exclui contatos |
 | Atendente | Atendimento e Contatos | Assume, responde, transfere e encerra conversas; edita tags e observações |
-| Marketing | Contatos | Busca, filtra, edita tags e exporta CSV. Não lê as conversas |
+| Marketing | Contatos | Busca, filtra e edita tags. Não exporta lista (botão de CSV retirado em 19/11/2026, LGPD) e não lê as conversas |
 
 Dica: coloque `?origem=instagram` no link do chat (ex.: na bio) para ver de onde veio cada contato.
 
@@ -196,10 +195,7 @@ A IA não fala com o paciente. Liga e desliga em `config.motor` (`fluxo` | `ia`)
 
 ### Leitura do pedido médico: letra de médico e dúvida explicada (Fase 8)
 
-A foto do pedido é lida de dois jeitos ao mesmo tempo:
-
-- **No celular** (Tesseract 7, com a sombra e a foto torta corrigidas): lê o texto impresso em 2 a 3 segundos.
-- **No servidor**, pela IA de visão (Edge Function `ler-pedido`): lê a letra do médico.
+A foto do pedido é lida **só no celular do paciente** (Tesseract 7, com a sombra e a foto torta corrigidas): lê o texto impresso em 2 a 3 segundos. **A leitura por IA no servidor (Edge Function `ler-pedido`) foi apagada do código em 19/11/2026** (decisão do dono, LGPD): nenhuma foto de pedido é enviada a serviço de inteligência artificial.
 
 O paciente vê um cartão por exame, com o recorte da linha da foto. Quando a leitura não tem certeza, ele é avisado e escolhe com caixas grandes ("Qual destes está no seu pedido?"), ou deixa para o atendente conferir pela foto. O que o paciente decidiu nunca é desfeito por uma leitura que chega depois.
 
@@ -207,16 +203,12 @@ As fotos e as leituras ficam guardadas. No painel, "Conferir a leitura (ensina o
 
 - Detalhes, pesquisa, custos e testes: `docs/fase8-leitura-do-pedido.md`.
 - SQL: `supabase/fase8-leitura-pedido.sql` (aplicado no Supabase em 31/10/2026).
-- Função: `supabase/functions/ler-pedido` (**ainda não publicada**). Publicar sem JWT e criar o secret `ANTHROPIC_API_KEY`. Sem a chave, o chat usa só a leitura do celular.
+- A função `ler-pedido` (IA) e o segredo `ANTHROPIC_API_KEY` **não existem mais**; as colunas `ia_*` de `conversa_anexo` ficam vazias e sem uso.
 - **Para depois**: mudar escolhas ao vivo e o convênio de quem volta, em `docs/lembrete-mudar-escolhas-e-convenio.md`. O convênio de quem volta já é perguntado (ver acima).
 
-## Fila em tempo real + assinatura biométrica
+## Fila em tempo real (a assinatura biométrica foi apagada)
 
-**Em construção; ainda não está no ar para o público.** O banco real está na primeira versão do módulo; a atualização (`supabase/fila-biometria-v2-delta.sql`) está escrita e testada, mas ainda não foi aplicada. A tela do paciente (`fila/`) ainda não existe no repositório: a versão antiga, incompatível, foi retirada para não ser publicada no GitHub Pages (continua no histórico do git, na branch `ccr-37cc4eeb-fi5p2l`).
-
-- Regras no banco: `supabase/fila-biometria.sql` (instalação do zero) e `supabase/fila-biometria-v2-delta.sql` (para quem já aplicou a primeira versão).
-- Algoritmo da assinatura: `supabase/functions/fila-validar-assinatura/avaliacao.ts` (Edge Function, sem servidor próprio). `biometria/avaliar_assinatura.py` é a referência em Python; `biometria/gerar_vetores.py` congela o que ele devolve e o teste exige o mesmo resultado do TypeScript.
-- Fluxo, Edge Functions, passo a passo para colocar no ar (o que é seu e o que é do Claude), riscos e LGPD: `docs/fila-biometria.md`.
+**A assinatura biométrica foi apagada do código e do banco em 19/11/2026** (decisão do dono, LGPD: dado biométrico é dado sensível; nunca foi usada, 0 registros). Saíram: a Edge Function `fila-validar-assinatura`, a pasta `biometria/`, as tabelas `registro_assinaturas` e `assinatura_tentativas` e as funções `assinatura_*`, `fila_chamar_assinatura` e `fila_cancelar_assinatura` (`supabase/lgpd-remover-biometria.sql`). Os arquivos `supabase/fila-biometria.sql` e `fila-biometria-v2-delta.sql` ficam só como **histórico** (a fila de chegada e os testes ainda nascem deles).
 
 ## Testes e auditoria
 

@@ -1,5 +1,5 @@
 -- RETRATO DA ESTRUTURA DO BANCO DE PRODUÇÃO (projeto webchat-atendimento). GERADO: não editar à mão.
--- Atualização parcial em 2026-11-18T12:00:00+00:00 (remarcações e ofertas no painel). Retrato inteiro tirado em 2026-11-14T20:32:54.165875+00:00 · Postgres 17.11. Só estrutura: nenhuma linha de tabela, nenhum valor de configuração.
+-- Atualização parcial em 2026-11-19T16:00:26+00:00 (remarcações e ofertas no painel). Retrato inteiro tirado em 2026-11-14T20:32:54.165875+00:00 · Postgres 17.11. Só estrutura: nenhuma linha de tabela, nenhum valor de configuração.
 -- Serve de referência e para os testes. NÃO rodar inteiro sobre a produção. Como refazer: supabase/producao/LEIAME.md.
 
 -- ===== Extensões =====
@@ -18,7 +18,7 @@
 -- authenticator: session_preload_libraries=supautils, safeupdate, statement_timeout=8s, lock_timeout=8s
 -- service_role: sem limite
 
--- ===== Tabelas (151) =====
+-- ===== Tabelas (150) =====
 
 create table public.agenda_ao_vivo (
   dia date not null,
@@ -179,24 +179,6 @@ create policy alerta_preco_select on public.alerta_preco as permissive for selec
   using ((( SELECT papel_atual() AS papel_atual) = ANY (ARRAY['admin'::text, 'atendente'::text])));
 -- concessão a anon: DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
 -- concessão a authenticated: DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
-
-create table public.assinatura_tentativas (
-  id bigint generated always as identity not null,
-  atendimento_id uuid not null,
-  numero smallint not null,
-  score_similaridade numeric(5,4) not null,
-  ip_origem text,
-  user_agent text,
-  created_at timestamp with time zone default now() not null,
-  constraint assinatura_tentativas_numero_check CHECK (((numero >= 1) AND (numero <= 3))),
-  constraint assinatura_tentativas_pkey PRIMARY KEY (id),
-  constraint assinatura_tentativas_atendimento_id_numero_key UNIQUE (atendimento_id, numero)
-);
-comment on table public.assinatura_tentativas is 'Tentativas reprovadas (score abaixo de 0,30). Imutável. O score nunca é devolvido ao paciente.';
-alter table public.assinatura_tentativas enable row level security;
-create policy assinatura_tentativas_admin on public.assinatura_tentativas as permissive for select to authenticated
-  using ((( SELECT papel_atual() AS papel_atual) = 'admin'::text));
--- concessão a authenticated: SELECT
 
 create table public.atendimento_tipo (
   chave text not null,
@@ -2007,41 +1989,6 @@ create table public.paciente_klingo_vinculo (
 comment on table public.paciente_klingo_vinculo is 'Ligação conversa do chat ↔ prontuário do Klingo, conferida por CPF + nascimento (Edge Function klingo-paciente). Sem nome, telefone, e-mail ou CPF. Só service_role e funções security definer acessam.';
 alter table public.paciente_klingo_vinculo enable row level security;
 
-create table public.pacientes (
-  id uuid default gen_random_uuid() not null,
-  nome text not null,
-  nome_norm text not null,
-  telefones text[] default '{}'::text[] not null,
-  email text,
-  dt_nasc date,
-  cpf text,
-  dados jsonb default '{}'::jsonb not null,
-  validado boolean default false not null,
-  validado_em timestamp with time zone,
-  revisar boolean default false not null,
-  origem_conversa uuid,
-  criado_em timestamp with time zone default now() not null,
-  atualizado_em timestamp with time zone default now() not null,
-  ultima_visita_em timestamp with time zone default now() not null,
-  email_cadastro text generated always as (lower(email)) stored,
-  perfil_biometrico_historico jsonb default '{}'::jsonb not null,
-  assinatura_papel_path text,
-  constraint pacientes_pkey PRIMARY KEY (id)
-);
-comment on table public.pacientes is 'Pacientes conhecidos (dados pessoais: CPF, mãe, endereço). validado = identidade conferida (data de nascimento batendo em novo atendimento) ou agendamento confirmado pelo atendente. revisar = CPF repetido ou dados divergentes. Só admin/atendente leem.';
-CREATE INDEX pacientes_cpf ON public.pacientes USING btree (cpf);
-CREATE INDEX pacientes_email ON public.pacientes USING btree (lower(email));
-CREATE INDEX pacientes_nome ON public.pacientes USING btree (nome_norm);
-CREATE INDEX pacientes_telefones ON public.pacientes USING gin (telefones);
-alter table public.pacientes enable row level security;
-create policy pacientes_select on public.pacientes as permissive for select to public
-  using ((( SELECT papel_atual() AS papel_atual) = ANY (ARRAY['admin'::text, 'atendente'::text])));
-create policy pacientes_update on public.pacientes as permissive for update to public
-  using ((( SELECT papel_atual() AS papel_atual) = ANY (ARRAY['admin'::text, 'atendente'::text])))
-  with check ((( SELECT papel_atual() AS papel_atual) = ANY (ARRAY['admin'::text, 'atendente'::text])));
--- concessão a anon: DELETE,INSERT,REFERENCES,TRIGGER,TRUNCATE
--- concessão a authenticated: DELETE,INSERT,REFERENCES,TRIGGER,TRUNCATE
-
 create table public.pedido_previsao (
   conversa_id uuid not null,
   turno text not null,
@@ -2232,33 +2179,6 @@ create table public.push_inscricao (
 );
 comment on table public.push_inscricao is 'Aparelhos que aceitaram notificação (Web Push). Só as funções fila_push_* e a Edge Function (service_role) acessam.';
 alter table public.push_inscricao enable row level security;
-
-create table public.registro_assinaturas (
-  id uuid default gen_random_uuid() not null,
-  atendimento_id uuid not null,
-  email_confirmado_transacao text not null,
-  hash_documento text not null,
-  consentimento_biometrico boolean not null,
-  tipo_validacao text not null,
-  score_similaridade numeric(5,4),
-  vetor_traco_bruto jsonb not null,
-  caracteristicas jsonb not null,
-  ip_origem text,
-  user_agent text not null,
-  created_at timestamp with time zone default now() not null,
-  constraint registro_assinaturas_consentimento_biometrico_check CHECK (consentimento_biometrico),
-  constraint registro_assinaturas_hash_documento_check CHECK ((hash_documento ~ '^[0-9a-f]{64}$'::text)),
-  constraint registro_assinaturas_tipo_validacao_check CHECK ((tipo_validacao = ANY (ARRAY['enrolamento'::text, 'comparacao'::text]))),
-  constraint registro_assinaturas_user_agent_check CHECK ((char_length(user_agent) <= 500)),
-  constraint registro_score_coerente CHECK ((((tipo_validacao = 'enrolamento'::text) AND (score_similaridade IS NULL)) OR ((tipo_validacao = 'comparacao'::text) AND (score_similaridade IS NOT NULL)))),
-  constraint registro_assinaturas_pkey PRIMARY KEY (id),
-  constraint registro_assinaturas_atendimento_id_key UNIQUE (atendimento_id)
-);
-comment on table public.registro_assinaturas is 'Lastro jurídico da assinatura. Imutável: UPDATE, DELETE e TRUNCATE são bloqueados por trigger. Só admin lê.';
-alter table public.registro_assinaturas enable row level security;
-create policy registro_assinaturas_admin on public.registro_assinaturas as permissive for select to authenticated
-  using ((( SELECT papel_atual() AS papel_atual) = 'admin'::text));
--- concessão a authenticated: SELECT
 
 create table public.respostas_prontas (
   id uuid default gen_random_uuid() not null,
@@ -2837,6 +2757,55 @@ alter table public.pmarc_tentativa enable row level security;
 
 
 
+
+create table public.lgpd_pedido (
+  id uuid default gen_random_uuid() not null,
+  criado_em timestamp with time zone default now() not null,
+  tipo text default 'eliminacao'::text not null,
+  ident_hash text[] default '{}'::text[] not null,
+  por uuid,
+  resumo jsonb default '{}'::jsonb not null,
+  constraint lgpd_pedido_tipo_check CHECK ((tipo = 'eliminacao'::text)),
+  constraint lgpd_pedido_pkey PRIMARY KEY (id)
+);
+comment on table public.lgpd_pedido is 'Registro dos pedidos de eliminação de dados (LGPD art. 18). Guarda só contagens e códigos embaralhados: prova que o pedido foi atendido sem manter o dado.';
+alter table public.lgpd_pedido enable row level security;
+-- concessão a service_role: DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+
+create table public.pacientes (
+  id uuid default gen_random_uuid() not null,
+  nome text not null,
+  nome_norm text not null,
+  telefones text[] default '{}'::text[] not null,
+  email text,
+  dt_nasc date,
+  cpf text,
+  dados jsonb default '{}'::jsonb not null,
+  validado boolean default false not null,
+  validado_em timestamp with time zone,
+  revisar boolean default false not null,
+  origem_conversa uuid,
+  criado_em timestamp with time zone default now() not null,
+  atualizado_em timestamp with time zone default now() not null,
+  ultima_visita_em timestamp with time zone default now() not null,
+  email_cadastro text generated always as (lower(email)) stored,
+  constraint pacientes_pkey PRIMARY KEY (id)
+);
+comment on table public.pacientes is 'Pacientes conhecidos (dados pessoais: CPF, mãe, endereço). validado = identidade conferida (data de nascimento batendo em novo atendimento) ou agendamento confirmado pelo atendente. revisar = CPF repetido ou dados divergentes. Só admin/atendente leem.';
+CREATE INDEX pacientes_cpf ON public.pacientes USING btree (cpf);
+CREATE INDEX pacientes_email ON public.pacientes USING btree (lower(email));
+CREATE INDEX pacientes_nome ON public.pacientes USING btree (nome_norm);
+CREATE INDEX pacientes_telefones ON public.pacientes USING gin (telefones);
+alter table public.pacientes enable row level security;
+create policy pacientes_select on public.pacientes as permissive for select to public
+  using ((( SELECT papel_atual() AS papel_atual) = ANY (ARRAY['admin'::text, 'atendente'::text])));
+create policy pacientes_update on public.pacientes as permissive for update to public
+  using ((( SELECT papel_atual() AS papel_atual) = ANY (ARRAY['admin'::text, 'atendente'::text])))
+  with check ((( SELECT papel_atual() AS papel_atual) = ANY (ARRAY['admin'::text, 'atendente'::text])));
+-- concessão a anon: DELETE,INSERT,REFERENCES,TRIGGER,TRUNCATE
+-- concessão a authenticated: DELETE,INSERT,REFERENCES,TRIGGER,TRUNCATE
+-- concessão a service_role: DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+
 -- ===== Chaves estrangeiras (depois de todas as tabelas) =====
 alter table public.agendamento_fechamento add constraint agendamento_fechamento_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE CASCADE;
 alter table public.agendamento_fechamento add constraint agendamento_fechamento_por_fkey FOREIGN KEY (por) REFERENCES agentes(id) ON DELETE SET NULL;
@@ -2845,7 +2814,6 @@ alter table public.agendamento_fechamento add constraint agendamento_fechamento_
 alter table public.agentes add constraint agentes_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE;
 alter table public.alerta_preco add constraint alerta_preco_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE CASCADE;
 alter table public.alerta_preco add constraint alerta_preco_mensagem_id_fkey FOREIGN KEY (mensagem_id) REFERENCES mensagens(id) ON DELETE SET NULL;
-alter table public.assinatura_tentativas add constraint assinatura_tentativas_atendimento_id_fkey FOREIGN KEY (atendimento_id) REFERENCES atendimentos(id) ON DELETE RESTRICT;
 alter table public.atendimentos add constraint atendimentos_paciente_id_fkey FOREIGN KEY (paciente_id) REFERENCES pacientes(id) ON DELETE RESTRICT;
 alter table public.autoencerramento_fechada add constraint autoencerramento_fechada_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE CASCADE;
 alter table public.avaliacao_atendimento add constraint avaliacao_atendimento_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE CASCADE;
@@ -2910,7 +2878,6 @@ alter table public.paciente_historico add constraint paciente_historico_conversa
 alter table public.paciente_historico add constraint paciente_historico_paciente_id_fkey FOREIGN KEY (paciente_id) REFERENCES pacientes(id) ON DELETE CASCADE;
 alter table public.paciente_historico add constraint paciente_historico_pre_agendamento_id_fkey FOREIGN KEY (pre_agendamento_id) REFERENCES pre_agendamentos(id) ON DELETE SET NULL;
 alter table public.paciente_klingo_vinculo add constraint paciente_klingo_vinculo_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE CASCADE;
-alter table public.pacientes add constraint pacientes_origem_conversa_fkey FOREIGN KEY (origem_conversa) REFERENCES conversas(id) ON DELETE SET NULL;
 alter table public.pedido_previsao add constraint pedido_previsao_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE CASCADE;
 alter table public.pessoa_klingo_vinculo add constraint pessoa_klingo_vinculo_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE CASCADE;
 alter table public.pessoa_klingo_vinculo add constraint pessoa_klingo_vinculo_por_fkey FOREIGN KEY (por) REFERENCES agentes(id) ON DELETE SET NULL;
@@ -2918,7 +2885,6 @@ alter table public.pre_agendamento_itens add constraint pre_agendamento_itens_co
 alter table public.pre_agendamentos add constraint pre_agendamentos_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE CASCADE;
 alter table public.pre_agendamentos add constraint pre_agendamentos_paciente_id_fkey FOREIGN KEY (paciente_id) REFERENCES pacientes(id) ON DELETE SET NULL;
 alter table public.push_inscricao add constraint push_inscricao_conta_id_fkey FOREIGN KEY (conta_id) REFERENCES auth.users(id) ON DELETE CASCADE;
-alter table public.registro_assinaturas add constraint registro_assinaturas_atendimento_id_fkey FOREIGN KEY (atendimento_id) REFERENCES atendimentos(id) ON DELETE RESTRICT;
 alter table public.vinculo_solicitacoes add constraint vinculo_solicitacoes_conta_id_fkey FOREIGN KEY (conta_id) REFERENCES auth.users(id) ON DELETE CASCADE;
 alter table public.vinculo_solicitacoes add constraint vinculo_solicitacoes_decidido_por_fkey FOREIGN KEY (decidido_por) REFERENCES auth.users(id) ON DELETE SET NULL;
 alter table public.vinculo_solicitacoes add constraint vinculo_solicitacoes_paciente_id_fkey FOREIGN KEY (paciente_id) REFERENCES pacientes(id) ON DELETE CASCADE;
@@ -2948,6 +2914,8 @@ alter table public.app_laudo_pessoa add constraint app_laudo_pessoa_paciente_id_
 alter table public.painel_oferta add constraint painel_oferta_conversa_fk FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE CASCADE;
 alter table public.pmarc_pessoa add constraint pmarc_pessoa_contato_id_fkey FOREIGN KEY (contato_id) REFERENCES public.contatos(id) ON DELETE SET NULL;
 alter table public.pmarc_pessoa add constraint pmarc_pessoa_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES public.conversas(id) ON DELETE SET NULL;
+alter table public.lgpd_pedido add constraint lgpd_pedido_por_fkey FOREIGN KEY (por) REFERENCES agentes(id) ON DELETE SET NULL;
+alter table public.pacientes add constraint pacientes_origem_conversa_fkey FOREIGN KEY (origem_conversa) REFERENCES conversas(id) ON DELETE SET NULL;
 
 -- ===== Visões (5) =====
 
@@ -3146,8 +3114,6 @@ create view public.v_olho_marcacao with (security_invoker=true) as
      LEFT JOIN jornada_exame e ON e.marcacao_id = c.m;
 
 -- ===== Gatilhos (as funções estão em funcoes/) =====
-CREATE TRIGGER assinatura_tentativas_imutavel BEFORE DELETE OR UPDATE ON public.assinatura_tentativas FOR EACH ROW EXECUTE FUNCTION registro_imutavel_trg();
-CREATE TRIGGER assinatura_tentativas_sem_truncate BEFORE TRUNCATE ON public.assinatura_tentativas FOR EACH STATEMENT EXECUTE FUNCTION registro_imutavel_trg();
 CREATE TRIGGER atendimentos_fila_avisar AFTER INSERT OR DELETE OR UPDATE OF status, bloqueado_em ON public.atendimentos FOR EACH ROW EXECUTE FUNCTION fila_avisar_trg();
 CREATE TRIGGER atendimentos_transicao BEFORE UPDATE ON public.atendimentos FOR EACH ROW EXECUTE FUNCTION atendimentos_transicao_trg();
 CREATE TRIGGER catalogo_agenda_hash BEFORE INSERT ON public.catalogo_agenda FOR EACH ROW EXECUTE FUNCTION catalogo_agenda_hash_trg();
@@ -3204,8 +3170,6 @@ CREATE TRIGGER pre_agendamento_historico AFTER UPDATE OF status ON public.pre_ag
 CREATE TRIGGER pre_agendamento_valida_paciente AFTER UPDATE ON public.pre_agendamentos FOR EACH ROW EXECUTE FUNCTION pre_agendamento_valida_paciente_trg();
 CREATE TRIGGER pre_agendamento_vincula_conta AFTER INSERT OR UPDATE OF paciente_id ON public.pre_agendamentos FOR EACH ROW EXECUTE FUNCTION pre_agendamento_vincula_conta_trg();
 CREATE TRIGGER pre_agendamentos_zz_autoria BEFORE UPDATE OF status ON public.pre_agendamentos FOR EACH ROW EXECUTE FUNCTION pre_agendamento_autoria_trg();
-CREATE TRIGGER registro_assinaturas_imutavel BEFORE DELETE OR UPDATE ON public.registro_assinaturas FOR EACH ROW EXECUTE FUNCTION registro_imutavel_trg();
-CREATE TRIGGER registro_assinaturas_sem_truncate BEFORE TRUNCATE ON public.registro_assinaturas FOR EACH STATEMENT EXECUTE FUNCTION registro_imutavel_trg();
 CREATE TRIGGER vinculo_log_imutavel BEFORE DELETE OR UPDATE ON public.vinculo_log FOR EACH ROW EXECUTE FUNCTION org_log_imutavel_trg();
 
 -- ===== Tabelas publicadas no tempo real (postgres_changes) =====
@@ -3293,4 +3257,4 @@ CREATE TRIGGER vinculo_log_imutavel BEFORE DELETE OR UPDATE ON public.vinculo_lo
 --   select net.http_post( url := 'https://nrvuynjwcgwpjdptkiay.supabase.co/functions/v1/sync-catalogo-klingo', headers := jsonb_build_object('Content-Type', 'application/json', 'x-sync-key', (select valor from public.config where chave = 'ia_segredo')), body := '{}'::jsonb, timeout_milliseconds := 120000);
 
 -- ===== Chaves existentes em public.config (só os nomes; os valores não são copiados) =====
--- agenda_ao_vivo, agenda_ao_vivo_max_dias, agenda_ao_vivo_trava_s, agenda_ao_vivo_validade_s, agendado_conferir_prazo_min, agendamento_cpf_divergentes_dia, agendamento_cpf_escritas_hora, agendamento_externo_modo, agendamento_ip_divergentes_hora, agendamento_ip_escritas_hora, agendamento_ip_por_minuto, agendamento_reconhecer, agendamento_reconhecer_msg_encerradas, app_acesso_modo, app_cadastros_max_hora, app_codigo_email, app_codigo_validade_min, app_laudos, app_local_ativo, app_pin_obrigatorio, app_pin_servidor, app_resultado_vigia, autoencerrar_horas, autoencerrar_modo, avaliacao_ativa, base_antes_programa, boas_vindas, cadastro_equipe_sem_convite, catalogo_csi, catalogo_desenvoar, catalogo_rmtc, chat_push_url, checkin_sem_login_max_dia, clinica_lat, clinica_lng, clinica_raio_m, convenio_seguir_klingo, convenio_suspenso_texto, despedida_configurada, despedida_inatividade_ativa, despedida_inatividade_texto, despedida_versao_atual, disponibilidade_encerra_conversa, disponibilidade_max_avisos_dia, disponibilidade_max_avisos_total, encerramento_exige_motivo, encerramento_valida_agendado, entrada_previsao_modo, entrada_webchat_modo, equipe_push_url, fila_autochegada, fila_aviso_antes, fila_push_url, fila_vapid_publica, horario_trabalho, ia_segredo, indicadores_fechar, jornada_identidade_klingo, jornada_relatorio_filtro, jornada_relatorio_id, klingo_api_resultado, klingo_api_telefones_teste, klingo_conferir_ativo, klingo_exames_so_api, klingo_exames_tem_min, klingo_exames_vazio_min, klingo_exames_vencimento_h, klingo_funcoes_base, klingo_paciente_url, klingo_reconfirmar_dias, klingo_so_liberados, klingo_webhook, login_paciente, marcacao_auto_csi, marcacao_auto_desenvoar, marcacao_auto_rmtc, nome_empresa, particular_valor_modo, pedido_escolha_texto, pedido_horario_modo, pedido_oferta2_texto, pedido_parado_horas, pedido_sem_horario_texto, permissao_modo, plano_exato_modo, previsao_decide_texto, previsao_final_texto, previsao_marcacao_aviso, previsao_marcacao_final, previsao_marcacao_modo, previsao_marcacao_novos_max_hora, previsao_oferta_texto, primeira_consulta_medicas, primeira_consulta_modo, reabrir_dias, reaproveitar_cadastro_convidado, retorno_dias_limite, retorno_dias_modo, teste_agentes, teste_marcadores, vinculo_manual_quem
+-- agenda_ao_vivo, agenda_ao_vivo_max_dias, agenda_ao_vivo_trava_s, agenda_ao_vivo_validade_s, agendado_conferir_prazo_min, agendamento_cpf_divergentes_dia, agendamento_cpf_escritas_hora, agendamento_externo_modo, agendamento_ip_divergentes_hora, agendamento_ip_escritas_hora, agendamento_ip_por_minuto, agendamento_reconhecer, agendamento_reconhecer_msg_encerradas, app_acesso_modo, app_cadastros_max_hora, app_codigo_email, app_codigo_validade_min, app_laudos, app_local_ativo, app_pin_obrigatorio, app_pin_servidor, app_resultado_vigia, autoencerrar_horas, autoencerrar_modo, avaliacao_ativa, base_antes_programa, boas_vindas, cadastro_equipe_sem_convite, catalogo_csi, catalogo_desenvoar, catalogo_rmtc, chat_push_url, checkin_sem_login_max_dia, clinica_lat, clinica_lng, clinica_raio_m, convenio_seguir_klingo, convenio_suspenso_texto, despedida_configurada, despedida_inatividade_ativa, despedida_inatividade_texto, despedida_versao_atual, disponibilidade_encerra_conversa, disponibilidade_max_avisos_dia, disponibilidade_max_avisos_total, encerramento_exige_motivo, encerramento_valida_agendado, entrada_previsao_modo, entrada_webchat_modo, equipe_push_url, fila_autochegada, fila_aviso_antes, fila_push_url, fila_vapid_publica, horario_trabalho, ia_ativa, ia_segredo, indicadores_fechar, jornada_identidade_klingo, jornada_relatorio_filtro, jornada_relatorio_id, klingo_api_cancelar, klingo_api_consultar, klingo_api_horarios, klingo_api_marcar, klingo_api_percentual, klingo_api_pos, klingo_api_pre_cadastro, klingo_api_remarcar, klingo_api_resultado, klingo_api_telefones_teste, klingo_auto, klingo_autogestao, klingo_conferir_ativo, klingo_exames_so_api, klingo_exames_tem_min, klingo_exames_vazio_min, klingo_exames_vencimento_h, klingo_funcoes_base, klingo_paciente_url, klingo_reconfirmar_dias, klingo_so_liberados, klingo_webhook, login_paciente, marcacao_auto_csi, marcacao_auto_desenvoar, marcacao_auto_rmtc, motor, motor_telefones_teste, nome_empresa, notificacao_modo, particular_valor_modo, pedido_escolha_texto, pedido_horario_modo, pedido_oferta2_texto, pedido_parado_horas, pedido_sem_horario_texto, permissao_modo, plano_exato_modo, previsao_decide_texto, previsao_final_texto, previsao_marcacao_aviso, previsao_marcacao_final, previsao_marcacao_modo, previsao_marcacao_novos_max_hora, previsao_modo, previsao_monitor_modo, previsao_oferta_texto, previsao_texto, primeira_consulta_medicas, primeira_consulta_modo, reabrir_dias, reaproveitar_cadastro_convidado, retorno_dias_limite, retorno_dias_modo, teste_agentes, teste_marcadores, vinculo_manual_quem
