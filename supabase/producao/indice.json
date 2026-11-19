@@ -2698,6 +2698,7 @@
   "clinica_lat",
   "clinica_lng",
   "clinica_raio_m",
+  "consultas_sem_api",
   "convenio_seguir_klingo",
   "convenio_suspenso_texto",
   "despedida_configurada",
@@ -7106,6 +7107,21 @@
    "md5": "661f050ba328dae5fcc96d1e21589264"
   },
   {
+   "nome": "consultas_da_unidade_antigas",
+   "args": [
+    {
+     "nome": "p_catalogo",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "f51c49dc023b7fddce01e3ba414e615c"
+  },
+  {
    "nome": "conta_paciente_adotar_conversas",
    "args": [
     {
@@ -9196,7 +9212,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "022a6f21e137a0373394cd1e3d858933"
+   "md5": "0329d00892b7b7825081c016d4956307"
   },
   {
    "nome": "fluxo_mensagem_trg",
@@ -9312,7 +9328,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "52c58ade7169ec19db90ff7ebabff5ff"
+   "md5": "b95098b7a41bd2420b80d404397bcca4"
   },
   {
    "nome": "fluxo_pos_aplicar",
@@ -9551,7 +9567,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "70d478d689df76956449e2cc02f19524"
+   "md5": "3c2eb4c4c82807407574d680b51fd970"
   },
   {
    "nome": "fluxo_set",
@@ -11389,7 +11405,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "c3217d3441e0a7e5de42e3955cd32e94"
+   "md5": "2d412d968d623146c7fa9ff0fbea81f1"
   },
   {
    "nome": "klingo_limpar",
