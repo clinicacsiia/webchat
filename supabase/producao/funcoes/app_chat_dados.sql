@@ -8,7 +8,7 @@ CREATE OR REPLACE FUNCTION public.app_chat_dados(p_token text, p_conversa uuid, 
 AS $function$
 declare
   s record; a public.app_paciente%rowtype; c public.conversas; f public.app_filho%rowtype; pa public.pre_agendamentos; d jsonb;
-  v_tel text; v_eu boolean; v_cpf text; v_nasc date; v_nome text; v_digitado text; v_passo text; v_depois text; v_valor jsonb; v_texto text; v_n integer := 0; v_guardou boolean := false;
+  v_tel text; v_eu boolean; v_cpf text; v_nasc date; v_digitado text; v_passo text; v_depois text; v_valor jsonb; v_texto text; v_n integer := 0; v_guardou boolean := false;
 begin
   select * into s from public.app_aparelho_validar(p_token);
   if s.o_erro is not null then return public.app_erro_json(s.o_erro); end if;
@@ -20,11 +20,11 @@ begin
   if v_tel is distinct from a.telefone then return jsonb_build_object('ok', false, 'erro', 'celular'); end if;
 
   v_eu := coalesce(c.paciente_tipo, 'proprio') = 'proprio';
-  if v_eu then v_cpf := a.cpf; v_nasc := a.nascimento; v_nome := a.nome;
+  if v_eu then v_cpf := a.cpf; v_nasc := a.nascimento;
   else
     select * into f from public.app_filho where responsavel_id = a.id and removido_em is null and public.app_norm(nome) = public.app_norm(c.paciente_nome) limit 1;
     if not found then return jsonb_build_object('ok', false, 'erro', 'pessoa'); end if;
-    v_cpf := f.cpf; v_nasc := f.nascimento; v_nome := f.nome;
+    v_cpf := f.cpf; v_nasc := f.nascimento;
   end if;
 
   select * into pa from public.pre_agendamentos where conversa_id = p_conversa;
@@ -47,10 +47,7 @@ begin
       when v_passo = 'identidade' and v_nasc is not null then jsonb_build_object('dt_nasc', to_char(v_nasc, 'DD/MM/YYYY'))
     end;
     exit when v_valor is null;
-    v_texto := concat_ws(E'\n', 'Dados carregados do acesso rápido.',
-                         case when nullif(btrim(coalesce(v_nome, '')), '') is not null then 'Nome: ' || left(btrim(v_nome), 120) end,
-                         case when v_valor ? 'cpf' then 'CPF: ' || public.app_cpf_mascara(v_cpf) end,
-                         case when v_valor ? 'dt_nasc' then 'Nascimento: ' || (v_valor ->> 'dt_nasc') end);
+    v_texto := 'Paciente identificado pelo acesso rápido (PIN confirmado)';
     begin
       perform public.chat_responder(p_conversa, p_conv_token, v_passo, v_valor, v_texto, null);
     exception when others then exit;
