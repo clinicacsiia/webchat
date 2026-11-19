@@ -164,7 +164,8 @@
     "test:v2-pos": "node sql-webchat-v2-pos.test.mjs",
     "test:v2-publico": "node sql-webchat-v2-publico.test.mjs",
     "test:pos": "node pos-agendamento.navegador.mjs",
-    "test:painel-v2": "node painel-v2.navegador.mjs"
+    "test:painel-v2": "node painel-v2.navegador.mjs",
+    "test:indicadores-agendado-dia": "node sql-indicadores-agendado-no-dia.test.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.2.17",

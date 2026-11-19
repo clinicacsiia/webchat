@@ -1,5 +1,5 @@
 -- RETRATO DA ESTRUTURA DO BANCO DE PRODUÇÃO (projeto webchat-atendimento). GERADO: não editar à mão.
--- Atualização parcial em 2026-11-18T12:00:00+00:00 (remarcações e ofertas no painel). Retrato inteiro tirado em 2026-11-14T20:32:54.165875+00:00 · Postgres 17.11. Só estrutura: nenhuma linha de tabela, nenhum valor de configuração.
+-- Atualização parcial em 2026-11-19T12:00:00Z (remarcações e ofertas no painel). Retrato inteiro tirado em 2026-11-14T20:32:54.165875+00:00 · Postgres 17.11. Só estrutura: nenhuma linha de tabela, nenhum valor de configuração.
 -- Serve de referência e para os testes. NÃO rodar inteiro sobre a produção. Como refazer: supabase/producao/LEIAME.md.
 
 -- ===== Extensões =====
@@ -2832,6 +2832,7 @@ create table public.pmarc_tentativa (
 comment on table public.pmarc_tentativa is 'Tentativas de achar a previsão sem o link (marca do celular + tipo). Serve só para limitar adivinhação; apagada em poucas horas.';
 CREATE INDEX pmarc_tentativa_idx ON public.pmarc_tentativa USING btree (marca, tipo, quando);
 alter table public.pmarc_tentativa enable row level security;
+
 
 
 

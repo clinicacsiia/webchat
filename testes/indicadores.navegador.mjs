@@ -89,8 +89,8 @@ const POR_DIA = DIAS_REAIS.map(linhaAg), TOTAL_AG = somaAg(POR_DIA);
 const PESSOAS = (a) => {
   const pequeno = a.p_unidade === 'rmtc', ent = pequeno ? 4 : a.p_unidade === 'desenvoar' ? 40 : 60;
   const so = a.p_tipo === 'exame';
-  const atual = so ? { procuraram: 8, atendidos: 6, agendaram: 1, robo: 1, robo_sem_atendente: 1, faltaram: 0, cancelaram: 0, faltaram_ou_cancelaram: 0 }
-    : { procuraram: ent, atendidos: Math.round(ent * 0.95), agendaram: Math.round(ent / 4), robo: 5, robo_sem_atendente: 3, faltaram: 2, cancelaram: 1, faltaram_ou_cancelaram: 3 };
+  const atual = so ? { procuraram: 8, atendidos: 6, agendaram: 1, agendaram_da_coorte: 1, agendaram_conversa_anterior: 0, robo: 1, robo_sem_atendente: 1, faltaram: 0, cancelaram: 0, faltaram_ou_cancelaram: 0 }
+    : { procuraram: ent, atendidos: Math.round(ent * 0.95), agendaram: Math.round(ent / 4), agendaram_da_coorte: Math.round(ent / 4), agendaram_conversa_anterior: 3, robo: 5, robo_sem_atendente: 3, faltaram: 2, cancelaram: 1, faltaram_ou_cancelaram: 3 };
   const anterior = pequeno ? { procuraram: 3, atendidos: 3, agendaram: 1, robo: 0, robo_sem_atendente: 0, faltaram: 0, cancelaram: 0, faltaram_ou_cancelaram: 0 }
     : { procuraram: 50, atendidos: 45, agendaram: 20, robo: 4, robo_sem_atendente: 1, faltaram: 1, cancelaram: 1, faltaram_ou_cancelaram: 2 };
   return { periodo: { de: a.p_de, ate: a.p_ate }, anterior_periodo: { de: a.p_de, ate: a.p_ate }, unidade: a.p_unidade, tipo: a.p_tipo || null, gerado_em: new Date().toISOString(), atual, anterior };
@@ -247,7 +247,7 @@ await caso('Topo: só os 5 números pedidos (procuraram, atendidos, agendaram no
   const ped = ultimo(t.reg, 'pessoas');
   await t.ctx.close();
   return { ok: topo.join('|') === 'Procuraram o chat|Foram atendidos|Agendaram, confirmado no Klingo|Desses, o robô marcou sozinho|Faltaram ou cancelaram' && ordem === 'Visão da agenda (marcações)' && new Set(todos).size === todos.length
-    && k['Procuraram o chat'].startsWith('60 | pessoas, pelo dia em que abriram o chat; cada uma conta uma vez | ▲ 20%') && k['Foram atendidos'].startsWith('57 | 95% de quem procurou') && k['Agendaram, confirmado no Klingo'].startsWith('15 | 25% de quem procurou')
+    && k['Procuraram o chat'].startsWith('60 | pessoas, pelo dia em que abriram o chat; cada uma conta uma vez | ▲ 20%') && k['Foram atendidos'].startsWith('57 | 95% de quem procurou') && k['Agendaram, confirmado no Klingo'].startsWith('15 | 3 de conversas abertas antes do período')
     && k['Desses, o robô marcou sozinho'].startsWith('5 | 33,3% dos que agendaram · 3 sem nenhum atendente na conversa') && k['Faltaram ou cancelaram'].startsWith('3 | 20% dos que agendaram · 2 faltaram · 1 cancelaram') && coloridos === 0
     && ped.p_tipo === null && ped.p_incluir_teste === false, detalhe: JSON.stringify(k) + ' ' + topo.join(',') };
 });
