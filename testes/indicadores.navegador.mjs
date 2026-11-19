@@ -95,6 +95,15 @@ const PESSOAS = (a) => {
     : { procuraram: 50, atendidos: 45, agendaram: 20, robo: 4, robo_sem_atendente: 1, faltaram: 1, cancelaram: 1, faltaram_ou_cancelaram: 2 };
   return { periodo: { de: a.p_de, ate: a.p_ate }, anterior_periodo: { de: a.p_de, ate: a.p_ate }, unidade: a.p_unidade, tipo: a.p_tipo || null, gerado_em: new Date().toISOString(), atual, anterior };
 };
+// Respostas de painel_indicadores_recorrencia (supabase/indicadores-recorrencia.sql): quem usou o chat, primeira vez, recorrentes e cadastradas. Tudo inventado.
+const RECORRENCIA = (a) => {
+  const dias = []; for (let d = a.p_de; d <= a.p_ate && dias.length < 40; d = mais(d, 1)) dias.push({ dia: d, pessoas: 5, primeira_vez: 3, recorrentes: 2 });
+  const chat = (n) => ({ cadastradas: 390 * n, cadastradas_antes: 240 * n, usaram: 168 * n, primeira_vez: 150 * n, recorrentes: 18 * n, primeira_vez_voltaram: 23 * n, conversas_no_periodo: 201 * n, historico_1: 314 * n, historico_2: 54 * n, historico_3mais: 22 * n });
+  const pequeno = a.p_unidade === 'rmtc';
+  return { periodo: { de: a.p_de, ate: a.p_ate }, anterior_periodo: { de: a.p_de, ate: a.p_ate }, unidade: a.p_unidade, gerado_em: new Date().toISOString(),
+    atual: { chat: pequeno ? { ...chat(0), usaram: 4, primeira_vez: 3, recorrentes: 1, cadastradas: 12, historico_1: 10, historico_2: 2 } : chat(1), acesso_rapido: { total: 151, novas: 151, usaram: 151, voltaram: 0, voltaram_outro_dia: 29, so_no_dia_do_cadastro: 122 }, por_dia: dias },
+    anterior: { chat: chat(0.5), acesso_rapido: {}, por_dia: [] } };
+};
 const AGENDA = (a) => {
   const pequeno = a.p_unidade === 'rmtc', ent = pequeno ? 4 : a.p_unidade === 'desenvoar' ? 40 : 60;
   const un = (f) => { const o = {}; for (const k of Object.keys(TOTAL_AG)) o[k] = Math.round(TOTAL_AG[k] * f); return o; };
@@ -142,7 +151,7 @@ const AVISOS_CONF = [
   { id: 72, conversa_id: 'c-2', tipo: 'klingo_dado_faltando', detalhe: { marcacoes: ['900002'], campos: ['celular'], filho: true }, criado_em: `${HOJE}T15:00:00Z`, nome: 'PEDRO DE TESTE' },
   { id: 73, conversa_id: 'c-4', tipo: 'klingo_dado_faltando', detalhe: { marcacoes: ['900004'], campos: ['celular', 'email'], filho: false }, criado_em: `${HOJE}T15:00:00Z`, nome: 'LUCIA DE TESTE' }];
 
-async function pagina(browser, { semSql = false, admin = false, semAtend = false, conf = false, semPlat = false, semAgenda = false, semPessoas = false } = {}) {
+async function pagina(browser, { semSql = false, admin = false, semAtend = false, conf = false, semPlat = false, semAgenda = false, semPessoas = false, semRec = false } = {}) {
   const eu = admin ? ADM : EU;
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 } });   // cartões do topo somem em telas baixas (<= 820 px)
   await ctx.addInitScript(([id, token, email]) => {
@@ -173,6 +182,7 @@ async function pagina(browser, { semSql = false, admin = false, semAtend = false
     }
     else if (p.endsWith('/rpc/painel_indicadores_diretoria')) { const b = JSON.parse(req.postData() || '{}'); reg.rpcs.push(['diretoria', b]); corpo = DIRETORIA; }
     else if (p.endsWith('/rpc/painel_indicadores_pessoas')) { const b = JSON.parse(req.postData() || '{}'); reg.rpcs.push(['pessoas', b]); if (semPessoas) { status = 404; corpo = { code: 'PGRST202', message: 'function not found' }; } else corpo = PESSOAS(b); }
+    else if (p.endsWith('/rpc/painel_indicadores_recorrencia')) { const b = JSON.parse(req.postData() || '{}'); reg.rpcs.push(['recorrencia', b]); if (semRec) { status = 404; corpo = { code: 'PGRST202', message: 'function not found' }; } else corpo = RECORRENCIA(b); }
     else if (p.endsWith('/rpc/painel_indicadores_agenda')) { const b = JSON.parse(req.postData() || '{}'); reg.rpcs.push(['agenda', b]); if (semAgenda) { status = 404; corpo = { code: 'PGRST202', message: 'function not found' }; } else corpo = AGENDA(b); }
     else if (p.endsWith('/rpc/painel_indicadores_plataforma')) { const b = JSON.parse(req.postData() || '{}'); reg.rpcs.push(['plataforma', b]); if (semPlat) { status = 404; corpo = { code: 'PGRST202', message: 'function not found' }; } else corpo = PLATAFORMA; }
     else if (p.endsWith('/rpc/painel_automacao_resumo')) { const b = JSON.parse(req.postData() || '{}'); reg.rpcs.push(['automacao', b]); corpo = AUTOMACAO; }
@@ -238,7 +248,7 @@ await caso('Aba Indicadores: período padrão é Hoje e cada bloco pede só a su
   const nomes = [...new Set(t.reg.rpcs.map((r) => r[0]))].sort().join();
   const ag = ultimo(t.reg, 'agenda');
   await t.ctx.close();
-  return { ok: a.p_de === HOJE && a.p_ate === HOJE && a.p_unidade === null && a.p_incluir_teste === false && ctrl.join() === `${HOJE},${HOJE}` && nomes === 'agenda,atendentes,decisao,diretoria,pessoas' && ag.p_incluir_teste === false && !t.reg.excecoes.length, detalhe: JSON.stringify(a) + ' ' + nomes + (t.reg.excecoes[0] ?? '') };
+  return { ok: a.p_de === HOJE && a.p_ate === HOJE && a.p_unidade === null && a.p_incluir_teste === false && ctrl.join() === `${HOJE},${HOJE}` && nomes === 'agenda,atendentes,decisao,diretoria,pessoas,recorrencia' && ag.p_incluir_teste === false && !t.reg.excecoes.length, detalhe: JSON.stringify(a) + ' ' + nomes + (t.reg.excecoes[0] ?? '') };
 });
 await caso('Topo: só os 5 números pedidos (procuraram, atendidos, agendaram no Klingo, robô sozinho, faltaram ou cancelaram), todos na mesma base, com comparação neutra e nomes que não se repetem', async () => {
   const t = await abrir(); await abaInd(t);
@@ -247,7 +257,7 @@ await caso('Topo: só os 5 números pedidos (procuraram, atendidos, agendaram no
   const todos = await t.page.locator('.ind-kpi-rot').allInnerTexts();
   const ped = ultimo(t.reg, 'pessoas');
   await t.ctx.close();
-  return { ok: topo.join('|') === 'Procuraram o chat|Foram atendidos|Agendaram, confirmado no Klingo|Desses, o robô marcou sozinho|Faltaram ou cancelaram' && ordem === 'Visão da agenda (marcações)' && new Set(todos).size === todos.length
+  return { ok: topo.join('|') === 'Procuraram o chat|Foram atendidos|Agendaram, confirmado no Klingo|Desses, o robô marcou sozinho|Faltaram ou cancelaram' && ordem === 'Quem usa o chat: primeira vez e quem volta' && new Set(todos).size === todos.length
     && k['Procuraram o chat'].startsWith('60 | pessoas, pelo dia em que abriram o chat; cada uma conta uma vez | ▲ 20%') && k['Foram atendidos'].startsWith('57 | 95% de quem procurou') && k['Agendaram, confirmado no Klingo'].startsWith('15 | 25% de quem procurou')
     && k['Desses, o robô marcou sozinho'].startsWith('5 | 33,3% dos que agendaram · 3 sem nenhum atendente na conversa') && k['Faltaram ou cancelaram'].startsWith('3 | 20% dos que agendaram · 2 faltaram · 1 cancelaram') && coloridos === 0
     && ped.p_tipo === null && ped.p_incluir_teste === false, detalhe: JSON.stringify(k) + ' ' + topo.join(',') };
@@ -269,6 +279,32 @@ await caso('Filtro "Só exames": os 5 números e a história das marcações pas
   const hist = await t.page.locator('.ind-painel', { hasText: 'A história das marcações' }).first().locator('.ind-rot').allInnerTexts();
   await t.ctx.close();
   return { ok: ped.p_tipo === 'exame' && k['Procuraram o chat'].startsWith('8 | pessoas que começaram um pedido de exame') && k['Agendaram, confirmado no Klingo'].startsWith('1 |') && /Filtro "Só exames"/.test(txt) && hist[0] === '1. Agendados', detalhe: JSON.stringify(k['Procuraram o chat']) + ' ' + hist.join(',') };
+});
+await caso('Recorrência: pessoas que usaram, primeira vez, já tinham usado e pessoas já cadastradas (390), com acesso rápido e gráfico por dia; só números', async () => {
+  const t = await abrir(); await abaInd(t);
+  await t.page.waitForSelector('text=Pessoas já cadastradas no chat', { timeout: 8000 });
+  const txt = await textoAba(t);
+  const q = ultimo(t.reg, 'recorrencia');
+  const rot = await t.page.locator('.ind-kpi').evaluateAll((l) => Object.fromEntries(l.map((k) => [k.querySelector('.ind-kpi-rot')?.textContent, k.querySelector('b')?.textContent])));
+  const colunas = await t.page.locator('svg.ind-colunas[aria-label^="Pessoas por dia"]').count();
+  if (process.env.CAPTURA_RECORRENCIA) { await t.page.setViewportSize({ width: 1100, height: 900 }); await t.page.locator('h3.ind-sec', { hasText: 'Quem usa o chat' }).scrollIntoViewIfNeeded(); await t.page.screenshot({ path: process.env.CAPTURA_RECORRENCIA }); }
+  await t.ctx.close();
+  return { ok: rot['Pessoas que usaram o chat'] === '168' && rot['Primeira vez'] === '150' && rot['Já tinham usado antes'] === '18' && rot['Pessoas já cadastradas no chat'] === '390'
+    && /Quem usa o chat: primeira vez e quem volta/.test(txt) && /Quantas vezes cada pessoa já usou o chat/.test(txt) && /Acesso rápido \(contas com celular e PIN\)/.test(txt) && /contas criadas até hoje/.test(txt) && colunas === 1
+    && q.p_de === HOJE && q.p_ate === HOJE && q.p_unidade === null && q.p_incluir_teste === false && !t.reg.excecoes.length, detalhe: JSON.stringify(rot) + ' colunas=' + colunas + (t.reg.excecoes[0] ?? '') };
+});
+await caso('Recorrência: escolher a unidade (CSI RM/TC) manda a unidade para a consulta e mostra os números dela', async () => {
+  const t = await abrir(); await abaInd(t);
+  await t.page.selectOption('#selUnidade', 'rmtc');
+  await t.page.waitForFunction(() => [...document.querySelectorAll('.ind-kpi')].some((k) => k.querySelector('.ind-kpi-rot')?.textContent === 'Pessoas já cadastradas no chat' && k.querySelector('b')?.textContent === '12'), null, { timeout: 8000 });
+  const q = ultimo(t.reg, 'recorrencia');
+  await t.ctx.close();
+  return { ok: q.p_unidade === 'rmtc' && !t.reg.excecoes.length, detalhe: JSON.stringify(q) };
+});
+await caso('Sem a função de recorrência no banco: avisa o arquivo a aplicar e o resto da aba continua', async () => {
+  const t = await abrir({ semRec: true }); await abaInd(t);
+  const txt = await textoAba(t); await t.ctx.close();
+  return { ok: /supabase\/indicadores-recorrencia\.sql/.test(txt) && /Visão da agenda \(marcações\)/.test(txt) && /Caminho do paciente no chat/.test(txt) && !t.reg.excecoes.length, detalhe: txt.slice(0, 200) + (t.reg.excecoes[0] ?? '') };
 });
 await caso('Sem a função dos 5 números no banco: avisa o arquivo a aplicar e o resto da aba continua', async () => {
   const t = await abrir({ semPessoas: true }); await abaInd(t);
@@ -369,11 +405,11 @@ await caso('Sem veredito: nada de "Bom/Ruim/Atenção", "período foi bom", "o q
   await t.ctx.close();
   return { ok: chips === 0 && !/O período (foi|pede)|Ver por quê|O que fazer|O que dá para melhorar|Poucos dados|Causa:|Melhorar:/.test(txt), detalhe: `chips=${chips} ` + (txt.match(/O período (foi|pede)|Ver por quê|O que fazer|Causa:|Melhorar:/) || [''])[0] };
 });
-await caso('Ordem da página: números do chat, marcações do chat, equipe, chat do site, onde o chat é usado e marcação automática (nada de clínica toda, avaliações, conferência nem gráfico mensal)', async () => {
+await caso('Ordem da página: números do chat, quem usa o chat (recorrência), marcações do chat, equipe, chat do site, onde o chat é usado e marcação automática (nada de clínica toda, avaliações, conferência nem gráfico mensal)', async () => {
   const t = await abrir({ admin: true }); await abaInd(t);
   const tits = await t.page.locator('.ind-pg h3.ind-sec').allInnerTexts(); const txt = await textoAba(t);
   await t.ctx.close();
-  return { ok: tits.join('|') === 'Visão da agenda (marcações)|A equipe de atendimento|O chat do site|Onde o chat mais é usado' && !/Avaliações dos pacientes|Nota média|Conferência|Para comparar: a clínica toda|Faltas por|Motivos dos cancelamentos/.test(txt), detalhe: tits.join('|') };
+  return { ok: tits.join('|') === 'Quem usa o chat: primeira vez e quem volta|Visão da agenda (marcações)|A equipe de atendimento|O chat do site|Onde o chat mais é usado' && !/Avaliações dos pacientes|Nota média|Conferência|Para comparar: a clínica toda|Faltas por|Motivos dos cancelamentos/.test(txt), detalhe: tits.join('|') };
 });
 await caso('Funil: 6 passos, a maior queda marcada (só uma) e os dois painéis de por que pararam', async () => {
   const t = await abrir(); await abaInd(t);

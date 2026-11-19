@@ -442,7 +442,7 @@
   .ind-mini-sub { display: block; margin-top: 2px; }
   .ind-procura .val { fill: var(--texto); font-size: 14px; font-weight: 700; } .ind-procura .rot { fill: var(--texto); font-size: 15px; font-weight: 650; } .ind-procura .pct { fill: var(--suave); font-size: 13px; }
   .ind-kpis6 { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
-  .ind-kpis5 { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+  .ind-kpis5, .ind-kpisrec { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
   .ind-kpi-un { margin: 8px 0 2px; padding-top: 6px; border-top: 1px solid var(--csi-border); display: grid; gap: 2px; font-size: 13px; }
   .ind-kpi-un > div { display: flex; justify-content: space-between; gap: 8px; } .ind-kpi-un > div > span { color: var(--suave); } .ind-kpi-un > div > strong { font-variant-numeric: tabular-nums; }
   .ind-tipo-leg { font-size: 13px; color: var(--suave); margin-right: 4px; }
@@ -5068,12 +5068,12 @@ h1.longo { font-size: 14mm; }
     return { caixa, total, melhor: melhor < 0 ? null : dados[melhor], melhorValor: melhor < 0 ? 0 : vals[melhor] };
   }
   // Colunas empilhadas: dados = [{ abr, ext, <série>: número }], series = [{ k, rot, cor }]. A legenda mostra o total de cada parte.
-  function graficoColunas(dados, series) {
+  function graficoColunas(dados, series, { titulo = 'Marcações por dia', unid = 'marcações' } = {}) {
     const W = 760, H = 250, ESQ = 40, DIR = 10, TOPO = 14, BAIXO = 34, aw = W - ESQ - DIR, ah = H - TOPO - BAIXO, n = dados.length;
     const soma = (d) => series.reduce((q, s) => q + (Number(d[s.k]) || 0), 0);
     const { passo, topo } = escalaY(Math.max(1, ...dados.map(soma))), larg = aw / n, bw = Math.min(36, larg * 0.72), cada = Math.max(1, Math.ceil(n / 12));
     const y = (v) => TOPO + ah - (v / topo) * ah;
-    const svg = svgEl('svg', { viewBox: `0 0 ${W} ${H}`, class: 'ind-area ind-colunas', role: 'img', 'aria-label': 'Marcações por dia: ' + dados.map((d) => `${d.abr} ${series.map((s) => `${s.rot} ${d[s.k] || 0}`).join(', ')}`).join('; ') });
+    const svg = svgEl('svg', { viewBox: `0 0 ${W} ${H}`, class: 'ind-area ind-colunas', role: 'img', 'aria-label': titulo + ': ' + dados.map((d) => `${d.abr} ${series.map((s) => `${s.rot} ${d[s.k] || 0}`).join(', ')}`).join('; ') });
     for (let v = 0; v <= topo; v += passo) svg.append(svgEl('line', { class: 'grade', x1: ESQ, x2: W - DIR, y1: y(v), y2: y(v) }), svgEl('text', { x: ESQ - 8, y: y(v) + 4, 'text-anchor': 'end' }, String(v)));
     const dica = h('div', { class: 'ind-area-dica', hidden: true }), caixa = h('div', { class: 'ind-area-caixa' }, svg, dica);
     const esconder = () => { dica.hidden = true; svg.querySelectorAll('.zona').forEach((z) => z.classList.remove('on')); };
@@ -5081,7 +5081,7 @@ h1.longo { font-size: 14mm; }
       const cx = ESQ + larg * i + larg / 2; let acc = 0;
       series.forEach((s) => { const v = Number(d[s.k]) || 0; if (!v) return; const y1 = y(acc + v), y0 = y(acc); svg.append(svgEl('rect', { x: cx - bw / 2, y: y1, width: bw, height: Math.max(0, y0 - y1), fill: s.cor })); acc += v; });
       if (i % cada === 0) svg.append(svgEl('text', { x: cx, y: H - 12, 'text-anchor': 'middle' }, d.abr));
-      const zona = svgEl('rect', { class: 'zona', x: ESQ + larg * i, y: TOPO, width: larg, height: ah + BAIXO, fill: 'transparent', tabindex: 0, 'aria-label': `${d.ext}: ${soma(d)} marcações` });
+      const zona = svgEl('rect', { class: 'zona', x: ESQ + larg * i, y: TOPO, width: larg, height: ah + BAIXO, fill: 'transparent', tabindex: 0, 'aria-label': `${d.ext}: ${soma(d)} ${unid}` });
       const mostrar = () => {
         svg.querySelectorAll('.zona').forEach((z, k) => z.classList.toggle('on', k === i));
         dica.hidden = false;
@@ -5237,6 +5237,40 @@ h1.longo { font-size: 14mm; }
     return painel('Chat por dia', 'Cada pessoa conta uma vez por dia. A soma dos dias pode ser maior que o total do período (quem volta em outro dia conta de novo). Passe o mouse (ou toque) para ver o dia.', box);
   }
   const GRAF_SITE = { chave: 'procuraram' };
+  /* ---------- Recorrência (19/11/2026, pedido do dono): quantas pessoas usam o chat, quem é primeira vez, quem volta e quantas já estão cadastradas.
+     Fonte: painel_indicadores_recorrencia (supabase/indicadores-recorrencia.sql). Pessoa = mesmo celular (ou o agrupamento de pessoa única). Só números. ---------- */
+  const COR_REC = { primeira: '#2a78d6', recorrente: '#1f9d55' };
+  function blocoRecorrencia(RC, de, ate) {
+    if (!RC || !RC.atual || !RC.atual.chat) return painel('Quem usa o chat: primeira vez e quem volta', null, h('p', { class: 'erro' }, 'Não consegui carregar a recorrência agora. Use "Atualizar agora" para tentar de novo.'), h('p', { class: 'dica' }, 'Se a mensagem fala de função inexistente, falta rodar o SQL supabase/indicadores-recorrencia.sql.'));
+    const A = RC.atual.chat, B = (RC.anterior || {}).chat || {}, AR = RC.atual.acesso_rapido || {}, un = RC.unidade;
+    const dC = (a, b) => delta(a, b, { cont: true, base: Math.min(a || 0, b || 0), neutro: true });
+    const kpis = h('div', { class: 'ind-kpis ind-kpisrec' },
+      kpi('Pessoas que usaram o chat', nf(A.usaram), `${nf(A.conversas_no_periodo)} conversas no período · cada celular conta uma vez`, dC(A.usaram, B.usaram)),
+      kpi('Primeira vez', nf(A.primeira_vez), `${pTxt(taxa(A.primeira_vez, A.usaram))} de quem usou · nunca tinham aberto o chat antes`, dC(A.primeira_vez, B.primeira_vez), 'Pessoa cuja primeira conversa no chat caiu dentro do período escolhido.'),
+      kpi('Já tinham usado antes', nf(A.recorrentes), `${pTxt(taxa(A.recorrentes, A.usaram))} de quem usou · já tinham conversa antes de ${dmy(de)}`, dC(A.recorrentes, B.recorrentes), 'Pessoa que já tinha conversa antes do período e abriu outra dentro dele.'),
+      kpi('Pessoas já cadastradas no chat', nf(A.cadastradas), `desde o começo do chat até ${dmy(ate)} · ${nf(A.primeira_vez)} entraram neste período`, dC(A.cadastradas, B.cadastradas), 'Todas as pessoas (celulares diferentes) que já abriram o chat, de qualquer unidade e de qualquer data até o fim do período.'));
+    const tot = Math.max(1, A.cadastradas || 0);
+    const vezes = [['Usou 1 vez', A.historico_1], ['Usou 2 vezes', A.historico_2], ['Usou 3 vezes ou mais', A.historico_3mais]];
+    const mxv = Math.max(1, ...vezes.map((x) => x[1] || 0));
+    const dias = diasCorridos(de, ate).slice(-31), m = new Map(((RC.atual || {}).por_dia || []).map((x) => [x.dia, x]));
+    const dados = dias.map((d) => ({ abr: dCurto(d), ext: diaExt(d), primeira: (m.get(d) || {}).primeira_vez || 0, recorrente: (m.get(d) || {}).recorrentes || 0 }));
+    const linhas = [...dias].reverse().map((d) => { const x = m.get(d) || {}; return h('tr', {}, h('td', {}, diaExt(d)), h('td', {}, nf(x.pessoas)), h('td', {}, nf(x.primeira_vez)), h('td', {}, nf(x.recorrentes))); });
+    const tem = (AR.total || 0) > 0;
+    return h('div', {},
+      kpis,
+      h('div', { class: 'ind-grade' },
+        painel('Quantas vezes cada pessoa já usou o chat', `Das ${nf(A.cadastradas)} pessoas cadastradas${un ? ' (nesta unidade)' : ''}, desde o começo. ${nf(A.primeira_vez_voltaram)} das ${nf(A.primeira_vez)} que foram de primeira vez neste período já voltaram a abrir outra conversa dentro do próprio período.`,
+          vezes.map(([rot, v]) => barra(rot, v || 0, mxv, `${nf(v)} · ${pTxt(taxa(v, tot))}`, 'azul'))),
+        painel('Acesso rápido (contas com celular e PIN)', 'Da clínica toda: não muda com a unidade. O sistema guarda só o último acesso de cada conta, então em períodos antigos "usaram" fica abaixo do real.',
+          tem ? h('div', { class: 'ind-minis' },
+            mini(AR.total, 'contas criadas até hoje'), mini(AR.novas, 'contas novas no período'), mini(AR.usaram, 'entraram no período', `${nf(AR.voltaram)} já tinham conta antes`),
+            mini(AR.voltaram_outro_dia, 'voltaram em outro dia', `${pTxt(taxa(AR.voltaram_outro_dia, AR.total))} das contas`), mini(AR.so_no_dia_do_cadastro, 'só entraram no dia do cadastro', `${pTxt(taxa(AR.so_no_dia_do_cadastro, AR.total))} das contas`))
+            : h('p', { class: 'dica' }, 'Nenhuma conta criada ainda.'))),
+      painel('Primeira vez e quem volta, por dia', 'Cada coluna é um dia. Primeira vez = a pessoa abriu o chat pela primeira vez naquele dia. Já tinham usado = já tinha conversa em dia anterior. A soma dos dias pode passar do total do período (quem volta em outro dia conta de novo).' + (dias.length === 31 ? ' Mostrando os últimos 31 dias.' : ''),
+        graficoColunas(dados, [{ k: 'primeira', rot: 'Primeira vez', cor: COR_REC.primeira }, { k: 'recorrente', rot: 'Já tinham usado antes', cor: COR_REC.recorrente }], { titulo: 'Pessoas por dia', unid: 'pessoas' }),
+        detalheNumeros(h('div', { class: 'ind-tab-rolagem' }, h('table', { class: 'ind-tab-graf' }, h('thead', {}, h('tr', {}, ['Dia', 'Pessoas', 'Primeira vez', 'Já tinham usado'].map((t) => h('th', {}, t)))), h('tbody', {}, linhas))))),
+      h('p', { class: 'dica' }, 'Aqui "pessoa" é o mesmo celular (ou a mesma pessoa que a equipe/sistema já juntou). Por isso estes números podem ser um pouco menores que "Procuraram o chat" no topo, que só junta conversas quando 3 dados batem. O chat é novo (começou em 29/10/2026): quem falava antes disso aparece como primeira vez.'));
+  }
   async function viewIndicadores(c, silencioso = false) {
     if (IND.preset !== 'livre') [IND.de, IND.ate] = periodoDe(IND.preset);
     const titulo = h('h2', {}, 'Indicadores');
@@ -5247,10 +5281,11 @@ h1.longo { font-size: 14mm; }
     const mole = (p) => Promise.resolve(p).then((x) => x, () => ({ error: true, data: null }));
     // Quantidade por unidade nos 5 quadros (19/11/2026): a mesma função, uma vez por unidade, junto com as outras consultas. Com a unidade já escolhida no topo não precisa.
     const UN_QUADROS = [...UNIDADES_PAINEL, ['sem', 'Sem unidade definida']];
-    const [r, dir, ag, eq, pes, ...porUn] = await Promise.all([db.rpc('painel_indicadores_decisao', args),
+    const [r, dir, ag, eq, pes, rec, ...porUn] = await Promise.all([db.rpc('painel_indicadores_decisao', args),
       mole(db.rpc('painel_indicadores_diretoria', { p_de: IND.de, p_ate: IND.ate, p_incluir_teste: IND.teste })),
       mole(db.rpc('painel_indicadores_agenda', args)), mole(db.rpc('painel_indicadores_atendentes', args)),
       mole(db.rpc('painel_indicadores_pessoas', { ...args, p_tipo: IND.tipo })),
+      mole(db.rpc('painel_indicadores_recorrencia', args)),
       ...(un ? [] : UN_QUADROS.map(([k]) => mole(db.rpc('painel_indicadores_pessoas', { ...args, p_unidade: k, p_tipo: IND.tipo }))))]);
     if (S.aba !== 'indicadores' || minha !== viewIndicadores.seq) return;
     if (r.error || !r.data) {
@@ -5261,6 +5296,7 @@ h1.longo { font-size: 14mm; }
     const D = dir && !dir.error ? dir.data : null;
     const AGD = ag && !ag.error && ag.data && ag.data.atual ? ag.data : null;
     const PES = pes && !pes.error && pes.data && pes.data.atual ? pes.data : null;
+    const REC = rec && !rec.error && rec.data && rec.data.atual ? rec.data : null;
     const hojeISO = isoSP();
     const atalhos = h('div', { class: 'chips ind-atalhos', role: 'group', 'aria-label': 'Período' },
       PRESETS_IND.map(([k, t]) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(IND.preset === k), onclick: () => { IND.preset = k; viewIndicadores(c); } }, t)));
@@ -5342,6 +5378,8 @@ h1.longo { font-size: 14mm; }
       R.periodo && R.periodo.ate === hojeISO ? h('p', { class: 'dica' }, 'O período inclui hoje, que ainda não terminou (e há conversas abertas): as setas comparam com um período inteiro e tendem a mostrar queda.') : null,
       kpisTopo,
       h('p', { class: 'dica' }, 'Os 5 números usam a mesma base: pessoas, pelo dia em que abriram o chat. Cada pessoa conta uma vez. Quem não tem marcação no Klingo não entra em "Agendaram", mesmo que a conversa tenha sido encerrada como "Agendado".' + (PU ? ' Dentro de cada quadro, a lista mostra a quantidade por unidade (quem ainda não escolheu a unidade fica em "Sem unidade definida"; em raros casos uma pessoa que mudou de unidade aparece em duas e a soma passa do total).' : '')),
+      h('h3', { class: 'ind-sec' }, 'Quem usa o chat: primeira vez e quem volta'),
+      blocoRecorrencia(REC, R.periodo.de, R.periodo.ate),
       blocoProcura(CA.por_tipo),
       h('h3', { class: 'ind-sec' }, 'Visão da agenda (marcações)'),
       h('p', { class: 'dica' }, 'Aqui a conta é por marcação e pela data do exame ou da consulta (não pelo dia em que a pessoa abriu o chat). Só entram as marcações do Klingo que vieram de uma conversa do chat (ligadas pelo pedido, ou por celular e nome). Marcação feita só pela recepção ou pelo telefone não entra.'),
