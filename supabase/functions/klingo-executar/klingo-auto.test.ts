@@ -3,8 +3,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { classificar, cotaGlobal, KlingoApi, KlingoErro, resumoPaciente } from "./klingo-api.ts";
-import { acharVoucher, executar, executarCancelamento, executarConsulta, executarMarcacao, type Pegar, type Rpc } from "./executor.ts";
+import { classificar, cotaGlobal, KlingoApi, KlingoErro, nomeConfere, resumoPaciente } from "./klingo-api.ts";
+import { acharVoucher, executar, notaDoCadastro, procurarCadastroPorTelefone, executarCancelamento, executarConsulta, executarMarcacao, type Pegar, type Rpc } from "./executor.ts";
 import { identificar } from "../klingo-identificar/identificar.ts";
 import { KlingoApi as KlingoApiIdent } from "../klingo-identificar/klingo-api.ts";   // cada função usa a própria cópia (classe de erro própria)
 import { montarOfertas, pedidoDaApi } from "../chat-agenda-api/oferta.ts";
@@ -25,6 +25,7 @@ type Cena = {
   vouchersDepoisDeCancelar?: Array<Record<string, unknown>>;   // o que a lista mostra depois do DELETE /voucher
   cancelar?: "ok" | "timeout" | "ja_cancelado";
   register?: "ok" | "timeout";
+  identificarTel?: "achou" | "recusa_400" | "outro_nome" | "outra_data" | "id_pre" | "queda";   // POST /paciente/identificar (telefone + nascimento); sem isso = 403 (não achou)
   limiteNaPrimeira?: boolean;
 };
 function klingo(c: Cena) {
@@ -36,6 +37,13 @@ function klingo(c: Cena) {
     const corpo = init?.body ? JSON.parse(String(init.body)) : undefined; corpos.push({ rota, corpo });
     if (c.limiteNaPrimeira && !jaDeu429 && rota.startsWith("GET /agenda/horarios")) { jaDeu429 = true; return resp(429, "<html>429</html>", "text/html"); }
     if (rota === "GET /paciente/cpf") return c.paciente ? resp(200, c.paciente) : resp(403, { msg: `Paciente não identificado: . ${u.searchParams.get("cpf")}`, code: "PACIENTE_NAO_IDENTIFICADO" });
+    if (rota === "POST /paciente/identificar") {
+      const t = c.identificarTel;
+      if (t === "queda") { const e = new Error("t"); e.name = "TimeoutError"; throw e; }
+      if (t === "recusa_400") return resp(400, { msg: "campo inválido" });
+      if (!t) return resp(403, { msg: "credenciais inválidas" });
+      return resp(200, { access_token: "tokTel", user: { id: t === "id_pre" ? "7777" : "P777", nome: t === "outro_nome" ? "Joana Silva" : "Maria Teste", nascimento: t === "outra_data" ? "1999-01-01" : NASC } });
+    }
     if (rota === "POST /externo/register") { if (c.register === "timeout") { const e = new Error("t"); e.name = "TimeoutError"; throw e; } return resp(200, { id: 7960 }); }
     if (rota === "POST /externo/login") return resp(200, { access_token: "tok", user: c.loginUser ?? { id: corpo.id, nome: "Maria Teste", nascimento: NASC, id_paciente: String(corpo.id).startsWith("P") ? "1" : "" } });
     if (rota === "GET /agenda/horarios") return resp(200, { horarios: [{ id: "x", data: "2026-11-20", procedimento: 1096, profissional: { id: 63, nome: "GEANNE CHRISTINA PINHEIRO" }, unidade: { id: 2, nome: "DESENVOAR" },
@@ -451,4 +459,85 @@ test("VER MARCAÇÕES não lista exame já realizado (atendido) como se pudesse 
   const { api } = apiDe({ paciente: PAC, vouchers: [V26700, { ...V26700, id: 41009, status: "atendido" }] });
   const r = await executar(api, rpcDe().rpc, opDe("ler_vouchers", {}), ESPS);
   assert.deepEqual(r.marcacoes!.map((m) => m.id), ["26700"]);
+});
+
+
+// ------------------------------------------------------------------ v1.5: achar cadastro existente por telefone antes de criar pré-cadastro
+test("TELEFONE: CPF não achado, mas telefone + nascimento + nome conferem: marca no cadastro existente, SEM criar pré-cadastro", async () => {
+  const a = apiDe({ paciente: null, identificarTel: "achou" }); const g = rpcDe({ preCadastro: true });
+  const r = await executarMarcacao(a.api, g.rpc, pegar(), ESPS);
+  assert.equal(r.estado, "sucesso"); assert.equal(r.cadastro, "achado_telefone");
+  assert.ok(!a.k.chamadas.includes("POST /externo/register"));
+  assert.equal(a.k.corpos.find((c) => c.rota === "POST /externo/login")!.corpo.id, "P777");
+  assert.ok(!g.gravados.some((x) => x.nome === "klingo_pre_reservar" || x.nome === "klingo_pre_gravar"), "não reserva nem grava pré-cadastro");
+  const corpo = a.k.corpos.find((c) => c.rota === "POST /paciente/identificar")!.corpo;
+  assert.deepEqual(corpo, { telefone: "71999990001", dt_nascimento: NASC });
+  assert.match(notaDoCadastro(r.cadastro, r.estado)!, /nenhum pré-cadastro novo/);
+});
+test("TELEFONE: nome diferente, nascimento diferente ou id que não é definitivo: NÃO usa o cadastro achado e cria o pré-cadastro como antes", async () => {
+  for (const t of ["outro_nome", "outra_data", "id_pre", "recusa_400"] as const) {
+    const a = apiDe({ paciente: null, identificarTel: t }); const r = await executarMarcacao(a.api, rpcDe({ preCadastro: true }).rpc, pegar(), ESPS);
+    assert.equal(r.estado, "sucesso", t); assert.equal(r.cadastro, t === "outro_nome" ? "pre_novo_conferir" : "pre_novo", t);
+    assert.equal(a.k.chamadas.filter((c) => c === "POST /externo/register").length, 1, t);
+    assert.notEqual(a.k.corpos.find((c) => c.rota === "POST /externo/login")!.corpo.id, "P777", t);
+  }
+});
+test("TELEFONE: o Klingo não acha (403): cria o pré-cadastro e deixa nota de conferir duplicado", async () => {
+  const a = apiDe({ paciente: null }); const r = await executarMarcacao(a.api, rpcDe({ preCadastro: true }).rpc, pegar(), ESPS);
+  assert.equal(r.estado, "sucesso"); assert.equal(r.cadastro, "pre_novo");
+  assert.match(notaDoCadastro(r.cadastro, r.estado)!, /conferir duplicado/);
+});
+test("TELEFONE: queda na busca = a marcação PARA com código próprio (nunca cria um possível duplicado às cegas)", async () => {
+  const a = apiDe({ paciente: null, identificarTel: "queda" }); const r = await executarMarcacao(a.api, rpcDe({ preCadastro: true }).rpc, pegar(), ESPS);
+  assert.equal(r.estado, "falha"); assert.equal(r.codigo, "busca_cadastro_falhou");
+  assert.ok(!a.k.chamadas.includes("POST /externo/register") && !a.k.chamadas.includes("POST /agenda/horario"));
+});
+test("TELEFONE: sem celular válido não pergunta ao Klingo; pré-cadastro já guardado para o CPF + nascimento segue o caminho de antes", async () => {
+  let a = apiDe({ paciente: null, identificarTel: "achou" }); let r = await executarMarcacao(a.api, rpcDe({ preCadastro: true }).rpc, pegar({ celular: null }), ESPS);
+  assert.ok(!a.k.chamadas.includes("POST /paciente/identificar")); assert.equal(r.cadastro, "pre_novo");
+  a = apiDe({ paciente: null, identificarTel: "achou" });
+  const base = rpcDe({ preCadastro: true, pre: { acao: "existente", klingo_id: "7900" } });
+  const rpc: Rpc = async (n, args) => n === "klingo_pre_do_par" ? { data: { klingo_id: "7900" } } : base.rpc(n, args);
+  r = await executarMarcacao(a.api, rpc, pegar(), ESPS);
+  assert.ok(!a.k.chamadas.includes("POST /paciente/identificar")); assert.equal(r.estado, "sucesso"); assert.equal(r.cadastro, undefined);
+});
+test("TELEFONE: só vale para MARCAR; ver marcações e cancelar continuam só por CPF ou pré-cadastro guardado (nunca por telefone)", async () => {
+  let a = apiDe({ paciente: null, identificarTel: "achou", vouchers: [] });
+  const r1 = await executarConsulta(a.api, rpcDe().rpc, { ...pegar(), operacao: { ...pegar().operacao, tipo: "ler_vouchers" } });
+  assert.equal(r1.codigo, "cadastro_nao_encontrado"); assert.ok(!a.k.chamadas.includes("POST /paciente/identificar"));
+  a = apiDe({ paciente: null, identificarTel: "achou", vouchers: [] });
+  const r2 = await executarCancelamento(a.api, rpcDe().rpc, { ...pegar(), operacao: { ...pegar().operacao, tipo: "cancelar", detalhe: { voucher: "26700" } } });
+  assert.equal(r2.codigo, "cadastro_nao_encontrado"); assert.ok(!a.k.chamadas.includes("POST /paciente/identificar"));
+});
+test("TELEFONE: nomeConfere exige nome completo (2+ nomes) e tolera acento, caixa e ligação; nome vazio nunca confere", () => {
+  assert.ok(nomeConfere("ANALU FONSECA SERRA", "Analu Fonseca Serra"));
+  assert.ok(nomeConfere("JOÃO DA SILVA SANTOS", "Joao Silva Santos"));
+  assert.ok(nomeConfere("MARIA ANA SOUZA", "Maria Souza"));   // curto dentro do longo, mesmo 1º e último
+  assert.equal(nomeConfere("MARIA ANA SOUZA", "Maria Clara Souza"), false);
+  assert.equal(nomeConfere("ANALU FONSECA SERRA", "Luanne Fonseca Silva"), false);
+  // nome digitado incompleto (sem o último sobrenome) confere; irmã com nome parecido não
+  assert.ok(nomeConfere("ANA LOUISE LIBORIO BORGES", "Ana Louise liborio"));
+  assert.ok(nomeConfere("ANALU FONSECA SERRA", "Analu Fonseca"));
+  assert.equal(nomeConfere("ANA LOUISE LIBORIO BORGES", "Ana Lis Liborio"), false);
+  assert.equal(nomeConfere("ANALU", "Analu"), false); assert.equal(nomeConfere("", ""), false); assert.equal(nomeConfere(null, "Maria Teste"), false);
+});
+test("TELEFONE: celular curto ou nome de um só termo não consulta o Klingo", async () => {
+  const a = apiDe({ identificarTel: "achou" });
+  assert.equal(await procurarCadastroPorTelefone(a.api, pegar({ celular: "999990001" }).dados), null);
+  assert.equal(await procurarCadastroPorTelefone(a.api, pegar({ nome: "Maria" }).dados), null);
+  assert.ok(!a.k.chamadas.includes("POST /paciente/identificar"), "celular curto e nome de um termo não chamam o Klingo");
+  assert.deepEqual(await procurarCadastroPorTelefone(a.api, pegar().dados), { id: "P777" });
+});
+
+test("TELEFONE: nome digitado sem o último sobrenome usa o cadastro existente; nome diferente avisa provável duplicado na nota", async () => {
+  const k = klingo({ paciente: null, identificarTel: "achou" });
+  const api = new KlingoApi("clinicacsi:segredo", async (u, i) => {
+    const rota = `${i?.method ?? "GET"} ${new URL(u).pathname.replace("/api", "")}`;
+    if (rota === "POST /paciente/identificar") return new Response(JSON.stringify({ access_token: "t", user: { id: "P888", nome: "MARIA TESTE SOUZA", nascimento: NASC } }), { status: 200, headers: { "content-type": "application/json" } });
+    if (rota === "POST /externo/login") return new Response(JSON.stringify({ access_token: "tok", user: { id: "P888", nome: "MARIA TESTE SOUZA", nascimento: NASC, id_paciente: "1" } }), { status: 200, headers: { "content-type": "application/json" } });
+    return k.f(u, i);
+  }, semEspera);
+  const r = await executarMarcacao(api, rpcDe({ preCadastro: true }).rpc, pegar({ nome: "Maria Teste" }), ESPS);
+  assert.equal(r.cadastro, "achado_telefone"); assert.equal(r.estado, "sucesso");
+  assert.match(notaDoCadastro("pre_novo_conferir", "sucesso")!, /PROV\u00c1VEL DUPLICADO/);
 });

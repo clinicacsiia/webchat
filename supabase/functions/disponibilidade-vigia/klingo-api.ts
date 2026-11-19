@@ -1,4 +1,6 @@
 // Cliente da API externa do Klingo (host api-externa.klingo.app, base /api) usado pelo autoatendimento.
+// Versão 1.6 — 19/11/2026 / Mudança: nomeConfere aceita nome digitado incompleto (começo igual ao do Klingo).
+// Versão 1.5 — 19/11/2026 / Mudança: pacientePorTelefone (telefone + nascimento) e nomeConfere, para achar o cadastro antes de criar pré-cadastro.
 // Versão 1.0 — 12/11/2026. ESTE ARQUIVO É COPIADO IGUAL para klingo-executar, chat-agenda-api, klingo-identificar e klingo-sincronizar
 // (as Edge Functions publicam cada pasta isolada); o teste klingo-auto.test.ts confere que as quatro cópias são idênticas.
 // Sem dependência do Deno: o `fetch` entra por parâmetro para testar com dados inventados.
@@ -211,6 +213,21 @@ export function camposDivergentes(
   return out;
 }
 
+/**
+ * v1.5 (19/11/2026): o nome do Klingo é o mesmo que o digitado? Mais rígido que a conferência de campos: nome vazio dos dois lados NÃO conta como igual.
+ * Ignora acento, caixa e ligações (de, da, do, e). Igual, começo igual (nome digitado sem o último sobrenome) ou mesmo primeiro e último nome com todos os nomes do mais curto presentes no outro.
+ */
+export function nomeConfere(a: unknown, b: unknown): boolean {
+  const lig = new Set(["DE", "DA", "DO", "DAS", "DOS", "E"]);
+  const toks = (v: unknown) => semAcento(v).split(" ").filter((t) => t && !lig.has(t));
+  const x = toks(a), y = toks(b);
+  if (x.length < 2 || y.length < 2) return false;
+  // v1.6: nome digitado incompleto (a mãe esquece o último sobrenome da criança): vale se TODOS os nomes digitados são o começo do nome do Klingo, ou o contrário
+  const [curto, longo] = x.length <= y.length ? [x, y] : [y, x];
+  if (curto.every((t, i) => t === longo[i])) return true;
+  return x.join(" ") === y.join(" ") || (x[0] === y[0] && x[x.length - 1] === y[y.length - 1] && x.filter((t) => y.includes(t)).length >= Math.min(x.length, y.length));
+}
+
 export class KlingoApi {
   private appToken: string;
   private f: Fetcher;
@@ -271,6 +288,22 @@ export class KlingoApi {
 
   /** GET /paciente/cpf — cadastro pelo CPF (11 dígitos). Não acha quem só tem pré-cadastro. */
   pacientePorCpf(cpf: string) { return this.chamar<Record<string, unknown>>("GET", "/paciente/cpf", { query: { cpf } }); }
+
+  /**
+   * v1.5 (19/11/2026): POST /paciente/identificar com TELEFONE + nascimento (a rota feita para o WhatsApp). Só acha quem tem cadastro definitivo.
+   * 4xx (403 = não achou) devolve null; queda, 5xx e limite sobem. Quem chama PRECISA conferir nome e nascimento do `user` antes de usar a sessão.
+   */
+  async pacientePorTelefone(telefone: string, nascimento: string): Promise<{ token: string; user: Record<string, unknown> } | null> {
+    try {
+      const r = await this.chamar<{ access_token?: string; user?: Record<string, unknown> }>("POST", "/paciente/identificar", { corpo: { telefone: String(telefone).replace(/\D/g, ""), dt_nascimento: nascimento } });
+      if (!r?.access_token) return null;
+      return { token: r.access_token, user: r.user ?? {} };
+    } catch (e) {
+      // 403 = não achou. Outro 4xx (menos 429) = a rota não aceitou o pedido: também "não achou" (a marcação segue como antes). Queda, 5xx, HTML e limite SOBEM.
+      if (e instanceof KlingoErro && e.status >= 400 && e.status < 500 && e.status !== 429) return null;
+      throw e;
+    }
+  }
 
   /**
    * POST /externo/login. O id vai EXATAMENTE como o Klingo o devolveu: definitivo "P123456"; pré-cadastro o número puro (com P abre OUTRO paciente).

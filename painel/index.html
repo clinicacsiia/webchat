@@ -774,7 +774,7 @@
   };
   /* ---------- pré-agendamento montado pela IA ---------- */
   const ROTULO_PRE = { rascunho: 'Em coleta', pronto: 'Pronto para marcar', agendado: 'Agendado', cancelado: 'Cancelado' };
-  const ROTULO_IDENT = { nova: 'Paciente novo: validar no Klingo', aguardando: 'Parece já ser paciente: data de nascimento ainda não conferida',
+  const ROTULO_IDENT = { nova: 'Não achamos este paciente na nossa base. Isso não prova que seja novo: conferir no Klingo por nome e nascimento (o CPF informado pode ser do responsável)', aguardando: 'Parece já ser paciente: data de nascimento ainda não conferida',
     conferida: 'Paciente conhecido: identidade conferida', atualizar: 'Paciente conhecido: alguns dados foram atualizados, conferir',
     divergente: 'Dados não batem com o cadastro que temos: tratar como paciente novo e conferir' };
   const CAMPOS_PRE = [['nome', 'Nome'], ['nome_social', 'Nome social'], ['sexo', 'Sexo'], ['dt_nasc', 'Nascimento'], ['mae', 'Mãe'], ['cpf', 'CPF'], ['rg', 'RG'], ['cns', 'CNS'],
