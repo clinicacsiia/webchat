@@ -2081,7 +2081,7 @@
       const { data, error } = await db.rpc('chat_consultas', { p_conversa: conv.id, p_token: conv.token });
       if (error) throw error;
       if (!conv || conv.id !== minha) return;
-      if (data && data.sem_unidade_autorizada) { blocoWhatsapp(f.corpo, f.rodape, data.aviso); return; }
+      if (data && data.sem_unidade_autorizada) { blocoWhatsapp(f.corpo, f.rodape); return; }
       const lista = (data && data.consultas) || [];
       const salvar = async (c, botao) => {
         botao.disabled = true;
@@ -2973,19 +2973,19 @@
      nao_integrado (o atendimento é da equipe: sem horário automático), sem_consulta (ainda não consultou). A grade nunca vira horário na tela. */
   /* ---------- Unidade não autorizada no chat: volta para o WhatsApp (19/11/2026) ----------
      Só a Desenvoar marca pelo chat (Configurações > Marcação automática por unidade). Quem cai em outra unidade (consulta de adulto, exame de CSI ou RM/TC) não segue:
-     o chat explica e leva ao WhatsApp. O toque também chama a equipe na própria conversa (responder com acao 'atendente'), sem mandar dado pessoal no link. */
+     o chat explica e leva ao WhatsApp. Decisão do dono: a equipe NÃO é chamada na conversa (nada de acao 'atendente' aqui) e o link não leva dado pessoal. */
   const WHATS_CLINICA = '5571999803806';
-  function blocoWhatsapp(corpo, rodape, aviso) {
+  function blocoWhatsapp(corpo, rodape) {
     const link = `https://wa.me/${WHATS_CLINICA}?text=${encodeURIComponent('Olá! Estava no chat do site e preciso de ajuda para agendar.')}`;
-    corpo.replaceChildren(h('p', { class: 'aviso-cal', role: 'status' }, aviso || 'No momento, o agendamento automático está disponível só para a Desenvoar. Para as outras unidades, a nossa equipe faz o agendamento com você.'),
-      h('p', { class: 'p-dica' }, 'Para este atendimento, continue pelo WhatsApp. A nossa equipe agenda com você.'));
+    corpo.replaceChildren(h('p', { class: 'aviso-cal', role: 'status' }, 'No momento, o agendamento pelo chat está disponível só para a Desenvoar.'),
+      h('p', { class: 'p-dica' }, 'Para este atendimento, continue pelo WhatsApp.'));
     rodape.replaceChildren(
-      h('a', { class: 'btn-w', href: link, target: '_blank', rel: 'noopener', style: 'display:block;text-align:center;text-decoration:none', onclick: () => { setTimeout(() => { fecharFolha(); pedirAtendente(); }, 300); } }, 'Continuar pelo WhatsApp'),
-      h('button', { class: 'btn-w sec', type: 'button', onclick: () => { fecharFolha(); pedirAtendente(); } }, 'Prefiro esperar a equipe aqui no chat'));
+      h('a', { class: 'btn-w', href: link, target: '_blank', rel: 'noopener', style: 'display:block;text-align:center;text-decoration:none' }, 'Continuar pelo WhatsApp'),
+      h('button', { class: 'btn-w sec', type: 'button', onclick: () => fecharFolha() }, 'Fechar'));
   }
   function desenharSemHorarios(r) {
     const corpo = $('#folhaCorpo'), rodape = $('#folhaRodape'), est = r.estado;
-    if (est === 'sem_horarios' && r.unidades_bloqueadas) { blocoWhatsapp(corpo, rodape, r.aviso); return; }
+    if (est === 'sem_horarios' && r.unidades_bloqueadas) { blocoWhatsapp(corpo, rodape); return; }
     corpo.replaceChildren(); rodape.replaceChildren();
     const falhou = est === 'indisponivel' || est === 'sem_consulta';
     corpo.append(h('p', { class: 'aviso-cal', role: 'status' }, est === 'sem_horarios' ? (r.unidades_bloqueadas && r.aviso ? r.aviso : 'Não encontramos horários disponíveis para esse atendimento no momento.')

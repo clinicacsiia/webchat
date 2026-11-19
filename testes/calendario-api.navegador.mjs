@@ -171,18 +171,18 @@ await caso('UNIDADE DESLIGADA (exame sem horário só em CSI/RM-TC): aviso, bot�
   const { page, ctx, erros } = await abrir('sem_horarios', (m) => { m.api.bloqueada = true; });
   await page.waitForSelector('#folhaRodape a.btn-w', { timeout: 8000 });
   const t = await texto(page), b = await botoes(page), href = await page.$eval('#folhaRodape a.btn-w', (a) => a.href), tem = await page.$$('#folhaCorpo .slot, #folhaCorpo .cal-dia');
-  const sem = !b.some((x) => /Registrar minha disponibilidade|consultar de novo/i.test(x));
+  const sem = !b.some((x) => /Registrar minha disponibilidade|consultar de novo|equipe/i.test(x));
   await ctx.close();
-  return { ok: /disponível só para Desenvoar/.test(t) && /continue pelo WhatsApp/i.test(t) && /^https:\/\/wa\.me\/5571999803806\?text=/.test(href) && sem && tem.length === 0 && erros.excecoes.length === 0, detalhe: `href=${href}; botões=${b.join(' | ')}` };
+  return { ok: /disponível só para a Desenvoar/.test(t) && /continue pelo WhatsApp/i.test(t) && /^https:\/\/wa\.me\/5571999803806\?text=/.test(href) && sem && tem.length === 0 && erros.excecoes.length === 0, detalhe: `href=${href}; botões=${b.join(' | ')}` };
 });
-await caso('UNIDADE DESLIGADA: tocar em "Continuar pelo WhatsApp" abre o link e chama a equipe na própria conversa (acao atendente)', async () => {
+await caso('UNIDADE DESLIGADA: tocar em "Continuar pelo WhatsApp" NÃO chama a equipe (nenhum chat_responder, nenhuma acao atendente)', async () => {
   const { mundo, page, ctx } = await abrir('sem_horarios', (m) => { m.api.bloqueada = true; });
   await page.waitForSelector('#folhaRodape a.btn-w', { timeout: 8000 });
   await page.$eval('#folhaRodape a.btn-w', (a) => { a.removeAttribute('target'); a.href = '#wa'; });   // não sair da página de teste
   await page.click('#folhaRodape a.btn-w'); await new Promise((r) => setTimeout(r, 1200));
-  const chamou = mundo.chamadas.some((c) => c.nome === 'chat_responder' && c.corpo && c.corpo.p_valor && c.corpo.p_valor.acao === 'atendente');
+  const chamou = mundo.chamadas.some((c) => c.nome === 'chat_responder' || c.nome === 'chat_enviar');
   await ctx.close();
-  return { ok: chamou, detalhe: `chat_responder atendente=${chamou}` };
+  return { ok: !chamou, detalhe: `chamou o servidor para falar com a equipe=${chamou}` };
 });
 await caso('CONSULTA SEM UNIDADE AUTORIZADA (adulto com a CSI desligada): sem lista de consultas, com o aviso e o botão do WhatsApp', async () => {
   const mundo = criarMundo(); mundo.consultas = { medico_preferido: null, consultas: [], sem_unidade_autorizada: true, aviso: 'No momento, o agendamento automático está disponível só para Desenvoar. Para as outras unidades, a nossa equipe faz o agendamento com você.' };
@@ -195,7 +195,7 @@ await caso('CONSULTA SEM UNIDADE AUTORIZADA (adulto com a CSI desligada): sem li
   await page.waitForSelector('#folhaRodape a.btn-w', { timeout: 8000 });
   const t = await texto(page), n = await page.$$('#folhaCorpo .op-lista .op');
   await ctx.close();
-  return { ok: /disponível só para Desenvoar/.test(t) && /Continuar pelo WhatsApp/.test(t) && n.length === 0 && erros.excecoes.length === 0, detalhe: `consultas listadas=${n.length}` };
+  return { ok: /disponível só para a Desenvoar/.test(t) && /Continuar pelo WhatsApp/.test(t) && n.length === 0 && erros.excecoes.length === 0, detalhe: `consultas listadas=${n.length}` };
 });
 
 await browser.close(); srv.close();
