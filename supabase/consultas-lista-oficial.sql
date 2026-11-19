@@ -54,10 +54,18 @@ insert into public.consulta_config (procedimento_id, oculta, rotulo) values
   (1783, true, null)    -- Puericultura
 on conflict (procedimento_id) do update set oculta = excluded.oculta, rotulo = excluded.rotulo, atualizado_em = now();
 
+-- ===== Parte 3: pedidos que já existem não mudam (pedido do dono: a lista nova vale só para os próximos) =====
+-- consultas_da_unidade_antigas = consultas_da_unidade sem o filtro "oculta". fluxo_medicos, fluxo_rotulo_item e fluxo_perguntar
+-- passam a usá-la só para reconhecer o item do pedido (médicos e nome da consulta). A lista que o paciente escolhe
+-- (chat_consultas) e o salvamento (chat_consulta_salvar) continuam em consultas_da_unidade, com as consultas ocultas fora.
+-- Corpo da função: supabase/producao/funcoes/consultas_da_unidade_antigas.sql. As 3 funções foram trocadas assim:
+--   execute replace(pg_get_functiondef(f), 'public.consultas_da_unidade(', 'public.consultas_da_unidade_antigas(')
+
 -- CONSULTA CARDIOPEDIATRICA (416): hoje a agenda dela (Daniela Ladeia, Camila Franzoni) está na CSI, que está desligada no chat.
 -- Fica pronta aqui; só aparece quando o Klingo tiver a agenda na unidade DESENVOAR (o catálogo é copiado do Klingo às 03:00).
 
 -- ===== ROLLBACK =====
 -- delete from public.consulta_config where procedimento_id in (1132,1474,1470,1472,1471,2100,2127,2128,1783,416);
 -- delete from public.config where chave = 'consultas_sem_api';
+-- (parte 3) voltar fluxo_medicos, fluxo_rotulo_item e fluxo_perguntar para 'public.consultas_da_unidade(' e: drop function public.consultas_da_unidade_antigas(text);
 -- e voltar klingo_liberado para supabase/producao/funcoes/klingo_liberado.sql
