@@ -443,6 +443,8 @@
   .ind-procura .val { fill: var(--texto); font-size: 14px; font-weight: 700; } .ind-procura .rot { fill: var(--texto); font-size: 15px; font-weight: 650; } .ind-procura .pct { fill: var(--suave); font-size: 13px; }
   .ind-kpis6 { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
   .ind-kpis5 { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+  .ind-eq-tit { margin: 18px 0 2px; font-size: 20px; }
+  .ind-kpis-eq { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin: 10px 0 6px; }
   .ind-tipo-leg { font-size: 13px; color: var(--suave); margin-right: 4px; }
   .ind-pt { display: inline-block; width: 9px; height: 9px; border-radius: 3px; margin-right: 6px; }
   .ind-colunas .zona.on { fill: rgba(42,120,214,.10); }
@@ -5097,6 +5099,26 @@ h1.longo { font-size: 14mm; }
       kpi('Desses, o robô marcou sozinho', nf(A.robo), `${porC(A.robo, A.agendaram)} dos que agendaram · ${nf(A.robo_sem_atendente)} sem nenhum atendente na conversa · ${nf(A.robo - A.robo_sem_atendente)} com`, dC(A.robo, B.robo, comBase), 'O próprio sistema fez a marcação no Klingo pela API (no Klingo aparece como "Marcado pelo chat (autoatendimento)"), mesmo que depois um atendente tenha falado com a pessoa. As outras foram marcadas pela equipe ou reconhecidas no Klingo.'),
       kpi('Faltaram ou cancelaram', nf(A.faltaram_ou_cancelaram), `${porC(A.faltaram_ou_cancelaram, A.agendaram)} dos que agendaram · ${nf(A.faltaram)} faltaram · ${nf(A.cancelaram)} cancelaram`, dC(A.faltaram_ou_cancelaram, B.faltaram_ou_cancelaram, comBase), 'Entre quem agendou: a marcação foi cancelada ou a pessoa faltou. Remarcar (trocar a data) não conta. Falta só existe para marcação cuja data já passou; marcação futura ainda pode faltar.'));
   }
+  // Equipe no Klingo (19/11/2026, pedido do dono; painel_indicadores_equipe_klingo): por MARCAÇÃO (dia em que foi marcada no Klingo, de qualquer canal) e por CONVERSA (dia em que foi encerrada como "Agendado").
+  // Não é a base dos 5 números por pessoa (abaixo), por isso os totais não precisam bater. O Klingo não traz o procedimento aqui: não separa consulta e exame.
+  const ROT_ORIGEM = { Whatsapp: 'WhatsApp', Telefone: 'telefone', 'Recepção': 'recepção', sem_origem: 'sem origem' };
+  function blocoEquipeKlingo(Q, comBase, tipo) {
+    if (!Q || !Q.atual) return h('p', { class: 'erro' }, 'Não consegui carregar a "Equipe no Klingo" agora. Use "Atualizar agora" para tentar de novo. Se a mensagem fala de função inexistente, falta rodar o SQL supabase/indicadores-equipe-klingo.sql.');
+    const K = Q.atual.klingo || {}, E = Q.atual.encerradas || {}, KB = (Q.anterior || {}).klingo || {}, EB = (Q.anterior || {}).encerradas || {};
+    const dC = (a, b) => (comBase ? delta(a || 0, b || 0, { cont: true, base: Math.min(a || 0, b || 0), neutro: true }) : h('span', { class: 'ind-delta neutro' }, 'sem período anterior com dados'));
+    const origens = Object.entries(K.por_origem || {}).sort((x, y) => y[1] - x[1]).map(([o, n]) => `${nf(n)} ${ROT_ORIGEM[o] || o}`).join(' · ');
+    const canc = K.canceladas ? ` · ${nf(K.canceladas)} cancelada${K.canceladas === 1 ? '' : 's'}` : '';
+    return h('div', {},
+      h('h3', { class: 'ind-eq-tit' }, 'Equipe no Klingo'),
+      h('p', { class: 'dica' }, 'Marcações pelo dia em que foram marcadas no Klingo (qualquer canal) e conversas pelo dia em que foram encerradas como "Agendado". Conta marcações e conversas, não pessoas: não precisa bater com os 5 números abaixo.'),
+      tipo ? h('p', { class: 'dica' }, `Filtro "${tipo === 'exame' ? 'Só exames' : 'Só consultas'}": estes números não separam consulta e exame e continuam mostrando tudo.`) : null,
+      h('div', { class: 'ind-kpis-eq' },
+        kpi('Marcações no Klingo', nf(K.total), `${nf(K.equipe)} pela equipe · ${nf(K.robo)} pelo robô${canc}`, dC(K.total, KB.total), 'Todas as marcações feitas no Klingo no período, de qualquer canal, pelo dia em que foram marcadas (não pelo dia do exame). Robô = o responsável da marcação no Klingo é a API do chat; equipe = todas as outras.'),
+        kpi('Cadastradas pela equipe', nf(K.equipe), origens || 'nenhuma no período', dC(K.equipe, KB.equipe), 'Tudo o que não foi o robô. O Klingo não diz quem marcou, só o canal (origem): não dá para separar por atendente. "Sem origem" = o campo ficou em branco no Klingo.'),
+        kpi('Encerradas como Agendado', nf(E.agendado), 'conversas, pelo dia em que foram encerradas', dC(E.agendado, EB.agendado), 'Conversas com o motivo de encerramento "Agendado" (pela equipe ou pelo sistema).'),
+        kpi('Dessas, com marcação da equipe', nf(E.equipe), `${porC(E.equipe, E.agendado)} das encerradas · ${nf(E.robo)} com marcação do robô`, dC(E.equipe, EB.equipe), 'Encerradas como "Agendado" que têm marcação encontrada no Klingo feita pela equipe (não pelo robô).'),
+        kpi('Dessas, sem marcação no Klingo', nf(E.sem_marcacao), `${porC(E.sem_marcacao, E.agendado)} das encerradas · vale conferir no Klingo`, dC(E.sem_marcacao, EB.sem_marcacao), 'Encerradas como "Agendado" sem nenhuma marcação encontrada no Klingo: marcação ainda não lida, cadastro com outro nome ou telefone, ou conversa encerrada sem agendar.')));
+  }
   // Marcações novas no período, pelo dia em que foram AGENDADAS (Agendado em no Klingo): fica na seção da agenda, longe dos números por pessoa.
   function blocoNovas(N, NA, comBase) {
     if (!N) return null;
@@ -5206,10 +5228,11 @@ h1.longo { font-size: 14mm; }
     const un = UN.sel || null;
     const args = { p_de: IND.de, p_ate: IND.ate, p_unidade: un, p_incluir_teste: IND.teste };
     const mole = (p) => Promise.resolve(p).then((x) => x, () => ({ error: true, data: null }));
-    const [r, dir, ag, eq, pes] = await Promise.all([db.rpc('painel_indicadores_decisao', args),
+    const [r, dir, ag, eq, pes, eqk] = await Promise.all([db.rpc('painel_indicadores_decisao', args),
       mole(db.rpc('painel_indicadores_diretoria', { p_de: IND.de, p_ate: IND.ate, p_incluir_teste: IND.teste })),
       mole(db.rpc('painel_indicadores_agenda', args)), mole(db.rpc('painel_indicadores_atendentes', args)),
-      mole(db.rpc('painel_indicadores_pessoas', { ...args, p_tipo: IND.tipo }))]);
+      mole(db.rpc('painel_indicadores_pessoas', { ...args, p_tipo: IND.tipo })),
+      mole(db.rpc('painel_indicadores_equipe_klingo', args))]);
     if (S.aba !== 'indicadores' || minha !== viewIndicadores.seq) return;
     if (r.error || !r.data) {
       c.replaceChildren(h('div', { class: 'pagina' }, titulo, h('p', { class: 'erro' }, msgErro(r.error || { message: 'Sem resposta do banco.' })),
@@ -5219,6 +5242,7 @@ h1.longo { font-size: 14mm; }
     const D = dir && !dir.error ? dir.data : null;
     const AGD = ag && !ag.error && ag.data && ag.data.atual ? ag.data : null;
     const PES = pes && !pes.error && pes.data && pes.data.atual ? pes.data : null;
+    const EQK = eqk && !eqk.error && eqk.data && eqk.data.atual ? eqk.data : null;
     const hojeISO = isoSP();
     const atalhos = h('div', { class: 'chips ind-atalhos', role: 'group', 'aria-label': 'Período' },
       PRESETS_IND.map(([k, t]) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(IND.preset === k), onclick: () => { IND.preset = k; viewIndicadores(c); } }, t)));
@@ -5297,6 +5321,7 @@ h1.longo { font-size: 14mm; }
         h('button', { class: 'btn', type: 'button', onclick: () => viewIndicadores(c, true) }, 'Atualizar agora'), caixaTeste),
       chipsTipo,
       R.periodo && R.periodo.ate === hojeISO ? h('p', { class: 'dica' }, 'O período inclui hoje, que ainda não terminou (e há conversas abertas): as setas comparam com um período inteiro e tendem a mostrar queda.') : null,
+      blocoEquipeKlingo(EQK, comBase, IND.tipo),
       kpisTopo,
       h('p', { class: 'dica' }, 'Os 5 números usam a mesma base: pessoas, pelo dia em que abriram o chat. Cada pessoa conta uma vez. Quem não tem marcação no Klingo não entra em "Agendaram", mesmo que a conversa tenha sido encerrada como "Agendado".'),
       blocoProcura(CA.por_tipo),
