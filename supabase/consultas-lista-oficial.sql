@@ -1,5 +1,6 @@
 -- Lista oficial de consultas do chat (pedido do dono em 19/11/2026):
 --   Consulta com pediatra · ortopediatra · endocrinopediatra · cardiopediatra · neuropediatra · gastropediatra
+--   + Consulta pediátrica pré-natal (pedido do dono, mesmo dia)
 -- Situação antes: o filtro "klingo_so_liberados" (ligado em 13/11/2026) só deixava aparecer o que a API do Klingo oferece
 -- (Pediatria, Neurologia, Radiologia); ortopediatra (1474), endocrinopediatra (1470) e gastropediatra (1471) sumiram do chat.
 -- Aplicado em partes (a ferramenta de migração expira em 60 s). Idempotente.
@@ -46,7 +47,7 @@ insert into public.consulta_config (procedimento_id, oculta, rotulo) values
   (1470, false, 'Consulta com endocrinopediatra'),
   (1472, false, 'Consulta com neuropediatra'),
   (1471, false, 'Consulta com gastropediatra'),
-  (2100, true, null),   -- Consulta Pediátrica Pré-Natal
+  (2100, false, 'Consulta pediátrica pré-natal'),
   (2127, true, null),   -- Teleconsulta de Pediatria (prontidão)
   (2128, true, null),   -- Consulta com Pediatra (Neuro Desenvolvimento)
   (1783, true, null)    -- Puericultura
