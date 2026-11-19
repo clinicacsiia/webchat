@@ -10113,33 +10113,6 @@
    "md5": "25cf53394adaca3038a76c98eea50d28"
   },
   {
-   "nome": "ind_equipe_klingo_periodo",
-   "args": [
-    {
-     "nome": "p_de",
-     "padrao": false
-    },
-    {
-     "nome": "p_ate",
-     "padrao": false
-    },
-    {
-     "nome": "p_un",
-     "padrao": false
-    },
-    {
-     "nome": "p_teste",
-     "padrao": false
-    }
-   ],
-   "definer": true,
-   "gatilho": false,
-   "anon": false,
-   "authenticated": false,
-   "publico": false,
-   "md5": "def123962f86a28ce16a1b972be67c1b"
-  },
-  {
    "nome": "ind_fechar_dia",
    "args": [
     {
@@ -13676,33 +13649,6 @@
    "authenticated": true,
    "publico": false,
    "md5": "0737a3b6432131800a3fa73adc0a9eed"
-  },
-  {
-   "nome": "painel_indicadores_equipe_klingo",
-   "args": [
-    {
-     "nome": "p_de",
-     "padrao": true
-    },
-    {
-     "nome": "p_ate",
-     "padrao": true
-    },
-    {
-     "nome": "p_unidade",
-     "padrao": true
-    },
-    {
-     "nome": "p_incluir_teste",
-     "padrao": true
-    }
-   ],
-   "definer": true,
-   "gatilho": false,
-   "anon": false,
-   "authenticated": true,
-   "publico": false,
-   "md5": "bcb9839a9439c8ea1f79da4cdbc64e1a"
   },
   {
    "nome": "painel_indicadores_mensal",

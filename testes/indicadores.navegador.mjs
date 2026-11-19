@@ -95,13 +95,6 @@ const PESSOAS = (a) => {
     : { procuraram: 50, atendidos: 45, agendaram: 20, robo: 4, robo_sem_atendente: 1, faltaram: 1, cancelaram: 1, faltaram_ou_cancelaram: 2 };
   return { periodo: { de: a.p_de, ate: a.p_ate }, anterior_periodo: { de: a.p_de, ate: a.p_ate }, unidade: a.p_unidade, tipo: a.p_tipo || null, gerado_em: new Date().toISOString(), atual, anterior };
 };
-// Respostas de painel_indicadores_equipe_klingo (supabase/indicadores-equipe-klingo.sql): marcações do Klingo e conversas encerradas como "Agendado".
-const EQUIPE_KLINGO = (a) => {
-  const atual = a.p_unidade === 'rmtc' ? { klingo: { total: 3, robo: 0, equipe: 3, canceladas: 0, por_origem: { Telefone: 3 } }, encerradas: { agendado: 0, com_marcacao: 0, equipe: 0, robo: 0, sem_marcacao: 0 } }
-    : { klingo: { total: 67, robo: 7, equipe: 60, canceladas: 1, por_origem: { Whatsapp: 30, sem_origem: 20, Telefone: 9, 'Recepção': 1 } }, encerradas: { agendado: 30, com_marcacao: 25, equipe: 19, robo: 6, sem_marcacao: 5 } };
-  const anterior = { klingo: { total: 50, robo: 4, equipe: 46, canceladas: 2, por_origem: { Whatsapp: 25 } }, encerradas: { agendado: 20, com_marcacao: 18, equipe: 15, robo: 3, sem_marcacao: 2 } };
-  return { periodo: { de: a.p_de, ate: a.p_ate }, anterior_periodo: { de: a.p_de, ate: a.p_ate }, unidade: a.p_unidade, gerado_em: new Date().toISOString(), atual, anterior };
-};
 const AGENDA = (a) => {
   const pequeno = a.p_unidade === 'rmtc', ent = pequeno ? 4 : a.p_unidade === 'desenvoar' ? 40 : 60;
   const un = (f) => { const o = {}; for (const k of Object.keys(TOTAL_AG)) o[k] = Math.round(TOTAL_AG[k] * f); return o; };
@@ -149,7 +142,7 @@ const AVISOS_CONF = [
   { id: 72, conversa_id: 'c-2', tipo: 'klingo_dado_faltando', detalhe: { marcacoes: ['900002'], campos: ['celular'], filho: true }, criado_em: `${HOJE}T15:00:00Z`, nome: 'PEDRO DE TESTE' },
   { id: 73, conversa_id: 'c-4', tipo: 'klingo_dado_faltando', detalhe: { marcacoes: ['900004'], campos: ['celular', 'email'], filho: false }, criado_em: `${HOJE}T15:00:00Z`, nome: 'LUCIA DE TESTE' }];
 
-async function pagina(browser, { semSql = false, admin = false, semAtend = false, conf = false, semPlat = false, semAgenda = false, semPessoas = false, semEqk = false } = {}) {
+async function pagina(browser, { semSql = false, admin = false, semAtend = false, conf = false, semPlat = false, semAgenda = false, semPessoas = false } = {}) {
   const eu = admin ? ADM : EU;
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 } });   // cartões do topo somem em telas baixas (<= 820 px)
   await ctx.addInitScript(([id, token, email]) => {
@@ -180,7 +173,6 @@ async function pagina(browser, { semSql = false, admin = false, semAtend = false
     }
     else if (p.endsWith('/rpc/painel_indicadores_diretoria')) { const b = JSON.parse(req.postData() || '{}'); reg.rpcs.push(['diretoria', b]); corpo = DIRETORIA; }
     else if (p.endsWith('/rpc/painel_indicadores_pessoas')) { const b = JSON.parse(req.postData() || '{}'); reg.rpcs.push(['pessoas', b]); if (semPessoas) { status = 404; corpo = { code: 'PGRST202', message: 'function not found' }; } else corpo = PESSOAS(b); }
-    else if (p.endsWith('/rpc/painel_indicadores_equipe_klingo')) { const b = JSON.parse(req.postData() || '{}'); reg.rpcs.push(['equipe_klingo', b]); if (semEqk) { status = 404; corpo = { code: 'PGRST202', message: 'function not found' }; } else corpo = EQUIPE_KLINGO(b); }
     else if (p.endsWith('/rpc/painel_indicadores_agenda')) { const b = JSON.parse(req.postData() || '{}'); reg.rpcs.push(['agenda', b]); if (semAgenda) { status = 404; corpo = { code: 'PGRST202', message: 'function not found' }; } else corpo = AGENDA(b); }
     else if (p.endsWith('/rpc/painel_indicadores_plataforma')) { const b = JSON.parse(req.postData() || '{}'); reg.rpcs.push(['plataforma', b]); if (semPlat) { status = 404; corpo = { code: 'PGRST202', message: 'function not found' }; } else corpo = PLATAFORMA; }
     else if (p.endsWith('/rpc/painel_automacao_resumo')) { const b = JSON.parse(req.postData() || '{}'); reg.rpcs.push(['automacao', b]); corpo = AUTOMACAO; }
@@ -245,7 +237,7 @@ await caso('Aba Indicadores: período padrão é Hoje e cada bloco pede só a su
   const nomes = [...new Set(t.reg.rpcs.map((r) => r[0]))].sort().join();
   const ag = ultimo(t.reg, 'agenda');
   await t.ctx.close();
-  return { ok: a.p_de === HOJE && a.p_ate === HOJE && a.p_unidade === null && a.p_incluir_teste === false && ctrl.join() === `${HOJE},${HOJE}` && nomes === 'agenda,atendentes,decisao,diretoria,equipe_klingo,pessoas' && ag.p_incluir_teste === false && !t.reg.excecoes.length, detalhe: JSON.stringify(a) + ' ' + nomes + (t.reg.excecoes[0] ?? '') };
+  return { ok: a.p_de === HOJE && a.p_ate === HOJE && a.p_unidade === null && a.p_incluir_teste === false && ctrl.join() === `${HOJE},${HOJE}` && nomes === 'agenda,atendentes,decisao,diretoria,pessoas' && ag.p_incluir_teste === false && !t.reg.excecoes.length, detalhe: JSON.stringify(a) + ' ' + nomes + (t.reg.excecoes[0] ?? '') };
 });
 await caso('Topo: só os 5 números pedidos (procuraram, atendidos, agendaram no Klingo, robô sozinho, faltaram ou cancelaram), todos na mesma base, com comparação neutra e nomes que não se repetem', async () => {
   const t = await abrir(); await abaInd(t);
@@ -271,35 +263,6 @@ await caso('Sem a função dos 5 números no banco: avisa o arquivo a aplicar e 
   const t = await abrir({ semPessoas: true }); await abaInd(t);
   const txt = await textoAba(t); await t.ctx.close();
   return { ok: /supabase\/indicadores-cinco-numeros\.sql/.test(txt) && /Visão da agenda \(marcações\)/.test(txt) && /Caminho do paciente no chat/.test(txt) && !t.reg.excecoes.length, detalhe: txt.slice(0, 200) + (t.reg.excecoes[0] ?? '') };
-});
-await caso('Topo: "Equipe no Klingo" vem antes dos 5 números, com marcações do Klingo e conversas encerradas como Agendado', async () => {
-  const t = await abrir(); await abaInd(t);
-  const ordem = await t.page.locator('.ind-pg').evaluate((pg) => { const a = pg.querySelector('.ind-kpis-eq'), b = pg.querySelector('.ind-kpis5'); return !!a && !!b && !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING); });
-  const tit = await t.page.locator('.ind-eq-tit').first().innerText();
-  const cart = await t.page.locator('.ind-kpis-eq .ind-kpi').evaluateAll((l) => l.map((k) => [k.querySelector('.ind-kpi-rot').textContent, k.querySelector('b').textContent, k.querySelector('.ind-kpi-sub').textContent]));
-  const q = ultimo(t.reg, 'equipe_klingo');
-  await t.ctx.close();
-  const c = Object.fromEntries(cart.map((x) => [x[0], x]));
-  return { ok: ordem && tit === 'Equipe no Klingo' && cart.length === 5
-    && c['Marcações no Klingo'][1] === '67' && c['Marcações no Klingo'][2].startsWith('60 pela equipe · 7 pelo robô · 1 cancelada')
-    && c['Cadastradas pela equipe'][1] === '60' && c['Cadastradas pela equipe'][2] === '30 WhatsApp · 20 sem origem · 9 telefone · 1 recepção'
-    && c['Encerradas como Agendado'][1] === '30'
-    && c['Dessas, com marcação da equipe'][1] === '19' && c['Dessas, com marcação da equipe'][2].startsWith('63,3% das encerradas · 6 com marcação do robô')
-    && c['Dessas, sem marcação no Klingo'][1] === '5' && c['Dessas, sem marcação no Klingo'][2].startsWith('16,7% das encerradas')
-    && q.p_unidade === null && q.p_incluir_teste === false && !t.reg.excecoes.length, detalhe: ordem + ' ' + JSON.stringify(cart) };
-});
-await caso('Equipe no Klingo: a unidade escolhida vai para o banco e o filtro de tipo avisa que não separa consulta e exame', async () => {
-  const t = await abrir(); await abaInd(t);
-  await t.page.selectOption('#selUnidade', 'rmtc'); await t.page.waitForFunction(() => [...document.querySelectorAll('.ind-kpis-eq .ind-kpi')].find((x) => x.querySelector('.ind-kpi-rot').textContent === 'Marcações no Klingo')?.querySelector('b').textContent === '3', null, { timeout: 8000 });
-  const q = ultimo(t.reg, 'equipe_klingo');
-  await t.page.click('.ind-tipo .chip >> text=Só exames'); await t.page.waitForFunction(() => /não separam consulta e exame/.test(document.querySelector('.ind-pg')?.innerText || ''), null, { timeout: 8000 });
-  const q2 = ultimo(t.reg, 'equipe_klingo'); await t.ctx.close();
-  return { ok: q.p_unidade === 'rmtc' && q2.p_unidade === 'rmtc' && !('p_tipo' in q2) && !t.reg.excecoes.length, detalhe: JSON.stringify(q) + JSON.stringify(q2) };
-});
-await caso('Sem a função da Equipe no Klingo no banco: avisa o arquivo a aplicar e o resto da aba continua', async () => {
-  const t = await abrir({ semEqk: true }); await abaInd(t);
-  const txt = await textoAba(t); const cinco = await t.page.locator('.ind-kpis5 .ind-kpi').count(); await t.ctx.close();
-  return { ok: /supabase\/indicadores-equipe-klingo\.sql/.test(txt) && cinco === 5 && /Visão da agenda \(marcações\)/.test(txt) && !t.reg.excecoes.length, detalhe: txt.slice(0, 200) + (t.reg.excecoes[0] ?? '') };
 });
 await caso('Gráfico "Procura e agendamento": consultas e exames, cada um com a procura (começaram um pedido) e quantos agendaram, e a porcentagem', async () => {
   const t = await abrir(); await abaInd(t);
