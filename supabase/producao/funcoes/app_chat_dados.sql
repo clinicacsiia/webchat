@@ -47,7 +47,7 @@ begin
       when v_passo = 'identidade' and v_nasc is not null then jsonb_build_object('dt_nasc', to_char(v_nasc, 'DD/MM/YYYY'))
     end;
     exit when v_valor is null;
-    v_texto := concat_ws(E'\n', 'Usei os dados salvos no meu acesso rápido.',
+    v_texto := concat_ws(E'\n', 'Dados carregados do acesso rápido.',
                          case when nullif(btrim(coalesce(v_nome, '')), '') is not null then 'Nome: ' || left(btrim(v_nome), 120) end,
                          case when v_valor ? 'cpf' then 'CPF: ' || public.app_cpf_mascara(v_cpf) end,
                          case when v_valor ? 'dt_nasc' then 'Nascimento: ' || (v_valor ->> 'dt_nasc') end);
