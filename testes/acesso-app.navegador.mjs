@@ -86,6 +86,14 @@ const NASC_ANA = '1988-04-12', NASC_LEO = '2019-08-30', NASC_DAVI = '2022-01-10'
 // ================================================================= Ana: primeiro acesso
 let ana = await novaPagina();
 await caso('aparelho sem cadastro abre no passo 1 (celular)', async () => ({ ok: /Vamos começar/.test(await texto(ana.page)) && /Já tenho cadastro/.test(await texto(ana.page)) }));
+// 19/11/2026: só a Pediatria (Desenvoar) agenda pelo site; o resto volta para o WhatsApp
+await caso('aviso grande no topo: só Pediatria por este site, o resto volta ao WhatsApp (link sem dado pessoal)', async () => {
+  const t = await ana.page.$eval('#avisoPediatria', (n) => n.innerText);
+  const href = await ana.page.$eval('#avisoPediatria a', (a) => a.href);
+  const alto = await ana.page.$eval('#avisoPediatria strong', (n) => parseFloat(getComputedStyle(n).fontSize));
+  const antes = await ana.page.$eval('#avisoPediatria', (n) => !!(n.compareDocumentPosition(document.querySelector('#app')) & Node.DOCUMENT_POSITION_FOLLOWING));
+  return { ok: /só agendamos Pediatria/.test(t) && /outro atendimento, volte ao WhatsApp/.test(t) && /^https:\/\/wa\.me\/5571999803806\?text=/.test(href) && !/\d{3}\.?\d{3}/.test(decodeURIComponent(href.split('?text=')[1])) && alto >= 18 && antes, detalhe: `href=${href} fonte=${alto}px` };
+});
 await caso('passo 1 recusa celular inválido, sem chamar o servidor', async () => {
   await ana.page.fill('#tel', '(71) 3333-0000'); await ana.page.click('[data-act="c1"]');
   return { ok: /Celular inválido/.test(await texto(ana.page)) && chamadasRede.filter((c) => c.nome !== 'app_porta').length === 0 };   // a página só pergunta a porta (app_porta) ao abrir
