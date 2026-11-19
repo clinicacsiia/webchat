@@ -45,7 +45,6 @@ npm test
 | Comando | O que prova | Resultado em 30/10/2026 |
 |---|---|---|
 | `npm run test:edge` | Conferência da marcação no Klingo e leitura de preços (`supabase/functions/sync-catalogo-klingo/`) | 27 de 27 |
-| `npm run test:python` | Algoritmo biométrico (`biometria/avaliar_assinatura.py`), inclusive executado com os *builtins* restritos do nó Python do n8n | 27 de 27 |
 | `npm run test:sql` | `supabase/fila-biometria.sql` num Postgres embutido (PGlite): RLS, JWT, máquina de estados, 3 tentativas, imutabilidade, broadcast | 46 de 46 |
 | `npm run test:delta` | `supabase/fila-biometria-v2-delta.sql` aplicado sobre o estado v1 dá o mesmo banco da instalação nova (corpo, *definer* e privilégio de execução das 23 funções) | 5 de 5 |
 | `npm run test:sw` | O `sw.js` não serve `/fila/` (nem `/painel/`) pelo cache do chat; a URL da fila leva o token e a chave única `./` serviria o chat no lugar da fila | 10 de 10 |
@@ -93,7 +92,7 @@ Leia isto antes de tratar "tudo verde" como "pronto para produção".
 | `sw.test.mjs` | Roda o `fetch` do `sw.js` num contexto isolado e confere o que entra ou não no cache. |
 | `navegador.smoke.mjs` | Servidor local + Playwright + Supabase simulado. `CHROMIUM_PATH` aponta para um Chromium já instalado. |
 
-Os testes do Python ficam em `biometria/test_avaliar_assinatura.py` e os da Edge Function em `supabase/functions/sync-catalogo-klingo/*.test.ts`, junto do código que testam.
+Os testes das Edge Functions ficam em `supabase/functions/sync-catalogo-klingo/*.test.ts`, junto do código que testam.
 
 ## WebChat v2 (14/11/2026)
 
@@ -118,4 +117,4 @@ Os testes do Python ficam em `biometria/test_avaliar_assinatura.py` e os da Edge
 
 **Carga (15/11/2026):** os testes de navegador (`acesso-chat`, `catalogo-painel`, `ao-vivo`, `medicos`) usam esperas curtas e falham de vez em quando se rodarem 4 ou mais ao mesmo tempo; sozinhos passam. Rodar as suítes uma por vez (ou no máximo 2 em paralelo) antes de concluir que a tela quebrou.
 
-**Ambiente:** `test:python` precisa de `pytest` (`python3 -m pip install pytest`, só no ambiente de teste; **não** é dependência do projeto: 27 testes passam); os demais rodam com `CHROMIUM_PATH=/opt/pw-browsers/chromium-1243/chrome-linux64/chrome` (a variável não persiste entre comandos: defina no mesmo comando).
+**Ambiente:** Os testes de navegador rodam com `CHROMIUM_PATH=/opt/pw-browsers/chromium-1243/chrome-linux64/chrome` (a variável não persiste entre comandos: defina no mesmo comando).

@@ -21,7 +21,7 @@ Atualizado em 02/11/2026. `[x]` = feito ou já estava em conformidade. `[ ]` = p
 - [ ] 17. Riscos jurídicos: ver bloqueios abaixo.
 
 ## Bloqueios antes de usar com paciente real
-- **Leitura da foto por IA** (`ler-pedido`) e **biometria da fila**: não ligar sem revisão jurídica (consentimento, retenção, RIPD, contrato com o provedor). Ver `docs/pendencias-e-dependencias.md` A8, B3 e D7.
+- ~~Leitura da foto por IA (`ler-pedido`) e biometria da fila~~: **apagadas do código e do banco em 19/11/2026** (ver `docs/lgpd.md`).
 - Prazo de retenção de conversas e fotos: definir e escrever em `privacidade.html`, item 5.
 - Confirmar região do Supabase e contratos de operador (art. 33 da LGPD).
 - Preencher CNPJ e e-mail do encarregado nas duas páginas, no rodapé do chat e nos textos de "Meus dados".

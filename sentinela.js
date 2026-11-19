@@ -145,7 +145,7 @@
   }
 
   /* --- chamadas ao Supabase: mede e aprende --- */
-  const SILENCIOSAS = new Set(['chat_config', 'chat_acompanhar', 'ler-pedido', 'chat_pedido_ler', 'chat_pedido_escolha', 'chat_anexo_enviar', 'chat_incidente']);
+  const SILENCIOSAS = new Set(['chat_config', 'chat_acompanhar', 'chat_pedido_ler', 'chat_pedido_escolha', 'chat_anexo_enviar', 'chat_incidente']);
   function envolverFetch() {
     if (typeof janela.fetch !== 'function' || janela.fetch.__sentinela) return;
     const original = janela.fetch.bind(janela);
