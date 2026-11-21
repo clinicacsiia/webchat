@@ -9,7 +9,12 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="img/logo-csi-simbolo.svg" type="image/svg+xml">
 <link rel="icon" href="icon-192.png" sizes="192x192">
-<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180">
+<!-- iPhone: nome curto embaixo do ícone e abrir como app (sem a barra do Safari) depois de "Adicionar à Tela de Início" -->
+<meta name="apple-mobile-web-app-title" content="CSI">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <style>
   :root {
     /* Design system CSI: tokens obrigatórios */
@@ -268,6 +273,23 @@
   .dica-caixa li { margin: 0 0 10px; }
   .dica-caixa p { margin: 0 0 12px; color: var(--texto-suave); }
   .dica-caixa .btn-primario { width: 100%; }
+  /* iPhone: a caixa fica no alto e uma seta aponta o botão do Safari (embaixo à direita no iOS 26 e 27, no meio de baixo até o iOS 18, no alto no iPad e no Chrome) */
+  .dica-app.no-alto { align-items: flex-start; padding-top: calc(16px + env(safe-area-inset-top)); }
+  .dica-app.no-alto .dica-caixa { max-height: calc(100dvh - 110px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }   /* deixa livre o pé da tela, onde a seta aponta */
+  .dica-seta { position: fixed; z-index: 41; font-size: 44px; line-height: 1; color: #fff; text-shadow: 0 2px 8px rgba(0,0,0,.5); pointer-events: none; animation: dica-pula 1s ease-in-out infinite; }
+  .dica-seta[hidden] { display: none; }
+  .dica-seta[data-lugar="baixo-direita"] { right: 22px; bottom: calc(8px + env(safe-area-inset-bottom)); }
+  .dica-seta[data-lugar="baixo-meio"] { left: calc(50% - 22px); bottom: calc(8px + env(safe-area-inset-bottom)); }
+  .dica-seta[data-lugar="cima-direita"] { right: 22px; top: calc(4px + env(safe-area-inset-top)); animation-name: dica-sobe; }
+  @keyframes dica-pula { 50% { transform: translateY(8px); } }
+  @keyframes dica-sobe { 50% { transform: translateY(-8px); } }
+  @media (prefers-reduced-motion: reduce) { .dica-seta { animation: none; } }
+  .dica-caixa .ico { display: inline-flex; align-items: center; justify-content: center; vertical-align: -6px; width: 26px; height: 26px; margin: 0 2px; border-radius: 7px; background: #e9eef4; color: var(--csi-sidebar-bg); font-weight: 800; }
+  .dica-caixa .ico svg { width: 18px; height: 18px; }
+  .dica-caixa .dica-acoes { display: flex; flex-direction: column; gap: 8px; margin: 0 0 12px; }
+  .dica-caixa a.btn-primario { display: block; box-sizing: border-box; text-align: center; text-decoration: none; }
+  .dica-caixa .btn-link { background: none; border: 1px solid var(--csi-primary-strong); color: var(--csi-primary-strong); border-radius: 12px; min-height: 44px; font-weight: 700; font-size: calc(15px * var(--esc)); cursor: pointer; }
+  .dica-caixa .nota { font-size: calc(14px * var(--esc)); }
 
   /* Widgets dentro das mensagens */
   .aval { margin-top: 10px; }
@@ -745,6 +767,7 @@
     <button type="button" class="btn-primario" id="dicaAppOk">Entendi</button>
   </div>
 </div>
+<div class="dica-seta" id="dicaSeta" aria-hidden="true" hidden>⬇</div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="sentinela.js"></script>
@@ -761,7 +784,7 @@
   const CHAVE_HIST = 'webchat.historico.v1';   // as últimas conversas deste aparelho (cada uma com o seu token): dá para voltar a elas
   const MAX_HIST = 5;                          // mínimo pedido: 3
   // Muda a cada alteração do chat. Cópia de mensagens guardada por outra versão é descartada (era isso que mostrava conversa velha e travada).
-  const VERSAO_APP = '2026.11.19-4';
+  const VERSAO_APP = '2026.11.21-1';
   // Mesmas regras do banco (fluxo_nome_ok, fluxo_telefone_ok, fluxo_email_ok): o banco confere de novo, aqui é só para avisar logo.
   const LET = 'A-Za-zÀ-ÖØ-öø-ÿ';
   const nomeCompletoOk = (v) => { const t = String(v || '').trim(); return t.length >= 5 && t.length <= 120 && new RegExp(`^[${LET}][${LET}'’.-]*( +[${LET}][${LET}'’.-]*)+$`).test(t) && t.split(/ +/).filter((w) => w.replace(new RegExp(`[^${LET}]`, 'g'), '').length >= 2).length >= 2; };
@@ -1384,6 +1407,20 @@
   const ehAndroid = /android/i.test(UA);
   const ehCelular = ehIOS || ehAndroid || /mobile/i.test(UA);
   const navDeOutroApp = /FBAN|FBAV|FB_IAB|Instagram|Line\/|TikTok|; wv\)/i.test(UA);   // navegador de dentro do Instagram/Facebook: não instala
+  /* iPhone e iPad: qual navegador e qual versão do iOS, para o passo a passo certo.
+     O Safari 26 congela o "OS 18_6" do userAgent; a versão real vem do "Version/26". iOS 26 e 27: o Compartilhar fica dentro do "⋯" (embaixo, à direita).
+     Chrome, Edge e Firefox do iPhone só instalam a partir do iOS 16.4; antes disso, só pelo Safari.
+     Navegador de dentro de outro app (Instagram, Facebook, TikTok, Google...) não tem "Adicionar à Tela de Início": precisa abrir no Safari.
+     O WhatsApp abre um Safari reduzido que parece o Safari e também não instala (o aviso do passo 1 cobre). */
+  function infoIOS(ua = UA) {
+    const so = ua.match(/OS (\d+)[_.](\d+)/), safariV = ua.match(/Version\/(\d+)(?:\.(\d+))?/);
+    let versao = so ? Number(so[1]) * 100 + Number(so[2]) : 0;
+    if (safariV && Number(safariV[1]) >= 26) versao = Math.max(versao, Number(safariV[1]) * 100 + Number(safariV[2] || 0));
+    const navegador = /FBAN|FBAV|FB_IAB|Instagram|Line\/|TikTok|musical_ly|Bytedance|LinkedInApp|GSA\/|Snapchat|Pinterest|Twitter/i.test(ua) ? 'app'
+      : /CriOS/.test(ua) ? 'chrome' : /EdgiOS/.test(ua) ? 'edge' : /FxiOS/.test(ua) ? 'firefox' : /Safari\//.test(ua) ? 'safari' : 'app';
+    const ipad = /ipad/i.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+    return { versao, navegador, ipad };
+  }
   function appInstalado() {
     try { if (matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: fullscreen)').matches || matchMedia('(display-mode: minimal-ui)').matches) return true; } catch { /* ignora */ }
     return navigator.standalone === true;
@@ -1441,9 +1478,73 @@
     } catch { mostrarDica('instalar'); }
     atualizarFaixaApp();
   }
+  // Ícones desenhados como os do iPhone, para a pessoa reconhecer o botão na tela.
+  const ICO_COMPARTILHAR = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7.5 7.5 12 3l4.5 4.5"/><path d="M8 10H6a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-9a1 1 0 0 0-1-1h-2"/></svg>';
+  const ICO_ADICIONAR = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M12 8v8M8 12h8"/></svg>';
+  function icone(svg, nome) { const s = h('span', { class: 'ico', role: 'img', 'aria-label': nome }); s.innerHTML = svg; return s; }
+  const icoTxt = (t, nome) => h('span', { class: 'ico', role: 'img', 'aria-label': nome }, t);
+  // Endereço para abrir no Safari a partir de outro navegador ou de dentro de outro app (iOS 17 ou mais novo); sem dado pessoal: só o endereço da página.
+  const linkSafari = () => 'x-safari-' + location.origin + location.pathname + location.search;
+  function botoesAbrirNoSafari() {
+    return h('div', { class: 'dica-acoes' },
+      h('a', { class: 'btn-primario', id: 'dicaAbrirSafari', href: linkSafari() }, 'Abrir no Safari'),
+      h('button', { type: 'button', class: 'btn-link', id: 'dicaCopiarLink', onclick: copiarLinkApp }, 'Copiar o link (para colar no Safari)'));
+  }
+  async function copiarLinkApp() {
+    const url = location.origin + location.pathname + location.search;
+    try { await navigator.clipboard.writeText(url); toast('Link copiado. Abra o Safari, toque no endereço e cole.'); }
+    catch { toast('Não deu para copiar. Abra o Safari e digite: ' + location.host + location.pathname); }
+  }
+  // Passo a passo do iPhone conforme o navegador e a versão do iOS. Devolve também para onde a seta aponta.
+  function dicaInstalarIOS(b) {
+    const { versao, navegador, ipad } = infoIOS();
+    const aparelho = ipad ? 'iPad' : 'iPhone';
+    const compartilhar = [icone(ICO_COMPARTILHAR, 'Compartilhar'), ' ', b('Compartilhar')];
+    const adicionar = [icone(ICO_ADICIONAR, ''), ' ', b('Adicionar à Tela de Início')];
+    const depois = h('li', null, 'Abra a CSI ', b('pelo ícone novo'), ' na tela do ' + aparelho + '. Na primeira vez, entre de novo com seu CPF e PIN (o app é separado do navegador) e toque em ', b('Ativar avisos'), '.');
+    const nota = versao && versao < 1604 ? h('p', { class: 'nota' }, 'Seu ' + aparelho + ' está com o iOS antigo: o app instala, mas os avisos só funcionam a partir do iOS 16.4. Se puder, atualize em Ajustes > Geral > Atualização de Software.') : null;
+    // Fora do Safari: dentro de outro app, ou navegador que não instala (iOS antes do 16.4).
+    if (navegador === 'app' || (navegador !== 'safari' && versao && versao < 1604)) {
+      return { titulo: 'Abra no Safari para instalar', seta: null, corpo: [
+        h('p', null, navegador === 'app' ? 'Este link abriu dentro de outro app, e ele não deixa instalar. Abra no Safari:' : 'Neste navegador o ' + aparelho + ' não deixa instalar. Abra no Safari:'),
+        botoesAbrirNoSafari(),
+        h('p', { class: 'nota' }, 'Se o botão não funcionar, toque em ', b('⋯'), ' ou no ícone do navegador e escolha ', b('Abrir no Safari'), ' (ou "Abrir no navegador"). No Safari, toque de novo em ', b('Instalar'), '.')] };
+    }
+    if (navegador !== 'safari') {   // Chrome, Edge ou Firefox no iOS 16.4 ou mais novo
+      const nome = { chrome: 'Chrome', edge: 'Edge', firefox: 'Firefox' }[navegador];
+      const onde = navegador === 'chrome' ? ['Toque em ', ...compartilhar, ' no alto, à direita do endereço (ou em ', b('⋯'), ' e depois ', b('Compartilhar'), ').']
+        : ['Toque no menu (', b(navegador === 'firefox' ? '☰' : '⋯'), ', na barra de baixo) e depois em ', ...compartilhar, '.'];
+      return { titulo: 'Instalar no ' + aparelho + ' (' + nome + ')', seta: navegador === 'chrome' ? 'cima-direita' : 'baixo-direita', corpo: [
+        h('ol', null,
+          h('li', null, ...onde),
+          h('li', null, 'Toque em ', b('Ver Mais'), ' (se aparecer) e depois em ', ...adicionar, '.'),
+          h('li', null, 'Toque em ', b('Adicionar'), '. O ícone da CSI aparece na tela do ' + aparelho + '.'),
+          depois),
+        h('p', { class: 'nota' }, 'Não achou "Adicionar à Tela de Início"? Abra no Safari, que sempre tem:'),
+        botoesAbrirNoSafari(), nota] };
+    }
+    const aviso = h('p', { class: 'nota' }, 'Abriu pelo WhatsApp? Toque primeiro na ', b('bússola 🧭'), ' (ou em ', b('⋯'), ') e escolha ', b('Abrir no Safari'), '.');
+    if (versao >= 2600) {   // iOS 26 e 27 (iPhone 17 e os que atualizaram): o Compartilhar mora no "⋯"
+      return { titulo: 'Instalar no ' + aparelho, seta: ipad ? 'cima-direita' : 'baixo-direita', corpo: [aviso,
+        h('ol', null,
+          h('li', null, 'Toque nos três pontinhos ', icoTxt('⋯', 'três pontinhos'), ' ', ipad ? 'no alto, à direita.' : 'na barra de baixo, à direita do endereço (a seta mostra onde).'),
+          h('li', null, 'Toque em ', ...compartilhar, '.'),
+          h('li', null, 'Toque em ', b('Ver Mais'), ' (se aparecer), role a lista e toque em ', ...adicionar, '.'),
+          h('li', null, 'Deixe ligado ', b('Abrir como App Web'), ' e toque em ', b('Adicionar'), '.'),
+          depois),
+        h('p', { class: 'nota' }, 'A barra do Safari está no alto? Então o ', b('⋯'), ' ou o ', icone(ICO_COMPARTILHAR, 'Compartilhar'), ' ficam lá em cima.')] };
+    }
+    return { titulo: 'Instalar no ' + aparelho, seta: ipad ? 'cima-direita' : 'baixo-meio', corpo: [aviso,   // iOS até o 18
+      h('ol', null,
+        h('li', null, 'Toque em ', ...compartilhar, ipad ? ' no alto, à direita.' : ' na barra de baixo, no meio (a seta mostra onde).'),
+        h('li', null, 'Role a lista para cima e toque em ', ...adicionar, '.'),
+        h('li', null, 'Toque em ', b('Adicionar'), ', no alto à direita.'),
+        depois),
+      h('p', { class: 'nota' }, 'Não vê a barra de baixo? Toque uma vez no fim da página ou role um pouco para cima que ela aparece.'), nota] };
+  }
   function mostrarDica(tipo) {
     const b = (t) => h('b', null, t), corpo = [];
-    let titulo;
+    let titulo, seta = null;
     if (tipo === 'liberar') {
       titulo = 'Como liberar os avisos';
       if (ehIOS) corpo.push(h('ol', null,
@@ -1459,13 +1560,7 @@
         h('li', null, 'Toque em ', b('Permissões'), ' ou ', b('Configurações do site'), '.'),
         h('li', null, 'Em ', b('Notificações'), ', escolha ', b('Permitir'), ' e volte para cá.')));
     } else if (ehIOS) {
-      titulo = 'Instalar no iPhone';
-      corpo.push(h('ol', null,
-        h('li', null, 'Se abriu pelo WhatsApp, Instagram ou outro app, toque primeiro em ', b('⋯'), ' ou na ', b('bússola'), ' e escolha ', b('Abrir no Safari'), '.'),
-        h('li', null, 'Toque no botão ', b('Compartilhar'), ' (o quadrado com a seta para cima ⬆️). No Safari fica na barra de baixo (ou dentro do ', b('⋯'), '); no Chrome, no alto à direita.'),
-        h('li', null, 'Role a lista e toque em ', b('Adicionar à Tela de Início'), '.'),
-        h('li', null, 'Toque em ', b('Adicionar'), '. O ícone da CSI aparece na tela do iPhone.'),
-        h('li', null, 'Abra a CSI ', b('pelo ícone'), ' e toque em ', b('Ativar avisos'), '.')));
+      const r = dicaInstalarIOS(b); titulo = r.titulo; corpo.push(...r.corpo); seta = r.seta;
     } else {
       titulo = 'Instalar no celular';
       corpo.push(h('ol', null,
@@ -1476,11 +1571,14 @@
         h('p', null, 'Se o app já está instalado, é só abrir pelo ícone da CSI.'));
     }
     $('#dicaAppTitulo').textContent = titulo;
-    $('#dicaAppCorpo').replaceChildren(...corpo);
+    $('#dicaAppCorpo').replaceChildren(...corpo.filter(Boolean));
+    $('#dicaApp').classList.toggle('no-alto', !!seta);
+    const sEl = $('#dicaSeta'); sEl.hidden = !seta; sEl.dataset.lugar = seta || ''; sEl.textContent = seta === 'cima-direita' ? '⬆' : '⬇';
     $('#dicaApp').hidden = false;
-    $('#dicaAppOk').focus();
+    $('#dicaAppCorpo').parentElement.scrollTop = 0;
+    try { $('#dicaAppOk').focus({ preventScroll: true }); } catch { $('#dicaAppOk').focus(); }
   }
-  function fecharDica() { $('#dicaApp').hidden = true; }
+  function fecharDica() { $('#dicaApp').hidden = true; $('#dicaSeta').hidden = true; }
   // Volta a valer como "novo acesso": página reaberta da memória do navegador ou de volta depois de ficar escondida.
   function novoAcessoApp() { fechadoAgora.avisos = false; pedidoNesteAcesso = false; atualizarFaixaApp(); }
   function iniciarFaixaApp() {
