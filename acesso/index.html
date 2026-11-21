@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!--
 FLUXOGRAMA: entrada (celular + PIN de 4 dígitos; no primeiro acesso, cadastro único em 5 passos) -> validação (a página confere o formato; quem decide é o servidor: funções app_* do Supabase, supabase/acesso-rapido-paciente.sql) -> lógica (o aparelho guarda só um código de acesso e o primeiro nome; PIN, filhos, números de confiança e marcações ficam no banco; o PIN é pedido de novo depois de 5 minutos em segundo plano) -> saída (tela inicial com Eu / cada filho / Todos juntos; solicitações de marcação; quem confia em você)
-Versão 3.3 — 21/11/2026 / Mudança: a página passa a apontar o manifesto do app (../manifest.webmanifest, liberado na CSP com manifest-src 'self') e o ícone do iPhone: quem toca em "Adicionar à Tela de Início" aqui (no meio do PIN) ganha o app da CSI inteiro, e não um atalho preso ao /acesso/ que abria o chat fora do app; o convite automático do Chrome fica escondido aqui (o botão Instalar está no chat). Versão 3.2 — 17/11/2026 / Mudança: depois do PIN aparece na hora a tela grande "Bem-vindo(a), nome!" (cobre o teclado, a pessoa não digita o PIN de novo); a conferência do cadastro e o registro do acesso saem em paralelo e a espera pela posição caiu de 5 para 2,5 segundos (a entrada demorava). Versão 3.1 — 16/11/2026 / Mudança: **confirmação por e-mail** (supabase/acesso-codigo-email.sql, chave `app_codigo_email`, nasce desligada): celular novo (primeiro acesso) e "esqueci o PIN" passam por um código de 6 números enviado ao e-mail; quem não recebe (spam, e-mail errado, falha no envio, cadastro sem e-mail) pede o código à atendente, que o vê no painel (Pendências > Códigos). Telas novas c4e, c4c e esqc. Versão 3.0 — 15/11/2026 / Mudança: quem já tem PIN e entra pela conta antiga (e-mail e senha) agora tem as duas JUNTAS (`app_conta_antiga_unir`: senha + PIN, só se for a mesma pessoa; traz as conversas da conta); antes a sessão antiga era descartada sem ligar nada. Versão 2.9 — 15/11/2026 / Mudança: apagada a tela inicial do acesso rápido ("Quem vai ser atendido?", "Marcar pelo chat", "Deixar uma solicitação (sem chat)", "Suas solicitações"): era cópia do chat (o botão só abria o chat), a solicitação sem chat nunca foi usada (0 na produção) e o chat já tem "Meus dados" e "Sair"; depois do PIN a pessoa vai direto ao chat. Versão 2.8 — 15/11/2026 / Mudança: o botão "Meus dados" do chat (?ir=dados) abre direto em Meus dados quando o PIN dos últimos 30 minutos ainda vale (antes pedia o PIN de novo e caía na tela inicial); o site (acesso e Minha vez) deixou de mudar para o tema escuro do celular e segue sempre o visual claro do chat. Versão 2.7 — 15/11/2026 / Mudança: quem tem conta de e-mail E já criou o PIN pelo celular (cadastro separado, sem ligação com a conta) não cai mais em "Confira os seus dados": a página pergunta ao servidor se o celular já tem PIN (app_pre_cadastro, só leitura) e leva direto para digitar o PIN, tanto ao abrir pelo chat quanto ao tocar em Continuar. Versão 2.6 — 15/11/2026 / Mudança: visual do site (cabeçalho com a logo da CSI, cores e fonte do chat, tema escuro); CPF conferido na hora, com os dígitos verificadores, em todas as telas que pedem CPF; o que a pessoa já digitou no cadastro (nome, nascimento, filho, CPF, contato) não se perde ao voltar, ao trocar Sim/Não ou ao ser mandada de volta por um erro do servidor. Versão 2.5 — 15/11/2026 / Mudança: some o cartão "Falta pouco" da tela inicial e de Meus dados (o que falta só é pedido na entrada, com o PIN obrigatório). Versão 2.4 — 15/11/2026 / Mudança: PIN OBRIGATÓRIO (quando config.app_pin_obrigatorio = sim): o primeiro acesso pede também o CPF (só o que o banco ainda não sabe) antes do PIN, quem entra com cadastro incompleto é obrigado a completar antes de seguir, e cada entrada é registrada (aparelho e, com permissão, a posição) (supabase/acesso-rapido-pin-obrigatorio.sql). Versão 2.3 — 15/11/2026 / Mudança: filhos da conta antiga (lista do histórico para conferir), filho com o nome do responsável (é ela mesma ou confirma), filho repetido (supabase/acesso-rapido-filhos.sql). Versão 2.2 — 15/11/2026 / Mudança: cartão "Falta pouco" (CPF dela e dos filhos, e-mail) para TODO paciente (supabase/acesso-rapido-pendencias.sql). Versão 2.1 — 15/11/2026 / Mudança: quem tem conta antiga (e-mail e senha) entra uma última vez, confere os dados que já temos e cria o PIN (supabase/acesso-rapido-conta-antiga.sql); "Meus dados" mais claro. Versão 2.0 — 14/11/2026 / Mudança: ligado ao Supabase (versão 1 guardava tudo só no celular)
+Versão 3.4 — 21/11/2026 / Mudança: **e-mail conferido na hora**: ao sair do campo e antes de enviar o código, se o endereço parece ter erro de digitação (ex.: hotmal.com, gmail.con) aparece "Será que é ...?" com o botão Corrigir; tocando de novo com o mesmo endereço a pessoa segue (só a página, o banco não muda; `npm run test:acesso-email-dica`). Versão 3.3 — 21/11/2026 / Mudança: a página passa a apontar o manifesto do app (../manifest.webmanifest, liberado na CSP com manifest-src 'self') e o ícone do iPhone: quem toca em "Adicionar à Tela de Início" aqui (no meio do PIN) ganha o app da CSI inteiro, e não um atalho preso ao /acesso/ que abria o chat fora do app; o convite automático do Chrome fica escondido aqui (o botão Instalar está no chat). Versão 3.2 — 17/11/2026 / Mudança: depois do PIN aparece na hora a tela grande "Bem-vindo(a), nome!" (cobre o teclado, a pessoa não digita o PIN de novo); a conferência do cadastro e o registro do acesso saem em paralelo e a espera pela posição caiu de 5 para 2,5 segundos (a entrada demorava). Versão 3.1 — 16/11/2026 / Mudança: **confirmação por e-mail** (supabase/acesso-codigo-email.sql, chave `app_codigo_email`, nasce desligada): celular novo (primeiro acesso) e "esqueci o PIN" passam por um código de 6 números enviado ao e-mail; quem não recebe (spam, e-mail errado, falha no envio, cadastro sem e-mail) pede o código à atendente, que o vê no painel (Pendências > Códigos). Telas novas c4e, c4c e esqc. Versão 3.0 — 15/11/2026 / Mudança: quem já tem PIN e entra pela conta antiga (e-mail e senha) agora tem as duas JUNTAS (`app_conta_antiga_unir`: senha + PIN, só se for a mesma pessoa; traz as conversas da conta); antes a sessão antiga era descartada sem ligar nada. Versão 2.9 — 15/11/2026 / Mudança: apagada a tela inicial do acesso rápido ("Quem vai ser atendido?", "Marcar pelo chat", "Deixar uma solicitação (sem chat)", "Suas solicitações"): era cópia do chat (o botão só abria o chat), a solicitação sem chat nunca foi usada (0 na produção) e o chat já tem "Meus dados" e "Sair"; depois do PIN a pessoa vai direto ao chat. Versão 2.8 — 15/11/2026 / Mudança: o botão "Meus dados" do chat (?ir=dados) abre direto em Meus dados quando o PIN dos últimos 30 minutos ainda vale (antes pedia o PIN de novo e caía na tela inicial); o site (acesso e Minha vez) deixou de mudar para o tema escuro do celular e segue sempre o visual claro do chat. Versão 2.7 — 15/11/2026 / Mudança: quem tem conta de e-mail E já criou o PIN pelo celular (cadastro separado, sem ligação com a conta) não cai mais em "Confira os seus dados": a página pergunta ao servidor se o celular já tem PIN (app_pre_cadastro, só leitura) e leva direto para digitar o PIN, tanto ao abrir pelo chat quanto ao tocar em Continuar. Versão 2.6 — 15/11/2026 / Mudança: visual do site (cabeçalho com a logo da CSI, cores e fonte do chat, tema escuro); CPF conferido na hora, com os dígitos verificadores, em todas as telas que pedem CPF; o que a pessoa já digitou no cadastro (nome, nascimento, filho, CPF, contato) não se perde ao voltar, ao trocar Sim/Não ou ao ser mandada de volta por um erro do servidor. Versão 2.5 — 15/11/2026 / Mudança: some o cartão "Falta pouco" da tela inicial e de Meus dados (o que falta só é pedido na entrada, com o PIN obrigatório). Versão 2.4 — 15/11/2026 / Mudança: PIN OBRIGATÓRIO (quando config.app_pin_obrigatorio = sim): o primeiro acesso pede também o CPF (só o que o banco ainda não sabe) antes do PIN, quem entra com cadastro incompleto é obrigado a completar antes de seguir, e cada entrada é registrada (aparelho e, com permissão, a posição) (supabase/acesso-rapido-pin-obrigatorio.sql). Versão 2.3 — 15/11/2026 / Mudança: filhos da conta antiga (lista do histórico para conferir), filho com o nome do responsável (é ela mesma ou confirma), filho repetido (supabase/acesso-rapido-filhos.sql). Versão 2.2 — 15/11/2026 / Mudança: cartão "Falta pouco" (CPF dela e dos filhos, e-mail) para TODO paciente (supabase/acesso-rapido-pendencias.sql). Versão 2.1 — 15/11/2026 / Mudança: quem tem conta antiga (e-mail e senha) entra uma última vez, confere os dados que já temos e cria o PIN (supabase/acesso-rapido-conta-antiga.sql); "Meus dados" mais claro. Versão 2.0 — 14/11/2026 / Mudança: ligado ao Supabase (versão 1 guardava tudo só no celular)
 -->
 <html lang="pt-BR">
 <head>
@@ -95,6 +95,7 @@ button{font:inherit;cursor:pointer}
 input[aria-invalid="true"]{border-color:var(--err);outline-color:var(--err)}
 input.cpf-ok{border-color:var(--ok)}
 .cpfmsg{display:block;min-height:1.2em;margin-top:4px;font-size:.85rem;color:var(--mut)}
+.emailmsg{display:block;min-height:1.2em;margin-top:4px;font-size:.85rem;color:var(--err)}
 .cpfmsg.e{color:var(--err)}.cpfmsg.v{color:var(--ok)}.busy button{opacity:.6;pointer-events:none}
 pre{white-space:pre-wrap;background:var(--bg);border-radius:12px;padding:12px;font:inherit;font-size:.92rem}
 </style>
@@ -140,6 +141,22 @@ const mascaraCpf=v=>{const d=digits(v).slice(0,11);return d.replace(/(\d{3})(\d{
 /* Mesma conta do banco (cpf_valido): 11 números, não todos iguais, e os dois dígitos verificadores. */
 const cpfOk=c=>{const d=digits(c);if(d.length!==11||/^(\d)\1+$/.test(d))return false;let t=0;for(let i=0;i<9;i++)t+=+d[i]*(10-i);if((t*10)%11%10!==+d[9])return false;t=0;for(let i=0;i<10;i++)t+=+d[i]*(11-i);return(t*10)%11%10===+d[10]};
 const MSG_CPF='Os números do CPF não conferem. Confira, por favor.';
+/*EMAIL-INI*/
+/* Erro de digitação no e-mail (ex.: hotmal.com, gmail.con): compara o que vem depois do @ com os provedores mais usados e sugere o certo. Só sugere; quem decide é a pessoa. */
+const DOMINIOS_COMUNS=['gmail.com','hotmail.com','outlook.com','yahoo.com.br','yahoo.com','icloud.com','uol.com.br','bol.com.br','live.com','outlook.com.br','hotmail.com.br','terra.com.br','globo.com','msn.com','me.com','ig.com.br'];
+const DOMINIOS_VALIDOS=DOMINIOS_COMUNS.concat(['mail.com','email.com','gmx.com','protonmail.com','proton.me','aol.com']);   // existem de verdade: nunca sugerir troca
+const distancia=(a,b)=>{let p=Array.from({length:b.length+1},(_,j)=>j);for(let i=1;i<=a.length;i++){const c=[i];for(let j=1;j<=b.length;j++)c[j]=Math.min(p[j]+1,c[j-1]+1,p[j-1]+(a[i-1]===b[j-1]?0:1));p=c}return p[b.length]};
+function emailSugestao(email){
+  const m=String(email||'').trim().toLowerCase().match(/^([^@\s]+)@([^@\s]+)$/);
+  if(!m)return'';
+  const dom=m[2];
+  if(DOMINIOS_VALIDOS.includes(dom))return'';
+  if(dom==='gmail.com.br')return m[1]+'@gmail.com';
+  let melhor='',d=3;
+  for(const c of DOMINIOS_COMUNS){const x=distancia(dom,c);if(x<d){d=x;melhor=c}}
+  return d<=2&&dom.length>=6?m[1]+'@'+melhor:'';
+}
+/*EMAIL-FIM*/
 const primeiro=n=>String(n||'').trim().split(/\s+/)[0];
 
 /* ===== O que fica no celular: só o código do aparelho e o primeiro nome (para o "Olá"). Nada de dado de saúde. ===== */
@@ -227,7 +244,7 @@ function lerCacheChat(){
 const aparelho=()=>(navigator.userAgentData&&navigator.userAgentData.platform)||(/iPhone|iPad/.test(navigator.userAgent)?'iPhone/iPad':/Android/.test(navigator.userAgent)?'Android':'Navegador');
 
 /* ===== Estado ===== */
-const S={dev:null,perfil:null,view:'',d:{filhos:[],confiavel:null},buf:'',mode:'unlock',tmp:'',old:'',after:null,unlocked:false,sheet:null,temFilhos:null,hiddenAt:0,busy:false,volta:'home',esq:null,tel:'',resumo:'',confirma:null,conta:null,aem:'',pend:null,pendOculta:false,porta:null,falta:[],completar:[],rasc:{},evento:null,soHome:false,cacheEmail:'',uniao:null,cod:null};
+const S={dev:null,perfil:null,view:'',d:{filhos:[],confiavel:null},buf:'',mode:'unlock',tmp:'',old:'',after:null,unlocked:false,sheet:null,temFilhos:null,hiddenAt:0,busy:false,volta:'home',esq:null,tel:'',resumo:'',confirma:null,conta:null,aem:'',pend:null,pendOculta:false,porta:null,falta:[],completar:[],rasc:{},evento:null,soHome:false,cacheEmail:'',uniao:null,cod:null,emailConfirmado:''};
 const app=$('#app');
 function toast(t){const e=document.createElement('div');e.className='toast';e.textContent=t;document.body.appendChild(e);setTimeout(()=>e.remove(),2600)}
 function erro(m){const e=$('#err');if(e)e.textContent=m||''}
@@ -479,6 +496,7 @@ function render(){
   const c=$('#cttel');if(c)c.addEventListener('input',()=>{c.value=fmtTel(c.value)});
   restaurarRascunho();
   document.querySelectorAll('input[data-cp],#pend input[data-pc="cpf"],#cpfn').forEach(ligarCpf);
+  document.querySelectorAll('#cemail,#pend input[data-pc="email"]').forEach(ligarEmail);
 }
 /* O que a pessoa já digitou nas telas do cadastro fica guardado só na memória da página: voltar, trocar Sim/Não ou ser mandada de volta por um erro não apaga nada. */
 const RASC_TELAS=['c1','c2','c3','c4','c4e'];   // a tela do CPF (c3b) guarda direto no cadastro em andamento (S.d): os campos dela mudam de posição conforme o que o banco já sabe
@@ -514,6 +532,31 @@ function guardarCpf(i){
 }
 /* Mensagem ao enviar com o CPF errado: avisa, marca o campo e leva o cursor até ele. */
 function cpfRecusado(i,msg){cpfAviso(i,true);i.focus();return erro(msg)}
+/* E-mail conferido ao sair do campo e ao tocar no botão: se o endereço parece errado, mostra "Você quis dizer ...?" com o botão Corrigir. Não trava para sempre: se a pessoa tocar de novo com o mesmo endereço, segue. */
+function emailAviso(i){
+  const s=emailSugestao(i.value);
+  let el=i.nextElementSibling;
+  if(!el||!el.classList.contains('emailmsg')){el=document.createElement('small');el.setAttribute('aria-live','polite');i.after(el)}
+  el.className='emailmsg';el.textContent='';
+  i.setAttribute('aria-invalid',s?'true':'false');
+  if(!s)return;
+  el.append('Será que é ');const b=document.createElement('b');b.textContent=s;el.append(b,'? ');
+  const bt=document.createElement('button');bt.type='button';bt.className='link inline';bt.textContent='Corrigir';
+  bt.addEventListener('click',()=>{i.value=s;i.dispatchEvent(new Event('input',{bubbles:true}));emailAviso(i);erro('')});
+  el.append(bt);
+}
+function ligarEmail(i){
+  i.addEventListener('input',()=>{const el=i.nextElementSibling;if(el&&el.classList.contains('emailmsg'))el.textContent='';i.removeAttribute('aria-invalid')});
+  i.addEventListener('blur',()=>emailAviso(i));
+}
+/* Antes de seguir: true se pode continuar. Na primeira vez com um endereço suspeito, avisa e para; tocando de novo com o mesmo endereço, a pessoa confirma que está certo. */
+function emailConferido(i){
+  const v=i.value.trim().toLowerCase();
+  if(!emailSugestao(v)||S.emailConfirmado===v)return true;
+  S.emailConfirmado=v;emailAviso(i);i.focus();
+  erro('Confira o e-mail: ele pode estar com erro de digitação. Se estiver certo mesmo, toque no botão de novo.');
+  return false;
+}
 
 /* ===== Validações reutilizáveis ===== */
 function lerContato(){
@@ -590,6 +633,7 @@ const A={
       if(i.dataset.pc==='cpf'&&digits(v).length!==11)return cpfRecusado(i,'O CPF tem 11 números.');
       if(i.dataset.pc==='cpf'&&!cpfOk(v))return cpfRecusado(i,MSG_CPF);
       if(i.dataset.pc==='email'&&!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v))return erro('Esse e-mail não parece certo.');
+      if(i.dataset.pc==='email'&&!emailConferido(i))return;
     }
     for(const i of campos){
       if(!i.value.trim())continue;
@@ -606,6 +650,7 @@ const A={
   c4e:async()=>{
     const em=$('#cemail').value.trim().toLowerCase();S.d.email=em;
     if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em))return erro('Esse e-mail não parece certo.');
+    if(!emailConferido($('#cemail')))return;
     ocupado(true);const r=await rpc('app_codigo_pedir',{p_telefone:S.d.telefone,p_finalidade:'cadastro',p_email:em,p_nome:S.d.nome});ocupado(false);
     if(r.erro==='indisponivel')return go('indisp');
     if(r.erro==='telefone_cadastrado'){S.tel=S.d.telefone;S.mode='login';S.buf='';go('pin');setTimeout(()=>erro(r.mensagem),0);return}
@@ -635,6 +680,7 @@ const A={
       if(i.dataset.pc==='cpf'&&digits(i.value).length!==11)return cpfRecusado(i,'O CPF tem 11 números.');
       if(i.dataset.pc==='cpf'&&!cpfOk(i.value))return cpfRecusado(i,MSG_CPF);
       if(i.dataset.pc==='email'&&!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(i.value.trim()))return erro('Esse e-mail não parece certo.');
+      if(i.dataset.pc==='email'&&!emailConferido(i))return;
     }
     for(const i of campos){
       const r=await chamar('app_pendencia_responder',{p_pessoa:i.dataset.pp,p_campo:i.dataset.pc,p_valor:i.value.trim()});
