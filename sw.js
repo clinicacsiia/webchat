@@ -1,7 +1,7 @@
 // Service worker do chat do cliente: abre na hora com a cópia guardada e busca a versão nova por trás (vale na próxima abertura).
 // O link pode vir do WhatsApp, do e-mail ou da bio com ?origem=...: a cópia é a mesma para todos.
-const VERSAO = 'webchat-cliente-v78';
-const BASE = ['./', 'index.html', 'privacidade.html', 'termos.html', 'sentinela.js', 'nomes-exame.js', 'icon-192.png', 'img/logo-csi.svg', 'img/logo-csi-sem-anel.svg', 'img/logo-csi-anel.svg', 'img/logo-csi-simbolo.svg', 'manifest.webmanifest'];
+const VERSAO = 'webchat-cliente-v79';
+const BASE = ['./', 'index.html', 'privacidade.html', 'termos.html', 'sentinela.js', 'nomes-exame.js', 'icon-192.png', 'apple-touch-icon.png', 'img/logo-csi.svg', 'img/logo-csi-sem-anel.svg', 'img/logo-csi-anel.svg', 'img/logo-csi-simbolo.svg', 'manifest.webmanifest'];
 
 self.addEventListener('install', (e) => {
   // cache: 'reload' = busca na rede de verdade (o GitHub Pages guarda 10 minutos e a instalação podia gravar uma cópia velha)
