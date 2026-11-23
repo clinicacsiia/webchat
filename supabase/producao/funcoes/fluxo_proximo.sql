@@ -6,7 +6,7 @@ CREATE OR REPLACE FUNCTION public.fluxo_proximo(p_conversa uuid)
  SECURITY DEFINER
  SET search_path TO ''
 AS $function$
-declare d jsonb; pa public.pre_agendamentos; n_itens int; v_conf jsonb; v_hist jsonb; v_procs int[]; v_med text[]; v_ja boolean;
+declare d jsonb; pa public.pre_agendamentos; n_itens int; v_conf jsonb; v_hist jsonb; v_procs int[]; v_med text[]; v_ja boolean; v_cv public.conversas; v_ct public.contatos; v_cel text; v_mail text;
 begin
   select dados into d from public.conversa_fluxo where conversa_id = p_conversa;
   d := coalesce(d, '{}'::jsonb);
@@ -80,6 +80,27 @@ begin
           and nullif(btrim(coalesce(pa.paciente ->> 'celular', '')), '') is not null
           and public.fluxo_cpf_ok(pa.paciente ->> 'cpf');   -- klingo-auto: quem não deixou CPF volta a ser perguntado
   if pa.identidade in ('conferida', 'atualizar') and d ->> 'mudou' is null and not v_ja then return 'mudou'; end if;
+  -- dados-ja-salvos (23/11/2026): o que o chat já tem guardado NÃO é perguntado de novo (a confirmação final mostra tudo e deixa corrigir).
+  --   contato: celular + e-mail válidos (do pedido, do formulário inicial ou do contato) -> grava no pedido e pula 'dados_contato'.
+  --   identidade: nome + sexo já no pedido -> pula 'dados_ident'. Só o que falta é perguntado. "Não sou eu" e "mudou" continuam pedindo de novo.
+  if not v_ja and not coalesce((d ->> 'nao_sou_eu')::boolean, false) and d ->> 'mudou' is distinct from 'mudou' then
+    if not coalesce((d ->> 'g_contato')::boolean, false) then
+      select * into v_cv from public.conversas where id = p_conversa;
+      select * into v_ct from public.contatos where id = v_cv.contato_id;
+      v_cel := regexp_replace(coalesce(nullif(pa.paciente ->> 'celular', ''), v_ct.telefone, ''), '\D', '', 'g');
+      v_mail := lower(btrim(coalesce(nullif(pa.paciente ->> 'email', ''), nullif(btrim(v_cv.email_informado), ''), v_ct.email, '')));
+      if public.fluxo_telefone_ok(v_cel) and public.fluxo_email_ok(v_mail) then
+        perform public.fluxo_pre(p_conversa, jsonb_build_object('paciente', jsonb_build_object('celular', v_cel, 'email', v_mail), 'etapa', 'dados'));
+        perform public.fluxo_set(p_conversa, '{"g_contato": true}');
+        d := d || '{"g_contato": true}'::jsonb;
+      end if;
+    end if;
+    if not coalesce((d ->> 'g_ident')::boolean, false)
+       and public.fluxo_nome_ok(btrim(coalesce(pa.paciente ->> 'nome', ''))) and upper(left(coalesce(pa.paciente ->> 'sexo', ''), 1)) in ('M', 'F') then
+      perform public.fluxo_set(p_conversa, '{"g_ident": true}');
+      d := d || '{"g_ident": true}'::jsonb;
+    end if;
+  end if;
   if not v_ja and not coalesce((d ->> 'g_ident')::boolean, false) then return 'dados_ident'; end if;
   if not v_ja and not coalesce((d ->> 'g_contato')::boolean, false) then return 'dados_contato'; end if;
   -- carteirinha-removida: o passo 'dados_carteira' não é mais perguntado; o atendente confere o convênio depois.
