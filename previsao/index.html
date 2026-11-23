@@ -96,7 +96,7 @@ button{font:inherit;cursor:pointer}
    as tabelas são fechadas e a credencial é o código secreto do link (ou celular + nascimento, com limite de tentativas). */
 const SUPABASE_URL='https://nrvuynjwcgwpjdptkiay.supabase.co';
 const SUPABASE_KEY='sb_publishable_e2GK1YGEj06STa_ESCevow_nvtATB-y';
-const VERSAO_PREVISAO='2026.11.17-3';
+const VERSAO_PREVISAO='2026.11.23-1';
 async function rpc(nome,args){
   const ctl=new AbortController(),t=setTimeout(()=>ctl.abort(),20000);
   try{
@@ -369,6 +369,11 @@ const ABAS=[['','Tudo'],['consulta','Consultas'],['exame','Exames'],['outro','Ou
 const TURNOS=[['qualquer','Sem preferência'],['manha','Manhã'],['tarde','Tarde'],['noite','Noite']];
 const NOME_TURNO={manha:'manhã',tarde:'tarde',noite:'noite'};
 const horasOpc=(vazio,sel)=>`<option value="">${vazio}</option>`+Array.from({length:31},(_,i)=>{const m=360+i*30,h=String(Math.floor(m/60)).padStart(2,'0'),v=h+':'+(m%60?'30':'00');return`<option value="${v}"${v===sel?' selected':''}>${v}</option>`}).join('');
+const somaDias=(iso,n)=>{const d=new Date(iso+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10)};
+const somaHora=(hm,min)=>{const t=Math.min(1439,Math.max(0,(+hm.slice(0,2))*60+(+hm.slice(3,5))+min));return String(Math.floor(t/60)).padStart(2,'0')+':'+String(t%60).padStart(2,'0')};
+/* Dia e hora que a pessoa prefere viram a janela de busca: o dia escolhido e os 2 seguintes; a hora escolhida de 1 h antes a 2 h depois */
+const janela=pe=>({data_de:pe.dia||undefined,data_ate:pe.dia?somaDias(pe.dia,2):undefined,hora_apos:pe.hora?somaHora(pe.hora,-60):undefined,hora_ate:pe.hora?somaHora(pe.hora,120):undefined});
+const dataBr=iso=>iso.split('-').reverse().join('/');
 const hojeIso=()=>new Date(Date.now()-3*3600e3).toISOString().slice(0,10);
 const diaFmt=iso=>{const d=new Date(iso+'T12:00:00');return isNaN(d)?iso:d.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'2-digit'})};
 const voltarDaqui=()=>(E.volta||(E.codigo?()=>abrir(E.codigo):telaAchar))();
@@ -420,21 +425,16 @@ function telaTextoLivre(){
   $('#voltar').onclick=()=>telaPedidoExame();
   $('#fLivre').onsubmit=ev=>{ev.preventDefault();const t=$('#livre').value.trim();if(!t)return void($('#erro').textContent='Escreva o que você procura.');E.pe={...E.pe,proc:null,texto:t,horario:undefined};telaQuando()};
 }
-/* Passo 2: quando? (turno, a partir de, até, até o dia, unidade) — ou nada */
+/* Passo 2: quando? (dia e horário que prefere) — ou nada */
 function telaQuando(){
   const pe=E.pe,nome=pe.proc?nomeExame(pe.proc.nome).titulo:pe.texto,semAgenda=!pe.proc||!pe.proc.agenda;
   mostrar(`<h1>Quando você prefere?</h1>
   <p class="sub"><b>${esc(nome)}</b> · <a href="#" id="trocar">trocar</a></p>
   ${avisoHtml()}
   <form class="card" id="fQuando" novalidate>
-    <label>Turno</label>
-    <div class="chips" role="group" aria-label="Turno">${TURNOS.map(([v,t])=>`<button class="chip" type="button" data-turno="${v}" aria-pressed="${(pe.turno||'qualquer')===v}">${t}</button>`).join('')}</div>
-    <div class="linha2">
-      <div><label for="apos">A partir das</label><select id="apos">${horasOpc('Qualquer hora',pe.apos)}</select></div>
-      <div><label for="ate">Até as</label><select id="ate">${horasOpc('Qualquer hora',pe.ate)}</select></div>
-    </div>
-    <label for="dia">Até o dia <span class="opc">(se quiser)</span></label><input id="dia" type="date" min="${hojeIso()}" value="${esc(pe.dia||'')}">
-    <label for="unid">Unidade</label><select id="unid"><option value="">Qualquer unidade</option>${[['CSI','CSI'],['DESENVOAR','Desenvoar'],['RM/TC','CSI RM/TC']].map(([v,t])=>`<option value="${v}"${pe.unid===v?' selected':''}>${t}</option>`).join('')}</select>
+    <label for="dia">Que dia você prefere? <span class="opc">(se quiser)</span></label><input id="dia" type="date" min="${hojeIso()}" max="${somaDias(hojeIso(),30)}" value="${esc(pe.dia||'')}">
+    <label for="hora">Que horário você prefere? <span class="opc">(se quiser)</span></label><select id="hora">${horasOpc('Qualquer horário',pe.hora)}</select>
+    <p class="sub" style="margin:6px 0 0">Mostramos os horários livres no dia escolhido e nos 2 dias seguintes, perto da hora que você preferir.</p>
     <label for="plano">Seu plano ou convênio <span class="opc">(se souber)</span></label><input id="plano" maxlength="80" autocomplete="off" value="${esc(pe.plano||'')}" placeholder="Ex.: particular, nome do convênio">
     <p class="sub" style="margin-top:12px">${semAgenda?'Para este item a nossa equipe olha a agenda e fala com você. Se quiser, diga quando prefere.':'Não precisa escolher nada: é só tocar em “Ver a disponibilidade”.'} Cobertura, autorização e valor dependem do plano: a equipe confirma.</p>
     <p class="msg-erro" id="erro" role="alert"></p>
@@ -442,29 +442,28 @@ function telaQuando(){
     <button class="btn ${semAgenda?'':'linha'}" id="pedirJa" type="button">${semAgenda?'Pedir para a equipe':'Pedir para a equipe sem ver os horários'}</button>
     <button class="btn sec" id="voltar" type="button">Voltar</button>
   </form>`);
-  const ler=()=>{pe.apos=$('#apos').value||undefined;pe.ate=$('#ate').value||undefined;pe.dia=$('#dia').value||undefined;pe.unid=$('#unid').value||undefined;pe.plano=$('#plano').value.trim()||undefined};
-  app.querySelectorAll('button[data-turno]').forEach(b=>b.onclick=()=>{pe.turno=b.dataset.turno;app.querySelectorAll('button[data-turno]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)))});
+  const ler=()=>{pe.hora=$('#hora').value||undefined;pe.dia=$('#dia').value||undefined;pe.plano=$('#plano').value.trim()||undefined};
   $('#trocar').onclick=ev=>{ev.preventDefault();telaPedidoExame()};
   $('#voltar').onclick=()=>telaPedidoExame();
   $('#pedirJa').onclick=()=>{ler();pe.horario=undefined;enviarPedido()};
   $('#fQuando').onsubmit=ev=>{ev.preventDefault();ler();
-    if(pe.apos&&pe.ate&&pe.ate<pe.apos)return void($('#erro').textContent='O horário “até” precisa ser depois do “a partir das”.');
+    if(pe.dia&&pe.dia<hojeIso())return void($('#erro').textContent='Escolha um dia a partir de hoje.');
     verDisponibilidade()};
 }
 /* Passo 3: a disponibilidade prevista */
 async function verDisponibilidade(){
   const pe=E.pe;mostrar('<p class="sub">Consultando a agenda…</p>');
-  const r=await rpc('pmarc_disponibilidade',{p_procedimento:pe.proc.id,p_dados:{turno:pe.turno||'qualquer',hora_apos:pe.apos,hora_ate:pe.ate,data_ate:pe.dia,unidade:pe.unid}});
+  const r=await rpc('pmarc_disponibilidade',{p_procedimento:pe.proc.id,p_dados:{turno:'qualquer',...janela(pe)}});
   if(r.motivo==='desligado')return telaDesligado();
   if(r.ok!==true){
     const msg=r.motivo==='muitos'?'Muita gente consultando agora. Tente de novo em instantes.':erroRede;
     return mostrar(`<div class="card"><p>${esc(msg)}</p><button class="btn" id="tentar" type="button">Tentar de novo</button><button class="btn sec" id="voltar" type="button">Voltar</button></div>`),$('#tentar').onclick=verDisponibilidade,$('#voltar').onclick=telaQuando;
   }
+  if(pe.dia&&r.dias){const ok=r.dias.filter(d=>d.data>=pe.dia);r.total=ok.reduce((n,d)=>n+d.slots.length,0);r.dias=ok}
   telaDisponibilidade(r);
 }
 function filtrosTexto(pe){
-  const f=[];if(pe.turno&&pe.turno!=='qualquer')f.push('turno: '+NOME_TURNO[pe.turno]);if(pe.apos)f.push('a partir das '+pe.apos);if(pe.ate)f.push('até as '+pe.ate);
-  if(pe.dia)f.push('até '+pe.dia.split('-').reverse().join('/'));if(pe.unid)f.push(UNID[pe.unid]||pe.unid);
+  const f=[];if(pe.dia)f.push('dia '+dataBr(pe.dia));if(pe.hora)f.push('perto das '+pe.hora);
   return f.length?f.join(' · '):'sem preferência (todos os horários)';
 }
 function telaDisponibilidade(r){
@@ -493,8 +492,8 @@ function telaDisponibilidade(r){
 }
 /* Enviar o pedido à equipe (quem não tem link deixa nome e celular antes; nada barra) */
 function dadosPedido(){
-  const pe=E.pe;
-  return{procedimento_id:pe.proc?pe.proc.id:undefined,procedimento_texto:pe.proc?undefined:pe.texto,turno:pe.turno&&pe.turno!=='qualquer'?pe.turno:undefined,hora_apos:pe.apos,hora_ate:pe.ate,data_ate:pe.dia,unidade:pe.unid,plano:pe.plano,horario:pe.horario};
+  const pe=E.pe,j=janela(pe);
+  return{procedimento_id:pe.proc?pe.proc.id:undefined,procedimento_texto:pe.proc?undefined:pe.texto,hora_apos:j.hora_apos,hora_ate:j.hora_ate,data_ate:j.data_ate,observacao:(pe.dia||pe.hora)?['Prefere',pe.dia?'o dia '+dataBr(pe.dia):'',pe.hora?'perto das '+pe.hora:''].filter(Boolean).join(' '):undefined,plano:pe.plano,horario:pe.horario};
 }
 async function enviarPedido(){
   if(!E.codigo)return telaIdentPedido();
