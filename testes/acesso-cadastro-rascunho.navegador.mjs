@@ -95,12 +95,27 @@ await caso('o cabeçalho continua nas outras telas (nome e nascimento)', async (
   await page.fill('#tel', '71991230001'); await page.click('[data-act="c1"]'); await esperaTexto(page, /Confirme quem é você/);
   return { ok: (await page.locator('header.topo img.topo-logo').count()) === 1 };
 });
+await caso('nascimento é digitado só com números e ganha as barras sozinho (sem calendário)', async () => {
+  const tipo = await page.getAttribute('#nasc', 'type'), modo = await page.getAttribute('#nasc', 'inputmode');
+  await page.fill('#nasc', ''); await page.type('#nasc', '15031988');
+  const v = await page.inputValue('#nasc');
+  await page.fill('#nasc', ''); await page.type('#nasc', '1503');
+  const parcial = await page.inputValue('#nasc');
+  return { ok: tipo !== 'date' && modo === 'numeric' && v === '15/03/1988' && parcial === '15/03', detalhe: `${tipo} ${modo} ${v} ${parcial}` };
+});
+await caso('data incompleta ou impossível é recusada com o exemplo de como digitar', async () => {
+  await page.fill('#nome', 'Ana Souza Teste'); await page.fill('#nasc', '31/02/1988'); await page.click('[data-act="c2"]');
+  const t = await page.textContent('#err');
+  await page.fill('#nasc', '1503'); await page.click('[data-act="c2"]');
+  const t2 = await page.textContent('#err');
+  return { ok: /15\/03\/1988/.test(t) && /15\/03\/1988/.test(t2), detalhe: t + ' | ' + t2 };
+});
 await caso('voltar do passo 2 ao 1 e avançar de novo: celular, nome e nascimento continuam preenchidos (mesmo sem apertar Continuar)', async () => {
   await page.fill('#nome', 'Ana Souza Teste'); await page.fill('#nasc', '1988-04-12');
   await page.click('[data-act="go"][data-v="c1"]'); const tel = await page.inputValue('#tel');
   await page.click('[data-act="c1"]'); await esperaTexto(page, /Confirme quem é você/);
   const nome = await page.inputValue('#nome'), nasc = await page.inputValue('#nasc');
-  return { ok: tel === '(71) 99123-0001' && nome === 'Ana Souza Teste' && nasc === '1988-04-12', detalhe: `${tel} | ${nome} | ${nasc}` };
+  return { ok: tel === '(71) 99123-0001' && nome === 'Ana Souza Teste' && nasc === '12/04/1988', detalhe: `${tel} | ${nome} | ${nasc}` };
 });
 await caso('filho meio digitado: trocar Sim/Não/Sim e ir e voltar não apaga o que estava no formulário', async () => {
   await page.click('[data-act="c2"]'); await esperaTexto(page, /Você tem filhos/);
@@ -110,7 +125,7 @@ await caso('filho meio digitado: trocar Sim/Não/Sim e ir e voltar não apaga o 
   const a = [await page.inputValue('#fnome'), await page.inputValue('#fnasc')];
   await page.click('[data-act="go"][data-v="c2"]'); await page.click('[data-act="c2"]'); await esperaTexto(page, /Você tem filhos/);
   const b = [await page.inputValue('#fnome'), await page.inputValue('#fnasc')];
-  return { ok: a.join() === 'Leo Souza Teste,2019-08-30' && b.join() === 'Leo Souza Teste,2019-08-30', detalhe: a.join() + ' / ' + b.join() };
+  return { ok: a.join() === 'Leo Souza Teste,30/08/2019' && b.join() === 'Leo Souza Teste,30/08/2019', detalhe: a.join() + ' / ' + b.join() };
 });
 await caso('adicionar o filho limpa o formulário (o rascunho não volta a aparecer)', async () => {
   await page.click('[data-act="addf"]'); await esperaTexto(page, /Leo Souza Teste/);
