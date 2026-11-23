@@ -14886,6 +14886,25 @@
    "md5": "b451951c5fa55e78c9b1ceed2cca7cee"
   },
   {
+   "nome": "pmarc_conversa_reabrir",
+   "args": [
+    {
+     "nome": "p_pessoa",
+     "padrao": false
+    },
+    {
+     "nome": "p_conv",
+     "padrao": false
+    }
+   ],
+   "definer": true,
+   "gatilho": false,
+   "anon": false,
+   "authenticated": false,
+   "publico": false,
+   "md5": "d37dafb541da054b96de6009f060e1e3"
+  },
+  {
    "nome": "pmarc_disparar",
    "args": [
     {
@@ -14955,7 +14974,7 @@
    "anon": true,
    "authenticated": true,
    "publico": false,
-   "md5": "6dee0ea2d9a853a87816ecb079a34168"
+   "md5": "c8e9592d7bc6777a50c46d5eb5ebb411"
   },
   {
    "nome": "pmarc_estado_gravar",
@@ -15056,7 +15075,7 @@
    "anon": true,
    "authenticated": true,
    "publico": false,
-   "md5": "5e8eac7a0c47549804794812db6851b7"
+   "md5": "441a5eb0bc3dd912859d5c55eec7d993"
   },
   {
    "nome": "pmarc_novo",
@@ -15102,7 +15121,7 @@
    "anon": true,
    "authenticated": true,
    "publico": false,
-   "md5": "b17da88425feb1090df4ee4f71339966"
+   "md5": "0478e22028a4d2faa8e4622562f87a2d"
   },
   {
    "nome": "pmarc_responder",
@@ -15121,7 +15140,7 @@
    "anon": true,
    "authenticated": true,
    "publico": false,
-   "md5": "d827f8466e4d288cb4bb8d360bc60879"
+   "md5": "a684ae7e6ef253deed1d696dac3e947e"
   },
   {
    "nome": "pmarc_telefone",
