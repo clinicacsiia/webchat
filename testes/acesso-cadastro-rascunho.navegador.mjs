@@ -16,6 +16,7 @@ await db.exec(readFileSync(`${REPO}/supabase/acesso-rapido-chat.sql`, 'utf8'));
 await db.exec(readFileSync(`${REPO}/supabase/acesso-rapido-pendencias.sql`, 'utf8'));
 await db.exec(readFileSync(`${REPO}/supabase/acesso-rapido-filhos.sql`, 'utf8'));
 await db.exec(readFileSync(`${REPO}/supabase/acesso-rapido-pin-obrigatorio.sql`, 'utf8'));
+await db.exec(readFileSync(`${REPO}/supabase/acesso-filho-cpf-opcional.sql`, 'utf8'));   // CPF do filho opcional (23/11/2026)
 await db.exec(`update public.config set valor = 'sim' where chave = 'app_pin_obrigatorio'`);
 await db.exec(`update public.config set valor = 'sim' where chave = 'app_acesso_modo'`);
 
@@ -95,12 +96,27 @@ await caso('o cabeçalho continua nas outras telas (nome e nascimento)', async (
   await page.fill('#tel', '71991230001'); await page.click('[data-act="c1"]'); await esperaTexto(page, /Confirme quem é você/);
   return { ok: (await page.locator('header.topo img.topo-logo').count()) === 1 };
 });
+await caso('nascimento é digitado só com números e ganha as barras sozinho (sem calendário)', async () => {
+  const tipo = await page.getAttribute('#nasc', 'type'), modo = await page.getAttribute('#nasc', 'inputmode');
+  await page.fill('#nasc', ''); await page.type('#nasc', '15031988');
+  const v = await page.inputValue('#nasc');
+  await page.fill('#nasc', ''); await page.type('#nasc', '1503');
+  const parcial = await page.inputValue('#nasc');
+  return { ok: tipo !== 'date' && modo === 'numeric' && v === '15/03/1988' && parcial === '15/03', detalhe: `${tipo} ${modo} ${v} ${parcial}` };
+});
+await caso('data incompleta ou impossível é recusada com o exemplo de como digitar', async () => {
+  await page.fill('#nome', 'Ana Souza Teste'); await page.fill('#nasc', '31/02/1988'); await page.click('[data-act="c2"]');
+  const t = await page.textContent('#err');
+  await page.fill('#nasc', '1503'); await page.click('[data-act="c2"]');
+  const t2 = await page.textContent('#err');
+  return { ok: /15\/03\/1988/.test(t) && /15\/03\/1988/.test(t2), detalhe: t + ' | ' + t2 };
+});
 await caso('voltar do passo 2 ao 1 e avançar de novo: celular, nome e nascimento continuam preenchidos (mesmo sem apertar Continuar)', async () => {
   await page.fill('#nome', 'Ana Souza Teste'); await page.fill('#nasc', '1988-04-12');
   await page.click('[data-act="go"][data-v="c1"]'); const tel = await page.inputValue('#tel');
   await page.click('[data-act="c1"]'); await esperaTexto(page, /Confirme quem é você/);
   const nome = await page.inputValue('#nome'), nasc = await page.inputValue('#nasc');
-  return { ok: tel === '(71) 99123-0001' && nome === 'Ana Souza Teste' && nasc === '1988-04-12', detalhe: `${tel} | ${nome} | ${nasc}` };
+  return { ok: tel === '(71) 99123-0001' && nome === 'Ana Souza Teste' && nasc === '12/04/1988', detalhe: `${tel} | ${nome} | ${nasc}` };
 });
 await caso('filho meio digitado: trocar Sim/Não/Sim e ir e voltar não apaga o que estava no formulário', async () => {
   await page.click('[data-act="c2"]'); await esperaTexto(page, /Você tem filhos/);
@@ -110,15 +126,15 @@ await caso('filho meio digitado: trocar Sim/Não/Sim e ir e voltar não apaga o 
   const a = [await page.inputValue('#fnome'), await page.inputValue('#fnasc')];
   await page.click('[data-act="go"][data-v="c2"]'); await page.click('[data-act="c2"]'); await esperaTexto(page, /Você tem filhos/);
   const b = [await page.inputValue('#fnome'), await page.inputValue('#fnasc')];
-  return { ok: a.join() === 'Leo Souza Teste,2019-08-30' && b.join() === 'Leo Souza Teste,2019-08-30', detalhe: a.join() + ' / ' + b.join() };
+  return { ok: a.join() === 'Leo Souza Teste,30/08/2019' && b.join() === 'Leo Souza Teste,30/08/2019', detalhe: a.join() + ' / ' + b.join() };
 });
 await caso('adicionar o filho limpa o formulário (o rascunho não volta a aparecer)', async () => {
   await page.click('[data-act="addf"]'); await esperaTexto(page, /Leo Souza Teste/);
   return { ok: (await page.inputValue('#fnome')) === '' && (await page.inputValue('#fnasc')) === '' };
 });
-await caso('tela do CPF: um por pessoa (ela e o filho), ainda sem aviso de erro', async () => {
+await caso('tela do CPF: só o do responsável (o do filho é opcional e não é pedido), ainda sem aviso de erro', async () => {
   await page.click('[data-act="c3"]'); await esperaTexto(page, /Seu CPF/);
-  return { ok: (await page.locator('input[data-cp]').count()) === 2 && (await msgCpf(page, 'input[data-cp="eu"]')) === '' };
+  return { ok: (await page.locator('input[data-cp]').count()) === 1 && (await msgCpf(page, 'input[data-cp="eu"]')) === '' };
 });
 await caso('CPF com 11 números errado é acusado na hora, sem apertar nada; o certo mostra "confere"; incompleto não acusa enquanto digita', async () => {
   const eu = 'input[data-cp="eu"]';
@@ -130,33 +146,33 @@ await caso('CPF com 11 números errado é acusado na hora, sem apertar nada; o c
 });
 await caso('CPF errado não passa nem vai ao servidor; a mensagem diz de quem é e o cursor vai para o campo', async () => {
   const antes = ult('app_pin_criar') + ult('app_pre_cadastro') + ult('app_cadastrar');
-  await page.fill('input[data-cp="0"]', CPF_ERRADO);
+  await page.fill('input[data-cp="eu"]', CPF_ERRADO);
   await page.click('[data-act="c3b"]'); const t = await texto(page);
   const foco = await page.evaluate(() => document.activeElement && document.activeElement.dataset.cp);
   const depois = ult('app_pin_criar') + ult('app_pre_cadastro') + ult('app_cadastrar');
-  return { ok: /CPF de Leo não confere/.test(t) && /Seu CPF/.test(t) && foco === '0' && antes === depois, detalhe: t.replace(/\s+/g, ' ').slice(0, 160) };
+  return { ok: /seu CPF não confere/i.test(t) && foco === 'eu' && antes === depois, detalhe: t.replace(/\s+/g, ' ').slice(0, 160) };
 });
-await caso('o que já foi digitado nos CPFs não some ao voltar e avançar (nem o do filho, mesmo errado)', async () => {
+await caso('o que já foi digitado no CPF não some ao voltar e avançar (mesmo errado)', async () => {
   await page.click('[data-act="go"][data-v="c3"]'); await esperaTexto(page, /Você tem filhos/);
   await page.click('[data-act="c3"]'); await esperaTexto(page, /Seu CPF/);
-  const eu = await page.inputValue('input[data-cp="eu"]'), filho = await page.inputValue('input[data-cp="0"]');
-  const aviso = await msgCpf(page, 'input[data-cp="0"]');
-  return { ok: eu === CPF_OK && filho === CPF_ERRADO && /não conferem/.test(aviso), detalhe: `${eu} | ${filho} | ${aviso}` };
+  const eu = await page.inputValue('input[data-cp="eu"]');
+  const aviso = await msgCpf(page, 'input[data-cp="eu"]');
+  return { ok: eu === CPF_ERRADO && /não conferem/.test(aviso), detalhe: `${eu} | ${aviso}` };
 });
-await caso('corrigido o CPF do filho, segue; o contato de confiança digitado sobrevive à ida ao PIN e volta', async () => {
-  await page.fill('input[data-cp="0"]', CPF_FILHO); await page.click('[data-act="c3b"]'); await esperaTexto(page, /Número de confiança/);
+await caso('corrigido o CPF, segue (sem pedir o do filho); o contato de confiança digitado sobrevive à ida ao PIN e volta', async () => {
+  await page.fill('input[data-cp="eu"]', CPF_OK); await page.click('[data-act="c3b"]'); await esperaTexto(page, /Número de confiança/);
   await page.fill('#ctnome', 'Maria Teste'); await page.fill('#cttel', '71988887777'); await page.selectOption('#ctrel', 'Irmão(ã)');
   await page.click('[data-act="c4"]'); await esperaTexto(page, /Crie seu PIN/);
   await page.click('[data-act="go"][data-v="c4"]'); await esperaTexto(page, /Número de confiança/);
   const v = [await page.inputValue('#ctnome'), await page.inputValue('#cttel'), await page.inputValue('#ctrel')];
   return { ok: v.join() === 'Maria Teste,(71) 98888-7777,Irmão(ã)', detalhe: v.join() };
 });
-await caso('cadastro termina com os dois CPFs certos gravados', async () => {
+await caso('cadastro termina com o CPF do responsável gravado e o filho com o CPF em branco', async () => {
   await page.click('[data-act="c4"]'); await esperaTexto(page, /Crie seu PIN/);
   await pin(page, '1357'); await pin(page, '1357'); await page.waitForURL((u) => u.pathname === '/', { timeout: 6000 });
   const eu = (await q(`select cpf from public.app_paciente where telefone = '71991230001'`))[0].cpf;
   const f = (await q(`select cpf from public.app_filho order by criado_em`))[0].cpf;
-  return { ok: eu === '52998224725' && f === '11144477735', detalhe: `${eu} ${f}` };
+  return { ok: eu === '52998224725' && f === null, detalhe: `${eu} ${f}` };
 });
 await caso('terminado o cadastro, os rascunhos são apagados da memória da página', async () => {
   await page.goto(`${ORIGEM}/acesso/?ir=dados`); await esperaTexto(page, /Nascimento/);   // a página foi para o chat: volta a ela só para olhar a memória

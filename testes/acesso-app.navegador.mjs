@@ -287,7 +287,7 @@ await caso('"Esqueci o PIN" (aparelho sem cadastro): pelo "Já tenho cadastro", 
   await novo.page.fill('#nome', 'Ana Outra Teste'); await novo.page.fill('#nasc', NASC_ANA); await novo.page.click('[data-act="esqueci2"]');
   await pin(novo.page, '7391'); await pin(novo.page, '7391');
   await esperaTexto(novo.page, /não conferem/);
-  const manteve = (await novo.page.inputValue('#nasc')) === NASC_ANA && (await novo.page.inputValue('#nome')) === 'Ana Outra Teste';
+  const manteve = (await novo.page.inputValue('#nasc')) === '12/04/1988' && (await novo.page.inputValue('#nome')) === 'Ana Outra Teste';
   await novo.page.fill('#nome', 'ana  SOUZA teste'); await novo.page.click('[data-act="esqueci2"]');
   await pin(novo.page, '7391'); await pin(novo.page, '7391');
   await noChat(novo.page);

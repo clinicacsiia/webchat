@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!--
 FLUXOGRAMA: entrada (celular + PIN de 4 dígitos; no primeiro acesso, cadastro único em 5 passos) -> validação (a página confere o formato; quem decide é o servidor: funções app_* do Supabase, supabase/acesso-rapido-paciente.sql) -> lógica (o aparelho guarda só um código de acesso e o primeiro nome; PIN, filhos, números de confiança e marcações ficam no banco; o PIN é pedido de novo depois de 5 minutos em segundo plano) -> saída (tela inicial com Eu / cada filho / Todos juntos; solicitações de marcação; quem confia em você)
-Versão 3.3 — 21/11/2026 / Mudança: a página passa a apontar o manifesto do app (../manifest.webmanifest, liberado na CSP com manifest-src 'self') e o ícone do iPhone: quem toca em "Adicionar à Tela de Início" aqui (no meio do PIN) ganha o app da CSI inteiro, e não um atalho preso ao /acesso/ que abria o chat fora do app; o convite automático do Chrome fica escondido aqui (o botão Instalar está no chat). Versão 3.2 — 17/11/2026 / Mudança: depois do PIN aparece na hora a tela grande "Bem-vindo(a), nome!" (cobre o teclado, a pessoa não digita o PIN de novo); a conferência do cadastro e o registro do acesso saem em paralelo e a espera pela posição caiu de 5 para 2,5 segundos (a entrada demorava). Versão 3.1 — 16/11/2026 / Mudança: **confirmação por e-mail** (supabase/acesso-codigo-email.sql, chave `app_codigo_email`, nasce desligada): celular novo (primeiro acesso) e "esqueci o PIN" passam por um código de 6 números enviado ao e-mail; quem não recebe (spam, e-mail errado, falha no envio, cadastro sem e-mail) pede o código à atendente, que o vê no painel (Pendências > Códigos). Telas novas c4e, c4c e esqc. Versão 3.0 — 15/11/2026 / Mudança: quem já tem PIN e entra pela conta antiga (e-mail e senha) agora tem as duas JUNTAS (`app_conta_antiga_unir`: senha + PIN, só se for a mesma pessoa; traz as conversas da conta); antes a sessão antiga era descartada sem ligar nada. Versão 2.9 — 15/11/2026 / Mudança: apagada a tela inicial do acesso rápido ("Quem vai ser atendido?", "Marcar pelo chat", "Deixar uma solicitação (sem chat)", "Suas solicitações"): era cópia do chat (o botão só abria o chat), a solicitação sem chat nunca foi usada (0 na produção) e o chat já tem "Meus dados" e "Sair"; depois do PIN a pessoa vai direto ao chat. Versão 2.8 — 15/11/2026 / Mudança: o botão "Meus dados" do chat (?ir=dados) abre direto em Meus dados quando o PIN dos últimos 30 minutos ainda vale (antes pedia o PIN de novo e caía na tela inicial); o site (acesso e Minha vez) deixou de mudar para o tema escuro do celular e segue sempre o visual claro do chat. Versão 2.7 — 15/11/2026 / Mudança: quem tem conta de e-mail E já criou o PIN pelo celular (cadastro separado, sem ligação com a conta) não cai mais em "Confira os seus dados": a página pergunta ao servidor se o celular já tem PIN (app_pre_cadastro, só leitura) e leva direto para digitar o PIN, tanto ao abrir pelo chat quanto ao tocar em Continuar. Versão 2.6 — 15/11/2026 / Mudança: visual do site (cabeçalho com a logo da CSI, cores e fonte do chat, tema escuro); CPF conferido na hora, com os dígitos verificadores, em todas as telas que pedem CPF; o que a pessoa já digitou no cadastro (nome, nascimento, filho, CPF, contato) não se perde ao voltar, ao trocar Sim/Não ou ao ser mandada de volta por um erro do servidor. Versão 2.5 — 15/11/2026 / Mudança: some o cartão "Falta pouco" da tela inicial e de Meus dados (o que falta só é pedido na entrada, com o PIN obrigatório). Versão 2.4 — 15/11/2026 / Mudança: PIN OBRIGATÓRIO (quando config.app_pin_obrigatorio = sim): o primeiro acesso pede também o CPF (só o que o banco ainda não sabe) antes do PIN, quem entra com cadastro incompleto é obrigado a completar antes de seguir, e cada entrada é registrada (aparelho e, com permissão, a posição) (supabase/acesso-rapido-pin-obrigatorio.sql). Versão 2.3 — 15/11/2026 / Mudança: filhos da conta antiga (lista do histórico para conferir), filho com o nome do responsável (é ela mesma ou confirma), filho repetido (supabase/acesso-rapido-filhos.sql). Versão 2.2 — 15/11/2026 / Mudança: cartão "Falta pouco" (CPF dela e dos filhos, e-mail) para TODO paciente (supabase/acesso-rapido-pendencias.sql). Versão 2.1 — 15/11/2026 / Mudança: quem tem conta antiga (e-mail e senha) entra uma última vez, confere os dados que já temos e cria o PIN (supabase/acesso-rapido-conta-antiga.sql); "Meus dados" mais claro. Versão 2.0 — 14/11/2026 / Mudança: ligado ao Supabase (versão 1 guardava tudo só no celular)
+Versão 3.5 — 23/11/2026 / Mudança: **CPF do filho opcional no cadastro** (a tela do CPF pede só o do responsável; supabase/acesso-filho-cpf-opcional.sql). Versão 3.4 — 23/11/2026 / Mudança: **data de nascimento digitada (DD/MM/AAAA, teclado numérico, barras automáticas) no lugar do calendário do celular** em todas as telas do cadastro (você, filhos, esqueci o PIN, conta antiga); e a conferência da data agora recusa dia que não existe (31/02 passava como 02/03). Versão 3.3 — 21/11/2026 / Mudança: a página passa a apontar o manifesto do app (../manifest.webmanifest, liberado na CSP com manifest-src 'self') e o ícone do iPhone: quem toca em "Adicionar à Tela de Início" aqui (no meio do PIN) ganha o app da CSI inteiro, e não um atalho preso ao /acesso/ que abria o chat fora do app; o convite automático do Chrome fica escondido aqui (o botão Instalar está no chat). Versão 3.2 — 17/11/2026 / Mudança: depois do PIN aparece na hora a tela grande "Bem-vindo(a), nome!" (cobre o teclado, a pessoa não digita o PIN de novo); a conferência do cadastro e o registro do acesso saem em paralelo e a espera pela posição caiu de 5 para 2,5 segundos (a entrada demorava). Versão 3.1 — 16/11/2026 / Mudança: **confirmação por e-mail** (supabase/acesso-codigo-email.sql, chave `app_codigo_email`, nasce desligada): celular novo (primeiro acesso) e "esqueci o PIN" passam por um código de 6 números enviado ao e-mail; quem não recebe (spam, e-mail errado, falha no envio, cadastro sem e-mail) pede o código à atendente, que o vê no painel (Pendências > Códigos). Telas novas c4e, c4c e esqc. Versão 3.0 — 15/11/2026 / Mudança: quem já tem PIN e entra pela conta antiga (e-mail e senha) agora tem as duas JUNTAS (`app_conta_antiga_unir`: senha + PIN, só se for a mesma pessoa; traz as conversas da conta); antes a sessão antiga era descartada sem ligar nada. Versão 2.9 — 15/11/2026 / Mudança: apagada a tela inicial do acesso rápido ("Quem vai ser atendido?", "Marcar pelo chat", "Deixar uma solicitação (sem chat)", "Suas solicitações"): era cópia do chat (o botão só abria o chat), a solicitação sem chat nunca foi usada (0 na produção) e o chat já tem "Meus dados" e "Sair"; depois do PIN a pessoa vai direto ao chat. Versão 2.8 — 15/11/2026 / Mudança: o botão "Meus dados" do chat (?ir=dados) abre direto em Meus dados quando o PIN dos últimos 30 minutos ainda vale (antes pedia o PIN de novo e caía na tela inicial); o site (acesso e Minha vez) deixou de mudar para o tema escuro do celular e segue sempre o visual claro do chat. Versão 2.7 — 15/11/2026 / Mudança: quem tem conta de e-mail E já criou o PIN pelo celular (cadastro separado, sem ligação com a conta) não cai mais em "Confira os seus dados": a página pergunta ao servidor se o celular já tem PIN (app_pre_cadastro, só leitura) e leva direto para digitar o PIN, tanto ao abrir pelo chat quanto ao tocar em Continuar. Versão 2.6 — 15/11/2026 / Mudança: visual do site (cabeçalho com a logo da CSI, cores e fonte do chat, tema escuro); CPF conferido na hora, com os dígitos verificadores, em todas as telas que pedem CPF; o que a pessoa já digitou no cadastro (nome, nascimento, filho, CPF, contato) não se perde ao voltar, ao trocar Sim/Não ou ao ser mandada de volta por um erro do servidor. Versão 2.5 — 15/11/2026 / Mudança: some o cartão "Falta pouco" da tela inicial e de Meus dados (o que falta só é pedido na entrada, com o PIN obrigatório). Versão 2.4 — 15/11/2026 / Mudança: PIN OBRIGATÓRIO (quando config.app_pin_obrigatorio = sim): o primeiro acesso pede também o CPF (só o que o banco ainda não sabe) antes do PIN, quem entra com cadastro incompleto é obrigado a completar antes de seguir, e cada entrada é registrada (aparelho e, com permissão, a posição) (supabase/acesso-rapido-pin-obrigatorio.sql). Versão 2.3 — 15/11/2026 / Mudança: filhos da conta antiga (lista do histórico para conferir), filho com o nome do responsável (é ela mesma ou confirma), filho repetido (supabase/acesso-rapido-filhos.sql). Versão 2.2 — 15/11/2026 / Mudança: cartão "Falta pouco" (CPF dela e dos filhos, e-mail) para TODO paciente (supabase/acesso-rapido-pendencias.sql). Versão 2.1 — 15/11/2026 / Mudança: quem tem conta antiga (e-mail e senha) entra uma última vez, confere os dados que já temos e cria o PIN (supabase/acesso-rapido-conta-antiga.sql); "Meus dados" mais claro. Versão 2.0 — 14/11/2026 / Mudança: ligado ao Supabase (versão 1 guardava tudo só no celular)
 -->
 <html lang="pt-BR">
 <head>
@@ -130,10 +130,16 @@ const fmtTel=d=>{d=digits(d).slice(0,11);if(d.length<=2)return d?'('+d:'';if(d.l
 const telOk=d=>/^[1-9]{2}9\d{8}$/.test(digits(d));
 const nomeOk=n=>{const t=String(n).trim();return t.length>=5&&/^[A-Za-zÀ-ÿ'.\- ]+$/.test(t)&&t.split(/\s+/).filter(x=>x.length>=2).length>=2};
 const hoje=()=>new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10);
-const dataOk=v=>{if(!/^\d{4}-\d{2}-\d{2}$/.test(v))return false;const d=new Date(v+'T00:00:00');return !isNaN(d)&&v<=hoje()&&d.getFullYear()>=1900};
+const dataOk=v=>{if(!/^\d{4}-\d{2}-\d{2}$/.test(v))return false;const d=new Date(v+'T00:00:00');return !isNaN(d)&&v<=hoje()&&d.getFullYear()>=1900&&d.getFullYear()===+v.slice(0,4)&&d.getMonth()+1===+v.slice(5,7)&&d.getDate()===+v.slice(8,10)};   /* confere dia/mês de verdade: 31/02 não vira 02/03 */
 const idade=v=>{const d=new Date(v+'T00:00:00'),n=new Date();let a=n.getFullYear()-d.getFullYear();if(n<new Date(n.getFullYear(),d.getMonth(),d.getDate()))a--;return a};
 const fmtIdade=v=>{const a=idade(v);return a<1?'menos de 1 ano':a+(a===1?' ano':' anos')};
 const fmtData=v=>v?String(v).slice(0,10).split('-').reverse().join('/'):'';
+/* Data de nascimento digitada (DD/MM/AAAA, teclado numérico): o seletor de calendário do celular obriga a rolar ano por ano. Por dentro tudo continua AAAA-MM-DD. */
+const maskData=v=>{const d=digits(v).slice(0,8);return d.length>4?`${d.slice(0,2)}/${d.slice(2,4)}/${d.slice(4)}`:d.length>2?`${d.slice(0,2)}/${d.slice(2)}`:d};
+const brData=v=>/^\d{4}-\d{2}-\d{2}$/.test(String(v||''))?fmtData(v):String(v||'');
+const isoData=v=>{v=String(v||'').trim();if(/^\d{4}-\d{2}-\d{2}$/.test(v))return v;const m=v.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);return m?`${m[3]}-${m[2]}-${m[1]}`:''};
+const campoData=(id,valor,extra)=>`<input id="${id}" ${extra||''} inputmode="numeric" maxlength="10" placeholder="DD/MM/AAAA" autocomplete="off" data-data value="${esc(brData(valor))}">`;
+const DICA_DATA='<small class="sub">Digite só os números: dia, mês e ano (ex.: 15031988).</small>';
 const mascaraCpf=v=>{const d=digits(v).slice(0,11);return d.replace(/(\d{3})(\d{1,3})?(\d{1,3})?(\d{1,2})?/,(m,a,b,c,e)=>a+(b?'.'+b:'')+(c?'.'+c:'')+(e?'-'+e:''))};
 /* Mesma conta do banco (cpf_valido): 11 números, não todos iguais, e os dois dígitos verificadores. */
 const cpfOk=c=>{const d=digits(c);if(d.length!==11||/^(\d)\1+$/.test(d))return false;let t=0;for(let i=0;i<9;i++)t+=+d[i]*(10-i);if((t*10)%11%10!==+d[9])return false;t=0;for(let i=0;i<10;i++)t+=+d[i]*(11-i);return(t*10)%11%10===+d[10]};
@@ -371,14 +377,14 @@ const V={
     ${r.cpf_mascara?linha('CPF',esc(r.cpf_mascara)):''}
     <label for="tel">Celular com DDD (será o seu login)</label><input id="tel" inputmode="numeric" autocomplete="tel-national" placeholder="(71) 99999-9999" value="${fmtTel(d.tel||r.telefone||'')}">
     <label for="nome">Nome completo</label><input id="nome" autocomplete="name" placeholder="Como no documento" value="${esc(d.nome||r.nome||'')}">
-    <label for="nasc">Data de nascimento</label><input id="nasc" type="date" max="${hoje()}" value="${esc(d.nasc||r.nascimento||'')}">
+    <label for="nasc">Data de nascimento</label>${campoData('nasc',d.nasc||r.nascimento||'','autocomplete="bday" ')}${DICA_DATA}
     <div class="err" id="err" role="alert"></div></div>
     ${filhosAntigaHtml()}
     <button class="btn" data-act="antiga2">Continuar e criar meu PIN</button>`;
   },
   c2:()=>`${prog(2)}${voltar('c1')}<h1>Confirme quem é você</h1><p class="sub">Usamos esses dados para encontrar seu cadastro na clínica.</p>
     <div class="card"><label for="nome">Nome completo</label><input id="nome" autocomplete="name" placeholder="Como no documento" value="${esc(S.d.nome||'')}">
-    <label for="nasc">Data de nascimento</label><input id="nasc" type="date" max="${hoje()}" value="${esc(S.d.nascimento||'')}">
+    <label for="nasc">Data de nascimento</label>${campoData('nasc',S.d.nascimento||'','autocomplete="bday" ')}${DICA_DATA}
     <div class="err" id="err" role="alert"></div></div>
     <button class="btn" data-act="c2">Continuar</button>`,
   c3:()=>{
@@ -387,7 +393,7 @@ const V={
     <div class="chips"><button class="chip ${S.temFilhos===true?'on':''}" data-act="tf" data-v="1">Sim</button><button class="chip ${S.temFilhos===false?'on':''}" data-act="tf" data-v="0">Não</button></div>
     ${S.temFilhos?`<div class="card">${f.map((x,i)=>`<div class="item"><div><b>${esc(x.nome)}</b><small>${fmtData(x.nascimento)} · ${fmtIdade(x.nascimento)}</small></div><button class="x" data-act="rmf" data-i="${i}" aria-label="Remover">×</button></div>`).join('')}
       <label for="fnome">Nome completo do filho(a)</label><input id="fnome" placeholder="Nome completo" autocomplete="off">
-      <label for="fnasc">Data de nascimento</label><input id="fnasc" type="date" max="${hoje()}">
+      <label for="fnasc">Data de nascimento</label>${campoData('fnasc','')}${DICA_DATA}
       <button class="btn sec" data-act="addf">+ Adicionar ${f.length?'outro filho':'filho'}</button></div>`:''}
     <div class="err" id="err" role="alert"></div>
     <button class="btn" data-act="c3">Continuar</button>`;
@@ -432,7 +438,7 @@ const V={
   esqueci:()=>`${voltar(S.dev?'pin':'entrar')}<h1>Esqueci o PIN</h1><p class="sub">Confirme seus dados para criar um novo PIN.</p>
     <div class="card"><label for="tel">Seu celular com DDD</label><input id="tel" inputmode="numeric" autocomplete="tel-national" placeholder="(71) 99999-9999" value="${fmtTel((S.esq&&S.esq.tel)||(S.dev?'':S.tel))}">
     <label for="nome">Nome completo</label><input id="nome" autocomplete="name" value="${esc(S.esq?S.esq.nome:'')}">
-    <label for="nasc">Data de nascimento</label><input id="nasc" type="date" max="${hoje()}" value="${esc(S.esq?S.esq.nasc:'')}">
+    <label for="nasc">Data de nascimento</label>${campoData('nasc',S.esq?S.esq.nasc:'','autocomplete="bday" ')}${DICA_DATA}
     <div class="err" id="err" role="alert"></div></div>
     <button class="btn" data-act="esqueci2">Continuar</button>`,
   pinnovo:()=>`${voltar(S.volta)}${pinView()}`,
@@ -461,7 +467,7 @@ const V={
 function sheetHtml(){
   const s=S.sheet;if(!s)return'';
   let c='';
-  if(s.t==='filho')c=`<h2 style="margin-top:0">Adicionar filho(a)</h2><label for="fnome">Nome completo</label><input id="fnome" autocomplete="off"><label for="fnasc">Data de nascimento</label><input id="fnasc" type="date" max="${hoje()}"><div class="err" id="err" role="alert"></div><button class="btn" data-act="sf">Salvar</button>`;
+  if(s.t==='filho')c=`<h2 style="margin-top:0">Adicionar filho(a)</h2><label for="fnome">Nome completo</label><input id="fnome" autocomplete="off"><label for="fnasc">Data de nascimento</label>${campoData('fnasc','')}${DICA_DATA}<div class="err" id="err" role="alert"></div><button class="btn" data-act="sf">Salvar</button>`;
   if(s.t==='conf')c=`<h2 style="margin-top:0">Número de confiança</h2><p class="sub">Essa pessoa poderá ver seus filhos e as marcações, depois de digitar o código que você vai passar.</p>${contatoForm()}<div class="err" id="err" role="alert"></div><button class="btn" data-act="sc">Salvar</button>`;
   if(s.t==='codigo')c=`<h2 style="margin-top:0">Tenho um código</h2><p class="sub">Digite os 6 números que a pessoa te passou. Vale só para o celular que ela cadastrou.</p><label for="cod">Código</label><input id="cod" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="000000"><div class="err" id="err" role="alert"></div><button class="btn" data-act="scod">Confirmar</button>`;
   if(s.t==='cpf')c=`<h2 style="margin-top:0">CPF para o chat</h2><p class="sub">${s.p==='eu'?'Seu CPF':'O CPF da criança (ou do responsável, se ela não tiver)'}. Guardado com a clínica para o chat não perguntar toda vez.</p><label for="cpfn">CPF</label><input id="cpfn" inputmode="numeric" maxlength="14" autocomplete="off" placeholder="000.000.000-00"><div class="err" id="err" role="alert"></div><button class="btn" data-act="scpf">Salvar</button>${(s.p==='eu'?S.perfil.cpf_salvo:(S.perfil.filhos.find(f=>f.id===s.p)||{}).cpf_salvo)?'<button class="btn danger" data-act="apagacpf">Apagar o CPF salvo</button>':''}`;
@@ -475,6 +481,7 @@ function render(){
   app.innerHTML=(V[S.view]?V[S.view]():'')+sheetHtml();
   const t=$('#tel');if(t)t.addEventListener('input',()=>{t.value=fmtTel(t.value)});
   const c=$('#cttel');if(c)c.addEventListener('input',()=>{c.value=fmtTel(c.value)});
+  document.querySelectorAll('input[data-data]').forEach(i=>i.addEventListener('input',()=>{i.value=maskData(brData(i.value))}));
   restaurarRascunho();
   document.querySelectorAll('input[data-cp],#pend input[data-pc="cpf"],#cpfn').forEach(ligarCpf);
 }
@@ -529,10 +536,10 @@ function conferirHomonimo(f,nomeTit,nascTit,ok){
   pedirConfirmacao('O nome é igual ao seu','É outra pessoa com o mesmo nome (por exemplo, um(a) filho(a))? Se for você, não precisa adicionar.','Sim, é outra pessoa',()=>{S.sheet=null;ok(Object.assign({mesmo_nome_confirmado:true},f))});
 }
 function lerFilho(){
-  const nome=$('#fnome').value.trim(),n=$('#fnasc').value;
+  const nome=$('#fnome').value.trim(),n=isoData($('#fnasc').value);
   if(!nome&&!n)return{vazio:true};
   if(!nomeOk(nome))return{e:'Informe nome e sobrenome do filho(a).'};
-  if(!dataOk(n))return{e:'Data de nascimento inválida.'};
+  if(!dataOk(n))return{e:'Data de nascimento inválida. Digite assim: 15/03/1988.'};
   return{f:{nome,nascimento:n}};
 }
 function pedirConfirmacao(titulo,msg,botao,fn){S.confirma=fn;S.sheet={t:'confirma',titulo,msg,botao};render()}
@@ -551,9 +558,9 @@ const A={
     go('c2')},
   entrar:()=>{const d=digits($('#tel').value);if(!telOk(d))return erro('Celular inválido. Use DDD + 9 dígitos.');S.tel=d;S.mode='login';S.buf='';go('pin')},
   c2:()=>{
-    const nome=$('#nome').value.trim(),n=$('#nasc').value;
+    const nome=$('#nome').value.trim(),n=isoData($('#nasc').value);
     if(!nomeOk(nome))return erro('Digite nome e sobrenome completos.');
-    if(!dataOk(n))return erro('Data de nascimento inválida.');
+    if(!dataOk(n))return erro('Data de nascimento inválida. Digite assim: 15/03/1988.');
     if(idade(n)<18)return erro('O cadastro principal precisa ser de um maior de 18 anos.');
     S.d.nome=nome;S.d.nascimento=n;go('c3');
   },
@@ -657,14 +664,14 @@ const A={
     ocupado(true);await pedirNovaSenha(em);ocupado(false);
     erro('');toast('Se este e-mail tiver conta, enviamos o link para criar uma nova senha.');
   },
-  fq:el=>{lerFilhosAntiga();const f=S.conta.filhos[Number(el.dataset.i)];f.ehFilho=el.dataset.v==='1';S.conta.dig=Object.assign(S.conta.dig||{},{tel:digits($('#tel').value),nome:$('#nome').value.trim(),nasc:$('#nasc').value});render()},
+  fq:el=>{lerFilhosAntiga();const f=S.conta.filhos[Number(el.dataset.i)];f.ehFilho=el.dataset.v==='1';S.conta.dig=Object.assign(S.conta.dig||{},{tel:digits($('#tel').value),nome:$('#nome').value.trim(),nasc:isoData($('#nasc').value)});render()},
   antiga2:async()=>{
-    const tel=digits($('#tel').value),nome=$('#nome').value.trim().replace(/\s+/g,' '),nasc=$('#nasc').value;
+    const tel=digits($('#tel').value),nome=$('#nome').value.trim().replace(/\s+/g,' '),nasc=isoData($('#nasc').value);
     S.conta.dig={tel,nome,nasc};
     const lf=lerFilhosAntiga();
     if(!telOk(tel))return erro('Celular inválido. Use DDD + 9 dígitos.');
     if(!nomeOk(nome))return erro('Digite nome e sobrenome completos.');
-    if(!dataOk(nasc))return erro('Data de nascimento inválida.');
+    if(!dataOk(nasc))return erro('Data de nascimento inválida. Digite assim: 15/03/1988.');
     if(idade(nasc)<18)return erro('O cadastro principal precisa ser de um maior de 18 anos.');
     if(lf.e)return erro(lf.e);
     S.conta.lista=lf.lista;
@@ -673,7 +680,7 @@ const A={
     iniciaPinAntiga();
   },
   esqueci2:async()=>{
-    const tel=digits($('#tel').value),nome=$('#nome').value.trim(),nasc=$('#nasc').value;
+    const tel=digits($('#tel').value),nome=$('#nome').value.trim(),nasc=isoData($('#nasc').value);
     if(!telOk(tel))return erro('Celular inválido. Use DDD + 9 dígitos.');
     if(!nome||!dataOk(nasc))return erro('Digite o nome completo e a data de nascimento do cadastro.');
     S.esq={tel,nome,nasc};
@@ -747,16 +754,16 @@ function filhosAntigaHtml(){
   ${fs.map((f,i)=>f.mesmoCadastro?`<div class="item"><div><b>${esc(f.nome)}</b><small>É você: já está no seu cadastro, então não vai como filho(a).</small></div><span class="tag ok">Você</span></div>`
    :f.mesmoNome?`<div class="item" style="display:block"><b>${esc(f.nome)}</b><small>O nome é igual ao seu. Quem é?</small>
      <div class="chips"><button class="chip ${!f.ehFilho?'on':''}" data-act="fq" data-i="${i}" data-v="0">Sou eu</button><button class="chip ${f.ehFilho?'on':''}" data-act="fq" data-i="${i}" data-v="1">É outra pessoa (filho/filha)</button></div>
-     ${f.ehFilho?`<label for="fn${i}">Data de nascimento</label><input id="fn${i}" data-fi="${i}" type="date" max="${hoje()}" value="${esc(f.nasc)}">`:''}</div>`
+     ${f.ehFilho?`<label for="fn${i}">Data de nascimento</label>${campoData('fn'+i,f.nasc,'data-fi="'+i+'"')}`:''}</div>`
    :`<div class="item" style="display:block"><label style="display:flex;gap:10px;align-items:center;margin:0"><input type="checkbox" data-fc="${i}" ${f.incluir?'checked':''} style="width:auto"> <b>${esc(f.nome)}</b></label>
      <small>${f.n} atendimento(s)${f.cpf?' · CPF já salvo '+esc(f.cpf):''}</small>
-     <label for="fn${i}">Data de nascimento${f.nasc?'':' (faltando)'}</label><input id="fn${i}" data-fi="${i}" type="date" max="${hoje()}" value="${esc(f.nasc)}"></div>`).join('')}
+     <label for="fn${i}">Data de nascimento${f.nasc?'':' (faltando)'}</label>${campoData('fn'+i,f.nasc,'data-fi="'+i+'"')}</div>`).join('')}
   </div>`;
 }
 /* Lê o que está na tela para a lista de filhos da conta antiga. Devolve {e} com o erro ou {lista} para o servidor. */
 function lerFilhosAntiga(){
   const fs=S.conta&&S.conta.filhos||[],lista=[];
-  document.querySelectorAll('[data-fi]').forEach(inp=>{const f=fs[Number(inp.dataset.fi)];if(f)f.nasc=inp.value});
+  document.querySelectorAll('[data-fi]').forEach(inp=>{const f=fs[Number(inp.dataset.fi)];if(f)f.nasc=isoData(inp.value)});
   document.querySelectorAll('[data-fc]').forEach(c=>{const f=fs[Number(c.dataset.fc)];if(f)f.incluir=c.checked});
   for(const f of fs){
     if(f.mesmoCadastro)continue;
@@ -816,7 +823,7 @@ async function depoisFilhos(){
   if(r&&r.erro==='indisponivel')return go('indisp');
   if(r&&r.ok&&r.situacao==='tem_pin'){S.tel=S.d.telefone;S.mode='login';S.buf='';go('pin');setTimeout(()=>erro('Este celular já tem cadastro. Digite o seu PIN.'),0);return}
   if(!r||!r.ok){const e=r&&r.erro,etapa={celular:'c1',nome:'c2',nascimento:'c2',menor:'c2'}[e]||'c3';go(etapa);setTimeout(()=>erro((r&&r.mensagem)||'Não foi possível continuar. Tente de novo.'),0);return}
-  S.falta=r.falta||[];
+  S.falta=(r.falta||[]).filter(x=>x.pessoa==='eu');   /* CPF do filho é opcional (23/11/2026): não se pergunta no cadastro; o chat pede ao marcar */
   go(S.falta.length?'c3b':'c4');
 }
 function esqueciPin(){
@@ -855,7 +862,7 @@ function iniciaPin(){
     // volta para a etapa que tem o problema, com a explicação do servidor
     const etapa={celular:'c1',telefone_cadastrado:'c1',nome:'c2',nascimento:'c2',menor:'c2',filho:'c3',homonimo:'c3',mesmo_cadastro:'c3',confianca:'c4',cpf:'c3b',cpf_falta:'c3b',filho_cpf:'c3b',filho_cpf_falta:'c3b',codigo_email:'c4e'}[r.erro]||'c4';
     if(r.erro==='codigo_email')S.cod=null;
-    if(etapa==='c3b')S.falta=[{pessoa:'eu'},...d.filhos.map((f,i)=>({pessoa:'filho',indice:i}))];   // o servidor recusou o CPF: pede de novo todos os CPFs
+    if(etapa==='c3b')S.falta=[{pessoa:'eu'}];   // o servidor recusou o CPF: pede de novo todos os CPFs
     S.mode='new1';S.buf='';S.tmp='';go(etapa);setTimeout(()=>erro(r.mensagem),0);
     if(r.erro==='telefone_cadastrado')S.tel=d.telefone;
   };

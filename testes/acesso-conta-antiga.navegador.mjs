@@ -136,7 +136,7 @@ await caso('senha certa: mostra o que já temos (e-mail, CPF mascarado) e deixa 
   await esperaTexto(a.page, /Confira os seus dados/);
   const t = await texto(a.page);
   const v = await a.page.evaluate(() => ({ tel: document.getElementById('tel').value, nome: document.getElementById('nome').value, nasc: document.getElementById('nasc').value }));
-  return { ok: /ana@exemplo\.invalid/.test(t) && /\*\*\*\.\*\*\*\.\*\*\*-25/.test(t) && !t.includes(CPF) && v.tel === '(71) 99123-0001' && v.nome === 'Ana Souza Teste' && v.nasc === '1988-04-12', detalhe: JSON.stringify(v) };
+  return { ok: /ana@exemplo\.invalid/.test(t) && /\*\*\*\.\*\*\*\.\*\*\*-25/.test(t) && !t.includes(CPF) && v.tel === '(71) 99123-0001' && v.nome === 'Ana Souza Teste' && v.nasc === '12/04/1988', detalhe: JSON.stringify(v) };
 });
 await caso('"Seus filhos": Leo (com CPF já salvo, mascarado), Lia (nascimento faltando) e a própria Ana marcada como "Você", sem checkbox', async () => {
   const t = await texto(a.page);
@@ -219,7 +219,7 @@ await caso('homônimo de criança (Dani, nascimento de menor): já vem como "É 
   await dn.page.fill('#nasc', '1980-01-01'); await dn.page.click('[data-act="antiga2"]');
   await pin(dn.page, '1357'); await pin(dn.page, '1357'); await dn.page.waitForURL((u) => u.pathname === '/', { timeout: 6000 });
   const f = await q(`select f.nome, f.nascimento::text n from public.app_filho f join public.app_paciente p on p.id = f.responsavel_id where p.conta_antiga_id = '${ids.dani}'`);
-  return { ok: /Quem é\?/.test(antes) && v === '2013-03-03' && f.length === 1 && f[0].nome === 'Dani Teste Costa' && f[0].n === '2013-03-03', detalhe: JSON.stringify(f) };
+  return { ok: /Quem é\?/.test(antes) && v === '03/03/2013' && f.length === 1 && f[0].nome === 'Dani Teste Costa' && f[0].n === '2013-03-03', detalhe: JSON.stringify(f) };
 });
 
 // ================================================================= Conta de e-mail + celular que JÁ tem PIN (cadastro separado, sem ligação com a conta)

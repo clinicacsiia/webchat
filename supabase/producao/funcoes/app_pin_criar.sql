@@ -20,8 +20,7 @@ begin
     v_fd := public.app_data(v_f ->> 'nascimento'); v_fcpf := nullif(regexp_replace(coalesce(v_f ->> 'cpf', ''), '\D', '', 'g'), '');
     if v_fcpf is not null and not public.fluxo_cpf_ok(v_fcpf) then return jsonb_build_object('ok', false, 'erro', 'filho_cpf', 'indice', v_i, 'mensagem', 'Os números do CPF de ' || split_part(coalesce(v_f ->> 'nome', 'filho(a)'), ' ', 1) || ' não conferem.'); end if;
     if v_fcpf is null and v_fd is not null and public.app_nome_ok(v_f ->> 'nome') and v_tel ~ '^[1-9]{2}9[0-9]{8}$' then v_fcpf := public.app_cpf_historico(v_tel, v_f ->> 'nome', v_fd, 'filho'); end if;
-    if v_fcpf is null then return jsonb_build_object('ok', false, 'erro', 'filho_cpf_falta', 'indice', v_i, 'mensagem', 'Informe o CPF de ' || split_part(coalesce(v_f ->> 'nome', 'filho(a)'), ' ', 1) || ' (se a criança não tiver, o do responsável).'); end if;
-    v_cpfs := v_cpfs || v_fcpf; v_i := v_i + 1;
+    v_cpfs := array_append(v_cpfs, v_fcpf); v_i := v_i + 1;   -- CPF do filho é OPCIONAL (23/11/2026): sem ele fica em branco e o chat pede na hora de marcar
   end loop;
   v_r := public.app_cadastrar(p_telefone, p_nome, p_nascimento, p_pin, v_filhos, p_confianca, p_aparelho);
   if coalesce((v_r ->> 'ok')::boolean, false) is not true then return v_r; end if;
@@ -36,4 +35,3 @@ begin
   perform public.app_conferir_cadastro(v_pac);
   return jsonb_build_object('ok', true, 'token', v_r ->> 'token', 'perfil', public.app_perfil_json(v_pac));
 end $function$;
-
