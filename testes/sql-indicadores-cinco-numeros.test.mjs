@@ -15,6 +15,7 @@ await db.exec(`
   insert into public.agentes (id, nome, email, papel, ativo) values ('${ADM}', 'Admin Teste', 'adm@exemplo.invalid', 'admin', true), ('${ANA}', 'Ana Teste', 'ana@exemplo.invalid', 'atendente', true);
 `);
 await db.exec(readFileSync(`${REPO}/supabase/indicadores-cinco-numeros.sql`, 'utf8'));
+await db.exec(readFileSync(`${REPO}/supabase/indicadores-sem-unidade-filtro.sql`, 'utf8'));   // 23/11/2026: o filtro 'sem' passa a valer
 
 await db.query(`insert into public.jornada_coluna (id, nome, ordem, etapa, origem) values ('agendado', 'Agendado', 1, 'agendamento', 'klingo') on conflict (id) do nothing`);
 const card = (await um(`insert into public.jornada_card (paciente_chave, data_ref, coluna) values ('teste-cinco', current_date, 'agendado') returning id`)).id;
@@ -76,6 +77,15 @@ await caso('período anterior vem calculado (o dia de ontem está vazio, 5 dias 
 await caso('tipo inválido vira "todos"', async () => {
   const r = await ler(`${hoje}, ${hoje}, null, false, 'qualquer'`);
   return { ok: r.tipo === null && r.atual.procuraram === 7, detalhe: `tipo=${r.tipo}` };
+});
+await caso('por unidade: "Sem unidade definida" não devolve todo mundo; as quatro linhas somam o total (defeito de 23/11/2026: 42 = 39 + 42)', async () => {
+  // Duas pessoas de hoje escolheram Desenvoar e uma escolheu CSI no formulário; as outras 4 ficam sem unidade.
+  await db.exec(`insert into public.unidade_config (chave, catalogo, rotulo, descricao, fluxo, instrucao) values ('desenvoar', 'D', 'Desenvoar', 'x', 'pediatria', 'x'), ('csi', 'C', 'CSI', 'x', 'exame_consulta', 'x') on conflict (chave) do nothing`);
+  await db.exec(`update public.conversas set unidade_inicial = 'desenvoar' where nome_informado in ('Paciente Teste 1', 'Paciente Teste 2');
+                 update public.conversas set unidade_inicial = 'csi' where nome_informado = 'Paciente Teste 3'`);
+  const n = async (u) => (await ler(`${hoje}, ${hoje}, '${u}'`)).atual.procuraram;
+  const [csi, rmtc, des, sem] = [await n('csi'), await n('rmtc'), await n('desenvoar'), await n('sem')];
+  return { ok: csi === 1 && rmtc === 0 && des === 2 && sem === 4 && csi + rmtc + des + sem === 7, detalhe: `csi=${csi} rmtc=${rmtc} desenvoar=${des} sem=${sem}` };
 });
 await caso('sem login (anônimo) é recusado', async () => {
   await como(null);
