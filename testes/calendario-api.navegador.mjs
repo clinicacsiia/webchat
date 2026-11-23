@@ -68,16 +68,14 @@ await caso('API LENTA DEMAIS (passa do limite de 14 s): a tela NÃO fica esperan
   await ctx.close();
   return { ok: /Não foi possível consultar os horários agora/.test(t) && b.some((x) => /Tentar de novo/.test(x)) && horarios === 0, detalhe: `horários na tela=${horarios}` };
 });
-await caso('SERVIÇO SEM INTEGRAÇÃO: diz que é agendado pela equipe, NÃO oferece registrar disponibilidade (não seria procurado) e "Enviar meu pedido para a equipe" responde "sem_horario" ao assistente', async () => {
+await caso('SERVIÇO SEM INTEGRAÇÃO: sem horário automático, o pedido vai sozinho para a equipe (responde "sem_horario" ao assistente, uma vez só), sem tela com botão e sem oferecer registrar disponibilidade', async () => {
   const { mundo, page, ctx } = await abrir('nao_integrado');
-  await page.waitForSelector('#folhaCorpo .aviso-cal', { timeout: 8000 });
-  const t = await texto(page), b = await botoes(page);
-  await page.click('#folhaRodape button >> text=Enviar meu pedido para a equipe');
   await page.waitForFunction(() => document.querySelector('#folha').hidden, null, { timeout: 8000 });
-  await new Promise((r) => setTimeout(r, 400));
-  const resp = mundo.chamadas.filter((c) => c.nome === 'chat_responder').at(-1);
+  await new Promise((r) => setTimeout(r, 600));
+  const resps = mundo.chamadas.filter((c) => c.nome === 'chat_responder');
+  const resp = resps.at(-1);
   await ctx.close();
-  return { ok: /agendado pela nossa equipe/.test(t) && !b.some((x) => /Registrar minha disponibilidade/.test(x)) && resp && resp.corpo.p_passo === 'horario' && resp.corpo.p_valor === 'sem_horario', detalhe: `botões=${b.join(' | ')}; resposta=${JSON.stringify(resp?.corpo?.p_valor)}` };
+  return { ok: resps.length === 1 && resp.corpo.p_passo === 'horario' && resp.corpo.p_valor === 'sem_horario', detalhe: `respostas=${resps.length}; valor=${JSON.stringify(resp?.corpo?.p_valor)}` };
 });
 await caso('REGISTRAR DISPONIBILIDADE: formulário com período, dias, turno, aviso desmarcado por padrão e texto "não é um agendamento"; envia os dados certos', async () => {
   const { mundo, page, ctx } = await abrir('sem_horarios');
