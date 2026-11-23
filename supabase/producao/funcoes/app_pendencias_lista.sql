@@ -15,8 +15,7 @@ AS $function$
              'pergunta', 'Qual é o seu e-mail? (opcional, para a clínica falar com você)')
       from public.app_paciente a where a.id = p_pac and a.email is null
     union all
-    select 3, jsonb_build_object('id', f.id::text || ':cpf', 'pessoa', f.id, 'nome', f.nome, 'campo', 'cpf', 'opcional', false,
-             'pergunta', 'Qual é o CPF de ' || split_part(f.nome, ' ', 1) || '? (se a criança não tiver, o do responsável)')
+    select 3, jsonb_build_object('id', f.id::text || ':cpf', 'pessoa', f.id, 'nome', f.nome, 'campo', 'cpf', 'opcional', true,
+             'pergunta', 'Qual é o CPF de ' || split_part(f.nome, ' ', 1) || '? (opcional; se a criança não tiver, pode ser o do responsável)')
       from public.app_filho f where f.responsavel_id = p_pac and f.removido_em is null and f.cpf is null
   ) t $function$;
-
