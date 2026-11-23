@@ -16,6 +16,7 @@ begin
     select jsonb_agg(jsonb_build_object('id', m.id, 'autor', m.autor, 'texto', m.texto, 'criado_em', m.criado_em,
              'agente', coalesce(ag.nome, case when m.autor = 'agente' then 'Assistente virtual' end)) order by m.id)
     from public.mensagens m left join public.agentes ag on ag.id = m.agente_id
-    where m.conversa_id = p.conversa_id and m.id > coalesce(p_apos, 0) and m.excluida_em is null), '[]'::jsonb));
+    where m.conversa_id = p.conversa_id and m.id > coalesce(p_apos, 0) and m.excluida_em is null
+      and m.id >= coalesce(nullif(p.informado ->> 'msg_desde', '')::bigint, 0)), '[]'::jsonb));
 end $function$;
 

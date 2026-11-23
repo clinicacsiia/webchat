@@ -1,5 +1,6 @@
 # Webchat de Previsão de marcação (17/11/2026)
 
+Versão 1.3 — 23/11/2026 / Mudança: **pedido de previsão reabre a conversa encerrada** (`supabase/previsao-reabre-conversa.sql`; ver a seção "Conversa encerrada: o pedido reabre" no fim).
 Versão 1.2 — 18/11/2026 / Mudança: **a lista do painel mostra só quem abriu a página** (`supabase/previsao-marcacao-so-quem-abriu.sql`; `painel_pmarc_lista` e `painel_pmarc_resumo`). O registro a partir do Klingo continua por trás.
 Versão 1.1 — 17/11/2026 / Mudança: **tela "Pedir uma previsão"** (escolher o exame ou a consulta, turno / a partir de / até / até o dia, ou não escolher e ver a disponibilidade; funções `pmarc_catalogo`, `pmarc_disponibilidade`, `pmarc_pedido`).
 Versão 1.0 — 17/11/2026 / Mudança: primeira versão. Segundo webchat, separado do chat de marcação: registra TODA pessoa com marcação aberta no Klingo, mostra a ela a PREVISÃO e abre uma conversa que a equipe responde no painel.
@@ -94,3 +95,12 @@ Medido na primeira leitura: sem o 2º filtro de período do #14359 (**"marcado e
 
 ## Conversa aberta pela atendente não vai para a conta de paciente dela (19/11/2026)
 O gatilho `conversas_conta` grava na conversa o login de quem a criou. Quando a atendente (que também tem conta de paciente, com o mesmo login) tocava em **Iniciar conversa**, a conversa da paciente ficava na conta pessoal dela e, ao criar o acesso rápido, aparecia no app dela com o nome da paciente. Agora `pmarc_conversa_garantir` solta a conversa da conta quando quem abriu é a atendente. A conversa que o paciente abre pelo próprio chat continua na conta dele. Arquivo: `supabase/previsao-conversa-sem-conta-da-atendente.sql`; teste: `npm run test:previsao-sem-conta-atendente`.
+
+## Conversa encerrada: o pedido reabre e o paciente vê só a conversa atual (23/11/2026)
+**O defeito:** quem já tinha uma conversa na Previsão que a equipe **encerrou** (com a despedida "Meu Tesouro") e voltava a pedir uma previsão tinha o pedido gravado **dentro da conversa encerrada**. O painel só lista conversas abertas, então a equipe **não via o pedido**; e a página mostrava o histórico velho (a despedida) misturado com o pedido novo. Só o botão de escrever mensagem (`pmarc_enviar`) reabria a conversa; o **pedido** (`pmarc_pedido`) e a **resposta** (`pmarc_responder`) não.
+**A correção (só banco; a página não mudou):**
+- Função nova `pmarc_conversa_reabrir`: se a conversa está encerrada, põe em **aguardando** (entra na fila do painel), sem atendente, **robô continua desligado**, o resumo da triagem volta, e marca em `pmarc_pessoa.informado.msg_desde` onde a conversa atual começa. Também apaga `final_em`, para o aviso "a previsão será vista e confirmada pela equipe…" ser dito de novo.
+- `pmarc_pedido`, `pmarc_responder` e `pmarc_enviar` usam essa mesma função (antes só o `pmarc_enviar` tinha a regra, escrita dentro dele).
+- `pmarc_mensagens` devolve ao paciente só as mensagens a partir de `msg_desde`. **Nada é apagado:** a equipe vê o histórico inteiro na conversa do painel.
+**Caso real:** em 23/11/2026 havia 1 conversa de Previsão nessa situação (pedido de 08h59, conversa encerrada em 19/11); foi reaberta à mão com a função nova e o pedido apareceu na fila. Medido antes: das 9 conversas da Previsão, 8 estavam encerradas e só 1 tinha mensagem do paciente depois de encerrar.
+**Arquivos:** `supabase/previsao-reabre-conversa.sql` (rollback: `previsao-reabre-conversa-rollback.sql`, no editor SQL por causa do `drop`), teste `npm run test:previsao-reabre-conversa` (10 casos, incluindo reproduzir o defeito com as funções da produção).

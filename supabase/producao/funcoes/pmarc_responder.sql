@@ -8,7 +8,7 @@ CREATE OR REPLACE FUNCTION public.pmarc_responder(p_codigo text, p_dados jsonb)
 AS $function$
 declare
   p public.pmarc_pessoa; d jsonb := case when jsonb_typeof(p_dados) = 'object' then p_dados else '{}'::jsonb end;
-  v_resp text; v_info jsonb; v_txt text; v_obs text; v_conv uuid; v_msg text; v_cel text; v_email text; v_cpf text; v_nasc date; v_nome text; v_primeira boolean;
+  v_resp text; v_info jsonb; v_txt text; v_obs text; v_conv uuid; v_msg text; v_cel text; v_email text; v_cpf text; v_nasc date; v_nome text; v_primeira boolean; v_reab boolean := false;
 begin
   if not public.pmarc_ligada() then return jsonb_build_object('ok', false, 'motivo', 'desligado'); end if;
   select * into p from public.pmarc_pessoa where codigo = btrim(coalesce(p_codigo, '')) for update;
@@ -55,6 +55,7 @@ begin
 
   v_conv := public.pmarc_conversa_garantir(p.id);
   if v_conv is not null then
+    v_reab := public.pmarc_conversa_reabrir(p.id, v_conv);   -- 23/11/2026: conversa encerrada volta para a fila do painel
     v_msg := 'Previsão de marcação: ' || case v_resp when 'sim' then 'a pessoa disse que está certo.' when 'nao' then 'a pessoa disse que tem algo diferente.'
                                               when 'nao_sei' then 'a pessoa não sabe / pediu para seguir (nada foi barrado).' else 'a pessoa deixou os dados abaixo.' end
       || case when v_txt is not null and nullif(d ->> 'resposta', '') is null then E'\nDisse: ' || v_txt else '' end
@@ -68,7 +69,7 @@ begin
     update public.conversas set triagem_resumo = regexp_replace(coalesce(triagem_resumo, ''), '\s*Resposta à previsão:.*$', '') ||
       ' Resposta à previsão: ' || case coalesce(v_resp, p.resposta) when 'sim' then 'está certo' when 'nao' then 'tem algo diferente' when 'nao_sei' then 'não sei / seguimos (não bloquear)' else 'sem resposta ainda' end || '.'
       where id = v_conv;
-    if coalesce(v_info ->> 'final_em', '') = '' then
+    if v_reab or coalesce(v_info ->> 'final_em', '') = '' then
       insert into public.mensagens (conversa_id, autor, texto) values (v_conv, 'agente', public.pmarc_texto('previsao_marcacao_final'));
       update public.pmarc_pessoa set informado = informado || jsonb_build_object('final_em', now()) where id = p.id;
     end if;
