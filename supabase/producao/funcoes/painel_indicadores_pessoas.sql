@@ -9,7 +9,7 @@ AS $function$
 declare
   v_hoje date := (now() at time zone 'America/Sao_Paulo')::date;
   v_ate date; v_de date; v_len integer;
-  v_un text := case when lower(coalesce(p_unidade, '')) in ('csi', 'rmtc', 'desenvoar') then lower(p_unidade) end;
+  v_un text := case when lower(coalesce(p_unidade, '')) in ('csi', 'rmtc', 'desenvoar', 'sem') then lower(p_unidade) end;
   v_tipo text := case when lower(coalesce(p_tipo, '')) in ('exame', 'consulta') then lower(p_tipo) end;
 begin
   if coalesce((select public.papel_atual()), '') not in ('admin', 'atendente') then
