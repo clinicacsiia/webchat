@@ -7,7 +7,7 @@ Tela inicial e identificação de quem será atendido (como antes) → **Começa
 
 | Etapa | O que acontece |
 |---|---|
-| Atendimento | Consulta ou outro assunto (leva ao atendimento humano). **Exames foram retirados do fluxo.** |
+| (início) | Vai direto para a escolha da consulta: sem pergunta "O que você precisa?", sem Exame e sem "Outro assunto" (o atendente continua no botão do topo) |
 | Procedimento | Lista com busca; procedimento **desativado** (pela configuração) aparece marcado "agendado pela equipe" e segue como pré-marcação |
 | Pagamento | Particular (mostra valor), Convênio ou **Não sei** |
 | Convênio / Plano | Listas + **Não sei** |

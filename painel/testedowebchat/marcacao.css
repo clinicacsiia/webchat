@@ -80,3 +80,7 @@ body.marc-aberta { overflow: hidden; }
 .marc-entrada { display: grid; gap: 10px; margin: 14px 0; }
 .marc-entrada .marc-bt { width: 100%; }
 @media (prefers-reduced-motion: reduce) { .marc-prog .barra i { transition: none; } .marc-esq { animation: none; } }
+
+/* telas largas: topo, progresso e rodapé alinhados com o conteúdo */
+.marc-topo, .marc-prog, .marc-rodape { padding-left: max(16px, calc((100% - 640px) / 2)); padding-right: max(16px, calc((100% - 640px) / 2)); }
+.marc-rodape > * { max-width: none; }
