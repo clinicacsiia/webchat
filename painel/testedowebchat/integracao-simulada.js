@@ -11,7 +11,7 @@
   'use strict';
   const K_CFG = 'teste_marc_config_v1', K_SOL = 'teste_marc_solicitacoes_v1';
   const ler = (k, pad) => { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? pad : v; } catch { return pad; } };
-  const gravar = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* sem armazenamento */ } };
+  const gravar = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } };   // false = não coube / sem armazenamento (quem chama avisa o paciente)
   const espera = (ms) => new Promise((r) => setTimeout(r, ms));
 
   /* ---------- catálogo fictício ---------- */
@@ -47,7 +47,7 @@
   const configRestaurar = () => { try { localStorage.removeItem(K_CFG); } catch { /* ignora */ } };
 
   /* ---------- consultas ---------- */
-  async function convenios() { await espera(150); return convenios_(); }
+  async function convenios() { return convenios_(); }
 
   /* ---------- horários REAIS do Klingo (função teste-agenda-klingo: só leitura, não grava nada) ---------- */
   const FN = 'https://nrvuynjwcgwpjdptkiay.supabase.co/functions/v1/teste-agenda-klingo', CHAVE_PUB = 'sb_publishable_e2GK1YGEj06STa_ESCevow_nvtATB-y';
@@ -64,7 +64,7 @@
     const c = config();
     if (c.simular_falha) return { estado: 'indisponivel', motivo: 'simulado', slots: [] };
     if (!naApi(procId)) return { estado: 'fora_do_escopo', motivo: 'Esta consulta é agendada apenas pela equipe.', slots: [] };
-    const chave = pid(procId) + '|' + String(pagador).toLowerCase(), c0 = vivo.get(chave);
+    const chave = pid(procId) + '|' + String(pagador).toLowerCase() + '|' + c.antecedencia_horas, c0 = vivo.get(chave);
     if (c0 && Date.now() - c0.t < 60000) return c0.r;
     const chamar = async (janela) => {
       const r = await fetch(FN, { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: CHAVE_PUB, Authorization: 'Bearer ' + CHAVE_PUB }, body: JSON.stringify({ consulta: pid(procId), pagador, janela, semFiltro: true }) });
@@ -79,10 +79,10 @@
     if (sem) { const r = { estado: sem.estado, motivo: sem.motivo, slots: [] }; vivo.set(chave, { t: Date.now(), r }); return r; }
     const limite = new Date(Date.now() + c.antecedencia_horas * 3600e3), slots = [];
     for (const x of rs) for (const h of x.horarios || []) {
-      const [y, m, d] = h.data.split('-').map(Number), [H, M] = h.hora.split(':').map(Number), quando = new Date(y, m - 1, d, H, M);
-      slots.push({ data: h.data, hora: h.hora, profissional: bonito(h.profissional || 'Médico(a)'), profId: h.profissional || '', local: '', unidade: h.unidade ? bonito(h.unidade) : 'Desenvoar', segurada: quando < limite, dow: quando.getDay(), min: H * 60 + M });
+      const [y, m, d] = h.data.split('-').map(Number), [H, M] = h.hora.split(':').map(Number), quando = new Date(Date.UTC(y, m - 1, d, H + 3, M));   // horário da Bahia (UTC-3, sem horário de verão): não depende do fuso do aparelho
+      slots.push({ data: h.data, hora: h.hora, profissional: bonito(h.profissional || 'Médico(a)'), profId: String(h.profissionalId || h.profissional || 'sem-nome'), local: '', unidade: h.unidade ? bonito(h.unidade) : 'Desenvoar', segurada: quando < limite, dow: new Date(Date.UTC(y, m - 1, d)).getUTCDay(), min: H * 60 + M });
     }
-    const r = { estado: slots.length ? 'com_horarios' : 'sem_horarios', motivo: rs[0].motivo || '', slots, consultadoEm: rs[0].consultadoEm || new Date().toISOString() };
+    const r = { estado: slots.length ? 'com_horarios' : 'sem_horarios', motivo: rs[0].motivo || '', slots, truncado: rs.some((x) => x.truncado), consultadoEm: rs[0].consultadoEm || new Date().toISOString() };
     vivo.set(chave, { t: Date.now(), r });
     return r;
   }
@@ -98,7 +98,6 @@
   }
   // Consultas oferecidas. As que a API do Klingo não oferece ficam marcadas (a equipe agenda → pré-marcação).
   async function catalogo() {
-    await espera(200);
     const c = config();
     return CATALOGO.map((p) => Object.assign({}, p, { ativo: !c.exames_inativos.includes(p.id), naApi: naApi(p.id) }));
   }
@@ -106,7 +105,7 @@
   async function medicos(procId, pagador = '') {
     const r = await buscarAoVivo(procId, pagadorChave(pagador)), por = new Map();
     for (const sl of r.slots) { const m = por.get(sl.profId) || { id: sl.profId, nome: sl.profissional, horarios: 0, segurados: 0 }; if (sl.segurada) m.segurados++; else m.horarios++; por.set(sl.profId, m); }
-    return { estado: r.estado, motivo: r.motivo, consultadoEm: r.consultadoEm, lista: [...por.values()].sort((a, b) => a.nome.localeCompare(b.nome)) };
+    return { estado: r.estado, motivo: r.motivo, truncado: !!r.truncado, consultadoEm: r.consultadoEm, lista: [...por.values()].sort((a, b) => a.nome.localeCompare(b.nome)) };
   }
   // Horários reais do Klingo, filtrados pela(s) médica(s) escolhida(s) e pela regra de antecedência.
   async function disponibilidade({ procId, medico = '', pagador = '' } = {}) {
@@ -115,12 +114,12 @@
     const todos = r.slots.filter((x) => !medico || medico === 'qualquer' || x.profId === medico), por = new Map(); let bloqueadosPelaRegra = 0;
     for (const x of todos) { if (x.segurada) { bloqueadosPelaRegra++; continue; } if (!por.has(x.data)) por.set(x.data, []); por.get(x.data).push(x); }
     const dias = [...por.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([data, hs]) => ({ data, horarios: hs.sort((a, b) => a.min - b.min || a.profissional.localeCompare(b.profissional)) }));
-    return { dias, bloqueadosPelaRegra, existentes: todos.length, antecedenciaHoras: c.antecedencia_horas, consultadoEm: r.consultadoEm };
+    return { dias, bloqueadosPelaRegra, truncado: !!r.truncado, existentes: todos.length, antecedenciaHoras: c.antecedencia_horas, consultadoEm: r.consultadoEm };
   }
 
   /* ---------- solicitações (marcadas e pré-marcadas) ---------- */
   const solicitacoes = () => ler(K_SOL, []);
-  const solicitacoesSalvar = (l) => gravar(K_SOL, l);
+  const solicitacoesSalvar = (l) => { if (!gravar(K_SOL, l)) { const e = new Error('armazenamento'); e.codigo = 'armazenamento'; throw e; } };
   const protocolo = () => 'TESTE-' + new Date().toISOString().slice(2, 10).replace(/-/g, '') + '-' + String(Math.floor(Math.random() * 9000) + 1000);
   async function marcar(dados, { preMarcacao = false, motivo = '' } = {}) {
     await espera(700);
@@ -130,7 +129,11 @@
       tipo: preMarcacao ? 'pre_marcacao' : 'marcacao', motivo, remarcacoes: 0, dados,
       venceEm: preMarcacao ? new Date(Date.now() + config().prazo_pre_horas * 3600e3).toISOString() : null
     };
-    const l = solicitacoes(); l.unshift(s); solicitacoesSalvar(l);
+    const l = solicitacoes(); l.unshift(s);
+    try { solicitacoesSalvar(l); }
+    catch (e) {   // não coube (foto da carteirinha): tenta de novo sem a foto; se ainda não couber, avisa o paciente em vez de fingir que gravou
+      if (s.dados && s.dados.fotoCart) { delete s.dados.fotoCart; solicitacoesSalvar(l); s.semFoto = true; } else throw e;
+    }
     return s;
   }
   // "Não quero a pré-marcação": encerra e registra o aviso à equipe para chamar no WhatsApp. SIMULADO: nada é enviado a ninguém.

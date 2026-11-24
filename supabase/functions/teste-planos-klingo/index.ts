@@ -1,5 +1,6 @@
 // FLUXOGRAMA: entrada (POST {operadora, busca?} vindo do site da clínica) -> validação (origem, formato, limite por IP) -> processamento (convênio da operadora em klingo_plano_map; lista de planos pela função STABLE plano_exato_itens; filtro por texto)
 //   -> persistência (NENHUMA) -> saída ({ok, total, itens: [{valor, rotulo}]} com no máximo 40 itens; "valor" é o id do plano no Klingo)
+// Versão 1.1 — 24/11/2026 (revisão): IP do cliente não forjável; mapa de limites com teto.
 // Versão 1.0 — 24/11/2026 / Mudança: função NOVA, só de leitura, do ambiente de testes (/painel/testedowebchat/): lista e pesquisa os planos reais de cada convênio (ex.: SulAmérica tem 1.368).
 //   Não chama o Klingo, não grava no banco, não devolve dado de paciente. O "valor" escolhido volta ao teste-agenda-klingo como "OPERADORA#valor" (mesma regra do chat: plano exato).
 import { createClient } from "jsr:@supabase/supabase-js@2";
@@ -7,8 +8,15 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 const ORIGENS = ["https://clinicacsiia.github.io"];
 const LIMITE_POR_MIN = 60, MAX_ITENS = 40, CACHE_S = 600;
 const semAcento = (v: unknown) => String(v ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+const clienteIp = (req: Request) => {   // o cliente pode escrever o começo de x-forwarded-for; vale o IP que a plataforma informa ou o ÚLTIMO item
+  const direto = req.headers.get("cf-connecting-ip") ?? req.headers.get("x-real-ip");
+  if (direto) return direto.trim();
+  const xs = (req.headers.get("x-forwarded-for") ?? "?").split(",");
+  return xs[xs.length - 1].trim();
+};
+const podar = <V>(m: Map<string, V>, max: number) => { if (m.size > max) m.clear(); };   // evita crescer sem limite na instância
 const porIp = new Map<string, number[]>();
-const cache = new Map<number, { t: number; itens: Array<{ valor: string; rotulo: string }>; exato: boolean }>();
+const cache = new Map<number, { t: number; itens: Array<{ valor: string; rotulo: string }>; exato: boolean }>();   // no máximo ~40 convênios
 
 const cors = (origem: string | null) => ({
   "Access-Control-Allow-Origin": origem && ORIGENS.includes(origem) ? origem : ORIGENS[0], "Vary": "Origin",
@@ -22,10 +30,10 @@ Deno.serve(async (req: Request) => {
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
   if (!origem || !ORIGENS.includes(origem)) return json({ error: "Origem não permitida" }, 403);
 
-  const ip = (req.headers.get("x-forwarded-for") ?? "?").split(",")[0].trim(), agora = Date.now();
+  const ip = clienteIp(req), agora = Date.now();
   const marcas = (porIp.get(ip) ?? []).filter((t) => t > agora - 60_000);
   if (marcas.length >= LIMITE_POR_MIN) return json({ ok: false, motivo: "muitas_consultas" }, 429);
-  marcas.push(agora); porIp.set(ip, marcas);
+  marcas.push(agora); podar(porIp, 5000); porIp.set(ip, marcas);
 
   const c = await req.json().catch(() => ({}));
   const operadora = String(c?.operadora ?? "").trim().slice(0, 80), busca = semAcento(String(c?.busca ?? "").trim().slice(0, 60));
