@@ -35,6 +35,7 @@
 
   /* ---------- configuração (o que a diretoria vai ajustar) ---------- */
   const CFG_PADRAO = {
+    prazo_pre_horas: 24,             // regra configurável: quanto tempo o paciente tem para completar uma pré-marcação (plano, carteirinha, médica e horário)
     antecedencia_horas: 24,          // regra configurável: horário com menos que isso só pela equipe (pré-marcação)
     exames_inativos: [],   // ativação/desativação por procedimento: inativo = só pré-marcação
     exigir_carteirinha: true,        // convênio exige foto da carteirinha para marcar
@@ -126,7 +127,8 @@
     // Simulação: NÃO chama Klingo, NÃO envia aviso/WhatsApp/e-mail/push. Só grava aqui.
     const s = {
       protocolo: protocolo(), criadoEm: new Date().toISOString(), status: preMarcacao ? 'aguardando_equipe' : 'marcado',
-      tipo: preMarcacao ? 'pre_marcacao' : 'marcacao', motivo, remarcacoes: 0, dados
+      tipo: preMarcacao ? 'pre_marcacao' : 'marcacao', motivo, remarcacoes: 0, dados,
+      venceEm: preMarcacao ? new Date(Date.now() + config().prazo_pre_horas * 3600e3).toISOString() : null
     };
     const l = solicitacoes(); l.unshift(s); solicitacoesSalvar(l);
     return s;

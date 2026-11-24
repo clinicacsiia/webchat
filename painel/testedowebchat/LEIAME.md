@@ -78,3 +78,10 @@ O plano escolhido volta como `OPERADORA#idDoPlano` (regra do chat: "plano exato"
 
 ## Pesquisa de 45 dias (24/11/2026)
 A busca de horários cobre **45 dias** (3 janelas de 15 dias, a pedido do dono; o Klingo aceita no máximo 15 dias por consulta). Cada escolha de pagador/consulta faz 3 consultas ao Klingo (cache de 60 s; limite de 20/min por IP na função).
+
+## Pré-marcação com prazo para completar (24/11/2026)
+Regra da ideia original (itens 12 e 13): quem **não informa o plano** (ou o convênio, o pagamento, a carteirinha, a médica/horário) faz uma **pré-marcação** e tem **24 horas** (configurável: 12/24/48/72 h em ⚙ Configurar teste) para **completar o que falta**: plano, foto da carteirinha, médica e horário.
+- A tela da pré-marcação explica o prazo e lista o que falta.
+- Em **Acompanhar** a pré-marcação mostra "Complete até dd/mm hh:mm (faltam X h)" e o botão **Completar agora**, que reabre direto no primeiro item pendente, com tudo o que já foi preenchido. Se o paciente completa tudo, ela **vira marcação**; se faltar algo, continua pré-marcada (o prazo original não renova).
+- Passado o prazo, o botão some e o cartão mostra "Prazo para completar encerrado" (para testar: **[Teste] simular: o prazo venceu**).
+- Não confundir com a **antecedência mínima** (horários com menos de 24 h só pela equipe): são duas regras configuráveis diferentes.
