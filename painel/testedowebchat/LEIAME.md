@@ -108,3 +108,9 @@ Na pré-marcação, depois da consulta e da médica de interesse, a tela **"Qual
 - Se o plano é desconhecido, os horários são **de referência** (de Particular) e a tela avisa que a equipe confere o convênio.
 - O horário aparece como **"Horário desejado (provisório)"** no resumo, no resultado e no cartão de Acompanhar.
 - Em **Completar agora** o horário é **conferido de novo no Klingo**: se continua livre, vem marcado ("continua disponível"); se foi ocupado, avisa e o paciente escolhe outro. A **reserva é simulada**: nada é reservado no Klingo de verdade.
+
+## Revisão dos textos (24/11/2026, v20261124l)
+- **Português revisado** em todas as telas do fluxo e da tela inicial (frases mais curtas e diretas; plural correto "1 plano / 2 planos"; sem "(s)"; "Não foi possível…", "Pelo site, só marcamos com…", etc.).
+- **Linguagem do paciente:** a palavra "Klingo" saiu das telas (vira "agenda"); "procedimento" virou "consulta"; "médica" virou **"médico(a)"** (há médicos homens na lista).
+- **Menos poluído:** saíram os ícones/emojis das opções, os avisos de teste repetidos (a faixa laranja do topo já avisa), os textos explicativos redundantes e as etiquetas de escolhas no resumo e nas condições.
+- **Avisos importantes maiores, em destaque** (caixa amarela, letra grande): o que a equipe precisa confirmar, o **prazo de 24 horas**, "a pré-marcação **não garante o horário**", a **antecedência mínima** de 24 h, o horário guardado por 24 h, o selo **PRÉ-MARCAÇÃO · ainda não confirmada** no resumo e as condições de cancelamento e remarcação. O resto ficou menor e discreto.

@@ -26,11 +26,11 @@
     { id: 'c-2100', tipo: 'consulta', nome: 'Consulta pediátrica pré-natal', detalhe: '7 profissionais', preco: null, preparo: '' }
   ];
   const POLITICA_PADRAO = [
-    'Cancelamento ou remarcação sem custo até 24 horas antes do horário marcado.',
+    'Você pode cancelar ou remarcar sem custo até 24 horas antes do horário marcado.',
     'Com menos de 24 horas, o cancelamento deve ser feito pelo telefone da clínica.',
     'Cada solicitação pode ser remarcada até 2 vezes pelo site.',
-    'Faltou sem avisar? O horário é liberado e uma nova marcação pode precisar de confirmação da equipe.',
-    'Pré-marcação não garante o horário: ela só vale depois que a equipe confirmar com você.'
+    'Se faltar sem avisar, o horário é liberado e uma nova marcação pode precisar de confirmação da equipe.',
+    'A pré-marcação não garante o horário. Ele só vale depois que a equipe confirmar com você.'
   ];
 
   /* ---------- configuração (o que a diretoria vai ajustar) ---------- */
@@ -63,7 +63,7 @@
   async function buscarAoVivo(procId, pagador) {
     const c = config();
     if (c.simular_falha) return { estado: 'indisponivel', motivo: 'simulado', slots: [] };
-    if (!naApi(procId)) return { estado: 'fora_do_escopo', motivo: 'A API do Klingo não oferece horários desta consulta; só a equipe agenda.', slots: [] };
+    if (!naApi(procId)) return { estado: 'fora_do_escopo', motivo: 'Esta consulta é agendada apenas pela equipe.', slots: [] };
     const chave = pid(procId) + '|' + String(pagador).toLowerCase(), c0 = vivo.get(chave);
     if (c0 && Date.now() - c0.t < 60000) return c0.r;
     const chamar = async (janela) => {
@@ -80,7 +80,7 @@
     const limite = new Date(Date.now() + c.antecedencia_horas * 3600e3), slots = [];
     for (const x of rs) for (const h of x.horarios || []) {
       const [y, m, d] = h.data.split('-').map(Number), [H, M] = h.hora.split(':').map(Number), quando = new Date(y, m - 1, d, H, M);
-      slots.push({ data: h.data, hora: h.hora, profissional: bonito(h.profissional || 'Médica(o)'), profId: h.profissional || '', local: '', unidade: h.unidade ? bonito(h.unidade) : 'Desenvoar', segurada: quando < limite, dow: quando.getDay(), min: H * 60 + M });
+      slots.push({ data: h.data, hora: h.hora, profissional: bonito(h.profissional || 'Médico(a)'), profId: h.profissional || '', local: '', unidade: h.unidade ? bonito(h.unidade) : 'Desenvoar', segurada: quando < limite, dow: quando.getDay(), min: H * 60 + M });
     }
     const r = { estado: slots.length ? 'com_horarios' : 'sem_horarios', motivo: rs[0].motivo || '', slots, consultadoEm: rs[0].consultadoEm || new Date().toISOString() };
     vivo.set(chave, { t: Date.now(), r });
