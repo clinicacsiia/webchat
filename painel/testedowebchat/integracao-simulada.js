@@ -46,10 +46,16 @@
   const configRestaurar = () => { try { localStorage.removeItem(K_CFG); } catch { /* ignora */ } };
 
   /* ---------- consultas ---------- */
-  async function catalogo() {
+  // Consultas oferecidas. Com o pagador já conhecido, informa quantas médicas o atendem e quantos horários passam na regra (para o paciente só ver o que serve).
+  async function catalogo(pagador = '') {
     await espera(250);
     const c = config();
-    return CATALOGO.map((p) => Object.assign({}, p, { ativo: !c.exames_inativos.includes(p.id) }));
+    return CATALOGO.map((p) => {
+      const base = Object.assign({}, p, { ativo: !c.exames_inativos.includes(p.id) });
+      if (!pagador) return base;
+      const slots = gerarSlots({ procId: p.id, pagador }).filter((x) => !x.segurada);
+      return Object.assign(base, { medicos: new Set(slots.map((x) => x.profId)).size, horarios: slots.length });
+    });
   }
   async function convenios() { await espera(150); return convenios_(); }
 
