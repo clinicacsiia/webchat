@@ -38,3 +38,6 @@ Antecedência (sem regra, 24, 48, 72 h) · exigir carteirinha · simular agenda 
 ## Limites / próximos passos
 - Reaproveitar o motor de regras do banco (`fluxo_*`, `klingo_*`) exige trocar `integracao-simulada.js` por chamadas reais, o que só deve ocorrer com um banco de homologação (hoje só existe a produção).
 - Regras de negócio mostradas (lista de procedimentos, convênios, política de cancelamento) são exemplos para validação com a diretoria.
+
+## Lista de consultas
+Copiada da produção em 24/11/2026 (`consultas_da_unidade('DESENVOAR')`): pediatra, cirurgia pediátrica, ortopediatra, endocrinopediatra, gastropediatra, neuropediatra e pediátrica pré-natal. Sem valor particular (o chat real não mostra nesta etapa). Se a lista mudar em produção, atualizar `CATALOGO` em `integracao-simulada.js`.

@@ -15,9 +15,15 @@
   const espera = (ms) => new Promise((r) => setTimeout(r, ms));
 
   /* ---------- catálogo fictício ---------- */
+  // Lista oficial em produção (consultas_da_unidade, unidade DESENVOAR, 24/11/2026). Sem valor e sem médico: o chat real não os traz nesta etapa.
   const CATALOGO = [
-    { id: 'c-ped', tipo: 'consulta', nome: 'Consulta Pediátrica', detalhe: 'Dra. Ana Exemplo · crianças e adolescentes', preco: 250, preparo: '' },
-    { id: 'c-pre', tipo: 'consulta', nome: 'Consulta Pré-natal', detalhe: 'Dr. Bruno Exemplo · acompanhamento da gestação', preco: 280, preparo: '' }
+    { id: 'c-1132', tipo: 'consulta', nome: 'Consulta com pediatra', detalhe: '9 profissionais', preco: null, preparo: '' },
+    { id: 'c-1003', tipo: 'consulta', nome: 'Consulta de Cirurgia Pediátrica', detalhe: '1 profissional', preco: null, preparo: '' },
+    { id: 'c-1474', tipo: 'consulta', nome: 'Consulta com ortopediatra', detalhe: '2 profissionais', preco: null, preparo: '' },
+    { id: 'c-1470', tipo: 'consulta', nome: 'Consulta com endocrinopediatra', detalhe: '1 profissional', preco: null, preparo: '' },
+    { id: 'c-1471', tipo: 'consulta', nome: 'Consulta com gastropediatra', detalhe: '1 profissional', preco: null, preparo: '' },
+    { id: 'c-1472', tipo: 'consulta', nome: 'Consulta com neuropediatra', detalhe: '1 profissional', preco: null, preparo: '' },
+    { id: 'c-2100', tipo: 'consulta', nome: 'Consulta pediátrica pré-natal', detalhe: '7 profissionais', preco: null, preparo: '' }
   ];
   const CONVENIOS = [
     { id: 'conv-alfa', nome: 'Saúde Alfa (fictício)', planos: ['Alfa Básico', 'Alfa Plus', 'Alfa Empresarial'] },
@@ -78,7 +84,7 @@
         if (quando <= agora) continue;
         existentes++;
         if (quando < limite) { bloqueadosPelaRegra++; continue; }
-        ok.push({ hora: hr, unidade: proc.tipo === 'consulta' ? 'CSI Brotas (fictícia)' : 'Desenvoar (fictícia)', profissional: proc.tipo === 'consulta' ? proc.detalhe.split(' · ')[0] : '' });
+        ok.push({ hora: hr, unidade: 'Desenvoar', profissional: '' });
       }
       if (ok.length) dias.push({ data: iso(d), horarios: ok });
     }

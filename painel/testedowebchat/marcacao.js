@@ -350,7 +350,7 @@
   function abrir(ident) {
     ctx.ident = ident; montar();
     let salvo = null; try { salvo = JSON.parse(localStorage.getItem(K_EST) || 'null'); } catch { /* ignora */ }
-    if (salvo && (salvo.tipo === 'exame' || salvo.passo === 'tipo')) salvo = null;   // exame saiu do sistema
+    if (salvo && (salvo.tipo === 'exame' || salvo.passo === 'tipo' || (salvo.procId && !S.CATALOGO.some((x) => x.id === salvo.procId)))) salvo = null;   // exame saiu do sistema
     st = salvo && salvo.ident && salvo.ident.nome === ident.nome && salvo.ident.nomeCrianca === ident.nomeCrianca ? salvo : novo(ident);
     st.ident = ident; abrirCasca(); desenhar();
   }
