@@ -88,3 +88,8 @@ Regra da ideia original (itens 12 e 13): quem **não informa o plano** (ou o con
 
 ## Aviso da tela inicial retirado (24/11/2026)
 Saíram "Você é da nossa família…" e a caixa "Entendi: se o chat não conseguir marcar sozinho, o pedido só vale quando uma pessoa da equipe confirmar". O "Começar" não exige mais essa marcação.
+
+## Correções de 24/11/2026 (v20261124i)
+- **"Fazer pré-marcação" travava** ("Escolha a médica…"): a validação da etapa da médica não aceitava a decisão de ir para a pré-marcação; e a etapa de horário ainda aparecia depois. Corrigido: decidiu pela pré-marcação, pula médica/horário e vai direto à pré-marcação.
+- **Pré-natal e neuropediatra mostravam "sem horário"**: o Klingo marca **todos** os horários de uma especialidade com um só código (pediatria = 1132, inclusive pré-natal; neurologia = 1096, inclusive neuropediatra). O teste descartava o que não fosse o código exato da consulta. Agora não descarta (o chat real também não). Consequência: para **pré-natal** aparecem as 9–10 médicas de pediatria da API, não só as 7 que a grade `catalogo_agenda` associa ao pré-natal; a clínica deve confirmar se todas atendem pré-natal.
+- A função `teste-agenda-klingo` v2 devolve também `procedimentos` (quantos horários a API mandou por código) e aceita `semFiltro` (sem dado de paciente).
