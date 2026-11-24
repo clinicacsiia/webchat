@@ -46,3 +46,13 @@ Copiada da produção em 24/11/2026 (`consultas_da_unidade('DESENVOAR')`): pedia
 - Os horários agora vêm da **grade real de atendimento** das médicas (`agenda-real.js`: dia da semana, início, fim, duração da consulta, consultório e vigência), lida da produção em modo **somente leitura** (`catalogo_agenda`, unidade Desenvoar). Sem dado de paciente.
 - **Limite importante:** é a grade, não a disponibilidade ao vivo do Klingo: não desconta horários já ocupados. A tela avisa isso. A disponibilidade ao vivo (`chat-agenda-api`) exige abrir uma conversa no banco de produção e está bloqueada neste ambiente.
 - Para atualizar o snapshot, reler `catalogo_agenda` e regerar `agenda-real.js`.
+
+## Opções que vão diminuindo (24/11/2026)
+Ordem: **consulta → pagamento → convênio → plano → carteirinha → médica → horário**. A cada clique a lista seguinte encolhe:
+- As escolhas feitas aparecem como chips no topo (✎ = tocar para corrigir).
+- **Convênio:** os nomes vêm das restrições reais das agendas (`catalogo_agenda.operadoras`). A lista de **médicas** mostra só quem atende aquele convênio (ou Particular), com o número de horários de cada uma.
+- **Horário:** só os da(s) médica(s) restantes, com filtros **Manhã/Tarde** e **dias da semana** e um contador ("80 horários em 8 dias").
+- Sem médica ou sem horário que sirva: oferece a **pré-marcação** (Sim/Não).
+- Plano: texto livre ou "Não sei" (a lista real tem ~4.700 planos; não cabe neste teste).
+
+Suposições a confirmar com a clínica: agenda sem restrição de operadora (`operadoras` vazio) = **aceita qualquer convênio**; a tabela `medico_convenio_bloqueio` **não** é usada (ela contradiz a agenda para algumas médicas, ex.: Geanne e SulAmérica).
