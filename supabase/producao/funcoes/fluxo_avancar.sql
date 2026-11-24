@@ -9,7 +9,7 @@ AS $function$
 declare
   c public.conversas; f public.conversa_fluxo; v_t0 timestamptz := clock_timestamp();
   v_passo text; v_valor jsonb := p_entrada -> 'valor'; v_texto text := btrim(coalesce(p_entrada ->> 'texto', ''));
-  v_norm text; v_res jsonb; v_prox text; v_prefixo text; v_tipo text := 'texto'; v_entendeu boolean := true; ctx jsonb;
+  v_norm text; v_opt text; v_res jsonb; v_prox text; v_prefixo text; v_tipo text := 'texto'; v_entendeu boolean := true; ctx jsonb;
 begin
   select * into c from public.conversas where id = p_conversa for update;
   if not found or c.motor <> 'fluxo' or not (c.ia_ativa and c.status = 'aguardando') then return; end if;
@@ -65,8 +65,25 @@ begin
       insert into public.fluxo_evento (conversa_id, passo, entrada, entendido, ms, ms_cliente) values (p_conversa, v_passo, 'texto', true, extract(milliseconds from clock_timestamp() - v_t0), (p_entrada ->> 'ms')::int);
       return;
     elsif v_passo in ('marcado', 'pos_menu', 'pos_cancelar') then
-      perform public.fluxo_pos_menu(p_conversa, public.fluxo_t('pos_menu_texto', ctx));
-      insert into public.fluxo_evento (conversa_id, passo, entrada, entendido, ms, ms_cliente) values (p_conversa, v_passo, 'texto', true, extract(milliseconds from clock_timestamp() - v_t0), (p_entrada ->> 'ms')::int);
+      -- pos-marcacao-sozinho: texto igual a uma opção do menu faz o mesmo que o botão; qualquer outra coisa vai para a equipe
+      v_opt := case
+        when char_length(v_norm) > 60 then null
+        when v_passo = 'pos_cancelar' and v_norm ~ '^(sim|pode|confirmo|confirmar|pode cancelar|quero cancelar)[^a-z0-9]*$' then 'cancelar_sim'
+        when v_passo = 'pos_cancelar' and v_norm ~ '^(nao|manter|nao quero|quero manter)[^a-z0-9]*$' then 'cancelar_nao'
+        when v_passo = 'pos_cancelar' then null
+        when v_norm ~ 'remarc' then 'remarcar'
+        when v_norm ~ 'cancel' then 'cancelar'
+        when v_norm ~ '^(ver|ver (a )?(minha )?marcacao|minha marcacao|ver (o )?(meu )?agendamento)[^a-z0-9]*$' then 'ver'
+        when v_norm ~ '^(ok|certo|tudo certo|esta tudo certo|beleza|obrigad[oa]|muito obrigad[oa]|valeu|tudo bem)[^a-z0-9]*$' then 'fim'
+        else null end;
+      if v_opt is not null then
+        perform public.fluxo_pos_responder(p_conversa, v_opt);
+        insert into public.fluxo_evento (conversa_id, passo, entrada, entendido, ms, ms_cliente) values (p_conversa, v_passo, 'texto', true, extract(milliseconds from clock_timestamp() - v_t0), (p_entrada ->> 'ms')::int);
+      else
+        perform public.fluxo_dizer(p_conversa, public.fluxo_t('pos_equipe', ctx));
+        perform public.fluxo_transferir(p_conversa, 'Paciente escreveu depois da marcação automática (fora das opções do menu): "' || left(v_texto, 200) || '"', 'baixa', true);
+        insert into public.fluxo_evento (conversa_id, passo, entrada, entendido, ms, ms_cliente) values (p_conversa, v_passo, 'texto_fora_das_opcoes', false, extract(milliseconds from clock_timestamp() - v_t0), (p_entrada ->> 'ms')::int);
+      end if;
       return;
     end if;
     if v_passo is distinct from 'assunto_texto' then
@@ -129,4 +146,3 @@ begin
   insert into public.fluxo_evento (conversa_id, passo, entrada, entendido, ms, ms_cliente)
   values (p_conversa, coalesce(v_passo, 'inicio'), v_tipo, v_entendeu, extract(milliseconds from clock_timestamp() - v_t0), (p_entrada ->> 'ms')::int);
 end $function$;
-
