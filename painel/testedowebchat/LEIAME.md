@@ -85,3 +85,6 @@ Regra da ideia original (itens 12 e 13): quem **não informa o plano** (ou o con
 - Em **Acompanhar** a pré-marcação mostra "Complete até dd/mm hh:mm (faltam X h)" e o botão **Completar agora**, que reabre direto no primeiro item pendente, com tudo o que já foi preenchido. Se o paciente completa tudo, ela **vira marcação**; se faltar algo, continua pré-marcada (o prazo original não renova).
 - Passado o prazo, o botão some e o cartão mostra "Prazo para completar encerrado" (para testar: **[Teste] simular: o prazo venceu**).
 - Não confundir com a **antecedência mínima** (horários com menos de 24 h só pela equipe): são duas regras configuráveis diferentes.
+
+## Aviso da tela inicial retirado (24/11/2026)
+Saíram "Você é da nossa família…" e a caixa "Entendi: se o chat não conseguir marcar sozinho, o pedido só vale quando uma pessoa da equipe confirmar". O "Começar" não exige mais essa marcação.
