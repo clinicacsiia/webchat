@@ -20,7 +20,7 @@
   const pl = (n, um, varios) => n + ' ' + (n === 1 ? um : (varios || um + 's'));   // plural correto: 1 médica, 2 médicas
 
   /* ---------- estado (nada se perde ao avançar, voltar ou corrigir) ---------- */
-  const novo = (ident) => ({ ident, passo: 'pagto', hist: [], tipo: 'consulta', procId: '', procNome: '', procTipo: '', procAtivo: true, medico: '', medicoNome: '', preco: null, preparo: '', pagto: '', convId: '', convNome: '', plano: '', planoId: '', cart: { anexada: false, semAgora: false, foto: '' }, slot: null, semHorario: '', pre: { aceita: '', periodo: '', dias: [] }, regras: false, retorno: false, remarcando: '' });
+  const novo = (ident) => ({ ident, passo: 'pagto', hist: [], tipo: 'consulta', procId: '', procNome: '', procTipo: '', procAtivo: true, medico: '', medicoNome: '', preco: null, preparo: '', pagto: '', convId: '', convNome: '', plano: '', planoId: '', cart: { anexada: false, semAgora: false, foto: '' }, slot: null, semHorario: '', pre: { aceita: '', periodo: '', dias: [], ciencia: null }, regras: false, retorno: false, remarcando: '' });
   let st = null, ctx = { catalogo: null };
   const salvar = () => { try { localStorage.setItem(K_EST, JSON.stringify(st)); } catch { try { const c = JSON.parse(JSON.stringify(st)); c.cart.foto = ''; localStorage.setItem(K_EST, JSON.stringify(c)); } catch { /* ignora */ } } };
   const limpar = () => { try { localStorage.removeItem(K_EST); } catch { /* ignora */ } };
@@ -123,6 +123,23 @@
     if (!st || !st.hist.length) { fechar(); return; }
     st.retorno = false; st.passo = st.hist.pop(); salvar(); desenhar();
   }
+  // Registro de ciência da pré-marcação: data/hora e dados do aparelho. O IP não é lido no navegador (exigiria um serviço externo, barrado neste teste); na versão real o servidor grava o IP.
+  function registrarCiencia() {
+    const n = navigator, ua = n.userAgent || '', am = ua.match(/Android\s([\d.]+)(?:;\s*([^)]+))?/), agora = new Date();
+    let fuso = ''; try { fuso = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch {}
+    return {
+      em: agora.toISOString(), emTexto: agora.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'medium' }), fuso,
+      ip: null, ipNota: 'não lido neste teste (o servidor grava na versão real)',
+      aparelho: am ? `Android ${am[1]}${am[2] ? ' · ' + am[2].replace(/\sBuild.*$/, '') : ''}` : (n.platform || 'não identificado'),
+      navegador: ua.slice(0, 160), idioma: n.language || '', tela: `${screen.width}x${screen.height}`, rede: n.onLine === false ? 'offline' : 'online'
+    };
+  }
+  function blocoCiencia(c) {
+    const lin = (r, v) => h('tr', {}, h('td', {}, r), h('td', {}, h('b', {}, v)));
+    return h('div', { class: 'marc-card', style: 'border:2px solid #b3261e' }, h('b', {}, 'Ciência registrada'), h('table', { class: 'marc-res' }, h('tbody', {},
+      lin('Data e hora', c.emTexto + (c.fuso ? ' (' + c.fuso + ')' : '')), lin('Aparelho', c.aparelho),
+      lin('IP', c.ip || 'indisponível neste teste'), lin('Idioma · tela', `${c.idioma} · ${c.tela}`))));
+  }
   function continuar() {
     const m = validar(); if (m) { erro(m); return; }
     if ((st.passo === 'pre' || st.passo === 'pre2') && st.pre.aceita === 'nao') { fim('whats'); return; }
@@ -141,6 +158,7 @@
     if (p === 'cart' && !completo.cart(st)) return 'Envie a foto da carteirinha ou toque em "Não tenho agora".';
     if (p === 'horario' && !completo.horario(st)) return 'Escolha um dia e um horário, ou toque em "Nenhum desses horários serve".';
     if ((p === 'pre' || p === 'pre2') && !st.pre.aceita) return 'Responda Sim ou Não.';
+    if ((p === 'pre' || p === 'pre2') && st.pre.aceita === 'sim' && !st.pre.ciencia) return 'Toque no botão vermelho “Estou ciente” para continuar.';
     if (p === 'prefer' && !st.slot && !st.pre.periodo) return 'Escolha um horário disponível ou o melhor período.';
     if (p === 'regras' && !st.regras) return 'Marque que você leu as condições para continuar.';
     return '';
@@ -331,7 +349,10 @@
         h('p', { class: 'marc-forte' }, 'A pré-marcação ', h('b', {}, 'não garante o horário'), '. Ele só vale depois que a equipe confirmar.'),
         h('div', { class: 'marc-lista', role: 'radiogroup' },
           opcao({ icone: '✅', titulo: 'Sim, quero a pré-marcação', detalhe: st.passo === 'pre2' ? 'Você diz o melhor horário ou período' : 'Você escolhe consulta, médico(a) e horário preferido', sel: st.pre.aceita === 'sim', onclick: () => { st.pre.aceita = 'sim'; salvar(); redesenhar(); } }),
-          opcao({ icone: '✖️', titulo: 'Não, obrigado(a)', detalhe: 'A equipe chama você no WhatsApp', sel: st.pre.aceita === 'nao', onclick: () => { st.pre.aceita = 'nao'; salvar(); redesenhar(); } }))),
+          opcao({ icone: '✖️', titulo: 'Não, obrigado(a)', detalhe: 'A equipe chama você no WhatsApp', sel: st.pre.aceita === 'nao', onclick: () => { st.pre.aceita = 'nao'; salvar(); redesenhar(); } })),
+        st.pre.aceita === 'sim' ? h('div', { style: 'margin-top:14px' },
+          h('button', { class: 'marc-bt vermelho', type: 'button', id: 'marcCiente', disabled: !!st.pre.ciencia, style: 'width:100%', onclick: () => { st.pre.ciencia = registrarCiencia(); salvar(); erro(''); redesenhar(); } }, st.pre.ciencia ? '✔ Ciência registrada' : 'Estou ciente: é uma pré-marcação e não garante o horário'),
+          st.pre.ciencia ? h('div', { style: 'margin-top:12px' }, blocoCiencia(st.pre.ciencia)) : null) : null),
         { botoes: botoesPadrao() });
     },
     pre2() { TELAS.pre(); },
@@ -434,6 +455,7 @@
         tipo === 'pre' && d.slot ? h('tr', {}, h('td', {}, 'Horário desejado'), h('td', {}, h('b', {}, `${dataBonita(d.slot.data)}, ${d.slot.hora} (provisório)`))) : null,
         h('tr', {}, h('td', {}, tipo === 'ok' ? 'Data e horário' : 'Situação'), h('td', {}, h('b', {}, tipo === 'ok' && d.slot ? `${dataBonita(d.slot.data)}, ${d.slot.hora}` : tipo === 'whats' ? 'A equipe vai chamar você' : 'Aguardando confirmação da equipe'))))) ) : null,
       d && d.pendencias && d.pendencias.length ? h('div', { class: 'marc-aviso' }, h('b', {}, 'A equipe vai confirmar com você: '), d.pendencias.join('; ')) : null,
+      tipo === 'pre' && d && d.preferencia && d.preferencia.ciencia ? blocoCiencia(d.preferencia.ciencia) : null,
       tipo === 'pre' && s && s.venceEm ? h('div', { class: 'marc-aviso' }, 'Complete até ', h('b', {}, prazoTxt(s.venceEm)), ' em “Acompanhar”.') : null,
       tipo !== 'nao' && tipo !== 'whats' ? h('div', { class: 'marc-card' }, h('b', {}, 'Cancelar ou remarcar'), h('ul', { class: 'marc-regras' }, ...S.config().politica.slice(0, 3).map((t) => h('li', {}, t)))) : null),
       { progresso: false, botoes: [h('button', { class: 'marc-bt', type: 'button', onclick: acompanhar }, 'Acompanhar')] });
@@ -455,7 +477,7 @@
     if (ids.includes('plano')) { st.plano = ''; st.planoId = ''; }
     if (ids.includes('carteirinha')) st.cart.semAgora = false;
     if (ids.includes('medico_horario')) { st.semHorario = ''; st.slot = null; st.medico = ''; st.medicoNome = ''; }
-    st.pre = Object.assign({ periodo: '', dias: [] }, st.pre, { aceita: '' });   // pergunta Sim/Não de novo, mas mantém período e dias já informados
+    st.pre = Object.assign({ periodo: '', dias: [] }, st.pre, { aceita: '', ciencia: null });   // pergunta Sim/Não e a ciência de novo, mas mantém período e dias já informados
     const alvos = ids.map((x) => ALVO[x]).filter(Boolean);
     st.passo = ORDEM.find((p) => alvos.includes(p) && aplica[p](st)) || ORDEM.find((p) => !completo[p](st) && aplica[p](st)) || 'resumo';
     salvar(); abrirCasca(); desenhar();
