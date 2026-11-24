@@ -7,8 +7,8 @@ Tela inicial e identificação de quem será atendido (como antes) → **Começa
 
 | Etapa | O que acontece |
 |---|---|
-| Atendimento | Exame, consulta ou outro assunto (leva ao atendimento humano) |
-| Procedimento | Lista com busca; procedimento **desativado** aparece marcado "agendado pela equipe" e segue como pré-marcação |
+| Atendimento | Consulta ou outro assunto (leva ao atendimento humano). **Exames foram retirados do fluxo.** |
+| Procedimento | Lista com busca; procedimento **desativado** (pela configuração) aparece marcado "agendado pela equipe" e segue como pré-marcação |
 | Pagamento | Particular (mostra valor), Convênio ou **Não sei** |
 | Convênio / Plano | Listas + **Não sei** |
 | Carteirinha | Foto (câmera ou galeria) ou "Não tenho agora" (vira pré-marcação) |

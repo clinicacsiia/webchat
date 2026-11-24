@@ -131,14 +131,14 @@
       const o = (v, ic, t, d) => opcao({ icone: ic, titulo: t, detalhe: d, sel: st.tipo === v, onclick: () => { st.tipo = v; salvar(); desenhar(); } });
       const quem = st.ident.tipo === 'filho' ? `para ${st.ident.nomeCrianca || 'a criança'}` : 'para você';
       mostrar('O que você precisa?', `Atendimento ${quem}. Escolha uma opção.`, h('div', { class: 'marc-lista', role: 'radiogroup' },
-        o('exame', '🩻', 'Fazer um exame', 'Ultrassom, raio-X, mamografia e outros'), o('consulta', '🩺', 'Marcar uma consulta', 'Pediatria e pré-natal'), o('outro', '💬', 'Outro assunto', 'Falar com a nossa equipe')),
+        o('consulta', '🩺', 'Marcar uma consulta', 'Pediatria e pré-natal'), o('outro', '💬', 'Outro assunto', 'Falar com a nossa equipe')),
         { botoes: botoesPadrao() });
     },
     async proc() {
-      mostrar(st.tipo === 'consulta' ? 'Qual consulta?' : 'Qual exame?', 'Toque no que você precisa.', h('div', { class: 'marc-lista' }, h('div', { class: 'marc-esq' }), h('div', { class: 'marc-esq' }), h('div', { class: 'marc-esq' })), { botoes: botoesPadrao({ off: true }) });
+      mostrar('Qual consulta?', 'Toque no que você precisa.', h('div', { class: 'marc-lista' }, h('div', { class: 'marc-esq' }), h('div', { class: 'marc-esq' }), h('div', { class: 'marc-esq' })), { botoes: botoesPadrao({ off: true }) });
       if (!ctx.catalogo) ctx.catalogo = await S.catalogo();
       if (st.passo !== 'proc') return;
-      const itens = ctx.catalogo.filter((p) => p.tipo === st.tipo);
+      const itens = ctx.catalogo.filter((p) => p.tipo === 'consulta');
       const busca = h('input', { class: 'marc-busca', type: 'search', placeholder: 'Buscar pelo nome', 'aria-label': 'Buscar procedimento', autocomplete: 'off' });
       const lista = h('div', { class: 'marc-lista', role: 'radiogroup' });
       const pintar = () => {
@@ -150,7 +150,7 @@
         })) : [h('p', { class: 'sub' }, 'Nada encontrado. Tente outra palavra ou fale com um atendente.')]));
       };
       busca.addEventListener('input', pintar); pintar();
-      mostrar(st.tipo === 'consulta' ? 'Qual consulta?' : 'Qual exame?', 'Toque no que você precisa.', h('div', {}, busca, lista), { botoes: botoesPadrao(), foco: false });
+      mostrar('Qual consulta?', 'Toque no que você precisa.', h('div', {}, busca, lista), { botoes: botoesPadrao(), foco: false });
     },
     pagto() {
       const o = (v, ic, t, d) => opcao({ icone: ic, titulo: t, detalhe: d, sel: st.pagto === v, onclick: () => { st.pagto = v; if (v !== 'convenio') { st.convId = ''; st.convNome = ''; st.plano = ''; st.cart = { anexada: false, semAgora: false, foto: '' }; } invalidarHorario(); salvar(); desenhar(); } });
@@ -359,6 +359,7 @@
   function abrir(ident) {
     ctx.ident = ident; montar();
     let salvo = null; try { salvo = JSON.parse(localStorage.getItem(K_EST) || 'null'); } catch { /* ignora */ }
+    if (salvo && salvo.tipo === 'exame') salvo = null;   // exame saiu do sistema
     st = salvo && salvo.ident && salvo.ident.nome === ident.nome && salvo.ident.nomeCrianca === ident.nomeCrianca ? salvo : novo(ident);
     st.ident = ident; abrirCasca(); desenhar();
   }

@@ -17,15 +17,7 @@
   /* ---------- catálogo fictício ---------- */
   const CATALOGO = [
     { id: 'c-ped', tipo: 'consulta', nome: 'Consulta Pediátrica', detalhe: 'Dra. Ana Exemplo · crianças e adolescentes', preco: 250, preparo: '' },
-    { id: 'c-pre', tipo: 'consulta', nome: 'Consulta Pré-natal', detalhe: 'Dr. Bruno Exemplo · acompanhamento da gestação', preco: 280, preparo: '' },
-    { id: 'e-usabd', tipo: 'exame', nome: 'Ultrassom de abdome total', detalhe: 'Ultrassonografia', preco: 190, preparo: 'Jejum de 8 horas (crianças: 4 horas).' },
-    { id: 'e-usobs', tipo: 'exame', nome: 'Ultrassom obstétrico', detalhe: 'Ultrassonografia', preco: 170, preparo: 'Sem preparo.' },
-    { id: 'e-usmorf', tipo: 'exame', nome: 'Ultrassom morfológico', detalhe: 'Ultrassonografia · gestação', preco: 320, preparo: 'Sem preparo.' },
-    { id: 'e-rxtor', tipo: 'exame', nome: 'Raio-X de tórax', detalhe: 'Radiografia', preco: 90, preparo: 'Sem preparo.' },
-    { id: 'e-mamo', tipo: 'exame', nome: 'Mamografia', detalhe: 'Imagem da mama', preco: 210, preparo: 'Não usar talco ou desodorante no dia.' },
-    { id: 'e-dens', tipo: 'exame', nome: 'Densitometria óssea', detalhe: 'Densitometria', preco: 240, preparo: 'Não fazer exame com contraste nos 7 dias anteriores.' },
-    { id: 'e-rmjoe', tipo: 'exame', nome: 'Ressonância do joelho', detalhe: 'Ressonância magnética', preco: 780, preparo: 'Retirar objetos de metal.' },
-    { id: 'e-tccra', tipo: 'exame', nome: 'Tomografia de crânio', detalhe: 'Tomografia computadorizada', preco: 560, preparo: 'Sem preparo.' }
+    { id: 'c-pre', tipo: 'consulta', nome: 'Consulta Pré-natal', detalhe: 'Dr. Bruno Exemplo · acompanhamento da gestação', preco: 280, preparo: '' }
   ];
   const CONVENIOS = [
     { id: 'conv-alfa', nome: 'Saúde Alfa (fictício)', planos: ['Alfa Básico', 'Alfa Plus', 'Alfa Empresarial'] },
@@ -43,7 +35,7 @@
   /* ---------- configuração (o que a diretoria vai ajustar) ---------- */
   const CFG_PADRAO = {
     antecedencia_horas: 24,          // regra configurável: horário com menos que isso só pela equipe (pré-marcação)
-    exames_inativos: ['e-rmjoe', 'e-tccra'],   // ativação/desativação por procedimento: inativo = só pré-marcação
+    exames_inativos: [],   // ativação/desativação por procedimento: inativo = só pré-marcação
     exigir_carteirinha: true,        // convênio exige foto da carteirinha para marcar
     simular_falha: false,            // simula a integração fora do ar
     politica: POLITICA_PADRAO
