@@ -1,6 +1,6 @@
 /* CSI WebChat — TESTE: sistema de marcação por etapas (autoatendimento).
-   Interface SEPARADA do atendimento humano. Fala só com window.CSI_SIM (integração simulada): nenhuma chamada real, nenhum dado real.
-   Pontos de integração futuros: CSI_SIM (dados e regras) e o evento "csi:atendimento-humano" (entrega o contexto à equipe). */
+   Fala só com window.CSI_SIM (integração simulada): nenhuma chamada real, nenhum dado real.
+   Pontos de integração futuros: CSI_SIM (dados e regras). */
 (function () {
   'use strict';
   const S = window.CSI_SIM;
@@ -63,8 +63,7 @@
     corpo = h('main', { class: 'marc-corpo', id: 'marcCorpo', 'aria-live': 'polite' });
     rodape = h('footer', { class: 'marc-rodape' });
     raiz = h('div', { id: 'marc', hidden: true, role: 'region', 'aria-label': 'Sistema de marcação' },
-      h('header', { class: 'marc-topo' }, btnVoltar, h('img', { src: 'img/logo-csi-simbolo.svg', alt: 'CSI' }), h('span', { class: 'esp' }),
-        h('button', { class: 'marc-humano', type: 'button', id: 'marcHumano', onclick: () => humano('marcacao') }, '💬 Falar com atendente')),
+      h('header', { class: 'marc-topo' }, btnVoltar, h('img', { src: 'img/logo-csi-simbolo.svg', alt: 'CSI' }), h('span', { class: 'esp' })),
       h('div', { class: 'marc-prog', id: 'marcProg' }, h('div', { class: 'txt' }, progTxt, h('button', { class: 'marc-link', type: 'button', style: 'padding:0;min-height:0;font-size:13px', onclick: recomecar }, 'Recomeçar')), h('div', { class: 'barra', role: 'progressbar', 'aria-valuemin': 0, 'aria-valuemax': 100 }, progBarra)),
       corpo, rodape);
     document.body.append(raiz);
@@ -138,7 +137,7 @@
         lista.replaceChildren(...(vis.length ? vis.map((p) => opcao({
           icone: p.tipo === 'consulta' ? '🩺' : '🩻', titulo: p.nome, detalhe: p.detalhe, sel: st.procId === p.id, selo: p.ativo ? '' : 'Agendado pela equipe (pré-marcação)',
           onclick: () => { if (st.procId !== p.id) invalidarHorario(); Object.assign(st, { procId: p.id, procNome: p.nome, procTipo: p.tipo, procAtivo: p.ativo, preco: p.preco, preparo: p.preparo }); salvar(); pintar(); erro(''); }
-        })) : [h('p', { class: 'sub' }, 'Nada encontrado. Tente outra palavra ou fale com um atendente.')]));
+        })) : [h('p', { class: 'sub' }, 'Nada encontrado. Tente outra palavra.')]));
       };
       busca.addEventListener('input', pintar); pintar();
       mostrar('Qual consulta?', `Atendimento ${st.ident.tipo === 'filho' ? 'para ' + (st.ident.nomeCrianca || 'a criança') : 'para você'}. Toque na consulta que você precisa.`, h('div', {}, busca, lista), { botoes: botoesPadrao(), foco: false });
@@ -271,7 +270,7 @@
     const info = {
       ok: ['✅', remarc ? 'Remarcado!' : 'Marcado!', 'Seu horário está reservado.'],
       pre: ['🕒', 'Pré-marcado', 'Ainda NÃO é uma marcação confirmada. A equipe vai conferir e falar com você.'],
-      nao: ['👍', 'Tudo bem, nada foi enviado', 'Você pode voltar quando quiser ou falar com um atendente.']
+      nao: ['👍', 'Tudo bem, nada foi enviado', 'Você pode voltar quando quiser e fazer uma nova marcação.']
     }[tipo];
     const d = s && s.dados;
     mostrar(info[1], null, h('div', {}, h('div', { class: 'marc-status ' + tipo }, h('div', { class: 'grande', 'aria-hidden': 'true' }, info[0]), h('h1', { tabindex: '-1', id: 'marcTitulo2', style: 'margin:8px 0 4px' }, tipo === 'pre' ? 'PRÉ-MARCAÇÃO registrada' : tipo === 'ok' ? 'MARCAÇÃO confirmada' : 'Sem solicitação'), h('p', { style: 'margin:0' }, info[2])),
@@ -279,7 +278,7 @@
         h('tr', {}, h('td', {}, tipo === 'ok' ? 'Data e horário' : 'Situação'), h('td', {}, h('b', {}, tipo === 'ok' && d.slot ? `${dataBonita(d.slot.data)}, ${d.slot.hora}` : 'Aguardando confirmação da equipe'))))) ) : null,
       h('div', { class: 'marc-info' }, '🔒 Ambiente de teste: nada foi enviado ao Klingo e nenhuma notificação real foi disparada.'),
       tipo !== 'nao' ? h('div', { class: 'marc-card' }, h('b', {}, 'Cancelar ou remarcar'), h('ul', { class: 'marc-regras' }, ...S.config().politica.slice(0, 3).map((t) => h('li', {}, t)))) : null),
-      { progresso: false, botoes: [h('button', { class: 'marc-bt sec', type: 'button', onclick: () => humano('fim', s) }, '💬 Atendente'), h('button', { class: 'marc-bt', type: 'button', onclick: acompanhar }, 'Acompanhar')] });
+      { progresso: false, botoes: [h('button', { class: 'marc-bt', type: 'button', onclick: acompanhar }, 'Acompanhar')] });
     corpo.append(h('button', { class: 'marc-link', type: 'button', onclick: () => { const id = (st && st.ident) || ctx.ident; st = novo(id); salvar(); desenhar(); } }, 'Fazer outra marcação'));
   }
 
@@ -299,30 +298,12 @@
           s.status === 'aguardando_equipe' ? h('button', { class: 'marc-link', type: 'button', onclick: () => { S.solicitacaoAtualizar(s.protocolo, (x) => { x.status = 'confirmado_equipe'; }); acompanhar(); } }, '[Teste] simular: equipe confirmou') : null,
           s.status === 'aguardando_equipe' ? h('button', { class: 'marc-link', type: 'button', onclick: () => { S.solicitacaoAtualizar(s.protocolo, (x) => { x.status = 'recusado_equipe'; }); acompanhar(); } }, '[Teste] simular: equipe não conseguiu') : null));
     }) : [h('div', { class: 'marc-info' }, 'Nenhuma solicitação ainda. Faça uma marcação para ela aparecer aqui.')])),
-      { progresso: false, botoes: [h('button', { class: 'marc-bt sec', type: 'button', onclick: () => humano('acompanhar') }, '💬 Atendente'), h('button', { class: 'marc-bt', type: 'button', onclick: () => { if (!st) st = novo(ctx.ident); desenhar(); } }, 'Nova marcação')] });
+      { progresso: false, botoes: [h('button', { class: 'marc-bt', type: 'button', onclick: () => { if (!st) st = novo(ctx.ident); desenhar(); } }, 'Nova marcação')] });
   }
   function remarcar(s) {
     const proc = S.CATALOGO.find((p) => p.id === s.dados.procId); if (!proc) return;
     st = novo(s.dados.paciente); Object.assign(st, { tipo: proc.tipo, procId: proc.id, procNome: proc.nome, procTipo: proc.tipo, preco: proc.preco, preparo: proc.preparo, pagto: s.dados.pagto, convNome: s.dados.convenio || '', convId: s.dados.convenio ? 'x' : '', plano: s.dados.plano || '', cart: { anexada: !!s.dados.carteirinha, semAgora: false, foto: '' }, remarcando: s.protocolo, passo: 'horario', regras: true });
     desenhar();
-  }
-
-  /* ---------- atendimento humano (interface separada; integração por evento) ---------- */
-  function humano(origem, solic) {
-    montar(); abrirCasca(); document.getElementById('marcProg').hidden = true;
-    const resumo = st && st.procNome ? `Marcação em andamento: ${st.procNome}` : solic ? `Solicitação ${solic.protocolo}` : '';
-    const msg = h('textarea', { class: 'marc-area', id: 'marcMsg', placeholder: 'Escreva aqui o que você precisa (use só dados fictícios).', 'aria-label': 'Mensagem para a equipe', maxlength: 500 });
-    mostrar('Falar com um atendente', 'A equipe da clínica atende você pessoalmente.', h('div', {}, resumo ? h('div', { class: 'marc-info' }, 'Vamos enviar junto o contexto: ', h('b', {}, resumo), '. Seus dados preenchidos não se perdem.') : null, msg,
-      h('div', { class: 'marc-aviso', style: 'margin-top:12px' }, 'Ambiente de teste: o atendimento humano é simulado aqui. Em produção, este botão abre o atendimento atual da equipe, com o resumo da marcação anexado.')),
-      { progresso: false, botoes: [h('button', { class: 'marc-bt sec', type: 'button', onclick: () => { if (st && st.procId) desenhar(); else if (origem === 'acompanhar') acompanhar(); else if (origem === 'fim') acompanhar(); else fechar(); } }, 'Voltar'),
-        h('button', { class: 'marc-bt', type: 'button', onclick: () => {
-          const texto = msg.value.trim(); if (texto.length < 3) { erro('Escreva uma mensagem curta.'); return; }
-          const dados = { mensagem: texto, contexto: resumo, paciente: ctx.ident };
-          document.dispatchEvent(new CustomEvent('csi:atendimento-humano', { detail: dados }));   // ponto de integração com o atendimento real
-          const s = { protocolo: 'ATD-TESTE-' + Math.floor(Math.random() * 9000 + 1000), criadoEm: new Date().toISOString(), status: 'atendimento_humano', tipo: 'atendimento', remarcacoes: 0, dados };
-          const l = S.solicitacoes(); l.unshift(s); localStorage.setItem('teste_marc_solicitacoes_v1', JSON.stringify(l));
-          mostrar('Mensagem enviada', null, h('div', {}, h('div', { class: 'marc-status nao' }, h('div', { class: 'grande' }, '💬'), h('p', {}, 'Uma pessoa da equipe vai responder (simulado). Protocolo ', h('b', {}, s.protocolo)))), { progresso: false, botoes: [h('button', { class: 'marc-bt', type: 'button', onclick: acompanhar }, 'Ver minhas solicitações')] });
-        } }, 'Enviar para a equipe')] });
   }
 
   /* ---------- configurações do teste (o que a diretoria quer ajustar) ---------- */
@@ -363,8 +344,7 @@
     const dica = document.getElementById('dicaPrevisaoEntrada'); if (dica) dica.remove();
     const form = document.getElementById('formInicio'); if (!form || document.getElementById('marcEntrada')) return;
     btnAcomp = h('button', { class: 'marc-op', type: 'button', id: 'marcAcompEntrada', onclick: acompanhar }, h('span', { class: 'ic', 'aria-hidden': 'true' }, '📋'), h('span', { class: 'tx' }, h('b', {}, 'Acompanhe suas solicitações'), h('small', {}, '')));
-    const hum = h('button', { class: 'marc-op', type: 'button', id: 'marcHumanoEntrada', onclick: () => { ctx.ident = ctx.ident || { nome: '' }; humano('entrada'); } }, h('span', { class: 'ic', 'aria-hidden': 'true' }, '💬'), h('span', { class: 'tx' }, h('b', {}, 'Falar com um atendente'), h('small', {}, 'Atendimento humano')));
-    form.after(h('div', { class: 'marc-entrada', id: 'marcEntrada' }, btnAcomp, hum)); atualizarEntrada();
+    form.after(h('div', { class: 'marc-entrada', id: 'marcEntrada' }, btnAcomp)); atualizarEntrada();
     const f = document.getElementById('faixaTeste'); if (f && !document.getElementById('marcCfgBt')) f.append(' ', h('button', { id: 'marcCfgBt', type: 'button', style: 'margin-left:8px;background:#fff;color:#8a4a00;border:0;border-radius:12px;padding:3px 10px;font-weight:700;cursor:pointer', onclick: configuracoes }, '⚙ Configurar teste'));
   }
   window.CSI_MARCACAO = { abrir, acompanhar, configuracoes };
