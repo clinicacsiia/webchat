@@ -19,7 +19,7 @@
   const NAO_SEI = 'nao_sei';
 
   /* ---------- estado (nada se perde ao avançar, voltar ou corrigir) ---------- */
-  const novo = (ident) => ({ ident, passo: 'pagto', hist: [], tipo: 'consulta', procId: '', procNome: '', procTipo: '', procAtivo: true, medico: '', medicoNome: '', preco: null, preparo: '', pagto: '', convId: '', convNome: '', plano: '', cart: { anexada: false, semAgora: false, foto: '' }, slot: null, semHorario: '', pre: { aceita: '', periodo: '', dias: [] }, regras: false, retorno: false, remarcando: '' });
+  const novo = (ident) => ({ ident, passo: 'pagto', hist: [], tipo: 'consulta', procId: '', procNome: '', procTipo: '', procAtivo: true, medico: '', medicoNome: '', preco: null, preparo: '', pagto: '', convId: '', convNome: '', plano: '', planoId: '', cart: { anexada: false, semAgora: false, foto: '' }, slot: null, semHorario: '', pre: { aceita: '', periodo: '', dias: [] }, regras: false, retorno: false, remarcando: '' });
   let st = null, ctx = { catalogo: null };
   const salvar = () => { try { localStorage.setItem(K_EST, JSON.stringify(st)); } catch { try { const c = JSON.parse(JSON.stringify(st)); c.cart.foto = ''; localStorage.setItem(K_EST, JSON.stringify(c)); } catch { /* ignora */ } } };
   const limpar = () => { try { localStorage.removeItem(K_EST); } catch { /* ignora */ } };
@@ -36,7 +36,7 @@
     }
     return '';
   };
-  const pagador = (s) => (s.pagto === 'particular' ? 'Particular' : s.pagto === 'convenio' && s.convId && s.convId !== NAO_SEI ? s.convId : '');
+  const pagador = (s) => (s.pagto === 'particular' ? 'Particular' : s.pagto === 'convenio' && s.convId && s.convId !== NAO_SEI ? (s.planoId ? s.convId + '#' + s.planoId : s.convId) : '');
   // O que a equipe precisa confirmar (vira a lista da pré-marcação). Vazio = dá para marcar.
   const pendencias = (s) => {
     const l = [], c = S.config();
@@ -187,7 +187,7 @@
         ...lista.map((m) => opcao({ icone: '👩‍⚕️', titulo: m.nome, detalhe: m.horarios ? m.horarios + ' horários disponíveis' : 'Sem horário pelo site (só a equipe)', off: !m.horarios, sel: st.medico === m.id, onclick: () => set(m.id, m.nome) }))), { botoes: botoesPadrao(), foco: false });
     },
     pagto() {
-      const o = (v, ic, t, d) => opcao({ icone: ic, titulo: t, detalhe: d, sel: st.pagto === v, onclick: () => { st.pagto = v; if (v !== 'convenio') { st.convId = ''; st.convNome = ''; st.plano = ''; st.cart = { anexada: false, semAgora: false, foto: '' }; } invalidarHorario(); st.medico = ''; st.medicoNome = ''; salvar(); desenhar(); } });
+      const o = (v, ic, t, d) => opcao({ icone: ic, titulo: t, detalhe: d, sel: st.pagto === v, onclick: () => { st.pagto = v; if (v !== 'convenio') { st.convId = ''; st.convNome = ''; st.plano = ''; st.planoId = ''; st.cart = { anexada: false, semAgora: false, foto: '' }; } invalidarHorario(); st.medico = ''; st.medicoNome = ''; salvar(); desenhar(); } });
       const part = st.pagto === 'particular' && st.preco != null ? h('div', { class: 'marc-info' }, `Valor particular de ${st.procNome}: `, h('b', {}, dinheiro(st.preco)), ' (valor fictício de teste).') : null;
       mostrar('Como será o pagamento?', `Atendimento ${st.ident.tipo === 'filho' ? 'para ' + (st.ident.nomeCrianca || 'a criança') : 'para você'}. Isso define quais consultas, médicas e horários você vê.`, h('div', {}, h('div', { class: 'marc-lista', role: 'radiogroup' },
         o('particular', '💳', 'Particular', 'Pago direto à clínica'), o('convenio', '🏥', 'Convênio', 'Plano de saúde'), o(NAO_SEI, '❓', 'Não sei', 'A equipe ajuda a conferir')), part), { botoes: botoesPadrao() });
@@ -196,16 +196,34 @@
       mostrar('Qual é o seu convênio?', 'Escolha na lista.', h('div', { class: 'marc-lista' }, h('div', { class: 'marc-esq' }), h('div', { class: 'marc-esq' })), { botoes: botoesPadrao({ off: true }) });
       if (!ctx.convenios) ctx.convenios = await S.convenios();
       if (st.passo !== 'conv') return;
-      const set = (id, nome) => { if (st.convId !== id) { st.plano = ''; st.cart = { anexada: false, semAgora: false, foto: '' }; invalidarHorario(); st.medico = ''; st.medicoNome = ''; } st.convId = id; st.convNome = nome; salvar(); desenhar(); };
+      const set = (id, nome) => { if (st.convId !== id) { st.plano = ''; st.planoId = ''; st.cart = { anexada: false, semAgora: false, foto: '' }; invalidarHorario(); st.medico = ''; st.medicoNome = ''; } st.convId = id; st.convNome = nome; salvar(); desenhar(); };
       mostrar('Qual é o seu convênio?', 'Escolha na lista.', h('div', { class: 'marc-lista', role: 'radiogroup' },
         ...ctx.convenios.map((c) => opcao({ icone: '🏥', titulo: c.nome, sel: st.convId === c.id, onclick: () => set(c.id, c.nome) })),
         opcao({ icone: '❓', titulo: 'Não sei', detalhe: 'A equipe confere para você', sel: st.convId === NAO_SEI, onclick: () => set(NAO_SEI, 'Não sei') })), { botoes: botoesPadrao(), foco: false });
     },
-    plano() {
-      const campo = h('input', { class: 'marc-busca', type: 'text', id: 'marcPlano', placeholder: 'Ex.: Nacional Flex, Plano Básico', 'aria-label': 'Nome do plano', autocomplete: 'off', maxlength: 60, value: st.plano && st.plano !== NAO_SEI ? st.plano : '' });
-      campo.addEventListener('input', () => { st.plano = campo.value.trim(); salvar(); erro(''); });
-      mostrar('Qual é o seu plano?', `Convênio: ${st.convNome}. Digite o nome do plano que está na carteirinha.`, h('div', {}, campo,
-        h('div', { class: 'marc-lista', style: 'margin-top:4px' }, opcao({ icone: '❓', titulo: 'Não sei', detalhe: 'A equipe confere pela carteirinha', sel: st.plano === NAO_SEI, onclick: () => { st.plano = st.plano === NAO_SEI ? '' : NAO_SEI; invalidarHorario(); salvar(); desenhar(); } }))), { botoes: botoesPadrao(), foco: false });
+    async plano() {
+      const nomeConv = st.convNome, op = st.convId;
+      const escolher = (valor, rotulo) => { if (st.planoId !== valor || st.plano !== rotulo) { invalidarHorario(); st.medico = ''; st.medicoNome = ''; st.cart = { anexada: false, semAgora: false, foto: '' }; } st.planoId = valor; st.plano = rotulo; salvar(); desenhar(); };
+      const naoSei = opcao({ icone: '❓', titulo: 'Não sei', detalhe: 'A equipe confere pela carteirinha', sel: st.plano === NAO_SEI, onclick: () => { st.plano = st.plano === NAO_SEI ? '' : NAO_SEI; st.planoId = ''; invalidarHorario(); st.medico = ''; salvar(); desenhar(); } });
+      mostrar('Qual é o seu plano?', `Convênio: ${nomeConv}. Carregando os planos…`, h('div', { class: 'marc-lista' }, h('div', { class: 'marc-esq' }), h('div', { class: 'marc-esq' })), { botoes: botoesPadrao({ off: true }), foco: false });
+      const primeira = await S.planos(op, '');
+      if (st.passo !== 'plano') return;
+      if (!primeira.itens.length) {   // sem lista de planos (ex.: "Outro convênio" ou falha): texto livre
+        const campo = h('input', { class: 'marc-busca', type: 'text', id: 'marcPlano', placeholder: 'Ex.: Nacional Flex, Plano Básico', 'aria-label': 'Nome do plano', autocomplete: 'off', maxlength: 60, value: st.plano && st.plano !== NAO_SEI ? st.plano : '' });
+        campo.addEventListener('input', () => { st.plano = campo.value.trim(); st.planoId = ''; salvar(); erro(''); });
+        mostrar('Qual é o seu plano?', `Convênio: ${nomeConv}. Digite o nome do plano que está na carteirinha.`, h('div', {}, campo, h('div', { class: 'marc-lista', style: 'margin-top:4px' }, naoSei)), { botoes: botoesPadrao(), foco: false });
+        return;
+      }
+      const busca = h('input', { class: 'marc-busca', type: 'search', id: 'marcPlanoBusca', placeholder: 'Buscar o plano pelo nome', 'aria-label': 'Buscar plano', autocomplete: 'off' });
+      const lista = h('div', { class: 'marc-lista', role: 'radiogroup' }), nota = h('p', { class: 'sub', style: 'margin:0 0 8px' });
+      let tempo = null, seq = 0;
+      const pintar = (r, texto) => {
+        nota.textContent = r.total > r.itens.length ? `Mostrando ${r.itens.length} de ${r.total} planos${texto ? ' para "' + texto + '"' : ''}. Digite mais letras para achar o seu.` : `${r.total} plano(s) do ${nomeConv}.`;
+        lista.replaceChildren(...(r.itens.length ? r.itens.map((p) => opcao({ icone: '📄', titulo: p.rotulo, sel: st.planoId === p.valor, onclick: () => escolher(p.valor, p.rotulo) })) : [h('p', { class: 'sub' }, 'Nenhum plano com esse nome. Tente outras letras ou toque em "Não sei".')]));
+      };
+      busca.addEventListener('input', () => { clearTimeout(tempo); const q = busca.value.trim(), n = ++seq; tempo = setTimeout(async () => { const r = await S.planos(op, q); if (n === seq && st.passo === 'plano') pintar(r, q); }, 300); });
+      pintar(primeira, '');
+      mostrar('Qual é o seu plano?', `Convênio: ${nomeConv}. Procure o plano que está na carteirinha.`, h('div', {}, busca, nota, lista, h('div', { class: 'marc-lista', style: 'margin-top:10px' }, naoSei)), { botoes: botoesPadrao(), foco: false });
     },
     cart() {
       const entrada = h('input', { type: 'file', accept: 'image/*', capture: 'environment', id: 'marcFoto', style: 'position:absolute;left:-9999px', 'aria-label': 'Foto da carteirinha' });

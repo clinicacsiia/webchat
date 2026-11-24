@@ -85,6 +85,15 @@
     return r;
   }
   const pagadorChave = (p) => (p || '').trim();
+  // Planos reais do convênio (função teste-planos-klingo, só leitura). Devolve { itens: [{valor, rotulo}], total } (no máximo 40, filtrados por `busca`).
+  const FN_PLANOS = 'https://nrvuynjwcgwpjdptkiay.supabase.co/functions/v1/teste-planos-klingo';
+  async function planos(operadora, busca = '') {
+    try {
+      const r = await fetch(FN_PLANOS, { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: CHAVE_PUB, Authorization: 'Bearer ' + CHAVE_PUB }, body: JSON.stringify({ operadora, busca }) });
+      const d = await r.json();
+      return d && d.ok ? { itens: d.itens || [], total: d.total || 0, exato: !!d.exato } : { itens: [], total: 0, erro: true };
+    } catch { return { itens: [], total: 0, erro: true }; }
+  }
   // Consultas oferecidas. As que a API do Klingo não oferece ficam marcadas (a equipe agenda → pré-marcação).
   async function catalogo() {
     await espera(200);
@@ -128,5 +137,5 @@
   }
   const solicitacoesApagarTudo = () => { try { localStorage.removeItem(K_SOL); } catch { /* ignora */ } };
 
-  window.CSI_SIM = { catalogo, convenios, medicos, disponibilidade, marcar, config, configSalvar, configRestaurar, solicitacoes, solicitacaoAtualizar, solicitacoesApagarTudo, CATALOGO, iso };
+  window.CSI_SIM = { catalogo, convenios, planos, medicos, disponibilidade, marcar, config, configSalvar, configRestaurar, solicitacoes, solicitacaoAtualizar, solicitacoesApagarTudo, CATALOGO, iso };
 })();

@@ -215,6 +215,7 @@ Todas publicadas **sem exigir JWT** e cada uma confere o próprio segredo.
 | `klingo-agenda-api` | diagnóstico: só **lê** horários (versão 0.4, sem escrita; marcar responde 410) | `x-sync-key` | sim |
 | `chat-agenda-api` | o chat, ao chegar no horário (só leitura: grava as ofertas da API; v2.0: registra o resultado de cada etapa em `klingo_consulta`) | token da conversa | sim |
 | `teste-agenda-klingo` (24/11/2026) | só o ambiente de testes `/painel/testedowebchat/` (origem conferida) | nenhuma (limite de 20/min por IP, cache de 60 s) | não | **Só leitura:** devolve os horários reais do Klingo (`GET /agenda/horarios`) por consulta e pagador; não grava nada no banco e não marca. Ver `painel/testedowebchat/LEIAME.md`. |
+| `teste-planos-klingo` (24/11/2026) | só o ambiente de testes `/painel/testedowebchat/` (origem conferida) | nenhuma (60/min por IP, cache de 10 min) | não | **Só leitura do banco** (não chama o Klingo): lista e pesquisa os planos reais de um convênio (`klingo_plano_map` + `plano_exato_itens`). Ver `painel/testedowebchat/LEIAME.md`. |
 | `disponibilidade-vigia` | o banco (`previsao_vigiar`, pg_net) | segredo do cofre | **não ainda** (nova, v2.0) |
 | `klingo-executar` | só o banco (pg_net), com o id de uma operação | segredo próprio do cofre (`klingo_interno_segredo`) | sim |
 | `klingo-identificar` | o banco (gatilho do CPF e rotina de revisão) | segredo do cofre | sim |
