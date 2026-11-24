@@ -59,3 +59,6 @@ Suposições a confirmar com a clínica: agenda sem restrição de operadora (`o
 
 ## Regra "não sei" → pré-marcação (24/11/2026)
 Qualquer "Não sei" (pagamento, convênio ou plano) ou "Não tenho agora" (carteirinha) leva **direto** à pré-marcação: o sistema não pergunta mais nada (nem médica nem horário), mostra a lista **"A equipe precisa confirmar"** (pendências), pergunta Sim/Não e segue para condições e resumo. A lista aparece também no resumo, no resultado e em "Suas solicitações". Quem sabe tudo continua: médica → horário → marcação. A barra de progresso se ajusta (ex.: "Etapa 3 de 5").
+
+## Nova ordem (24/11/2026)
+**Pagamento (Particular / Convênio / Não sei) é a 1ª pergunta**, porque limita tudo: pagamento → convênio → plano → carteirinha → **consulta** → médica → horário. Com o pagamento conhecido, a lista de consultas mostra só as que têm médica para ele (com número de médicas e de horários); as sem médica ficam no fim, marcadas "pré-marcação". "Não sei" ainda pede a consulta e vai à pré-marcação com a lista de pendências.
