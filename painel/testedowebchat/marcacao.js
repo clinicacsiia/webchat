@@ -19,7 +19,7 @@
   const NAO_SEI = 'nao_sei';
 
   /* ---------- estado (nada se perde ao avançar, voltar ou corrigir) ---------- */
-  const novo = (ident) => ({ ident, passo: 'tipo', hist: [], tipo: '', procId: '', procNome: '', procTipo: '', procAtivo: true, preco: null, preparo: '', pagto: '', convId: '', convNome: '', plano: '', cart: { anexada: false, semAgora: false, foto: '' }, slot: null, semHorario: '', pre: { aceita: '', periodo: '', dias: [] }, regras: false, retorno: false, remarcando: '' });
+  const novo = (ident) => ({ ident, passo: 'proc', hist: [], tipo: 'consulta', procId: '', procNome: '', procTipo: '', procAtivo: true, preco: null, preparo: '', pagto: '', convId: '', convNome: '', plano: '', cart: { anexada: false, semAgora: false, foto: '' }, slot: null, semHorario: '', pre: { aceita: '', periodo: '', dias: [] }, regras: false, retorno: false, remarcando: '' });
   let st = null, ctx = { catalogo: null };
   const salvar = () => { try { localStorage.setItem(K_EST, JSON.stringify(st)); } catch { try { const c = JSON.parse(JSON.stringify(st)); c.cart.foto = ''; localStorage.setItem(K_EST, JSON.stringify(c)); } catch { /* ignora */ } } };
   const limpar = () => { try { localStorage.removeItem(K_EST); } catch { /* ignora */ } };
@@ -38,20 +38,20 @@
   };
   const motivoPre = (s) => motivoAntesDoHorario(s) || s.semHorario;
   const completo = {
-    tipo: (s) => !!s.tipo, proc: (s) => !!s.procId, pagto: (s) => !!s.pagto, conv: (s) => !!s.convId, plano: (s) => !!s.plano,
+    proc: (s) => !!s.procId, pagto: (s) => !!s.pagto, conv: (s) => !!s.convId, plano: (s) => !!s.plano,
     cart: (s) => s.cart.anexada || s.cart.semAgora, horario: (s) => !!s.slot || !!s.semHorario,
     pre: (s) => s.pre.aceita === 'nao' || (s.pre.aceita === 'sim' && !!s.pre.periodo), regras: (s) => s.regras, resumo: () => false
   };
   const aplica = {
-    tipo: () => true, proc: () => true, pagto: () => true,
+    proc: () => true, pagto: () => true,
     conv: (s) => s.pagto === 'convenio',
     plano: (s) => s.pagto === 'convenio' && s.convId && s.convId !== NAO_SEI,
     cart: (s) => s.pagto === 'convenio' && S.config().exigir_carteirinha,
     horario: (s) => !motivoAntesDoHorario(s),
     pre: (s) => !!motivoPre(s), regras: () => true, resumo: () => true
   };
-  const ORDEM = ['tipo', 'proc', 'pagto', 'conv', 'plano', 'cart', 'horario', 'pre', 'regras', 'resumo'];
-  const NOMES = { tipo: 'Atendimento', proc: 'Procedimento', pagto: 'Pagamento', conv: 'Convênio', plano: 'Plano', cart: 'Carteirinha', horario: 'Horário', pre: 'Pré-marcação', regras: 'Condições', resumo: 'Resumo' };
+  const ORDEM = ['proc', 'pagto', 'conv', 'plano', 'cart', 'horario', 'pre', 'regras', 'resumo'];
+  const NOMES = { proc: 'Procedimento', pagto: 'Pagamento', conv: 'Convênio', plano: 'Plano', cart: 'Carteirinha', horario: 'Horário', pre: 'Pré-marcação', regras: 'Condições', resumo: 'Resumo' };
   const aplicaveis = () => ORDEM.filter((p) => aplica[p](st));
 
   /* ---------- casca da tela ---------- */
@@ -101,7 +101,6 @@
   }
   function continuar() {
     const m = validar(); if (m) { erro(m); return; }
-    if (st.passo === 'tipo' && st.tipo === 'outro') { humano('tipo'); return; }
     if (st.passo === 'pre' && st.pre.aceita === 'nao') { fim('nao'); return; }
     const lista = aplicaveis(), i = lista.indexOf(st.passo);
     let prox = lista[i + 1];
@@ -110,7 +109,6 @@
   }
   function validar() {
     const p = st.passo;
-    if (p === 'tipo' && !st.tipo) return 'Escolha o que você precisa.';
     if (p === 'proc' && !st.procId) return 'Escolha o procedimento.';
     if (p === 'pagto' && !st.pagto) return 'Escolha como vai pagar, ou toque em "Não sei".';
     if (p === 'conv' && !st.convId) return 'Escolha o convênio, ou toque em "Não sei".';
@@ -127,18 +125,11 @@
 
   /* ---------- telas ---------- */
   const TELAS = {
-    tipo() {
-      const o = (v, ic, t, d) => opcao({ icone: ic, titulo: t, detalhe: d, sel: st.tipo === v, onclick: () => { st.tipo = v; salvar(); desenhar(); } });
-      const quem = st.ident.tipo === 'filho' ? `para ${st.ident.nomeCrianca || 'a criança'}` : 'para você';
-      mostrar('O que você precisa?', `Atendimento ${quem}. Escolha uma opção.`, h('div', { class: 'marc-lista', role: 'radiogroup' },
-        o('exame', '🩻', 'Fazer um exame', 'Ultrassom, raio-X, mamografia e outros'), o('consulta', '🩺', 'Marcar uma consulta', 'Pediatria e pré-natal'), o('outro', '💬', 'Outro assunto', 'Falar com a nossa equipe')),
-        { botoes: botoesPadrao() });
-    },
     async proc() {
-      mostrar(st.tipo === 'consulta' ? 'Qual consulta?' : 'Qual exame?', 'Toque no que você precisa.', h('div', { class: 'marc-lista' }, h('div', { class: 'marc-esq' }), h('div', { class: 'marc-esq' }), h('div', { class: 'marc-esq' })), { botoes: botoesPadrao({ off: true }) });
+      mostrar('Qual consulta?', 'Carregando…', h('div', { class: 'marc-lista' }, h('div', { class: 'marc-esq' }), h('div', { class: 'marc-esq' }), h('div', { class: 'marc-esq' })), { botoes: botoesPadrao({ off: true }) });
       if (!ctx.catalogo) ctx.catalogo = await S.catalogo();
       if (st.passo !== 'proc') return;
-      const itens = ctx.catalogo.filter((p) => p.tipo === st.tipo);
+      const itens = ctx.catalogo.filter((p) => p.tipo === 'consulta');
       const busca = h('input', { class: 'marc-busca', type: 'search', placeholder: 'Buscar pelo nome', 'aria-label': 'Buscar procedimento', autocomplete: 'off' });
       const lista = h('div', { class: 'marc-lista', role: 'radiogroup' });
       const pintar = () => {
@@ -150,7 +141,7 @@
         })) : [h('p', { class: 'sub' }, 'Nada encontrado. Tente outra palavra ou fale com um atendente.')]));
       };
       busca.addEventListener('input', pintar); pintar();
-      mostrar(st.tipo === 'consulta' ? 'Qual consulta?' : 'Qual exame?', 'Toque no que você precisa.', h('div', {}, busca, lista), { botoes: botoesPadrao(), foco: false });
+      mostrar('Qual consulta?', `Atendimento ${st.ident.tipo === 'filho' ? 'para ' + (st.ident.nomeCrianca || 'a criança') : 'para você'}. Toque na consulta que você precisa.`, h('div', {}, busca, lista), { botoes: botoesPadrao(), foco: false });
     },
     pagto() {
       const o = (v, ic, t, d) => opcao({ icone: ic, titulo: t, detalhe: d, sel: st.pagto === v, onclick: () => { st.pagto = v; if (v !== 'convenio') { st.convId = ''; st.convNome = ''; st.plano = ''; st.cart = { anexada: false, semAgora: false, foto: '' }; } invalidarHorario(); salvar(); desenhar(); } });
@@ -259,7 +250,7 @@
         { botoes: [h('button', { class: 'marc-bt sec', type: 'button', onclick: voltar, style: 'flex:0 0 34%' }, 'Voltar'), h('button', { class: 'marc-bt verde', type: 'button', id: 'marcConfirmar', onclick: confirmar }, pre ? 'Confirmar pré-marcação' : 'Confirmar marcação')] });
     }
   };
-  function desenhar() { ajustarTopo(); btnVoltar.hidden = false; const f = TELAS[st.passo]; if (f) f(); else irPara('tipo', { empilhar: false }); }
+  function desenhar() { ajustarTopo(); btnVoltar.hidden = false; const f = TELAS[st.passo]; if (f) f(); else irPara('proc', { empilhar: false }); }
 
   /* ---------- confirmação e resultado ---------- */
   async function confirmar() {
@@ -359,6 +350,7 @@
   function abrir(ident) {
     ctx.ident = ident; montar();
     let salvo = null; try { salvo = JSON.parse(localStorage.getItem(K_EST) || 'null'); } catch { /* ignora */ }
+    if (salvo && (salvo.tipo === 'exame' || salvo.passo === 'tipo')) salvo = null;   // exame saiu do sistema
     st = salvo && salvo.ident && salvo.ident.nome === ident.nome && salvo.ident.nomeCrianca === ident.nomeCrianca ? salvo : novo(ident);
     st.ident = ident; abrirCasca(); desenhar();
   }

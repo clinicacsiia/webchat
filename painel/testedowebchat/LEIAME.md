@@ -7,8 +7,8 @@ Tela inicial e identificação de quem será atendido (como antes) → **Começa
 
 | Etapa | O que acontece |
 |---|---|
-| Atendimento | Exame, consulta ou outro assunto (leva ao atendimento humano) |
-| Procedimento | Lista com busca; procedimento **desativado** aparece marcado "agendado pela equipe" e segue como pré-marcação |
+| (início) | Vai direto para a escolha da consulta: sem pergunta "O que você precisa?", sem Exame e sem "Outro assunto" (o atendente continua no botão do topo) |
+| Procedimento | Lista com busca; procedimento **desativado** (pela configuração) aparece marcado "agendado pela equipe" e segue como pré-marcação |
 | Pagamento | Particular (mostra valor), Convênio ou **Não sei** |
 | Convênio / Plano | Listas + **Não sei** |
 | Carteirinha | Foto (câmera ou galeria) ou "Não tenho agora" (vira pré-marcação) |
