@@ -102,3 +102,9 @@ Saíram "Você é da nossa família…" e a caixa "Entendi: se o chat não conse
   - **Sim** → pergunta a **consulta**, a **médica de interesse** (lista real do Klingo, ou "Tanto faz"), o **melhor período e os dias** → condições → resumo (que mostra consulta, médica de interesse e preferência).
 - **Listas não voltam ao topo** ao escolher uma opção (convênios e planos), para o paciente ver que a escolha foi registrada; o plano marcado fica destacado no lugar.
 - Ordem de etapas: pagamento → convênio → plano → carteirinha → **pré-marcação (Sim/Não)** → consulta → médica → (horário) → preferências → condições → resumo. Se o paciente sabia tudo mas não achou horário, a pergunta da pré-marcação vem depois da busca de horário.
+
+## Pré-marcação com horário desejado (24/11/2026, v20261124k)
+Na pré-marcação, depois da consulta e da médica de interesse, a tela **"Qual horário você prefere?"** mostra os **dias e horários reais do Klingo** (45 dias) para o que a pessoa escolheu. O horário escolhido fica **reservado provisoriamente**: o paciente tem 24 h (configurável) para voltar em **Acompanhar**, conferir e confirmar. Alternativa: dizer só o melhor período e os dias da semana.
+- Se o plano é desconhecido, os horários são **de referência** (de Particular) e a tela avisa que a equipe confere o convênio.
+- O horário aparece como **"Horário desejado (provisório)"** no resumo, no resultado e no cartão de Acompanhar.
+- Em **Completar agora** o horário é **conferido de novo no Klingo**: se continua livre, vem marcado ("continua disponível"); se foi ocupado, avisa e o paciente escolhe outro. A **reserva é simulada**: nada é reservado no Klingo de verdade.
