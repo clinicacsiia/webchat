@@ -62,3 +62,12 @@ Qualquer "Não sei" (pagamento, convênio ou plano) ou "Não tenho agora" (carte
 
 ## Nova ordem (24/11/2026)
 **Pagamento (Particular / Convênio / Não sei) é a 1ª pergunta**, porque limita tudo: pagamento → convênio → plano → carteirinha → **consulta** → médica → horário. Com o pagamento conhecido, a lista de consultas mostra só as que têm médica para ele (com número de médicas e de horários); as sem médica ficam no fim, marcadas "pré-marcação". "Não sei" ainda pede a consulta e vai à pré-marcação com a lista de pendências.
+
+## Horários REAIS do Klingo (24/11/2026) — substitui a grade
+Os horários e as médicas agora vêm **ao vivo da API do Klingo** pela Edge Function nova **`teste-agenda-klingo`** (`supabase/functions/teste-agenda-klingo/index.ts`), publicada em 24/11/2026 a pedido do dono (opção B).
+- **Só leitura:** consulta `GET /agenda/horarios`; não marca, não reserva, **não grava nada no banco** (só lê `klingo_especialidade` e chama `klingo_plano_resolver`, que é `STABLE`); sem dado de paciente.
+- **Proteções:** só responde à origem `https://clinicacsiia.github.io`; limite de 20 consultas/min por IP; cache de 60 s; janela de 14 dias (a tela pede 2 janelas = 28 dias); não usa a cota global (que grava no banco). Usa o mesmo segredo `KLINGO_APP_TOKEN` das outras funções, então as consultas dividem a cota do Klingo com o chat real.
+- **O que a API oferece:** só Pediatria (inclui pré-natal), Neurologia (neuropediatra) e Radiologia (`klingo_especialidade.liberada_api`). Ortopediatra, endócrino, gastro e cirurgia pediátrica **não têm horário na API**: seguem como pré-marcação (equipe).
+- **Convênio:** a lista é a do `klingo_plano_map` (26 operadoras que a clínica atende). Seis delas (Amor Saúde, Bradesco x2, Central Nacional Unimed, SulAmérica, Unimed Seguros) precisam do **plano do cadastro do paciente** para consultar horário (`plano_do_cadastro_necessario`): neste teste, que não tem CPF/cadastro, caem na **pré-marcação**.
+- A marcação continua **simulada** (nada é reservado no Klingo) e os dados do paciente continuam fictícios.
+- `agenda-real.js` agora só guarda a lista de convênios e quais consultas a API oferece; a grade foi removida.

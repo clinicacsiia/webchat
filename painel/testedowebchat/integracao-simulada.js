@@ -3,7 +3,7 @@
    O contrato (nomes e formatos) espelha as funções reais do motor, para a troca futura ser pontual:
      catalogo()            ~ chat_exames_buscar / chat_consultas
      convenios()           ~ convênios que restringem as agendas (reais, do catalogo_agenda)
-     disponibilidade()     ~ chat_horarios / chat-agenda-api   (HOJE: grade real das médicas, de agenda-real.js; ainda não é a disponibilidade ao vivo do Klingo)
+     disponibilidade()     ~ chat_horarios / chat-agenda-api   (HOJE: horários REAIS do Klingo ao vivo, pela função teste-agenda-klingo, só leitura)
      marcar()              ~ chat_horario_escolher + klingo-executar   (aqui NUNCA chama o Klingo)
      solicitacoes*()       ~ app_pedidos / "Acompanhe seus pedidos"
    Regras de negócio (antecedência, ativação de exames, exigência de carteirinha, política) ficam na CONFIG, não na tela. */
@@ -46,68 +46,65 @@
   const configRestaurar = () => { try { localStorage.removeItem(K_CFG); } catch { /* ignora */ } };
 
   /* ---------- consultas ---------- */
-  // Consultas oferecidas. Com o pagador já conhecido, informa quantas médicas o atendem e quantos horários passam na regra (para o paciente só ver o que serve).
-  async function catalogo(pagador = '') {
-    await espera(250);
-    const c = config();
-    return CATALOGO.map((p) => {
-      const base = Object.assign({}, p, { ativo: !c.exames_inativos.includes(p.id) });
-      if (!pagador) return base;
-      const slots = gerarSlots({ procId: p.id, pagador }).filter((x) => !x.segurada);
-      return Object.assign(base, { medicos: new Set(slots.map((x) => x.profId)).size, horarios: slots.length });
-    });
-  }
   async function convenios() { await espera(150); return convenios_(); }
 
-  /* ---------- grade REAL das médicas (snapshot de leitura da produção; ver agenda-real.js) ---------- */
+  /* ---------- horários REAIS do Klingo (função teste-agenda-klingo: só leitura, não grava nada) ---------- */
+  const FN = 'https://nrvuynjwcgwpjdptkiay.supabase.co/functions/v1/teste-agenda-klingo', CHAVE_PUB = 'sb_publishable_e2GK1YGEj06STa_ESCevow_nvtATB-y';
   const NOME_MIN = ['de', 'da', 'do', 'dos', 'das', 'e', 's/a'];
   const bonito = (n) => String(n).toLowerCase().split(' ').map((w, i) => (i && NOME_MIN.includes(w) ? (w === 's/a' ? 'S/A' : w) : w.charAt(0).toUpperCase() + w.slice(1))).join(' ');
   const iso = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   const pid = (procId) => Number(String(procId).replace(/^c-/, ''));
-  const GRADE = () => (window.CSI_AGENDA_REAL && window.CSI_AGENDA_REAL.grade) || [];
-  const gradeDe = (procId) => GRADE().filter((g) => g[0] === pid(procId));
-  // Convênios que aparecem nas restrições das agendas reais (os demais convênios da clínica não restringem a grade). "OUTRO" = não está na lista.
-  function convenios_() {
-    const ops = new Set(); GRADE().forEach((g) => (g[9] || []).forEach((o) => { if (o !== 'Particular') ops.add(o); }));
-    return [...ops].sort().map((o) => ({ id: o, nome: bonito(o) })).concat([{ id: 'OUTRO', nome: 'Outro convênio' }]);
-  }
-  // A agenda aceita o pagador? operadoras null = sem restrição (suposição a confirmar).
-  const aceita = (g, pagador) => !g[9] || !pagador || g[9].some((o) => o.toLowerCase() === String(pagador).toLowerCase());
-  // Todos os horários da grade (28 dias) para a consulta e o pagador; marca os que a regra de antecedência segura.
-  function gerarSlots({ procId, pagador = '', diasAdiante = 28 }) {
-    const c = config(), agora = new Date(), limite = new Date(agora.getTime() + c.antecedencia_horas * 3600e3);
-    const grade = gradeDe(procId).filter((g) => aceita(g, pagador)), out = [];
-    for (let i = 0; i <= diasAdiante; i++) {
-      const d = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate() + i), dd = iso(d), ds = d.getDay();
-      for (const [, prof, dia, ini, fim, dur, local, vi, vf] of grade) {
-        if (dia !== ds || dd < vi || dd > vf) continue;
-        const [h1, m1] = ini.split(':').map(Number), [h2, m2] = fim.split(':').map(Number);
-        for (let t = h1 * 60 + m1; t + dur <= h2 * 60 + m2; t += dur) {
-          const quando = new Date(d.getFullYear(), d.getMonth(), d.getDate(), Math.floor(t / 60), t % 60);
-          if (quando <= agora) continue;
-          out.push({ data: dd, hora: String(Math.floor(t / 60)).padStart(2, '0') + ':' + String(t % 60).padStart(2, '0'), profissional: bonito(prof), profId: prof, local: bonito(local), unidade: 'Desenvoar', segurada: quando < limite, dow: ds, min: t });
-        }
-      }
-    }
-    return out;
-  }
-  // Médicas que atendem esse pagador nessa consulta, com quantos horários livres (pela grade) já passam na regra.
-  async function medicos(procId, pagador = '') {
-    await espera(200);
-    const slots = gerarSlots({ procId, pagador }), porMed = new Map();
-    for (const sl of slots) { const m = porMed.get(sl.profId) || { id: sl.profId, nome: sl.profissional, horarios: 0, segurados: 0 }; if (sl.segurada) m.segurados++; else m.horarios++; porMed.set(sl.profId, m); }
-    return [...porMed.values()].sort((a, b) => a.nome.localeCompare(b.nome));
-  }
-  // Horários = a grade real de cada médica, filtrada por convênio e médica escolhidos (sem descontar horários já ocupados).
-  async function disponibilidade({ procId, medico = '', pagador = '' } = {}) {
-    await espera(450);
+  const REAL = () => window.CSI_AGENDA_REAL || { convenios: [], consultasNaApi: [] };
+  const naApi = (procId) => REAL().consultasNaApi.includes(pid(procId));
+  function convenios_() { return REAL().convenios.map((o) => ({ id: o, nome: bonito(o) })).concat([{ id: 'OUTRO', nome: 'Outro convênio' }]); }
+  // Uma consulta ao vivo (2 janelas de 14 dias), com cache de 60 s no navegador. Devolve { estado, motivo, slots, consultadoEm }.
+  const vivo = new Map();
+  async function buscarAoVivo(procId, pagador) {
     const c = config();
-    if (c.simular_falha) { const e = new Error('Integração simulada indisponível'); e.codigo = 'integracao_fora'; throw e; }
-    const todos = gerarSlots({ procId, pagador }).filter((x) => !medico || medico === 'qualquer' || x.profId === medico);
-    const porDia = new Map(); let bloqueadosPelaRegra = 0;
-    for (const x of todos) { if (x.segurada) { bloqueadosPelaRegra++; continue; } if (!porDia.has(x.data)) porDia.set(x.data, []); porDia.get(x.data).push(x); }
-    const dias = [...porDia.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([data, hs]) => ({ data, horarios: hs.sort((a, b) => a.min - b.min || a.profissional.localeCompare(b.profissional)) }));
-    return { dias, bloqueadosPelaRegra, existentes: todos.length, antecedenciaHoras: c.antecedencia_horas };
+    if (c.simular_falha) return { estado: 'indisponivel', motivo: 'simulado', slots: [] };
+    if (!naApi(procId)) return { estado: 'fora_do_escopo', motivo: 'A API do Klingo não oferece horários desta consulta; só a equipe agenda.', slots: [] };
+    const chave = pid(procId) + '|' + String(pagador).toLowerCase(), c0 = vivo.get(chave);
+    if (c0 && Date.now() - c0.t < 60000) return c0.r;
+    const chamar = async (janela) => {
+      const r = await fetch(FN, { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: CHAVE_PUB, Authorization: 'Bearer ' + CHAVE_PUB }, body: JSON.stringify({ consulta: pid(procId), pagador, janela }) });
+      return r.json();
+    };
+    let rs;
+    try { rs = await Promise.all([chamar(0), chamar(1)]); } catch { return { estado: 'indisponivel', motivo: 'rede', slots: [] }; }
+    const ruim = rs.find((x) => !x || !x.ok);
+    if (ruim) return { estado: ruim && ruim.estado === 'limite' ? 'limite' : 'indisponivel', motivo: (ruim && ruim.motivo) || 'erro', slots: [] };
+    const sem = rs.find((x) => x.estado === 'fora_do_escopo' || x.estado === 'sem_plano');
+    if (sem) { const r = { estado: sem.estado, motivo: sem.motivo, slots: [] }; vivo.set(chave, { t: Date.now(), r }); return r; }
+    const limite = new Date(Date.now() + c.antecedencia_horas * 3600e3), slots = [];
+    for (const x of rs) for (const h of x.horarios || []) {
+      const [y, m, d] = h.data.split('-').map(Number), [H, M] = h.hora.split(':').map(Number), quando = new Date(y, m - 1, d, H, M);
+      slots.push({ data: h.data, hora: h.hora, profissional: bonito(h.profissional || 'Médica(o)'), profId: h.profissional || '', local: '', unidade: h.unidade ? bonito(h.unidade) : 'Desenvoar', segurada: quando < limite, dow: quando.getDay(), min: H * 60 + M });
+    }
+    const r = { estado: slots.length ? 'com_horarios' : 'sem_horarios', motivo: rs[0].motivo || '', slots, consultadoEm: rs[0].consultadoEm || new Date().toISOString() };
+    vivo.set(chave, { t: Date.now(), r });
+    return r;
+  }
+  const pagadorChave = (p) => (p || '').trim();
+  // Consultas oferecidas. As que a API do Klingo não oferece ficam marcadas (a equipe agenda → pré-marcação).
+  async function catalogo() {
+    await espera(200);
+    const c = config();
+    return CATALOGO.map((p) => Object.assign({}, p, { ativo: !c.exames_inativos.includes(p.id), naApi: naApi(p.id) }));
+  }
+  // Médicas com horário real para o pagador (e quantos horários passam na regra de antecedência).
+  async function medicos(procId, pagador = '') {
+    const r = await buscarAoVivo(procId, pagadorChave(pagador)), por = new Map();
+    for (const sl of r.slots) { const m = por.get(sl.profId) || { id: sl.profId, nome: sl.profissional, horarios: 0, segurados: 0 }; if (sl.segurada) m.segurados++; else m.horarios++; por.set(sl.profId, m); }
+    return { estado: r.estado, motivo: r.motivo, consultadoEm: r.consultadoEm, lista: [...por.values()].sort((a, b) => a.nome.localeCompare(b.nome)) };
+  }
+  // Horários reais do Klingo, filtrados pela(s) médica(s) escolhida(s) e pela regra de antecedência.
+  async function disponibilidade({ procId, medico = '', pagador = '' } = {}) {
+    const c = config(), r = await buscarAoVivo(procId, pagadorChave(pagador));
+    if (r.estado === 'indisponivel' || r.estado === 'limite') { const e = new Error('Klingo indisponível'); e.codigo = r.estado; throw e; }
+    const todos = r.slots.filter((x) => !medico || medico === 'qualquer' || x.profId === medico), por = new Map(); let bloqueadosPelaRegra = 0;
+    for (const x of todos) { if (x.segurada) { bloqueadosPelaRegra++; continue; } if (!por.has(x.data)) por.set(x.data, []); por.get(x.data).push(x); }
+    const dias = [...por.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([data, hs]) => ({ data, horarios: hs.sort((a, b) => a.min - b.min || a.profissional.localeCompare(b.profissional)) }));
+    return { dias, bloqueadosPelaRegra, existentes: todos.length, antecedenciaHoras: c.antecedencia_horas, consultadoEm: r.consultadoEm };
   }
 
   /* ---------- solicitações (marcadas e pré-marcadas) ---------- */

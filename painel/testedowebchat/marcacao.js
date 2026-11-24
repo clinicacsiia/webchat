@@ -146,35 +146,43 @@
   const TELAS = {
     async proc() {
       mostrar('Qual consulta?', 'Carregando…', h('div', { class: 'marc-lista' }, h('div', { class: 'marc-esq' }), h('div', { class: 'marc-esq' }), h('div', { class: 'marc-esq' })), { botoes: botoesPadrao({ off: true }) });
-      ctx.catalogo = await S.catalogo(pagador(st));
+      ctx.catalogo = await S.catalogo();
       if (st.passo !== 'proc') return;
-      const filtrado = !!pagador(st), itens = ctx.catalogo.filter((p) => p.tipo === 'consulta').sort((a, b) => (filtrado ? (b.medicos > 0) - (a.medicos > 0) : 0) || 0);
+      const filtrado = false, itens = ctx.catalogo.filter((p) => p.tipo === 'consulta').sort((a, b) => (b.naApi - a.naApi) || 0);
       const busca = h('input', { class: 'marc-busca', type: 'search', placeholder: 'Buscar pelo nome', 'aria-label': 'Buscar procedimento', autocomplete: 'off' });
       const lista = h('div', { class: 'marc-lista', role: 'radiogroup' });
       const pintar = () => {
         const q = busca.value.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
         const vis = itens.filter((p) => !q || (p.nome + ' ' + p.detalhe).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().includes(q));
         lista.replaceChildren(...(vis.length ? vis.map((p) => opcao({
-          icone: p.tipo === 'consulta' ? '🩺' : '🩻', titulo: p.nome, detalhe: filtrado ? (p.medicos ? `${p.medicos} médica(s) · ${p.horarios} horários nas próximas 4 semanas` : '') : p.detalhe, sel: st.procId === p.id, selo: !p.ativo ? 'Agendado pela equipe (pré-marcação)' : filtrado && !p.medicos ? 'Sem horário pelo site para o seu pagamento (pré-marcação)' : '',
+          icone: p.tipo === 'consulta' ? '🩺' : '🩻', titulo: p.nome, detalhe: p.detalhe, sel: st.procId === p.id, selo: !p.ativo ? 'Agendado pela equipe (pré-marcação)' : !p.naApi ? 'Agendada pela equipe (pré-marcação)' : '',
           onclick: () => { if (st.procId !== p.id) { invalidarHorario(); st.medico = ''; st.medicoNome = ''; } Object.assign(st, { procId: p.id, procNome: p.nome, procTipo: p.tipo, procAtivo: p.ativo, preco: p.preco, preparo: p.preparo }); salvar(); pintar(); erro(''); }
         })) : [h('p', { class: 'sub' }, 'Nada encontrado. Tente outra palavra.')]));
       };
       busca.addEventListener('input', pintar); pintar();
-      mostrar('Qual consulta?', (filtrado ? 'Mostrando só o que atende ' + (st.pagto === 'particular' ? 'Particular' : st.convNome) + '. ' : '') + `Atendimento ${st.ident.tipo === 'filho' ? 'para ' + (st.ident.nomeCrianca || 'a criança') : 'para você'}. Toque na consulta que você precisa.`, h('div', {}, busca, lista), { botoes: botoesPadrao(), foco: false });
+      mostrar('Qual consulta?', `Atendimento ${st.ident.tipo === 'filho' ? 'para ' + (st.ident.nomeCrianca || 'a criança') : 'para você'}. Toque na consulta que você precisa.`, h('div', {}, busca, lista), { botoes: botoesPadrao(), foco: false });
     },
     async medico() {
-      mostrar('Qual médica?', st.procNome, h('div', { class: 'marc-lista' }, h('div', { class: 'marc-esq' }), h('div', { class: 'marc-esq' })), { botoes: botoesPadrao({ off: true }), foco: false });
-      const lista = await S.medicos(st.procId, pagador(st));
+      mostrar('Consultando o Klingo…', st.procNome, h('div', { 'aria-busy': 'true' }, h('p', { class: 'sub' }, 'Buscando os horários reais, só um instante.'), h('div', { class: 'marc-esq' }), h('div', { class: 'marc-esq' })), { botoes: botoesPadrao({ off: true }), foco: false });
+      const r = await S.medicos(st.procId, pagador(st));
       if (st.passo !== 'medico') return;
-      const quem = st.pagto === 'particular' ? 'atendem Particular' : st.convNome && st.convId !== NAO_SEI ? 'atendem ' + st.convNome : 'atendem';
+      const lista = r.lista, quem = st.pagto === 'particular' ? 'Particular' : st.convNome;
+      const MSG = {
+        fora_do_escopo: 'Esta consulta é agendada pela equipe: o Klingo não oferece horários para ela pelo site.',
+        sem_plano: r.motivo === 'plano_do_cadastro_necessario' ? `Para ${quem}, a equipe precisa conferir o seu plano no cadastro antes de reservar um horário.` : `A clínica não marca ${quem} pelo site.`,
+        sem_horarios: `Não há horário livre no Klingo nas próximas 4 semanas para ${quem}.`,
+        indisponivel: 'Não conseguimos consultar o Klingo agora.', limite: 'O Klingo está recebendo muitas consultas agora.'
+      };
       if (!lista.length) {
-        mostrar('Nenhuma médica com horário', `${st.procNome}`, h('div', {}, h('div', { class: 'marc-aviso' }, `Nenhuma médica ${quem} esta consulta nas próximas 4 semanas, ou os horários estão dentro da regra de antecedência. Você pode deixar uma pré-marcação.`),
-          h('button', { class: 'marc-link', type: 'button', onclick: () => { st.semHorario = 'Nenhuma médica com horário livre para o seu convênio nas próximas semanas.'; salvar(); continuar(); } }, 'Fazer uma pré-marcação')), { botoes: [st.hist.length ? h('button', { class: 'marc-bt sec', type: 'button', onclick: voltar }, 'Voltar') : null] });
+        const m = MSG[r.estado] || (r.estado === 'com_horarios' ? 'Os horários livres estão dentro da regra de antecedência.' : 'Nenhum horário disponível.');
+        mostrar('Sem horário pelo site', st.procNome, h('div', {}, h('div', { class: 'marc-aviso' }, m + ' Você pode deixar uma pré-marcação.'),
+          r.estado === 'indisponivel' || r.estado === 'limite' ? h('button', { class: 'marc-bt sec', type: 'button', style: 'margin-bottom:8px', onclick: () => desenhar() }, 'Tentar de novo') : null,
+          h('button', { class: 'marc-bt', type: 'button', onclick: () => { st.semHorario = m; salvar(); continuar(); } }, 'Fazer pré-marcação')), { botoes: [st.hist.length ? h('button', { class: 'marc-bt sec', type: 'button', onclick: voltar }, 'Voltar') : null] });
         return;
       }
       const set = (id, nome) => { if (st.medico !== id) invalidarHorario(); st.medico = id; st.medicoNome = nome; salvar(); desenhar(); };
-      const total = lista.reduce((n, m) => n + m.horarios, 0);
-      mostrar('Qual médica?', `${lista.length} médica(s) ${quem} · ${total} horários nas próximas 4 semanas.`, h('div', { class: 'marc-lista', role: 'radiogroup' },
+      const total = lista.reduce((n, m) => n + m.horarios, 0), hh = r.consultadoEm ? new Date(r.consultadoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '';
+      mostrar('Qual médica?', `${lista.length} médica(s) com horário · ${total} horários reais no Klingo nas próximas 4 semanas${hh ? ' (consultado às ' + hh + ')' : ''}.`, h('div', { class: 'marc-lista', role: 'radiogroup' },
         opcao({ icone: '🔁', titulo: 'Tanto faz', detalhe: 'Mostrar os horários de todas', sel: st.medico === 'qualquer', onclick: () => set('qualquer', 'Tanto faz') }),
         ...lista.map((m) => opcao({ icone: '👩‍⚕️', titulo: m.nome, detalhe: m.horarios ? m.horarios + ' horários disponíveis' : 'Sem horário pelo site (só a equipe)', off: !m.horarios, sel: st.medico === m.id, onclick: () => set(m.id, m.nome) }))), { botoes: botoesPadrao(), foco: false });
     },
@@ -248,7 +256,7 @@
         horas.replaceChildren(...(d ? d.horarios.map((hr) => h('button', { class: 'marc-hora', type: 'button', role: 'radio', 'aria-checked': String(!!st.slot && st.slot.data === d.data && st.slot.hora === hr.hora && st.slot.profissional === hr.profissional), onclick: () => { st.slot = { data: d.data, hora: hr.hora, unidade: hr.unidade, profissional: hr.profissional, local: hr.local }; st.semHorario = ''; salvar(); pintar(); erro(''); } }, hr.hora, st.medico === 'qualquer' ? h('small', { style: 'display:block;font-weight:500;font-size:12px' }, hr.profissional.split(' ')[0]) : null)) : []));
       };
       pintar();
-      const regra0 = h('div', { class: 'marc-info' }, 'Horários da grade de atendimento de ' + (st.medico === 'qualquer' ? 'todas as médicas' : st.medicoNome) + '. A equipe confirma a disponibilidade final.');
+      const regra0 = h('div', { class: 'marc-info' }, '✔ Horários reais do Klingo de ' + (st.medico === 'qualquer' ? 'todas as médicas' : st.medicoNome) + (r.consultadoEm ? ', consultados às ' + new Date(r.consultadoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '') + '.');
       const regra = r.antecedenciaHoras ? h('div', { class: 'marc-info' }, `Marcações pelo site precisam de pelo menos ${r.antecedenciaHoras} horas de antecedência.`, r.bloqueadosPelaRegra ? ` Há ${r.bloqueadosPelaRegra} horário(s) mais próximos que só a equipe pode confirmar.` : '') : null;
       mostrar(semRegra ? 'Sem horários pelo site' : 'Escolha o dia e o horário', st.procNome + (st.slot ? '' : ''), h('div', {}, regra0, regra,
         semRegra ? h('div', { class: 'marc-aviso' }, 'Não há horários livres que respeitem a regra de antecedência. Você pode deixar uma pré-marcação.') : h('div', {}, contagem, filtros, dias, horas),
