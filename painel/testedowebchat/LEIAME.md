@@ -18,14 +18,13 @@ Tela inicial e identificação de quem será atendido (como antes) → **Começa
 | Resumo | Tudo com "Corrigir" em cada linha; diz se será **MARCAÇÃO** ou **PRÉ-MARCAÇÃO** |
 | Resultado | Selo verde "MARCAÇÃO confirmada" ou amarelo "PRÉ-MARCAÇÃO registrada", com protocolo |
 
-Barra de progresso, Voltar/Continuar sem perder dados (o estado fica guardado), **Acompanhar solicitações** (remarcar até 2 vezes, cancelar) e **Falar com atendente** em todas as telas. O botão "Previsão de marcação" foi retirado.
+Barra de progresso, Voltar/Continuar sem perder dados (o estado fica guardado), **Acompanhar solicitações** (remarcar até 2 vezes, cancelar) e (Botão "Falar com atendente" retirado a pedido do dono em 24/11/2026.) O botão "Previsão de marcação" foi retirado.
 
 ## Arquitetura (arquivos)
 - `index.html`: tela inicial/identificação (reaproveitada). O "Começar" chama `CSI_MARCACAO.abrir(...)` em vez de abrir a conversa.
 - `marcacao.js` / `marcacao.css`: interface das etapas, acompanhamento e atendimento humano (separados do chat antigo, que continua no arquivo mas não é usado neste ambiente).
 - `integracao-simulada.js`: **toda** a regra e os dados fictícios (catálogo, convênios, horários, regra de antecedência, ativação, política de cancelamento, solicitações). Sem rede. É o único ponto a trocar pela integração real; a tela não conhece regra de negócio.
   - `catalogo` ~ `chat_exames_buscar`/`chat_consultas` · `disponibilidade` ~ `chat_horarios`/`chat-agenda-api` · `marcar` ~ `chat_horario_escolher` + `klingo-executar` · `solicitacoes` ~ "Acompanhe seus pedidos".
-- Atendimento humano: a tela dispara o evento `csi:atendimento-humano` (com o resumo da marcação). Em produção, um ouvinte desse evento abre o atendimento atual da equipe.
 
 ## Segurança deste ambiente
 - Dados 100% fictícios, guardados só no navegador (`teste_*`); apagar em **⚙ Configurar teste > Apagar dados do teste**.
