@@ -17,6 +17,7 @@
   const dinheiro = (n) => 'R$ ' + Number(n).toFixed(2).replace('.', ',');
   const dataBonita = (d) => { const [y, m, dd] = d.split('-').map(Number); return new Date(y, m - 1, dd).toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' }); };
   const NAO_SEI = 'nao_sei';
+  const pl = (n, um, varios) => n + ' ' + (n === 1 ? um : (varios || um + 's'));   // plural correto: 1 médica, 2 médicas
 
   /* ---------- estado (nada se perde ao avançar, voltar ou corrigir) ---------- */
   const novo = (ident) => ({ ident, passo: 'pagto', hist: [], tipo: 'consulta', procId: '', procNome: '', procTipo: '', procAtivo: true, medico: '', medicoNome: '', preco: null, preparo: '', pagto: '', convId: '', convNome: '', plano: '', planoId: '', cart: { anexada: false, semAgora: false, foto: '' }, slot: null, semHorario: '', pre: { aceita: '', periodo: '', dias: [] }, regras: false, retorno: false, remarcando: '' });
@@ -27,11 +28,11 @@
   /* ---------- regras (a tela só pergunta; quem decide é aqui + a configuração da integração) ---------- */
   const motivoAntesDoHorario = (s) => {
     const c = S.config();
-    if (!s.procAtivo) return 'Este procedimento está temporariamente agendado apenas pela equipe.';
-    if (s.pagto === NAO_SEI) return 'Sem saber a forma de pagamento, não conseguimos reservar o horário na hora.';
+    if (!s.procAtivo) return 'Esta consulta é agendada apenas pela equipe.';
+    if (s.pagto === NAO_SEI) return 'Sem a forma de pagamento, não dá para reservar o horário agora.';
     if (s.pagto === 'convenio') {
-      if (s.convId === NAO_SEI) return 'Sem saber o convênio, a equipe precisa conferir o seu cadastro antes de confirmar.';
-      if (s.plano === NAO_SEI) return 'Sem saber o plano, a equipe precisa conferir a cobertura antes de confirmar.';
+      if (s.convId === NAO_SEI) return 'Sem o convênio, a equipe precisa conferir o seu cadastro antes de confirmar.';
+      if (s.plano === NAO_SEI) return 'Sem o plano, a equipe precisa conferir a cobertura antes de confirmar.';
       if (c.exigir_carteirinha && !s.cart.anexada) return 'Sem a foto da carteirinha, a equipe precisa conferir o convênio antes de confirmar.';
     }
     return '';
@@ -40,14 +41,14 @@
   // O que a equipe precisa confirmar (vira a lista da pré-marcação). Vazio = dá para marcar.
   const pendIds = (s) => {
     const l = [], c = S.config();
-    if (!s.procAtivo) l.push({ id: 'procedimento', rotulo: 'Consulta agendada apenas pela equipe' });
-    if (s.pagto === NAO_SEI) l.push({ id: 'pagamento', rotulo: 'Forma de pagamento (particular ou convênio)' });
+    if (!s.procAtivo) l.push({ id: 'procedimento', rotulo: 'Consulta agendada só pela equipe' });
+    if (s.pagto === NAO_SEI) l.push({ id: 'pagamento', rotulo: 'Forma de pagamento' });
     if (s.pagto === 'convenio') {
-      if (s.convId === NAO_SEI) l.push({ id: 'convenio', rotulo: 'Qual é o convênio' });
-      else if (s.plano === NAO_SEI) l.push({ id: 'plano', rotulo: 'Qual é o plano' });
+      if (s.convId === NAO_SEI) l.push({ id: 'convenio', rotulo: 'Convênio' });
+      else if (s.plano === NAO_SEI) l.push({ id: 'plano', rotulo: 'Plano do convênio' });
       else if (c.exigir_carteirinha && !s.cart.anexada) l.push({ id: 'carteirinha', rotulo: 'Foto da carteirinha' });
     }
-    if (l.length || s.semHorario) l.push({ id: 'medico_horario', rotulo: 'Escolher a médica e o horário' });
+    if ((l.length || s.semHorario) && !s.slot) l.push({ id: 'medico_horario', rotulo: 'Médico(a) e horário' });
     return l;
   };
   const pendencias = (s) => pendIds(s).map((x) => x.rotulo);
@@ -55,8 +56,9 @@
   const completo = {
     proc: (s) => !!s.procId, medico: (s) => !!s.medico, pagto: (s) => !!s.pagto, conv: (s) => !!s.convId, plano: (s) => !!s.plano,
     cart: (s) => s.cart.anexada || s.cart.semAgora, horario: (s) => !!s.slot || !!s.semHorario,
-    pre: (s) => !!s.pre.aceita, pre2: (s) => !!s.pre.aceita, prefer: (s) => !!s.pre.periodo, regras: (s) => s.regras, resumo: () => false
+    pre: (s) => !!s.pre.aceita, prefer: (s) => !!s.slot || !!s.pre.periodo, regras: (s) => s.regras, resumo: () => false
   };
+  completo.pre2 = completo.pre;
   const aplica = {
     proc: () => true, medico: () => true, pagto: () => true,   // médica: com pré-marcação vira "médica de interesse"
     conv: (s) => s.pagto === 'convenio',
@@ -69,7 +71,7 @@
     regras: () => true, resumo: () => true
   };
   const ORDEM = ['pagto', 'conv', 'plano', 'cart', 'pre', 'proc', 'medico', 'horario', 'pre2', 'prefer', 'regras', 'resumo'];
-  const NOMES = { proc: 'Consulta', medico: 'Médica', pagto: 'Pagamento', conv: 'Convênio', plano: 'Plano', cart: 'Carteirinha', horario: 'Horário', pre: 'Pré-marcação', pre2: 'Pré-marcação', prefer: 'Preferências', regras: 'Condições', resumo: 'Resumo' };
+  const NOMES = { proc: 'Consulta', medico: 'Médico(a)', pagto: 'Pagamento', conv: 'Convênio', plano: 'Plano', cart: 'Carteirinha', horario: 'Horário', pre: 'Pré-marcação', pre2: 'Pré-marcação', prefer: 'Preferências', regras: 'Condições', resumo: 'Resumo' };
   const aplicaveis = () => ORDEM.filter((p) => aplica[p](st));
 
   /* ---------- casca da tela ---------- */
@@ -100,7 +102,7 @@
     const sel = [];
     if (progresso && st) {
       const pg = st.pagto === 'particular' ? 'Particular' : st.pagto === 'convenio' ? (st.convId && st.convId !== NAO_SEI ? st.convNome : 'Convênio') : st.pagto === NAO_SEI ? 'Pagamento: não sei' : '';
-      [['pagto', pg], ['plano', st.plano && st.plano !== NAO_SEI ? 'Plano ' + st.plano : ''], ['proc', st.procNome], ['medico', st.medico ? st.medicoNome : '']].forEach(([passo, rot]) => { if (rot && passo !== st.passo && !(passo === 'pagto' && st.passo === 'conv')) sel.push(h('button', { class: 'marc-chip', type: 'button', style: 'min-height:34px;padding:0 12px;font-size:13.5px', title: 'Corrigir', onclick: () => { st.retorno = true; irPara(passo); } }, rot + ' ✎')); });
+      [['pagto', pg], ['plano', st.plano && st.plano !== NAO_SEI ? 'Plano ' + st.plano : ''], ['proc', st.procNome], ['medico', st.medico && st.medico !== 'qualquer' ? st.medicoNome : '']].forEach(([passo, rot]) => { if (rot && st.passo !== 'resumo' && st.passo !== 'regras' && passo !== st.passo && !(passo === 'pagto' && st.passo === 'conv')) sel.push(h('button', { class: 'marc-chip', type: 'button', style: 'min-height:34px;padding:0 12px;font-size:13.5px', title: 'Corrigir', onclick: () => { st.retorno = true; irPara(passo); } }, rot)); });
     }
     corpo.replaceChildren(...[sel.length ? h('div', { class: 'marc-chips', 'aria-label': 'Suas escolhas' }, ...sel) : null, h('h1', { tabindex: '-1', id: 'marcTitulo' }, titulo), sub ? h('p', { class: 'sub' }, sub) : null, conteudo, h('p', { class: 'marc-erro', id: 'marcErro', role: 'alert' })].filter(Boolean));
     rodape.replaceChildren(...(botoes || []).filter(Boolean));
@@ -109,7 +111,7 @@
   }
   const erro = (m) => { const e = document.getElementById('marcErro'); if (e) e.textContent = m || ''; };
   const opcao = ({ icone, titulo, detalhe, sel, selo, off, onclick }) => h('button', { class: 'marc-op', type: 'button', role: 'radio', 'aria-checked': String(!!sel), disabled: off, onclick },
-    icone ? h('span', { class: 'ic', 'aria-hidden': 'true' }, icone) : null, h('span', { class: 'tx' }, h('b', {}, titulo), detalhe ? h('small', {}, detalhe) : null, selo ? h('span', { class: 'marc-selo' }, selo) : null));
+    h('span', { class: 'tx' }, h('b', {}, titulo), detalhe ? h('small', {}, detalhe) : null, selo ? h('span', { class: 'marc-selo' }, selo) : null));
   const botoesPadrao = (opts = {}) => [
     st.hist.length ? h('button', { class: 'marc-bt sec', type: 'button', onclick: voltar, style: 'flex:0 0 34%' }, 'Voltar') : null,
     h('button', { class: 'marc-bt', type: 'button', id: 'marcContinuar', onclick: opts.onclick || continuar, disabled: opts.off }, opts.texto || 'Continuar')
@@ -131,15 +133,15 @@
   }
   function validar() {
     const p = st.passo;
-    if (p === 'proc' && !st.procId) return 'Escolha o procedimento.';
-    if (p === 'medico' && !st.medico && !st.semHorario) return 'Escolha a médica ou toque em "Tanto faz".';
+    if (p === 'proc' && !st.procId) return 'Escolha a consulta.';
+    if (p === 'medico' && !st.medico && !st.semHorario) return 'Escolha o(a) médico(a) ou toque em "Tanto faz".';
     if (p === 'pagto' && !st.pagto) return 'Escolha Particular ou Convênio.';
     if (p === 'conv' && !st.convId) return 'Escolha o convênio, ou toque em "Não sei".';
     if (p === 'plano' && !st.plano) return 'Escolha o plano, ou toque em "Não sei".';
     if (p === 'cart' && !completo.cart(st)) return 'Envie a foto da carteirinha ou toque em "Não tenho agora".';
     if (p === 'horario' && !completo.horario(st)) return 'Escolha um dia e um horário, ou toque em "Nenhum desses horários serve".';
     if ((p === 'pre' || p === 'pre2') && !st.pre.aceita) return 'Responda Sim ou Não.';
-    if (p === 'prefer' && !st.pre.periodo) return 'Escolha o melhor período para você.';
+    if (p === 'prefer' && !st.slot && !st.pre.periodo) return 'Escolha um horário disponível ou o melhor período.';
     if (p === 'regras' && !st.regras) return 'Marque que você leu as condições para continuar.';
     return '';
   }
@@ -152,8 +154,8 @@
       mostrar('Qual consulta?', 'Carregando…', h('div', { class: 'marc-lista' }, h('div', { class: 'marc-esq' }), h('div', { class: 'marc-esq' }), h('div', { class: 'marc-esq' })), { botoes: botoesPadrao({ off: true }) });
       ctx.catalogo = await S.catalogo();
       if (st.passo !== 'proc') return;
-      const filtrado = false, itens = ctx.catalogo.filter((p) => p.tipo === 'consulta').sort((a, b) => (b.naApi - a.naApi) || 0);
-      const busca = h('input', { class: 'marc-busca', type: 'search', placeholder: 'Buscar pelo nome', 'aria-label': 'Buscar procedimento', autocomplete: 'off' });
+      const itens = ctx.catalogo.filter((p) => p.tipo === 'consulta').sort((a, b) => (b.naApi - a.naApi) || 0);
+      const busca = h('input', { class: 'marc-busca', type: 'search', placeholder: 'Buscar pelo nome', 'aria-label': 'Buscar consulta', autocomplete: 'off' });
       const lista = h('div', { class: 'marc-lista', role: 'radiogroup' });
       const pintar = () => {
         const q = busca.value.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
@@ -164,66 +166,74 @@
         })) : [h('p', { class: 'sub' }, 'Nada encontrado. Tente outra palavra.')]));
       };
       busca.addEventListener('input', pintar); pintar();
-      mostrar('Qual consulta?', `Atendimento ${st.ident.tipo === 'filho' ? 'para ' + (st.ident.nomeCrianca || 'a criança') : 'para você'}. Toque na consulta que você precisa.`, h('div', {}, busca, lista), { botoes: botoesPadrao(), foco: false });
+      mostrar('Qual consulta?', `Atendimento ${st.ident.tipo === 'filho' ? 'para ' + (st.ident.nomeCrianca || 'a criança') : 'para você'}.`, h('div', {}, busca, lista), { botoes: botoesPadrao(), foco: false });
     },
     async medico() {
       if (motivoAntesDoHorario(st)) {   // pré-marcação: pergunta com qual médica o paciente tem interesse (sem horários)
-        mostrar('Tem interesse em alguma médica?', st.procNome, h('div', { class: 'marc-lista' }, h('div', { class: 'marc-esq' }), h('div', { class: 'marc-esq' })), { botoes: botoesPadrao({ off: true }), foco: false });
+        mostrar('Tem preferência por médico(a)?', st.procNome, h('div', { class: 'marc-lista' }, h('div', { class: 'marc-esq' }), h('div', { class: 'marc-esq' })), { botoes: botoesPadrao({ off: true }), foco: false });
         const ri = await S.medicos(st.procId, st.pagto === 'particular' || st.planoId ? pagador(st) : 'Particular');   // plano desconhecido: só para listar os nomes das médicas
         if (st.passo !== 'medico') return;
         const setI = (id, nome) => { st.medico = id; st.medicoNome = nome; salvar(); redesenhar(); };
-        if (!ri.lista.length) {   // sem nomes (ex.: consulta só da equipe): a equipe escolhe
+        if (!ri.lista.length) {   // sem nomes: consulta só da equipe OU a agenda não respondeu (são casos diferentes)
+          const falhou = ri.estado === 'indisponivel' || ri.estado === 'limite';
+          const aceitar = () => { st.medico = 'qualquer'; st.medicoNome = 'A equipe escolhe'; salvar(); continuar(); };
+          if (falhou) {
+            mostrar('Não conseguimos ver os médicos agora', st.procNome, h('div', {}, h('div', { class: 'marc-aviso' }, ri.estado === 'limite' ? 'A agenda está muito ocupada agora. Tente de novo em instantes.' : 'A agenda não respondeu agora.'),
+              h('button', { class: 'marc-bt sec', type: 'button', style: 'margin-bottom:8px', onclick: () => desenhar() }, 'Tentar de novo'),
+              h('button', { class: 'marc-link', type: 'button', onclick: aceitar }, 'Continuar sem escolher médico(a)')), { botoes: botoesPadrao({ off: true }), foco: false });
+            return;
+          }
           st.medico = st.medico || 'qualquer'; st.medicoNome = st.medicoNome || 'A equipe escolhe'; salvar();
-          mostrar('Médica de interesse', st.procNome, h('div', { class: 'marc-info' }, 'Esta consulta é agendada pela equipe, que escolhe a médica e o horário com você.'), { botoes: botoesPadrao(), foco: false });
+          mostrar('Médico(a) de interesse', st.procNome, h('div', { class: 'marc-info' }, 'Esta consulta é agendada pela equipe, que escolhe o(a) médico(a) e o horário com você.'), { botoes: botoesPadrao(), foco: false });
           return;
         }
-        mostrar('Tem interesse em alguma médica?', `${st.procNome}. É opcional: a equipe tenta atender o seu pedido.`, h('div', { class: 'marc-lista', role: 'radiogroup' },
+        mostrar('Tem preferência por médico(a)?', `${st.procNome}. Opcional: a equipe tenta atender o seu pedido.`, h('div', { class: 'marc-lista', role: 'radiogroup' },
           opcao({ icone: '🔁', titulo: 'Tanto faz', detalhe: 'A equipe escolhe', sel: st.medico === 'qualquer', onclick: () => setI('qualquer', 'Tanto faz') }),
           ...ri.lista.map((m) => opcao({ icone: '👩‍⚕️', titulo: m.nome, sel: st.medico === m.id, onclick: () => setI(m.id, m.nome) }))), { botoes: botoesPadrao(), foco: false });
         return;
       }
-      mostrar('Consultando o Klingo…', st.procNome, h('div', { 'aria-busy': 'true' }, h('p', { class: 'sub' }, 'Buscando os horários reais, só um instante.'), h('div', { class: 'marc-esq' }), h('div', { class: 'marc-esq' })), { botoes: botoesPadrao({ off: true }), foco: false });
+      mostrar('Buscando horários…', st.procNome, h('div', { 'aria-busy': 'true' }, h('p', { class: 'sub' }, 'Buscando os horários, só um instante.'), h('div', { class: 'marc-esq' }), h('div', { class: 'marc-esq' })), { botoes: botoesPadrao({ off: true }), foco: false });
       const r = await S.medicos(st.procId, pagador(st));
       if (st.passo !== 'medico') return;
       const lista = r.lista, quem = st.pagto === 'particular' ? 'Particular' : st.convNome;
       const MSG = {
-        fora_do_escopo: 'Esta consulta é agendada pela equipe: o Klingo não oferece horários para ela pelo site.',
-        sem_plano: r.motivo === 'plano_do_cadastro_necessario' ? `Para ${quem}, a equipe precisa conferir o seu plano no cadastro antes de reservar um horário.` : `A clínica não marca ${quem} pelo site.`,
-        sem_horarios: `Não há horário livre no Klingo nos próximos 45 dias para ${quem}.`,
-        indisponivel: 'Não conseguimos consultar o Klingo agora.', limite: 'O Klingo está recebendo muitas consultas agora.'
+        fora_do_escopo: 'Esta consulta é agendada apenas pela equipe.',
+        sem_plano: r.motivo === 'plano_do_cadastro_necessario' ? `Para ${quem}, a equipe precisa conferir o seu plano antes de reservar um horário.` : `Não marcamos ${quem} pelo site.`,
+        sem_horarios: `Não há horário livre nos próximos 45 dias para ${quem}.`,
+        indisponivel: 'Não conseguimos consultar a agenda agora.', limite: 'A agenda está muito ocupada agora. Tente de novo em instantes.'
       };
-      if (!lista.length) {
-        const m = MSG[r.estado] || (r.estado === 'com_horarios' ? 'Os horários livres estão dentro da regra de antecedência.' : 'Nenhum horário disponível.');
+      if (!lista.some((x) => x.horarios)) {   // nenhuma médica com horário livre pela regra de antecedência
+        const m = lista.length ? `Os horários livres estão a menos de ${S.config().antecedencia_horas} horas e só a equipe pode confirmar.` : (MSG[r.estado] || 'Nenhum horário disponível.');
         mostrar('Sem horário pelo site', st.procNome, h('div', {}, h('div', { class: 'marc-aviso' }, m + ' Você pode deixar uma pré-marcação.'),
           r.estado === 'indisponivel' || r.estado === 'limite' ? h('button', { class: 'marc-bt sec', type: 'button', style: 'margin-bottom:8px', onclick: () => desenhar() }, 'Tentar de novo') : null,
           h('button', { class: 'marc-bt', type: 'button', onclick: () => { st.semHorario = m; salvar(); continuar(); } }, 'Fazer pré-marcação')), { botoes: [st.hist.length ? h('button', { class: 'marc-bt sec', type: 'button', onclick: voltar }, 'Voltar') : null] });
         return;
       }
-      const set = (id, nome) => { if (st.medico !== id) invalidarHorario(); st.medico = id; st.medicoNome = nome; salvar(); desenhar(); };
+      const set = (id, nome) => { if (st.medico !== id || st.semHorario) invalidarHorario(); st.medico = id; st.medicoNome = nome; salvar(); desenhar(); };
       const total = lista.reduce((n, m) => n + m.horarios, 0), hh = r.consultadoEm ? new Date(r.consultadoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '';
-      mostrar('Qual médica?', `${lista.length} médica(s) com horário · ${total} horários reais no Klingo nos próximos 45 dias${hh ? ' (consultado às ' + hh + ')' : ''}.`, h('div', { class: 'marc-lista', role: 'radiogroup' },
-        opcao({ icone: '🔁', titulo: 'Tanto faz', detalhe: 'Mostrar os horários de todas', sel: st.medico === 'qualquer', onclick: () => set('qualquer', 'Tanto faz') }),
-        ...lista.map((m) => opcao({ icone: '👩‍⚕️', titulo: m.nome, detalhe: m.horarios ? m.horarios + ' horários disponíveis' : 'Sem horário pelo site (só a equipe)', off: !m.horarios, sel: st.medico === m.id, onclick: () => set(m.id, m.nome) }))), { botoes: botoesPadrao(), foco: false });
+      mostrar('Qual médico(a)?', `${pl(lista.filter((x) => x.horarios).length, 'profissional', 'profissionais')} com horário nos próximos 45 dias${hh ? ' · atualizado às ' + hh : ''}.`, h('div', { class: 'marc-lista', role: 'radiogroup' },
+        opcao({ icone: '🔁', titulo: 'Tanto faz', detalhe: 'Ver os horários de todos(as)', sel: st.medico === 'qualquer', onclick: () => set('qualquer', 'Tanto faz') }),
+        ...lista.map((m) => opcao({ icone: '👩‍⚕️', titulo: m.nome, detalhe: m.horarios ? pl(m.horarios, 'horário disponível', 'horários disponíveis') : 'Sem horário pelo site', off: !m.horarios, sel: st.medico === m.id, onclick: () => set(m.id, m.nome) }))), { botoes: botoesPadrao(), foco: false });
     },
     pagto() {
       const o = (v, ic, t, d) => opcao({ icone: ic, titulo: t, detalhe: d, sel: st.pagto === v, onclick: () => { st.pagto = v; if (v !== 'convenio') { st.convId = ''; st.convNome = ''; st.plano = ''; st.planoId = ''; st.cart = { anexada: false, semAgora: false, foto: '' }; } invalidarHorario(); st.medico = ''; st.medicoNome = ''; salvar(); redesenhar(); } });
       const part = st.pagto === 'particular' && st.preco != null ? h('div', { class: 'marc-info' }, `Valor particular de ${st.procNome}: `, h('b', {}, dinheiro(st.preco)), ' (valor fictício de teste).') : null;
-      mostrar('Como será o pagamento?', `Atendimento ${st.ident.tipo === 'filho' ? 'para ' + (st.ident.nomeCrianca || 'a criança') : 'para você'}. Isso define quais consultas, médicas e horários você vê.`, h('div', {}, h('div', { class: 'marc-lista', role: 'radiogroup' },
+      mostrar('Como será o pagamento?', `Atendimento ${st.ident.tipo === 'filho' ? 'para ' + (st.ident.nomeCrianca || 'a criança') : 'para você'}`, h('div', {}, h('div', { class: 'marc-lista', role: 'radiogroup' },
         o('particular', '💳', 'Particular', 'Pago direto à clínica'), o('convenio', '🏥', 'Convênio', 'Plano de saúde')), part), { botoes: botoesPadrao() });
     },
     async conv() {
-      if (!ctx.convenios) { mostrar('Qual é o seu convênio?', 'Escolha na lista.', h('div', { class: 'marc-lista' }, h('div', { class: 'marc-esq' }), h('div', { class: 'marc-esq' })), { botoes: botoesPadrao({ off: true }) }); ctx.convenios = await S.convenios(); }
+      if (!ctx.convenios) { mostrar('Qual é o seu convênio?', '', h('div', { class: 'marc-lista' }, h('div', { class: 'marc-esq' }), h('div', { class: 'marc-esq' })), { botoes: botoesPadrao({ off: true }) }); ctx.convenios = await S.convenios(); }
       if (st.passo !== 'conv') return;
       const set = (id, nome) => { if (st.convId !== id) { st.plano = ''; st.planoId = ''; st.cart = { anexada: false, semAgora: false, foto: '' }; invalidarHorario(); st.medico = ''; st.medicoNome = ''; } st.convId = id; st.convNome = nome; salvar(); if (id === NAO_SEI) continuar(); else redesenhar(); };   // "Não sei" já segue para a pré-marcação
-      mostrar('Qual é o seu convênio?', 'Escolha na lista.', h('div', { class: 'marc-lista', role: 'radiogroup' },
+      mostrar('Qual é o seu convênio?', '', h('div', { class: 'marc-lista', role: 'radiogroup' },
         ...ctx.convenios.map((c) => opcao({ icone: '🏥', titulo: c.nome, sel: st.convId === c.id, onclick: () => set(c.id, c.nome) })),
-        opcao({ icone: '❓', titulo: 'Não sei', detalhe: 'Faço uma pré-marcação e completo depois', sel: st.convId === NAO_SEI, onclick: () => set(NAO_SEI, 'Não sei') })), { botoes: botoesPadrao(), foco: false });
+        opcao({ icone: '❓', titulo: 'Não sei', detalhe: 'Deixe uma pré-marcação e complete depois', sel: st.convId === NAO_SEI, onclick: () => set(NAO_SEI, 'Não sei') })), { botoes: botoesPadrao(), foco: false });
     },
     async plano() {
       const nomeConv = st.convNome, op = st.convId;
       let refrescar = () => {};   // escolher um plano só repinta a lista: a tela não volta ao topo
-      const escolher = (valor, rotulo) => { if (st.planoId !== valor || st.plano !== rotulo) { invalidarHorario(); st.medico = ''; st.medicoNome = ''; st.cart = { anexada: false, semAgora: false, foto: '' }; } st.planoId = valor; st.plano = rotulo; salvar(); refrescar(); };
-      const naoSei = opcao({ icone: '❓', titulo: 'Não sei agora', detalhe: `Faço uma pré-marcação e completo em até ${S.config().prazo_pre_horas} horas`, sel: st.plano === NAO_SEI, onclick: () => { st.plano = NAO_SEI; st.planoId = ''; invalidarHorario(); st.medico = ''; st.medicoNome = ''; salvar(); continuar(); } });   // já segue para a pré-marcação
+      const escolher = (valor, rotulo) => { if (st.planoId !== valor || st.plano !== rotulo) { invalidarHorario(); st.medico = ''; st.medicoNome = ''; } /* a foto da carteirinha continua valendo */ st.planoId = valor; st.plano = rotulo; salvar(); refrescar(); };
+      const naoSei = opcao({ icone: '❓', titulo: 'Não sei agora', detalhe: `Deixe uma pré-marcação e complete em até ${S.config().prazo_pre_horas} horas`, sel: st.plano === NAO_SEI, onclick: () => { st.plano = NAO_SEI; st.planoId = ''; invalidarHorario(); st.medico = ''; st.medicoNome = ''; salvar(); continuar(); } });   // já segue para a pré-marcação
       mostrar('Qual é o seu plano?', `Convênio: ${nomeConv}. Carregando os planos…`, h('div', { class: 'marc-lista' }, h('div', { class: 'marc-esq' }), h('div', { class: 'marc-esq' })), { botoes: botoesPadrao({ off: true }), foco: false });
       const primeira = await S.planos(op, '');
       if (st.passo !== 'plano') return;
@@ -239,13 +249,13 @@
       let ultimo = null, ultimoTexto = '';
       const pintar = (r, texto) => {
         ultimo = r; ultimoTexto = texto;
-        nota.textContent = r.total > r.itens.length ? `Mostrando ${r.itens.length} de ${r.total} planos${texto ? ' para "' + texto + '"' : ''}. Digite mais letras para achar o seu.` : `${r.total} plano(s) do ${nomeConv}.`;
+        nota.textContent = r.total > r.itens.length ? `Mostrando ${r.itens.length} de ${r.total} planos${texto ? ' para "' + texto + '"' : ''}. Digite mais letras para achar o seu.` : `${pl(r.total, 'plano')} do ${nomeConv}.`;
         lista.replaceChildren(...(r.itens.length ? r.itens.map((p) => opcao({ icone: '📄', titulo: p.rotulo, sel: st.planoId === p.valor, onclick: () => escolher(p.valor, p.rotulo) })) : [h('p', { class: 'sub' }, 'Nenhum plano com esse nome. Tente outras letras ou toque em "Não sei".')]));
       };
       busca.addEventListener('input', () => { clearTimeout(tempo); const q = busca.value.trim(), n = ++seq; tempo = setTimeout(async () => { const r = await S.planos(op, q); if (n === seq && st.passo === 'plano') pintar(r, q); }, 300); });
       refrescar = () => pintar(ultimo, ultimoTexto);
       pintar(primeira, '');
-      mostrar('Qual é o seu plano?', `Convênio: ${nomeConv}. Procure o plano que está na carteirinha.`, h('div', {}, busca, nota, lista, h('div', { class: 'marc-lista', style: 'margin-top:10px' }, naoSei)), { botoes: botoesPadrao(), foco: false });
+      mostrar('Qual é o seu plano?', `Convênio: ${nomeConv}. O plano está na carteirinha.`, h('div', {}, busca, nota, lista, h('div', { class: 'marc-lista', style: 'margin-top:10px' }, naoSei)), { botoes: botoesPadrao(), foco: false });
     },
     cart() {
       const entrada = h('input', { type: 'file', accept: 'image/*', capture: 'environment', id: 'marcFoto', style: 'position:absolute;left:-9999px', 'aria-label': 'Foto da carteirinha' });
@@ -256,14 +266,14 @@
         rd.onload = () => {
           const im = new Image();
           im.onload = () => { const e = Math.min(1, 720 / Math.max(im.width, im.height)), c = document.createElement('canvas'); c.width = Math.round(im.width * e); c.height = Math.round(im.height * e); c.getContext('2d').drawImage(im, 0, 0, c.width, c.height); st.cart = { anexada: true, semAgora: false, foto: c.toDataURL('image/jpeg', .7) }; invalidarHorario(); salvar(); desenhar(); };
-          im.onerror = () => erro('Não consegui ler essa imagem. Tente outra foto.'); im.src = rd.result;
+          im.onerror = () => erro('Não foi possível ler essa imagem. Tente outra foto.'); im.src = rd.result;
         };
         rd.readAsDataURL(f);
       });
-      mostrar('Foto da carteirinha', 'Precisamos ver a frente da carteirinha do convênio. Em teste, use só uma imagem fictícia.', h('div', {},
-        prev, h('button', { class: 'marc-bt', type: 'button', onclick: () => entrada.click() }, st.cart.anexada ? '📷 Trocar a foto' : '📷 Tirar ou escolher foto'), entrada,
+      mostrar('Foto da carteirinha', 'Envie uma foto da frente da carteirinha do convênio.', h('div', {},
+        prev, h('button', { class: 'marc-bt', type: 'button', onclick: () => entrada.click() }, st.cart.anexada ? 'Trocar a foto' : 'Tirar ou escolher foto'), entrada,
         st.cart.anexada ? null : h('button', { class: 'marc-link', type: 'button', onclick: () => { st.cart.semAgora = true; salvar(); continuar(); } }, 'Não tenho agora'),
-        st.cart.semAgora && !st.cart.anexada ? h('div', { class: 'marc-aviso' }, 'Sem a foto, sua solicitação vira uma pré-marcação e a equipe confere o convênio com você.') : null), { botoes: botoesPadrao() });
+        st.cart.semAgora && !st.cart.anexada ? h('div', { class: 'marc-aviso' }, `Sem a foto, você faz uma pré-marcação e tem ${S.config().prazo_pre_horas} horas para enviá-la.`) : null), { botoes: botoesPadrao() });
     },
     async horario() {
       const carregando = () => mostrar('Escolha o dia e o horário', `${st.procNome}`, h('div', { 'aria-busy': 'true' }, h('p', { class: 'sub' }, 'Consultando horários disponíveis…'), h('div', { class: 'marc-esq' }), h('div', { class: 'marc-esq' })), { botoes: botoesPadrao({ off: true }), foco: false });
@@ -272,14 +282,21 @@
       try { r = await S.disponibilidade({ procId: st.procId, medico: st.medico, pagador: pagador(st) }); }
       catch {
         if (st.passo !== 'horario') return;
-        mostrar('Não conseguimos consultar os horários', 'O sistema de agenda não respondeu agora.', h('div', {},
-          h('div', { class: 'marc-aviso' }, 'Você pode tentar de novo ou deixar uma pré-marcação para a equipe confirmar com você.'),
+        mostrar('Não conseguimos consultar os horários', 'A agenda não respondeu agora.', h('div', {},
+          h('div', { class: 'marc-aviso' }, st.remarcando ? 'Você pode tentar de novo. Enquanto isso, o seu horário atual continua valendo.' : 'Você pode tentar de novo ou deixar uma pré-marcação para a equipe confirmar com você.'),
           h('button', { class: 'marc-bt sec', type: 'button', onclick: () => desenhar() }, 'Tentar de novo')),
-          { botoes: [st.hist.length ? h('button', { class: 'marc-bt sec', type: 'button', onclick: voltar, style: 'flex:0 0 34%' }, 'Voltar') : null, h('button', { class: 'marc-bt', type: 'button', onclick: () => { st.slot = null; st.semHorario = 'A agenda não respondeu no momento da consulta.'; salvar(); continuar(); } }, 'Fazer pré-marcação')] });
+          { botoes: [st.hist.length ? h('button', { class: 'marc-bt sec', type: 'button', onclick: voltar, style: 'flex:0 0 34%' }, 'Voltar') : null, st.remarcando ? h('button', { class: 'marc-bt', type: 'button', onclick: () => { limpar(); st = null; acompanhar(); } }, 'Manter o meu horário') : h('button', { class: 'marc-bt', type: 'button', onclick: () => { st.slot = null; st.semHorario = 'A agenda não respondeu.'; salvar(); continuar(); } }, 'Fazer pré-marcação')] });
         return;
       }
       if (st.passo !== 'horario') return;
       const semRegra = !r.dias.length;
+      let avisoDesejado = null;
+      if (st.slotDesejado) {
+        const sd = st.slotDesejado, dd0 = r.dias.find((x) => x.data === sd.data), ach = dd0 && dd0.horarios.find((x) => x.hora === sd.hora && x.profissional === sd.profissional);
+        if (ach) { st.slot = { data: sd.data, hora: sd.hora, unidade: ach.unidade, profissional: ach.profissional, local: ach.local }; avisoDesejado = h('div', { class: 'marc-info' }, 'O horário que você escolheu continua disponível. Confirme abaixo.'); }
+        else avisoDesejado = h('div', { class: 'marc-aviso' }, `O horário que você escolheu (${dataBonita(sd.data)}, ${sd.hora}) não está mais disponível. Escolha outro.`);
+        delete st.slotDesejado; salvar();
+      }
       const F = { per: '', dow: [] }, contagem = h('p', { class: 'sub', style: 'margin:0 0 8px', id: 'marcContagem' });
       const dowTxt = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'], dowTem = [...new Set(r.dias.map((d) => { const [y, m, dd] = d.data.split('-').map(Number); return new Date(y, m - 1, dd).getDay(); }))].sort();
       const filtradoDias = () => r.dias.map((d) => { const [y, m, dd] = d.data.split('-').map(Number), w = new Date(y, m - 1, dd).getDay(); if (F.dow.length && !F.dow.includes(w)) return null; const hs = d.horarios.filter((x) => !F.per || (F.per === 'manha' ? x.min < 720 : x.min >= 720)); return hs.length ? { data: d.data, horarios: hs } : null; }).filter(Boolean);
@@ -290,38 +307,60 @@
         const dv = filtradoDias(); if (!dv.some((x) => x.data === diaSel)) diaSel = dv[0] && dv[0].data;
         const chip = (rot, on, fn) => h('button', { class: 'marc-chip', type: 'button', role: 'checkbox', 'aria-checked': String(on), style: 'min-height:40px;padding:0 14px', onclick: fn }, rot);
         filtros.replaceChildren(h('div', { class: 'marc-chips' }, chip('Manhã', F.per === 'manha', () => { F.per = F.per === 'manha' ? '' : 'manha'; pintar(); }), chip('Tarde', F.per === 'tarde', () => { F.per = F.per === 'tarde' ? '' : 'tarde'; pintar(); }), ...dowTem.map((w) => chip(dowTxt[w], F.dow.includes(w), () => { F.dow = F.dow.includes(w) ? F.dow.filter((x) => x !== w) : F.dow.concat(w); pintar(); }))));
-        contagem.textContent = dv.length ? `${dv.reduce((n, x) => n + x.horarios.length, 0)} horário(s) em ${dv.length} dia(s) — toque nos filtros para reduzir.` : 'Nenhum horário com esses filtros. Toque de novo nos filtros para tirar.';
+        contagem.textContent = dv.length ? `${pl(dv.reduce((n, x) => n + x.horarios.length, 0), 'horário')} em ${pl(dv.length, 'dia')}. Use os filtros para reduzir.` : 'Nenhum horário com esses filtros. Toque num filtro para tirá-lo.';
         dias.replaceChildren(...dv.map((d) => { const [y, m, dd] = d.data.split('-').map(Number), dt = new Date(y, m - 1, dd); return h('button', { class: 'marc-dia', type: 'button', role: 'radio', 'aria-checked': String(d.data === diaSel), onclick: () => { diaSel = d.data; pintar(); } }, h('small', {}, dt.toLocaleDateString('pt-BR', { weekday: 'short' })), h('b', {}, dd), h('small', {}, dt.toLocaleDateString('pt-BR', { month: 'short' }))); }));
         const d = dv.find((x) => x.data === diaSel);
         horas.replaceChildren(...(d ? d.horarios.map((hr) => h('button', { class: 'marc-hora', type: 'button', role: 'radio', 'aria-checked': String(!!st.slot && st.slot.data === d.data && st.slot.hora === hr.hora && st.slot.profissional === hr.profissional), onclick: () => { st.slot = { data: d.data, hora: hr.hora, unidade: hr.unidade, profissional: hr.profissional, local: hr.local }; st.semHorario = ''; salvar(); pintar(); erro(''); } }, hr.hora, st.medico === 'qualquer' ? h('small', { style: 'display:block;font-weight:500;font-size:12px' }, hr.profissional.split(' ')[0]) : null)) : []));
       };
       pintar();
-      const regra0 = h('div', { class: 'marc-info' }, '✔ Horários reais do Klingo de ' + (st.medico === 'qualquer' ? 'todas as médicas' : st.medicoNome) + (r.consultadoEm ? ', consultados às ' + new Date(r.consultadoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '') + '.');
-      const regra = r.antecedenciaHoras ? h('div', { class: 'marc-info' }, `Marcações pelo site precisam de pelo menos ${r.antecedenciaHoras} horas de antecedência.`, r.bloqueadosPelaRegra ? ` Há ${r.bloqueadosPelaRegra} horário(s) mais próximos que só a equipe pode confirmar.` : '') : null;
-      mostrar(semRegra ? 'Sem horários pelo site' : 'Escolha o dia e o horário', st.procNome + (st.slot ? '' : ''), h('div', {}, regra0, regra,
-        semRegra ? h('div', { class: 'marc-aviso' }, 'Não há horários livres que respeitem a regra de antecedência. Você pode deixar uma pré-marcação.') : h('div', {}, contagem, filtros, dias, horas),
-        h('button', { class: 'marc-link', type: 'button', onclick: () => { st.slot = null; st.semHorario = semRegra ? 'Não há horários livres dentro da regra de antecedência.' : 'Nenhum dos horários oferecidos serviu.'; salvar(); continuar(); } }, semRegra ? 'Quero fazer uma pré-marcação' : 'Nenhum desses horários serve')),
+      const regra0 = h('div', { class: 'marc-info' }, 'Horários de ' + (st.medico === 'qualquer' ? 'todos(as)' : st.medicoNome) + (r.consultadoEm ? ' · atualizados às ' + new Date(r.consultadoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : ''));
+      const cortada = r.truncado ? h('div', { class: 'marc-aviso' }, 'Há muitos horários: mostramos só os mais próximos. Para outra data, fale com a equipe.') : null;
+      const regra = r.antecedenciaHoras ? h('div', { class: 'marc-aviso' }, `Pelo site, só marcamos com pelo menos ${r.antecedenciaHoras} horas de antecedência.`, r.bloqueadosPelaRegra ? ' Os horários mais próximos só a equipe pode confirmar.' : '') : null;
+      mostrar(semRegra ? 'Sem horários pelo site' : 'Escolha o dia e o horário', st.procNome + (st.slot ? '' : ''), h('div', {}, avisoDesejado, regra0, regra, cortada,
+        semRegra ? h('div', { class: 'marc-aviso' }, 'Não há horário livre com a antecedência mínima. Você pode deixar uma pré-marcação.') : h('div', {}, contagem, filtros, dias, horas),
+        st.remarcando
+          ? h('button', { class: 'marc-link', type: 'button', onclick: () => { limpar(); st = null; acompanhar(); } }, 'Manter o meu horário atual')
+          : h('button', { class: 'marc-link', type: 'button', onclick: () => { st.slot = null; st.semHorario = semRegra ? 'Não há horários livres dentro da regra de antecedência.' : 'Nenhum dos horários oferecidos serviu.'; salvar(); continuar(); } }, semRegra ? 'Quero fazer uma pré-marcação' : 'Nenhum desses horários serve')),
         { botoes: botoesPadrao({ off: semRegra }), foco: false });
     },
     pre() {
       const causas = pendIds(st).filter((x) => x.id !== 'medico_horario').map((x) => x.rotulo);
-      mostrar('Quer deixar uma pré-marcação?', 'Não foi possível concluir a marcação agora.', h('div', {},
+      mostrar('Quer deixar uma pré-marcação?', 'Ainda não dá para marcar o horário.', h('div', {},
         h('div', { class: 'marc-aviso' }, h('b', {}, 'A equipe precisa confirmar com você:'), h('ul', { class: 'marc-regras', style: 'margin:6px 0 0' }, ...(causas.length ? causas : [motivoPre(st)]).map((t) => h('li', {}, t)))),
-        h('div', { class: 'marc-info' }, '⏳ Você terá ', h('b', {}, S.config().prazo_pre_horas + ' horas'), ' para preencher o que faltar, em "Acompanhar". Depois disso o prazo vence.'),
-        h('p', { class: 'sub' }, 'Na pré-marcação, a equipe confere tudo e confirma com você. Ela ', h('b', {}, 'não garante'), ' o horário até a confirmação.'),
+        h('div', { class: 'marc-aviso' }, 'Você tem ', h('b', {}, S.config().prazo_pre_horas + ' horas'), ' para completar o que falta, em “Acompanhar”. Passado o prazo, a pré-marcação vence.'),
+        h('p', { class: 'marc-forte' }, 'A pré-marcação ', h('b', {}, 'não garante o horário'), '. Ele só vale depois que a equipe confirmar.'),
         h('div', { class: 'marc-lista', role: 'radiogroup' },
-          opcao({ icone: '✅', titulo: 'Sim, quero a pré-marcação', detalhe: 'Vou dizer a consulta, a médica e o horário que prefiro', sel: st.pre.aceita === 'sim', onclick: () => { st.pre.aceita = 'sim'; salvar(); redesenhar(); } }),
-          opcao({ icone: '✖️', titulo: 'Não, obrigado(a)', detalhe: 'Encerra e a equipe chama você no WhatsApp', sel: st.pre.aceita === 'nao', onclick: () => { st.pre.aceita = 'nao'; salvar(); redesenhar(); } }))),
+          opcao({ icone: '✅', titulo: 'Sim, quero a pré-marcação', detalhe: st.passo === 'pre2' ? 'Você diz o melhor horário ou período' : 'Você escolhe consulta, médico(a) e horário preferido', sel: st.pre.aceita === 'sim', onclick: () => { st.pre.aceita = 'sim'; salvar(); redesenhar(); } }),
+          opcao({ icone: '✖️', titulo: 'Não, obrigado(a)', detalhe: 'A equipe chama você no WhatsApp', sel: st.pre.aceita === 'nao', onclick: () => { st.pre.aceita = 'nao'; salvar(); redesenhar(); } }))),
         { botoes: botoesPadrao() });
     },
     pre2() { TELAS.pre(); },
-    prefer() {
-      const per = (v, t) => h('button', { class: 'marc-chip', type: 'button', role: 'radio', 'aria-checked': String(st.pre.periodo === v), onclick: () => { st.pre.periodo = v; salvar(); redesenhar(); } }, t);
+    async prefer() {
+      const quemTxt = `${st.procNome}${st.medico && st.medico !== 'qualquer' ? ' · ' + st.medicoNome : ''}`;
+      mostrar('Qual horário você prefere?', quemTxt, h('div', { 'aria-busy': 'true' }, h('p', { class: 'sub' }, 'Buscando os horários, só um instante.'), h('div', { class: 'marc-esq' }), h('div', { class: 'marc-esq' })), { botoes: botoesPadrao({ off: true }), foco: false });
+      const referencia = !(st.pagto === 'particular' || st.planoId);   // plano desconhecido: os horários são de referência (Particular); a equipe confere o convênio
+      let r = null;
+      if (S.CATALOGO.some((x) => x.id === st.procId)) { try { r = await S.disponibilidade({ procId: st.procId, medico: st.medico, pagador: referencia ? 'Particular' : pagador(st) }); } catch { r = null; } }
+      if (st.passo !== 'prefer') return;
+      const per = (v, t) => h('button', { class: 'marc-chip', type: 'button', role: 'radio', 'aria-checked': String(st.pre.periodo === v), onclick: () => { st.pre.periodo = st.pre.periodo === v ? '' : v; salvar(); redesenhar(); } }, t);
       const dia = (v, t) => h('button', { class: 'marc-chip', type: 'button', role: 'checkbox', 'aria-checked': String(st.pre.dias.includes(v)), onclick: () => { st.pre.dias = st.pre.dias.includes(v) ? st.pre.dias.filter((x) => x !== v) : st.pre.dias.concat(v); salvar(); redesenhar(); } }, t);
-      mostrar('Qual horário você prefere?', `${st.procNome}${st.medico && st.medico !== 'qualquer' ? ' · ' + st.medicoNome : ''}. A equipe tenta atender o que você pedir.`, h('div', {},
-        h('p', { class: 'sub', style: 'margin-bottom:4px' }, 'Melhor período'), h('div', { class: 'marc-chips', role: 'radiogroup' }, per('manha', 'Manhã'), per('tarde', 'Tarde'), per('qualquer', 'Tanto faz')),
-        h('p', { class: 'sub', style: 'margin-bottom:4px' }, 'Dias da semana (opcional)'), h('div', { class: 'marc-chips' }, ...[['seg', 'Seg'], ['ter', 'Ter'], ['qua', 'Qua'], ['qui', 'Qui'], ['sex', 'Sex'], ['sab', 'Sáb']].map(([v, t]) => dia(v, t)))),
-        { botoes: botoesPadrao() });
+      const blocoPeriodo = h('div', {}, h('p', { class: 'sub', style: 'margin:14px 0 4px' }, r && r.dias.length ? 'Ou, se preferir, diga só o melhor período' : 'Melhor período'), h('div', { class: 'marc-chips', role: 'radiogroup' }, per('manha', 'Manhã'), per('tarde', 'Tarde'), per('qualquer', 'Tanto faz')),
+        h('p', { class: 'sub', style: 'margin-bottom:4px' }, 'Dias da semana (opcional)'), h('div', { class: 'marc-chips' }, ...[['seg', 'Seg'], ['ter', 'Ter'], ['qua', 'Qua'], ['qui', 'Qui'], ['sex', 'Sex'], ['sab', 'Sáb']].map(([v, t]) => dia(v, t))));
+      let seletor = null;
+      if (r && r.dias.length) {
+        let diaSel = st.slot ? st.slot.data : r.dias[0].data;
+        const dias = h('div', { class: 'marc-dias', role: 'radiogroup', 'aria-label': 'Dias' }), horas = h('div', { class: 'marc-horas', role: 'radiogroup', 'aria-label': 'Horários' });
+        const pintar = () => {
+          dias.replaceChildren(...r.dias.map((d) => { const [y, m, dd] = d.data.split('-').map(Number), dt = new Date(y, m - 1, dd); return h('button', { class: 'marc-dia', type: 'button', role: 'radio', 'aria-checked': String(d.data === diaSel), onclick: () => { diaSel = d.data; pintar(); } }, h('small', {}, dt.toLocaleDateString('pt-BR', { weekday: 'short' })), h('b', {}, dd), h('small', {}, dt.toLocaleDateString('pt-BR', { month: 'short' }))); }));
+          const d = r.dias.find((x) => x.data === diaSel);
+          horas.replaceChildren(...(d ? d.horarios.map((hr) => h('button', { class: 'marc-hora', type: 'button', role: 'radio', 'aria-checked': String(!!st.slot && st.slot.data === d.data && st.slot.hora === hr.hora && st.slot.profissional === hr.profissional), onclick: () => { st.slot = st.slot && st.slot.data === d.data && st.slot.hora === hr.hora && st.slot.profissional === hr.profissional ? null : { data: d.data, hora: hr.hora, unidade: hr.unidade, profissional: hr.profissional, local: hr.local }; salvar(); pintar(); erro(''); } }, hr.hora, st.medico === 'qualquer' ? h('small', { style: 'display:block;font-weight:500;font-size:12px' }, hr.profissional.split(' ')[0]) : null)) : []));
+        };
+        pintar();
+        seletor = h('div', {}, h('div', { class: 'marc-aviso' }, 'O horário fica ', h('b', {}, `guardado por ${S.config().prazo_pre_horas} horas`), '. Volte em “Acompanhar” para confirmar. Se for ocupado, você escolhe outro.'),
+          referencia ? h('div', { class: 'marc-aviso' }, 'Horários de referência: a equipe confere o seu convênio e o plano antes de confirmar.') : null,
+          dias, horas);
+      }
+      mostrar('Qual horário você prefere?', quemTxt + (r && r.dias.length ? '' : '. Não há horário real para escolher agora; diga o melhor período.'), h('div', {}, seletor, blocoPeriodo), { botoes: botoesPadrao(), foco: false });
     },
     regras() {
       const chk = h('input', { type: 'checkbox', id: 'marcRegras', checked: st.regras });
@@ -335,26 +374,27 @@
       const pagtoTxt = st.pagto === 'particular' ? 'Particular' + (st.preco != null ? ' · ' + dinheiro(st.preco) : '') : st.pagto === 'convenio' ? `Convênio: ${st.convId === NAO_SEI ? 'não sei' : st.convNome}${st.convId !== NAO_SEI ? ' · plano: ' + (st.plano === NAO_SEI ? 'não sei' : st.plano) : ''}` : 'Não sei';
       const lin = (rot, val, passo) => h('tr', {}, h('td', {}, rot), h('td', {}, h('b', {}, val), passo ? h('button', { class: 'marc-link ed', type: 'button', style: 'min-height:0;padding:0', onclick: () => { st.retorno = true; irPara(passo); } }, 'Corrigir') : null));
       const quando = st.slot ? `${dataBonita(st.slot.data)}, ${st.slot.hora}` + (st.slot.local ? ` · ${st.slot.local}` : '') + (st.slot.unidade ? ` · ${st.slot.unidade}` : '') : pre ? `Pré-marcação · ${{ manha: 'manhã', tarde: 'tarde', qualquer: 'qualquer período' }[st.pre.periodo] || ''}${st.pre.dias.length ? ' · ' + st.pre.dias.join(', ') : ''}` : '';
-      mostrar('Confira antes de confirmar', pre ? 'Esta solicitação será uma PRÉ-MARCAÇÃO.' : 'Esta solicitação será uma MARCAÇÃO.', h('div', {},
+      mostrar('Confira os dados', null, h('div', {},
+        h('div', { class: 'marc-tipo ' + (pre ? 'pre' : 'ok') }, pre ? 'PRÉ-MARCAÇÃO · ainda não confirmada' : 'MARCAÇÃO'),
         h('div', { class: 'marc-card' }, h('table', { class: 'marc-res' }, h('tbody', {},
           lin('Paciente', id.tipo === 'filho' ? id.nomeCrianca : id.nome), id.tipo === 'filho' ? lin('Responsável', id.nome) : null, lin('Contato', id.telefone + ' · ' + id.email),
-          lin('Pagamento', pagtoTxt, 'pagto'), lin('Consulta', st.procNome, 'proc'), lin(pre ? 'Médica de interesse' : 'Médica(o)', st.slot ? st.slot.profissional : st.medicoNome, 'medico'),
+          lin('Pagamento', pagtoTxt, 'pagto'), lin('Consulta', st.procNome, 'proc'), lin(pre ? 'Médico(a) de interesse' : 'Médico(a)', st.slot ? st.slot.profissional : st.medicoNome, 'medico'),
           aplica.cart(st) ? lin('Carteirinha', st.cart.anexada ? 'Foto enviada' : 'Não enviada', 'cart') : null,
-          lin(pre ? 'Preferência' : 'Data e horário', quando, pre ? 'pre' : 'horario')))),
-        pre ? h('div', { class: 'marc-aviso' }, h('b', {}, 'A equipe vai confirmar: '), (pendencias(st).length ? pendencias(st) : [motivoPre(st)]).join('; ')) : h('div', { class: 'marc-info' }, 'Horário reservado assim que você confirmar.'),
-        h('div', { class: 'marc-info' }, '🔒 Ambiente de teste: nada é enviado ao Klingo e nenhum aviso real é disparado.')),
+          lin(pre ? (st.slot ? 'Horário desejado' : 'Preferência') : 'Data e horário', quando + (pre && st.slot ? ' (provisório)' : ''), pre ? (st.slot || st.pre.periodo ? 'prefer' : 'pre') : 'horario')))),
+        pre ? h('div', { class: 'marc-aviso' }, h('b', {}, 'A equipe vai confirmar: '), (pendencias(st).length ? pendencias(st) : [motivoPre(st)]).join('; ')) : null),
         { botoes: [h('button', { class: 'marc-bt sec', type: 'button', onclick: voltar, style: 'flex:0 0 34%' }, 'Voltar'), h('button', { class: 'marc-bt verde', type: 'button', id: 'marcConfirmar', onclick: confirmar }, pre ? 'Confirmar pré-marcação' : 'Confirmar marcação')] });
     }
   };
   function redesenhar() { const y = corpo ? corpo.scrollTop : 0; desenhar(); if (corpo) corpo.scrollTop = y; }   // para quem toca numa opção de lista longa: a tela não volta ao topo
-  function desenhar() { ajustarTopo(); btnVoltar.hidden = false; const f = TELAS[st.passo]; if (f) f(); else irPara('pagto', { empilhar: false }); }
+  function desenhar() { if (!st || !st.ident) { fechar(); return; } ajustarTopo(); btnVoltar.hidden = false; const f = TELAS[st.passo]; if (f) f(); else irPara('pagto', { empilhar: false }); }
 
   /* ---------- confirmação e resultado ---------- */
   async function confirmar() {
     const b = document.getElementById('marcConfirmar'); if (b) { b.disabled = true; b.textContent = 'Enviando…'; }
-    const pre = !!motivoPre(st), dados = { paciente: st.ident, procId: st.procId, procNome: st.procNome, pagto: st.pagto, convenio: st.convNome, plano: st.plano, carteirinha: st.cart.anexada, slot: st.slot, preferencia: pre ? st.pre : null, pendencias: pre ? pendencias(st) : [], pendIds: pre ? pendIds(st).map((x) => x.id) : [], estado: pre ? (() => { const e = JSON.parse(JSON.stringify(st)); delete e.hist; delete e.completando; delete e.remarcando; return e; })() : null };
+    const pre = !!motivoPre(st), dados = { paciente: st.ident, procId: st.procId, procNome: st.procNome, pagto: st.pagto, convenio: st.convNome, convId: st.convId, plano: st.plano, planoId: st.planoId, carteirinha: st.cart.anexada, fotoCart: st.cart.foto || '', slot: st.slot, preferencia: pre ? st.pre : null, pendencias: pre ? pendencias(st) : [], pendIds: pre ? pendIds(st).map((x) => x.id) : [], estado: pre ? (() => { const e = JSON.parse(JSON.stringify(st)); delete e.hist; delete e.completando; delete e.remarcando; e.cart.foto = ''; return e; /* a foto fica só em dados.fotoCart (não duplica) */ })() : null };
     try {
       if (st.remarcando) {
+        if (!st.slot || pre) { if (b) { b.disabled = false; b.textContent = 'Confirmar marcação'; } erro('Escolha um novo horário para remarcar, ou volte e mantenha o horário atual.'); return; }
         const s = S.solicitacaoAtualizar(st.remarcando, (x) => { x.dados.slot = st.slot; x.remarcacoes += 1; x.status = 'marcado'; });
         const proto = st.remarcando; limpar(); st = null; fimTela('ok', s || { protocolo: proto, dados }, true); return;
       }
@@ -365,29 +405,36 @@
       }
       const s = await S.marcar(dados, { preMarcacao: pre, motivo: pre ? motivoPre(st) : '' });
       limpar(); const id = st.ident; st = novo(id); fimTela(pre ? 'pre' : 'ok', s);
-    } catch { if (b) { b.disabled = false; b.textContent = 'Tentar de novo'; } erro('Não foi possível concluir agora. Tente de novo.'); }
+    } catch (e) { if (b) { b.disabled = false; b.textContent = 'Tentar de novo'; } erro(e && e.codigo === 'armazenamento' ? 'Não coube neste aparelho. Libere espaço (⚙ Configurar teste > Apagar dados do teste) e tente de novo.' : 'Não foi possível concluir agora. Tente de novo.'); }
   }
   // "Não" na pré-marcação: encerra e avisa a equipe para chamar no WhatsApp (SIMULADO: nenhum aviso real sai deste ambiente).
   function fim(tipo) {
     const id = st.ident, causas = pendIds(st).filter((x) => x.id !== 'medico_horario').map((x) => x.rotulo);
-    if (tipo === 'whats') { const sol = S.avisoWhatsapp({ paciente: id, motivo: motivoPre(st), pendencias: causas }); limpar(); st = novo(id); fimTela('whats', sol); return; }
+    if (tipo === 'whats') {
+      let sol;
+      try {
+        sol = st.completando ? S.solicitacaoAtualizar(st.completando, (x) => { x.status = 'aviso_equipe'; x.tipo = 'contato_whatsapp'; x.venceEm = null; x.dados.pendencias = causas; }) : null;   // completando: não cria um segundo registro
+        if (!sol) sol = S.avisoWhatsapp({ paciente: id, motivo: motivoPre(st), pendencias: causas });
+      } catch { erro('Não coube neste aparelho. Libere espaço (⚙ Configurar teste > Apagar dados do teste) e tente de novo.'); return; }
+      limpar(); st = novo(id); fimTela('whats', sol); return;
+    }
     limpar(); st = novo(id); fimTela('nao', null);
   }
   function fimTela(tipo, s, remarc, completou) {
     document.getElementById('marcProg').hidden = true;
     const info = {
       ok: ['✅', remarc ? 'Remarcado!' : completou === 'completada' ? 'Completado!' : 'Marcado!', completou === 'completada' ? 'Você completou a pré-marcação e agora ela é uma marcação.' : 'Seu horário está reservado.'],
-      pre: ['🕒', 'Pré-marcado', 'Ainda NÃO é uma marcação confirmada. A equipe vai conferir e falar com você.'],
+      pre: ['🕒', 'Pré-marcado', 'Ainda não é uma marcação confirmada. A equipe vai conferir e falar com você.'],
       nao: ['👍', 'Tudo bem, nada foi enviado', 'Você pode voltar quando quiser e fazer uma nova marcação.'],
       whats: ['💬', 'Vamos chamar você no WhatsApp', 'Tudo bem. Avisamos a equipe para entrar em contato com você pelo WhatsApp e ajudar a concluir o agendamento.']
     }[tipo];
     const d = s && s.dados;
     mostrar(info[1], null, h('div', {}, h('div', { class: 'marc-status ' + tipo }, h('div', { class: 'grande', 'aria-hidden': 'true' }, info[0]), h('h1', { tabindex: '-1', id: 'marcTitulo2', style: 'margin:8px 0 4px' }, tipo === 'pre' ? 'PRÉ-MARCAÇÃO registrada' : tipo === 'ok' ? 'MARCAÇÃO confirmada' : tipo === 'whats' ? 'Equipe avisada' : 'Sem solicitação'), h('p', { style: 'margin:0' }, info[2])),
-      s ? h('div', { class: 'marc-card' }, h('table', { class: 'marc-res' }, h('tbody', {}, h('tr', {}, h('td', {}, 'Protocolo'), h('td', {}, h('b', {}, s.protocolo))), tipo === 'whats' ? h('tr', {}, h('td', {}, 'WhatsApp'), h('td', {}, h('b', {}, d.paciente.telefone))) : h('tr', {}, h('td', {}, 'Consulta'), h('td', {}, h('b', {}, d.procNome))), d.slot && d.slot.profissional ? h('tr', {}, h('td', {}, 'Médica(o)'), h('td', {}, h('b', {}, d.slot.profissional))) : null,
+      s ? h('div', { class: 'marc-card' }, h('table', { class: 'marc-res' }, h('tbody', {}, h('tr', {}, h('td', {}, 'Protocolo'), h('td', {}, h('b', {}, s.protocolo))), tipo === 'whats' ? h('tr', {}, h('td', {}, 'WhatsApp'), h('td', {}, h('b', {}, d.paciente.telefone))) : h('tr', {}, h('td', {}, 'Consulta'), h('td', {}, h('b', {}, d.procNome))), d.slot && d.slot.profissional ? h('tr', {}, h('td', {}, 'Médico(a)'), h('td', {}, h('b', {}, d.slot.profissional))) : null,
+        tipo === 'pre' && d.slot ? h('tr', {}, h('td', {}, 'Horário desejado'), h('td', {}, h('b', {}, `${dataBonita(d.slot.data)}, ${d.slot.hora} (provisório)`))) : null,
         h('tr', {}, h('td', {}, tipo === 'ok' ? 'Data e horário' : 'Situação'), h('td', {}, h('b', {}, tipo === 'ok' && d.slot ? `${dataBonita(d.slot.data)}, ${d.slot.hora}` : tipo === 'whats' ? 'A equipe vai chamar você' : 'Aguardando confirmação da equipe'))))) ) : null,
       d && d.pendencias && d.pendencias.length ? h('div', { class: 'marc-aviso' }, h('b', {}, 'A equipe vai confirmar com você: '), d.pendencias.join('; ')) : null,
-      tipo === 'pre' && s && s.venceEm ? h('div', { class: 'marc-info' }, '⏳ Complete até ', h('b', {}, prazoTxt(s.venceEm)), ' em "Acompanhar".') : null,
-      h('div', { class: 'marc-info' }, '🔒 Ambiente de teste: nada foi enviado ao Klingo e nenhuma notificação real foi disparada' + (tipo === 'whats' ? ' (o aviso à equipe é simulado).' : '.')),
+      tipo === 'pre' && s && s.venceEm ? h('div', { class: 'marc-aviso' }, 'Complete até ', h('b', {}, prazoTxt(s.venceEm)), ' em “Acompanhar”.') : null,
       tipo !== 'nao' && tipo !== 'whats' ? h('div', { class: 'marc-card' }, h('b', {}, 'Cancelar ou remarcar'), h('ul', { class: 'marc-regras' }, ...S.config().politica.slice(0, 3).map((t) => h('li', {}, t)))) : null),
       { progresso: false, botoes: [h('button', { class: 'marc-bt', type: 'button', onclick: acompanhar }, 'Acompanhar')] });
     corpo.append(h('button', { class: 'marc-link', type: 'button', onclick: () => { const id = (st && st.ident) || ctx.ident; st = novo(id); salvar(); desenhar(); } }, 'Fazer outra marcação'));
@@ -400,14 +447,15 @@
   // Reabre a pré-marcação no primeiro item que falta, com tudo o que já foi preenchido.
   function completar(s) {
     if (!s.venceEm || Date.parse(s.venceEm) < Date.now() || !s.dados.estado) return;
-    st = JSON.parse(JSON.stringify(s.dados.estado)); st.hist = []; st.completando = s.protocolo; st.retorno = true; st.regras = false;
+    st = JSON.parse(JSON.stringify(s.dados.estado)); if (s.dados.fotoCart && st.cart) st.cart.foto = s.dados.fotoCart; st.hist = []; st.completando = s.protocolo; st.retorno = true; st.regras = false;
+    if (st.slot) { st.slotDesejado = st.slot; st.slot = null; }   // o horário escolhido na pré-marcação é conferido de novo ao completar (pode ter sido ocupado)
     const ids = s.dados.pendIds || [];
     if (ids.includes('pagamento')) { st.pagto = ''; st.convId = ''; st.convNome = ''; st.plano = ''; st.planoId = ''; }
     if (ids.includes('convenio')) { st.convId = ''; st.convNome = ''; st.plano = ''; st.planoId = ''; }
     if (ids.includes('plano')) { st.plano = ''; st.planoId = ''; }
     if (ids.includes('carteirinha')) st.cart.semAgora = false;
     if (ids.includes('medico_horario')) { st.semHorario = ''; st.slot = null; st.medico = ''; st.medicoNome = ''; }
-    st.pre = { aceita: '', periodo: '', dias: [] };
+    st.pre = Object.assign({ periodo: '', dias: [] }, st.pre, { aceita: '' });   // pergunta Sim/Não de novo, mas mantém período e dias já informados
     const alvos = ids.map((x) => ALVO[x]).filter(Boolean);
     st.passo = ORDEM.find((p) => alvos.includes(p) && aplica[p](st)) || ORDEM.find((p) => !completo[p](st) && aplica[p](st)) || 'resumo';
     salvar(); abrirCasca(); desenhar();
@@ -415,28 +463,36 @@
   const ROT = { marcado: ['Marcado', 'ok'], aguardando_equipe: ['Pré-marcado · aguardando equipe', 'pre'], confirmado_equipe: ['Confirmado pela equipe', 'ok'], recusado_equipe: ['Equipe não conseguiu confirmar', 'nao'], cancelado: ['Cancelado', 'cancel'], atendimento_humano: ['Enviado ao atendimento', 'nao'], aviso_equipe: ['Equipe avisada · vai chamar no WhatsApp', 'nao'] };
   function acompanhar() {
     montar(); abrirCasca();
-    const l = S.solicitacoes();
+    const tel = ctx.ident && ctx.ident.telefone, l = S.solicitacoes().filter((x) => !tel || !x.dados || !x.dados.paciente || x.dados.paciente.telefone === tel);   // aparelho compartilhado: só as do paciente identificado
     document.getElementById('marcProg').hidden = true;
-    mostrar('Suas solicitações', 'Acompanhe aqui o que você pediu neste aparelho.', h('div', {}, ...(l.length ? l.map((s) => {
+    mostrar('Suas solicitações', 'Suas marcações e pré-marcações neste aparelho.', h('div', {}, ...(l.length ? l.map((s) => {
       const r = ROT[s.status] || [s.status, 'nao'], d = s.dados || {}, pode = s.status === 'marcado' || s.status === 'confirmado_equipe';
-      const q = d.slot ? `${dataBonita(d.slot.data)}, ${d.slot.hora}` : s.status === 'aviso_equipe' ? 'A equipe vai chamar você no WhatsApp ' + (d.paciente && d.paciente.telefone || '') : d.mensagem ? 'Mensagem enviada' : 'Horário a confirmar pela equipe';
+      const q = d.slot ? (s.status === 'aguardando_equipe' ? 'Horário desejado (provisório): ' : '') + `${dataBonita(d.slot.data)}, ${d.slot.hora}` : s.status === 'aviso_equipe' ? 'A equipe vai chamar você no WhatsApp ' + (d.paciente && d.paciente.telefone || '') : d.mensagem ? 'Mensagem enviada' : 'Horário a confirmar pela equipe';
       const pend = s.status === 'aguardando_equipe', venceu = pend && s.venceEm && Date.parse(s.venceEm) < Date.now();
       return h('div', { class: 'marc-card' }, h('span', { class: 'marc-badge ' + r[1] }, r[0]), h('p', { style: 'margin:8px 0 2px' }, h('b', {}, d.procNome || (s.status === 'aviso_equipe' ? 'Contato por WhatsApp' : 'Atendimento humano'))), h('p', { class: 'sub', style: 'margin:0 0 4px' }, q), s.status === 'aguardando_equipe' && d.pendencias && d.pendencias.length ? h('p', { style: 'margin:4px 0;font-size:14px' }, h('b', {}, 'A confirmar: '), d.pendencias.join('; ')) : null, h('small', {}, 'Protocolo ' + s.protocolo + (s.remarcacoes ? ` · ${s.remarcacoes} remarcação(ões)` : '')),
-        pend && s.venceEm ? h('p', { style: 'margin:6px 0;font-size:14px;color:' + (venceu ? '#8c1d18' : '#6e4700') }, '⏳ ', venceu ? 'Prazo para completar encerrado (' + prazoTxt(s.venceEm) + ').' : 'Complete até ' + prazoTxt(s.venceEm) + ' (' + faltam(s.venceEm) + ').') : null,
+        pend && s.venceEm ? h('p', { style: 'margin:6px 0;font-size:14px;color:' + (venceu ? '#8c1d18' : '#6e4700') }, venceu ? 'Prazo para completar encerrado (' + prazoTxt(s.venceEm) + ').' : 'Complete até ' + prazoTxt(s.venceEm) + ' (' + faltam(s.venceEm) + ').') : null,
         h('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;margin-top:10px' },
           pend && !venceu && s.dados.estado ? h('button', { class: 'marc-bt', type: 'button', style: 'flex:1 1 100%;min-height:46px;font-size:16px', onclick: () => completar(s) }, 'Completar agora') : null,
           pode ? h('button', { class: 'marc-bt sec', type: 'button', style: 'flex:1 1 40%;min-height:44px;font-size:15px', disabled: s.remarcacoes >= 2, onclick: () => remarcar(s) }, s.remarcacoes >= 2 ? 'Limite de remarcações' : 'Remarcar') : null,
-          pode || s.status === 'aguardando_equipe' ? h('button', { class: 'marc-bt sec', type: 'button', style: 'flex:1 1 40%;min-height:44px;font-size:15px', onclick: () => { if (confirm('Cancelar esta solicitação? (teste)')) { S.solicitacaoAtualizar(s.protocolo, (x) => { x.status = 'cancelado'; }); acompanhar(); } } }, 'Cancelar') : null,
+          pode || s.status === 'aguardando_equipe' ? h('button', { class: 'marc-bt sec', type: 'button', style: 'flex:1 1 40%;min-height:44px;font-size:15px', onclick: () => { if (confirm('Cancelar esta solicitação?')) { S.solicitacaoAtualizar(s.protocolo, (x) => { x.status = 'cancelado'; }); acompanhar(); } } }, 'Cancelar') : null,
           pend && !venceu ? h('button', { class: 'marc-link', type: 'button', onclick: () => { S.solicitacaoAtualizar(s.protocolo, (x) => { x.venceEm = new Date(Date.now() - 1000).toISOString(); }); acompanhar(); } }, '[Teste] simular: o prazo venceu') : null,
           s.status === 'aguardando_equipe' ? h('button', { class: 'marc-link', type: 'button', onclick: () => { S.solicitacaoAtualizar(s.protocolo, (x) => { x.status = 'confirmado_equipe'; }); acompanhar(); } }, '[Teste] simular: equipe confirmou') : null,
           s.status === 'aguardando_equipe' ? h('button', { class: 'marc-link', type: 'button', onclick: () => { S.solicitacaoAtualizar(s.protocolo, (x) => { x.status = 'recusado_equipe'; }); acompanhar(); } }, '[Teste] simular: equipe não conseguiu') : null));
-    }) : [h('div', { class: 'marc-info' }, 'Nenhuma solicitação ainda. Faça uma marcação para ela aparecer aqui.')])),
-      { progresso: false, botoes: [h('button', { class: 'marc-bt', type: 'button', onclick: () => { if (!st) st = novo(ctx.ident); desenhar(); } }, 'Nova marcação')] });
+    }) : [h('div', { class: 'marc-info' }, 'Você ainda não tem solicitações. Faça uma marcação e ela aparece aqui.')])),
+      { progresso: false, botoes: [h('button', { class: 'marc-bt', type: 'button', onclick: () => { if (!ctx.ident) { fechar(); return; } if (!st) st = novo(ctx.ident); desenhar(); } }, ctx.ident ? 'Nova marcação' : 'Voltar e identificar-se')] });
   }
-  function remarcar(s) {
-    const proc = S.CATALOGO.find((p) => p.id === s.dados.procId); if (!proc) return;
-    st = novo(s.dados.paciente); Object.assign(st, { tipo: proc.tipo, procId: proc.id, procNome: proc.nome, procTipo: proc.tipo, preco: proc.preco, preparo: proc.preparo, pagto: s.dados.pagto, convNome: s.dados.convenio || '', convId: s.dados.convenio ? 'x' : '', plano: s.dados.plano || '', cart: { anexada: !!s.dados.carteirinha, semAgora: false, foto: '' }, remarcando: s.protocolo, passo: 'horario', regras: true, medico: 'qualquer', medicoNome: 'Tanto faz' });
-    desenhar();
+  async function remarcar(s) {
+    const d = s.dados || {}, proc = S.CATALOGO.find((p) => p.id === d.procId); if (!proc) return;
+    let convId = d.convId || '';
+    if (d.pagto === 'convenio' && !convId && d.convenio) {   // solicitações antigas não guardavam o id do convênio: procura pelo nome
+      try { const lista = await S.convenios(), nome = String(d.convenio).toLowerCase(), c = lista.find((x) => x.nome.toLowerCase() === nome); if (c) convId = c.id; } catch { /* ignora */ }
+    }
+    const semAgora = d.pagto === 'convenio' && (!convId || convId === NAO_SEI || !d.plano || d.plano === NAO_SEI);
+    if (semAgora) { alert('Para remarcar este pedido, fale com a equipe: faltam dados do convênio ou do plano.'); return; }
+    st = novo(d.paciente);
+    Object.assign(st, { tipo: proc.tipo, procId: proc.id, procNome: proc.nome, procTipo: proc.tipo, preco: proc.preco, preparo: proc.preparo, pagto: d.pagto, convNome: d.convenio || '', convId, plano: d.plano || '', planoId: d.planoId || '',
+      cart: { anexada: !!d.carteirinha || s.status === 'confirmado_equipe', semAgora: false, foto: '' }, remarcando: s.protocolo, passo: 'horario', regras: true, medico: 'qualquer', medicoNome: 'Tanto faz' });
+    ctx.ident = ctx.ident || d.paciente; abrirCasca(); desenhar();
   }
 
   /* ---------- configurações do teste (o que a diretoria quer ajustar) ---------- */
@@ -473,7 +529,7 @@
 
   /* ---------- tela inicial: botões novos e retirada do "Previsão de marcação" ---------- */
   let btnAcomp;
-  function atualizarEntrada() { if (btnAcomp) { const n = S.solicitacoes().length; btnAcomp.querySelector('small').textContent = n ? `${n} solicitação(ões) neste aparelho` : 'Veja marcações e pré-marcações'; } }
+  function atualizarEntrada() { if (btnAcomp) { const n = S.solicitacoes().length; btnAcomp.querySelector('small').textContent = n ? `${pl(n, 'solicitação', 'solicitações')} neste aparelho` : 'Veja marcações e pré-marcações'; } }
   function prepararEntrada() {
     const prev = document.getElementById('btnPrevisaoEntrada'); if (prev) prev.remove();
     const dica = document.getElementById('dicaPrevisaoEntrada'); if (dica) dica.remove();

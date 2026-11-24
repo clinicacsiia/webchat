@@ -102,3 +102,29 @@ Saíram "Você é da nossa família…" e a caixa "Entendi: se o chat não conse
   - **Sim** → pergunta a **consulta**, a **médica de interesse** (lista real do Klingo, ou "Tanto faz"), o **melhor período e os dias** → condições → resumo (que mostra consulta, médica de interesse e preferência).
 - **Listas não voltam ao topo** ao escolher uma opção (convênios e planos), para o paciente ver que a escolha foi registrada; o plano marcado fica destacado no lugar.
 - Ordem de etapas: pagamento → convênio → plano → carteirinha → **pré-marcação (Sim/Não)** → consulta → médica → (horário) → preferências → condições → resumo. Se o paciente sabia tudo mas não achou horário, a pergunta da pré-marcação vem depois da busca de horário.
+
+## Pré-marcação com horário desejado (24/11/2026, v20261124k)
+Na pré-marcação, depois da consulta e da médica de interesse, a tela **"Qual horário você prefere?"** mostra os **dias e horários reais do Klingo** (45 dias) para o que a pessoa escolheu. O horário escolhido fica **reservado provisoriamente**: o paciente tem 24 h (configurável) para voltar em **Acompanhar**, conferir e confirmar. Alternativa: dizer só o melhor período e os dias da semana.
+- Se o plano é desconhecido, os horários são **de referência** (de Particular) e a tela avisa que a equipe confere o convênio.
+- O horário aparece como **"Horário desejado (provisório)"** no resumo, no resultado e no cartão de Acompanhar.
+- Em **Completar agora** o horário é **conferido de novo no Klingo**: se continua livre, vem marcado ("continua disponível"); se foi ocupado, avisa e o paciente escolhe outro. A **reserva é simulada**: nada é reservado no Klingo de verdade.
+
+## Revisão dos textos (24/11/2026, v20261124l)
+- **Português revisado** em todas as telas do fluxo e da tela inicial (frases mais curtas e diretas; plural correto "1 plano / 2 planos"; sem "(s)"; "Não foi possível…", "Pelo site, só marcamos com…", etc.).
+- **Linguagem do paciente:** a palavra "Klingo" saiu das telas (vira "agenda"); "procedimento" virou "consulta"; "médica" virou **"médico(a)"** (há médicos homens na lista).
+- **Menos poluído:** saíram os ícones/emojis das opções, os avisos de teste repetidos (a faixa laranja do topo já avisa), os textos explicativos redundantes e as etiquetas de escolhas no resumo e nas condições.
+- **Avisos importantes maiores, em destaque** (caixa amarela, letra grande): o que a equipe precisa confirmar, o **prazo de 24 horas**, "a pré-marcação **não garante o horário**", a **antecedência mínima** de 24 h, o horário guardado por 24 h, o selo **PRÉ-MARCAÇÃO · ainda não confirmada** no resumo e as condições de cancelamento e remarcação. O resto ficou menor e discreto.
+
+## Revisão de lógica (24/11/2026, v20261124m) — só teste
+Corrigido depois de uma leitura completa do código:
+- **Remarcar:** guarda o id do convênio e do plano (antes virava convênio "x" e ficava sem horários); não deixa apagar o horário (novo link "Manter o meu horário atual"; sem novo horário não confirma); aceita pedidos antigos procurando o convênio pelo nome.
+- **"Acompanhar" antes de se identificar** não dá mais erro: o botão vira "Voltar e identificar-se". Com o paciente identificado, só aparecem as solicitações dele (aparelho compartilhado). Na produção isso virá do PIN/CPF.
+- **Armazenamento cheio** agora avisa em vez de fingir que gravou; a foto da carteirinha é guardada uma vez só (`dados.fotoCart`) e, se não couber, a solicitação é gravada sem a foto.
+- **Agenda fora do ar na pré-marcação** não diz mais "consulta agendada pela equipe": mostra "Tentar de novo" e "Continuar sem escolher médico(a)".
+- **Antecedência de 24 h** calculada no horário da Bahia (não depende do fuso do aparelho); o cache de 60 s também considera a regra configurada.
+- Lista de médicos conta só quem tem horário livre; se só há horários dentro das 24 h, avisa com a antecedência configurada. Escolher de novo o mesmo médico depois de "sem horário" volta a mostrar os horários. Texto da pré-marcação certo na `pre2`. A foto da carteirinha não some ao trocar de plano. Ao completar, período/dias já informados são mantidos; escolher "Não" ao completar atualiza a mesma solicitação (sem registro duplicado).
+- Retirados: espera artificial do catálogo/convênios, código sem uso (`filtrado`, `completo.pre2` duplicado).
+- Médico é identificado pelo `id` do Klingo quando a função o devolver (senão, pelo nome).
+- **Funções (código v1.1, AINDA NÃO publicadas):** `teste-agenda-klingo`: 403 do Klingo só vira "sem horário" se o texto falar de médico credenciado (senão é falha); limite de horários 600→1500 com aviso `truncado`; devolve `profissionalId`; "sem_plano" em cache; caches com teto. As duas: IP do cliente não forjável (`cf-connecting-ip`/último item do `x-forwarded-for`). A tela funciona com a versão antiga e a nova.
+- Conferido e **não é problema**: o campo `exato` dos planos pode ser ignorado, pois `klingo_plano_resolver` usa o plano escolhido quando é válido e cai no padrão quando não.
+- Ainda existem (sem risco): parâmetro `icone` não desenhado em `opcao()`, caminhos "Não sei" de pagamento sem uso, lista `consultasNaApi` duplicada do servidor. Limpar na migração para produção.

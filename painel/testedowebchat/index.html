@@ -7,7 +7,7 @@
 <meta name="theme-color" content="#b45309"><meta name="robots" content="noindex,nofollow">
 <meta name="description" content="CSI - Clínica de Saúde e Imagem. Peça seu agendamento e fale com a nossa equipe.">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="stylesheet" href="marcacao.css?v=20261124j">
+<link rel="stylesheet" href="marcacao.css?v=20261124m">
 <link rel="icon" href="img/logo-csi-simbolo.svg" type="image/svg+xml">
 <link rel="icon" href="icon-192.png" sizes="192x192">
 <link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180">
@@ -608,7 +608,7 @@
 </style>
 </head>
 <body>
-<div id="faixaTeste" style="position:sticky;top:0;z-index:99999;background:#b45309;color:#fff;font:600 12px/1.3 system-ui,sans-serif;padding:5px 8px;text-align:center">AMBIENTE DE TESTE · dados fictícios · v20261124j</div>
+<div id="faixaTeste" style="position:sticky;top:0;z-index:99999;background:#b45309;color:#fff;font:600 12px/1.3 system-ui,sans-serif;padding:5px 8px;text-align:center">AMBIENTE DE TESTE · dados fictícios · v20261124m</div>
 
 <div id="porta" hidden role="status" aria-live="polite"><img src="img/logo-csi-simbolo.svg" alt="" width="89" height="30"><p class="porta-bv" id="portaBv">Abrindo com segurança…</p><p id="portaSub" hidden>Abrindo o chat…</p></div>
 <script>try { if (localStorage.getItem('teste_csi_porta_v1') === '1') { document.getElementById('porta').hidden = false;
@@ -662,7 +662,7 @@
   <!-- Tela 1: dados iniciais -->
   <section class="inicio" id="telaInicio" hidden>
     <div class="saudacao"><h1 id="tituloInicio">Vamos agendar?</h1><span class="acoes-saudacao" id="acoesSaudacao" hidden></span></div>
-    <p class="sub" id="boasVindasForm">Responda rapidinho, é só tocar nas opções.</p>
+    <p class="sub" id="boasVindasForm">Preencha os dados de quem será atendido(a).</p>
     <div class="conta-faixa" id="faixaConta" hidden>
       <span class="txt" id="faixaContaTxt"></span>
       <span class="acoes">
@@ -689,7 +689,7 @@
         <label for="fFilho">Nome completo da criança</label>
         <input type="text" id="fFilho" autocomplete="off" maxlength="120">
         <div id="listaIrmaos"></div>
-        <button type="button" class="link-add" id="btnAddIrmao">+ Tenho outro filho(a) para agendar</button>
+        <button type="button" class="link-add" id="btnAddIrmao">+ Agendar para outro filho(a)</button>
         <div id="blocoModoIrmaos" hidden>
           <p class="dica-campo" id="lModoIrmaos">Como você prefere agendar?</p>
           <div class="unidades dois" id="fModoIrmaos" role="radiogroup" aria-labelledby="lModoIrmaos"></div>
@@ -697,7 +697,7 @@
       </div>
       <div id="blocoContato">
         <div class="campo">
-          <label for="fTel">Telefone com DDD (de preferência o WhatsApp)</label>
+          <label for="fTel">Telefone com DDD (de preferência WhatsApp)</label>
           <input type="tel" id="fTel" inputmode="tel" autocomplete="tel-national" placeholder="(71) 99999-9999" maxlength="16" required>
         </div>
         <div class="campo">
@@ -706,7 +706,7 @@
         </div>
         <label class="aceite">
           <input type="checkbox" id="fAceite">
-          <span id="aceiteTxt">Concordo que a clínica guarde meu nome, telefone, e-mail e a conversa para me atender e entrar em contato. Li a <a href="privacidade.html" target="_blank" rel="noopener">Política de Privacidade</a> e os <a href="termos.html" target="_blank" rel="noopener">Termos</a>.</span>
+          <span id="aceiteTxt">Concordo que a clínica guarde meu nome, telefone e e-mail para me atender e entrar em contato. Li a <a href="privacidade.html" target="_blank" rel="noopener">Política de Privacidade</a> e os <a href="termos.html" target="_blank" rel="noopener">Termos</a>.</span>
         </label>
       </div>
       <p class="erro-form" id="erroForm" role="alert"></p>
@@ -720,7 +720,7 @@
       <p>Tel: <a href="tel:+557131817666">(71) 3181-7666</a> | WhatsApp: <a href="https://wa.me/5571999803806" target="_blank" rel="noopener">(71) 99980-3806</a></p>
       <p>Seg a Sex: 7h às 18h30 | Sáb: 8h às 12h</p>
       <p>Resp. Técnico: Dr. João Rafael Santos Carneiro | CRM 24778 - CBR</p>
-      <p>CNPJ: a informar | <a href="privacidade.html">Política de Privacidade</a> | <a href="termos.html">Termos de Serviço</a></p>
+      <p><a href="privacidade.html">Política de Privacidade</a> | <a href="termos.html">Termos de Serviço</a></p>
     </details>
   </section>
 
@@ -766,9 +766,9 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="sentinela.js"></script>
 <script src="nomes-exame.js"></script>
-<script src="agenda-real.js?v=20261124j"></script>
-<script src="integracao-simulada.js?v=20261124j"></script>
-<script src="marcacao.js?v=20261124j"></script>
+<script src="agenda-real.js?v=20261124m"></script>
+<script src="integracao-simulada.js?v=20261124m"></script>
+<script src="marcacao.js?v=20261124m"></script>
 <script>
 (() => {
   'use strict';
@@ -1050,8 +1050,8 @@
   function textoAceite(filho) {
     const links = [' Li a ', h('a', { href: 'privacidade.html', target: '_blank', rel: 'noopener' }, 'Política de Privacidade'), ' e os ', h('a', { href: 'termos.html', target: '_blank', rel: 'noopener' }, 'Termos'), '.'];
     return [filho
-      ? 'Sou o pai, a mãe ou o responsável legal da criança e concordo que a clínica guarde os dados dela e os meus (nome, telefone, e-mail e a conversa) para atendê-la e entrar em contato.'
-      : 'Concordo que a clínica guarde meu nome, telefone, e-mail e a conversa para me atender e entrar em contato.', ...links];
+      ? 'Sou o pai, a mãe ou o responsável legal da criança e concordo que a clínica guarde os dados dela e os meus (nome, telefone e e-mail) para atendê-la e entrar em contato.'
+      : 'Concordo que a clínica guarde meu nome, telefone e e-mail para me atender e entrar em contato.', ...links];
   }
   // Acesso rápido: as pessoas vêm do cadastro (Eu, cada filho, Todos os filhos). Usa o que o chat já tem: filho + irmãos "juntos" ou "um de cada vez".
   let acessoSel = null;   // 'eu' | id do filho | 'filhos'
@@ -1096,7 +1096,7 @@
       return h('div', { class: 'irmao-linha' }, inp, x);
     }));
     el.btnAddIrmao.hidden = !filho || irmaosForm.length >= MAX_IRMAOS;
-    el.btnAddIrmao.textContent = irmaosForm.length ? '+ Mais um filho(a)' : '+ Tenho outro filho(a) para agendar';
+    el.btnAddIrmao.textContent = irmaosForm.length ? '+ Mais um filho(a)' : '+ Agendar para outro filho(a)';
     el.blocoModoIrmaos.hidden = !filho || !irmaosForm.length;
     if (filho && irmaosForm.length) {
       const total = irmaosForm.length + 1;
@@ -3872,7 +3872,7 @@
         fecharFolha(); toast('Você entrou na sua conta.');
       }) }, e.campo, s.campo, s.mostrar, cap.el, erro, btn, rodape(['Esqueci a senha', 'esqueci'], ['Criar conta', 'criar'])));
     } else if (modo === 'criar') {
-      const n = campoTxt('cNome', 'Seu nome', { type: 'text', autocomplete: 'name', maxlength: 120 }), t = campoTxt('cTel', 'Telefone com DDD (de preferência o WhatsApp)', { type: 'tel', inputmode: 'tel', autocomplete: 'tel-national', placeholder: '(71) 99999-9999', maxlength: 16 });
+      const n = campoTxt('cNome', 'Seu nome', { type: 'text', autocomplete: 'name', maxlength: 120 }), t = campoTxt('cTel', 'Telefone com DDD (de preferência WhatsApp)', { type: 'tel', inputmode: 'tel', autocomplete: 'tel-national', placeholder: '(71) 99999-9999', maxlength: 16 });
       t.inp.addEventListener('input', () => { t.inp.value = mascaraTel(t.inp.value); });
       const e = campoTxt('cEmail', 'E-mail', { type: 'email', autocomplete: 'email', value: emailAtual }), s = campoSenha('cSenha', 'Crie uma senha', 'new-password');
       const aceite = h('input', { type: 'checkbox', id: 'cAceite' });

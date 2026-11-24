@@ -35,8 +35,10 @@ body.marc-aberta { overflow: hidden; }
 .marc-bt.verde { background: #1f7a3d; border-color: #1f7a3d; }
 .marc-erro { color: var(--erro, #b3261e); font-weight: 600; margin: 12px 0 0; min-height: 1.2em; }
 .marc-card { background: #fff; border: 1.5px solid var(--csi-border-strong, #cfd6df); border-radius: 14px; padding: 14px; margin-bottom: 12px; }
-.marc-aviso { background: #fff7e0; border: 1.5px dashed #c9a24a; border-radius: 12px; padding: 12px 14px; margin: 0 0 14px; font-size: 15px; }
-.marc-info { background: var(--csi-primary-soft, #e6f4fb); border-radius: 12px; padding: 12px 14px; margin: 0 0 14px; font-size: 15px; }
+.marc-aviso { background: #fff4d6; border: 2px solid #e0b43c; border-radius: 14px; padding: 14px 16px; margin: 0 0 14px; font-size: 17.5px; line-height: 1.45; font-weight: 650; color: #4a3300; }
+.marc-aviso li { font-weight: 600; }
+.marc-aviso b { font-weight: 800; }
+.marc-info { margin: 0 0 12px; font-size: 13.5px; line-height: 1.4; color: var(--csi-text-secondary, #5a6878); }
 .marc-dias { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 8px; scroll-snap-type: x proximity; }
 .marc-dia { flex: none; scroll-snap-align: start; min-width: 78px; text-align: center; background: #fff; border: 2px solid var(--csi-border-strong, #cfd6df); border-radius: 12px; padding: 8px 6px; font: inherit; cursor: pointer; min-height: 64px; }
 .marc-dia b { display: block; font-size: 20px; }
@@ -84,3 +86,14 @@ body.marc-aberta { overflow: hidden; }
 /* telas largas: topo, progresso e rodapé alinhados com o conteúdo */
 .marc-topo, .marc-prog, .marc-rodape { padding-left: max(16px, calc((100% - 640px) / 2)); padding-right: max(16px, calc((100% - 640px) / 2)); }
 .marc-rodape > * { max-width: none; }
+
+/* hierarquia dos textos: o importante é grande e destacado; o resto é pequeno e discreto */
+.marc-forte { margin: 0 0 14px; font-size: 17.5px; line-height: 1.45; color: var(--csi-text-main, #333); }
+.marc-forte b { color: #8c1d18; }
+.marc-corpo .sub { font-size: 14.5px; margin-bottom: 14px; }
+.marc-regras li { font-size: 17px; line-height: 1.45; }
+.marc-status p { font-size: 17px; line-height: 1.4; }
+.marc-tipo { display: block; text-align: center; font-size: 17px; font-weight: 800; letter-spacing: .02em; padding: 12px 14px; border-radius: 14px; margin: 0 0 14px; }
+.marc-tipo.ok { background: #e7f6ec; color: #17602f; border: 2px solid #1f7a3d; }
+.marc-tipo.pre { background: #fff4d6; color: #6e4700; border: 2px solid #e0b43c; }
+.marc-op .tx small { font-size: 13px; }
