@@ -93,3 +93,12 @@ Saíram "Você é da nossa família…" e a caixa "Entendi: se o chat não conse
 - **"Fazer pré-marcação" travava** ("Escolha a médica…"): a validação da etapa da médica não aceitava a decisão de ir para a pré-marcação; e a etapa de horário ainda aparecia depois. Corrigido: decidiu pela pré-marcação, pula médica/horário e vai direto à pré-marcação.
 - **Pré-natal e neuropediatra mostravam "sem horário"**: o Klingo marca **todos** os horários de uma especialidade com um só código (pediatria = 1132, inclusive pré-natal; neurologia = 1096, inclusive neuropediatra). O teste descartava o que não fosse o código exato da consulta. Agora não descarta (o chat real também não). Consequência: para **pré-natal** aparecem as 9–10 médicas de pediatria da API, não só as 7 que a grade `catalogo_agenda` associa ao pré-natal; a clínica deve confirmar se todas atendem pré-natal.
 - A função `teste-agenda-klingo` v2 devolve também `procedimentos` (quantos horários a API mandou por código) e aceita `semFiltro` (sem dado de paciente).
+
+## Ajustes do fluxo de pré-marcação (24/11/2026, v20261124j)
+- **Pagamento** só tem **Particular** e **Convênio** (saiu o "Não sei").
+- **"Não sei" no convênio ou no plano avança sozinho** (sem apertar Continuar) para a pergunta **"Quer deixar uma pré-marcação?"**, que agora vem **antes** de escolher a consulta.
+  - Essa tela mostra **só a causa** (ex.: "Qual é o plano") e o aviso de que há 24 h para preencher o que faltar; não fala de médica nem de horário, que ainda não foram perguntados.
+  - **Não** → encerra e **avisa a equipe para chamar no WhatsApp** do paciente (tela "Equipe avisada" + cartão em "Acompanhar"; **simulado**, nenhum aviso real sai).
+  - **Sim** → pergunta a **consulta**, a **médica de interesse** (lista real do Klingo, ou "Tanto faz"), o **melhor período e os dias** → condições → resumo (que mostra consulta, médica de interesse e preferência).
+- **Listas não voltam ao topo** ao escolher uma opção (convênios e planos), para o paciente ver que a escolha foi registrada; o plano marcado fica destacado no lugar.
+- Ordem de etapas: pagamento → convênio → plano → carteirinha → **pré-marcação (Sim/Não)** → consulta → médica → (horário) → preferências → condições → resumo. Se o paciente sabia tudo mas não achou horário, a pergunta da pré-marcação vem depois da busca de horário.

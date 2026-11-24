@@ -133,6 +133,12 @@
     const l = solicitacoes(); l.unshift(s); solicitacoesSalvar(l);
     return s;
   }
+  // "Não quero a pré-marcação": encerra e registra o aviso à equipe para chamar no WhatsApp. SIMULADO: nada é enviado a ninguém.
+  function avisoWhatsapp(dados) {
+    const sol = { protocolo: 'ZAP-TESTE-' + Math.floor(Math.random() * 9000 + 1000), criadoEm: new Date().toISOString(), status: 'aviso_equipe', tipo: 'contato_whatsapp', remarcacoes: 0, dados };
+    const l = solicitacoes(); l.unshift(sol); solicitacoesSalvar(l);
+    return sol;
+  }
   function solicitacaoAtualizar(proto, mudar) {
     const l = solicitacoes(); const s = l.find((x) => x.protocolo === proto);
     if (s) { mudar(s); solicitacoesSalvar(l); }
@@ -140,5 +146,5 @@
   }
   const solicitacoesApagarTudo = () => { try { localStorage.removeItem(K_SOL); } catch { /* ignora */ } };
 
-  window.CSI_SIM = { catalogo, convenios, planos, medicos, disponibilidade, marcar, config, configSalvar, configRestaurar, solicitacoes, solicitacaoAtualizar, solicitacoesApagarTudo, CATALOGO, iso };
+  window.CSI_SIM = { catalogo, convenios, planos, medicos, disponibilidade, marcar, avisoWhatsapp, config, configSalvar, configRestaurar, solicitacoes, solicitacaoAtualizar, solicitacoesApagarTudo, CATALOGO, iso };
 })();

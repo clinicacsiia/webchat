@@ -55,18 +55,21 @@
   const completo = {
     proc: (s) => !!s.procId, medico: (s) => !!s.medico, pagto: (s) => !!s.pagto, conv: (s) => !!s.convId, plano: (s) => !!s.plano,
     cart: (s) => s.cart.anexada || s.cart.semAgora, horario: (s) => !!s.slot || !!s.semHorario,
-    pre: (s) => s.pre.aceita === 'nao' || (s.pre.aceita === 'sim' && !!s.pre.periodo), regras: (s) => s.regras, resumo: () => false
+    pre: (s) => !!s.pre.aceita, pre2: (s) => !!s.pre.aceita, prefer: (s) => !!s.pre.periodo, regras: (s) => s.regras, resumo: () => false
   };
   const aplica = {
-    proc: () => true, medico: (s) => !motivoAntesDoHorario(s), pagto: () => true,
+    proc: () => true, medico: () => true, pagto: () => true,   // médica: com pré-marcação vira "médica de interesse"
     conv: (s) => s.pagto === 'convenio',
     plano: (s) => s.pagto === 'convenio' && s.convId && s.convId !== NAO_SEI,
     cart: (s) => s.pagto === 'convenio' && s.convId !== NAO_SEI && s.plano !== NAO_SEI && S.config().exigir_carteirinha,
     horario: (s) => !motivoAntesDoHorario(s) && (!s.semHorario || s.passo === 'horario'),   // já decidiu pela pré-marcação (sem médica/horário): pula a etapa
-    pre: (s) => !!motivoPre(s), regras: () => true, resumo: () => true
+    pre: (s) => !!motivoAntesDoHorario(s),                                  // não sabe plano/convênio: confirma a pré-marcação ANTES de escolher consulta
+    pre2: (s) => !motivoAntesDoHorario(s) && !!s.semHorario,                // sabia tudo, mas não achou horário
+    prefer: (s) => !!motivoPre(s) && s.pre.aceita === 'sim',                // médica já foi perguntada; falta o período/dias desejados
+    regras: () => true, resumo: () => true
   };
-  const ORDEM = ['pagto', 'conv', 'plano', 'cart', 'proc', 'medico', 'horario', 'pre', 'regras', 'resumo'];
-  const NOMES = { proc: 'Consulta', medico: 'Médica', pagto: 'Pagamento', conv: 'Convênio', plano: 'Plano', cart: 'Carteirinha', horario: 'Horário', pre: 'Pré-marcação', regras: 'Condições', resumo: 'Resumo' };
+  const ORDEM = ['pagto', 'conv', 'plano', 'cart', 'pre', 'proc', 'medico', 'horario', 'pre2', 'prefer', 'regras', 'resumo'];
+  const NOMES = { proc: 'Consulta', medico: 'Médica', pagto: 'Pagamento', conv: 'Convênio', plano: 'Plano', cart: 'Carteirinha', horario: 'Horário', pre: 'Pré-marcação', pre2: 'Pré-marcação', prefer: 'Preferências', regras: 'Condições', resumo: 'Resumo' };
   const aplicaveis = () => ORDEM.filter((p) => aplica[p](st));
 
   /* ---------- casca da tela ---------- */
@@ -120,7 +123,7 @@
   }
   function continuar() {
     const m = validar(); if (m) { erro(m); return; }
-    if (st.passo === 'pre' && st.pre.aceita === 'nao') { fim('nao'); return; }
+    if ((st.passo === 'pre' || st.passo === 'pre2') && st.pre.aceita === 'nao') { fim('whats'); return; }
     const lista = aplicaveis(), i = lista.indexOf(st.passo);
     let prox = lista[i + 1];
     if (st.retorno) { prox = lista.slice(i + 1).find((p) => p !== 'resumo' && !completo[p](st)) || 'resumo'; if (prox === 'resumo') st.retorno = false; }
@@ -130,13 +133,13 @@
     const p = st.passo;
     if (p === 'proc' && !st.procId) return 'Escolha o procedimento.';
     if (p === 'medico' && !st.medico && !st.semHorario) return 'Escolha a médica ou toque em "Tanto faz".';
-    if (p === 'pagto' && !st.pagto) return 'Escolha como vai pagar, ou toque em "Não sei".';
+    if (p === 'pagto' && !st.pagto) return 'Escolha Particular ou Convênio.';
     if (p === 'conv' && !st.convId) return 'Escolha o convênio, ou toque em "Não sei".';
     if (p === 'plano' && !st.plano) return 'Escolha o plano, ou toque em "Não sei".';
     if (p === 'cart' && !completo.cart(st)) return 'Envie a foto da carteirinha ou toque em "Não tenho agora".';
     if (p === 'horario' && !completo.horario(st)) return 'Escolha um dia e um horário, ou toque em "Nenhum desses horários serve".';
-    if (p === 'pre' && !st.pre.aceita) return 'Responda Sim ou Não.';
-    if (p === 'pre' && st.pre.aceita === 'sim' && !st.pre.periodo) return 'Escolha o melhor período para você.';
+    if ((p === 'pre' || p === 'pre2') && !st.pre.aceita) return 'Responda Sim ou Não.';
+    if (p === 'prefer' && !st.pre.periodo) return 'Escolha o melhor período para você.';
     if (p === 'regras' && !st.regras) return 'Marque que você leu as condições para continuar.';
     return '';
   }
@@ -164,6 +167,21 @@
       mostrar('Qual consulta?', `Atendimento ${st.ident.tipo === 'filho' ? 'para ' + (st.ident.nomeCrianca || 'a criança') : 'para você'}. Toque na consulta que você precisa.`, h('div', {}, busca, lista), { botoes: botoesPadrao(), foco: false });
     },
     async medico() {
+      if (motivoAntesDoHorario(st)) {   // pré-marcação: pergunta com qual médica o paciente tem interesse (sem horários)
+        mostrar('Tem interesse em alguma médica?', st.procNome, h('div', { class: 'marc-lista' }, h('div', { class: 'marc-esq' }), h('div', { class: 'marc-esq' })), { botoes: botoesPadrao({ off: true }), foco: false });
+        const ri = await S.medicos(st.procId, st.pagto === 'particular' || st.planoId ? pagador(st) : 'Particular');   // plano desconhecido: só para listar os nomes das médicas
+        if (st.passo !== 'medico') return;
+        const setI = (id, nome) => { st.medico = id; st.medicoNome = nome; salvar(); redesenhar(); };
+        if (!ri.lista.length) {   // sem nomes (ex.: consulta só da equipe): a equipe escolhe
+          st.medico = st.medico || 'qualquer'; st.medicoNome = st.medicoNome || 'A equipe escolhe'; salvar();
+          mostrar('Médica de interesse', st.procNome, h('div', { class: 'marc-info' }, 'Esta consulta é agendada pela equipe, que escolhe a médica e o horário com você.'), { botoes: botoesPadrao(), foco: false });
+          return;
+        }
+        mostrar('Tem interesse em alguma médica?', `${st.procNome}. É opcional: a equipe tenta atender o seu pedido.`, h('div', { class: 'marc-lista', role: 'radiogroup' },
+          opcao({ icone: '🔁', titulo: 'Tanto faz', detalhe: 'A equipe escolhe', sel: st.medico === 'qualquer', onclick: () => setI('qualquer', 'Tanto faz') }),
+          ...ri.lista.map((m) => opcao({ icone: '👩‍⚕️', titulo: m.nome, sel: st.medico === m.id, onclick: () => setI(m.id, m.nome) }))), { botoes: botoesPadrao(), foco: false });
+        return;
+      }
       mostrar('Consultando o Klingo…', st.procNome, h('div', { 'aria-busy': 'true' }, h('p', { class: 'sub' }, 'Buscando os horários reais, só um instante.'), h('div', { class: 'marc-esq' }), h('div', { class: 'marc-esq' })), { botoes: botoesPadrao({ off: true }), foco: false });
       const r = await S.medicos(st.procId, pagador(st));
       if (st.passo !== 'medico') return;
@@ -188,24 +206,24 @@
         ...lista.map((m) => opcao({ icone: '👩‍⚕️', titulo: m.nome, detalhe: m.horarios ? m.horarios + ' horários disponíveis' : 'Sem horário pelo site (só a equipe)', off: !m.horarios, sel: st.medico === m.id, onclick: () => set(m.id, m.nome) }))), { botoes: botoesPadrao(), foco: false });
     },
     pagto() {
-      const o = (v, ic, t, d) => opcao({ icone: ic, titulo: t, detalhe: d, sel: st.pagto === v, onclick: () => { st.pagto = v; if (v !== 'convenio') { st.convId = ''; st.convNome = ''; st.plano = ''; st.planoId = ''; st.cart = { anexada: false, semAgora: false, foto: '' }; } invalidarHorario(); st.medico = ''; st.medicoNome = ''; salvar(); desenhar(); } });
+      const o = (v, ic, t, d) => opcao({ icone: ic, titulo: t, detalhe: d, sel: st.pagto === v, onclick: () => { st.pagto = v; if (v !== 'convenio') { st.convId = ''; st.convNome = ''; st.plano = ''; st.planoId = ''; st.cart = { anexada: false, semAgora: false, foto: '' }; } invalidarHorario(); st.medico = ''; st.medicoNome = ''; salvar(); redesenhar(); } });
       const part = st.pagto === 'particular' && st.preco != null ? h('div', { class: 'marc-info' }, `Valor particular de ${st.procNome}: `, h('b', {}, dinheiro(st.preco)), ' (valor fictício de teste).') : null;
       mostrar('Como será o pagamento?', `Atendimento ${st.ident.tipo === 'filho' ? 'para ' + (st.ident.nomeCrianca || 'a criança') : 'para você'}. Isso define quais consultas, médicas e horários você vê.`, h('div', {}, h('div', { class: 'marc-lista', role: 'radiogroup' },
-        o('particular', '💳', 'Particular', 'Pago direto à clínica'), o('convenio', '🏥', 'Convênio', 'Plano de saúde'), o(NAO_SEI, '❓', 'Não sei', 'A equipe ajuda a conferir')), part), { botoes: botoesPadrao() });
+        o('particular', '💳', 'Particular', 'Pago direto à clínica'), o('convenio', '🏥', 'Convênio', 'Plano de saúde')), part), { botoes: botoesPadrao() });
     },
     async conv() {
-      mostrar('Qual é o seu convênio?', 'Escolha na lista.', h('div', { class: 'marc-lista' }, h('div', { class: 'marc-esq' }), h('div', { class: 'marc-esq' })), { botoes: botoesPadrao({ off: true }) });
-      if (!ctx.convenios) ctx.convenios = await S.convenios();
+      if (!ctx.convenios) { mostrar('Qual é o seu convênio?', 'Escolha na lista.', h('div', { class: 'marc-lista' }, h('div', { class: 'marc-esq' }), h('div', { class: 'marc-esq' })), { botoes: botoesPadrao({ off: true }) }); ctx.convenios = await S.convenios(); }
       if (st.passo !== 'conv') return;
-      const set = (id, nome) => { if (st.convId !== id) { st.plano = ''; st.planoId = ''; st.cart = { anexada: false, semAgora: false, foto: '' }; invalidarHorario(); st.medico = ''; st.medicoNome = ''; } st.convId = id; st.convNome = nome; salvar(); desenhar(); };
+      const set = (id, nome) => { if (st.convId !== id) { st.plano = ''; st.planoId = ''; st.cart = { anexada: false, semAgora: false, foto: '' }; invalidarHorario(); st.medico = ''; st.medicoNome = ''; } st.convId = id; st.convNome = nome; salvar(); if (id === NAO_SEI) continuar(); else redesenhar(); };   // "Não sei" já segue para a pré-marcação
       mostrar('Qual é o seu convênio?', 'Escolha na lista.', h('div', { class: 'marc-lista', role: 'radiogroup' },
         ...ctx.convenios.map((c) => opcao({ icone: '🏥', titulo: c.nome, sel: st.convId === c.id, onclick: () => set(c.id, c.nome) })),
-        opcao({ icone: '❓', titulo: 'Não sei', detalhe: 'A equipe confere para você', sel: st.convId === NAO_SEI, onclick: () => set(NAO_SEI, 'Não sei') })), { botoes: botoesPadrao(), foco: false });
+        opcao({ icone: '❓', titulo: 'Não sei', detalhe: 'Faço uma pré-marcação e completo depois', sel: st.convId === NAO_SEI, onclick: () => set(NAO_SEI, 'Não sei') })), { botoes: botoesPadrao(), foco: false });
     },
     async plano() {
       const nomeConv = st.convNome, op = st.convId;
-      const escolher = (valor, rotulo) => { if (st.planoId !== valor || st.plano !== rotulo) { invalidarHorario(); st.medico = ''; st.medicoNome = ''; st.cart = { anexada: false, semAgora: false, foto: '' }; } st.planoId = valor; st.plano = rotulo; salvar(); desenhar(); };
-      const naoSei = opcao({ icone: '❓', titulo: 'Não sei agora', detalhe: `Faço uma pré-marcação e completo em até ${S.config().prazo_pre_horas} horas`, sel: st.plano === NAO_SEI, onclick: () => { st.plano = st.plano === NAO_SEI ? '' : NAO_SEI; st.planoId = ''; invalidarHorario(); st.medico = ''; salvar(); desenhar(); } });
+      let refrescar = () => {};   // escolher um plano só repinta a lista: a tela não volta ao topo
+      const escolher = (valor, rotulo) => { if (st.planoId !== valor || st.plano !== rotulo) { invalidarHorario(); st.medico = ''; st.medicoNome = ''; st.cart = { anexada: false, semAgora: false, foto: '' }; } st.planoId = valor; st.plano = rotulo; salvar(); refrescar(); };
+      const naoSei = opcao({ icone: '❓', titulo: 'Não sei agora', detalhe: `Faço uma pré-marcação e completo em até ${S.config().prazo_pre_horas} horas`, sel: st.plano === NAO_SEI, onclick: () => { st.plano = NAO_SEI; st.planoId = ''; invalidarHorario(); st.medico = ''; st.medicoNome = ''; salvar(); continuar(); } });   // já segue para a pré-marcação
       mostrar('Qual é o seu plano?', `Convênio: ${nomeConv}. Carregando os planos…`, h('div', { class: 'marc-lista' }, h('div', { class: 'marc-esq' }), h('div', { class: 'marc-esq' })), { botoes: botoesPadrao({ off: true }), foco: false });
       const primeira = await S.planos(op, '');
       if (st.passo !== 'plano') return;
@@ -218,11 +236,14 @@
       const busca = h('input', { class: 'marc-busca', type: 'search', id: 'marcPlanoBusca', placeholder: 'Buscar o plano pelo nome', 'aria-label': 'Buscar plano', autocomplete: 'off' });
       const lista = h('div', { class: 'marc-lista', role: 'radiogroup' }), nota = h('p', { class: 'sub', style: 'margin:0 0 8px' });
       let tempo = null, seq = 0;
+      let ultimo = null, ultimoTexto = '';
       const pintar = (r, texto) => {
+        ultimo = r; ultimoTexto = texto;
         nota.textContent = r.total > r.itens.length ? `Mostrando ${r.itens.length} de ${r.total} planos${texto ? ' para "' + texto + '"' : ''}. Digite mais letras para achar o seu.` : `${r.total} plano(s) do ${nomeConv}.`;
         lista.replaceChildren(...(r.itens.length ? r.itens.map((p) => opcao({ icone: '📄', titulo: p.rotulo, sel: st.planoId === p.valor, onclick: () => escolher(p.valor, p.rotulo) })) : [h('p', { class: 'sub' }, 'Nenhum plano com esse nome. Tente outras letras ou toque em "Não sei".')]));
       };
       busca.addEventListener('input', () => { clearTimeout(tempo); const q = busca.value.trim(), n = ++seq; tempo = setTimeout(async () => { const r = await S.planos(op, q); if (n === seq && st.passo === 'plano') pintar(r, q); }, 300); });
+      refrescar = () => pintar(ultimo, ultimoTexto);
       pintar(primeira, '');
       mostrar('Qual é o seu plano?', `Convênio: ${nomeConv}. Procure o plano que está na carteirinha.`, h('div', {}, busca, nota, lista, h('div', { class: 'marc-lista', style: 'margin-top:10px' }, naoSei)), { botoes: botoesPadrao(), foco: false });
     },
@@ -283,17 +304,23 @@
         { botoes: botoesPadrao({ off: semRegra }), foco: false });
     },
     pre() {
-      const sim = st.pre.aceita === 'sim', per = (v, t) => h('button', { class: 'marc-chip', type: 'button', role: 'radio', 'aria-checked': String(st.pre.periodo === v), onclick: () => { st.pre.periodo = v; salvar(); desenhar(); } }, t);
-      const dia = (v, t) => h('button', { class: 'marc-chip', type: 'button', role: 'checkbox', 'aria-checked': String(st.pre.dias.includes(v)), onclick: () => { st.pre.dias = st.pre.dias.includes(v) ? st.pre.dias.filter((x) => x !== v) : st.pre.dias.concat(v); salvar(); desenhar(); } }, t);
+      const causas = pendIds(st).filter((x) => x.id !== 'medico_horario').map((x) => x.rotulo);
       mostrar('Quer deixar uma pré-marcação?', 'Não foi possível concluir a marcação agora.', h('div', {},
-        h('div', { class: 'marc-aviso' }, h('b', {}, 'A equipe precisa confirmar com você:'), h('ul', { class: 'marc-regras', style: 'margin:6px 0 0' }, ...(pendencias(st).length ? pendencias(st) : [motivoPre(st)]).map((t) => h('li', {}, t)))),
-        h('div', { class: 'marc-info' }, '⏳ Você tem ', h('b', {}, S.config().prazo_pre_horas + ' horas'), ' para completar o que falta, em "Acompanhar" (plano, foto da carteirinha, médica e horário). Depois disso o prazo vence.'),
-        h('p', { class: 'sub' }, 'Na pré-marcação, a equipe confere tudo e confirma com você. Ela ',  h('b', {}, 'não garante'), ' o horário até a confirmação.'),
+        h('div', { class: 'marc-aviso' }, h('b', {}, 'A equipe precisa confirmar com você:'), h('ul', { class: 'marc-regras', style: 'margin:6px 0 0' }, ...(causas.length ? causas : [motivoPre(st)]).map((t) => h('li', {}, t)))),
+        h('div', { class: 'marc-info' }, '⏳ Você terá ', h('b', {}, S.config().prazo_pre_horas + ' horas'), ' para preencher o que faltar, em "Acompanhar". Depois disso o prazo vence.'),
+        h('p', { class: 'sub' }, 'Na pré-marcação, a equipe confere tudo e confirma com você. Ela ', h('b', {}, 'não garante'), ' o horário até a confirmação.'),
         h('div', { class: 'marc-lista', role: 'radiogroup' },
-          opcao({ icone: '✅', titulo: 'Sim, quero a pré-marcação', sel: sim, onclick: () => { st.pre.aceita = 'sim'; salvar(); desenhar(); } }),
-          opcao({ icone: '✖️', titulo: 'Não, obrigado(a)', sel: st.pre.aceita === 'nao', onclick: () => { st.pre.aceita = 'nao'; salvar(); desenhar(); } })),
-        sim ? h('div', { style: 'margin-top:16px' }, h('p', { class: 'sub', style: 'margin-bottom:4px' }, 'Qual o melhor período?'), h('div', { class: 'marc-chips', role: 'radiogroup' }, per('manha', 'Manhã'), per('tarde', 'Tarde'), per('qualquer', 'Tanto faz')),
-          h('p', { class: 'sub', style: 'margin-bottom:4px' }, 'Dias da semana (opcional)'), h('div', { class: 'marc-chips' }, ...[['seg', 'Seg'], ['ter', 'Ter'], ['qua', 'Qua'], ['qui', 'Qui'], ['sex', 'Sex'], ['sab', 'Sáb']].map(([v, t]) => dia(v, t)))) : null),
+          opcao({ icone: '✅', titulo: 'Sim, quero a pré-marcação', detalhe: 'Vou dizer a consulta, a médica e o horário que prefiro', sel: st.pre.aceita === 'sim', onclick: () => { st.pre.aceita = 'sim'; salvar(); redesenhar(); } }),
+          opcao({ icone: '✖️', titulo: 'Não, obrigado(a)', detalhe: 'Encerra e a equipe chama você no WhatsApp', sel: st.pre.aceita === 'nao', onclick: () => { st.pre.aceita = 'nao'; salvar(); redesenhar(); } }))),
+        { botoes: botoesPadrao() });
+    },
+    pre2() { TELAS.pre(); },
+    prefer() {
+      const per = (v, t) => h('button', { class: 'marc-chip', type: 'button', role: 'radio', 'aria-checked': String(st.pre.periodo === v), onclick: () => { st.pre.periodo = v; salvar(); redesenhar(); } }, t);
+      const dia = (v, t) => h('button', { class: 'marc-chip', type: 'button', role: 'checkbox', 'aria-checked': String(st.pre.dias.includes(v)), onclick: () => { st.pre.dias = st.pre.dias.includes(v) ? st.pre.dias.filter((x) => x !== v) : st.pre.dias.concat(v); salvar(); redesenhar(); } }, t);
+      mostrar('Qual horário você prefere?', `${st.procNome}${st.medico && st.medico !== 'qualquer' ? ' · ' + st.medicoNome : ''}. A equipe tenta atender o que você pedir.`, h('div', {},
+        h('p', { class: 'sub', style: 'margin-bottom:4px' }, 'Melhor período'), h('div', { class: 'marc-chips', role: 'radiogroup' }, per('manha', 'Manhã'), per('tarde', 'Tarde'), per('qualquer', 'Tanto faz')),
+        h('p', { class: 'sub', style: 'margin-bottom:4px' }, 'Dias da semana (opcional)'), h('div', { class: 'marc-chips' }, ...[['seg', 'Seg'], ['ter', 'Ter'], ['qua', 'Qua'], ['qui', 'Qui'], ['sex', 'Sex'], ['sab', 'Sáb']].map(([v, t]) => dia(v, t)))),
         { botoes: botoesPadrao() });
     },
     regras() {
@@ -311,14 +338,15 @@
       mostrar('Confira antes de confirmar', pre ? 'Esta solicitação será uma PRÉ-MARCAÇÃO.' : 'Esta solicitação será uma MARCAÇÃO.', h('div', {},
         h('div', { class: 'marc-card' }, h('table', { class: 'marc-res' }, h('tbody', {},
           lin('Paciente', id.tipo === 'filho' ? id.nomeCrianca : id.nome), id.tipo === 'filho' ? lin('Responsável', id.nome) : null, lin('Contato', id.telefone + ' · ' + id.email),
-          lin('Pagamento', pagtoTxt, 'pagto'), lin('Consulta', st.procNome, 'proc'), lin('Médica(o)', st.slot ? st.slot.profissional : st.medicoNome, 'medico'),
-          st.pagto === 'convenio' && S.config().exigir_carteirinha ? lin('Carteirinha', st.cart.anexada ? 'Foto enviada' : 'Não enviada', 'cart') : null,
+          lin('Pagamento', pagtoTxt, 'pagto'), lin('Consulta', st.procNome, 'proc'), lin(pre ? 'Médica de interesse' : 'Médica(o)', st.slot ? st.slot.profissional : st.medicoNome, 'medico'),
+          aplica.cart(st) ? lin('Carteirinha', st.cart.anexada ? 'Foto enviada' : 'Não enviada', 'cart') : null,
           lin(pre ? 'Preferência' : 'Data e horário', quando, pre ? 'pre' : 'horario')))),
         pre ? h('div', { class: 'marc-aviso' }, h('b', {}, 'A equipe vai confirmar: '), (pendencias(st).length ? pendencias(st) : [motivoPre(st)]).join('; ')) : h('div', { class: 'marc-info' }, 'Horário reservado assim que você confirmar.'),
         h('div', { class: 'marc-info' }, '🔒 Ambiente de teste: nada é enviado ao Klingo e nenhum aviso real é disparado.')),
         { botoes: [h('button', { class: 'marc-bt sec', type: 'button', onclick: voltar, style: 'flex:0 0 34%' }, 'Voltar'), h('button', { class: 'marc-bt verde', type: 'button', id: 'marcConfirmar', onclick: confirmar }, pre ? 'Confirmar pré-marcação' : 'Confirmar marcação')] });
     }
   };
+  function redesenhar() { const y = corpo ? corpo.scrollTop : 0; desenhar(); if (corpo) corpo.scrollTop = y; }   // para quem toca numa opção de lista longa: a tela não volta ao topo
   function desenhar() { ajustarTopo(); btnVoltar.hidden = false; const f = TELAS[st.passo]; if (f) f(); else irPara('pagto', { empilhar: false }); }
 
   /* ---------- confirmação e resultado ---------- */
@@ -339,22 +367,28 @@
       limpar(); const id = st.ident; st = novo(id); fimTela(pre ? 'pre' : 'ok', s);
     } catch { if (b) { b.disabled = false; b.textContent = 'Tentar de novo'; } erro('Não foi possível concluir agora. Tente de novo.'); }
   }
-  function fim(tipo) { const id = st.ident; limpar(); st = novo(id); fimTela('nao', null); }
+  // "Não" na pré-marcação: encerra e avisa a equipe para chamar no WhatsApp (SIMULADO: nenhum aviso real sai deste ambiente).
+  function fim(tipo) {
+    const id = st.ident, causas = pendIds(st).filter((x) => x.id !== 'medico_horario').map((x) => x.rotulo);
+    if (tipo === 'whats') { const sol = S.avisoWhatsapp({ paciente: id, motivo: motivoPre(st), pendencias: causas }); limpar(); st = novo(id); fimTela('whats', sol); return; }
+    limpar(); st = novo(id); fimTela('nao', null);
+  }
   function fimTela(tipo, s, remarc, completou) {
     document.getElementById('marcProg').hidden = true;
     const info = {
       ok: ['✅', remarc ? 'Remarcado!' : completou === 'completada' ? 'Completado!' : 'Marcado!', completou === 'completada' ? 'Você completou a pré-marcação e agora ela é uma marcação.' : 'Seu horário está reservado.'],
       pre: ['🕒', 'Pré-marcado', 'Ainda NÃO é uma marcação confirmada. A equipe vai conferir e falar com você.'],
-      nao: ['👍', 'Tudo bem, nada foi enviado', 'Você pode voltar quando quiser e fazer uma nova marcação.']
+      nao: ['👍', 'Tudo bem, nada foi enviado', 'Você pode voltar quando quiser e fazer uma nova marcação.'],
+      whats: ['💬', 'Vamos chamar você no WhatsApp', 'Tudo bem. Avisamos a equipe para entrar em contato com você pelo WhatsApp e ajudar a concluir o agendamento.']
     }[tipo];
     const d = s && s.dados;
-    mostrar(info[1], null, h('div', {}, h('div', { class: 'marc-status ' + tipo }, h('div', { class: 'grande', 'aria-hidden': 'true' }, info[0]), h('h1', { tabindex: '-1', id: 'marcTitulo2', style: 'margin:8px 0 4px' }, tipo === 'pre' ? 'PRÉ-MARCAÇÃO registrada' : tipo === 'ok' ? 'MARCAÇÃO confirmada' : 'Sem solicitação'), h('p', { style: 'margin:0' }, info[2])),
-      s ? h('div', { class: 'marc-card' }, h('table', { class: 'marc-res' }, h('tbody', {}, h('tr', {}, h('td', {}, 'Protocolo'), h('td', {}, h('b', {}, s.protocolo))), h('tr', {}, h('td', {}, 'Consulta'), h('td', {}, h('b', {}, d.procNome))), d.slot && d.slot.profissional ? h('tr', {}, h('td', {}, 'Médica(o)'), h('td', {}, h('b', {}, d.slot.profissional))) : null,
-        h('tr', {}, h('td', {}, tipo === 'ok' ? 'Data e horário' : 'Situação'), h('td', {}, h('b', {}, tipo === 'ok' && d.slot ? `${dataBonita(d.slot.data)}, ${d.slot.hora}` : 'Aguardando confirmação da equipe'))))) ) : null,
+    mostrar(info[1], null, h('div', {}, h('div', { class: 'marc-status ' + tipo }, h('div', { class: 'grande', 'aria-hidden': 'true' }, info[0]), h('h1', { tabindex: '-1', id: 'marcTitulo2', style: 'margin:8px 0 4px' }, tipo === 'pre' ? 'PRÉ-MARCAÇÃO registrada' : tipo === 'ok' ? 'MARCAÇÃO confirmada' : tipo === 'whats' ? 'Equipe avisada' : 'Sem solicitação'), h('p', { style: 'margin:0' }, info[2])),
+      s ? h('div', { class: 'marc-card' }, h('table', { class: 'marc-res' }, h('tbody', {}, h('tr', {}, h('td', {}, 'Protocolo'), h('td', {}, h('b', {}, s.protocolo))), tipo === 'whats' ? h('tr', {}, h('td', {}, 'WhatsApp'), h('td', {}, h('b', {}, d.paciente.telefone))) : h('tr', {}, h('td', {}, 'Consulta'), h('td', {}, h('b', {}, d.procNome))), d.slot && d.slot.profissional ? h('tr', {}, h('td', {}, 'Médica(o)'), h('td', {}, h('b', {}, d.slot.profissional))) : null,
+        h('tr', {}, h('td', {}, tipo === 'ok' ? 'Data e horário' : 'Situação'), h('td', {}, h('b', {}, tipo === 'ok' && d.slot ? `${dataBonita(d.slot.data)}, ${d.slot.hora}` : tipo === 'whats' ? 'A equipe vai chamar você' : 'Aguardando confirmação da equipe'))))) ) : null,
       d && d.pendencias && d.pendencias.length ? h('div', { class: 'marc-aviso' }, h('b', {}, 'A equipe vai confirmar com você: '), d.pendencias.join('; ')) : null,
       tipo === 'pre' && s && s.venceEm ? h('div', { class: 'marc-info' }, '⏳ Complete até ', h('b', {}, prazoTxt(s.venceEm)), ' em "Acompanhar".') : null,
-      h('div', { class: 'marc-info' }, '🔒 Ambiente de teste: nada foi enviado ao Klingo e nenhuma notificação real foi disparada.'),
-      tipo !== 'nao' ? h('div', { class: 'marc-card' }, h('b', {}, 'Cancelar ou remarcar'), h('ul', { class: 'marc-regras' }, ...S.config().politica.slice(0, 3).map((t) => h('li', {}, t)))) : null),
+      h('div', { class: 'marc-info' }, '🔒 Ambiente de teste: nada foi enviado ao Klingo e nenhuma notificação real foi disparada' + (tipo === 'whats' ? ' (o aviso à equipe é simulado).' : '.')),
+      tipo !== 'nao' && tipo !== 'whats' ? h('div', { class: 'marc-card' }, h('b', {}, 'Cancelar ou remarcar'), h('ul', { class: 'marc-regras' }, ...S.config().politica.slice(0, 3).map((t) => h('li', {}, t)))) : null),
       { progresso: false, botoes: [h('button', { class: 'marc-bt', type: 'button', onclick: acompanhar }, 'Acompanhar')] });
     corpo.append(h('button', { class: 'marc-link', type: 'button', onclick: () => { const id = (st && st.ident) || ctx.ident; st = novo(id); salvar(); desenhar(); } }, 'Fazer outra marcação'));
   }
@@ -378,16 +412,16 @@
     st.passo = ORDEM.find((p) => alvos.includes(p) && aplica[p](st)) || ORDEM.find((p) => !completo[p](st) && aplica[p](st)) || 'resumo';
     salvar(); abrirCasca(); desenhar();
   }
-  const ROT = { marcado: ['Marcado', 'ok'], aguardando_equipe: ['Pré-marcado · aguardando equipe', 'pre'], confirmado_equipe: ['Confirmado pela equipe', 'ok'], recusado_equipe: ['Equipe não conseguiu confirmar', 'nao'], cancelado: ['Cancelado', 'cancel'], atendimento_humano: ['Enviado ao atendimento', 'nao'] };
+  const ROT = { marcado: ['Marcado', 'ok'], aguardando_equipe: ['Pré-marcado · aguardando equipe', 'pre'], confirmado_equipe: ['Confirmado pela equipe', 'ok'], recusado_equipe: ['Equipe não conseguiu confirmar', 'nao'], cancelado: ['Cancelado', 'cancel'], atendimento_humano: ['Enviado ao atendimento', 'nao'], aviso_equipe: ['Equipe avisada · vai chamar no WhatsApp', 'nao'] };
   function acompanhar() {
     montar(); abrirCasca();
     const l = S.solicitacoes();
     document.getElementById('marcProg').hidden = true;
     mostrar('Suas solicitações', 'Acompanhe aqui o que você pediu neste aparelho.', h('div', {}, ...(l.length ? l.map((s) => {
       const r = ROT[s.status] || [s.status, 'nao'], d = s.dados || {}, pode = s.status === 'marcado' || s.status === 'confirmado_equipe';
-      const q = d.slot ? `${dataBonita(d.slot.data)}, ${d.slot.hora}` : d.mensagem ? 'Mensagem enviada' : 'Horário a confirmar pela equipe';
+      const q = d.slot ? `${dataBonita(d.slot.data)}, ${d.slot.hora}` : s.status === 'aviso_equipe' ? 'A equipe vai chamar você no WhatsApp ' + (d.paciente && d.paciente.telefone || '') : d.mensagem ? 'Mensagem enviada' : 'Horário a confirmar pela equipe';
       const pend = s.status === 'aguardando_equipe', venceu = pend && s.venceEm && Date.parse(s.venceEm) < Date.now();
-      return h('div', { class: 'marc-card' }, h('span', { class: 'marc-badge ' + r[1] }, r[0]), h('p', { style: 'margin:8px 0 2px' }, h('b', {}, d.procNome || 'Atendimento humano')), h('p', { class: 'sub', style: 'margin:0 0 4px' }, q), s.status === 'aguardando_equipe' && d.pendencias && d.pendencias.length ? h('p', { style: 'margin:4px 0;font-size:14px' }, h('b', {}, 'A confirmar: '), d.pendencias.join('; ')) : null, h('small', {}, 'Protocolo ' + s.protocolo + (s.remarcacoes ? ` · ${s.remarcacoes} remarcação(ões)` : '')),
+      return h('div', { class: 'marc-card' }, h('span', { class: 'marc-badge ' + r[1] }, r[0]), h('p', { style: 'margin:8px 0 2px' }, h('b', {}, d.procNome || (s.status === 'aviso_equipe' ? 'Contato por WhatsApp' : 'Atendimento humano'))), h('p', { class: 'sub', style: 'margin:0 0 4px' }, q), s.status === 'aguardando_equipe' && d.pendencias && d.pendencias.length ? h('p', { style: 'margin:4px 0;font-size:14px' }, h('b', {}, 'A confirmar: '), d.pendencias.join('; ')) : null, h('small', {}, 'Protocolo ' + s.protocolo + (s.remarcacoes ? ` · ${s.remarcacoes} remarcação(ões)` : '')),
         pend && s.venceEm ? h('p', { style: 'margin:6px 0;font-size:14px;color:' + (venceu ? '#8c1d18' : '#6e4700') }, '⏳ ', venceu ? 'Prazo para completar encerrado (' + prazoTxt(s.venceEm) + ').' : 'Complete até ' + prazoTxt(s.venceEm) + ' (' + faltam(s.venceEm) + ').') : null,
         h('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;margin-top:10px' },
           pend && !venceu && s.dados.estado ? h('button', { class: 'marc-bt', type: 'button', style: 'flex:1 1 100%;min-height:46px;font-size:16px', onclick: () => completar(s) }, 'Completar agora') : null,
