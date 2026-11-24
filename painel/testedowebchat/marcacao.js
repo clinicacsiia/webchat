@@ -37,6 +37,19 @@
     return '';
   };
   const pagador = (s) => (s.pagto === 'particular' ? 'Particular' : s.pagto === 'convenio' && s.convId && s.convId !== NAO_SEI ? s.convId : '');
+  // O que a equipe precisa confirmar (vira a lista da pré-marcação). Vazio = dá para marcar.
+  const pendencias = (s) => {
+    const l = [], c = S.config();
+    if (!s.procAtivo) l.push('Consulta agendada apenas pela equipe');
+    if (s.pagto === NAO_SEI) l.push('Forma de pagamento (particular ou convênio)');
+    if (s.pagto === 'convenio') {
+      if (s.convId === NAO_SEI) l.push('Qual é o convênio');
+      else if (s.plano === NAO_SEI) l.push('Qual é o plano');
+      else if (c.exigir_carteirinha && !s.cart.anexada) l.push('Foto da carteirinha');
+    }
+    if (!l.length && s.semHorario) l.push('Médica e horário');
+    return l;
+  };
   const motivoPre = (s) => motivoAntesDoHorario(s) || s.semHorario;
   const completo = {
     proc: (s) => !!s.procId, medico: (s) => !!s.medico, pagto: (s) => !!s.pagto, conv: (s) => !!s.convId, plano: (s) => !!s.plano,
@@ -47,7 +60,7 @@
     proc: () => true, medico: (s) => !motivoAntesDoHorario(s), pagto: () => true,
     conv: (s) => s.pagto === 'convenio',
     plano: (s) => s.pagto === 'convenio' && s.convId && s.convId !== NAO_SEI,
-    cart: (s) => s.pagto === 'convenio' && S.config().exigir_carteirinha,
+    cart: (s) => s.pagto === 'convenio' && s.convId !== NAO_SEI && s.plano !== NAO_SEI && S.config().exigir_carteirinha,
     horario: (s) => !motivoAntesDoHorario(s),
     pre: (s) => !!motivoPre(s), regras: () => true, resumo: () => true
   };
@@ -246,7 +259,7 @@
       const sim = st.pre.aceita === 'sim', per = (v, t) => h('button', { class: 'marc-chip', type: 'button', role: 'radio', 'aria-checked': String(st.pre.periodo === v), onclick: () => { st.pre.periodo = v; salvar(); desenhar(); } }, t);
       const dia = (v, t) => h('button', { class: 'marc-chip', type: 'button', role: 'checkbox', 'aria-checked': String(st.pre.dias.includes(v)), onclick: () => { st.pre.dias = st.pre.dias.includes(v) ? st.pre.dias.filter((x) => x !== v) : st.pre.dias.concat(v); salvar(); desenhar(); } }, t);
       mostrar('Quer deixar uma pré-marcação?', 'Não foi possível concluir a marcação agora.', h('div', {},
-        h('div', { class: 'marc-aviso' }, h('b', {}, 'Motivo: '), motivoPre(st)),
+        h('div', { class: 'marc-aviso' }, h('b', {}, 'A equipe precisa confirmar com você:'), h('ul', { class: 'marc-regras', style: 'margin:6px 0 0' }, ...(pendencias(st).length ? pendencias(st) : [motivoPre(st)]).map((t) => h('li', {}, t)))),
         h('p', { class: 'sub' }, 'Na pré-marcação, a equipe confere tudo e confirma com você. Ela ',  h('b', {}, 'não garante'), ' o horário até a confirmação.'),
         h('div', { class: 'marc-lista', role: 'radiogroup' },
           opcao({ icone: '✅', titulo: 'Sim, quero a pré-marcação', sel: sim, onclick: () => { st.pre.aceita = 'sim'; salvar(); desenhar(); } }),
@@ -273,7 +286,7 @@
           lin('Consulta', st.procNome, 'proc'), lin('Médica(o)', st.slot ? st.slot.profissional : st.medicoNome, 'medico'), lin('Pagamento', pagtoTxt, 'pagto'),
           st.pagto === 'convenio' && S.config().exigir_carteirinha ? lin('Carteirinha', st.cart.anexada ? 'Foto enviada' : 'Não enviada', 'cart') : null,
           lin(pre ? 'Preferência' : 'Data e horário', quando, pre ? 'pre' : 'horario')))),
-        pre ? h('div', { class: 'marc-aviso' }, h('b', {}, 'Por que pré-marcação: '), motivoPre(st)) : h('div', { class: 'marc-info' }, 'Horário reservado assim que você confirmar.'),
+        pre ? h('div', { class: 'marc-aviso' }, h('b', {}, 'A equipe vai confirmar: '), (pendencias(st).length ? pendencias(st) : [motivoPre(st)]).join('; ')) : h('div', { class: 'marc-info' }, 'Horário reservado assim que você confirmar.'),
         h('div', { class: 'marc-info' }, '🔒 Ambiente de teste: nada é enviado ao Klingo e nenhum aviso real é disparado.')),
         { botoes: [h('button', { class: 'marc-bt sec', type: 'button', onclick: voltar, style: 'flex:0 0 34%' }, 'Voltar'), h('button', { class: 'marc-bt verde', type: 'button', id: 'marcConfirmar', onclick: confirmar }, pre ? 'Confirmar pré-marcação' : 'Confirmar marcação')] });
     }
@@ -283,7 +296,7 @@
   /* ---------- confirmação e resultado ---------- */
   async function confirmar() {
     const b = document.getElementById('marcConfirmar'); if (b) { b.disabled = true; b.textContent = 'Enviando…'; }
-    const pre = !!motivoPre(st), dados = { paciente: st.ident, procId: st.procId, procNome: st.procNome, pagto: st.pagto, convenio: st.convNome, plano: st.plano, carteirinha: st.cart.anexada, slot: st.slot, preferencia: pre ? st.pre : null };
+    const pre = !!motivoPre(st), dados = { paciente: st.ident, procId: st.procId, procNome: st.procNome, pagto: st.pagto, convenio: st.convNome, plano: st.plano, carteirinha: st.cart.anexada, slot: st.slot, preferencia: pre ? st.pre : null, pendencias: pre ? pendencias(st) : [] };
     try {
       if (st.remarcando) {
         const s = S.solicitacaoAtualizar(st.remarcando, (x) => { x.dados.slot = st.slot; x.remarcacoes += 1; x.status = 'marcado'; });
@@ -305,6 +318,7 @@
     mostrar(info[1], null, h('div', {}, h('div', { class: 'marc-status ' + tipo }, h('div', { class: 'grande', 'aria-hidden': 'true' }, info[0]), h('h1', { tabindex: '-1', id: 'marcTitulo2', style: 'margin:8px 0 4px' }, tipo === 'pre' ? 'PRÉ-MARCAÇÃO registrada' : tipo === 'ok' ? 'MARCAÇÃO confirmada' : 'Sem solicitação'), h('p', { style: 'margin:0' }, info[2])),
       s ? h('div', { class: 'marc-card' }, h('table', { class: 'marc-res' }, h('tbody', {}, h('tr', {}, h('td', {}, 'Protocolo'), h('td', {}, h('b', {}, s.protocolo))), h('tr', {}, h('td', {}, 'Consulta'), h('td', {}, h('b', {}, d.procNome))), d.slot && d.slot.profissional ? h('tr', {}, h('td', {}, 'Médica(o)'), h('td', {}, h('b', {}, d.slot.profissional))) : null,
         h('tr', {}, h('td', {}, tipo === 'ok' ? 'Data e horário' : 'Situação'), h('td', {}, h('b', {}, tipo === 'ok' && d.slot ? `${dataBonita(d.slot.data)}, ${d.slot.hora}` : 'Aguardando confirmação da equipe'))))) ) : null,
+      d && d.pendencias && d.pendencias.length ? h('div', { class: 'marc-aviso' }, h('b', {}, 'A equipe vai confirmar com você: '), d.pendencias.join('; ')) : null,
       h('div', { class: 'marc-info' }, '🔒 Ambiente de teste: nada foi enviado ao Klingo e nenhuma notificação real foi disparada.'),
       tipo !== 'nao' ? h('div', { class: 'marc-card' }, h('b', {}, 'Cancelar ou remarcar'), h('ul', { class: 'marc-regras' }, ...S.config().politica.slice(0, 3).map((t) => h('li', {}, t)))) : null),
       { progresso: false, botoes: [h('button', { class: 'marc-bt', type: 'button', onclick: acompanhar }, 'Acompanhar')] });
@@ -320,7 +334,7 @@
     mostrar('Suas solicitações', 'Acompanhe aqui o que você pediu neste aparelho.', h('div', {}, ...(l.length ? l.map((s) => {
       const r = ROT[s.status] || [s.status, 'nao'], d = s.dados || {}, pode = s.status === 'marcado' || s.status === 'confirmado_equipe';
       const q = d.slot ? `${dataBonita(d.slot.data)}, ${d.slot.hora}` : d.mensagem ? 'Mensagem enviada' : 'Horário a confirmar pela equipe';
-      return h('div', { class: 'marc-card' }, h('span', { class: 'marc-badge ' + r[1] }, r[0]), h('p', { style: 'margin:8px 0 2px' }, h('b', {}, d.procNome || 'Atendimento humano')), h('p', { class: 'sub', style: 'margin:0 0 4px' }, q), h('small', {}, 'Protocolo ' + s.protocolo + (s.remarcacoes ? ` · ${s.remarcacoes} remarcação(ões)` : '')),
+      return h('div', { class: 'marc-card' }, h('span', { class: 'marc-badge ' + r[1] }, r[0]), h('p', { style: 'margin:8px 0 2px' }, h('b', {}, d.procNome || 'Atendimento humano')), h('p', { class: 'sub', style: 'margin:0 0 4px' }, q), s.status === 'aguardando_equipe' && d.pendencias && d.pendencias.length ? h('p', { style: 'margin:4px 0;font-size:14px' }, h('b', {}, 'A confirmar: '), d.pendencias.join('; ')) : null, h('small', {}, 'Protocolo ' + s.protocolo + (s.remarcacoes ? ` · ${s.remarcacoes} remarcação(ões)` : '')),
         h('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;margin-top:10px' },
           pode ? h('button', { class: 'marc-bt sec', type: 'button', style: 'flex:1 1 40%;min-height:44px;font-size:15px', disabled: s.remarcacoes >= 2, onclick: () => remarcar(s) }, s.remarcacoes >= 2 ? 'Limite de remarcações' : 'Remarcar') : null,
           pode || s.status === 'aguardando_equipe' ? h('button', { class: 'marc-bt sec', type: 'button', style: 'flex:1 1 40%;min-height:44px;font-size:15px', onclick: () => { if (confirm('Cancelar esta solicitação? (teste)')) { S.solicitacaoAtualizar(s.protocolo, (x) => { x.status = 'cancelado'; }); acompanhar(); } } }, 'Cancelar') : null,

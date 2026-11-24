@@ -56,3 +56,6 @@ Ordem: **consulta → pagamento → convênio → plano → carteirinha → méd
 - Plano: texto livre ou "Não sei" (a lista real tem ~4.700 planos; não cabe neste teste).
 
 Suposições a confirmar com a clínica: agenda sem restrição de operadora (`operadoras` vazio) = **aceita qualquer convênio**; a tabela `medico_convenio_bloqueio` **não** é usada (ela contradiz a agenda para algumas médicas, ex.: Geanne e SulAmérica).
+
+## Regra "não sei" → pré-marcação (24/11/2026)
+Qualquer "Não sei" (pagamento, convênio ou plano) ou "Não tenho agora" (carteirinha) leva **direto** à pré-marcação: o sistema não pergunta mais nada (nem médica nem horário), mostra a lista **"A equipe precisa confirmar"** (pendências), pergunta Sim/Não e segue para condições e resumo. A lista aparece também no resumo, no resultado e em "Suas solicitações". Quem sabe tudo continua: médica → horário → marcação. A barra de progresso se ajusta (ex.: "Etapa 3 de 5").
