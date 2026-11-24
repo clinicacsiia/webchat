@@ -3,7 +3,7 @@
    O contrato (nomes e formatos) espelha as funções reais do motor, para a troca futura ser pontual:
      catalogo()            ~ chat_exames_buscar / chat_consultas
      convenios(), planos() ~ catálogo de convênios do Klingo
-     disponibilidade()     ~ chat_horarios / chat-agenda-api   (já aplica a regra configurável de antecedência)
+     disponibilidade()     ~ chat_horarios / chat-agenda-api   (HOJE: grade real das médicas, de agenda-real.js; ainda não é a disponibilidade ao vivo do Klingo)
      marcar()              ~ chat_horario_escolher + klingo-executar   (aqui NUNCA chama o Klingo)
      solicitacoes*()       ~ app_pedidos / "Acompanhe seus pedidos"
    Regras de negócio (antecedência, ativação de exames, exigência de carteirinha, política) ficam na CONFIG, não na tela. */
@@ -59,34 +59,42 @@
   async function convenios() { await espera(150); return CONVENIOS.map((c) => ({ id: c.id, nome: c.nome })); }
   async function planos(convId) { await espera(150); const c = CONVENIOS.find((x) => x.id === convId); return c ? c.planos.slice() : []; }
 
-  // Horários determinísticos (mesmo procedimento + dia = mesma grade). Os dias e horários variam por procedimento.
+  /* ---------- grade REAL das médicas (snapshot de leitura da produção; ver agenda-real.js) ---------- */
+  const NOME_MIN = ['de', 'da', 'do', 'dos', 'das', 'e'];
+  const bonito = (n) => String(n).toLowerCase().split(' ').map((w, i) => (i && NOME_MIN.includes(w) ? w : w.charAt(0).toUpperCase() + w.slice(1))).join(' ');
   const iso = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-  const sem = (s) => { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0; return h; };
-  async function disponibilidade({ procId, diasAdiante = 21 } = {}) {
-    await espera(600);
+  const pid = (procId) => Number(String(procId).replace(/^c-/, ''));
+  const gradeDe = (procId) => ((window.CSI_AGENDA_REAL && window.CSI_AGENDA_REAL.grade) || []).filter((g) => g[0] === pid(procId));
+  async function medicos(procId) {
+    await espera(150);
+    const nomes = [...new Set(gradeDe(procId).map((g) => g[1]))].sort();
+    return nomes.map((n) => ({ id: n, nome: bonito(n) }));
+  }
+  // Horários = a grade real de cada médica (dia da semana, início, fim, duração, consultório, vigência), sem descontar horários já ocupados.
+  async function disponibilidade({ procId, medico = '', diasAdiante = 28 } = {}) {
+    await espera(500);
     const c = config();
     if (c.simular_falha) { const e = new Error('Integração simulada indisponível'); e.codigo = 'integracao_fora'; throw e; }
-    const proc = CATALOGO.find((p) => p.id === procId);
-    if (!proc) throw new Error('Procedimento desconhecido');
+    const grade = gradeDe(procId).filter((g) => !medico || medico === 'qualquer' || g[1] === medico);
+    if (!grade.length) return { dias: [], bloqueadosPelaRegra: 0, existentes: 0, antecedenciaHoras: c.antecedencia_horas };
     const agora = new Date(), limite = new Date(agora.getTime() + c.antecedencia_horas * 3600e3);
-    const base = ['07:30', '08:00', '08:30', '09:00', '09:30', '10:00', '10:30', '11:00', '13:30', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30', '17:00'];
     const dias = []; let bloqueadosPelaRegra = 0, existentes = 0;
     for (let i = 0; i <= diasAdiante; i++) {
-      const d = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate() + i);
-      if (d.getDay() === 0) continue;
-      const h = sem(procId + iso(d));
-      if (h % 5 === 0) continue;   // dia sem agenda
-      const horarios = base.filter((_, j) => (h >> (j % 11)) % 3 === 0 || j % 7 === h % 7).slice(0, d.getDay() === 6 ? 4 : 9);
+      const d = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate() + i), dd = iso(d), ds = d.getDay();   // 0 = domingo; a grade usa 1 = segunda ... 6 = sábado
       const ok = [];
-      for (const hr of horarios) {
-        const [H, M] = hr.split(':').map(Number);
-        const quando = new Date(d.getFullYear(), d.getMonth(), d.getDate(), H, M);
-        if (quando <= agora) continue;
-        existentes++;
-        if (quando < limite) { bloqueadosPelaRegra++; continue; }
-        ok.push({ hora: hr, unidade: 'Desenvoar', profissional: '' });
+      for (const [, prof, dia, ini, fim, dur, local, vi, vf] of grade) {
+        if (dia !== ds || dd < vi || dd > vf) continue;
+        const [h1, m1] = ini.split(':').map(Number), [h2, m2] = fim.split(':').map(Number);
+        for (let t = h1 * 60 + m1; t + dur <= h2 * 60 + m2; t += dur) {
+          const quando = new Date(d.getFullYear(), d.getMonth(), d.getDate(), Math.floor(t / 60), t % 60);
+          if (quando <= agora) continue;
+          existentes++;
+          if (quando < limite) { bloqueadosPelaRegra++; continue; }
+          ok.push({ hora: String(Math.floor(t / 60)).padStart(2, '0') + ':' + String(t % 60).padStart(2, '0'), unidade: 'Desenvoar', profissional: bonito(prof), local: bonito(local) });
+        }
       }
-      if (ok.length) dias.push({ data: iso(d), horarios: ok });
+      ok.sort((a, b) => a.hora.localeCompare(b.hora) || a.profissional.localeCompare(b.profissional));
+      if (ok.length) dias.push({ data: dd, horarios: ok });
     }
     return { dias, bloqueadosPelaRegra, existentes, antecedenciaHoras: c.antecedencia_horas };
   }
@@ -112,5 +120,5 @@
   }
   const solicitacoesApagarTudo = () => { try { localStorage.removeItem(K_SOL); } catch { /* ignora */ } };
 
-  window.CSI_SIM = { catalogo, convenios, planos, disponibilidade, marcar, config, configSalvar, configRestaurar, solicitacoes, solicitacaoAtualizar, solicitacoesApagarTudo, CATALOGO, iso };
+  window.CSI_SIM = { catalogo, convenios, planos, medicos, disponibilidade, marcar, config, configSalvar, configRestaurar, solicitacoes, solicitacaoAtualizar, solicitacoesApagarTudo, CATALOGO, iso };
 })();

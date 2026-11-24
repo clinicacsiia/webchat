@@ -40,3 +40,9 @@ Antecedência (sem regra, 24, 48, 72 h) · exigir carteirinha · simular agenda 
 
 ## Lista de consultas
 Copiada da produção em 24/11/2026 (`consultas_da_unidade('DESENVOAR')`): pediatra, cirurgia pediátrica, ortopediatra, endocrinopediatra, gastropediatra, neuropediatra e pediátrica pré-natal. Sem valor particular (o chat real não mostra nesta etapa). Se a lista mudar em produção, atualizar `CATALOGO` em `integracao-simulada.js`.
+
+## Horários e médicas (24/11/2026)
+- Passo novo **Qual médica?** (ou "Tanto faz"), com as médicas reais de cada consulta.
+- Os horários agora vêm da **grade real de atendimento** das médicas (`agenda-real.js`: dia da semana, início, fim, duração da consulta, consultório e vigência), lida da produção em modo **somente leitura** (`catalogo_agenda`, unidade Desenvoar). Sem dado de paciente.
+- **Limite importante:** é a grade, não a disponibilidade ao vivo do Klingo: não desconta horários já ocupados. A tela avisa isso. A disponibilidade ao vivo (`chat-agenda-api`) exige abrir uma conversa no banco de produção e está bloqueada neste ambiente.
+- Para atualizar o snapshot, reler `catalogo_agenda` e regerar `agenda-real.js`.

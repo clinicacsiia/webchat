@@ -19,7 +19,7 @@
   const NAO_SEI = 'nao_sei';
 
   /* ---------- estado (nada se perde ao avançar, voltar ou corrigir) ---------- */
-  const novo = (ident) => ({ ident, passo: 'proc', hist: [], tipo: 'consulta', procId: '', procNome: '', procTipo: '', procAtivo: true, preco: null, preparo: '', pagto: '', convId: '', convNome: '', plano: '', cart: { anexada: false, semAgora: false, foto: '' }, slot: null, semHorario: '', pre: { aceita: '', periodo: '', dias: [] }, regras: false, retorno: false, remarcando: '' });
+  const novo = (ident) => ({ ident, passo: 'proc', hist: [], tipo: 'consulta', procId: '', procNome: '', procTipo: '', procAtivo: true, medico: '', medicoNome: '', preco: null, preparo: '', pagto: '', convId: '', convNome: '', plano: '', cart: { anexada: false, semAgora: false, foto: '' }, slot: null, semHorario: '', pre: { aceita: '', periodo: '', dias: [] }, regras: false, retorno: false, remarcando: '' });
   let st = null, ctx = { catalogo: null };
   const salvar = () => { try { localStorage.setItem(K_EST, JSON.stringify(st)); } catch { try { const c = JSON.parse(JSON.stringify(st)); c.cart.foto = ''; localStorage.setItem(K_EST, JSON.stringify(c)); } catch { /* ignora */ } } };
   const limpar = () => { try { localStorage.removeItem(K_EST); } catch { /* ignora */ } };
@@ -38,20 +38,20 @@
   };
   const motivoPre = (s) => motivoAntesDoHorario(s) || s.semHorario;
   const completo = {
-    proc: (s) => !!s.procId, pagto: (s) => !!s.pagto, conv: (s) => !!s.convId, plano: (s) => !!s.plano,
+    proc: (s) => !!s.procId, medico: (s) => !!s.medico, pagto: (s) => !!s.pagto, conv: (s) => !!s.convId, plano: (s) => !!s.plano,
     cart: (s) => s.cart.anexada || s.cart.semAgora, horario: (s) => !!s.slot || !!s.semHorario,
     pre: (s) => s.pre.aceita === 'nao' || (s.pre.aceita === 'sim' && !!s.pre.periodo), regras: (s) => s.regras, resumo: () => false
   };
   const aplica = {
-    proc: () => true, pagto: () => true,
+    proc: () => true, medico: () => true, pagto: () => true,
     conv: (s) => s.pagto === 'convenio',
     plano: (s) => s.pagto === 'convenio' && s.convId && s.convId !== NAO_SEI,
     cart: (s) => s.pagto === 'convenio' && S.config().exigir_carteirinha,
     horario: (s) => !motivoAntesDoHorario(s),
     pre: (s) => !!motivoPre(s), regras: () => true, resumo: () => true
   };
-  const ORDEM = ['proc', 'pagto', 'conv', 'plano', 'cart', 'horario', 'pre', 'regras', 'resumo'];
-  const NOMES = { proc: 'Procedimento', pagto: 'Pagamento', conv: 'Convênio', plano: 'Plano', cart: 'Carteirinha', horario: 'Horário', pre: 'Pré-marcação', regras: 'Condições', resumo: 'Resumo' };
+  const ORDEM = ['proc', 'medico', 'pagto', 'conv', 'plano', 'cart', 'horario', 'pre', 'regras', 'resumo'];
+  const NOMES = { proc: 'Consulta', medico: 'Médica(o)', pagto: 'Pagamento', conv: 'Convênio', plano: 'Plano', cart: 'Carteirinha', horario: 'Horário', pre: 'Pré-marcação', regras: 'Condições', resumo: 'Resumo' };
   const aplicaveis = () => ORDEM.filter((p) => aplica[p](st));
 
   /* ---------- casca da tela ---------- */
@@ -109,6 +109,7 @@
   function validar() {
     const p = st.passo;
     if (p === 'proc' && !st.procId) return 'Escolha o procedimento.';
+    if (p === 'medico' && !st.medico) return 'Escolha a médica ou toque em "Tanto faz".';
     if (p === 'pagto' && !st.pagto) return 'Escolha como vai pagar, ou toque em "Não sei".';
     if (p === 'conv' && !st.convId) return 'Escolha o convênio, ou toque em "Não sei".';
     if (p === 'plano' && !st.plano) return 'Escolha o plano, ou toque em "Não sei".';
@@ -136,11 +137,20 @@
         const vis = itens.filter((p) => !q || (p.nome + ' ' + p.detalhe).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().includes(q));
         lista.replaceChildren(...(vis.length ? vis.map((p) => opcao({
           icone: p.tipo === 'consulta' ? '🩺' : '🩻', titulo: p.nome, detalhe: p.detalhe, sel: st.procId === p.id, selo: p.ativo ? '' : 'Agendado pela equipe (pré-marcação)',
-          onclick: () => { if (st.procId !== p.id) invalidarHorario(); Object.assign(st, { procId: p.id, procNome: p.nome, procTipo: p.tipo, procAtivo: p.ativo, preco: p.preco, preparo: p.preparo }); salvar(); pintar(); erro(''); }
+          onclick: () => { if (st.procId !== p.id) { invalidarHorario(); st.medico = ''; st.medicoNome = ''; } Object.assign(st, { procId: p.id, procNome: p.nome, procTipo: p.tipo, procAtivo: p.ativo, preco: p.preco, preparo: p.preparo }); salvar(); pintar(); erro(''); }
         })) : [h('p', { class: 'sub' }, 'Nada encontrado. Tente outra palavra.')]));
       };
       busca.addEventListener('input', pintar); pintar();
       mostrar('Qual consulta?', `Atendimento ${st.ident.tipo === 'filho' ? 'para ' + (st.ident.nomeCrianca || 'a criança') : 'para você'}. Toque na consulta que você precisa.`, h('div', {}, busca, lista), { botoes: botoesPadrao(), foco: false });
+    },
+    async medico() {
+      mostrar('Qual médica?', st.procNome, h('div', { class: 'marc-lista' }, h('div', { class: 'marc-esq' }), h('div', { class: 'marc-esq' })), { botoes: botoesPadrao({ off: true }), foco: false });
+      const lista = await S.medicos(st.procId);
+      if (st.passo !== 'medico') return;
+      const set = (id, nome) => { if (st.medico !== id) invalidarHorario(); st.medico = id; st.medicoNome = nome; salvar(); desenhar(); };
+      mostrar('Qual médica?', st.procNome + ' · escolha com quem você quer ser atendido(a).', h('div', { class: 'marc-lista', role: 'radiogroup' },
+        opcao({ icone: '🔁', titulo: 'Tanto faz', detalhe: 'Mostrar os horários de todas', sel: st.medico === 'qualquer', onclick: () => set('qualquer', 'Tanto faz') }),
+        ...lista.map((m) => opcao({ icone: '👩‍⚕️', titulo: m.nome, sel: st.medico === m.id, onclick: () => set(m.id, m.nome) }))), { botoes: botoesPadrao(), foco: false });
     },
     pagto() {
       const o = (v, ic, t, d) => opcao({ icone: ic, titulo: t, detalhe: d, sel: st.pagto === v, onclick: () => { st.pagto = v; if (v !== 'convenio') { st.convId = ''; st.convNome = ''; st.plano = ''; st.cart = { anexada: false, semAgora: false, foto: '' }; } invalidarHorario(); salvar(); desenhar(); } });
@@ -188,7 +198,7 @@
       const carregando = () => mostrar('Escolha o dia e o horário', `${st.procNome}`, h('div', { 'aria-busy': 'true' }, h('p', { class: 'sub' }, 'Consultando horários disponíveis…'), h('div', { class: 'marc-esq' }), h('div', { class: 'marc-esq' })), { botoes: botoesPadrao({ off: true }), foco: false });
       carregando();
       let r;
-      try { r = await S.disponibilidade({ procId: st.procId }); }
+      try { r = await S.disponibilidade({ procId: st.procId, medico: st.medico }); }
       catch {
         if (st.passo !== 'horario') return;
         mostrar('Não conseguimos consultar os horários', 'O sistema de agenda não respondeu agora.', h('div', {},
@@ -204,11 +214,12 @@
       const pintar = () => {
         dias.replaceChildren(...r.dias.map((d) => { const [y, m, dd] = d.data.split('-').map(Number), dt = new Date(y, m - 1, dd); return h('button', { class: 'marc-dia', type: 'button', role: 'radio', 'aria-checked': String(d.data === diaSel), onclick: () => { diaSel = d.data; pintar(); } }, h('small', {}, dt.toLocaleDateString('pt-BR', { weekday: 'short' })), h('b', {}, dd), h('small', {}, dt.toLocaleDateString('pt-BR', { month: 'short' }))); }));
         const d = r.dias.find((x) => x.data === diaSel);
-        horas.replaceChildren(...(d ? d.horarios.map((hr) => h('button', { class: 'marc-hora', type: 'button', role: 'radio', 'aria-checked': String(!!st.slot && st.slot.data === d.data && st.slot.hora === hr.hora), onclick: () => { st.slot = { data: d.data, hora: hr.hora, unidade: hr.unidade, profissional: hr.profissional }; st.semHorario = ''; salvar(); pintar(); erro(''); } }, hr.hora)) : []));
+        horas.replaceChildren(...(d ? d.horarios.map((hr) => h('button', { class: 'marc-hora', type: 'button', role: 'radio', 'aria-checked': String(!!st.slot && st.slot.data === d.data && st.slot.hora === hr.hora && st.slot.profissional === hr.profissional), onclick: () => { st.slot = { data: d.data, hora: hr.hora, unidade: hr.unidade, profissional: hr.profissional, local: hr.local }; st.semHorario = ''; salvar(); pintar(); erro(''); } }, hr.hora, st.medico === 'qualquer' ? h('small', { style: 'display:block;font-weight:500;font-size:12px' }, hr.profissional.split(' ')[0]) : null)) : []));
       };
       pintar();
+      const regra0 = h('div', { class: 'marc-info' }, 'Horários da grade de atendimento de ' + (st.medico === 'qualquer' ? 'todas as médicas' : st.medicoNome) + '. A equipe confirma a disponibilidade final.');
       const regra = r.antecedenciaHoras ? h('div', { class: 'marc-info' }, `Marcações pelo site precisam de pelo menos ${r.antecedenciaHoras} horas de antecedência.`, r.bloqueadosPelaRegra ? ` Há ${r.bloqueadosPelaRegra} horário(s) mais próximos que só a equipe pode confirmar.` : '') : null;
-      mostrar(semRegra ? 'Sem horários pelo site' : 'Escolha o dia e o horário', st.procNome + (st.slot ? '' : ''), h('div', {}, regra,
+      mostrar(semRegra ? 'Sem horários pelo site' : 'Escolha o dia e o horário', st.procNome + (st.slot ? '' : ''), h('div', {}, regra0, regra,
         semRegra ? h('div', { class: 'marc-aviso' }, 'Não há horários livres que respeitem a regra de antecedência. Você pode deixar uma pré-marcação.') : h('div', {}, dias, horas),
         h('button', { class: 'marc-link', type: 'button', onclick: () => { st.slot = null; st.semHorario = semRegra ? 'Não há horários livres dentro da regra de antecedência.' : 'Nenhum dos horários oferecidos serviu.'; salvar(); continuar(); } }, semRegra ? 'Quero fazer uma pré-marcação' : 'Nenhum desses horários serve')),
         { botoes: botoesPadrao({ off: semRegra }), foco: false });
@@ -237,11 +248,11 @@
       const pre = !!motivoPre(st), id = st.ident;
       const pagtoTxt = st.pagto === 'particular' ? 'Particular' + (st.preco != null ? ' · ' + dinheiro(st.preco) : '') : st.pagto === 'convenio' ? `Convênio: ${st.convId === NAO_SEI ? 'não sei' : st.convNome}${st.convId !== NAO_SEI ? ' · plano: ' + (st.plano === NAO_SEI ? 'não sei' : st.plano) : ''}` : 'Não sei';
       const lin = (rot, val, passo) => h('tr', {}, h('td', {}, rot), h('td', {}, h('b', {}, val), passo ? h('button', { class: 'marc-link ed', type: 'button', style: 'min-height:0;padding:0', onclick: () => { st.retorno = true; irPara(passo); } }, 'Corrigir') : null));
-      const quando = st.slot ? `${dataBonita(st.slot.data)}, ${st.slot.hora}` + (st.slot.unidade ? ` · ${st.slot.unidade}` : '') : pre ? `Pré-marcação · ${{ manha: 'manhã', tarde: 'tarde', qualquer: 'qualquer período' }[st.pre.periodo] || ''}${st.pre.dias.length ? ' · ' + st.pre.dias.join(', ') : ''}` : '';
+      const quando = st.slot ? `${dataBonita(st.slot.data)}, ${st.slot.hora}` + (st.slot.local ? ` · ${st.slot.local}` : '') + (st.slot.unidade ? ` · ${st.slot.unidade}` : '') : pre ? `Pré-marcação · ${{ manha: 'manhã', tarde: 'tarde', qualquer: 'qualquer período' }[st.pre.periodo] || ''}${st.pre.dias.length ? ' · ' + st.pre.dias.join(', ') : ''}` : '';
       mostrar('Confira antes de confirmar', pre ? 'Esta solicitação será uma PRÉ-MARCAÇÃO.' : 'Esta solicitação será uma MARCAÇÃO.', h('div', {},
         h('div', { class: 'marc-card' }, h('table', { class: 'marc-res' }, h('tbody', {},
           lin('Paciente', id.tipo === 'filho' ? id.nomeCrianca : id.nome), id.tipo === 'filho' ? lin('Responsável', id.nome) : null, lin('Contato', id.telefone + ' · ' + id.email),
-          lin('Procedimento', st.procNome, 'proc'), lin('Pagamento', pagtoTxt, 'pagto'),
+          lin('Consulta', st.procNome, 'proc'), lin('Médica(o)', st.slot ? st.slot.profissional : st.medicoNome, 'medico'), lin('Pagamento', pagtoTxt, 'pagto'),
           st.pagto === 'convenio' && S.config().exigir_carteirinha ? lin('Carteirinha', st.cart.anexada ? 'Foto enviada' : 'Não enviada', 'cart') : null,
           lin(pre ? 'Preferência' : 'Data e horário', quando, pre ? 'pre' : 'horario')))),
         pre ? h('div', { class: 'marc-aviso' }, h('b', {}, 'Por que pré-marcação: '), motivoPre(st)) : h('div', { class: 'marc-info' }, 'Horário reservado assim que você confirmar.'),
@@ -274,7 +285,7 @@
     }[tipo];
     const d = s && s.dados;
     mostrar(info[1], null, h('div', {}, h('div', { class: 'marc-status ' + tipo }, h('div', { class: 'grande', 'aria-hidden': 'true' }, info[0]), h('h1', { tabindex: '-1', id: 'marcTitulo2', style: 'margin:8px 0 4px' }, tipo === 'pre' ? 'PRÉ-MARCAÇÃO registrada' : tipo === 'ok' ? 'MARCAÇÃO confirmada' : 'Sem solicitação'), h('p', { style: 'margin:0' }, info[2])),
-      s ? h('div', { class: 'marc-card' }, h('table', { class: 'marc-res' }, h('tbody', {}, h('tr', {}, h('td', {}, 'Protocolo'), h('td', {}, h('b', {}, s.protocolo))), h('tr', {}, h('td', {}, 'Procedimento'), h('td', {}, h('b', {}, d.procNome))),
+      s ? h('div', { class: 'marc-card' }, h('table', { class: 'marc-res' }, h('tbody', {}, h('tr', {}, h('td', {}, 'Protocolo'), h('td', {}, h('b', {}, s.protocolo))), h('tr', {}, h('td', {}, 'Consulta'), h('td', {}, h('b', {}, d.procNome))), d.slot && d.slot.profissional ? h('tr', {}, h('td', {}, 'Médica(o)'), h('td', {}, h('b', {}, d.slot.profissional))) : null,
         h('tr', {}, h('td', {}, tipo === 'ok' ? 'Data e horário' : 'Situação'), h('td', {}, h('b', {}, tipo === 'ok' && d.slot ? `${dataBonita(d.slot.data)}, ${d.slot.hora}` : 'Aguardando confirmação da equipe'))))) ) : null,
       h('div', { class: 'marc-info' }, '🔒 Ambiente de teste: nada foi enviado ao Klingo e nenhuma notificação real foi disparada.'),
       tipo !== 'nao' ? h('div', { class: 'marc-card' }, h('b', {}, 'Cancelar ou remarcar'), h('ul', { class: 'marc-regras' }, ...S.config().politica.slice(0, 3).map((t) => h('li', {}, t)))) : null),
@@ -302,7 +313,7 @@
   }
   function remarcar(s) {
     const proc = S.CATALOGO.find((p) => p.id === s.dados.procId); if (!proc) return;
-    st = novo(s.dados.paciente); Object.assign(st, { tipo: proc.tipo, procId: proc.id, procNome: proc.nome, procTipo: proc.tipo, preco: proc.preco, preparo: proc.preparo, pagto: s.dados.pagto, convNome: s.dados.convenio || '', convId: s.dados.convenio ? 'x' : '', plano: s.dados.plano || '', cart: { anexada: !!s.dados.carteirinha, semAgora: false, foto: '' }, remarcando: s.protocolo, passo: 'horario', regras: true });
+    st = novo(s.dados.paciente); Object.assign(st, { tipo: proc.tipo, procId: proc.id, procNome: proc.nome, procTipo: proc.tipo, preco: proc.preco, preparo: proc.preparo, pagto: s.dados.pagto, convNome: s.dados.convenio || '', convId: s.dados.convenio ? 'x' : '', plano: s.dados.plano || '', cart: { anexada: !!s.dados.carteirinha, semAgora: false, foto: '' }, remarcando: s.protocolo, passo: 'horario', regras: true, medico: 'qualquer', medicoNome: 'Tanto faz' });
     desenhar();
   }
 
