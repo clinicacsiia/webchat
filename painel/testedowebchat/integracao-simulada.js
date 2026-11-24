@@ -67,7 +67,7 @@
     const chave = pid(procId) + '|' + String(pagador).toLowerCase(), c0 = vivo.get(chave);
     if (c0 && Date.now() - c0.t < 60000) return c0.r;
     const chamar = async (janela) => {
-      const r = await fetch(FN, { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: CHAVE_PUB, Authorization: 'Bearer ' + CHAVE_PUB }, body: JSON.stringify({ consulta: pid(procId), pagador, janela }) });
+      const r = await fetch(FN, { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: CHAVE_PUB, Authorization: 'Bearer ' + CHAVE_PUB }, body: JSON.stringify({ consulta: pid(procId), pagador, janela, semFiltro: true }) });
       return r.json();
     };
     let rs;

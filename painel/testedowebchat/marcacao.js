@@ -62,7 +62,7 @@
     conv: (s) => s.pagto === 'convenio',
     plano: (s) => s.pagto === 'convenio' && s.convId && s.convId !== NAO_SEI,
     cart: (s) => s.pagto === 'convenio' && s.convId !== NAO_SEI && s.plano !== NAO_SEI && S.config().exigir_carteirinha,
-    horario: (s) => !motivoAntesDoHorario(s),
+    horario: (s) => !motivoAntesDoHorario(s) && (!s.semHorario || s.passo === 'horario'),   // já decidiu pela pré-marcação (sem médica/horário): pula a etapa
     pre: (s) => !!motivoPre(s), regras: () => true, resumo: () => true
   };
   const ORDEM = ['pagto', 'conv', 'plano', 'cart', 'proc', 'medico', 'horario', 'pre', 'regras', 'resumo'];
@@ -129,7 +129,7 @@
   function validar() {
     const p = st.passo;
     if (p === 'proc' && !st.procId) return 'Escolha o procedimento.';
-    if (p === 'medico' && !st.medico) return 'Escolha a médica ou toque em "Tanto faz".';
+    if (p === 'medico' && !st.medico && !st.semHorario) return 'Escolha a médica ou toque em "Tanto faz".';
     if (p === 'pagto' && !st.pagto) return 'Escolha como vai pagar, ou toque em "Não sei".';
     if (p === 'conv' && !st.convId) return 'Escolha o convênio, ou toque em "Não sei".';
     if (p === 'plano' && !st.plano) return 'Escolha o plano, ou toque em "Não sei".';

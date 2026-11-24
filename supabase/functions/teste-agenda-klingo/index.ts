@@ -41,7 +41,7 @@ Deno.serve(async (req: Request) => {
   const janela = Math.min(Math.max(Number.isInteger(c?.janela) ? Number(c.janela) : 0, 0), 2);
   if (!Number.isInteger(consulta) || consulta <= 0 || !pagador || /[\r\n]/.test(pagador)) return json({ error: "Pedido inválido" }, 400);
 
-  const chaveCache = `${consulta}|${pagador.toLowerCase()}|${janela}`, c0 = cache.get(chaveCache);
+  const chaveCache = `${consulta}|${pagador.toLowerCase()}|${janela}|${c?.semFiltro === true ? "sf" : ""}`, c0 = cache.get(chaveCache);
   if (c0 && agora - c0.t < CACHE_S * 1000) return json({ ...(c0.corpo as object), cache: true });
 
   const token = Deno.env.get("KLINGO_APP_TOKEN");
@@ -77,10 +77,13 @@ Deno.serve(async (req: Request) => {
   if (!Array.isArray(dias)) return json({ ok: false, estado: "indisponivel", motivo: "estrutura_inesperada" });
 
   const hoje = hojeBahia(), hora = horaBahia(), out: Array<Record<string, unknown>> = [], vistos = new Set<string>();
+  const porProc: Record<string, number> = {}, semFiltro = c?.semFiltro === true;
   for (const d of dias as Record<string, unknown>[]) {
     const prof = d.profissional as Record<string, unknown> | undefined, uni = d.unidade as Record<string, unknown> | undefined;
     const proc = texto(d.procedimento);
-    if (proc && Number(proc) !== consulta) continue;   // a API devolve vários procedimentos da especialidade; fica o da consulta escolhida
+    const nHoras = Array.isArray(d.horarios) ? d.horarios.length : d.horarios && typeof d.horarios === "object" ? Object.keys(d.horarios as object).length : 0;
+    porProc[proc ?? "?"] = (porProc[proc ?? "?"] ?? 0) + nHoras;   // resumo (sem dado pessoal): quantos horários a API mandou por procedimento
+    if (!semFiltro && proc && Number(proc) !== consulta) continue;   // a API devolve vários procedimentos da especialidade; fica o da consulta escolhida
     const data = String(d.data ?? ""), lista = d.horarios;
     const horas: string[] = [];
     if (Array.isArray(lista)) for (const h of lista) { const s = typeof h === "string" ? h : String((h as Record<string, unknown>)?.hora ?? (h as Record<string, unknown>)?.horario ?? ""); if (/^\d{2}:\d{2}/.test(s)) horas.push(s.slice(0, 5)); }
@@ -93,7 +96,7 @@ Deno.serve(async (req: Request) => {
     }
   }
   out.sort((a, b) => (String(a.data) + String(a.hora)).localeCompare(String(b.data) + String(b.hora)));
-  const r = { ok: true, estado: out.length ? "com_horarios" : "sem_horarios", fonte: "klingo_api", consultadoEm: new Date().toISOString(), inicio, fim, total: out.length, horarios: out.slice(0, 600) };
+  const r = { ok: true, estado: out.length ? "com_horarios" : "sem_horarios", fonte: "klingo_api", procedimentos: porProc, consultadoEm: new Date().toISOString(), inicio, fim, total: out.length, horarios: out.slice(0, 600) };
   cache.set(chaveCache, { t: agora, corpo: r });
   return json(r);
 });
