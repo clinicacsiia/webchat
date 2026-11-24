@@ -170,7 +170,7 @@
       const MSG = {
         fora_do_escopo: 'Esta consulta é agendada pela equipe: o Klingo não oferece horários para ela pelo site.',
         sem_plano: r.motivo === 'plano_do_cadastro_necessario' ? `Para ${quem}, a equipe precisa conferir o seu plano no cadastro antes de reservar um horário.` : `A clínica não marca ${quem} pelo site.`,
-        sem_horarios: `Não há horário livre no Klingo nas próximas 4 semanas para ${quem}.`,
+        sem_horarios: `Não há horário livre no Klingo nos próximos 45 dias para ${quem}.`,
         indisponivel: 'Não conseguimos consultar o Klingo agora.', limite: 'O Klingo está recebendo muitas consultas agora.'
       };
       if (!lista.length) {
@@ -182,7 +182,7 @@
       }
       const set = (id, nome) => { if (st.medico !== id) invalidarHorario(); st.medico = id; st.medicoNome = nome; salvar(); desenhar(); };
       const total = lista.reduce((n, m) => n + m.horarios, 0), hh = r.consultadoEm ? new Date(r.consultadoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '';
-      mostrar('Qual médica?', `${lista.length} médica(s) com horário · ${total} horários reais no Klingo nas próximas 4 semanas${hh ? ' (consultado às ' + hh + ')' : ''}.`, h('div', { class: 'marc-lista', role: 'radiogroup' },
+      mostrar('Qual médica?', `${lista.length} médica(s) com horário · ${total} horários reais no Klingo nos próximos 45 dias${hh ? ' (consultado às ' + hh + ')' : ''}.`, h('div', { class: 'marc-lista', role: 'radiogroup' },
         opcao({ icone: '🔁', titulo: 'Tanto faz', detalhe: 'Mostrar os horários de todas', sel: st.medico === 'qualquer', onclick: () => set('qualquer', 'Tanto faz') }),
         ...lista.map((m) => opcao({ icone: '👩‍⚕️', titulo: m.nome, detalhe: m.horarios ? m.horarios + ' horários disponíveis' : 'Sem horário pelo site (só a equipe)', off: !m.horarios, sel: st.medico === m.id, onclick: () => set(m.id, m.nome) }))), { botoes: botoesPadrao(), foco: false });
     },

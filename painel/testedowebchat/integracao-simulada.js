@@ -57,7 +57,7 @@
   const REAL = () => window.CSI_AGENDA_REAL || { convenios: [], consultasNaApi: [] };
   const naApi = (procId) => REAL().consultasNaApi.includes(pid(procId));
   function convenios_() { return REAL().convenios.map((o) => ({ id: o, nome: bonito(o) })).concat([{ id: 'OUTRO', nome: 'Outro convênio' }]); }
-  // Uma consulta ao vivo (2 janelas de 14 dias), com cache de 60 s no navegador. Devolve { estado, motivo, slots, consultadoEm }.
+  // Uma consulta ao vivo (3 janelas = 45 dias), com cache de 60 s no navegador. Devolve { estado, motivo, slots, consultadoEm }.
   const vivo = new Map();
   async function buscarAoVivo(procId, pagador) {
     const c = config();
@@ -70,7 +70,8 @@
       return r.json();
     };
     let rs;
-    try { rs = await Promise.all([chamar(0), chamar(1)]); } catch { return { estado: 'indisponivel', motivo: 'rede', slots: [] }; }
+    // 3 janelas de 15 dias = 45 dias (o Klingo aceita no máximo 15 dias por consulta)
+    try { rs = await Promise.all([chamar(0), chamar(1), chamar(2)]); } catch { return { estado: 'indisponivel', motivo: 'rede', slots: [] }; }
     const ruim = rs.find((x) => !x || !x.ok);
     if (ruim) return { estado: ruim && ruim.estado === 'limite' ? 'limite' : 'indisponivel', motivo: (ruim && ruim.motivo) || 'erro', slots: [] };
     const sem = rs.find((x) => x.estado === 'fora_do_escopo' || x.estado === 'sem_plano');

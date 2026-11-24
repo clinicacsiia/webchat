@@ -66,7 +66,7 @@ Qualquer "Não sei" (pagamento, convênio ou plano) ou "Não tenho agora" (carte
 ## Horários REAIS do Klingo (24/11/2026) — substitui a grade
 Os horários e as médicas agora vêm **ao vivo da API do Klingo** pela Edge Function nova **`teste-agenda-klingo`** (`supabase/functions/teste-agenda-klingo/index.ts`), publicada em 24/11/2026 a pedido do dono (opção B).
 - **Só leitura:** consulta `GET /agenda/horarios`; não marca, não reserva, **não grava nada no banco** (só lê `klingo_especialidade` e chama `klingo_plano_resolver`, que é `STABLE`); sem dado de paciente.
-- **Proteções:** só responde à origem `https://clinicacsiia.github.io`; limite de 20 consultas/min por IP; cache de 60 s; janela de 14 dias (a tela pede 2 janelas = 28 dias); não usa a cota global (que grava no banco). Usa o mesmo segredo `KLINGO_APP_TOKEN` das outras funções, então as consultas dividem a cota do Klingo com o chat real.
+- **Proteções:** só responde à origem `https://clinicacsiia.github.io`; limite de 20 consultas/min por IP; cache de 60 s; janela de 14 dias (a tela pede 3 janelas = 45 dias, como o chat real); não usa a cota global (que grava no banco). Usa o mesmo segredo `KLINGO_APP_TOKEN` das outras funções, então as consultas dividem a cota do Klingo com o chat real.
 - **O que a API oferece:** só Pediatria (inclui pré-natal), Neurologia (neuropediatra) e Radiologia (`klingo_especialidade.liberada_api`). Ortopediatra, endócrino, gastro e cirurgia pediátrica **não têm horário na API**: seguem como pré-marcação (equipe).
 - **Convênio:** a lista é a do `klingo_plano_map` (26 operadoras que a clínica atende). Seis delas (Amor Saúde, Bradesco x2, Central Nacional Unimed, SulAmérica, Unimed Seguros) precisam do **plano do cadastro do paciente** para consultar horário (`plano_do_cadastro_necessario`): neste teste, que não tem CPF/cadastro, caem na **pré-marcação**.
 - A marcação continua **simulada** (nada é reservado no Klingo) e os dados do paciente continuam fictícios.
@@ -75,3 +75,6 @@ Os horários e as médicas agora vêm **ao vivo da API do Klingo** pela Edge Fun
 ## Planos reais do convênio (24/11/2026)
 Depois do convênio, a tela mostra a **lista real de planos** daquele convênio (do `klingo_convenio`, a mesma que o chat usa), com **busca**: ex.: SulAmérica 1.368 planos, Bradesco Saúde 199, Amil 281, Promédica 2. Função nova só de leitura **`teste-planos-klingo`** (`supabase/functions/teste-planos-klingo/index.ts`: só lê o banco, não chama o Klingo, não grava, origem conferida, 60/min por IP, no máximo 40 resultados por busca).
 O plano escolhido volta como `OPERADORA#idDoPlano` (regra do chat: "plano exato"). Isso resolve os convênios que exigiam o plano do cadastro (SulAmérica, Bradesco, Central Nacional Unimed, Unimed Seguros, Amor Saúde): com o plano escolhido, o Klingo devolve os horários reais. "Outro convênio" e falha da lista usam texto livre.
+
+## Pesquisa de 45 dias (24/11/2026)
+A busca de horários cobre **45 dias** (3 janelas de 15 dias, a pedido do dono; o Klingo aceita no máximo 15 dias por consulta). Cada escolha de pagador/consulta faz 3 consultas ao Klingo (cache de 60 s; limite de 20/min por IP na função).
