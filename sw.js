@@ -1,6 +1,10 @@
 // Service worker do chat do cliente: abre na hora com a cópia guardada e busca a versão nova por trás (vale na próxima abertura).
 // O link pode vir do WhatsApp, do e-mail ou da bio com ?origem=...: a cópia é a mesma para todos.
-const VERSAO = 'webchat-cliente-v82';
+const VERSAO = 'webchat-cliente-v83';
+// ATUALIZAÇÃO FORÇADA (25/11/2026): celular que guardava uma cópia ANTIGA do chat (cache abaixo desta versão) recarrega o chat sozinho assim que este service worker assume,
+// em vez de esperar a próxima abertura. A conversa continua: ela fica no servidor e no aparelho (a tela por etapas volta na mesma pergunta). Só se perde o que estava digitado e ainda não foi enviado.
+// Vale uma vez: para quem já está nesta versão (ou acima) a atualização volta a ser a educada (avisa a página). Para forçar de novo numa próxima publicação, suba este número junto com a VERSAO.
+const FORCAR_ABAIXO_DE = 83;
 const BASE = ['./', 'index.html', 'privacidade.html', 'termos.html', 'sentinela.js', 'nomes-exame.js', 'etapas.js', 'etapas.css', 'icon-192.png', 'apple-touch-icon.png', 'img/logo-csi.svg', 'img/logo-csi-sem-anel.svg', 'img/logo-csi-anel.svg', 'img/logo-csi-simbolo.svg', 'manifest.webmanifest'];
 
 self.addEventListener('install', (e) => {
@@ -9,12 +13,25 @@ self.addEventListener('install', (e) => {
   self.skipWaiting();
 });
 
+// Só o chat (a raiz do site e index.html): o painel, a fila, o /acesso/ e a minha-vez não são tocados.
+async function recarregarChats() {
+  const raiz = new URL('./', self.registration.scope).pathname;
+  const cs = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+  await Promise.all(cs.map(async (c) => {
+    try { const p = new URL(c.url).pathname; if (p === raiz || p === raiz + 'index.html') await c.navigate(c.url); } catch { /* aba fechada ou navegador sem suporte: vale na próxima abertura */ }
+  }));
+}
+const numeroDaVersao = (k) => { const m = /(\d+)$/.exec(k); return m ? Number(m[1]) : 0; };
+
 self.addEventListener('activate', (e) => {
-  e.waitUntil(
-    caches.keys()
-      .then((ks) => Promise.all(ks.filter((k) => k !== VERSAO && k.startsWith('webchat-cliente')).map((k) => caches.delete(k))))
-      .then(() => self.clients.claim())
-  );
+  e.waitUntil((async () => {
+    const antigas = (await caches.keys()).filter((k) => k !== VERSAO && k.startsWith('webchat-cliente'));
+    const veioDeVelha = antigas.some((k) => numeroDaVersao(k) < FORCAR_ABAIXO_DE);
+    await Promise.all(antigas.map((k) => caches.delete(k)));
+    await self.clients.claim();
+    // SEM esperar (sem await): a página só carrega depois que este service worker termina de ativar; esperar aqui travaria os dois.
+    if (veioDeVelha) recarregarChats().catch(() => {});
+  })());
 });
 
 self.addEventListener('fetch', (e) => {

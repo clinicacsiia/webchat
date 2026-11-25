@@ -113,6 +113,30 @@ Rodei a bateria inteira (`npm test`, que para na primeira falha) e depois **cada
 
 **Não testado em navegador:** o caminho com PIN e filhos do acesso rápido ("Para <filho>" com o aparelho cadastrado) e o "um de cada vez" fim a fim; ficam para o piloto. **Atenção à regra nova do paciente novo (CPF, nascimento e celular):** celular que já tem cadastro no acesso rápido precisa continuar pedindo PIN.
 
+## 5.3 Cadastro e PIN no modelo novo (revisão de 25/11/2026)
+**Modelo do dono:** marcar e pré-marcar só com CPF, nascimento e celular; cadastro e PIN só para remarcar, cancelar e pegar resultado; celular novo não precisa se cadastrar; cadastro opcional. Quem já tem cadastro continua.
+
+**Como é hoje (conferido no código e na produção, 25/11/2026)**
+- **Duas travas, uma chave.** Na tela: `app_porta()` manda quem não tem PIN para `/acesso/` (`index.html`, `portaBarrar`). No servidor: `app_pin_exigir()` (5 funções de escrita: `chat_iniciar`, `chat_responder`, `chat_enviar`, `chat_nova_conversa`, `chat_irmao_iniciar`) e `app_pin_exigir_leitura()` (44 funções: `chat_*` de leitura e `conta_paciente_*`). Tudo depende de `app_pin_obrigatorio = sim` (e `app_pin_servidor = sim`): `app_pin_token()` devolve nulo se qualquer uma for `nao`.
+- **O que já exige cadastro por conta própria** (funções `app_*`, não dependem da chave acima): Acompanhe seus pedidos (`app_pedidos`, `app_pedido_acao`), cancelar pelo acompanhamento (`app_marcacao_cancelar`), laudos (`app_laudos_pode`, função `app-laudos`), resultados, Meus dados, números de confiança, check-in com PIN (`acesso_checkin_pin`).
+- **O que NÃO se protege sozinho:** remarcar, cancelar e resultado **dentro do chat** (passos `marc_*` e `resultado_*` de `fluxo_perguntar`, pelo "Outro assunto"). Hoje só estão atrás da porta do PIN. Se a porta abrir para marcar sem cadastro, esses passos ficam abertos a quem digitar CPF e nascimento.
+- **Vínculo tardio já existe:** `acessoVincular` (`index.html`) liga ao cadastro todas as conversas guardadas no aparelho (histórico e atual), conferindo o código da conversa e que o celular é o mesmo (`app_conversa_vincular`). Quem marcou sem cadastro e cria o PIN no mesmo aparelho passa a ver o pedido. Em outro aparelho não (falta o código da conversa).
+- **Prova de identidade:** o PIN é escolhido por quem se cadastra; o código por e-mail (`app_codigo_email`) prova o e-mail, não o CPF; "esqueci o PIN" usa celular + nome + nascimento. Pelo que li em `app_laudos_pode`, o laudo depende do CPF e do nascimento do cadastro conferidos no Klingo, então quem digita CPF e nascimento de outra pessoa no cadastro poderia pedir o laudo dela. **Isso já é assim hoje**; vale reforçar (decisão D14).
+- **Edge Functions:** `chat-agenda-api` confere só o código da conversa (não o PIN): marcar sem PIN não a quebra.
+
+**O que muda para o modelo do dono (nada foi feito)**
+1. `app_pin_obrigatorio = nao`: a porta abre e o servidor deixa de pedir PIN nas 49 funções. **Só depois** de (2).
+2. **Trava por etapa no motor:** `marc_*` e `resultado_*` passam a exigir cadastro com PIN **e** que o CPF da conversa seja o do cadastro (titular ou filho). Resposta nova ao navegador (por exemplo `pin_necessario`); o chat e `etapas.js` mostram "Para continuar, crie ou digite o seu PIN" e voltam à mesma pergunta depois do `/acesso/`. Mudança em `chat_responder`/`fluxo_*`, testada no clone antes.
+3. **Cadastro curto** para quem precisa: o celular já vem da conversa; pedir nome, nascimento, CPF, e-mail e o código por e-mail (o mesmo `app_cadastrar`).
+4. **Quem já tem cadastro:** com a porta aberta, o aparelho dele continua ligado; **comportamento do "Olá, nome" sem PIN na abertura não foi testado**: ver no piloto.
+5. **Check-in na recepção** (`minha-vez`): hoje com PIN; decidir (D15).
+
+## 5.4 Atualização forçada dos celulares antigos (25/11/2026)
+**Como era:** o service worker abria o chat com a cópia guardada e baixava a nova por trás ("vale na próxima abertura"); a página só se recarregava sozinha se o formulário estivesse vazio. Quem não abria o chat ficava com a cópia velha.
+**Agora (`sw.js` v83, chat `2026.11.25-1`):** quando um celular que guardava uma cópia **abaixo da v83** recebe este service worker, ele recarrega **só o chat** (a raiz e `index.html`; `/acesso/`, painel, fila e minha-vez não são tocados) e apaga a cópia antiga. A conversa continua (servidor e aparelho; a tela por etapas volta na mesma pergunta); perde-se só o que estava digitado e não enviado. Quem já está na v83 ou acima volta à atualização educada. Para forçar de novo numa próxima publicação, subir `FORCAR_ABAIXO_DE` junto com `VERSAO`.
+**Cuidado que o teste achou:** esperar a página recarregar **dentro** do `activate` trava o service worker (a página só carrega depois da ativação). A chamada é feita sem esperar.
+**Limites:** só vale **depois que a PR for juntada na `main`** (GitHub Pages) e o celular abrir o site (o navegador procura o `sw.js` novo ao abrir); celular que nunca mais abre o site, ou que apagou os dados, não é alcançado. Teste: `npm run test:sw-atualizacao-forcada` (5/5), com service worker de verdade.
+
 ## 6. O que NÃO foi feito (para não haver surpresa)
 
 - Nenhuma migração aplicada; nenhuma função publicada; nenhuma chave de `config` criada na produção.
