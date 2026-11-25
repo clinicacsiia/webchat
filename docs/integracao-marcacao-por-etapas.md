@@ -1,106 +1,91 @@
 # Integração do sistema de marcação por etapas (TesteWebchat) com a produção
 
-Versão 1.0 — 24/11/2026 / Mudança: primeira versão (pesquisa e desenho; **nada foi publicado e nenhuma mudança de banco foi aplicada**).
+Versão 1.1 — 25/11/2026 / Mudança: **construído e testado no clone, tudo desligado** (parte 1 do banco, `etapas.js`/`etapas.css`, troca no `index.html` atrás da chave `marcacao_etapas_modo`; testes `test:marcacao-etapas-sql` e `test:marcacao-etapas`). **Nada foi aplicado na produção e o `index.html` só muda o comportamento quando a chave estiver em `piloto` ou `sim`.** Versão 1.0 — 24/11/2026: pesquisa e desenho.
 
-Este documento diz **o que precisa existir** para trocar o botão **Começar** do chat de produção pelo sistema por etapas de `painel/testedowebchat/`, e **em que ordem** fazer isso sem risco. Ele não substitui `painel/testedowebchat/LEIAME.md` (o que o teste faz) nem `docs/DOCUMENTACAO.md` (como a produção funciona).
+Este documento diz **o que foi feito**, **como trocar o botão Começar** quando o dono pedir, **como voltar atrás** e **o que ficou pendente**. Não substitui `painel/testedowebchat/LEIAME.md` (o que o ambiente de teste faz) nem `docs/DOCUMENTACAO.md` (como a produção funciona).
 
-## 1. O que a pesquisa mostrou (resumo)
+## 1. A decisão de engenharia (e por quê)
 
-O TesteWebchat é uma **tela nova com regras simuladas no navegador**. A produção é um **motor no banco** (funções `chat_*`, `fluxo_*`, `klingo_*`, `app_*`) ligado à conversa do paciente. Ao ler o motor, ficou claro que **a tela de teste não passa por regras que o chat real aplica hoje**:
+A página de teste é uma **tela nova com regras simuladas no navegador**. A produção é um **motor no banco** (`chat_*`, `fluxo_*`, `klingo_*`, `app_*`) ligado à conversa do paciente. A tela de teste **não passava** por regras que o chat real aplica hoje:
 
-| Regra da produção (já no ar) | Onde fica | Na tela de teste |
-|---|---|---|
-| PIN de 30 min e cadastro completo para abrir o chat | `app_pin_exigir`, `app_porta`, `/acesso/` | **não existe** |
-| CPF + nascimento conferidos no Klingo (`cpf_nasc`, identidade) | `fluxo_proximo`, `klingo_identificar` | **não pede** |
-| Horários só se a API do Klingo ofereceu, com validade, por conversa, sexo e nascimento do paciente | `chat-agenda-api`, `klingo_oferta`, `chat_horarios` | usa função própria sem token e sem paciente |
-| Escolher horário só entre as ofertas vivas; "esse horário acabou de ficar indisponível" | `chat_horario_escolher` | só confere no navegador |
-| Marcar de verdade, com trava e operação auditada | `klingo_pode_marcar`, `klingo_operacao_criar`, `klingo-executar` | simulado |
-| Valor **Particular** mostrado e aceito antes de marcar | `particular_valor_*` | **não existe** |
-| Retorno com menos de 30 dias e primeira consulta com a médica: só atendente | `retorno_recente_ok`, `primeira_consulta_ok` | **não existe** |
-| Convênio suspenso/desativado | `convenio_ativo`, `convenio_avisar` | **não existe** |
-| Plano exato do convênio (id do Klingo) | `plano_exato_*` | existe (lista real), mas sem gravar |
-| Só a unidade Desenvoar marca sozinha | `unidade_marca_auto` | lista fixa no navegador |
-| Médico escolhido nunca é trocado | `klingo_prof_confere` | só no navegador |
-| Limite de mensagens por minuto, conversa duplicada, token da conversa | `chat_responder`, `chat_iniciar`, `chat_valida` | **não existe** |
-| Equipe vê, assume e responde no painel; "Acompanhe seus pedidos" | `conversas`, `pre_agendamentos`, `app_pedidos` | só `localStorage` |
-
-**Conclusão de engenharia:** trocar o botão ligando a tela de teste ao próprio navegador seria **abrir um caminho paralelo sem as travas**. O caminho certo é a tela nova **conduzir o motor que já existe** (mesmas funções, mesmas travas), e só criar no servidor o que o motor **ainda não tem**.
-
-## 2. Arquitetura escolhida
-
-1. **Troca atrás de uma chave.** Nova chave em `config`: `marcacao_etapas_modo` = `nao` (padrão: botão atual) | `piloto` (só números de telefone de uma lista) | `sim` (todos). Entra em `chat_config()` (já é pública e já carrega `entrada_webchat_modo`). **Desligar = uma linha de SQL**, sem publicar nada. O ponto único de troca é `iniciar()` em `index.html` (hoje chama `chat_iniciar`; no teste chama `CSI_MARCACAO.abrir`).
-2. **A identidade vem do acesso rápido.** A tela só abre depois do PIN (portão atual do chat). Nome, telefone, e-mail, CPF e nascimento vêm do cadastro (`app_perfil` / `app_chat_dados`), então a tela **não digita** esses dados. Filho(a): igual ao chat de hoje (`p_paciente_tipo = 'filho'`).
-3. **A tela vira um "condutor" do motor.** Ela guarda as respostas (pagamento, convênio, plano…) na ordem pedida pela diretoria, mas **só as envia na ordem que o motor exige**, sempre conferindo o passo atual devolvido pelo servidor (`chat_responder` recusa resposta de passo errado). Assim `fluxo_proximo` continua sendo a única fonte da ordem e das travas.
-4. **Cada etapa da tela usa a função real:**
-
-| Etapa da tela | Função real (já existe) |
+| Regra da produção (já no ar) | Onde fica |
 |---|---|
-| abrir | `chat_iniciar` (PIN no servidor, limite de 5 conversas/h, aceite LGPD) |
-| consulta | `chat_consultas` → `chat_consulta_salvar` |
-| médico(a) | `chat_medicos_disponiveis` / passo `medico` |
-| pagamento, convênio | passo `plano` (`fluxo_aplicar`; recusa convênio inativo) |
-| plano | passo `plano_exato` (valor = id do Klingo, ou `nao_sei`) |
-| horário | `chat-agenda-api` (token da conversa) → `chat_horarios` → `chat_horario_escolher` |
-| valor Particular | passo `valor` |
-| resumo / confirmar | passo `confirmar` → `fluxo_finalizar` → `klingo_pode_marcar` → `klingo-executar` |
-| acompanhar, remarcar, cancelar | `app_pedidos`, `app_pedido_acao`, `app_marcacao_cancelar` (já existem) |
-| avisar equipe | `fluxo_finalizar_humano` / `fluxo_transferir` (a equipe vê no painel) |
+| PIN de 30 min e cadastro completo para abrir o chat | `app_pin_exigir`, `app_porta`, `/acesso/` |
+| CPF + nascimento conferidos no Klingo | `fluxo_proximo`, `klingo_identificar` |
+| Horários só se a API do Klingo ofereceu, com validade, por conversa | `chat-agenda-api`, `klingo_oferta`, `chat_horarios` |
+| Escolher horário só entre as ofertas vivas | `chat_horario_escolher` |
+| Marcar de verdade, com trava e operação auditada | `klingo_pode_marcar`, `klingo_operacao_criar`, `klingo-executar` |
+| Valor **Particular** mostrado e aceito antes de marcar | `particular_valor_*` |
+| Retorno com menos de 30 dias e primeira consulta com a médica: só atendente | `retorno_recente_ok`, `primeira_consulta_ok` |
+| Convênio suspenso/desativado; plano exato do convênio | `convenio_ativo`, `plano_exato_*` |
+| Só a unidade autorizada marca sozinha; médico escolhido nunca é trocado | `unidade_marca_auto`, `klingo_prof_confere` |
+| Limite de mensagens, conversa duplicada, token da conversa | `chat_responder`, `chat_iniciar`, `chat_valida` |
+| Equipe vê e assume no painel; "Acompanhe seus pedidos" | `conversas`, `pre_agendamentos`, `app_pedidos` |
 
-5. **Nada de regra no navegador.** Antecedência de 24 h, prazo, limite de 2 remarcações, carteirinha obrigatória, consulta ativa: **decididas pelo servidor** (`config` + funções). Os botões de teste (⚙ Configurar, "[Teste] simular…", "Apagar dados do teste") **não vão** para a produção.
-6. **As funções `teste-agenda-klingo` e `teste-planos-klingo` saem de cena.** Hoje elas já estão publicadas, abertas ao público (só a origem é conferida) e **gastam a mesma cota do Klingo do chat real**. Depois do piloto, apagá-las em https://supabase.com/dashboard/project/nrvuynjwcgwpjdptkiay/functions.
+**Trocar o botão ligando a tela de teste ao navegador seria abrir um caminho paralelo sem essas travas.** Por isso a tela de produção (`etapas.js`) **só desenha o que o servidor manda**: cada resposta vai por `chat_responder`, `chat_consulta_salvar` e `chat_horario_escolher`, as mesmas funções e travas do chat de hoje. **Nenhuma regra de negócio mora na tela.** O que a tela não entende vai para o chat de sempre, **na mesma conversa** ("Continuar no chat").
 
-## 3. O que o motor ainda NÃO tem (precisa ser criado, com teste e rollback)
+## 2. O que foi construído
 
-| # | Peça nova | Por quê | Observação |
-|---|---|---|---|
-| N1 | **Ciência da pré-marcação gravada no servidor** (hora do servidor, IP, aparelho, texto aceito) | hoje o registro é do navegador e pode ser forjado; IP não existe | tabela nova só de escrita por função; sem leitura pública |
-| N2 | **Pré-marcação com prazo para completar** (24 h, configurável) | o motor manda para a equipe ou abre "previsão"; não há "completar depois" | reaproveitar `pre_agendamentos` (`rascunho`) + prazo; avisar quando vencer |
-| N3 | **Médico de interesse e preferências (período/dias)** na pré-marcação | hoje só `medico_preferido` e `previsao_*` | pode caber em `conversa_fluxo.dados` sem tabela nova |
-| N4 | **"Não" na pré-marcação → equipe chama no WhatsApp** | hoje não existe esse desfecho | reaproveitar `fluxo_transferir` com motivo próprio |
-| N5 | **Foto da carteirinha** | o chat de hoje **removeu** o passo ("carteirinha-removida"); só a foto do pedido existe (`chat_foto_enviar`/`chat_anexo_enviar`) | decisão do dono; se mantiver, usar o envio de anexo já existente |
-| N6 | **Chave `marcacao_etapas_modo` e lista do piloto** | troca reversível | entra em `chat_config()` |
-| N7 | **Limite global de buscas de horário** | proteger a cota do Klingo | o `chat-agenda-api` já tem `cotaGlobal` |
+| Peça | Arquivo | O que faz |
+|---|---|---|
+| Chave e piloto | `supabase/marcacao-etapas-parte1.sql` | `config.marcacao_etapas_modo` = `nao` (padrão) \| `piloto` \| `sim`; `config.marcacao_etapas_telefones` (lista do piloto, **nunca** sai pela `chat_config`); `marcacao_etapas_pode(telefone)`; `chat_config()` devolve o modo. |
+| Ciência no servidor | mesmo arquivo | Tabela `marcacao_ciencia` (fechada ao público) e `marcacao_ciencia_registrar(...)`: **hora do servidor, IP que a plataforma informa, só campos permitidos do aparelho**, PIN + token da conversa, limite de 5 por hora, nota na conversa para a equipe. Apagar a conversa apaga a ciência. |
+| Tela por etapas | `etapas.js`, `etapas.css` | Renderiza as perguntas do motor: escolha (com busca e "outro"), campos, consulta, calendário (via `chat-agenda-api` → `chat_horarios` → `chat_horario_escolher`), marcando, fim. Barra de progresso, Voltar (`chat_voltar`), "Falar com a equipe". |
+| Troca do botão | `index.html` (`iniciar()`, `init()`, PIN) | Só abre a tela por etapas se `modo` deixar. Irmãos "juntos" **sempre** vão para o chat de sempre. Se `etapas.js` não carregar, segue no chat de sempre (mesma conversa). Recarregar a página volta à mesma pergunta. |
+| Cache | `sw.js` | `etapas.js` e `etapas.css` entram no cache; `VERSAO` v82; chat `2026.11.24-1`. |
+| Testes | `testes/sql-marcacao-etapas-parte1.test.mjs` (19 casos), `testes/marcacao-etapas.navegador.mjs` (11 casos, navegador de verdade falando com o **motor real** num clone do banco), `testes/retrato.test.mjs` (agora também confere as chamadas de `etapas.js`) | |
 
-## 4. As 10 falhas da revisão de segurança e como ficam resolvidas
+**Pré-marcação:** não é um caminho separado. Quando o paciente escolhe **"Não sei qual é o meu plano"** ou **"Nenhum desses horários serve"**, a tela mostra o aviso e o **botão vermelho** "Estou ciente"; só depois disso grava a ciência e envia a resposta ao motor, que leva o pedido para a equipe (como já faz hoje). **"Não, obrigado: quero falar com a equipe"** usa o pedido de atendente que já existe.
 
-1. Sem identificação → portão do PIN + CPF/nascimento do cadastro (item 2 e 4 acima).
-2. Regras no navegador → regras no servidor (item 5).
-3. Marcação simulada → `klingo_pode_marcar` + `klingo-executar` conferem o horário de novo.
-4. Ciência forjável → N1.
-5. Dados no aparelho → a tela só guarda a conversa (token já existente); **sem foto nem dados pessoais no `localStorage`** além do que o chat de hoje já guarda; limpar ao concluir.
-6. Funções de teste esgotando a cota → `chat-agenda-api` com token e cota; funções de teste apagadas.
-7. "Não" → WhatsApp sem verificação → só quem passou pelo PIN chega aqui (N4).
-8. `supabase-js@2` sem versão fixa/SRI e sem CSP → fixar versão e `integrity`; copiar o CSP da `/acesso/`.
-9. LGPD → atualizar `privacidade.html` (ciência com IP/aparelho, carteirinha), prazo de guarda e revisão do advogado (pendente do dono).
-10. Restos de teste → remover faixa laranja, ⚙, `[Teste]`, `testeBloqueio` e "TESTE" do manifesto.
+## 3. Como trocar o botão Começar (quando o dono pedir)
 
-## 5. Como será testado (nada vai ao ar sem isto verde)
+Nada abaixo foi feito. Cada passo tem a volta.
 
-- **Banco (clone da produção):** novo `testes/sql-marcacao-etapas.test.mjs` — caminho completo (PIN → consulta → plano → horário → confirmar), as travas (PIN ausente, CPF inválido, convênio inativo, retorno < 30 dias, Particular sem aceitar o valor, horário que expirou, médico trocado), pré-marcação com prazo, ciência gravada, "Não" → WhatsApp, limite de conversas. Reaproveitar `banco-producao.mjs` e `sql-ponta-a-ponta.test.mjs`.
-- **Navegador:** `testes/marcacao-etapas.navegador.mjs` (Playwright) com o mock de `testes/mock-chat.mjs`: ordem das telas, "Voltar/Corrigir", falha da agenda, tela sem rede.
-- **Regressão obrigatória:** `npm run test:retrato` (hoje 10/10 verde), `test:ponta-a-ponta`, e os testes do chat (`test:c1`, `test:horarios`, `test:acesso-chat-sql`, `test:particular-valor`, `test:retorno-30-dias`).
-- **Depois de cada migração aplicada:** medir na produção (só estrutura, contagens e erros) e **refazer o retrato** (`supabase/producao/LEIAME.md`).
+1. **Conferir a `main`** (`git fetch`, comparar com as migrações aplicadas em `supabase_migrations.schema_migrations`). O dono trabalha em várias sessões.
+2. **Aplicar `supabase/marcacao-etapas-parte1.sql` em partes** pela ferramenta de migração do Supabase (ela expira em 60 s e pede confirmação em comandos que parecem destrutivos): (a) as duas linhas de `config`; (b) `chat_config()`; (c) `marcacao_etapas_pode`; (d) a tabela e o índice; (e) `marcacao_ciencia_registrar`; (f) os `revoke/grant`. Link: https://supabase.com/dashboard/project/nrvuynjwcgwpjdptkiay/sql/new
+3. **Medir na produção** (só estrutura/contagens): as 2 funções existem; `select valor from config where chave='marcacao_etapas_modo'` = `nao`; `chat_config()` traz a chave. Depois **refazer o retrato** (`supabase/producao/LEIAME.md`) e rodar `npm run test:retrato` (a linha "aguardam a migração" some).
+4. **Publicar a tela** (juntar a PR do `index.html`/`etapas.*`/`sw.js` na `main`; o GitHub Pages publica em ~1 minuto). Com a chave em `nao`, **o botão de hoje continua igual**.
+5. **Piloto:** `update public.config set valor = '<telefones separados por vírgula>' where chave='marcacao_etapas_telefones'; update public.config set valor='piloto' where chave='marcacao_etapas_modo';` — a equipe faz **uma marcação real e uma pré-marcação** de ponta a ponta e confere no painel (Atendimento).
+6. **Todos:** `update public.config set valor='sim' where chave='marcacao_etapas_modo';` — com a equipe de plantão; acompanhar erros técnicos por 24 h.
+7. **Limpeza:** apagar as funções `teste-agenda-klingo` e `teste-planos-klingo` (ver pendência 8) e refazer o retrato.
 
-## 6. Plano de publicação (passo a passo, cada passo reversível)
+**Voltar atrás, a qualquer hora, sem publicar nada:** `update public.config set valor='nao' where chave='marcacao_etapas_modo';` — quem já está no meio de uma conversa por etapas **continua** no chat de sempre, na mesma conversa. Reversão do banco: bloco `ROLLBACK` no fim de `supabase/marcacao-etapas-parte1.sql`.
 
-1. Migrações **em partes pequenas**, cada uma com `rollback` — só **depois do seu OK** (mudam a produção, mesmo sem ninguém usar).
-2. Publicar a tela nova **com a chave em `nao`** (o botão de hoje continua igual). Trocar `VERSAO_APP` e as `VERSAO` dos `sw.js`.
-3. Ligar `piloto` para 1–2 telefones da equipe; fazer uma marcação **real e uma pré-marcação** de ponta a ponta; conferir no painel.
-4. Se algo errar: `update public.config set valor = 'nao' where chave = 'marcacao_etapas_modo';` (volta na hora).
-5. Abrir para todos (`sim`) com a equipe de plantão; acompanhar erros técnicos e a fila por 24 h.
-6. Apagar `teste-agenda-klingo` e `teste-planos-klingo`; refazer retrato; atualizar `DOCUMENTACAO.md`.
+## 4. As 10 falhas da revisão de segurança: situação
 
-## 7. Decisões que só o dono pode tomar (pendências)
+| # | Falha | Situação |
+|---|---|---|
+| 1 | Sem identificação | **Resolvida:** o chat de produção já exige PIN e cadastro; a tela usa a mesma conversa (`chat_iniciar` com PIN no servidor) e CPF + nascimento do motor. |
+| 2 | Regras só no navegador | **Resolvida:** as regras são do motor. A tela não tem configuração local. |
+| 3 | Marcação simulada | **Resolvida:** marca o motor (`klingo_pode_marcar` + `klingo-executar`). |
+| 4 | Ciência forjável | **Resolvida:** gravada pelo servidor (hora, IP, aparelho filtrado). |
+| 5 | Dados pessoais no aparelho | **Resolvida:** a tela não guarda nada além do que o chat de hoje já guarda (`conversa` e `perfil`); sem foto de carteirinha. |
+| 6 | Funções de teste esgotando a cota | **Resolvida na tela** (usa `chat-agenda-api`, com token e cota). **Pendente:** apagar as funções `teste-*` ainda publicadas (pendência 8). |
+| 7 | "Não" → WhatsApp sem verificação | **Resolvida:** só quem passou pelo PIN chega aqui; o pedido de atendente é o que o chat já usa. |
+| 8 | `supabase-js@2` sem versão fixa/SRI; sem CSP | **Pendente** (vale para o chat inteiro, não só para esta tela). |
+| 9 | LGPD | **Pendente** (textos, prazo de guarda, advogado). |
+| 10 | Restos de teste | **Resolvida:** nada de faixa laranja, ⚙ ou `[Teste]` em `etapas.js`. |
 
-1. **Foto da carteirinha:** manter (volta um passo que o chat tirou) ou seguir sem foto, como o chat de hoje? (N5)
-2. **Prazo de 24 h para completar a pré-marcação** e a **reserva provisória do horário**: o Klingo **não reserva** horário por 24 h. Aceitar que o horário "guardado" é só um **desejo** (a equipe confirma) ou criar uma regra operacional com a equipe? (N2)
-3. **"Não, obrigado" → a equipe chama no WhatsApp:** confirma que a equipe quer receber esse aviso na fila do painel?
-4. **Piloto:** quais telefones da equipe entram na lista (`piloto`)?
-5. **Texto jurídico:** prazo de guarda, revisão do advogado em `privacidade.html` e `termos.html` (já pendente em `docs/pendencias-do-dono.md`).
-6. **Convênios que exigem "plano do cadastro"** (Bradesco, SulAmérica, Central Nacional Unimed, Unimed Seguros, Amor Saúde): seguem o motor (plano exato ou equipe).
+## 5. Pendências (anotadas; nada disto bloqueia o piloto)
 
-## 8. O que NÃO foi feito ainda (nesta versão do documento)
+**Decisões do dono**
+1. **Ordem das perguntas.** A tela segue a ordem do motor (CPF e nascimento → consulta → médico(a) → pagamento/plano → horário → dados → conferir). A ordem do protótipo (pagamento primeiro) exige mudar `fluxo_proximo`, que é a função central do chat de hoje: só com teste no clone e atrás de uma chave por conversa. **Não foi feito.**
+2. **Foto da carteirinha.** O chat de hoje **removeu** o passo ("carteirinha-removida"); a tela por etapas também não pede. Se o dono quiser a foto de volta, usar o envio de anexo que já existe (`chat_anexo_enviar`).
+3. **Prazo de 24 h para completar a pré-marcação e "Completar agora".** **Não existe** no motor e o Klingo **não reserva** horário. A tela diz só que a equipe confirma e que **a pré-marcação não garante o horário**. Para ter prazo, é preciso criar uma regra operacional com a equipe e um vencimento no banco.
+4. **Caixa "Entendi: se o chat não conseguir marcar sozinho, o pedido só vale quando uma pessoa da equipe confirmar".** Ela continua **obrigatória** no formulário de produção (o dono a retirou só do ambiente de teste). Decidir se sai (a ciência da pré-marcação já cobre o caso).
+5. **Aviso da equipe quando o paciente diz "Não, obrigado".** Hoje vira um pedido de atendente na fila (como "Falar com um atendente"). Confirmar que a equipe quer isso.
+6. **Telefones do piloto.** A lista nasce **vazia**: em `piloto`, ninguém entra até o dono informar.
+7. **Texto jurídico.** `privacidade.html` e `termos.html` precisam citar a ciência (data/hora, IP e aparelho), o prazo de guarda e a revisão do advogado (`docs/lgpd.md` seção 6). A tabela `marcacao_ciencia` **não tem limpeza periódica** (só apaga com a conversa); definir o prazo.
 
-- Nenhuma migração escrita ou aplicada; nenhuma mudança em `index.html` de produção; nenhuma função publicada.
-- O motor não foi executado de ponta a ponta com a tela nova.
-- Não foi testado nenhum endpoint ao vivo.
+**Técnicas**
+8. **Apagar `teste-agenda-klingo` e `teste-planos-klingo`** no Supabase depois do piloto: estão publicadas, abertas (só a origem é conferida) e gastam a cota do Klingo do chat real. https://supabase.com/dashboard/project/nrvuynjwcgwpjdptkiay/functions
+9. **Hardening do chat inteiro:** fixar a versão do `supabase-js` no jsDelivr com `integrity` (SRI) e acrescentar CSP ao `index.html` (a `/acesso/` já tem).
+10. **Teste de ponta a ponta com o Klingo de verdade** (marcação real) só acontece no piloto; o clone não fala com o Klingo.
+11. **O que a tela ainda manda para o chat de sempre** (por segurança): irmãos "juntos", exames, "outro assunto", médico sem horário com solicitação de disponibilidade, resultado, remarcar/cancelar. Pode ser levado para a tela por etapas aos poucos.
+12. **Revisar na prática no celular** (leitura de tela, teclado numérico dos campos CPF/data) durante o piloto.
+
+## 6. O que NÃO foi feito (para não haver surpresa)
+
+- Nenhuma migração aplicada; nenhuma função publicada; nenhuma chave de `config` criada na produção.
+- Nenhum endpoint ao vivo foi chamado; o clone não fala com o Klingo.
+- O PIN no navegador foi coberto no banco (`test:marcacao-etapas-sql`, `test:acesso-pin-servidor`), não num navegador com o teclado do PIN.
