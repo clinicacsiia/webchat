@@ -696,6 +696,10 @@
   .pm-zap svg { width: 20px; height: 20px; fill: currentColor; }
   .pm-acoes .btn { flex: 1 1 auto; width: auto; padding: 8px 12px; font-size: 13px; }
   .pm-filtros select { width: auto; flex: 0 0 auto; }
+  .pm-sug { margin: 8px 16px 0; padding: 10px 12px; border-radius: var(--radius-md); background: var(--csi-primary-soft); display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12.5px; }
+  .pm-sug b { flex: 1 1 100%; color: var(--csi-primary-strong); }
+  .pm-sug .dica { flex: 1 1 100%; margin: 2px 0 0; color: var(--suave); }
+  .pm-hor { background: #fff; border: 1px solid var(--csi-primary); color: var(--csi-primary-strong); border-radius: 999px; padding: 3px 10px; font-weight: 600; font-size: 12.5px; }
   .pm-vazio { text-align: center; padding: 48px 16px; color: var(--suave); border: 1px dashed var(--csi-border-strong); border-radius: var(--radius-lg); }
   @media (max-width: 640px) { .pm-grade { grid-template-columns: 1fr; } .pm-lin { grid-template-columns: 82px 1fr; } }
 </style>
@@ -3730,9 +3734,9 @@
 
   /* ---------- Pré-marcação: o que as pessoas escolheram no teste do webchat (/painel/testedowebchat/) ---------- */
   const ZAP_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8s-.4-.1-.6.1-.7.8-.8 1-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.2-.4.2-.4.7-1.300.1-.2 0-.3 0-.4l-.8-1.800c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.200 5.200 5.200 0 0 0 1.100 2.800 11.900 11.900 0 0 0 4.600 4c1.700.7 2.400.8 3.200.7a2.700 2.700 0 0 0 1.800-1.300 2.200 2.200 0 0 0 .2-1.300c-.1-.1-.3-.2-.6-.3z"/></svg>';
-  const PREM = { fila: 'pendentes', tipo: '', q: '', lista: [] };
+  const PREM = { fila: 'pendencia', tipo: '', q: '', lista: [] };
   const PREM_ROT = { pre_marcacao: 'Pré-marcação', contato_whatsapp: 'Chamar no WhatsApp', marcacao: 'Marcação' };
-  const PREM_COLS = 'id,protocolo,origem,tipo,situacao,fila,tipo_ident,nome_paciente,responsavel,telefone,email,consulta,pagamento,convenio,plano,medico,horario_data,horario_hora,horario_local,periodo,dias,pendencias,motivo,carteirinha,ciente_em,vence_em,obs,atendido_em,criado_em,atualizado_em';
+  const PREM_COLS = 'id,protocolo,origem,tipo,situacao,fila,tipo_ident,nome_paciente,responsavel,telefone,email,consulta,pagamento,convenio,plano,medico,horario_data,horario_hora,horario_local,periodo,dias,pendencias,motivo,carteirinha,ciente_em,vence_em,obs,atendido_em,criado_em,atualizado_em,busca:dados->busca';
   function pmZapNumero(tel) {
     let d = String(tel || '').replace(/\D/g, '');
     if ([12, 13].includes(d.length) && d.startsWith('55')) d = d.slice(2);
@@ -3748,13 +3752,53 @@
     if (m < 1) return 'agora'; if (m < 60) return 'há ' + m + ' min'; if (m < 1440) return 'há ' + Math.floor(m / 60) + ' h';
     return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) + ' ' + new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   }
-  function pmMensagem(r) {
+  function pmMensagem(r, sugestoes) {
     const quem = r.tipo_ident === 'filho' && r.responsavel ? r.responsavel.split(' ')[0] : (r.nome_paciente || '').split(' ')[0];
     const paraQuem = r.tipo_ident === 'filho' && r.nome_paciente ? ' para ' + r.nome_paciente.split(' ')[0] : '';
     const que = r.consulta ? ' de ' + r.consulta : '';
     const abertura = r.tipo === 'marcacao' ? 'Recebemos o seu pedido de marcação' : r.tipo === 'contato_whatsapp' ? 'Vimos que você quer ajuda para marcar' : 'Recebemos a sua pré-marcação';
-    return `Olá${quem ? ', ' + quem : ''}! Aqui é a equipe da CSI. ${abertura}${que}${paraQuem}. Podemos continuar a conversa por aqui?`;
+    return `Olá${quem ? ', ' + quem : ''}! Aqui é a equipe da CSI. ${abertura}${que}${paraQuem}. ${sugestoes && sugestoes.length ? 'Temos estes horários livres: ' + sugestoes.map((x) => pmHorarioTexto(x).replace(' · ', ' com ')).join('; ') + '. Algum serve para você?' : 'Podemos continuar a conversa por aqui?'}`;
   }
+  // Onde cada pedido fica: encerrada (já marcada, cancelada, resolvida ou descartada) · pendência (falta algo ou a pessoa quer ser chamada) · completa (tudo informado, só falta a equipe confirmar)
+  function pmGrupo(r) {
+    if (r.fila === 'resolvido' || r.fila === 'descartado' || r.tipo === 'marcacao' || ['marcado', 'cancelado', 'recusado_equipe', 'confirmado_equipe'].includes(r.situacao)) return 'encerrada';
+    if (r.tipo === 'contato_whatsapp' || (r.pendencias || []).length) return 'pendencia';
+    return 'completa';
+  }
+  const PREM_FN = 'https://nrvuynjwcgwpjdptkiay.supabase.co/functions/v1/teste-agenda-klingo';
+  const pmBonito = (n) => String(n || '').toLowerCase().split(' ').map((w, i) => (i && ['de', 'da', 'do', 'dos', 'das', 'e'].includes(w) ? w : w.charAt(0).toUpperCase() + w.slice(1))).join(' ');
+  // Horários livres do Klingo para o que a pessoa pediu (só leitura; mesma função do teste do webchat; sem dado de paciente). Devolve { sugestoes, nota, desejadoLivre }.
+  async function pmHorarios(r) {
+    const b = r.busca; if (!b || !b.procId) throw new Error('Este pedido não tem consulta escolhida.');
+    const consulta = Number(String(b.procId).replace(/^c-/, '')), referencia = !b.pagador, pagador = b.pagador || 'Particular';
+    const rs = await Promise.all([0, 1, 2].map(async (janela) => {
+      const res = await fetch(PREM_FN, { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }, body: JSON.stringify({ consulta, pagador, janela, semFiltro: true }) });
+      return res.json();
+    }));
+    const ruim = rs.find((x) => !x || !x.ok); if (ruim) throw new Error(ruim && ruim.estado === 'limite' ? 'Muitas consultas seguidas. Tente em 1 minuto.' : 'A agenda do Klingo não respondeu agora. Tente de novo.');
+    const sem = rs.find((x) => x.estado === 'fora_do_escopo' || x.estado === 'sem_plano');
+    if (sem) return { sugestoes: [], nota: sem.estado === 'fora_do_escopo' ? 'Esta consulta é agendada só pela equipe (o Klingo não mostra horários dela pela API).' : 'Este convênio/plano precisa ser conferido: o Klingo não devolveu horários.' };
+    const limite = Date.now() + 24 * 3600e3, todos = [];
+    for (const x of rs) for (const h0 of x.horarios || []) {
+      const [y, m, d] = h0.data.split('-').map(Number), [H, M] = h0.hora.split(':').map(Number), quando = Date.UTC(y, m - 1, d, H + 3, M);   // horário da Bahia (UTC-3)
+      todos.push({ data: h0.data, hora: h0.hora, min: H * 60 + M, dow: new Date(Date.UTC(y, m - 1, d)).getUTCDay(), medico: pmBonito(h0.profissional || 'Médico(a)'), medId: String(h0.profissionalId || h0.profissional || ''), quando });
+    }
+    let lista = todos.filter((x) => x.quando >= limite).sort((a, b2) => a.data.localeCompare(b2.data) || a.min - b2.min);
+    const notas = [];
+    if (referencia) notas.push('Horários de referência (Particular): confira o convênio com a pessoa.');
+    const desejadoLivre = r.horario_data ? todos.some((x) => x.data === r.horario_data && x.hora === r.horario_hora) : null;
+    if (b.medicoId) { const so = lista.filter((x) => x.medId === b.medicoId); if (so.length) lista = so; else notas.push('Sem horário com ' + (b.medicoNome || 'o(a) médico(a) pedido(a)') + ': mostrando outros(as).'); }
+    const dm = { seg: 1, ter: 2, qua: 3, qui: 4, sex: 5, sab: 6 }, dias = (r.dias || []).map((x) => dm[x]).filter((x) => x !== undefined);
+    let pref = lista.filter((x) => (!dias.length || dias.includes(x.dow)) && (r.periodo === 'manha' ? x.min < 720 : r.periodo === 'tarde' ? x.min >= 720 : true));
+    if ((dias.length || r.periodo === 'manha' || r.periodo === 'tarde') && !pref.length && lista.length) notas.push('Nada no período/dias que ela pediu: mostrando os mais próximos.');
+    if (dias.length || r.periodo === 'manha' || r.periodo === 'tarde') {
+      if (pref.length >= 3) lista = pref;
+      else if (pref.length) { lista = pref.concat(lista.filter((x) => !pref.includes(x))); notas.push('Poucos horários no período/dias pedidos: completei com os mais próximos.'); }
+    }
+    if (!lista.length) notas.push(todos.length ? 'Só há horários com menos de 24 h de antecedência.' : 'Não há horário livre nos próximos 45 dias.');
+    return { sugestoes: lista.slice(0, 6), nota: notas.join(' '), desejadoLivre, total: lista.length };
+  }
+  const pmHorarioTexto = (x) => pmDataBonita(x.data) + ' às ' + x.hora + ' · ' + x.medico;
   async function pmAtualizarFila(r, fila, obs) {
     const { error } = await db.rpc('pre_marcacao_atender', { p_id: r.id, p_fila: fila, p_obs: obs === undefined ? null : obs });
     if (error) { toast(msgErro(error)); return false; }
@@ -3764,7 +3808,7 @@
   async function atualizarSeloPreMarc() {
     const s = document.getElementById('seloPreMarc'); if (!s || !S.me) return;
     try {
-      const { count, error } = await db.from('pre_marcacao').select('id', { count: 'exact', head: true }).eq('fila', 'novo');
+      const { count, error } = await db.from('pre_marcacao').select('id', { count: 'exact', head: true }).eq('fila', 'novo').neq('tipo', 'marcacao');
       if (error) return; s.textContent = count > 99 ? '99+' : count; s.hidden = !count;
     } catch { /* selo é só aviso */ }
   }
@@ -3782,7 +3826,8 @@
       h('button', { type: 'button', class: 'btn', onclick: () => recarregar(true) }, 'Atualizar')),
       h('div', { class: 'pm-filtros' }, abas, busca, selTipo), grade);
 
-    const ABAS = [['pendentes', 'Pendentes', (r) => r.fila === 'novo' || r.fila === 'em_contato'], ['novo', 'Novas', (r) => r.fila === 'novo'], ['em_contato', 'Em contato', (r) => r.fila === 'em_contato'], ['resolvido', 'Resolvidas', (r) => r.fila === 'resolvido'], ['descartado', 'Descartadas', (r) => r.fila === 'descartado'], ['todas', 'Todas', () => true]];
+    const ABAS = [['pendencia', 'Com pendência', (r) => pmGrupo(r) === 'pendencia'], ['completa', 'Completas', (r) => pmGrupo(r) === 'completa'], ['encerrada', 'Encerradas', (r) => pmGrupo(r) === 'encerrada'], ['todas', 'Todas', () => true]];
+    const AJUDA = { pendencia: 'Falta algo (plano, carteirinha, médico ou horário) ou a pessoa pediu para ser chamada no WhatsApp.', completa: 'Tudo informado: falta só a equipe confirmar o horário com a pessoa.', encerrada: 'Já marcadas, canceladas, resolvidas ou descartadas.', todas: '' };
     const sa = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
     function cartao(r) {
@@ -3790,6 +3835,7 @@
       const feito = r.fila === 'resolvido' || r.fila === 'descartado';
       const quem = r.nome_paciente || r.responsavel || 'Sem nome';
       const selos = [h('span', { class: 'pm-tag ' + (r.tipo === 'contato_whatsapp' ? 'zap' : r.tipo === 'marcacao' ? 'azul' : '') }, PREM_ROT[r.tipo] || r.tipo)];
+      const g = pmGrupo(r); selos.unshift(h('span', { class: 'pm-tag ' + (g === 'pendencia' ? 'erro' : g === 'completa' ? 'ok' : 'cinza') }, g === 'pendencia' ? 'Com pendência' : g === 'completa' ? 'Completa' : 'Encerrada'));
       if (r.fila === 'novo') selos.push(h('span', { class: 'pm-tag erro' }, 'Nova'));
       if (r.fila === 'em_contato') selos.push(h('span', { class: 'pm-tag azul' }, 'Em contato'));
       if (r.fila === 'resolvido') selos.push(h('span', { class: 'pm-tag ok' }, 'Resolvida'));
@@ -3804,8 +3850,24 @@
       const obs = h('textarea', { rows: '1', maxlength: '2000', placeholder: 'Anotação da equipe (salva ao sair do campo)', 'aria-label': 'Anotação' }); obs.value = r.obs || '';
       obs.addEventListener('blur', async () => { if (obs.value.trim() !== (r.obs || '')) { if (await pmAtualizarFila(r, r.fila, obs.value.trim())) toast('Anotação salva.'); } });
       const mover = (fila, rot, cls) => h('button', { type: 'button', class: 'btn' + (cls ? ' ' + cls : ''), onclick: async () => { if (fila === 'descartado' && !confirm('Descartar esta solicitação?')) return; if (await pmAtualizarFila(r, fila)) desenhar(); } }, rot);
+      const sug = h('div', { class: 'pm-sug', hidden: true }), sugBtn = h('button', { type: 'button', class: 'btn', title: 'Consulta o Klingo agora e mostra horários livres para o que a pessoa pediu' }, 'Ver horários livres');
+      let zapRef = null, sugestoes = [];
+      const atualizarZap = () => { if (zapRef && num) zapRef.href = 'https://wa.me/' + num + '?text=' + encodeURIComponent(pmMensagem(r, sugestoes)); };
+      sugBtn.addEventListener('click', async () => {
+        sugBtn.disabled = true; sugBtn.textContent = 'Consultando o Klingo…'; sug.hidden = false; sug.replaceChildren(h('span', { class: 'dica' }, 'Consultando a agenda…'));
+        try {
+          const res = await pmHorarios(r); sugestoes = res.sugestoes; atualizarZap();
+          sug.replaceChildren(...[
+            h('b', {}, res.sugestoes.length ? 'Horários livres para ' + (r.consulta || 'o que ela pediu') + (res.total > res.sugestoes.length ? ` (${res.sugestoes.length} de ${res.total})` : '') : 'Sem horários para sugerir'),
+            res.desejadoLivre === true ? h('span', { class: 'pm-tag ok' }, 'O horário que ela escolheu continua livre') : res.desejadoLivre === false ? h('span', { class: 'pm-tag erro' }, 'O horário que ela escolheu foi ocupado') : null,
+            ...res.sugestoes.map((x) => h('span', { class: 'pm-hor' }, pmHorarioTexto(x))),
+            res.nota ? h('p', { class: 'dica' }, res.nota) : null,
+            res.sugestoes.length ? h('p', { class: 'dica' }, 'Estes horários já vão na mensagem do WhatsApp. Consultado agora; o horário só vale depois que a equipe marcar.') : null].filter(Boolean));
+        } catch (e) { sug.replaceChildren(h('p', { class: 'erro' }, msgErro(e))); }
+        finally { sugBtn.disabled = false; sugBtn.textContent = 'Atualizar horários livres'; }
+      });
       const zap = h('a', { class: 'pm-zap', href: num ? 'https://wa.me/' + num + '?text=' + encodeURIComponent(pmMensagem(r)) : '#', target: '_blank', rel: 'noopener noreferrer', 'aria-disabled': num ? 'false' : 'true', title: num ? 'Abrir a conversa no WhatsApp com uma mensagem pronta' : 'Telefone inválido para WhatsApp' });
-      zap.innerHTML = ZAP_SVG; zap.append(num ? 'Chamar no WhatsApp' : 'Sem telefone válido');
+      zapRef = zap; zap.innerHTML = ZAP_SVG; zap.append(num ? 'Chamar no WhatsApp' : 'Sem telefone válido');
       zap.addEventListener('click', () => { if (num && r.fila === 'novo') pmAtualizarFila(r, 'em_contato').then((ok) => { if (ok) setTimeout(desenhar, 300); }); });
       return h('article', { class: 'pm-card t-' + r.tipo + (feito ? ' feito' : '') },
         h('div', { class: 'pm-cab' }, h('div', { class: 'pm-av', 'aria-hidden': 'true' }, iniciais(quem)),
@@ -3813,8 +3875,10 @@
         h('div', { class: 'pm-selos' }, ...selos),
         h('div', { class: 'pm-corpo' }, lin('Consulta', r.consulta), lin('Médico(a)', r.medico), lin(horario ? 'Horário desejado' : 'Preferência', horario || pref), lin('Pagamento', conv), lin('Carteirinha', r.pagamento && !/particular/i.test(r.pagamento) ? (r.carteirinha ? 'Foto enviada' : 'Não enviada') : ''), lin('Telefone', r.telefone), lin('E-mail', r.email), lin('Motivo', r.motivo)),
         (r.pendencias || []).length ? h('div', { class: 'pm-pend' }, h('b', {}, 'A equipe precisa confirmar'), (r.pendencias || []).join(' · ')) : null,
+        sug,
         h('div', { class: 'pm-obs' }, obs),
         h('div', { class: 'pm-acoes' }, zap,
+          !feito && r.busca && r.busca.procId ? sugBtn : null,
           r.fila === 'novo' ? mover('em_contato', 'Iniciei o contato') : null,
           r.fila !== 'resolvido' ? mover('resolvido', 'Resolvida', 'prim') : null,
           r.fila === 'resolvido' || r.fila === 'descartado' ? mover('novo', 'Reabrir') : null,
@@ -3827,7 +3891,8 @@
       const f = ABAS.find((a) => a[0] === PREM.fila)[2];
       const itens = PREM.lista.filter((r) => f(r) && (!PREM.tipo || r.tipo === PREM.tipo) && (!q || sa([r.nome_paciente, r.responsavel, r.telefone, r.consulta, r.medico, r.convenio, r.protocolo].join(' ')).includes(q)));
       const novas = PREM.lista.filter((r) => r.fila === 'novo').length;
-      sub.textContent = novas ? `${novas} nova${novas > 1 ? 's' : ''} sem contato. Toque em “Chamar no WhatsApp” para levar a pessoa à conversa.` : 'Nada novo sem contato. As escolhas feitas no teste do webchat aparecem aqui.';
+      sub.textContent = (novas ? `${novas} nova${novas > 1 ? 's' : ''} sem contato. ` : 'Nada novo sem contato. ') + (AJUDA[PREM.fila] || '');
+      itens.sort((a, b2) => (b2.fila === 'novo') - (a.fila === 'novo') || b2.criado_em.localeCompare(a.criado_em));
       grade.replaceChildren(itens.length ? h('div', { class: 'pm-grade' }, ...itens.map(cartao)) : h('div', { class: 'pm-vazio' }, PREM.lista.length ? 'Nenhuma solicitação neste filtro.' : 'Ainda não chegou nenhuma pré-marcação.'));
       atualizarSeloPreMarc();
     }
