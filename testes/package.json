@@ -125,6 +125,8 @@
     "test:retrato": "node retrato.test.mjs",
     "test:marcacao-etapas-sql": "node sql-marcacao-etapas-parte1.test.mjs",
     "test:marcacao-etapas": "node marcacao-etapas.navegador.mjs",
+    "test:marcacao-etapas-ligadas": "node marcacao-etapas-ligadas.navegador.mjs",
+    "test:sw-atualizacao-forcada": "node sw-atualizacao-forcada.navegador.mjs",
     "test:lgpd": "node sql-lgpd.test.mjs",
     "test:lgpd-painel": "node lgpd-painel.navegador.mjs",
     "test:previsao-marcacao": "node sql-previsao-marcacao.test.mjs",
