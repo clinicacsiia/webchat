@@ -1,0 +1,101 @@
+/* Sistema de marcação por etapas (TESTE). Usa as variáveis da identidade visual da CSI definidas no index.html. */
+body.mt-aberta { overflow: hidden; }
+#mt { position: fixed; left: 0; right: 0; bottom: 0; top: var(--mt-topo, 0px); z-index: 9000; background: var(--csi-background, #f8f9fa); display: flex; flex-direction: column; font-family: var(--font-family, system-ui, sans-serif); color: var(--csi-text-main, #333); }
+#mt[hidden] { display: none; }
+.mt-topo { background: #fff; border-bottom: 1px solid var(--csi-border, #eaedf1); display: flex; align-items: center; gap: 8px; padding: 8px 12px; padding-top: max(8px, env(safe-area-inset-top)); }
+.mt-topo img { height: 28px; width: auto; }
+.mt-topo .esp { flex: 1; }
+.mt-ic { min-width: 44px; min-height: 44px; border: 0; background: transparent; color: var(--csi-primary-strong, #006ba1); font-size: 22px; border-radius: 12px; cursor: pointer; }
+.mt-ic:focus-visible, .mt-bt:focus-visible, .mt-op:focus-visible, .mt-link:focus-visible { outline: 3px solid var(--csi-primary, #0088cc); outline-offset: 2px; }
+.mt-humano { min-height: 44px; border: 1.5px solid var(--csi-primary-strong, #006ba1); background: #fff; color: var(--csi-primary-strong, #006ba1); font-weight: 650; font-size: 14px; border-radius: 22px; padding: 0 14px; cursor: pointer; }
+.mt-prog { background: #fff; padding: 10px 16px 12px; border-bottom: 1px solid var(--csi-border, #eaedf1); }
+.mt-prog .txt { display: flex; justify-content: space-between; font-size: 13px; color: var(--csi-text-secondary, #5a6878); margin-bottom: 6px; }
+.mt-prog .barra { height: 8px; border-radius: 8px; background: var(--csi-primary-soft, #e6f4fb); overflow: hidden; }
+.mt-prog .barra i { display: block; height: 100%; background: var(--csi-primary, #0088cc); border-radius: 8px; transition: width .25s ease; }
+.mt-corpo { flex: 1; overflow-y: auto; padding: 18px 16px 24px; max-width: 640px; width: 100%; box-sizing: border-box; margin: 0 auto; }
+.mt-corpo h1 { font-size: 22px; line-height: 1.25; margin: 0 0 6px; color: var(--csi-sidebar-bg, #1e3a5f); outline: none; }
+.mt-corpo .sub { margin: 0 0 16px; color: var(--csi-text-secondary, #5a6878); font-size: 15.5px; }
+.mt-lista { display: grid; gap: 10px; }
+.mt-op { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; background: #fff; border: 2px solid var(--csi-border-strong, #cfd6df); border-radius: 14px; padding: 14px; min-height: 56px; font: inherit; color: inherit; cursor: pointer; box-shadow: var(--shadow-sm); }
+.mt-op .ic { font-size: 26px; flex: none; }
+.mt-op .tx { flex: 1; min-width: 0; }
+.mt-op .tx b { display: block; font-size: 16.5px; }
+.mt-op .tx small { display: block; color: var(--csi-text-secondary, #5a6878); font-size: 13.5px; margin-top: 2px; }
+.mt-op[aria-checked="true"] { border-color: var(--csi-primary, #0088cc); background: var(--csi-primary-soft, #e6f4fb); }
+.mt-op[aria-checked="true"]::after { content: '✓'; color: var(--csi-primary-strong, #006ba1); font-weight: 800; font-size: 20px; }
+.mt-op[disabled] { opacity: .65; cursor: default; background: #f1f3f5; }
+.mt-selo { display: inline-block; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 10px; background: #fff3d6; color: #8a5a00; margin-top: 4px; }
+.mt-busca { width: 100%; box-sizing: border-box; font: inherit; font-size: 17px; padding: 13px 14px; border: 2px solid var(--csi-border-strong, #cfd6df); border-radius: 12px; margin-bottom: 12px; }
+.mt-busca:focus { outline: none; border-color: var(--csi-primary, #0088cc); box-shadow: var(--csi-focus, 0 0 0 3px rgba(0,136,204,.28)); }
+.mt-rodape { background: #fff; border-top: 1px solid var(--csi-border, #eaedf1); padding: 10px 16px; padding-bottom: max(10px, env(safe-area-inset-bottom)); display: flex; gap: 10px; }
+.mt-rodape > * { max-width: 640px; }
+.mt-bt { flex: 1; min-height: 50px; border-radius: 12px; font: inherit; font-weight: 700; font-size: 17px; cursor: pointer; border: 2px solid var(--csi-primary-strong, #006ba1); background: var(--csi-primary-strong, #006ba1); color: #fff; }
+.mt-bt.sec { background: #fff; color: var(--csi-primary-strong, #006ba1); }
+.mt-bt:disabled { opacity: .55; cursor: default; }
+.mt-bt.verde { background: #1f7a3d; border-color: #1f7a3d; }
+.mt-bt.vermelho { background: #b3261e; border-color: #b3261e; white-space: normal; padding: 10px 14px; line-height: 1.3; }
+.mt-bt.vermelho:disabled { opacity: 1; background: #8c1d18; border-color: #8c1d18; }
+.mt-erro { color: var(--erro, #b3261e); font-weight: 600; margin: 12px 0 0; min-height: 1.2em; }
+.mt-card { background: #fff; border: 1.5px solid var(--csi-border-strong, #cfd6df); border-radius: 14px; padding: 14px; margin-bottom: 12px; }
+.mt-aviso { background: #fff4d6; border: 2px solid #e0b43c; border-radius: 14px; padding: 14px 16px; margin: 0 0 14px; font-size: 17.5px; line-height: 1.45; font-weight: 650; color: #4a3300; }
+.mt-aviso li { font-weight: 600; }
+.mt-aviso b { font-weight: 800; }
+.mt-info { margin: 0 0 12px; font-size: 13.5px; line-height: 1.4; color: var(--csi-text-secondary, #5a6878); }
+.mt-dias { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 8px; scroll-snap-type: x proximity; }
+.mt-dia { flex: none; scroll-snap-align: start; min-width: 78px; text-align: center; background: #fff; border: 2px solid var(--csi-border-strong, #cfd6df); border-radius: 12px; padding: 8px 6px; font: inherit; cursor: pointer; min-height: 64px; }
+.mt-dia b { display: block; font-size: 20px; }
+.mt-dia small { display: block; font-size: 12.5px; color: var(--csi-text-secondary, #5a6878); text-transform: capitalize; }
+.mt-dia[aria-checked="true"] { border-color: var(--csi-primary, #0088cc); background: var(--csi-primary-soft, #e6f4fb); }
+.mt-horas { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 8px 0 14px; }
+.mt-hora { min-height: 48px; border: 2px solid var(--csi-border-strong, #cfd6df); background: #fff; border-radius: 12px; font: inherit; font-weight: 650; font-size: 16.5px; cursor: pointer; }
+.mt-hora[aria-checked="true"] { border-color: var(--csi-primary, #0088cc); background: var(--csi-primary, #0088cc); color: #fff; }
+.mt-link { background: none; border: 0; color: var(--csi-primary-strong, #006ba1); font: inherit; font-weight: 650; text-decoration: underline; cursor: pointer; padding: 10px 4px; min-height: 44px; }
+.mt-res { width: 100%; border-collapse: collapse; }
+.mt-res td { padding: 9px 0; border-bottom: 1px solid var(--csi-border, #eaedf1); vertical-align: top; font-size: 15.5px; }
+.mt-res td:first-child { color: var(--csi-text-secondary, #5a6878); width: 38%; padding-right: 8px; }
+.mt-res td:last-child b { display: block; }
+.mt-res .ed { float: right; }
+.mt-status { border-radius: 16px; padding: 18px 16px; text-align: center; margin-bottom: 14px; }
+.mt-status .grande { font-size: 44px; line-height: 1; }
+.mt-status h1 { margin-top: 8px; color: inherit; }
+.mt-status.ok { background: #e7f6ec; color: #17602f; border: 2px solid #1f7a3d; }
+.mt-status.pre { background: #fff3d6; color: #6e4700; border: 2px solid #c9a24a; }
+.mt-status.nao { background: #eef1f4; color: #3c4854; border: 2px solid #b6c0ca; }
+.mt-badge { display: inline-block; font-size: 12.5px; font-weight: 800; padding: 3px 10px; border-radius: 12px; }
+.mt-badge.ok { background: #e7f6ec; color: #17602f; } .mt-badge.pre { background: #fff3d6; color: #6e4700; } .mt-badge.cancel { background: #fdecea; color: #8c1d18; } .mt-badge.nao { background: #eef1f4; color: #3c4854; }
+.mt-chk { display: flex; gap: 10px; align-items: flex-start; font-size: 16px; margin: 14px 0; }
+.mt-chk input { width: 24px; height: 24px; flex: none; margin-top: 2px; }
+.mt-regras { margin: 0 0 8px; padding-left: 20px; } .mt-regras li { margin: 8px 0; }
+.mt-foto { max-width: 100%; max-height: 220px; border-radius: 12px; border: 1.5px solid var(--csi-border-strong, #cfd6df); display: block; margin: 10px 0; }
+.mt-esq { height: 56px; border-radius: 14px; background: linear-gradient(90deg, #eef1f4 25%, #f8f9fa 50%, #eef1f4 75%); background-size: 200% 100%; animation: marcesq 1.1s infinite linear; margin-bottom: 10px; }
+@keyframes marcesq { to { background-position: -200% 0; } }
+.mt-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0 12px; }
+.mt-chip { min-height: 44px; padding: 0 16px; border-radius: 22px; border: 2px solid var(--csi-border-strong, #cfd6df); background: #fff; font: inherit; font-weight: 650; cursor: pointer; }
+.mt-chip[aria-checked="true"] { border-color: var(--csi-primary, #0088cc); background: var(--csi-primary-soft, #e6f4fb); }
+.mt-area { width: 100%; box-sizing: border-box; min-height: 110px; font: inherit; font-size: 16.5px; padding: 12px; border: 2px solid var(--csi-border-strong, #cfd6df); border-radius: 12px; }
+.mt-modal { position: fixed; inset: 0; z-index: 99998; background: rgba(0,0,0,.45); display: flex; align-items: flex-end; justify-content: center; }
+.mt-modal > div { background: #fff; width: 100%; max-width: 560px; max-height: 88vh; overflow-y: auto; border-radius: 18px 18px 0 0; padding: 18px 16px 24px; box-sizing: border-box; }
+.mt-modal h2 { margin: 0 0 10px; font-size: 19px; }
+.mt-modal label.l { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--csi-border, #eaedf1); font-size: 15.5px; }
+.mt-modal select { font: inherit; padding: 8px; border-radius: 8px; }
+.mt-modal input[type=checkbox] { width: 22px; height: 22px; }
+/* entrada: o fluxo novo substitui o botão de Previsão e as portas de conversa antigas na tela inicial */
+#btnPrevisaoEntrada, #dicaPrevisaoEntrada, #linkAcompanhar, #btnHistoricoForm { display: none !important; }
+.mt-entrada { display: grid; gap: 10px; margin: 14px 0; }
+.mt-entrada .mt-bt { width: 100%; }
+@media (prefers-reduced-motion: reduce) { .mt-prog .barra i { transition: none; } .mt-esq { animation: none; } }
+
+/* telas largas: topo, progresso e rodapé alinhados com o conteúdo */
+.mt-topo, .mt-prog, .mt-rodape { padding-left: max(16px, calc((100% - 640px) / 2)); padding-right: max(16px, calc((100% - 640px) / 2)); }
+.mt-rodape > * { max-width: none; }
+
+/* hierarquia dos textos: o importante é grande e destacado; o resto é pequeno e discreto */
+.mt-forte { margin: 0 0 14px; font-size: 17.5px; line-height: 1.45; color: var(--csi-text-main, #333); }
+.mt-forte b { color: #8c1d18; }
+.mt-corpo .sub { font-size: 14.5px; margin-bottom: 14px; }
+.mt-regras li { font-size: 17px; line-height: 1.45; }
+.mt-status p { font-size: 17px; line-height: 1.4; }
+.mt-tipo { display: block; text-align: center; font-size: 17px; font-weight: 800; letter-spacing: .02em; padding: 12px 14px; border-radius: 14px; margin: 0 0 14px; }
+.mt-tipo.ok { background: #e7f6ec; color: #17602f; border: 2px solid #1f7a3d; }
+.mt-tipo.pre { background: #fff4d6; color: #6e4700; border: 2px solid #e0b43c; }
+.mt-op .tx small { font-size: 13px; }
