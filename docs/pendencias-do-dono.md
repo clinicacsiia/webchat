@@ -211,9 +211,9 @@ Tudo está descrito em [`integracao-marcacao-por-etapas.md`](integracao-marcacao
 Resumo em **2 páginas** (fluxograma + decisões D1 a D12): [`marcacao-etapas-fluxo-e-decisoes.pdf`](marcacao-etapas-fluxo-e-decisoes.pdf) (fonte: `marcacao-etapas-fluxo-e-decisoes.html`). Estado conferido na produção em 25/11/2026: a migração `marcacao-etapas-parte1.sql` **não foi aplicada**; a tela por etapas está no site com a chave em `nao`. Testes: `test:retrato` 10/10, `test:marcacao-etapas-sql` 19/19, `test:marcacao-etapas` 11/11.
 **Regra nova pedida pelo dono (25/11/2026):** os pacientes já cadastrados continuam como estão; o paciente **novo** só digita **CPF, data de nascimento e celular** (o dono confere no dia 26/11). Isso muda o PIN e o código por e-mail para o novo (hoje obrigatórios: `app_pin_obrigatorio`, `app_pin_servidor`, `app_codigo_email`) e a ciência da pré-marcação (`marcacao_ciencia_registrar` chama `app_pin_exigir()`): **mudança de banco, a testar no clone antes**.
 Decisões (sugestão do Claude entre parênteses):
-- **D1** O PIN some só para o paciente novo? (sim; antigos mantêm o PIN.)
+- **D1** O PIN some só para o paciente novo? (sim; antigos mantêm o PIN. Celular que já tem cadastro no acesso rápido, hoje 267 pessoas e 318 filhos, continua pedindo PIN.)
 - **D2** Prova do celular: não provar, WhatsApp (grátis, precisa de robô no n8n), SMS (pago por mensagem; descartado em 15/11) ou e-mail. (começar sem prova e estudar o WhatsApp.)
-- **D3** O que a entrada simples libera. (só marcar e pré-marcar; ver pedidos, cancelar, remarcar e laudos continuam com PIN ou equipe, porque CPF + nascimento são a única prova.)
+- **D3** O que a entrada simples libera. (só marcar e pré-marcar; ver pedidos, cancelar, remarcar e laudos continuam com PIN ou equipe, porque CPF + nascimento são a única prova. 92% das conversas são de criança: o CPF pode ser do responsável, e isso já gera divergência com o Klingo.)
 - **D4** Ordem das perguntas: pagamento primeiro (teste) ou a do motor (CPF, consulta, médico(a), pagamento).
 - **D5** Foto da carteirinha volta?
 - **D6** Prazo de 24 h, "Completar agora" e horário provisório: criar de verdade (regra com a equipe + vencimento no banco) ou só "a equipe confirma"? O Klingo não reserva horário.
@@ -223,6 +223,7 @@ Decisões (sugestão do Claude entre parênteses):
 - **D10** Piloto: telefones, quem da equipe acompanha e a data.
 - **D11** Jurídico: citar a ciência, os dados do paciente novo e o prazo de guarda; revisão do advogado.
 - **D12** Técnico (Claude, quando você mandar): aplicar o banco em partes, refazer o retrato, só depois do piloto apagar `teste-agenda-klingo` e `teste-planos-klingo` (https://supabase.com/dashboard/project/nrvuynjwcgwpjdptkiay/functions), fixar versão e CSP do chat, 5 testes antigos.
+**Pessoas ligadas e conversas antigas (revisão de 25/11/2026):** nada é migrado, porque a tela por etapas usa as mesmas tabelas e o mesmo motor (conversas, grupos de pessoa, vínculos com o Klingo, acesso rápido). Conversa antiga ou aberta continua no chat de sempre, na mesma conversa. Irmãos (juntos ou um de cada vez) e "Todos os filhos" vão para o chat de sempre. A página de teste (`painel/testedowebchat`) não lê nada disso: tem dados fictícios no navegador. Teste novo: `npm run test:marcacao-etapas-ligadas` (5/5). Detalhes em `integracao-marcacao-por-etapas.md`, seção 5.2.
 Para voltar atrás a qualquer hora: `update public.config set valor = 'nao' where chave = 'marcacao_etapas_modo';` ([editor SQL](https://supabase.com/dashboard/project/nrvuynjwcgwpjdptkiay/sql/new)).
 
 ## 3. Contas e segurança

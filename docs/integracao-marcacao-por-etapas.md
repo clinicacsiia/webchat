@@ -98,6 +98,21 @@ Rodei a bateria inteira (`npm test`, que para na primeira falha) e depois **cada
 | `test:painel-v2` (1 caso) | Aba Indicadores: o teste espera um elemento que não aparece em 10 s. | **Pendente:** investigar. |
 | `test:acesso-chat` (2 casos) | Layout da tela inicial do acesso rápido (não cabe sem rolar em 390x780; "Começar" fica depois de "Acompanhe seus pedidos" no teste). Mais uma falha **ocasional** ("Para Leo") só quando a máquina está ocupada. | **Pendente:** decidir se o layout atual é o desejado e ajustar o teste. |
 
+## 5.2 Pessoas ligadas e conversas antigas (revisão de 25/11/2026)
+**Conclusão: não há migração e nada se perde.** A tela por etapas conversa com as mesmas funções e tabelas do chat de hoje (`chat_iniciar`, `chat_responder`, `conversas`, `pre_agendamentos`, `conversa_grupo`, vínculos com o Klingo, `app_paciente` e `app_filho`). A produção tinha, em 25/11/2026: 677 conversas (51 abertas; 673 do motor novo e 4 do motor antigo `ia`), 620 de filho (92%), 86 grupos de pessoa (82 automáticos, 4 da equipe), 267 cadastros do acesso rápido e 318 filhos ativos.
+
+| Situação | O que acontece | Prova |
+|---|---|---|
+| Conversa antiga ou aberta com a chave ligada depois | Continua no chat de sempre, na mesma conversa (só abre por etapas quem **começou** por etapas neste aparelho) | `test:marcacao-etapas-ligadas` caso 2 |
+| Chave desligada com conversa por etapas aberta | A pessoa volta ao chat de sempre, na mesma conversa | caso 3 |
+| Filho(a) sozinho(a) | Abre por etapas, a conversa fica `filho` com o nome da criança; a consulta vai para a unidade de pediatria como hoje | caso 1 |
+| Irmãos (juntos ou um de cada vez) e "Todos os filhos" | Sempre o chat de sempre (`!irmaos.length` em `index.html`) | `test:marcacao-etapas` (juntos); um de cada vez por leitura do código |
+| A mesma pessoa em conversa antiga e conversa por etapas | Cai no mesmo grupo de pessoa (o agrupamento usa celular, e-mail, conta e nascimento, que o motor grava igual) | caso 4 |
+| Conversa do motor antigo (`ia`, 4) | Nunca abre por etapas (exige `motor = fluxo`) | leitura do código |
+| Passo que a tela não conhece (exame, remarcar/cancelar, resultado) | "Continuar no chat", na mesma conversa | leitura do código |
+
+**Não testado em navegador:** o caminho com PIN e filhos do acesso rápido ("Para <filho>" com o aparelho cadastrado) e o "um de cada vez" fim a fim; ficam para o piloto. **Atenção à regra nova do paciente novo (CPF, nascimento e celular):** celular que já tem cadastro no acesso rápido precisa continuar pedindo PIN.
+
 ## 6. O que NÃO foi feito (para não haver surpresa)
 
 - Nenhuma migração aplicada; nenhuma função publicada; nenhuma chave de `config` criada na produção.
