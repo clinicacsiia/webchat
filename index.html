@@ -784,7 +784,7 @@
   const CHAVE_HIST = 'webchat.historico.v1';   // as últimas conversas deste aparelho (cada uma com o seu token): dá para voltar a elas
   const MAX_HIST = 5;                          // mínimo pedido: 3
   // Muda a cada alteração do chat. Cópia de mensagens guardada por outra versão é descartada (era isso que mostrava conversa velha e travada).
-  const VERSAO_APP = '2026.11.25-3';
+  const VERSAO_APP = '2026.11.25-4';
   // Mesmas regras do banco (fluxo_nome_ok, fluxo_telefone_ok, fluxo_email_ok): o banco confere de novo, aqui é só para avisar logo.
   const LET = 'A-Za-zÀ-ÖØ-öø-ÿ';
   const nomeCompletoOk = (v) => { const t = String(v || '').trim(); return t.length >= 5 && t.length <= 120 && new RegExp(`^[${LET}][${LET}'’.-]*( +[${LET}][${LET}'’.-]*)+$`).test(t) && t.split(/ +/).filter((w) => w.replace(new RegExp(`[^${LET}]`, 'g'), '').length >= 2).length >= 2; };
@@ -1001,7 +1001,7 @@
     if (jaAberta) return;
     clearTimeout(tGuardar); fecharCanal(); pararAcompanhar();
     conv = { id: it.id, token: it.token, tipo: it.tipo, nomeCrianca: it.nomeCrianca, irmaos: it.irmaos || [], irmaosModo: it.irmaosModo || '' };
-    const etapasOk = !!it.etapas && (config.marcacao_etapas_modo === 'sim' || config.marcacao_etapas_modo === 'piloto');   // conversa começada na tela por etapas continua nela
+    const etapasOk = !!it.etapas && etapasLigadas();   // conversa começada na tela por etapas continua nela
     if (etapasOk) conv.etapas = true;
     gravarLocal(CHAVE_CONVERSA, conv);
     if (etapasOk) abrirEtapas(null).catch(() => { conv.etapas = false; gravarLocal(CHAVE_CONVERSA, conv); abrirChat(); });
@@ -1677,7 +1677,7 @@
       motorAtivo = data.motor === 'fluxo'; passoAtual = null;
       // Sistema de marcação por etapas (config.marcacao_etapas_modo: nao | piloto | sim; padrão "nao" = este chat de sempre). Só com o motor, sem irmãos juntos.
       // Se a tela nova não carregar, segue para o chat de sempre na MESMA conversa (nada se perde).
-      if (data.motor === 'fluxo' && !irmaos.length && (config.marcacao_etapas_modo === 'sim' || config.marcacao_etapas_modo === 'piloto') && await etapasAtivas(telTxt)) {   // sem a chave, nenhuma espera a mais: o chat de sempre abre no mesmo instante
+      if (data.motor === 'fluxo' && !irmaos.length && etapasLigadas() && await etapasAtivas(telTxt)) {   // sem a chave, nenhuma espera a mais: o chat de sempre abre no mesmo instante
         try { conv.etapas = true; gravarLocal(CHAVE_CONVERSA, conv); registrarHistorico(conv, { etapas: true }); await abrirEtapas(data.respostas); respostaAvisos.then(assinarPush); return; }
         catch { conv.etapas = false; gravarLocal(CHAVE_CONVERSA, conv); }
       }
@@ -1697,10 +1697,11 @@
   /* ---------- sistema de marcação por etapas (etapas.js; ver docs/integracao-marcacao-por-etapas.md) ----------
      Só abre quando o banco mandar marcacao_etapas_modo = "sim" (todos) ou "piloto" (só os telefones da lista). Sem a chave, erro de rede ou "nao": nada muda.
      A tela só desenha as perguntas do motor; "Continuar no chat" abre a MESMA conversa no chat de sempre. Desligar: update public.config set valor = 'nao' where chave = 'marcacao_etapas_modo'. */
+  const etapasLigadas = () => ['sim', 'piloto', 'teste'].includes(config.marcacao_etapas_modo);   // 'teste' = piloto com a tela do ambiente de teste (v20261125a)
   async function etapasAtivas(tel) {
     const m = config.marcacao_etapas_modo;
     if (m === 'sim') return true;
-    if (m !== 'piloto') return false;
+    if (m !== 'piloto' && m !== 'teste') return false;
     try { const { data, error } = await db.rpc('marcacao_etapas_pode', { p_telefone: tel }); return !error && data === true; } catch { return false; }
   }
   let etapasCarregando = null;
@@ -1712,7 +1713,44 @@
     });
     return etapasCarregando;
   }
+  // Tela do ambiente de teste (v20261125a) ligada ao motor real. Só quando marcacao_etapas_modo = 'teste' e a conversa não foi entregue à tela por etapas (conv.etapasMotor).
+  let testeCarregando = null;
+  function carregarTeste() {
+    if (window.CSI_MARCACAO) return Promise.resolve();
+    if (!testeCarregando) testeCarregando = new Promise((ok, no) => {
+      const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = 'marcacao.css?v=' + VERSAO_APP; document.head.append(l);
+      const seq = ['agenda-real.js', 'integracao-real.js', 'marcacao.js'];
+      const carrega = (i) => { if (i >= seq.length) { ok(); return; } const sc = document.createElement('script'); sc.src = seq[i] + '?v=' + VERSAO_APP; sc.onload = () => carrega(i + 1); sc.onerror = () => { testeCarregando = null; no(new Error('teste')); }; document.head.append(sc); };
+      carrega(0);
+    });
+    return testeCarregando;
+  }
+  async function abrirTeste() {
+    await carregarTeste();
+    if (!window.CSI_MARCACAO || !window.CSI_SIM || !conv) throw new Error('teste');
+    const perfil = lerLocal(CHAVE_PERFIL) || {};
+    try { if (localStorage.getItem('csi_marc_conv') !== conv.id) { localStorage.removeItem('csi_marc_estado_v1'); localStorage.setItem('csi_marc_conv', conv.id); } } catch { /* sem armazenamento: começa do zero */ }   // conversa nova = marcação nova
+    window.CSI_SIM.ligar({
+      db, conv,
+      aoDados: async () => {   // conta já cadastrada: o banco responde CPF e nascimento sozinho
+        const dev = acessoDev(), c = conv;
+        if (!acessoPerfil || !dev || !c || !c.id) return false;
+        try {
+          const { data, error } = await db.rpc('app_chat_dados', { p_token: dev, p_conversa: c.id, p_conv_token: c.token });
+          if (error || !data || !data.ok) return false;
+          if (data.guardou) acessoCarregar().then(() => atualizarAcessoUI(true), () => {});
+          return data.respondeu > 0;
+        } catch { return false; }
+      },
+      aoMenu: () => { const ant = conv && conv.id && conv.token ? { id: conv.id, token: conv.token } : null; if (conv) registrarHistorico(conv, { etapas: false }); irParaFormNovo(ant); },
+      aoPin: () => pinVenceu('bloqueado'),
+      aoEtapas: () => { if (conv) { conv.etapasMotor = true; gravarLocal(CHAVE_CONVERSA, conv); } abrirEtapas(null).catch(() => { if (conv) { conv.etapas = false; gravarLocal(CHAVE_CONVERSA, conv); } abrirChat(); }); },   // o resto da marcação segue na tela por etapas, na mesma conversa
+      aoAcompanhar: () => { location.href = 'minha-vez/?acompanhar=1'; }
+    });
+    window.CSI_MARCACAO.abrir({ tipo: conv.tipo === 'filho' ? 'filho' : 'proprio', nome: perfil.nome || '', telefone: perfil.telefone || '', email: perfil.email || '', nomeCrianca: conv.nomeCrianca || '', irmaos: [] });
+  }
   async function abrirEtapas(respostas) {
+    if (config.marcacao_etapas_modo === 'teste' && conv && !conv.etapasMotor) { await abrirTeste(); return; }
     await carregarEtapas();
     if (!window.CSI_ETAPAS || !conv) throw new Error('etapas');
     window.CSI_ETAPAS.abrir({
@@ -1735,7 +1773,7 @@
   }
   // Depois de digitar o PIN no meio do caminho, a pessoa volta para a MESMA pergunta da tela por etapas (a tela fica escondida enquanto o teclado do PIN aparece).
   function reabrirEtapas() {
-    if (conv && conv.etapas && (config.marcacao_etapas_modo === 'sim' || config.marcacao_etapas_modo === 'piloto')) abrirEtapas(null).catch(() => { conv.etapas = false; gravarLocal(CHAVE_CONVERSA, conv); abrirChat(); });
+    if (conv && conv.etapas && etapasLigadas()) abrirEtapas(null).catch(() => { conv.etapas = false; gravarLocal(CHAVE_CONVERSA, conv); abrirChat(); });
   }
   async function enviar(ev) {
     ev.preventDefault();
@@ -4083,7 +4121,7 @@
     iniciarSentinela();
     if (conv && conv.id && conv.token) {   // registrar: conversa de antes desta versão entra na lista
       registrarHistorico(conv);
-      if (conv.etapas && (config.marcacao_etapas_modo === 'sim' || config.marcacao_etapas_modo === 'piloto')) abrirEtapas(null).catch(() => { conv.etapas = false; gravarLocal(CHAVE_CONVERSA, conv); abrirChat(); });   // conversa começada na tela por etapas volta nela
+      if (conv.etapas && etapasLigadas()) abrirEtapas(null).catch(() => { conv.etapas = false; gravarLocal(CHAVE_CONVERSA, conv); abrirChat(); });   // conversa começada na tela por etapas volta nela
       else abrirChat();
     } else mostrarForm();
     iniciarConta();   // sem esperar: o formulário já está na tela; a conta (se existir) refaz o formulário quando chegar

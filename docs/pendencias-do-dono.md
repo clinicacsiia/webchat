@@ -196,7 +196,7 @@ Detalhes em [`previsao-marcacao.md`](previsao-marcacao.md). Estado conferido na 
 - [ ] **ATENÇÃO, Jornada:** o #14359 sem o filtro "marcado em" (`periodo2`) devolve só as marcações feitas **hoje** (49 linhas em vez de 3.158). A `sync-jornada-klingo` lê assim; se isso se confirmar, a Jornada não vê cancelamento/confirmação de marcações de dias anteriores. A correção é pequena (enviar `periodo2`), mas é uma função em produção: **diga "corrija a Jornada" para eu fazer com teste**.
 - Para desligar na hora: `update public.config set valor = 'nao' where chave = 'previsao_marcacao_modo';` ([editor SQL](https://supabase.com/dashboard/project/nrvuynjwcgwpjdptkiay/sql/new)). Para apagar tudo: `supabase/previsao-marcacao-rollback.sql`.
 
-## 2.22 Sistema de marcação por etapas no lugar do botão Começar (25/11/2026): **pronto no repositório, DESLIGADO e nada aplicado**
+## 2.22 Sistema de marcação por etapas no lugar do botão Começar (25/11/2026): **em piloto só com o telefone do dono** (tela do teste v20261125a ligada ao motor real: `docs/integracao-teste-no-piloto.md`, com as pendências da fase 1)
 Tudo está descrito em [`integracao-marcacao-por-etapas.md`](integracao-marcacao-por-etapas.md) (passo a passo da troca na seção 3 e como voltar atrás). **Quando você pedir, eu aplico o banco em partes, publico a tela com a chave em `nao`, ligo o piloto e depois abro para todos.** O que só você decide:
 1. **Telefones do piloto** (a lista nasce vazia: sem ela, ninguém entra no piloto).
 2. **Ordem das perguntas:** a tela segue a ordem do chat de hoje (CPF e nascimento primeiro). A ordem do teste (pagamento primeiro) exige mexer na função central do chat; faço só com a sua ordem, em teste e atrás de uma chave.
