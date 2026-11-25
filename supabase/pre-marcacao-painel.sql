@@ -1,5 +1,6 @@
 -- FLUXOGRAMA: página de teste (/painel/testedowebchat/) -> pre_marcacao_registrar (anônimo, só grava/atualiza o próprio protocolo)
 --             -> tabela public.pre_marcacao -> aba "Pré-marcação" do painel (equipe lê; pre_marcacao_atender muda a fila).
+-- Versão 1.1 — 25/11/2026 / Mudança: o médico de interesse (dados.busca.medicoNome) vale quando não há horário escolhido.
 -- Versão 1.0 — 25/11/2026 / Mudança: implementação inicial. Pode ser aplicado de novo sem efeito.
 --
 -- O que guarda: o que a pessoa escolheu e informou no teste (nome, telefone, e-mail, consulta, pagamento, convênio, plano, médico, horário
@@ -114,7 +115,7 @@ begin
   values (v_proto, v_chave, v_tipo, left(coalesce(p->>'status', ''), 40), v_ident, v_nome, v_resp,
       left(btrim(coalesce(pac->>'telefone', '')), 30), left(btrim(coalesce(pac->>'email', '')), 200), left(btrim(coalesce(d->>'procNome', '')), 120),
       left(btrim(coalesce(d->>'pagto', '')), 40), left(btrim(coalesce(d->>'convenio', '')), 120), left(btrim(coalesce(d->>'plano', '')), 160),
-      left(btrim(coalesce(slot->>'profissional', '')), 120), v_data, left(coalesce(slot->>'hora', ''), 10),
+      left(btrim(coalesce(nullif(slot->>'profissional', ''), d->'busca'->>'medicoNome', '')), 120), v_data, left(coalesce(slot->>'hora', ''), 10),
       left(btrim(concat_ws(' · ', nullif(slot->>'local', ''), nullif(slot->>'unidade', ''))), 160),
       left(coalesce(pref->>'periodo', ''), 20), v_dias, v_pend, left(btrim(coalesce(p->>'motivo', '')), 300),
       coalesce((d->>'carteirinha')::boolean, false), v_ciente, v_venc, d)

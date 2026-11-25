@@ -157,7 +157,11 @@
   const chaveNova = () => { try { return crypto.randomUUID().replace(/-/g, '') + Math.random().toString(36).slice(2); } catch { return String(Date.now()) + Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2); } };
   async function enviarUma(s) {
     if (!s.chave) s.chave = chaveNova();
-    const d = Object.assign({}, s.dados || {}); delete d.fotoCart; delete d.estado;
+    const d = Object.assign({}, s.dados || {}), e = d.estado || {}; delete d.fotoCart; delete d.estado;
+    // "busca" = o que a pessoa pediu, para a equipe consultar os horários livres no painel (mesma regra de pagador do marcacao.js)
+    const pag = d.pagto === 'particular' ? 'Particular' : d.pagto === 'convenio' && d.convId && d.convId !== 'nao_sei' && !/^n[aã]o/i.test(String(d.convId)) ? (d.planoId ? d.convId + '#' + d.planoId : d.convId) : '';
+    const med = e.medico && e.medico !== 'qualquer' ? { medicoId: String(e.medico), medicoNome: e.medicoNome || '' } : {};
+    if (d.procId) d.busca = Object.assign({ procId: d.procId, pagador: pag }, med);
     const corpo = { protocolo: s.protocolo, chave: s.chave, tipo: s.tipo, status: s.status, motivo: s.motivo || d.motivo || '', venceEm: s.venceEm || null, dados: d };
     const r = await fetch(PAINEL_URL, { method: 'POST', headers: { apikey: PAINEL_KEY, Authorization: 'Bearer ' + PAINEL_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify({ p: corpo }) });
     if (!r.ok) throw new Error('painel ' + r.status);

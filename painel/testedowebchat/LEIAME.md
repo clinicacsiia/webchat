@@ -137,3 +137,7 @@ Cada pré-marcação, aviso "chamar no WhatsApp" ou marcação do teste (e cada 
 - Anônimo só **grava**; não lê nada. Cada aparelho só atualiza o próprio protocolo (`chave_cliente`). Limite de 300 novos/hora. A foto da carteirinha **não** é enviada.
 - Falha de rede não atrapalha o paciente: a solicitação fica com `sinc=false` e é reenviada na próxima oportunidade.
 - Rollback: ver cabeçalho do SQL.
+
+### Organização e horários livres (25/11/2026)
+- Cada pedido cai em um grupo: **Com pendência** (falta plano, carteirinha, médico ou horário, ou a pessoa pediu para ser chamada no WhatsApp), **Completas** (tudo informado, falta a equipe confirmar) e **Encerradas** (já marcada, cancelada, resolvida ou descartada). Regra em `pmGrupo` (`painel/index.html`).
+- Botão **Ver horários livres** no cartão: consulta `teste-agenda-klingo` (só leitura, 45 dias, mínimo 24 h de antecedência) com o que a pessoa pediu (consulta, convênio/plano, médico, período e dias), diz se o horário que ela escolheu continua livre e coloca as sugestões na mensagem do WhatsApp. O teste agora envia `dados.busca` (consulta, pagador, médico).
