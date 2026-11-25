@@ -784,7 +784,7 @@
   const CHAVE_HIST = 'webchat.historico.v1';   // as últimas conversas deste aparelho (cada uma com o seu token): dá para voltar a elas
   const MAX_HIST = 5;                          // mínimo pedido: 3
   // Muda a cada alteração do chat. Cópia de mensagens guardada por outra versão é descartada (era isso que mostrava conversa velha e travada).
-  const VERSAO_APP = '2026.11.25-7';
+  const VERSAO_APP = '2026.11.25-9';
   // Mesmas regras do banco (fluxo_nome_ok, fluxo_telefone_ok, fluxo_email_ok): o banco confere de novo, aqui é só para avisar logo.
   const LET = 'A-Za-zÀ-ÖØ-öø-ÿ';
   const nomeCompletoOk = (v) => { const t = String(v || '').trim(); return t.length >= 5 && t.length <= 120 && new RegExp(`^[${LET}][${LET}'’.-]*( +[${LET}][${LET}'’.-]*)+$`).test(t) && t.split(/ +/).filter((w) => w.replace(new RegExp(`[^${LET}]`, 'g'), '').length >= 2).length >= 2; };
@@ -1702,16 +1702,17 @@
   let rotuloIniciar = 'Começar';
   function rotuloPiloto() {
     try {
-      if (config.marcacao_etapas_modo !== 'teste' || !el.btnIniciar) return;
+      if ((config.marcacao_etapas_modo !== 'teste' && config.marcacao_etapas_modo !== 'todos') || !el.btnIniciar) return;
+      if (config.marcacao_etapas_modo === 'todos') { rotuloIniciar = 'Pré-marcação'; if (!el.btnIniciar.disabled) el.btnIniciar.textContent = rotuloIniciar; return; }
       const p = lerLocal(CHAVE_PERFIL) || {}, tel = (el.fTel && el.fTel.value) || p.telefone || '';
       if (!tel) return;
       etapasAtivas(tel).then((ok) => { rotuloIniciar = ok ? 'Pré-marcação' : 'Começar'; if (!el.btnIniciar.disabled) el.btnIniciar.textContent = rotuloIniciar; }, () => {});
     } catch { /* fica "Começar" */ }
   }
-  const etapasLigadas = () => ['sim', 'piloto', 'teste'].includes(config.marcacao_etapas_modo);   // 'teste' = piloto com a tela do ambiente de teste (v20261125a)
+  const etapasLigadas = () => ['sim', 'piloto', 'teste', 'todos'].includes(config.marcacao_etapas_modo);   // 'teste' = piloto com a tela do teste; 'todos' = tela do teste para todos   // 'teste' = piloto com a tela do ambiente de teste (v20261125a)
   async function etapasAtivas(tel) {
     const m = config.marcacao_etapas_modo;
-    if (m === 'sim') return true;
+    if (m === 'sim' || m === 'todos') return true;
     if (m !== 'piloto' && m !== 'teste') return false;
     try { const { data, error } = await db.rpc('marcacao_etapas_pode', { p_telefone: tel }); return !error && data === true; } catch { return false; }
   }
@@ -1755,13 +1756,13 @@
       },
       aoMenu: () => { const ant = conv && conv.id && conv.token ? { id: conv.id, token: conv.token } : null; if (conv) registrarHistorico(conv, { etapas: false }); irParaFormNovo(ant); },
       aoPin: () => pinVenceu('bloqueado'),
-      aoEtapas: () => { if (conv) { conv.etapasMotor = true; gravarLocal(CHAVE_CONVERSA, conv); } abrirEtapas(null).catch(() => { if (conv) { conv.etapas = false; gravarLocal(CHAVE_CONVERSA, conv); } abrirChat(); }); },   // o resto da marcação segue na tela por etapas, na mesma conversa
+      aoEtapas: () => { window.CSI_SEM_ATENDENTE = true; if (conv) { conv.etapasMotor = true; gravarLocal(CHAVE_CONVERSA, conv); } abrirEtapas(null).catch(() => { if (conv) { conv.etapas = false; gravarLocal(CHAVE_CONVERSA, conv); } abrirChat(); }); },   // o resto da marcação segue na tela por etapas, na mesma conversa
       aoAcompanhar: () => { location.href = 'minha-vez/?acompanhar=1'; }
     });
     window.CSI_MARCACAO.abrir({ tipo: conv.tipo === 'filho' ? 'filho' : 'proprio', nome: perfil.nome || '', telefone: perfil.telefone || '', email: perfil.email || '', nomeCrianca: conv.nomeCrianca || '', irmaos: [] });
   }
   async function abrirEtapas(respostas) {
-    if (config.marcacao_etapas_modo === 'teste' && conv && !conv.etapasMotor) { await abrirTeste(); return; }
+    if ((config.marcacao_etapas_modo === 'teste' || config.marcacao_etapas_modo === 'todos') && conv && !conv.etapasMotor) { await abrirTeste(); return; }
     await carregarEtapas();
     if (!window.CSI_ETAPAS || !conv) throw new Error('etapas');
     window.CSI_ETAPAS.abrir({
