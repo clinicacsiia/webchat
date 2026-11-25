@@ -30,13 +30,15 @@ const pessoa = async (chave, nome, cel) => {
 const conta = async (conv) => (await um(`select conta_id from public.conversas where id = $1`, [conv])).conta_id;
 
 let antigaConv, antigaApp;
-await caso('ANTES: a conversa aberta pela atendente cai na conta de paciente dela (reproduz o defeito)', async () => {
+// O retrato da produção JÁ traz a correção (aplicada e conferida), então o defeito antigo não se reproduz mais: a conversa aberta pela atendente nasce SEM conta de paciente.
+// A segunda parte do arquivo prova que aplicar a migração de novo é seguro e que ela ainda limpa conversas antigas gravadas com o defeito.
+await caso('RETRATO DA PRODUÇÃO: a conversa aberta pela atendente nasce sem conta de paciente (a correção já está no ar)', async () => {
   const id = await pessoa('9101', 'PESSOA UM TESTE', '71933330001');
   await como(ATE);
   const conv = (await q(`select public.painel_pmarc_conversa($1) v`, [id]))[0].v;
   await db.exec('reset role');
   antigaConv = conv;
-  return { ok: (await conta(conv)) === ATE, detalhe: String(await conta(conv)) };
+  return { ok: (await conta(conv)) === null, detalhe: String(await conta(conv)) };
 });
 
 // o estado de produção: o acesso rápido da atendente já importou a conversa

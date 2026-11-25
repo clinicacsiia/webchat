@@ -147,19 +147,20 @@ await caso('voltar do HORÁRIO leva ao PLANO e o plano antigo é apagado', async
   const pa = await pedidoDe(p.c);
   return { ok: ok1 && r.passo === 'plano' && pa.plano === null, detalhe: p.passos.join(' > ') };
 });
-await caso('voltar dos DADOS (contato) leva aos dados de identificação, já preenchidos com o que foi digitado', async () => {
+// 23/11/2026 (dados-ja-salvos): celular e e-mail já vêm do formulário inicial e nome + sexo já guardados não são perguntados de novo; o chat não faz mais a pergunta
+// 'dados_contato' nesse caminho, e voltar passa direto pelo que já está salvo (a tela de conferência tem "Corrigir os dados do cadastro" para mudar). Os dois casos abaixo seguem o comportamento de hoje.
+await caso('voltar dos DADOS (identificação) leva de volta ao horário: o que já está salvo não é perguntado de novo', async () => {
   const p = await iniciar('Voltar Dados Teste');
-  for (let i = 0; i < 20 && p.ult.opcoes.passo !== 'dados_contato'; i++) await responder(p, { motivo: 'exame', plano: 'Particular' });
+  for (let i = 0; i < 20 && p.ult.opcoes.passo !== 'dados_ident'; i++) await responder(p, { motivo: 'exame', plano: 'Particular' });
+  const chegou = p.ult.opcoes.passo === 'dados_ident';
   const r = await voltar(p);
-  const campos = Object.fromEntries((p.ult.opcoes.campos || []).map((c) => [c.nome, c.valor]));
-  // 15/11/2026: dados_ident pede só nome e sexo; nascimento, CPF e nome da mãe não são perguntados de novo (supabase/dados-ident-sem-repetir.sql)
-  return { ok: r.passo === 'dados_ident' && campos.nome === 'Maria Teste da Silva' && !('dt_nasc' in campos) && !('cpf' in campos) && !('mae' in campos), detalhe: `${p.passos.join(' > ')} | nome preenchido: ${campos.nome}` };
+  return { ok: chegou && r.passo === 'horario' && !p.passos.includes('dados_contato'), detalhe: p.passos.join(' > ') };
 });
-await caso('voltar da CONFIRMAÇÃO leva ao último grupo de dados; voltar de novo segue andando para trás, um passo por vez', async () => {
+await caso('voltar da CONFIRMAÇÃO anda para trás um passo por vez, sem repetir o que já está salvo (nome, sexo, celular, e-mail)', async () => {
   const p = await iniciar('Voltar Confirma Teste');
   for (let i = 0; i < 20 && p.ult.opcoes.passo !== 'confirmar'; i++) await responder(p, { motivo: 'exame', plano: 'Particular' });
   const a = await voltar(p), b = await voltar(p), c = await voltar(p), d = await voltar(p);
-  return { ok: a.passo === 'dados_contato' && b.passo === 'dados_ident' && c.passo === 'horario' && d.passo === 'plano', detalhe: [a, b, c, d].map((x) => x.passo).join(' < ') };
+  return { ok: a.passo === 'horario' && b.passo === 'plano' && c.passo === 'exame' && d.passo === 'motivo', detalhe: [a, b, c, d].map((x) => x.passo).join(' < ') };
 });
 await caso('CONSULTA: voltar do PLANO leva à escolha do médico; do médico, à consulta', async () => {
   const p = await iniciar('Voltar Consulta Teste');
