@@ -84,6 +84,20 @@ Nada abaixo foi feito. Cada passo tem a volta.
 11. **O que a tela ainda manda para o chat de sempre** (por segurança): irmãos "juntos", exames, "outro assunto", médico sem horário com solicitação de disponibilidade, resultado, remarcar/cancelar. Pode ser levado para a tela por etapas aos poucos.
 12. **Revisar na prática no celular** (leitura de tela, teclado numérico dos campos CPF/data) durante o piloto.
 
+## 5.1 Testes que já falhavam ANTES desta mudança (comparados com o commit anterior, `e57af26`)
+Rodei a bateria inteira (`npm test`, que para na primeira falha) e depois **cada teste restante sozinho**. Tudo o que falhou, falhava igual no commit anterior: **nenhuma falha vem da tela por etapas**. O que é teste velho de uma tela que mudou de propósito:
+
+| Teste | Causa (conferida) | Situação |
+|---|---|---|
+| `test:ponta-a-ponta` (2 casos) | Desde 23/11 (`dados-ja-salvos`) o chat **não pergunta mais** `dados_contato` quando celular e e-mail já vieram do formulário; o teste ainda esperava a pergunta. | **Corrigido** (sequência esperada atualizada). |
+| `test:voltar-sql` (2 casos) | Mesma causa: voltar passa direto pelo que já está salvo (nome, sexo, celular, e-mail). | **Corrigido.** |
+| `test:previsao-sem-conta-atendente` (1 caso) | O caso "ANTES" esperava reproduzir o defeito antigo, mas o retrato da produção **já traz a correção**. | **Corrigido** (agora prova que a correção está no ar). |
+| `test:previsao-escolha-pagina` (6 casos) | A página de Previsão trocou turno, "a partir das", "até as" e unidade por **dia e horário preferidos** (commit `f2e5bed`, 23/11); o teste ainda usa `#apos`, `#ate`, Manhã/Tarde. | **Pendente:** reescrever os casos para o formulário novo (`#dia`, `#hora`, `#plano`) e para o texto novo do pedido à equipe. |
+| `test:sentinela-navegador` (7 casos de "pedido de exames" e "lado") | Procuram um botão **"Lista"** que a tela de escolha de exames não tem mais. | **Pendente:** reescrever para a tela atual. |
+| `test:pessoa` (1 caso) | Painel em janela baixa (560 px): a área das mensagens tem 79 px e o teste exige 90 px. **Pode ser um incômodo real da equipe em tela baixa**, não só do teste. | **Pendente:** decidir (ajustar a tela ou o limite). |
+| `test:painel-v2` (1 caso) | Aba Indicadores: o teste espera um elemento que não aparece em 10 s. | **Pendente:** investigar. |
+| `test:acesso-chat` (2 casos) | Layout da tela inicial do acesso rápido (não cabe sem rolar em 390x780; "Começar" fica depois de "Acompanhe seus pedidos" no teste). Mais uma falha **ocasional** ("Para Leo") só quando a máquina está ocupada. | **Pendente:** decidir se o layout atual é o desejado e ajustar o teste. |
+
 ## 6. O que NÃO foi feito (para não haver surpresa)
 
 - Nenhuma migração aplicada; nenhuma função publicada; nenhuma chave de `config` criada na produção.
