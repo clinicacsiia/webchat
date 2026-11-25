@@ -118,9 +118,21 @@
       falhou(e);
     }
   }
+  // Voltar na primeira pergunta de verdade (ou para trás dos dados do cadastro, que o banco responde sozinho) = sair para o menu principal, nunca ficar preso.
+  const PRIMEIRAS = new Set(['consulta', 'motivo', 'atalho']);
+  function menuPrincipal() { parar(); fechar(); if (C && C.aoNova) C.aoNova(); }
   async function voltar() {
-    if (C.ocupado) return; C.ocupado = true;
-    try { const r = await rpc('chat_voltar', { p_conversa: C.conv.id, p_token: C.conv.token }); C.ocupado = false; await aposResposta(r); }
+    if (C.ocupado) return;
+    const passoAgora = C.atual && C.atual.opcoes ? C.atual.opcoes.passo : null;
+    if (PRIMEIRAS.has(passoAgora)) { menuPrincipal(); return; }
+    C.ocupado = true;
+    try {
+      const r = await rpc('chat_voltar', { p_conversa: C.conv.id, p_token: C.conv.token }); C.ocupado = false;
+      const lista = r && Array.isArray(r.respostas) ? r.respostas : [];
+      const ultima = [...lista].reverse().find((m) => m && m.opcoes && typeof m.opcoes === 'object');
+      if (ultima && PASSOS_CADASTRO.has(ultima.opcoes.passo)) { menuPrincipal(); return; }
+      await aposResposta(r);
+    }
     catch (e) { C.ocupado = false; if (e && e.code === '22023') erro('Não deu para voltar agora.'); else falhou(e); }
   }
 
