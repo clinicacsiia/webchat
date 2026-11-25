@@ -784,7 +784,7 @@
   const CHAVE_HIST = 'webchat.historico.v1';   // as últimas conversas deste aparelho (cada uma com o seu token): dá para voltar a elas
   const MAX_HIST = 5;                          // mínimo pedido: 3
   // Muda a cada alteração do chat. Cópia de mensagens guardada por outra versão é descartada (era isso que mostrava conversa velha e travada).
-  const VERSAO_APP = '2026.11.25-5';
+  const VERSAO_APP = '2026.11.25-7';
   // Mesmas regras do banco (fluxo_nome_ok, fluxo_telefone_ok, fluxo_email_ok): o banco confere de novo, aqui é só para avisar logo.
   const LET = 'A-Za-zÀ-ÖØ-öø-ÿ';
   const nomeCompletoOk = (v) => { const t = String(v || '').trim(); return t.length >= 5 && t.length <= 120 && new RegExp(`^[${LET}][${LET}'’.-]*( +[${LET}][${LET}'’.-]*)+$`).test(t) && t.split(/ +/).filter((w) => w.replace(new RegExp(`[^${LET}]`, 'g'), '').length >= 2).length >= 2; };
@@ -927,7 +927,7 @@
   }
   setInterval(atualizarSaude, 60000);
   function mostrarForm(manterEscolha) {
-    fecharCanal(); pararAcompanhar();
+    fecharCanal(); pararAcompanhar(); rotuloPiloto();
     el.telaChat.hidden = true; el.telaChat.style.display = 'none';
     el.telaInicio.hidden = false; el.btnMenu.hidden = true; el.btnVoltarInicio.hidden = true; el.menu.hidden = true;
     acessoDesenharBalao(); acessoContar();   // botão grande "Acompanhe seus pedidos" e o balão de novidades
@@ -1677,10 +1677,11 @@
       motorAtivo = data.motor === 'fluxo'; passoAtual = null;
       // Sistema de marcação por etapas (config.marcacao_etapas_modo: nao | piloto | sim; padrão "nao" = este chat de sempre). Só com o motor, sem irmãos juntos.
       // Se a tela nova não carregar, segue para o chat de sempre na MESMA conversa (nada se perde).
+      if (config.marcacao_etapas_modo === 'teste' && irmaos.length) toast('Piloto: com "todos os filhos" o chat segue como antes. Escolha um filho de cada vez para ver a tela nova.');
       if (data.motor === 'fluxo' && !irmaos.length && etapasLigadas() && await etapasAtivas(telTxt)) {   // sem a chave, nenhuma espera a mais: o chat de sempre abre no mesmo instante
         try { conv.etapas = true; gravarLocal(CHAVE_CONVERSA, conv); registrarHistorico(conv, { etapas: true }); await abrirEtapas(data.respostas); respostaAvisos.then(assinarPush); return; }
-        catch { conv.etapas = false; gravarLocal(CHAVE_CONVERSA, conv); }
-      }
+        catch (e) { conv.etapas = false; gravarLocal(CHAVE_CONVERSA, conv); if (config.marcacao_etapas_modo === 'teste') toast('Tela nova indisponível agora (' + ((e && e.message) || 'erro') + '). Seguindo no chat de sempre.'); }
+      } else if (config.marcacao_etapas_modo === 'teste' && data.motor === 'fluxo') toast('Piloto: esta conversa não entrou na tela nova (telefone fora da lista).');
       mostrarChat(); limparConversa();
       mostrarRespostas(data.respostas, t0);
       atualizarStatus('aguardando');
@@ -1691,12 +1692,22 @@
     } catch (e) {
       el.erroForm.textContent = mensagemErro(e);
     } finally {
-      el.btnIniciar.disabled = false; el.btnIniciar.textContent = 'Começar';
+      el.btnIniciar.disabled = false; el.btnIniciar.textContent = rotuloIniciar;
     }
   }
   /* ---------- sistema de marcação por etapas (etapas.js; ver docs/integracao-marcacao-por-etapas.md) ----------
      Só abre quando o banco mandar marcacao_etapas_modo = "sim" (todos) ou "piloto" (só os telefones da lista). Sem a chave, erro de rede ou "nao": nada muda.
      A tela só desenha as perguntas do motor; "Continuar no chat" abre a MESMA conversa no chat de sempre. Desligar: update public.config set valor = 'nao' where chave = 'marcacao_etapas_modo'. */
+  // Piloto da tela nova: para o telefone da lista o botão se chama "Pré-marcação" (os demais pacientes seguem com "Começar").
+  let rotuloIniciar = 'Começar';
+  function rotuloPiloto() {
+    try {
+      if (config.marcacao_etapas_modo !== 'teste' || !el.btnIniciar) return;
+      const p = lerLocal(CHAVE_PERFIL) || {}, tel = (el.fTel && el.fTel.value) || p.telefone || '';
+      if (!tel) return;
+      etapasAtivas(tel).then((ok) => { rotuloIniciar = ok ? 'Pré-marcação' : 'Começar'; if (!el.btnIniciar.disabled) el.btnIniciar.textContent = rotuloIniciar; }, () => {});
+    } catch { /* fica "Começar" */ }
+  }
   const etapasLigadas = () => ['sim', 'piloto', 'teste'].includes(config.marcacao_etapas_modo);   // 'teste' = piloto com a tela do ambiente de teste (v20261125a)
   async function etapasAtivas(tel) {
     const m = config.marcacao_etapas_modo;
@@ -4117,6 +4128,7 @@
     el.empresa.textContent = config.nome_empresa === NOME_CLINICA ? 'CSI · Clínica de Saúde e Imagem' : config.nome_empresa;
     if (config.boas_vindas && config.boas_vindas.length <= 90) el.boasForm.textContent = config.boas_vindas;
     aplicarEntrada();
+    rotuloPiloto();
     iniciarFaixaApp();
     iniciarSentinela();
     if (conv && conv.id && conv.token) {   // registrar: conversa de antes desta versão entra na lista

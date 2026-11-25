@@ -425,7 +425,7 @@
         limpar(); const id0 = st.ident; st = novo(id0); fimTela(pronto ? 'ok' : 'pre', s, false, pronto ? 'completada' : 'parcial'); return;
       }
       const s = await S.marcar(dados, { preMarcacao: pre, motivo: pre ? motivoPre(st) : '' });
-      limpar(); const id = st.ident; st = novo(id); fimTela(pre ? 'pre' : 'ok', s);
+      limpar(); const id = st.ident; st = novo(id); fimTela(pre || (s && s.tipo === 'pre_marcacao') ? 'pre' : 'ok', s);
     } catch (e) {
       if (e && e.codigo === 'pin') { if (b) { b.disabled = false; b.textContent = 'Confirmar marcação'; } fechar(); if (S.aoPin) S.aoPin(); return; }
       if (e && e.codigo === 'valor') { if (b) { b.disabled = false; b.textContent = 'Confirmar marcação'; } telaValor(e); return; }
