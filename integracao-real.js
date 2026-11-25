@@ -176,7 +176,11 @@
       if (!p) throw sair('sem pergunta');
       const o = p.opcoes, passo = o.passo || o.tipo;
       if (o.tipo === 'marcado' || o.tipo === 'acompanhar' || o.tipo === 'despedida' || o.tipo === 'nova') return resultado();
-      if (!aberta) { if (pre) return resultado(); throw sair('equipe assumiu'); }
+      if (!aberta) {   // o motor entregou o pedido à equipe (ex.: primeira consulta com a médica, retorno em menos de 30 dias): para o paciente isso é uma PRÉ-MARCAÇÃO, nunca "atendente"
+        const t = nm(p.texto);
+        dados.pendencias = [t.includes('primeira consulta') ? 'Primeira consulta com a médica: a equipe confirma o agendamento' : (t.includes('30 dias') || t.includes('retorno')) ? 'Retorno em menos de 30 dias: a equipe confirma o agendamento' : 'A equipe vai conferir o seu pedido e confirmar'];
+        return Object.assign(resultado(), { status: 'aguardando_equipe', tipo: 'pre_marcacao', motivo: dados.pendencias[0] });
+      }
       if (o.tipo === 'marcando' || o.tipo === 'espera') { if (pre) return resultado(); await new Promise((r) => setTimeout(r, 2500)); vistos.espera = (vistos.espera || 0) + 1; if (vistos.espera > 28) throw sair('demora'); continue; }
       vistos[passo] = (vistos[passo] || 0) + 1;
       if (vistos[passo] > 2) throw sair('sem avanço em ' + passo);   // a mesma pergunta voltou: não insiste
