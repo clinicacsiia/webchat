@@ -266,7 +266,7 @@
     const meu = C.sessao, grupo = (a.opcoes && a.opcoes.grupo) || 1;
     carregando('Conferindo a agenda da clínica agora…');
     const H = { janela: 0, per: '', dia: null, slot: null };
-    await agendaApi(0, true);
+    await agendaApi(0, false);   // ao abrir usa a lista guardada há menos de 45 s (poupa a cota do Klingo); a conferência "fresca" é só logo antes de escolher
     if (meu !== C.sessao) return;
     const buscar = async () => { const hoje = new Date(); return rpc('chat_horarios', { p_conversa: C.conv.id, p_token: C.conv.token, p_grupo: grupo, p_de: ymd(hoje), p_ate: ymd(new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() + 45)), p_unidade: null, p_periodo: H.per || null }); };
     let r;
@@ -277,7 +277,7 @@
     if (r.estado !== 'com_horarios' || !dias.length || r.medico_sem_horario) {
       const msg = r.medico_sem_horario ? 'O(a) médico(a) escolhido(a) não tem horário livre agora.' : (r.aviso || 'Não encontramos horários disponíveis para este atendimento agora.');
       tela('Sem horário pelo site', msg, h('div', {}, avisosDe(), h('div', { class: 'marc-aviso' }, 'Você pode deixar uma pré-marcação: a equipe procura um horário e confirma com você.')),
-        { passo: 'horario', voltar: true, botoes: [r.estado === 'indisponivel' ? botao('Tentar de novo', desenhar, 'sec') : null, botao('Fazer pré-marcação', semHorario)] });
+        { passo: 'horario', voltar: true, botoes: [r.estado === 'indisponivel' || r.estado === 'sem_consulta' ? botao('Tentar de novo', desenhar, 'sec') : null, botao('Fazer pré-marcação', semHorario)] });
       return;
     }
     const diaDe = (d) => { const [y, m, dd] = d.split('-').map(Number); return new Date(y, m - 1, dd); };
