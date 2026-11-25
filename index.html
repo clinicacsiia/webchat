@@ -784,7 +784,7 @@
   const CHAVE_HIST = 'webchat.historico.v1';   // as últimas conversas deste aparelho (cada uma com o seu token): dá para voltar a elas
   const MAX_HIST = 5;                          // mínimo pedido: 3
   // Muda a cada alteração do chat. Cópia de mensagens guardada por outra versão é descartada (era isso que mostrava conversa velha e travada).
-  const VERSAO_APP = '2026.11.25-2';
+  const VERSAO_APP = '2026.11.25-3';
   // Mesmas regras do banco (fluxo_nome_ok, fluxo_telefone_ok, fluxo_email_ok): o banco confere de novo, aqui é só para avisar logo.
   const LET = 'A-Za-zÀ-ÖØ-öø-ÿ';
   const nomeCompletoOk = (v) => { const t = String(v || '').trim(); return t.length >= 5 && t.length <= 120 && new RegExp(`^[${LET}][${LET}'’.-]*( +[${LET}][${LET}'’.-]*)+$`).test(t) && t.split(/ +/).filter((w) => w.replace(new RegExp(`[^${LET}]`, 'g'), '').length >= 2).length >= 2; };
@@ -1001,8 +1001,11 @@
     if (jaAberta) return;
     clearTimeout(tGuardar); fecharCanal(); pararAcompanhar();
     conv = { id: it.id, token: it.token, tipo: it.tipo, nomeCrianca: it.nomeCrianca, irmaos: it.irmaos || [], irmaosModo: it.irmaosModo || '' };
+    const etapasOk = !!it.etapas && (config.marcacao_etapas_modo === 'sim' || config.marcacao_etapas_modo === 'piloto');   // conversa começada na tela por etapas continua nela
+    if (etapasOk) conv.etapas = true;
     gravarLocal(CHAVE_CONVERSA, conv);
-    abrirChat();
+    if (etapasOk) abrirEtapas(null).catch(() => { conv.etapas = false; gravarLocal(CHAVE_CONVERSA, conv); abrirChat(); });
+    else abrirChat();
   }
   function atualizarAcessoHistorico() {
     const n = lerHist().length;
@@ -1675,7 +1678,7 @@
       // Sistema de marcação por etapas (config.marcacao_etapas_modo: nao | piloto | sim; padrão "nao" = este chat de sempre). Só com o motor, sem irmãos juntos.
       // Se a tela nova não carregar, segue para o chat de sempre na MESMA conversa (nada se perde).
       if (data.motor === 'fluxo' && !irmaos.length && (config.marcacao_etapas_modo === 'sim' || config.marcacao_etapas_modo === 'piloto') && await etapasAtivas(telTxt)) {   // sem a chave, nenhuma espera a mais: o chat de sempre abre no mesmo instante
-        try { conv.etapas = true; gravarLocal(CHAVE_CONVERSA, conv); await abrirEtapas(data.respostas); respostaAvisos.then(assinarPush); return; }
+        try { conv.etapas = true; gravarLocal(CHAVE_CONVERSA, conv); registrarHistorico(conv, { etapas: true }); await abrirEtapas(data.respostas); respostaAvisos.then(assinarPush); return; }
         catch { conv.etapas = false; gravarLocal(CHAVE_CONVERSA, conv); }
       }
       mostrarChat(); limparConversa();
@@ -1714,7 +1717,7 @@
     if (!window.CSI_ETAPAS || !conv) throw new Error('etapas');
     window.CSI_ETAPAS.abrir({
       db, conv, respostas, ident: { filho: conv.tipo === 'filho', nomeCrianca: conv.nomeCrianca || '' },
-      aoChat: () => { window.CSI_ETAPAS.fechar(); if (conv) { conv.etapas = false; gravarLocal(CHAVE_CONVERSA, conv); } abrirChat(); },   // a mesma conversa, no chat de sempre
+      aoChat: () => { window.CSI_ETAPAS.fechar(); if (conv) { conv.etapas = false; gravarLocal(CHAVE_CONVERSA, conv); registrarHistorico(conv, { etapas: false }); } abrirChat(); },   // a mesma conversa, no chat de sempre
       aoPin: () => { window.CSI_ETAPAS.fechar(); pinVenceu('bloqueado'); },
       aoDados: async () => {   // conta já cadastrada: o banco responde CPF e nascimento sozinho (true = respondeu alguma pergunta)
         const dev = acessoDev(), c = conv;
@@ -1726,7 +1729,8 @@
           return data.respondeu > 0;
         } catch { return false; }
       },
-      aoNova: () => { if (conv) { conv.etapas = false; gravarLocal(CHAVE_CONVERSA, conv); } novaConversa(); }
+      // Menu principal (tela "Olá…"): fecha a conversa por etapas e abre o formulário novo; a antiga é encerrada pelo servidor ao começar a próxima (sem a janela "conversa aberta", que deixava a tela em branco aqui).
+      aoNova: () => { const ant = conv && conv.id && conv.token ? { id: conv.id, token: conv.token } : null; if (conv) registrarHistorico(conv, { etapas: false }); irParaFormNovo(ant); }
     });
   }
   // Depois de digitar o PIN no meio do caminho, a pessoa volta para a MESMA pergunta da tela por etapas (a tela fica escondida enquanto o teclado do PIN aparece).
