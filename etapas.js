@@ -50,7 +50,7 @@
     rodape = h('footer', { class: 'marc-rodape' });
     raiz = h('div', { id: 'marc', hidden: true, role: 'region', 'aria-label': 'Marcação de consulta' },
       h('header', { class: 'marc-topo' }, btnVoltar, h('img', { src: 'img/logo-csi-simbolo.svg', alt: 'CSI' }), h('span', { class: 'esp' }),
-        h('button', { class: 'marc-humano', type: 'button', id: 'etpChat', onclick: () => irParaChat() }, 'Falar com a equipe')),
+        h('button', { class: 'marc-humano', type: 'button', id: 'etpChat', hidden: !!window.CSI_SEM_ATENDENTE, onclick: () => irParaChat() }, 'Falar com a equipe')),
       h('div', { class: 'marc-prog', id: 'etpProg' }, h('div', { class: 'txt' }, progTxt), h('div', { class: 'barra', role: 'progressbar', 'aria-valuemin': 0, 'aria-valuemax': 100 }, progBarra)),
       corpo, rodape);
     document.body.append(raiz);

@@ -784,7 +784,7 @@
   const CHAVE_HIST = 'webchat.historico.v1';   // as últimas conversas deste aparelho (cada uma com o seu token): dá para voltar a elas
   const MAX_HIST = 5;                          // mínimo pedido: 3
   // Muda a cada alteração do chat. Cópia de mensagens guardada por outra versão é descartada (era isso que mostrava conversa velha e travada).
-  const VERSAO_APP = '2026.11.25-8';
+  const VERSAO_APP = '2026.11.25-9';
   // Mesmas regras do banco (fluxo_nome_ok, fluxo_telefone_ok, fluxo_email_ok): o banco confere de novo, aqui é só para avisar logo.
   const LET = 'A-Za-zÀ-ÖØ-öø-ÿ';
   const nomeCompletoOk = (v) => { const t = String(v || '').trim(); return t.length >= 5 && t.length <= 120 && new RegExp(`^[${LET}][${LET}'’.-]*( +[${LET}][${LET}'’.-]*)+$`).test(t) && t.split(/ +/).filter((w) => w.replace(new RegExp(`[^${LET}]`, 'g'), '').length >= 2).length >= 2; };
@@ -1756,7 +1756,7 @@
       },
       aoMenu: () => { const ant = conv && conv.id && conv.token ? { id: conv.id, token: conv.token } : null; if (conv) registrarHistorico(conv, { etapas: false }); irParaFormNovo(ant); },
       aoPin: () => pinVenceu('bloqueado'),
-      aoEtapas: () => { if (conv) { conv.etapasMotor = true; gravarLocal(CHAVE_CONVERSA, conv); } abrirEtapas(null).catch(() => { if (conv) { conv.etapas = false; gravarLocal(CHAVE_CONVERSA, conv); } abrirChat(); }); },   // o resto da marcação segue na tela por etapas, na mesma conversa
+      aoEtapas: () => { window.CSI_SEM_ATENDENTE = true; if (conv) { conv.etapasMotor = true; gravarLocal(CHAVE_CONVERSA, conv); } abrirEtapas(null).catch(() => { if (conv) { conv.etapas = false; gravarLocal(CHAVE_CONVERSA, conv); } abrirChat(); }); },   // o resto da marcação segue na tela por etapas, na mesma conversa
       aoAcompanhar: () => { location.href = 'minha-vez/?acompanhar=1'; }
     });
     window.CSI_MARCACAO.abrir({ tipo: conv.tipo === 'filho' ? 'filho' : 'proprio', nome: perfil.nome || '', telefone: perfil.telefone || '', email: perfil.email || '', nomeCrianca: conv.nomeCrianca || '', irmaos: [] });

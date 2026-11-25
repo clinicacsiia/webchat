@@ -236,7 +236,7 @@
     pagto() {
       const o = (v, ic, t, d) => opcao({ icone: ic, titulo: t, detalhe: d, sel: st.pagto === v, onclick: () => { st.pagto = v; if (v !== 'convenio') { st.convId = ''; st.convNome = ''; st.plano = ''; st.planoId = ''; st.cart = { anexada: false, semAgora: false, foto: '' }; } invalidarHorario(); st.medico = ''; st.medicoNome = ''; salvar(); redesenhar(); } });
       const part = st.pagto === 'particular' && st.preco != null ? h('div', { class: 'mt-info' }, `Valor particular de ${st.procNome}: `, h('b', {}, dinheiro(st.preco)), ' (valor fictício de teste).') : null;
-      mostrar('Como será o pagamento?', `Atendimento ${st.ident.tipo === 'filho' ? 'para ' + (st.ident.nomeCrianca || 'a criança') : 'para você'}`, h('div', {}, h('div', { class: 'mt-lista', role: 'radiogroup' },
+      mostrar('Como será o pagamento?', `Atendimento ${st.ident.tipo === 'filho' ? 'para ' + (st.ident.nomeCrianca || 'a criança') : 'para você'}`, h('div', {}, h('div', { class: 'mt-aviso', id: 'marcAvisoPre' }, h('b', {}, 'Aviso: este é um pedido de pré-marcação. '), 'Não há atendente por chat. Se o sistema não conseguir marcar sozinho, a equipe confirma com você depois, e a pré-marcação não garante o horário.'), h('div', { class: 'mt-lista', role: 'radiogroup' },
         o('particular', '💳', 'Particular', 'Pago direto à clínica'), o('convenio', '🏥', 'Convênio', 'Plano de saúde')), part), { botoes: botoesPadrao() });
     },
     async conv() {
