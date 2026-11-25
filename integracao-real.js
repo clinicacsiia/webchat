@@ -150,19 +150,34 @@
     const a = nm(alvo); if (!a) return null;
     return (itens || []).find((i) => nm(i.valor) === a || nm(i.rotulo) === a) || (itens || []).find((i) => nm(i.rotulo).includes(a) || a.includes(nm(i.rotulo))) || (extra ? (itens || []).find((i) => nm(i.valor) === nm(extra)) : null) || null;
   };
-  async function marcar(dados, { preMarcacao = false } = {}) {
+  const protocolo = () => 'CSI-' + LIG.conv.id.slice(0, 8).toUpperCase();
+  // Foto da carteirinha: vai para a conversa (mesma função que o chat usa para anexos); se falhar, a equipe pede a foto depois.
+  async function enviarFoto(dados) {
+    if (!dados.fotoCart || LIG.fotoEnviada === LIG.conv.id) return;
+    try { await rpc('chat_anexo_enviar', Object.assign(base(), { p_mime: 'image/jpeg', p_base64: dados.fotoCart, p_ocr: null })); LIG.fotoEnviada = LIG.conv.id; } catch (e) { if (e && e.codigo === 'pin') throw e; /* segue sem a foto */ }
+  }
+  // Ciência da pré-marcação gravada NO SERVIDOR (hora, IP e aparelho).
+  async function registrarCiencia(dados, motivo) {
+    if (LIG.cienciaFeita === LIG.conv.id) return;
+    const c = (dados.preferencia && dados.preferencia.ciencia) || {};
+    await rpc('marcacao_ciencia_registrar', Object.assign(base(), { p_aparelho: { aparelho: c.aparelho || '', fuso: c.fuso || '', navegador: c.navegador || '', idioma: navigator.language || '', tela: screen.width + 'x' + screen.height }, p_motivo: motivo || null }));
+    LIG.cienciaFeita = LIG.conv.id;
+  }
+  const NAO_SEI = 'nao_sei';
+  // Conduz o motor. pre = true: pré-marcação (o que a pessoa não soube vira "Não sei" e o pedido vai para a equipe).
+  async function marcar(dados, { preMarcacao = false, motivo = '' } = {}) {
     if (!LIG.db || !LIG.conv) throw sair('sem conversa');
-    if (preMarcacao) throw sair('pre-marcacao');   // fase 1: a pré-marcação continua na tela por etapas (o motor leva o pedido para a equipe)
-    const vistos = {};
+    const pre = !!preMarcacao, vistos = {};
+    const resultado = () => ({ protocolo: protocolo(), criadoEm: new Date().toISOString(), status: pre ? 'aguardando_equipe' : 'marcado', tipo: pre ? 'pre_marcacao' : 'marcacao', motivo: pre ? motivo : '', remarcacoes: 0, venceEm: null, dados });
+    if (pre) await registrarCiencia(dados, motivo);
+    await enviarFoto(dados);
     for (let volta = 0; volta < 30; volta++) {
       const { p, aberta } = await pergunta();
       if (!p) throw sair('sem pergunta');
       const o = p.opcoes, passo = o.passo || o.tipo;
-      if (o.tipo === 'marcado' || o.tipo === 'acompanhar' || o.tipo === 'despedida' || o.tipo === 'nova') {
-        return { protocolo: 'CSI-' + LIG.conv.id.slice(0, 8).toUpperCase(), criadoEm: new Date().toISOString(), status: 'marcado', tipo: 'marcacao', motivo: '', remarcacoes: 0, dados };
-      }
-      if (!aberta) throw sair('equipe assumiu');
-      if (o.tipo === 'marcando' || o.tipo === 'espera') { await new Promise((r) => setTimeout(r, 2500)); vistos.espera = (vistos.espera || 0) + 1; if (vistos.espera > 28) throw sair('demora'); continue; }
+      if (o.tipo === 'marcado' || o.tipo === 'acompanhar' || o.tipo === 'despedida' || o.tipo === 'nova') return resultado();
+      if (!aberta) { if (pre) return resultado(); throw sair('equipe assumiu'); }
+      if (o.tipo === 'marcando' || o.tipo === 'espera') { if (pre) return resultado(); await new Promise((r) => setTimeout(r, 2500)); vistos.espera = (vistos.espera || 0) + 1; if (vistos.espera > 28) throw sair('demora'); continue; }
       vistos[passo] = (vistos[passo] || 0) + 1;
       if (vistos[passo] > 2) throw sair('sem avanço em ' + passo);   // a mesma pergunta voltou: não insiste
       if (passo === 'cpf_nasc' || passo === 'cpf_confirma' || passo === 'identidade') { const ok = LIG.aoDados ? await LIG.aoDados() : false; if (!ok) throw sair('cadastro'); continue; }
@@ -176,42 +191,53 @@
       }
       if (passo === 'medico') {
         const livre = !dados.medico || dados.medico === 'qualquer';
-        const it = livre ? (o.itens || []).find((i) => i.valor === '') : achar(o.itens, dados.slot && dados.slot.profissional);
+        const it = livre ? (o.itens || []).find((i) => i.valor === '') : achar(o.itens, dados.medicoNome || (dados.slot && dados.slot.profissional));
         if (!it) throw sair('médico');
         await responder('medico', it.valor, it.rotulo); continue;
       }
       if (passo === 'plano') {
-        const it = dados.pagto === 'particular' ? (o.itens || []).find((i) => nm(i.valor) === 'particular') : achar(o.itens, dados.convId || dados.convenio);
-        if (!it) throw sair('convênio');
-        await responder('plano', it.valor, it.rotulo); continue;
+        if (dados.pagto === 'particular') { const it = (o.itens || []).find((i) => nm(i.valor) === 'particular'); if (!it) throw sair('pagamento'); await responder('plano', it.valor, it.rotulo); continue; }
+        const it = dados.convId && dados.convId !== NAO_SEI ? achar(o.itens, dados.convId || dados.convenio) : null;
+        if (it) { await responder('plano', it.valor, it.rotulo); continue; }
+        if (pre) { await responder('plano', { outro: 'Não sei' }, 'Não sei'); continue; }   // não sabe pagamento/convênio: o motor leva para a equipe
+        throw sair('convênio');
       }
       if (passo === 'plano_exato') {
-        const it = achar(o.itens, dados.plano, dados.planoId);
-        if (!it || it.valor === 'nao_sei') throw sair('plano');
-        await responder('plano_exato', it.valor, it.rotulo); continue;
+        const it = dados.plano && dados.plano !== NAO_SEI ? achar(o.itens, dados.plano, dados.planoId) : null;
+        if (it && it.valor !== NAO_SEI) { await responder('plano_exato', it.valor, it.rotulo); continue; }
+        if (pre) { await responder('plano_exato', NAO_SEI, 'Não sei qual é o meu plano'); continue; }
+        throw sair('plano');
       }
       if (passo === 'plano_confirma') { await responder('plano_confirma', 'sim', 'Sim, é o mesmo'); continue; }
+      if (passo === 'dados_carteira' && pre) { await responder('dados_carteira', { pular: true }, null); continue; }
       if (o.tipo === 'calendario') {
-        if (!dados.slot) throw sair('horário');
         const grupo = o.grupo || 1;
+        if (!dados.slot) { if (pre) { await responder('horario', 'sem_horario', 'Nenhum horário serve para mim'); continue; } throw sair('horário'); }
         await agendaApi(0, false);
         const hoje = new Date();
         const r = await rpc('chat_horarios', Object.assign(base(), { p_grupo: grupo, p_de: ymd(hoje), p_ate: ymd(new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() + 45)), p_unidade: null, p_periodo: null }));
         const sl = ((r && r.dias) || []).flatMap((d) => (d.slots || []).map((s) => Object.assign({ data: d.data }, s))).find((s) => s.data === dados.slot.data && s.hora === dados.slot.hora);
-        if (!sl) throw sair('horário indisponível');
+        if (!sl) { if (pre) { await responder('horario', 'sem_horario', 'Nenhum horário serve para mim'); continue; } throw sair('horário indisponível'); }
         await agendaApi(0, true);
         try { await rpc('chat_horario_escolher', Object.assign(base(), { p_grupo: grupo, p_data: sl.data, p_hora: sl.hora, p_unidade: sl.unidade || null })); }
         catch (e) { if (e && e.code === 'P0002') throw sair('horário ocupado'); throw e; }
         continue;
       }
+      if (passo === 'valor') {   // Particular: o paciente precisa ver e concordar com o valor (a tela do teste mostra e chama responderValor)
+        const e = new Error('valor'); e.codigo = 'valor'; e.destaque = o.destaque || null; e.texto = p.texto || ''; e.itens = o.itens || []; throw e;
+      }
       if (passo === 'confirmar') { await responder('confirmar', 'ok', 'Está tudo certo'); continue; }
-      throw sair(passo);   // dados do cadastro, valor Particular, carteirinha, pré-marcação…: a tela por etapas pergunta
+      throw sair(passo);   // dados do cadastro (endereço, contato…), previsão…: a tela por etapas pergunta
     }
     throw sair('muitas voltas');
   }
-  // "Não" na pré-marcação: fase 1 só devolve o aviso na tela; o pedido de atendente real é feito pela tela por etapas.
-  function avisoWhatsapp(dados) { return { protocolo: 'CSI-' + (LIG.conv ? LIG.conv.id.slice(0, 8).toUpperCase() : 'WHATS'), criadoEm: new Date().toISOString(), status: 'aviso_equipe', tipo: 'contato_whatsapp', remarcacoes: 0, dados }; }
+  const responderValor = async (v) => { await responder('valor', v, v === 'sim' ? 'Concordo com o valor e quero marcar' : 'Não quero marcar por causa do valor'); };
+  // "Não, obrigado: quero falar com a equipe": vira pedido de atendente na fila do painel (o mesmo "Falar com um atendente" do chat).
+  function avisoWhatsapp(dados) {
+    if (LIG.db && LIG.conv) pergunta().then(({ p }) => { const passo = p && p.opcoes && (p.opcoes.passo || ''); if (passo) return responder(passo, { acao: 'atendente' }, null); }).catch(() => {});
+    return { protocolo: LIG.conv ? protocolo() : 'CSI-WHATS', criadoEm: new Date().toISOString(), status: 'aviso_equipe', tipo: 'contato_whatsapp', remarcacoes: 0, dados };
+  }
   const solicitacoes = () => [], solicitacaoAtualizar = () => null, solicitacoesApagarTudo = () => {};
 
-  window.CSI_SIM = { catalogo, convenios, planos, medicos, disponibilidade, marcar, avisoWhatsapp, config, configSalvar, configRestaurar, solicitacoes, solicitacaoAtualizar, solicitacoesApagarTudo, CATALOGO, iso, ligar, get aoMenu() { return LIG.aoMenu; }, get aoPin() { return LIG.aoPin; }, get aoEtapas() { return LIG.aoEtapas; }, get aoAcompanhar() { return LIG.aoAcompanhar; } };
+  window.CSI_SIM = { catalogo, convenios, planos, medicos, disponibilidade, marcar, responderValor, avisoWhatsapp, config, configSalvar, configRestaurar, solicitacoes, solicitacaoAtualizar, solicitacoesApagarTudo, CATALOGO, iso, ligar, get aoMenu() { return LIG.aoMenu; }, get aoPin() { return LIG.aoPin; }, get aoEtapas() { return LIG.aoEtapas; }, get aoAcompanhar() { return LIG.aoAcompanhar; } };
 })();

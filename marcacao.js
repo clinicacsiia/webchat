@@ -428,8 +428,18 @@
       limpar(); const id = st.ident; st = novo(id); fimTela(pre ? 'pre' : 'ok', s);
     } catch (e) {
       if (e && e.codigo === 'pin') { if (b) { b.disabled = false; b.textContent = 'Confirmar marcação'; } fechar(); if (S.aoPin) S.aoPin(); return; }
+      if (e && e.codigo === 'valor') { if (b) { b.disabled = false; b.textContent = 'Confirmar marcação'; } telaValor(e); return; }
       if (e && e.codigo === 'continuar') { fechar(); if (S.aoEtapas) S.aoEtapas(e.motivo || ''); return; }   // o resto continua na tela por etapas, na mesma conversa
       if (b) { b.disabled = false; b.textContent = 'Tentar de novo'; } erro(e && e.codigo === 'armazenamento' ? 'Não coube neste aparelho. Libere espaço (⚙ Configurar teste > Apagar dados do teste) e tente de novo.' : 'Não foi possível concluir agora. Tente de novo.'); }
+  }
+  // Particular: o motor exige que a pessoa veja e concorde com o valor antes de marcar.
+  function telaValor(e) {
+    const d = e.destaque;
+    mostrar('Valor da consulta', e.texto && !d ? e.texto : 'Confira o valor antes de marcar.', h('div', {},
+      d ? h('div', { class: 'mt-card' }, h('b', {}, d.titulo || 'Valor total (Particular)'), h('p', { style: 'font-size:26px;font-weight:800;margin:6px 0' }, d.valor), h('ul', { class: 'mt-regras' }, ...(d.linhas || []).map((l) => h('li', {}, l)))) : null),
+      { progresso: false, botoes: [
+        h('button', { class: 'mt-bt sec', type: 'button', style: 'flex:0 0 40%', onclick: async (ev) => { ev.currentTarget.disabled = true; try { await S.responderValor('nao'); fim('nao'); } catch { erro('Não foi possível agora. Tente de novo.'); ev.currentTarget.disabled = false; } } }, 'Não quero'),
+        h('button', { class: 'mt-bt', type: 'button', onclick: async (ev) => { ev.currentTarget.disabled = true; try { await S.responderValor('sim'); confirmar(); } catch { erro('Não foi possível agora. Tente de novo.'); ev.currentTarget.disabled = false; } } }, 'Concordo e quero marcar')] });
   }
   // "Não" na pré-marcação: encerra e avisa a equipe para chamar no WhatsApp (SIMULADO: nenhum aviso real sai deste ambiente).
   function fim(tipo) {

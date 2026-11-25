@@ -18,13 +18,16 @@ Quando o motor pergunta algo que a tela do teste não sabe responder, **a conver
 - Voltar na primeira pergunta e "Fazer outra marcação" levam ao menu principal.
 - "Acompanhar" abre "Acompanhe seus pedidos" (`minha-vez/?acompanhar=1`), onde o cancelamento real já existe.
 
+## Feito na fase 2 (25/11/2026)
+- **Pré-marcação real** pela tela do teste: a ciência é gravada no servidor (`marcacao_ciencia_registrar`) e o motor recebe "Não sei" (convênio ou plano), "Nenhum horário serve" ou "Não tenho a carteirinha agora", levando o pedido para a equipe. "Não, obrigado" vira pedido de atendente.
+- **Foto da carteirinha** enviada à conversa (`chat_anexo_enviar`) quando a pessoa anexa.
+- **Valor Particular**: a tela do teste mostra o valor do motor, com "Concordo e quero marcar" e "Não quero".
+- **Cancelar e remarcar**: "Acompanhar" abre "Acompanhe seus pedidos", que já cancela e remarca de verdade. O "remarcar até 2 vezes" e o "Completar agora" simulados do teste não existem aqui.
+
 ## Pendências (anotadas)
-1. **Pré-marcação** (não sei o plano, nenhum horário serve, sem carteirinha): a tela do teste faz a pergunta, mas o envio real ainda vai pela tela por etapas. Falta ligar a ciência (`marcacao_ciencia_registrar`) e o envio ao motor/painel direto da tela do teste.
-2. **Foto da carteirinha**: a tela do teste guarda a foto no aparelho e ela **não é enviada**. Falta usar `chat_anexo_enviar`. Com convênio, o motor pede o número da carteirinha e a tela por etapas assume.
-3. **Valor Particular**: o motor exige que o paciente concorde com o valor; a tela do teste não mostra. Hoje a tela por etapas assume nesse passo.
-4. **Dados do cadastro** (endereço, contato, sexo) quando faltam: a tela por etapas assume.
-5. **Cancelar e remarcar** dentro da tela do teste (hoje "Acompanhar" abre "Acompanhe seus pedidos"). "Remarcar até 2 vezes" e "Completar agora" do teste continuam simulados e estão desligados aqui.
-6. **Leituras abertas**: a tela usa `teste-agenda-klingo` e `teste-planos-klingo` (funções abertas, só leitura). Não apagar essas funções antes de trocar por `chat-agenda-api`/`chat_horarios` (pendência 8 da seção 2.22).
-7. **Antecedência de 24 h e política de cancelamento** do teste valem só como texto e filtro da tela; o motor tem as suas regras. Conferir se coincidem.
-8. **Retrato do banco** (`supabase/producao/`) não foi refeito para as funções `marcacao_*`.
-9. **Teste no navegador contra o banco real**: só foi testado com o motor simulado (`marcar()` com respostas combinadas) e com a tela em página isolada. A primeira marcação real é o teste de verdade.
+1. **Dados do cadastro** (endereço, contato, sexo) quando faltam: a tela por etapas assume. A tela do teste não tem essas perguntas.
+2. **Previsão de marcação** (perguntas de turno, período e antecedência que o motor faz depois da pré-marcação): a tela por etapas assume.
+3. **Leituras abertas**: a tela usa `teste-agenda-klingo` e `teste-planos-klingo` (funções abertas, só leitura) para listar médicos, horários e planos antes de existir a marcação. Trocar por `chat-agenda-api`/`chat_horarios` exige conduzir o motor passo a passo durante as perguntas, não só no fim. **Não apagar essas funções antes.**
+4. **Antecedência de 24 h e política de cancelamento** do teste valem só como filtro e texto da tela; o motor tem as suas regras. Conferir se coincidem.
+5. **Retrato do banco** (`supabase/producao/`) não foi refeito para `marcacao_etapas_pode`, `marcacao_ciencia_registrar`, `chat_config` e a tabela `marcacao_ciencia` (procedimento em `supabase/producao/LEIAME.md`, `parcial.py`).
+6. **Teste contra o banco real**: só foi feito com o motor simulado e com a tela em página isolada. A primeira marcação e a primeira pré-marcação reais são o teste de verdade.
