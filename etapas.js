@@ -28,6 +28,7 @@
     mudou: ['Seus dados', 6], dados_ident: ['Seus dados', 6], dados_contato: ['Contato', 6], dados_endereco: ['Endereço', 6], dados_carteira: ['Carteirinha', 6], confirmar: ['Conferir', 7], valor: ['Valor', 7]
   };
   const TOTAL = 7;
+  const PASSOS_CADASTRO = new Set(['cpf_nasc', 'cpf_confirma', 'identidade']);   // perguntas que o cadastro do aplicativo sabe responder
   let C = null, raiz, corpo, rodape, progTxt, progBarra, btnVoltar;   // C = estado desta abertura
 
   const rpc = async (nome, args) => { const { data, error } = await C.db.rpc(nome, args); if (error) throw error; return data; };
@@ -104,7 +105,12 @@
     document.querySelectorAll('#marc button').forEach((b) => { b.dataset.eraOk = b.disabled ? '0' : '1'; b.disabled = true; });
     try {
       const r = await rpc('chat_responder', { p_conversa: C.conv.id, p_token: C.conv.token, p_passo: passo, p_valor: valor, p_texto: texto || null });
-      C.ocupado = false; await aposResposta(r);
+      C.ocupado = false;
+      if (C.aoDados && PASSOS_CADASTRO.has(passo)) {   // o cadastro aprende o CPF/nascimento digitado agora (e responde o que ainda faltar)
+        let mais = false; try { mais = await C.aoDados(); } catch { mais = false; }
+        if (mais) { if (r && Array.isArray(r.respostas)) receber(r.respostas); await sincronizar(); desenhar(); return; }
+      }
+      await aposResposta(r);
     } catch (e) {
       C.ocupado = false;
       if (e && e.code === '22023') { try { C.ultimoId = 0; await sincronizar(0); desenhar(); return; } catch { /* cai no aviso abaixo */ } }   // a pergunta já mudou (outra aba, equipe): relê a conversa
@@ -127,6 +133,17 @@
     if (!C.motorAtivo) { telaEquipe(a); return; }
     const o = a.opcoes;
     if (!o) { telaTexto(a); return; }
+    // Conta já cadastrada: o banco responde sozinho CPF e nascimento que o cadastro sabe (app_chat_dados). Só pergunta quando o cadastro não sabe (pessoa nova, filho novo) ou não deu certo.
+    if (C.aoDados && PASSOS_CADASTRO.has(o.passo) && !C.autoDados[o.passo]) {
+      C.autoDados[o.passo] = true; carregando();
+      const sess = C.sessao;
+      Promise.resolve().then(() => C.aoDados()).catch(() => false).then(async (ok) => {
+        if (!C || C.sessao !== sess) return;
+        if (ok) { try { await sincronizar(); } catch { /* mostra o que já tem */ } }
+        desenhar();
+      });
+      return;
+    }
     if (o.tipo === 'escolha') {
       if (o.passo === 'motivo' && !C.autoMotivo && (o.itens || []).some((i) => i.valor === 'consulta')) { C.autoMotivo = true; responder('motivo', 'consulta', 'Consulta'); return; }   // este sistema é só de consultas
       telaEscolha(a); return;
@@ -337,9 +354,9 @@
   }
 
   /* ---------- abrir ---------- */
-  function abrir({ db, conv, respostas, ident, aoChat, aoPin, aoNova }) {
+  function abrir({ db, conv, respostas, ident, aoChat, aoPin, aoNova, aoDados }) {
     if (C) parar();
-    C = { db, conv, ident: ident || {}, aoChat, aoPin, aoNova, ultimoId: 0, atual: null, avisos: [], motorAtivo: true, ocupado: false, sessao: (C && C.sessao) || 0, autoMotivo: false };
+    C = { db, conv, ident: ident || {}, aoChat, aoPin, aoNova, aoDados, autoDados: {}, ultimoId: 0, atual: null, avisos: [], motorAtivo: true, ocupado: false, sessao: (C && C.sessao) || 0, autoMotivo: false };
     montar(); raiz.hidden = false; document.body.classList.add('marc-aberta');
     if (respostas && respostas.length && receber(respostas)) desenhar();
     else { carregando(); sincronizar(0).then(desenhar).catch(falhou); }
