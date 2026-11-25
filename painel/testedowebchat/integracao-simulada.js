@@ -134,19 +134,47 @@
     catch (e) {   // não coube (foto da carteirinha): tenta de novo sem a foto; se ainda não couber, avisa o paciente em vez de fingir que gravou
       if (s.dados && s.dados.fotoCart) { delete s.dados.fotoCart; solicitacoesSalvar(l); s.semFoto = true; } else throw e;
     }
+    sincronizar();
     return s;
   }
   // "Não quero a pré-marcação": encerra e registra o aviso à equipe para chamar no WhatsApp. SIMULADO: nada é enviado a ninguém.
   function avisoWhatsapp(dados) {
     const sol = { protocolo: 'ZAP-TESTE-' + Math.floor(Math.random() * 9000 + 1000), criadoEm: new Date().toISOString(), status: 'aviso_equipe', tipo: 'contato_whatsapp', remarcacoes: 0, dados };
     const l = solicitacoes(); l.unshift(sol); solicitacoesSalvar(l);
+    sincronizar();
     return sol;
   }
   function solicitacaoAtualizar(proto, mudar) {
     const l = solicitacoes(); const s = l.find((x) => x.protocolo === proto);
-    if (s) { mudar(s); solicitacoesSalvar(l); }
+    if (s) { mudar(s); s.sinc = false; solicitacoesSalvar(l); sincronizar(); }
     return s;
   }
+  /* ---------- envio ao painel da equipe (aba "Pré-marcação") ----------
+     Única escrita fora do navegador: chama SÓ a função pre_marcacao_registrar (grava o que o paciente escolheu; sem foto da carteirinha).
+     Não chama Klingo e não dispara aviso. Se a rede falhar, a solicitação fica marcada (sinc=false) e é reenviada na próxima oportunidade. */
+  const PAINEL_URL = 'https://nrvuynjwcgwpjdptkiay.supabase.co/rest/v1/rpc/pre_marcacao_registrar';
+  const PAINEL_KEY = 'sb_publishable_e2GK1YGEj06STa_ESCevow_nvtATB-y';
+  const chaveNova = () => { try { return crypto.randomUUID().replace(/-/g, '') + Math.random().toString(36).slice(2); } catch { return String(Date.now()) + Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2); } };
+  async function enviarUma(s) {
+    if (!s.chave) s.chave = chaveNova();
+    const d = Object.assign({}, s.dados || {}); delete d.fotoCart; delete d.estado;
+    const corpo = { protocolo: s.protocolo, chave: s.chave, tipo: s.tipo, status: s.status, motivo: s.motivo || d.motivo || '', venceEm: s.venceEm || null, dados: d };
+    const r = await fetch(PAINEL_URL, { method: 'POST', headers: { apikey: PAINEL_KEY, Authorization: 'Bearer ' + PAINEL_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify({ p: corpo }) });
+    if (!r.ok) throw new Error('painel ' + r.status);
+  }
+  let enviando = false;
+  async function sincronizar() {
+    if (enviando) return; enviando = true;
+    try {
+      for (const x of solicitacoes().filter((y) => y.sinc !== true).slice(0, 20)) {
+        try { await enviarUma(x); } catch { continue; }
+        const l = solicitacoes(), a = l.find((y) => y.protocolo === x.protocolo);
+        if (a) { a.sinc = true; a.chave = x.chave; gravar(K_SOL, l); }
+      }
+    } finally { enviando = false; }
+  }
+  setTimeout(sincronizar, 1500);
+
   const solicitacoesApagarTudo = () => { try { localStorage.removeItem(K_SOL); } catch { /* ignora */ } };
 
   window.CSI_SIM = { catalogo, convenios, planos, medicos, disponibilidade, marcar, avisoWhatsapp, config, configSalvar, configRestaurar, solicitacoes, solicitacaoAtualizar, solicitacoesApagarTudo, CATALOGO, iso };

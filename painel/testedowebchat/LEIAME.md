@@ -28,7 +28,7 @@ Barra de progresso, Voltar/Continuar sem perder dados (o estado fica guardado), 
 
 ## Segurança deste ambiente
 - Dados 100% fictícios, guardados só no navegador (`teste_*`); apagar em **⚙ Configurar teste > Apagar dados do teste**.
-- A rede para o Supabase é barrada na própria página: **só `chat_config` (leitura)** passa. Sem RPC, sem login, sem Edge Function, sem push, sem service worker. Nada chega ao Klingo nem ao banco, e nenhum aviso real é disparado.
+- A rede para o Supabase é barrada na própria página: **só `chat_config` (leitura)** passa. **Única exceção (25/11/2026, pedido do dono):** `integracao-simulada.js` envia cada solicitação à função `pre_marcacao_registrar` (ver abaixo), sem foto da carteirinha. Sem RPC, sem login, sem Edge Function, sem push, sem service worker. Nada chega ao Klingo nem ao banco, e nenhum aviso real é disparado.
 - Faixa laranja "AMBIENTE DE TESTE" sempre visível.
 
 ## Configurar o teste (faixa laranja > ⚙)
@@ -131,3 +131,9 @@ Corrigido depois de uma leitura completa do código:
 
 ## Ciência da pré-marcação (24/11/2026, v20261124n) — só teste
 Na tela "Quer deixar uma pré-marcação?", ao escolher **Sim** aparece o botão vermelho **"Estou ciente: é uma pré-marcação e não garante o horário"**. É obrigatório para continuar. Ao tocar, grava data/hora (com fuso) e o aparelho (ex.: Android 14 · modelo) e mostra o registro embaixo. Uma **cópia** vai junto da pré-marcação (`dados.preferencia.ciencia`) e aparece de novo na tela final. (IP, idioma e tela foram retirados a pedido do dono em 25/11/2026.)
+
+## Envio ao painel — aba "Pré-marcação" (25/11/2026)
+Cada pré-marcação, aviso "chamar no WhatsApp" ou marcação do teste (e cada mudança: completar, remarcar, cancelar) é enviada ao banco pela função `pre_marcacao_registrar` (`supabase/pre-marcacao-painel.sql`) e aparece na aba **Pré-marcação** do painel (`/painel/`), com botão **Chamar no WhatsApp** (mensagem pronta), fila (Nova / Em contato / Resolvida / Descartada) e anotação da equipe.
+- Anônimo só **grava**; não lê nada. Cada aparelho só atualiza o próprio protocolo (`chave_cliente`). Limite de 300 novos/hora. A foto da carteirinha **não** é enviada.
+- Falha de rede não atrapalha o paciente: a solicitação fica com `sinc=false` e é reenviada na próxima oportunidade.
+- Rollback: ver cabeçalho do SQL.

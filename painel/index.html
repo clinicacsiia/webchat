@@ -655,6 +655,49 @@
     .q-card:hover:not(:active) { transform: none; }
   }
   @media (prefers-reduced-motion: no-preference) { .msg { animation: entra .15s ease-out; } @keyframes entra { from { opacity: 0; transform: translateY(4px); } } }
+
+  /* ---------- aba Pré-marcação ---------- */
+  .pm-topo { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; justify-content: space-between; margin-bottom: 14px; }
+  .pm-filtros { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 16px; }
+  .pm-abas { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+  .pm-abas .chip[aria-pressed="true"] { background: var(--csi-primary-strong); border-color: var(--csi-primary-strong); color: #fff; }
+  .pm-abas .chip b { margin-left: 6px; font-weight: 700; opacity: .85; }
+  .pm-filtros input[type=search], .pm-filtros select { border: 1px solid var(--csi-border-strong); border-radius: 999px; padding: 6px 14px; font-size: 13.5px; background: var(--papel); min-width: 0; }
+  .pm-filtros input[type=search] { flex: 1 1 200px; max-width: 320px; }
+  .pm-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 16px; align-items: start; }
+  .pm-card { background: var(--papel); border: 1px solid var(--linha); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); overflow: hidden; display: flex; flex-direction: column; border-top: 4px solid #f2b84b; transition: box-shadow var(--csi-ease), transform var(--csi-ease); }
+  .pm-card:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
+  .pm-card.t-contato_whatsapp { border-top-color: #25d366; }
+  .pm-card.t-marcacao { border-top-color: var(--csi-primary); }
+  .pm-card.feito { opacity: .72; border-top-color: var(--csi-border-strong); }
+  .pm-cab { display: flex; gap: 12px; align-items: center; padding: 14px 16px 6px; }
+  .pm-av { flex: 0 0 auto; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 15px; background: var(--csi-primary-soft); color: var(--csi-primary-strong); }
+  .pm-nome { font-weight: 700; font-size: 16px; line-height: 1.2; overflow-wrap: anywhere; }
+  .pm-sub { font-size: 12.5px; color: var(--suave); margin-top: 2px; }
+  .pm-selos { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 16px 0; }
+  .pm-tag { display: inline-flex; align-items: center; gap: 4px; border-radius: 999px; padding: 2px 10px; font-size: 11.5px; font-weight: 700; background: var(--csi-warning-soft); color: var(--csi-warning-strong); }
+  .pm-tag.zap { background: #e3f9ec; color: #0b6b34; }
+  .pm-tag.ok { background: var(--csi-success-soft); color: var(--csi-success-strong); }
+  .pm-tag.azul { background: var(--csi-primary-soft); color: var(--csi-primary-strong); }
+  .pm-tag.erro { background: var(--csi-danger-bg); color: var(--csi-danger-strong); }
+  .pm-tag.cinza { background: #eef1f4; color: var(--csi-text-secondary); }
+  .pm-corpo { padding: 10px 16px 4px; display: grid; gap: 7px; }
+  .pm-lin { display: grid; grid-template-columns: 92px 1fr; gap: 8px; font-size: 13.5px; }
+  .pm-lin span { color: var(--suave); }
+  .pm-lin b { font-weight: 600; overflow-wrap: anywhere; }
+  .pm-pend { margin: 6px 16px 0; padding: 8px 10px; border-radius: var(--radius-md); background: var(--csi-warning-soft); color: var(--csi-warning-strong); font-size: 12.5px; }
+  .pm-pend b { display: block; margin-bottom: 2px; }
+  .pm-obs { margin: 8px 16px 0; }
+  .pm-obs textarea { width: 100%; box-sizing: border-box; border: 1px solid var(--csi-border-strong); border-radius: var(--radius-md); padding: 6px 10px; font: inherit; font-size: 13px; resize: vertical; min-height: 36px; }
+  .pm-acoes { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 16px 14px; margin-top: auto; }
+  .pm-zap { flex: 1 1 100%; display: inline-flex; align-items: center; justify-content: center; gap: 8px; background: #25d366; color: #063d1d; font-weight: 700; font-size: 15px; border: 0; border-radius: var(--radius-md); padding: 11px 14px; text-decoration: none; cursor: pointer; transition: background-color var(--csi-ease); }
+  .pm-zap:hover { background: #1ebe5b; }
+  .pm-zap[aria-disabled="true"] { background: #d5dbe1; color: #5a6878; pointer-events: none; }
+  .pm-zap svg { width: 20px; height: 20px; fill: currentColor; }
+  .pm-acoes .btn { flex: 1 1 auto; width: auto; padding: 8px 12px; font-size: 13px; }
+  .pm-filtros select { width: auto; flex: 0 0 auto; }
+  .pm-vazio { text-align: center; padding: 48px 16px; color: var(--suave); border: 1px dashed var(--csi-border-strong); border-radius: var(--radius-lg); }
+  @media (max-width: 640px) { .pm-grade { grid-template-columns: 1fr; } .pm-lin { grid-template-columns: 82px 1fr; } }
 </style>
 </head>
 <body>
@@ -1005,12 +1048,12 @@
   /* ---------- estrutura ---------- */
   function montarApp() {
     const abas = [];
-    const ICONE_ABA = { atendimento: 'fone', jornada: 'pin', fila: 'pessoas', avisos: 'sino', indicadores: 'barras', contatos: 'lista', equipe: 'pessoa', catalogo: 'barras', convenios: 'lista', medicos: 'pessoa', aprendizado: 'livro', config: 'engrenagem', atalhos: 'lista' };
-    if (podeAtender()) { abas.push(['atendimento', 'Atendimento']); abas.push(['jornada', 'Jornada']); abas.push(['fila', 'Fila']); abas.push(['avisos', 'Avisos']); abas.push(['indicadores', 'Indicadores']); }
+    const ICONE_ABA = { atendimento: 'fone', jornada: 'pin', fila: 'pessoas', avisos: 'sino', indicadores: 'barras', contatos: 'lista', equipe: 'pessoa', catalogo: 'barras', convenios: 'lista', medicos: 'pessoa', aprendizado: 'livro', config: 'engrenagem', atalhos: 'lista', premarcacao: 'calendario' };
+    if (podeAtender()) { abas.push(['atendimento', 'Atendimento']); abas.push(['jornada', 'Jornada']); abas.push(['fila', 'Fila']); abas.push(['premarcacao', 'Pré-marcação']); abas.push(['avisos', 'Avisos']); abas.push(['indicadores', 'Indicadores']); }
     abas.push(['contatos', 'Contatos']);
     if (ehAdmin()) { abas.push(['equipe', 'Equipe']); abas.push(['convenios', 'Convênios']); abas.push(['medicos', 'Médicos']); abas.push(['catalogo', 'Catálogo']); abas.push(['aprendizado', 'Aprendizado']); abas.push(['config', 'Configurações']); abas.push(['atalhos', 'Atalhos']); }
     const nav = h('nav', { class: 'nav', 'aria-label': 'Seções' }, abas.map(([id, rot]) =>
-      h('button', { type: 'button', 'data-aba': id, onclick: () => { S.aba = id; renderAba(); } }, icone(ICONE_ABA[id] || 'lista'), h('span', { class: 'nav-rot' }, rot), id === 'atendimento' ? h('span', { class: 'selo', id: 'seloAguardando', hidden: true }, '0') : null, id === 'fila' ? h('span', { class: 'selo', id: 'seloFila', hidden: true }, '0') : null, id === 'avisos' ? h('span', { class: 'selo', id: 'seloAvisos', hidden: true }, '0') : null, id === 'convenios' ? h('span', { class: 'selo erro', id: 'seloConvenios', title: 'Mudanças de preço ou de convênio que você ainda não viu', hidden: true }, '0') : null, id === 'medicos' ? h('span', { class: 'selo erro', id: 'seloMedicos', title: 'Pendências de validação na agenda dos médicos (exame novo, mudança de grade, médico novo)', hidden: true }, '0') : null, id === 'jornada' ? h('span', { class: 'selo erro', id: 'seloJornada', title: 'Pacientes que precisam de atenção agora', hidden: true }, '0') : null)));
+      h('button', { type: 'button', 'data-aba': id, onclick: () => { S.aba = id; renderAba(); } }, icone(ICONE_ABA[id] || 'lista'), h('span', { class: 'nav-rot' }, rot), id === 'atendimento' ? h('span', { class: 'selo', id: 'seloAguardando', hidden: true }, '0') : null, id === 'fila' ? h('span', { class: 'selo', id: 'seloFila', hidden: true }, '0') : null, id === 'premarcacao' ? h('span', { class: 'selo', id: 'seloPreMarc', title: 'Pré-marcações novas ainda sem contato', hidden: true }, '0') : null, id === 'avisos' ? h('span', { class: 'selo', id: 'seloAvisos', hidden: true }, '0') : null, id === 'convenios' ? h('span', { class: 'selo erro', id: 'seloConvenios', title: 'Mudanças de preço ou de convênio que você ainda não viu', hidden: true }, '0') : null, id === 'medicos' ? h('span', { class: 'selo erro', id: 'seloMedicos', title: 'Pendências de validação na agenda dos médicos (exame novo, mudança de grade, médico novo)', hidden: true }, '0') : null, id === 'jornada' ? h('span', { class: 'selo erro', id: 'seloJornada', title: 'Pacientes que precisam de atenção agora', hidden: true }, '0') : null)));
     const lateral = h('aside', { class: 'lateral' },
       h('div', { class: 'marca' }, h('i', { id: 'pontoVivo' }), h('img', { class: 'marca-logo', src: '../img/logo-csi-branco.svg', alt: 'CSI - Clínica de Saúde e Imagem' }), h('small', {}, 'Atendimento')),
       nav, h('div', { class: 'espaco' }),
@@ -1045,6 +1088,7 @@
     if (S.aba !== 'jornada') sairJornada();
     if (S.aba === 'atendimento') viewAtendimento(c);
     else if (S.aba === 'fila') viewFila(c);
+    else if (S.aba === 'premarcacao') viewPreMarcacao(c);
     else if (S.aba === 'avisos') viewAvisos(c);
     else if (S.aba === 'indicadores') viewIndicadores(c);
     else if (S.aba === 'jornada') viewJornada(c);
@@ -1056,7 +1100,7 @@
     else if (S.aba === 'aprendizado') viewAprendizado(c);
     else if (S.aba === 'config') viewConfig(c);
     else if (S.aba === 'atalhos') viewAtalhos(c);
-    atualizarSelo();
+    atualizarSelo(); atualizarSeloPreMarc();
     if (ehAdmin()) { atualizarSeloMedicos(); }
   }
 
@@ -3681,6 +3725,122 @@
         h('button', { type: 'button', class: 'btn prim', onclick: () => abrirForm(null) }, 'Adicionar resposta pronta')),
       formBox, lista));
     recarregar();
+  }
+
+
+  /* ---------- Pré-marcação: o que as pessoas escolheram no teste do webchat (/painel/testedowebchat/) ---------- */
+  const ZAP_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8s-.4-.1-.6.1-.7.8-.8 1-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.2-.4.2-.4.7-1.300.1-.2 0-.3 0-.4l-.8-1.800c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.200 5.200 5.200 0 0 0 1.100 2.800 11.900 11.900 0 0 0 4.600 4c1.700.7 2.400.8 3.200.7a2.700 2.700 0 0 0 1.800-1.300 2.200 2.200 0 0 0 .2-1.300c-.1-.1-.3-.2-.6-.3z"/></svg>';
+  const PREM = { fila: 'pendentes', tipo: '', q: '', lista: [] };
+  const PREM_ROT = { pre_marcacao: 'Pré-marcação', contato_whatsapp: 'Chamar no WhatsApp', marcacao: 'Marcação' };
+  const PREM_COLS = 'id,protocolo,origem,tipo,situacao,fila,tipo_ident,nome_paciente,responsavel,telefone,email,consulta,pagamento,convenio,plano,medico,horario_data,horario_hora,horario_local,periodo,dias,pendencias,motivo,carteirinha,ciente_em,vence_em,obs,atendido_em,criado_em,atualizado_em';
+  function pmZapNumero(tel) {
+    let d = String(tel || '').replace(/\D/g, '');
+    if ([12, 13].includes(d.length) && d.startsWith('55')) d = d.slice(2);
+    return [10, 11].includes(d.length) ? '55' + d : '';
+  }
+  function pmDataBonita(iso) {
+    if (!iso) return '';
+    const d = new Date(iso + 'T12:00:00'); if (isNaN(d)) return iso;
+    return d.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' }).replace('.', '');
+  }
+  function pmHa(iso) {
+    const m = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+    if (m < 1) return 'agora'; if (m < 60) return 'há ' + m + ' min'; if (m < 1440) return 'há ' + Math.floor(m / 60) + ' h';
+    return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) + ' ' + new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  }
+  function pmMensagem(r) {
+    const quem = r.tipo_ident === 'filho' && r.responsavel ? r.responsavel.split(' ')[0] : (r.nome_paciente || '').split(' ')[0];
+    const paraQuem = r.tipo_ident === 'filho' && r.nome_paciente ? ' para ' + r.nome_paciente.split(' ')[0] : '';
+    const que = r.consulta ? ' de ' + r.consulta : '';
+    const abertura = r.tipo === 'marcacao' ? 'Recebemos o seu pedido de marcação' : r.tipo === 'contato_whatsapp' ? 'Vimos que você quer ajuda para marcar' : 'Recebemos a sua pré-marcação';
+    return `Olá${quem ? ', ' + quem : ''}! Aqui é a equipe da CSI. ${abertura}${que}${paraQuem}. Podemos continuar a conversa por aqui?`;
+  }
+  async function pmAtualizarFila(r, fila, obs) {
+    const { error } = await db.rpc('pre_marcacao_atender', { p_id: r.id, p_fila: fila, p_obs: obs === undefined ? null : obs });
+    if (error) { toast(msgErro(error)); return false; }
+    r.fila = fila; if (obs !== undefined) r.obs = obs; r.atendido_em = fila === 'novo' ? null : new Date().toISOString();
+    return true;
+  }
+  async function atualizarSeloPreMarc() {
+    const s = document.getElementById('seloPreMarc'); if (!s || !S.me) return;
+    try {
+      const { count, error } = await db.from('pre_marcacao').select('id', { count: 'exact', head: true }).eq('fila', 'novo');
+      if (error) return; s.textContent = count > 99 ? '99+' : count; s.hidden = !count;
+    } catch { /* selo é só aviso */ }
+  }
+  setInterval(() => { if (S.me && podeAtender() && !document.hidden) { atualizarSeloPreMarc(); if (S.aba === 'premarcacao' && !document.activeElement?.closest?.('.pm-obs')) viewPreMarcacao.recarregar?.(); } }, 60000);
+
+  async function viewPreMarcacao(c) {
+    const raiz = h('div', { class: 'pagina' });
+    c.replaceChildren(raiz);
+    const grade = h('div', {}), abas = h('div', { class: 'pm-abas', role: 'group', 'aria-label': 'Situação' });
+    const busca = h('input', { type: 'search', placeholder: 'Buscar nome, telefone ou consulta…', 'aria-label': 'Buscar pré-marcação', value: PREM.q, oninput: (ev) => { PREM.q = ev.target.value; desenhar(); } });
+    const selTipo = h('select', { 'aria-label': 'Tipo', onchange: (ev) => { PREM.tipo = ev.target.value; desenhar(); } },
+      ...[['', 'Todos os tipos'], ['pre_marcacao', 'Pré-marcação'], ['contato_whatsapp', 'Chamar no WhatsApp'], ['marcacao', 'Marcação']].map(([v, t]) => h('option', { value: v, selected: PREM.tipo === v }, t)));
+    const sub = h('p', { class: 'sub' }, 'Carregando…');
+    raiz.append(h('div', { class: 'pm-topo' }, h('div', {}, h('h2', {}, 'Pré-marcação'), sub),
+      h('button', { type: 'button', class: 'btn', onclick: () => recarregar(true) }, 'Atualizar')),
+      h('div', { class: 'pm-filtros' }, abas, busca, selTipo), grade);
+
+    const ABAS = [['pendentes', 'Pendentes', (r) => r.fila === 'novo' || r.fila === 'em_contato'], ['novo', 'Novas', (r) => r.fila === 'novo'], ['em_contato', 'Em contato', (r) => r.fila === 'em_contato'], ['resolvido', 'Resolvidas', (r) => r.fila === 'resolvido'], ['descartado', 'Descartadas', (r) => r.fila === 'descartado'], ['todas', 'Todas', () => true]];
+    const sa = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+
+    function cartao(r) {
+      const num = pmZapNumero(r.telefone), venceu = r.tipo === 'pre_marcacao' && r.vence_em && new Date(r.vence_em) < new Date() && r.fila !== 'resolvido';
+      const feito = r.fila === 'resolvido' || r.fila === 'descartado';
+      const quem = r.nome_paciente || r.responsavel || 'Sem nome';
+      const selos = [h('span', { class: 'pm-tag ' + (r.tipo === 'contato_whatsapp' ? 'zap' : r.tipo === 'marcacao' ? 'azul' : '') }, PREM_ROT[r.tipo] || r.tipo)];
+      if (r.fila === 'novo') selos.push(h('span', { class: 'pm-tag erro' }, 'Nova'));
+      if (r.fila === 'em_contato') selos.push(h('span', { class: 'pm-tag azul' }, 'Em contato'));
+      if (r.fila === 'resolvido') selos.push(h('span', { class: 'pm-tag ok' }, 'Resolvida'));
+      if (r.fila === 'descartado') selos.push(h('span', { class: 'pm-tag cinza' }, 'Descartada'));
+      if (venceu) selos.push(h('span', { class: 'pm-tag erro' }, 'Prazo vencido'));
+      else if (r.tipo === 'pre_marcacao' && r.vence_em && !feito) selos.push(h('span', { class: 'pm-tag' }, 'Prazo ' + new Date(r.vence_em).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })));
+      if (r.origem === 'teste') selos.push(h('span', { class: 'pm-tag cinza', title: 'Veio da página de teste do webchat' }, 'Teste'));
+      const lin = (rot, val) => val ? h('div', { class: 'pm-lin' }, h('span', {}, rot), h('b', {}, val)) : null;
+      const horario = r.horario_data ? pmDataBonita(r.horario_data) + (r.horario_hora ? ' às ' + r.horario_hora : '') + (r.horario_local ? ' · ' + r.horario_local : '') : '';
+      const pref = !horario && (r.periodo || (r.dias || []).length) ? [({ manha: 'Manhã', tarde: 'Tarde', qualquer: 'Qualquer período' })[r.periodo] || r.periodo, (r.dias || []).join(', ')].filter(Boolean).join(' · ') : '';
+      const conv = r.pagamento === 'Particular' || /particular/i.test(r.pagamento) ? 'Particular' : [r.convenio, r.plano].filter(Boolean).join(' · ') || r.pagamento;
+      const obs = h('textarea', { rows: '1', maxlength: '2000', placeholder: 'Anotação da equipe (salva ao sair do campo)', 'aria-label': 'Anotação' }); obs.value = r.obs || '';
+      obs.addEventListener('blur', async () => { if (obs.value.trim() !== (r.obs || '')) { if (await pmAtualizarFila(r, r.fila, obs.value.trim())) toast('Anotação salva.'); } });
+      const mover = (fila, rot, cls) => h('button', { type: 'button', class: 'btn' + (cls ? ' ' + cls : ''), onclick: async () => { if (fila === 'descartado' && !confirm('Descartar esta solicitação?')) return; if (await pmAtualizarFila(r, fila)) desenhar(); } }, rot);
+      const zap = h('a', { class: 'pm-zap', href: num ? 'https://wa.me/' + num + '?text=' + encodeURIComponent(pmMensagem(r)) : '#', target: '_blank', rel: 'noopener noreferrer', 'aria-disabled': num ? 'false' : 'true', title: num ? 'Abrir a conversa no WhatsApp com uma mensagem pronta' : 'Telefone inválido para WhatsApp' });
+      zap.innerHTML = ZAP_SVG; zap.append(num ? 'Chamar no WhatsApp' : 'Sem telefone válido');
+      zap.addEventListener('click', () => { if (num && r.fila === 'novo') pmAtualizarFila(r, 'em_contato').then((ok) => { if (ok) setTimeout(desenhar, 300); }); });
+      return h('article', { class: 'pm-card t-' + r.tipo + (feito ? ' feito' : '') },
+        h('div', { class: 'pm-cab' }, h('div', { class: 'pm-av', 'aria-hidden': 'true' }, iniciais(quem)),
+          h('div', {}, h('div', { class: 'pm-nome' }, quem), h('div', { class: 'pm-sub' }, (r.tipo_ident === 'filho' && r.responsavel ? 'Responsável: ' + r.responsavel + ' · ' : '') + 'recebida ' + pmHa(r.criado_em) + ' · ' + r.protocolo))),
+        h('div', { class: 'pm-selos' }, ...selos),
+        h('div', { class: 'pm-corpo' }, lin('Consulta', r.consulta), lin('Médico(a)', r.medico), lin(horario ? 'Horário desejado' : 'Preferência', horario || pref), lin('Pagamento', conv), lin('Carteirinha', r.pagamento && !/particular/i.test(r.pagamento) ? (r.carteirinha ? 'Foto enviada' : 'Não enviada') : ''), lin('Telefone', r.telefone), lin('E-mail', r.email), lin('Motivo', r.motivo)),
+        (r.pendencias || []).length ? h('div', { class: 'pm-pend' }, h('b', {}, 'A equipe precisa confirmar'), (r.pendencias || []).join(' · ')) : null,
+        h('div', { class: 'pm-obs' }, obs),
+        h('div', { class: 'pm-acoes' }, zap,
+          r.fila === 'novo' ? mover('em_contato', 'Iniciei o contato') : null,
+          r.fila !== 'resolvido' ? mover('resolvido', 'Resolvida', 'prim') : null,
+          r.fila === 'resolvido' || r.fila === 'descartado' ? mover('novo', 'Reabrir') : null,
+          r.fila !== 'descartado' ? mover('descartado', 'Descartar') : null,
+          num ? h('button', { type: 'button', class: 'btn', onclick: () => { try { navigator.clipboard.writeText(r.telefone); toast('Telefone copiado.'); } catch { toast(r.telefone); } } }, 'Copiar telefone') : null));
+    }
+    function desenhar() {
+      const q = sa(PREM.q);
+      abas.replaceChildren(...ABAS.map(([id, rot, f]) => h('button', { type: 'button', class: 'chip', 'aria-pressed': String(PREM.fila === id), onclick: () => { PREM.fila = id; desenhar(); } }, rot, h('b', {}, String(PREM.lista.filter(f).length)))));
+      const f = ABAS.find((a) => a[0] === PREM.fila)[2];
+      const itens = PREM.lista.filter((r) => f(r) && (!PREM.tipo || r.tipo === PREM.tipo) && (!q || sa([r.nome_paciente, r.responsavel, r.telefone, r.consulta, r.medico, r.convenio, r.protocolo].join(' ')).includes(q)));
+      const novas = PREM.lista.filter((r) => r.fila === 'novo').length;
+      sub.textContent = novas ? `${novas} nova${novas > 1 ? 's' : ''} sem contato. Toque em “Chamar no WhatsApp” para levar a pessoa à conversa.` : 'Nada novo sem contato. As escolhas feitas no teste do webchat aparecem aqui.';
+      grade.replaceChildren(itens.length ? h('div', { class: 'pm-grade' }, ...itens.map(cartao)) : h('div', { class: 'pm-vazio' }, PREM.lista.length ? 'Nenhuma solicitação neste filtro.' : 'Ainda não chegou nenhuma pré-marcação.'));
+      atualizarSeloPreMarc();
+    }
+    async function recarregar(avisar) {
+      try {
+        const { data, error } = await db.from('pre_marcacao').select(PREM_COLS).order('criado_em', { ascending: false }).limit(500);
+        if (error) throw error;
+        if (S.aba !== 'premarcacao') return;
+        PREM.lista = data || []; desenhar(); if (avisar) toast('Lista atualizada.');
+      } catch (e) { sub.textContent = ''; sub.className = 'erro'; sub.textContent = msgErro(e); }
+    }
+    viewPreMarcacao.recarregar = () => recarregar(false);
+    recarregar(false);
   }
 
   /* ---------- contatos ---------- */

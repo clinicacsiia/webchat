@@ -303,3 +303,7 @@ Ferramentas: `mock-chat.mjs` (servidor de mentira do chat, com atraso, erro e qu
 - **RLS**: regra de acesso por linha do Postgres. É o que impede um papel de ler o que não deve.
 - **Retrato**: a cópia da estrutura da produção em `supabase/producao/`.
 - **Sentinela**: o monitor do chat que gera os códigos `CSI-...`.
+
+
+## Aba "Pré-marcação" do painel (25/11/2026)
+Tabela `pre_marcacao` (RLS: só admin/atendente leem; ninguém escreve direto) + RPC `pre_marcacao_registrar` (anônimo, só do teste `/painel/testedowebchat/`) + RPC `pre_marcacao_atender` (equipe muda a fila e anota). Painel: aba `premarcacao` (`viewPreMarcacao` em `painel/index.html`), selo com as novas, botão WhatsApp (`wa.me`). Detalhes em `painel/testedowebchat/LEIAME.md` e `supabase/pre-marcacao-painel.sql`. **Pendente:** refazer o retrato `supabase/producao/` (tabela e 2 funções novas).
