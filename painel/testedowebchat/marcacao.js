@@ -274,7 +274,7 @@
       mostrar('Qual é o seu plano?', `Convênio: ${nomeConv}. O plano está na carteirinha.`, h('div', {}, busca, nota, lista, h('div', { class: 'marc-lista', style: 'margin-top:10px' }, naoSei)), { botoes: botoesPadrao(), foco: false });
     },
     cart() {
-      const entrada = h('input', { type: 'file', accept: 'image/*', capture: 'environment', id: 'marcFoto', style: 'position:absolute;left:-9999px', 'aria-label': 'Foto da carteirinha' });
+      const entrada = h('input', { type: 'file', accept: 'image/*', id: 'marcFoto', style: 'position:absolute;left:-9999px', 'aria-label': 'Foto da carteirinha' });
       const prev = st.cart.foto ? h('img', { class: 'marc-foto', src: st.cart.foto, alt: 'Foto da carteirinha enviada' }) : null;
       entrada.addEventListener('change', () => {
         const f = entrada.files && entrada.files[0]; if (!f) return;
