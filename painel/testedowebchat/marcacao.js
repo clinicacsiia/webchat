@@ -123,22 +123,20 @@
     if (!st || !st.hist.length) { fechar(); return; }
     st.retorno = false; st.passo = st.hist.pop(); salvar(); desenhar();
   }
-  // Registro de ciência da pré-marcação: data/hora e dados do aparelho. O IP não é lido no navegador (exigiria um serviço externo, barrado neste teste); na versão real o servidor grava o IP.
+  // Registro de ciência da pré-marcação: data/hora e aparelho.
   function registrarCiencia() {
     const n = navigator, ua = n.userAgent || '', am = ua.match(/Android\s([\d.]+)(?:;\s*([^)]+))?/), agora = new Date();
     let fuso = ''; try { fuso = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch {}
     return {
       em: agora.toISOString(), emTexto: agora.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'medium' }), fuso,
-      ip: null, ipNota: 'não lido neste teste (o servidor grava na versão real)',
       aparelho: am ? `Android ${am[1]}${am[2] ? ' · ' + am[2].replace(/\sBuild.*$/, '') : ''}` : (n.platform || 'não identificado'),
-      navegador: ua.slice(0, 160), idioma: n.language || '', tela: `${screen.width}x${screen.height}`, rede: n.onLine === false ? 'offline' : 'online'
+      navegador: ua.slice(0, 160)
     };
   }
   function blocoCiencia(c) {
     const lin = (r, v) => h('tr', {}, h('td', {}, r), h('td', {}, h('b', {}, v)));
     return h('div', { class: 'marc-card', style: 'border:2px solid #b3261e' }, h('b', {}, 'Ciência registrada'), h('table', { class: 'marc-res' }, h('tbody', {},
-      lin('Data e hora', c.emTexto + (c.fuso ? ' (' + c.fuso + ')' : '')), lin('Aparelho', c.aparelho),
-      lin('IP', c.ip || 'indisponível neste teste'), lin('Idioma · tela', `${c.idioma} · ${c.tela}`))));
+      lin('Data e hora', c.emTexto + (c.fuso ? ' (' + c.fuso + ')' : '')), lin('Aparelho', c.aparelho))));
   }
   function continuar() {
     const m = validar(); if (m) { erro(m); return; }
