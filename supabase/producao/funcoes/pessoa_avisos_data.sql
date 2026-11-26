@@ -17,6 +17,7 @@ begin
        and a.j ->> 'fone' is not null and a.j ->> 'fone' = b.j ->> 'fone'
        and a.j ->> 'email' is not null and a.j ->> 'email' = b.j ->> 'email'
        and a.j ->> 'tipo' = b.j ->> 'tipo' and public.nome_confere(a.j ->> 'nome', b.j ->> 'nome')
+       and not exists (select 1 from public.aviso_silenciado s where s.fone = a.j ->> 'fone')
        and not exists (select 1 from public.conversa_grupo_recusa x where x.a = least(a.id, b.id) and x.b = greatest(a.id, b.id) and x.por is not null))
   select coalesce(jsonb_agg(jsonb_build_object('nome', q.nome, 'nasc_a', q.na, 'nasc_b', q.nb, 'parecida', public.pessoa_nasc_parecida(q.na, q.nb),
            'ids_a', q.ids_a, 'ids_b', q.ids_b) order by q.nome), '[]'::jsonb) into v

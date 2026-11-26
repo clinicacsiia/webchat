@@ -1,0 +1,4 @@
+-- Silenciar avisos de "data de nascimento diferente" e "dado diferente do cadastro" por celular (pedido do dono, 26/11/2026: filho Alisson).
+-- O celular é gravado direto no banco (não fica neste arquivo). Para silenciar outro: insert into public.aviso_silenciado (fone, motivo) values (<fone_chave>, '...');
+-- Aplicado em 3 partes (aviso_silenciado_tabela, _pessoa_avisos_data, _dado_conferir); as funções novas estão em supabase/producao/funcoes/.
+-- Rollback: drop table public.aviso_silenciado; e voltar as duas funções à versão anterior (git log de supabase/producao/funcoes).

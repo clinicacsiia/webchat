@@ -8,6 +8,7 @@ CREATE OR REPLACE FUNCTION public.paciente_dado_conferir(p_conversa uuid)
 AS $function$
 declare pa record; pc record; v_cpf text; v_dif jsonb := '{}'::jsonb; v_fone text; v_email text; v_nasc date;
 begin
+  if exists (select 1 from public.aviso_silenciado s where s.fone = (public.pessoa_ficha(p_conversa) ->> 'fone')) then return 0; end if;
   select * into pa from public.pre_agendamentos where conversa_id = p_conversa;
   if not found or jsonb_typeof(pa.paciente) <> 'object' then return 0; end if;
   v_cpf := nullif(regexp_replace(coalesce(pa.paciente ->> 'cpf', ''), '\D', '', 'g'), '');
