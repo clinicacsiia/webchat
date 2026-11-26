@@ -639,7 +639,7 @@
     const filhos = [h('b', {}, tituloExame(e.nome))];
     if (e.data) filhos.push(h('p', { class: 'quando' }, dataBR(e.data) + (e.hora && e.hora !== '00:00' ? ' às ' + e.hora : '') + (e.unidade ? ' · ' + e.unidade : '')));
     if (e.voucher) filhos.push(h('p', { class: 'voucher' }, 'Marcação nº ', h('b', {}, e.voucher), e.chegada ? ' · chegada às ' + e.chegada : ''));
-    if (e.excecao) { filhos.push(h('div', { class: 'excecao' }, EXC_MSG[e.excecao] || 'Fale com a clínica pela conversa.')); return h('div', { class: 'exame' }, filhos); }
+    if (e.excecao) { filhos.push(h('div', { class: 'excecao' }, e.excecao === 'cancelado' && !e.voucher && !e.data ? 'Este pedido foi encerrado sem marcação. Se ainda precisa, toque em “Reabrir o pedido”.' : (EXC_MSG[e.excecao] || 'Fale com a clínica pela conversa.'))); return h('div', { class: 'exame' }, filhos); }
     const ok = Math.max(0, Math.min(6, e.ok || 0));
     if (!p.aberta && ok <= 1) { filhos.push(h('p', { class: 'msg' }, 'Sem horário marcado.')); return h('div', { class: 'exame' }, filhos); }   // encerrado sem marcar: nada de "estamos organizando"
     const etapa = etapaDe(ok, e.data, e.resultado, false);
