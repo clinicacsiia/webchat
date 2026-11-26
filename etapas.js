@@ -105,7 +105,7 @@
     document.querySelectorAll('#marc button').forEach((b) => { b.dataset.eraOk = b.disabled ? '0' : '1'; b.disabled = true; });
     try {
       const r = await rpc('chat_responder', { p_conversa: C.conv.id, p_token: C.conv.token, p_passo: passo, p_valor: valor, p_texto: texto || null });
-      C.ocupado = false;
+      C.ocupado = false; C.aviso = '';   // respondeu: o aviso da troca de tela já cumpriu o papel
       if (C.aoDados && PASSOS_CADASTRO.has(passo)) {   // o cadastro aprende o CPF/nascimento digitado agora (e responde o que ainda faltar)
         let mais = false; try { mais = await C.aoDados(); } catch { mais = false; }
         if (mais) { if (r && Array.isArray(r.respostas)) receber(r.respostas); await sincronizar(); desenhar(); return; }
@@ -168,7 +168,7 @@
     telaTexto(a);   // qualquer coisa que esta tela não conhece: texto e o caminho do chat de hoje
   }
   const titulo = (a, pad) => { const o = a.opcoes; return (o && ETAPAS[o.passo] && ETAPAS[o.passo][0]) || pad; };
-  const avisosDe = () => (C.avisos && C.avisos.length ? h('div', { class: 'marc-aviso' }, C.avisos.join('\n')) : null);
+  const avisosDe = () => { const l = [C.aviso, ...(C.avisos || [])].filter(Boolean); return l.length ? h('div', { class: 'marc-aviso' }, l.join('\n')) : null; };   // C.aviso: por que a tela nova passou a conversa para cá (fica na tela até a pessoa responder)
   const voltarOk = (a) => !!(a.opcoes && ETAPAS[a.opcoes.passo] && a.opcoes.passo !== 'cpf_nasc' && a.opcoes.passo !== 'cpf_confirma');
 
   function telaTexto(a) {
@@ -366,9 +366,9 @@
   }
 
   /* ---------- abrir ---------- */
-  function abrir({ db, conv, respostas, ident, aoChat, aoPin, aoNova, aoDados }) {
+  function abrir({ db, conv, respostas, ident, aoChat, aoPin, aoNova, aoDados, aviso }) {
     if (C) parar();
-    C = { db, conv, ident: ident || {}, aoChat, aoPin, aoNova, aoDados, autoDados: {}, ultimoId: 0, atual: null, avisos: [], motorAtivo: true, ocupado: false, sessao: (C && C.sessao) || 0, autoMotivo: false };
+    C = { db, conv, aviso: aviso || '', ident: ident || {}, aoChat, aoPin, aoNova, aoDados, autoDados: {}, ultimoId: 0, atual: null, avisos: [], motorAtivo: true, ocupado: false, sessao: (C && C.sessao) || 0, autoMotivo: false };
     montar(); raiz.hidden = false; document.body.classList.add('marc-aberta');
     if (respostas && respostas.length && receber(respostas)) desenhar();
     else { carregando(); sincronizar(0).then(desenhar).catch(falhou); }

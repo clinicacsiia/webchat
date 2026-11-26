@@ -784,7 +784,7 @@
   const CHAVE_HIST = 'webchat.historico.v1';   // as últimas conversas deste aparelho (cada uma com o seu token): dá para voltar a elas
   const MAX_HIST = 5;                          // mínimo pedido: 3
   // Muda a cada alteração do chat. Cópia de mensagens guardada por outra versão é descartada (era isso que mostrava conversa velha e travada).
-  const VERSAO_APP = '2026.11.25-9';
+  const VERSAO_APP = '2026.11.26-1';
   // Mesmas regras do banco (fluxo_nome_ok, fluxo_telefone_ok, fluxo_email_ok): o banco confere de novo, aqui é só para avisar logo.
   const LET = 'A-Za-zÀ-ÖØ-öø-ÿ';
   const nomeCompletoOk = (v) => { const t = String(v || '').trim(); return t.length >= 5 && t.length <= 120 && new RegExp(`^[${LET}][${LET}'’.-]*( +[${LET}][${LET}'’.-]*)+$`).test(t) && t.split(/ +/).filter((w) => w.replace(new RegExp(`[^${LET}]`, 'g'), '').length >= 2).length >= 2; };
@@ -1756,17 +1756,26 @@
       },
       aoMenu: () => { const ant = conv && conv.id && conv.token ? { id: conv.id, token: conv.token } : null; if (conv) registrarHistorico(conv, { etapas: false }); irParaFormNovo(ant); },
       aoPin: () => pinVenceu('bloqueado'),
-      aoEtapas: () => { window.CSI_SEM_ATENDENTE = true; if (conv) { conv.etapasMotor = true; gravarLocal(CHAVE_CONVERSA, conv); } abrirEtapas(null).catch(() => { if (conv) { conv.etapas = false; gravarLocal(CHAVE_CONVERSA, conv); } abrirChat(); }); },   // o resto da marcação segue na tela por etapas, na mesma conversa
+      aoEtapas: (motivo) => { window.CSI_SEM_ATENDENTE = true; if (conv) { conv.etapasMotor = true; gravarLocal(CHAVE_CONVERSA, conv); } abrirEtapas(null, avisoDaTroca(motivo)).catch(() => { if (conv) { conv.etapas = false; gravarLocal(CHAVE_CONVERSA, conv); } abrirChat(); }); },   // o resto da marcação segue na tela por etapas, na mesma conversa
       aoAcompanhar: () => { location.href = 'minha-vez/?acompanhar=1'; }
     });
     window.CSI_MARCACAO.abrir({ tipo: conv.tipo === 'filho' ? 'filho' : 'proprio', nome: perfil.nome || '', telefone: perfil.telefone || '', email: perfil.email || '', nomeCrianca: conv.nomeCrianca || '', irmaos: [] });
   }
-  async function abrirEtapas(respostas) {
+  // Por que a tela nova passou a conversa para a tela por etapas (o pedido NÃO foi enviado ainda): em palavras simples.
+  function avisoDaTroca(motivo) {
+    const m = String(motivo || '');
+    const quase = 'Sua marcação ainda não foi concluída. Continue por aqui: o que você já escolheu fica salvo.';
+    if (/hor[aá]rio/i.test(m)) return 'Esse horário não está mais disponível. Escolha outro abaixo. ' + quase;
+    if (/conv[eê]nio|plano|pagamento/i.test(m)) return 'Precisamos confirmar o seu plano ou convênio. ' + quase;
+    if (/m[eé]dico|consulta|unidade/i.test(m)) return 'Precisamos confirmar a consulta ou o médico. ' + quase;
+    return quase;
+  }
+  async function abrirEtapas(respostas, aviso) {
     if ((config.marcacao_etapas_modo === 'teste' || config.marcacao_etapas_modo === 'todos') && conv && !conv.etapasMotor) { await abrirTeste(); return; }
     await carregarEtapas();
     if (!window.CSI_ETAPAS || !conv) throw new Error('etapas');
     window.CSI_ETAPAS.abrir({
-      db, conv, respostas, ident: { filho: conv.tipo === 'filho', nomeCrianca: conv.nomeCrianca || '' },
+      db, conv, respostas, aviso, ident: { filho: conv.tipo === 'filho', nomeCrianca: conv.nomeCrianca || '' },
       aoChat: () => { window.CSI_ETAPAS.fechar(); if (conv) { conv.etapas = false; gravarLocal(CHAVE_CONVERSA, conv); registrarHistorico(conv, { etapas: false }); } abrirChat(); },   // a mesma conversa, no chat de sempre
       aoPin: () => { window.CSI_ETAPAS.fechar(); pinVenceu('bloqueado'); },
       aoDados: async () => {   // conta já cadastrada: o banco responde CPF e nascimento sozinho (true = respondeu alguma pergunta)
