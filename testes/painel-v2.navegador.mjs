@@ -148,12 +148,17 @@ await caso('CONFIGURAÇÕES: salvar sem mexer em nada não grava chave nenhuma d
   await ctx.close();
   return { ok: gravou.length === 0, detalhe: JSON.stringify(gravou) };
 });
-await caso('INDICADORES: mostra as consultas de marcações, os cancelamentos e as remarcações confirmados pelo Klingo e o que foi para a equipe', async () => {
-  const { page, ctx } = await abrir();
-  await page.click('button[data-aba="indicadores"]').catch(() => {}); await page.waitForSelector('.ind-auto', { timeout: 10000 });
-  const t = await page.$eval('.ind-auto', (e) => e.textContent.replace(/\s+/g, ' '));
+await caso('INDICADORES: a aba abre com período, atalhos e botão de atualizar, lê só as funções de indicadores (nenhuma gravação) e NÃO busca mais o bloco de automação (painel_automacao_resumo)', async () => {
+  // O bloco ".ind-auto" (consultas de marcações / cancelamentos / remarcações confirmados) saiu da aba na reforma dos indicadores (18/11/2026);
+  // esses números agora ficam em "Marcações feitas no período" (painel_indicadores_agenda), coberto por indicadores.navegador.mjs.
+  const { page, ctx, reg } = await abrir();
+  await page.click('button[data-aba="indicadores"]').catch(() => {}); await page.waitForSelector('.ind-ctl', { timeout: 10000 }); await page.waitForTimeout(800);
+  const t = await page.$eval('body', (e) => e.innerText.replace(/\s+/g, ' '));
+  const lidas = reg.pedidos.filter((x) => /rpc\/painel_indicadores_/.test(x)).map((x) => x.replace(/.*rpc\//, '').replace(/\?.*/, ''));
+  const automacao = reg.pedidos.some((x) => /painel_automacao_resumo/.test(x)), temBloco = await page.$('.ind-auto') !== null;
   await ctx.close();
-  return { ok: /11\s*consultas de marcações/.test(t) && /3\s*cancelamentos confirmados pelo Klingo/.test(t) && /2\s*remarcações confirmadas/.test(t) && /1\s*cancelar\/remarcar que foram para a equipe/.test(t) && /sempre ligado/.test(t), detalhe: t.slice(0, 160) };
+  return { ok: /Indicadores/.test(t) && /Hoje/.test(t) && /Últimos 7 dias/.test(t) && /Atualizar agora/.test(t) && /Ver período/.test(t) && ['painel_indicadores_decisao', 'painel_indicadores_agenda', 'painel_indicadores_pessoas'].every((n) => lidas.includes(n)) && !automacao && !temBloco && reg.rpcs.length === 0,
+    detalhe: `lidas=${[...new Set(lidas)].join(',')}; automação=${automacao}; gravações=${reg.rpcs.length}` };
 });
 
 await browser.close(); srv.close();
