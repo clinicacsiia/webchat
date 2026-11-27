@@ -1,5 +1,5 @@
 -- RETRATO DA ESTRUTURA DO BANCO DE PRODUÇÃO (projeto webchat-atendimento). GERADO: não editar à mão.
--- Atualização parcial em 2026-11-27T14:00:00+00:00 (remarcações e ofertas no painel). Retrato inteiro tirado em 2026-11-14T20:32:54.165875+00:00 · Postgres 17.11. Só estrutura: nenhuma linha de tabela, nenhum valor de configuração.
+-- Atualização parcial em 2026-11-27T19:09:56.866771+00:00 (remarcações e ofertas no painel). Retrato inteiro tirado em 2026-11-14T20:32:54.165875+00:00 · Postgres 17.11. Só estrutura: nenhuma linha de tabela, nenhum valor de configuração.
 -- Serve de referência e para os testes. NÃO rodar inteiro sobre a produção. Como refazer: supabase/producao/LEIAME.md.
 
 -- ===== Extensões =====
@@ -18,7 +18,7 @@
 -- authenticator: session_preload_libraries=supautils, safeupdate, statement_timeout=8s, lock_timeout=8s
 -- service_role: sem limite
 
--- ===== Tabelas (150) =====
+-- ===== Tabelas (152) =====
 
 create table public.agenda_ao_vivo (
   dia date not null,
@@ -2808,6 +2808,65 @@ create policy pacientes_update on public.pacientes as permissive for update to p
 
 
 
+
+create table public.marcacao_ciencia (
+  id bigint generated always as identity not null,
+  conversa_id uuid not null,
+  em timestamp with time zone default now() not null,
+  ip text,
+  aparelho jsonb default '{}'::jsonb not null,
+  motivo text,
+  versao_texto text not null,
+  constraint marcacao_ciencia_pkey PRIMARY KEY (id)
+);
+CREATE INDEX marcacao_ciencia_conversa_idx ON public.marcacao_ciencia USING btree (conversa_id, em DESC);
+alter table public.marcacao_ciencia enable row level security;
+
+create table public.pre_marcacao (
+  id uuid default gen_random_uuid() not null,
+  protocolo text not null,
+  chave_cliente text not null,
+  origem text default 'teste'::text not null,
+  tipo text not null,
+  situacao text default ''::text not null,
+  fila text default 'novo'::text not null,
+  tipo_ident text default ''::text not null,
+  nome_paciente text default ''::text not null,
+  responsavel text default ''::text not null,
+  telefone text default ''::text not null,
+  email text default ''::text not null,
+  consulta text default ''::text not null,
+  pagamento text default ''::text not null,
+  convenio text default ''::text not null,
+  plano text default ''::text not null,
+  medico text default ''::text not null,
+  horario_data date,
+  horario_hora text default ''::text not null,
+  horario_local text default ''::text not null,
+  periodo text default ''::text not null,
+  dias text[] default '{}'::text[] not null,
+  pendencias text[] default '{}'::text[] not null,
+  motivo text default ''::text not null,
+  carteirinha boolean default false not null,
+  ciente_em timestamp with time zone,
+  vence_em timestamp with time zone,
+  obs text default ''::text not null,
+  atendido_por uuid,
+  atendido_em timestamp with time zone,
+  dados jsonb default '{}'::jsonb not null,
+  criado_em timestamp with time zone default now() not null,
+  atualizado_em timestamp with time zone default now() not null,
+  constraint pre_marcacao_fila_ck CHECK ((fila = ANY (ARRAY['novo'::text, 'em_contato'::text, 'resolvido'::text, 'descartado'::text]))),
+  constraint pre_marcacao_obs_ck CHECK ((length(obs) <= 2000)),
+  constraint pre_marcacao_tipo_ck CHECK ((tipo = ANY (ARRAY['pre_marcacao'::text, 'contato_whatsapp'::text, 'marcacao'::text]))),
+  constraint pre_marcacao_pkey PRIMARY KEY (id)
+);
+CREATE INDEX pre_marcacao_fila_criado_ix ON public.pre_marcacao USING btree (fila, criado_em DESC);
+CREATE UNIQUE INDEX pre_marcacao_protocolo_uq ON public.pre_marcacao USING btree (protocolo);
+alter table public.pre_marcacao enable row level security;
+create policy pre_marcacao_select on public.pre_marcacao as permissive for select to public
+  using ((( SELECT papel_atual() AS papel_atual) = ANY (ARRAY['admin'::text, 'atendente'::text])));
+
 -- ===== Chaves estrangeiras (depois de todas as tabelas) =====
 alter table public.agendamento_fechamento add constraint agendamento_fechamento_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE CASCADE;
 alter table public.agendamento_fechamento add constraint agendamento_fechamento_por_fkey FOREIGN KEY (por) REFERENCES agentes(id) ON DELETE SET NULL;
@@ -2918,6 +2977,8 @@ alter table public.pmarc_pessoa add constraint pmarc_pessoa_contato_id_fkey FORE
 alter table public.pmarc_pessoa add constraint pmarc_pessoa_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES public.conversas(id) ON DELETE SET NULL;
 alter table public.lgpd_pedido add constraint lgpd_pedido_por_fkey FOREIGN KEY (por) REFERENCES agentes(id) ON DELETE SET NULL;
 alter table public.pacientes add constraint pacientes_origem_conversa_fkey FOREIGN KEY (origem_conversa) REFERENCES conversas(id) ON DELETE SET NULL;
+alter table public.marcacao_ciencia add constraint marcacao_ciencia_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE CASCADE;
+alter table public.pre_marcacao add constraint pre_marcacao_atendido_por_fkey FOREIGN KEY (atendido_por) REFERENCES auth.users(id) ON DELETE SET NULL;
 
 -- ===== Visões (5) =====
 
@@ -3255,10 +3316,12 @@ CREATE TRIGGER vinculo_log_imutavel BEFORE DELETE OR UPDATE ON public.vinculo_lo
 --   select public.pessoa_agrupar_pendentes()
 -- pmarc-cadastrar · */10 * * * * · ativa
 --   select public.pmarc_vigiar()
+-- pre-marcacao-vigia · */10 * * * * · ativa
+--   select public.pre_marcacao_vencer()
 -- previsao-vigia · */10 * * * * · ativa
 --   select public.previsao_vigiar()
 -- sync-catalogo-klingo · 0 6 * * * · ativa
 --   select net.http_post( url := 'https://nrvuynjwcgwpjdptkiay.supabase.co/functions/v1/sync-catalogo-klingo', headers := jsonb_build_object('Content-Type', 'application/json', 'x-sync-key', (select valor from public.config where chave = 'ia_segredo')), body := '{}'::jsonb, timeout_milliseconds := 120000);
 
 -- ===== Chaves existentes em public.config (só os nomes; os valores não são copiados) =====
--- agenda_ao_vivo, agenda_ao_vivo_max_dias, agenda_ao_vivo_trava_s, agenda_ao_vivo_validade_s, agendado_conferir_prazo_min, agendamento_cpf_divergentes_dia, agendamento_cpf_escritas_hora, agendamento_externo_modo, agendamento_ip_divergentes_hora, agendamento_ip_escritas_hora, agendamento_ip_por_minuto, agendamento_reconhecer, agendamento_reconhecer_msg_encerradas, app_acesso_modo, app_cadastros_max_hora, app_codigo_email, app_codigo_validade_min, app_laudos, app_local_ativo, app_pin_obrigatorio, app_pin_servidor, app_resultado_vigia, autoencerrar_horas, autoencerrar_modo, avaliacao_ativa, base_antes_programa, boas_vindas, cadastro_equipe_sem_convite, catalogo_csi, catalogo_desenvoar, catalogo_rmtc, chat_push_url, checkin_sem_login_max_dia, clinica_lat, clinica_lng, clinica_raio_m, consultas_sem_api, convenio_seguir_klingo, convenio_suspenso_texto, despedida_configurada, despedida_inatividade_ativa, despedida_inatividade_texto, despedida_versao_atual, disponibilidade_encerra_conversa, disponibilidade_max_avisos_dia, disponibilidade_max_avisos_total, encerramento_exige_motivo, encerramento_valida_agendado, entrada_previsao_modo, entrada_webchat_modo, equipe_push_url, fila_autochegada, fila_aviso_antes, fila_push_url, fila_vapid_publica, horario_trabalho, ia_ativa, ia_segredo, indicadores_fechar, jornada_identidade_klingo, jornada_relatorio_filtro, jornada_relatorio_id, klingo_api_cancelar, klingo_api_consultar, klingo_api_horarios, klingo_api_marcar, klingo_api_percentual, klingo_api_pos, klingo_api_pre_cadastro, klingo_api_remarcar, klingo_api_resultado, klingo_api_telefones_teste, klingo_auto, klingo_autogestao, klingo_conferir_ativo, klingo_exames_so_api, klingo_exames_tem_min, klingo_exames_vazio_min, klingo_exames_vencimento_h, klingo_funcoes_base, klingo_paciente_url, klingo_reconfirmar_dias, klingo_so_liberados, klingo_webhook, login_paciente, marcacao_auto_csi, marcacao_auto_desenvoar, marcacao_auto_rmtc, motor, motor_telefones_teste, nome_empresa, notificacao_modo, particular_valor_modo, pedido_escolha_texto, pedido_horario_modo, pedido_oferta2_texto, pedido_parado_horas, pedido_sem_horario_texto, permissao_modo, plano_exato_modo, previsao_decide_texto, previsao_final_texto, previsao_marcacao_aviso, previsao_marcacao_final, previsao_marcacao_modo, previsao_marcacao_novos_max_hora, previsao_modo, previsao_monitor_modo, previsao_oferta_texto, previsao_texto, primeira_consulta_medicas, primeira_consulta_modo, reabrir_dias, reaproveitar_cadastro_convidado, retorno_dias_limite, retorno_dias_modo, teste_agentes, teste_marcadores, vinculo_manual_quem
+-- agenda_ao_vivo, agenda_ao_vivo_max_dias, agenda_ao_vivo_trava_s, agenda_ao_vivo_validade_s, agendado_conferir_prazo_min, agendamento_cpf_divergentes_dia, agendamento_cpf_escritas_hora, agendamento_externo_modo, agendamento_ip_divergentes_hora, agendamento_ip_escritas_hora, agendamento_ip_por_minuto, agendamento_reconhecer, agendamento_reconhecer_msg_encerradas, app_acesso_modo, app_cadastros_max_hora, app_codigo_email, app_codigo_validade_min, app_laudos, app_local_ativo, app_pin_obrigatorio, app_pin_servidor, app_resultado_vigia, autoencerrar_horas, autoencerrar_modo, avaliacao_ativa, base_antes_programa, boas_vindas, cadastro_equipe_sem_convite, catalogo_csi, catalogo_desenvoar, catalogo_rmtc, chat_push_url, checkin_sem_login_max_dia, clinica_lat, clinica_lng, clinica_raio_m, consultas_sem_api, convenio_seguir_klingo, convenio_suspenso_texto, despedida_configurada, despedida_inatividade_ativa, despedida_inatividade_texto, despedida_versao_atual, disponibilidade_encerra_conversa, disponibilidade_max_avisos_dia, disponibilidade_max_avisos_total, encerramento_exige_motivo, encerramento_valida_agendado, entrada_previsao_modo, entrada_webchat_modo, equipe_push_url, fila_autochegada, fila_aviso_antes, fila_push_url, fila_vapid_publica, horario_trabalho, ia_segredo, indicadores_fechar, jornada_identidade_klingo, jornada_relatorio_filtro, jornada_relatorio_id, klingo_api_resultado, klingo_api_telefones_teste, klingo_conferir_ativo, klingo_exames_so_api, klingo_exames_tem_min, klingo_exames_vazio_min, klingo_exames_vencimento_h, klingo_funcoes_base, klingo_paciente_url, klingo_reconfirmar_dias, klingo_so_liberados, klingo_webhook, login_paciente, marcacao_auto_csi, marcacao_auto_desenvoar, marcacao_auto_rmtc, marcacao_etapas_modo, marcacao_etapas_telefones, nome_empresa, particular_valor_modo, pedido_escolha_texto, pedido_horario_modo, pedido_oferta2_texto, pedido_parado_horas, pedido_sem_horario_texto, permissao_modo, plano_exato_modo, pre_marcacao_prazo_horas, previsao_decide_texto, previsao_final_texto, previsao_marcacao_aviso, previsao_marcacao_final, previsao_marcacao_modo, previsao_marcacao_novos_max_hora, previsao_oferta_texto, primeira_consulta_medicas, primeira_consulta_modo, reabrir_dias, reaproveitar_cadastro_convidado, retorno_dias_limite, retorno_dias_modo, teste_agentes, teste_marcadores, vinculo_manual_quem

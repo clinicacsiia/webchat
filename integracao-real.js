@@ -110,6 +110,18 @@
     for (const sl of r.slots) { const m = por.get(sl.profId) || { id: sl.profId, nome: sl.profissional, horarios: 0, segurados: 0 }; if (sl.segurada) m.segurados++; else m.horarios++; por.set(sl.profId, m); }
     return { estado: r.estado, motivo: r.motivo, truncado: !!r.truncado, consultadoEm: r.consultadoEm, lista: [...por.values()].sort((a, b) => a.nome.localeCompare(b.nome)) };
   }
+  // Médicos que atendem a consulta, pelo cadastro das agendas (função consulta_medicos, só nomes): aparecem mesmo sem horário livre.
+  const cadastroMed = new Map();
+  async function medicosCadastro(procId) {
+    const id = pid(procId); if (cadastroMed.has(id)) return cadastroMed.get(id);
+    let nomes = [];
+    try {
+      const r = await fetch('https://nrvuynjwcgwpjdptkiay.supabase.co/rest/v1/rpc/consulta_medicos', { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: CHAVE_PUB, Authorization: 'Bearer ' + CHAVE_PUB }, body: JSON.stringify({ p_procedimento_id: id }) });
+      const d = r.ok ? await r.json() : []; nomes = (Array.isArray(d) ? d : []).filter((x) => typeof x === 'string' && x.trim()).map((n) => ({ nome: bonito(n) }));
+    } catch { nomes = []; }
+    if (nomes.length) cadastroMed.set(id, nomes);   // falha não fica guardada: tenta de novo na próxima vez
+    return nomes;
+  }
   // Horários reais do Klingo, filtrados pela(s) médica(s) escolhida(s) e pela regra de antecedência.
   async function disponibilidade({ procId, medico = '', pagador = '' } = {}) {
     const c = config(), r = await buscarAoVivo(procId, pagadorChave(pagador));
@@ -163,25 +175,36 @@
     await rpc('marcacao_ciencia_registrar', Object.assign(base(), { p_aparelho: { aparelho: c.aparelho || '', fuso: c.fuso || '', navegador: c.navegador || '', idioma: navigator.language || '', tela: screen.width + 'x' + screen.height }, p_motivo: motivo || null }));
     LIG.cienciaFeita = LIG.conv.id;
   }
+  // Guarda o pedido no painel (aba Pré-marcação) e dá a ele o prazo de 24 h, que é decidido pelo SERVIDOR (pre_marcacao_registrar).
+  // Sem foto da carteirinha. Se falhar, a pré-marcação já está na conversa da equipe: não atrapalha o paciente.
+  async function registrarPedido(r) {
+    try {
+      let chave = ler('csi_marc_chave_v1', '');
+      if (!chave || chave.length < 16) { chave = Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join(''); gravar('csi_marc_chave_v1', chave); }
+      const d = Object.assign({}, r.dados); delete d.fotoCart; delete d.estado; delete d.hist;
+      await Promise.race([LIG.db.rpc('pre_marcacao_registrar', { p: { protocolo: r.protocolo, chave, origem: 'piloto', tipo: r.tipo, status: r.status, motivo: r.motivo || '', dados: d } }), espera(6000)]);
+    } catch { /* segue */ }
+  }
   const NAO_SEI = 'nao_sei';
   // Conduz o motor. pre = true: pré-marcação (o que a pessoa não soube vira "Não sei" e o pedido vai para a equipe).
   async function marcar(dados, { preMarcacao = false, motivo = '' } = {}) {
     if (!LIG.db || !LIG.conv) throw sair('sem conversa');
     const pre = !!preMarcacao, vistos = {};
-    const resultado = () => ({ protocolo: protocolo(), criadoEm: new Date().toISOString(), status: pre ? 'aguardando_equipe' : 'marcado', tipo: pre ? 'pre_marcacao' : 'marcacao', motivo: pre ? motivo : '', remarcacoes: 0, venceEm: null, dados });
+    const resultado = () => ({ protocolo: protocolo(), criadoEm: new Date().toISOString(), status: pre ? 'aguardando_equipe' : 'marcado', tipo: pre ? 'pre_marcacao' : 'marcacao', motivo: pre ? motivo : '', remarcacoes: 0, venceEm: pre ? new Date(Date.now() + config().prazo_pre_horas * 3600e3).toISOString() : null, dados });
+    const fim = async (r) => { if (r.tipo === 'pre_marcacao') await registrarPedido(r); return r; };   // a pré-marcação fica guardada no servidor, com o prazo de 24 h
     if (pre) await registrarCiencia(dados, motivo);
     await enviarFoto(dados);
     for (let volta = 0; volta < 30; volta++) {
       const { p, aberta } = await pergunta();
       if (!p) throw sair('sem pergunta');
       const o = p.opcoes, passo = o.passo || o.tipo;
-      if (o.tipo === 'marcado' || o.tipo === 'acompanhar' || o.tipo === 'despedida' || o.tipo === 'nova') return resultado();
+      if (o.tipo === 'marcado' || o.tipo === 'acompanhar' || o.tipo === 'despedida' || o.tipo === 'nova') return fim(resultado());
       if (!aberta) {   // o motor entregou o pedido à equipe (ex.: primeira consulta com a médica, retorno em menos de 30 dias): para o paciente isso é uma PRÉ-MARCAÇÃO, nunca "atendente"
         const t = nm(p.texto);
         dados.pendencias = [t.includes('primeira consulta') ? 'Primeira consulta com a médica: a equipe confirma o agendamento' : (t.includes('30 dias') || t.includes('retorno')) ? 'Retorno em menos de 30 dias: a equipe confirma o agendamento' : 'A equipe vai conferir o seu pedido e confirmar'];
-        return Object.assign(resultado(), { status: 'aguardando_equipe', tipo: 'pre_marcacao', motivo: dados.pendencias[0] });
+        return fim(Object.assign(resultado(), { status: 'aguardando_equipe', tipo: 'pre_marcacao', motivo: dados.pendencias[0] }));
       }
-      if (o.tipo === 'marcando' || o.tipo === 'espera') { if (pre) return resultado(); await new Promise((r) => setTimeout(r, 2500)); vistos.espera = (vistos.espera || 0) + 1; if (vistos.espera > 28) throw sair('demora'); continue; }
+      if (o.tipo === 'marcando' || o.tipo === 'espera') { if (pre) return fim(resultado()); await new Promise((r) => setTimeout(r, 2500)); vistos.espera = (vistos.espera || 0) + 1; if (vistos.espera > 28) throw sair('demora'); continue; }
       vistos[passo] = (vistos[passo] || 0) + 1;
       if (vistos[passo] > 2) throw sair('sem avanço em ' + passo);   // a mesma pergunta voltou: não insiste
       if (passo === 'cpf_nasc' || passo === 'cpf_confirma' || passo === 'identidade') { const ok = LIG.aoDados ? await LIG.aoDados() : false; if (!ok) throw sair('cadastro'); continue; }
@@ -247,5 +270,5 @@
   }
   const solicitacoes = () => [], solicitacaoAtualizar = () => null, solicitacoesApagarTudo = () => {};
 
-  window.CSI_SIM = { catalogo, convenios, planos, medicos, disponibilidade, marcar, responderValor, avisoWhatsapp, config, configSalvar, configRestaurar, solicitacoes, solicitacaoAtualizar, solicitacoesApagarTudo, CATALOGO, iso, ligar, get aoMenu() { return LIG.aoMenu; }, get aoPin() { return LIG.aoPin; }, get aoEtapas() { return LIG.aoEtapas; }, get aoAcompanhar() { return LIG.aoAcompanhar; } };
+  window.CSI_SIM = { catalogo, convenios, planos, medicos, medicosCadastro, disponibilidade, marcar, responderValor, avisoWhatsapp, config, configSalvar, configRestaurar, solicitacoes, solicitacaoAtualizar, solicitacoesApagarTudo, CATALOGO, iso, ligar, get aoMenu() { return LIG.aoMenu; }, get aoPin() { return LIG.aoPin; }, get aoEtapas() { return LIG.aoEtapas; }, get aoAcompanhar() { return LIG.aoAcompanhar; } };
 })();

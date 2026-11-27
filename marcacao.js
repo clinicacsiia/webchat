@@ -172,10 +172,20 @@
   async function listarMedicos() {
     const real = st.pagto === 'particular' || st.planoId ? pagador(st) : '';
     const r = real ? await S.medicos(st.procId, real) : null;
-    if (r && (r.lista.length || r.estado === 'indisponivel' || r.estado === 'limite')) return { r, referencia: false };
+    if (r && r.lista.length) return { r: Object.assign({}, r, { lista: await comCadastro(r.lista, st.procId) }), referencia: false };
+    if (r && (r.estado === 'indisponivel' || r.estado === 'limite')) { const cad = await comCadastro([], st.procId); return cad.length ? { r: Object.assign({}, r, { lista: cad }), referencia: false } : { r, referencia: false }; }
     const p = real === 'Particular' ? r : await S.medicos(st.procId, 'Particular');
-    if (p.lista.length) return { r: p, referencia: st.pagto !== 'particular' };
-    return { r: r || p, referencia: false };
+    if (p.lista.length) return { r: Object.assign({}, p, { lista: await comCadastro(p.lista, st.procId) }), referencia: st.pagto !== 'particular' };
+    const base = r || p, cad = await comCadastro([], st.procId);
+    return cad.length ? { r: Object.assign({}, base, { lista: cad, estado: 'com_horarios' }), referencia: st.pagto !== 'particular' } : { r: base, referencia: false };
+  }
+  // Junta os médicos do cadastro das agendas (sem horário livre) aos que o Klingo mostrou. Quem atende a consulta aparece sempre.
+  const semAc = (v) => String(v || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+  async function comCadastro(lista, procId) {
+    let nomes = []; try { nomes = S.medicosCadastro ? await S.medicosCadastro(procId) : []; } catch { nomes = []; }
+    const out = lista.slice();
+    for (const n of nomes) { const k = semAc(n.nome); if (k && !out.some((m) => { const a = semAc(m.nome); return a === k || a.includes(k) || k.includes(a); })) out.push({ id: 'nome:' + k, nome: n.nome, horarios: 0, segurados: 0, cadastro: true }); }
+    return out.sort((a, b) => a.nome.localeCompare(b.nome));
   }
   const NOTA_REF = 'Estes são os médicos que atendem esta consulta na clínica. A equipe confere se atendem o seu convênio e plano antes de confirmar.';
 
@@ -233,7 +243,7 @@
     const volta = h('button', { class: 'mt-link', type: 'button', id: 'marcCienteVoltar', onclick: () => fecharPop(true) }, 'Voltar');
     const fundo = h('div', { class: 'mt-modal mt-pop', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'marcPopTitulo' },
       h('div', {}, h('h2', { id: 'marcPopTitulo', tabindex: '-1' }, 'Antes de continuar'),
-        h('div', { class: 'mt-aviso' }, 'Você tem ', h('b', {}, horas + ' horas'), ' para terminar de preencher o que falta, em “Acompanhar”. Passado o prazo, a pré-marcação vence.'),
+        h('div', { class: 'mt-aviso' }, 'O seu pedido fica guardado por ', h('b', {}, horas + ' horas'), '. Só seguimos com ele no sistema da clínica depois que você mandar todos os arquivos que faltam (fotos e documentos). Passado o prazo, o pedido vence e você faz um novo.'),
         causas.length ? h('div', { class: 'mt-info', style: 'font-size:15px' }, h('b', {}, 'A equipe vai confirmar com você:'), h('ul', { class: 'mt-regras', style: 'margin:4px 0 0' }, ...causas.map((t) => h('li', { style: 'font-size:15px' }, t)))) : null,
         h('p', { class: 'mt-forte' }, 'A pré-marcação ', h('b', {}, 'não garante o horário'), '. Ele só vale depois que a equipe confirmar com você.'),
         h('label', { class: 'mt-chk' }, chk, h('span', {}, 'Li as regras e estou ciente.')),
@@ -305,7 +315,7 @@
       if (!lista.some((x) => x.horarios)) {   // nenhuma médica com horário livre pela regra de antecedência
         const m = lista.length ? `Os horários livres estão a menos de ${S.config().antecedencia_horas} horas e só a equipe pode confirmar.` : (MSG[r.estado] || 'Nenhum horário disponível.');
         let ref = [];   // quem atende a consulta tem médico: mostra para escolher de preferência (a equipe confere o plano)
-        if (st.pagto === 'convenio' && r.estado !== 'indisponivel' && r.estado !== 'limite') { try { ref = (await S.medicos(st.procId, 'Particular')).lista; } catch { ref = []; } if (st.passo !== 'medico') return; }
+        if (st.pagto === 'convenio') { try { ref = await comCadastro(r.estado !== 'indisponivel' && r.estado !== 'limite' ? (await S.medicos(st.procId, 'Particular')).lista : [], st.procId); } catch { ref = []; } if (st.passo !== 'medico') return; }
         const prefMed = (id, nome) => { st.medico = id; st.medicoNome = nome; salvar(); redesenhar(); };
         mostrar('Sem horário pelo site', st.procNome, h('div', {}, h('div', { class: 'mt-aviso' }, m + ' Você pode deixar uma pré-marcação.'),
           ref.length ? h('div', {}, h('p', { class: 'sub', style: 'margin:0 0 6px' }, 'Se quiser, diga com qual médico(a) prefere. ' + NOTA_REF), h('div', { class: 'mt-lista', role: 'radiogroup', style: 'margin-bottom:12px' },
@@ -420,7 +430,7 @@
       const causas = pendIds(st).filter((x) => x.id !== 'medico_horario').map((x) => x.rotulo);
       mostrar('Quer deixar uma pré-marcação?', 'Ainda não dá para marcar o horário.', h('div', {},
         h('div', { class: 'mt-aviso' }, h('b', {}, 'A equipe precisa confirmar com você:'), h('ul', { class: 'mt-regras', style: 'margin:6px 0 0' }, ...(causas.length ? causas : [motivoPre(st)]).map((t) => h('li', {}, t)))),
-        h('div', { class: 'mt-aviso' }, 'Você tem ', h('b', {}, S.config().prazo_pre_horas + ' horas'), ' para completar o que falta, em “Acompanhar”. Passado o prazo, a pré-marcação vence.'),
+        h('div', { class: 'mt-aviso' }, 'O seu pedido fica guardado por ', h('b', {}, S.config().prazo_pre_horas + ' horas'), '. Só seguimos com ele no sistema da clínica depois que você mandar todos os arquivos que faltam. Passado o prazo, o pedido vence e você faz um novo.'),
         h('p', { class: 'mt-forte' }, 'A pré-marcação ', h('b', {}, 'não garante o horário'), '. Ele só vale depois que a equipe confirmar.'),
         h('div', { class: 'mt-lista', role: 'radiogroup' },
           opcao({ icone: '✅', titulo: 'Sim, quero a pré-marcação', detalhe: st.passo === 'pre2' ? 'Você diz o melhor horário ou período' : 'Você escolhe consulta, médico(a) e horário preferido', sel: st.pre.aceita === 'sim', onclick: () => { st.pre.aceita = 'sim'; salvar(); if (st.pre.ciencia) redesenhar(); else { redesenhar(); abrirCiencia(); } } }),
@@ -542,7 +552,7 @@
         h('tr', {}, h('td', {}, tipo === 'ok' ? 'Data e horário' : 'Situação'), h('td', {}, h('b', {}, tipo === 'ok' && d.slot ? `${dataBonita(d.slot.data)}, ${d.slot.hora}` : tipo === 'whats' ? 'A equipe vai chamar você' : 'Aguardando confirmação da equipe'))))) ) : null,
       d && d.pendencias && d.pendencias.length ? h('div', { class: 'mt-aviso' }, h('b', {}, 'A equipe vai confirmar com você: '), d.pendencias.join('; ')) : null,
       tipo === 'pre' && d && d.preferencia && d.preferencia.ciencia ? blocoCiencia(d.preferencia.ciencia) : null,
-      tipo === 'pre' && s && s.venceEm ? h('div', { class: 'mt-aviso' }, 'Complete até ', h('b', {}, prazoTxt(s.venceEm)), ' em “Acompanhar”.') : null,
+      tipo === 'pre' && s && s.venceEm ? h('div', { class: 'mt-aviso' }, 'Seu pedido fica guardado até ', h('b', {}, prazoTxt(s.venceEm)), '. Mande o que falta até lá; depois disso ele vence e você faz um novo.') : null,
       tipo !== 'nao' && tipo !== 'whats' ? h('div', { class: 'mt-card' }, h('b', {}, 'Cancelar ou remarcar'), h('ul', { class: 'mt-regras' }, ...S.config().politica.slice(0, 3).map((t) => h('li', {}, t)))) : null),
       { progresso: false, botoes: [h('button', { class: 'mt-bt', type: 'button', onclick: () => { fechar(); if (S.aoAcompanhar) S.aoAcompanhar(); } }, 'Acompanhar')] });
     corpo.append(h('button', { class: 'mt-link', type: 'button', onclick: () => { limpar(); st = null; fechar(); if (S.aoMenu) S.aoMenu(); } }, 'Fazer outra marcação'));

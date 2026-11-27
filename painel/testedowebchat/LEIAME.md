@@ -141,3 +141,6 @@ Cada pré-marcação, aviso "chamar no WhatsApp" ou marcação do teste (e cada 
 ### Organização e horários livres (25/11/2026)
 - Cada pedido cai em um grupo: **Com pendência** (falta plano, carteirinha, médico ou horário, ou a pessoa pediu para ser chamada no WhatsApp), **Completas** (tudo informado, falta a equipe confirmar) e **Encerradas** (já marcada, cancelada, resolvida ou descartada). Regra em `pmGrupo` (`painel/index.html`).
 - Botão **Ver horários livres** no cartão: consulta `teste-agenda-klingo` (só leitura, 45 dias, mínimo 24 h de antecedência) com o que a pessoa pediu (consulta, convênio/plano, médico, período e dias), diz se o horário que ela escolheu continua livre e coloca as sugestões na mensagem do WhatsApp. O teste agora envia `dados.busca` (consulta, pagador, médico).
+
+## Atualização de 27/11/2026 (mesma mudança do piloto)
+Calendário em verde com filtros, lista de médicos com reserva pelo Particular e pelo cadastro das agendas (`consulta_medicos`), pop-up de ciência com um toque e o texto "o pedido fica guardado por 24 horas". O prazo da pré-marcação agora é decidido pelo servidor (`pre_marcacao_registrar` + rotina `pre-marcacao-vigia`); o seletor de prazo da faixa laranja (12 a 72 h) continua valendo só aqui. Detalhes em `docs/integracao-teste-no-piloto.md`.
