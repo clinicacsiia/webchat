@@ -2,6 +2,7 @@
 //   -> validação (faixa de horário invertida avisa; nada barra: escolher nada, não achar na lista e quem não tem link também enviam)
 //   -> lógica (lista de exames/consultas com busca e abas; turno / a partir de / até; disponibilidade prevista; o pedido vira mensagem para a equipe)
 //   -> saída (PASS/FAIL por caso) | ROLLBACK: apagar a pasta previsao/
+// Versão 1.1 — 27/11/2026 / Mudança: casos reescritos para o formulário atual (dia e horário preferidos, plano), que substituiu turno / a partir das / até as / unidade em 23/11/2026.
 // Versão 1.0 — 17/11/2026 / Mudança: primeira versão (tela "Pedir uma previsão"). Prova a página e o banco JUNTOS. Não fala com o Supabase de verdade.
 import { readFileSync } from 'node:fs';
 import { chromium } from './mock-chat.mjs';
@@ -130,22 +131,23 @@ await caso('a lista mostra exames e consultas com agenda, com o aviso de previs�
   const busca = /Abdome/i.test(await a.page.locator('#lista').innerText());
   return { ok: temAvisoCompleto(t) && /Abdome/i.test(t) && /Pediatria/i.test(t) && /Consulta/.test(t) && /Exame/.test(t) && soCons && busca };
 });
-await caso('escolher o exame abre "Quando você prefere?" com turno, a partir das, até as, até o dia e unidade', async () => {
+await caso('escolher o exame abre "Quando você prefere?" com dia, horário e plano (tudo opcional) e o botão de ver a disponibilidade', async () => {
   await a.page.locator('#lista button.proc').first().click(); await esperaTexto(a.page, /Quando você prefere/);
   const t = await texto(a.page);
-  return { ok: /Abdome/i.test(t) && /Manhã/.test(t) && /Tarde/.test(t) && /Noite/.test(t) && /Sem preferência/.test(t) && /A partir das/.test(t) && /Até as/.test(t) && /Até o dia/.test(t) && /Unidade/.test(t) && /Ver a disponibilidade/.test(t) && temAvisoCompleto(t) };
+  return { ok: /Abdome/i.test(t) && /Que dia você prefere/.test(t) && /Que horário você prefere/.test(t) && /Seu plano ou convênio/.test(t) && /Ver a disponibilidade/.test(t) && !/Noite|Sem preferência de turno/.test(t), detalhe: t.slice(0, 120).replace(/\n/g, ' | ') };
 });
-await caso('faixa invertida (até antes de a partir) avisa e não consulta', async () => {
-  await a.page.selectOption('#apos', '14:00'); await a.page.selectOption('#ate', '09:00'); await a.page.click('#fQuando button[type=submit]');
-  await esperaTexto(a.page, /precisa ser depois/);
+await caso('dia que já passou avisa e não consulta', async () => {
+  await a.page.fill('#dia', '2020-01-02'); await a.page.click('#fQuando button[type=submit]');
+  await esperaTexto(a.page, /a partir de hoje/);
+  await a.page.fill('#dia', '');
   return { ok: true };
 });
-await caso('tarde + a partir das 13:00: só mostra horários da tarde a partir de 13:00, com aviso de que é previsão', async () => {
-  await a.page.selectOption('#ate', ''); await clicaTexto(a.page, 'Tarde'); await a.page.selectOption('#apos', '13:00'); await a.page.click('#fQuando button[type=submit]');
+await caso('horário preferido 14:00: só mostra horários de 13:00 a 16:00 (1 h antes, 2 h depois), com aviso de que é previsão', async () => {
+  await a.page.selectOption('#hora', '14:00'); await a.page.click('#fQuando button[type=submit]');
   await esperaTexto(a.page, /Disponibilidade prevista/); await esperaTexto(a.page, /Horários previstos|\d\d:\d\d/);
   const horas = await a.page.locator('button[data-k]').evaluateAll((bs) => bs.map((b) => b.dataset.k.split('|')[1]));
   const t = await texto(a.page);
-  return { ok: horas.length > 0 && horas.every((h) => h >= '13:00' && h < '18:00') && /tarde/.test(t) && /a partir das 13:00/.test(t) && /PREVISÃO/.test(t) && /reservados nem confirmados/.test(t), detalhe: `${horas.length} horários, ${horas.slice(0, 4).join(',')}` };
+  return { ok: horas.length > 0 && horas.every((h) => h >= '13:00' && h <= '16:00') && /perto das 14:00/.test(t) && /PREVISÃO/.test(t) && /reservados nem confirmados/.test(t), detalhe: `${horas.length} horários` };
 });
 await caso('tocar num horário o marca; "Pedir esta previsão" sem link pede só o celular, e o pedido chega à equipe com o horário visto', async () => {
   await a.page.locator('button[data-k]').first().click();
@@ -156,7 +158,7 @@ await caso('tocar num horário o marca; "Pedir esta previsão" sem link pede só
   const t = await texto(a.page);
   const m = (await q(`select m.autor, m.texto, cv.ia_ativa from public.mensagens m join public.pmarc_pessoa p on p.conversa_id = m.conversa_id join public.conversas cv on cv.id = p.conversa_id where p.celular = '71988880001' order by m.id`));
   const ped = m.find((x) => x.autor === 'cliente' && /Pedido de previsão/.test(x.texto));
-  return { ok: marcado === 1 && /recebeu o seu pedido/.test(t) && temAvisoCompleto(t) && !!ped && /ULTRASSONOGRAFIA ABDOME TOTAL/.test(ped.texto) && /Turno: tarde/.test(ped.texto) && /A partir das: 13:00/.test(ped.texto) && /Horário que viu/.test(ped.texto) && m[0].ia_ativa === false, detalhe: ped && ped.texto.replace(/\n/g, ' | ') };
+  return { ok: marcado === 1 && /recebeu o seu pedido/.test(t) && temAvisoCompleto(t) && !!ped && /ULTRASSONOGRAFIA ABDOME TOTAL/.test(ped.texto) && /A partir das: 13:00/.test(ped.texto) && /Horário que viu/.test(ped.texto) && m[0].ia_ativa === false, detalhe: ped && ped.texto.replace(/\n/g, ' | ') };
 });
 await caso('depois do envio dá para falar com a equipe (a conversa abre)', async () => {
   await clicaTexto(a.page, 'Falar com a equipe'); await esperaTexto(a.page, /Fale com a equipe/);
