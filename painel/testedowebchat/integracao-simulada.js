@@ -107,6 +107,18 @@
     for (const sl of r.slots) { const m = por.get(sl.profId) || { id: sl.profId, nome: sl.profissional, horarios: 0, segurados: 0 }; if (sl.segurada) m.segurados++; else m.horarios++; por.set(sl.profId, m); }
     return { estado: r.estado, motivo: r.motivo, truncado: !!r.truncado, consultadoEm: r.consultadoEm, lista: [...por.values()].sort((a, b) => a.nome.localeCompare(b.nome)) };
   }
+  // Médicos que atendem a consulta, pelo cadastro das agendas (função consulta_medicos, só leitura e só nomes): aparecem mesmo sem horário livre.
+  const cadastroMed = new Map();
+  async function medicosCadastro(procId) {
+    const id = pid(procId); if (cadastroMed.has(id)) return cadastroMed.get(id);
+    let nomes = [];
+    try {
+      const r = await fetch('https://nrvuynjwcgwpjdptkiay.supabase.co/rest/v1/rpc/consulta_medicos', { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: CHAVE_PUB, Authorization: 'Bearer ' + CHAVE_PUB }, body: JSON.stringify({ p_procedimento_id: id }) });
+      const d = r.ok ? await r.json() : []; nomes = (Array.isArray(d) ? d : []).filter((x) => typeof x === 'string' && x.trim()).map((n) => ({ nome: bonito(n) }));
+    } catch { nomes = []; }
+    if (nomes.length) cadastroMed.set(id, nomes);
+    return nomes;
+  }
   // Horários reais do Klingo, filtrados pela(s) médica(s) escolhida(s) e pela regra de antecedência.
   async function disponibilidade({ procId, medico = '', pagador = '' } = {}) {
     const c = config(), r = await buscarAoVivo(procId, pagadorChave(pagador));
@@ -181,5 +193,5 @@
 
   const solicitacoesApagarTudo = () => { try { localStorage.removeItem(K_SOL); } catch { /* ignora */ } };
 
-  window.CSI_SIM = { catalogo, convenios, planos, medicos, disponibilidade, marcar, avisoWhatsapp, config, configSalvar, configRestaurar, solicitacoes, solicitacaoAtualizar, solicitacoesApagarTudo, CATALOGO, iso };
+  window.CSI_SIM = { catalogo, convenios, planos, medicos, medicosCadastro, disponibilidade, marcar, avisoWhatsapp, config, configSalvar, configRestaurar, solicitacoes, solicitacaoAtualizar, solicitacoesApagarTudo, CATALOGO, iso };
 })();

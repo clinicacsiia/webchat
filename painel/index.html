@@ -3842,6 +3842,7 @@
       if (r.fila === 'descartado') selos.push(h('span', { class: 'pm-tag cinza' }, 'Descartada'));
       if (venceu) selos.push(h('span', { class: 'pm-tag erro' }, 'Prazo vencido'));
       else if (r.tipo === 'pre_marcacao' && r.vence_em && !feito) selos.push(h('span', { class: 'pm-tag' }, 'Prazo ' + new Date(r.vence_em).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })));
+      if (r.origem === 'piloto') selos.push(h('span', { class: 'pm-tag azul', title: 'Veio da tela de marcação do chat (piloto)' }, 'Piloto'));
       if (r.origem === 'teste') selos.push(h('span', { class: 'pm-tag cinza', title: 'Veio da página de teste do webchat' }, 'Teste'));
       const lin = (rot, val) => val ? h('div', { class: 'pm-lin' }, h('span', {}, rot), h('b', {}, val)) : null;
       const horario = r.horario_data ? pmDataBonita(r.horario_data) + (r.horario_hora ? ' às ' + r.horario_hora : '') + (r.horario_local ? ' · ' + r.horario_local : '') : '';
