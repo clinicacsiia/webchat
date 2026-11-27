@@ -3,6 +3,7 @@
 //   -> lógica (retorno_recente_ok: mesma especialidade pelo cadastro do médico na agenda + atendimento com MENOS de 30 dias, pelo CPF + nascimento ou prontuário)
 //   -> saída (fluxo_proximo devolve 'retorno_recente'; fluxo_perguntar avisa que o atendimento tem menos de 30 dias e passa para a atendente sem marcar; klingo_pode_marcar tem a segunda trava) | PASS/FAIL
 // Versão 1.0 — 17/11/2026 / Mudança: primeira versão (consulta na mesma especialidade com menos de 30 dias vai para a atendente).
+// Versão 1.1 — 27/11/2026 / Mudança: parte 5 (marcação recente do Klingo que não consta como atendida também vai para a atendente; casos reais de 18/11 e 27/11).
 // Dados: todos inventados aqui. Nenhuma linha vem da produção.
 import { readFileSync } from 'node:fs';
 import { criarBancoProducao, ajudantes, REPO } from './banco-producao.mjs';
@@ -16,7 +17,7 @@ const { q, um, como, anonimo } = ajudantes(db);
 await db.exec(`insert into vault.secrets_tbl (name, secret) values ('klingo_hash_sal', 'sal-de-teste')`);
 registrar('o retrato da produção monta inteiro', falhas.length === 0, `${falhas.length} falhas`);
 
-const nomes = ['regra', 'fluxo-proximo', 'fluxo-perguntar', 'pode-marcar'];
+const nomes = ['regra', 'fluxo-proximo', 'fluxo-perguntar', 'pode-marcar', 'marcacao-recente'];
 const partes = nomes.map((n, i) => readFileSync(`${REPO}/supabase/retorno-30-dias-parte${i + 1}-${n}.sql`, 'utf8'));
 await caso('as 4 partes aplicam duas vezes sem erro (idempotente)', async () => { for (const s of [...partes, ...partes]) await db.exec(s); return { ok: true }; });
 
@@ -135,6 +136,70 @@ await caso('sem atendimento recente, fluxo_proximo segue o caminho de sempre', a
 await caso('klingo_pode_marcar carrega a segunda trava e recusa com o motivo retorno_recente', async () => {
   const def = (await um(`select pg_get_functiondef('public.klingo_pode_marcar'::regproc) like '%retorno_recente_ok%' as v`)).v;
   return { ok: def };
+});
+// ---- parte 5: marcação recente do Klingo (vínculo) que não consta como atendida ----
+const hist = (c, pront, atras, proc = 'CONSULTA') => db.query(
+  `insert into public.paciente_klingo_vinculo (conversa_id, situacao, prontuario, chave, historico) values ($1, 'confere', $2, 'x', $3::jsonb)
+   on conflict (conversa_id) do update set situacao = 'confere', prontuario = excluded.prontuario, historico = excluded.historico`,
+  [c, pront, JSON.stringify({ total: 3, ultima_data: atras === null ? null : dia(atras), ultimo_procedimento: proc })]);
+await caso('P5: última marcação de consulta há 2 dias, sem atendimento feito: bloqueia com motivo marcacao_recente', async () => {
+  const c = await nova(); await medico(c, NEURO1); await hist(c, 'P501', 2); const r = await ok(c);
+  return { ok: r.bloqueia === true && r.motivo === 'marcacao_recente' && r.dias_desde === 2 && r.especialidade === 'Neurologia' && r.limite === 30, detalhe: JSON.stringify(r) };
+});
+await caso('P5: 29 dias atrás bloqueia; 30 dias atrás (exatos) não bloqueia', async () => {
+  const a = await nova(); await hist(a, 'P502', 29); const b = await nova(); await hist(b, 'P503', 30);
+  return { ok: (await ok(a)).bloqueia === true && (await ok(b)).bloqueia === false };
+});
+await caso('P5: última marcação que não é consulta (exame) não bloqueia', async () => {
+  const c = await nova(); await hist(c, 'P504', 2, 'RM JOELHO'); return { ok: (await ok(c)).bloqueia === false };
+});
+await caso('P5: sem histórico, histórico vazio ou data no futuro não bloqueia', async () => {
+  const a = await nova(); await vinculo(a, 'P505'); const b = await nova(); await hist(b, 'P506', null); const c = await nova(); await hist(c, 'P507', -3);
+  return { ok: (await ok(a)).bloqueia === false && (await ok(b)).bloqueia === false && (await ok(c)).bloqueia === false };
+});
+await caso('P5: se aquele dia consta como atendido em OUTRA especialidade (cardiologia), não bloqueia quem pede neurologia', async () => {
+  const c = await nova(); await hist(c, 'P508', 4);
+  await db.query(`insert into public.consulta_feita (marcacao_id, prontuario, profissional, atendido_em) values ('t-508', 'P508', $1, $2)`, [CARDIO, dia(4)]);
+  const r = await ok(c); return { ok: r.bloqueia === false, detalhe: JSON.stringify(r) };
+});
+await caso('P5: se aquele dia consta como atendido na MESMA especialidade, vale a regra antiga (retorno_recente)', async () => {
+  const c = await nova(); await hist(c, 'P509', 4);
+  await db.query(`insert into public.consulta_feita (marcacao_id, prontuario, profissional, atendido_em) values ('t-509', 'P509', $1, $2)`, [NEURO2, dia(4)]);
+  const r = await ok(c); return { ok: r.bloqueia === true && r.motivo === 'retorno_recente', detalhe: JSON.stringify(r) };
+});
+await caso('P5: exame, remarcação e regra desligada continuam não bloqueando', async () => {
+  const e = await nova(); await hist(e, 'P510', 2); await db.query(`update public.pre_agendamentos set tipo = 'exame' where conversa_id = $1`, [e]);
+  const rm = await nova(); await hist(rm, 'P511', 2); await db.query(`update public.conversa_fluxo set dados = dados || '{"remarcando": {"voucher": "x"}}'::jsonb where conversa_id = $1`, [rm]);
+  const of = await nova(); await hist(of, 'P512', 2);
+  await db.query(`update public.config set valor = 'nao' where chave = 'retorno_dias_modo'`); const rOff = (await ok(of)).bloqueia;
+  await db.query(`update public.config set valor = 'sim' where chave = 'retorno_dias_modo'`);
+  return { ok: (await ok(e)).bloqueia === false && (await ok(rm)).bloqueia === false && rOff === false };
+});
+await caso('P5: vínculo que não confere (divergente) não é usado', async () => {
+  const c = await nova(); await hist(c, 'P513', 2); await db.query(`update public.paciente_klingo_vinculo set situacao = 'divergente' where conversa_id = $1`, [c]);
+  return { ok: (await ok(c)).bloqueia === false };
+});
+const c7 = await nova(); await medico(c7, NEURO1); await hist(c7, 'P514', 2); await preparar(c7);
+await caso('P5: fluxo_proximo manda para o passo retorno_recente', async () => { const r = (await um(`select public.fluxo_proximo($1) as v`, [c7])).v; return { ok: r === 'retorno_recente', detalhe: r }; });
+await caso('P5: o aviso fala de consulta MARCADA (não de atendida), passa para a atendente, sem nome de médico nem data, e não marca nada', async () => {
+  await db.query(`select public.fluxo_perguntar($1, 'retorno_recente', null)`, [c7]);
+  const cv = (await q(`select ia_ativa, triagem_resumo from public.conversas where id = $1`, [c7]))[0];
+  const f = (await q(`select passo from public.conversa_fluxo where conversa_id = $1`, [c7]))[0];
+  const m = await q(`select texto from public.mensagens where conversa_id = $1 and autor = 'agente' order by id desc limit 1`, [c7]);
+  const pa = (await q(`select status from public.pre_agendamentos where conversa_id = $1`, [c7]))[0];
+  const t = m[0]?.texto || '';
+  return { ok: cv.ia_ativa === false && f.passo === 'humano' && /consulta marcada/.test(t) && /menos de 30 dias/.test(t) && !/foi atendid/.test(t) && /atendente/.test(t) && !/EXEMPLO|\d{2}\/\d{2}\/\d{4}/i.test(t)
+    && /RETORNO EM MENOS DE 30 DIAS/.test(cv.triagem_resumo) && /ainda não consta como atendida/.test(cv.triagem_resumo) && /\d{2}\/\d{2}\/\d{4}/.test(cv.triagem_resumo) && pa.status !== 'agendado', detalhe: t + ' || ' + cv.triagem_resumo };
+});
+await caso('P5: klingo_pode_marcar recusa com o motivo retorno_recente (segunda trava)', async () => {
+  const c = await nova(); await medico(c, NEURO1); await hist(c, 'P515', 2);
+  const r = (await um(`select public.klingo_pode_marcar($1) as v`, [c])).v; return { ok: r.ok === false && r.motivo === 'retorno_recente', detalhe: JSON.stringify(r) };
+});
+await caso('P5: o texto do caso antigo (atendido) continua igual', async () => {
+  const c = await nova(); await medico(c, NEURO1); await atendido(c, NEURO2, 9); await preparar(c);
+  await db.query(`select public.fluxo_perguntar($1, 'retorno_recente', null)`, [c]);
+  const m = await q(`select texto from public.mensagens where conversa_id = $1 and autor = 'agente' order by id desc limit 1`, [c]);
+  return { ok: /foi atendido\(a\) em consulta de Neurologia/.test(m[0].texto), detalhe: m[0].texto };
 });
 await caso('as funções novas só existem para o sistema', async () => {
   const r = await q(`select has_function_privilege('anon', 'public.retorno_recente_ok(uuid)', 'execute') a, has_function_privilege('authenticated', 'public.retorno_recente_ok(uuid)', 'execute') b, has_function_privilege('anon', 'public.fluxo_retorno_equipe(uuid)', 'execute') c, has_function_privilege('service_role', 'public.retorno_recente_ok(uuid)', 'execute') d`);

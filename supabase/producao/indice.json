@@ -2446,6 +2446,12 @@
    "comando": "select public.chat_corpo_atualizar()"
   },
   {
+   "nome": "consulta-atendida-recarga",
+   "quando": "10 6 * * *",
+   "ativa": true,
+   "comando": "select public.consulta_atendida_disparar((now() at time zone 'America/Sao_Paulo')::date - 30, (now() at time zone 'America/Sao_Paulo')::date - 1)"
+  },
+  {
    "nome": "consulta-atendida-sync",
    "quando": "*/10 * * * *",
    "ativa": true,
@@ -9540,7 +9546,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "a7641fa118e1102df65095f6faf86033"
+   "md5": "a1dd817edfa1380c354299a6f540a694"
   },
   {
    "nome": "fluxo_rotulo_item",
@@ -15633,7 +15639,7 @@
    "anon": false,
    "authenticated": false,
    "publico": false,
-   "md5": "f16d4afeb973420ca5514972886e14f6"
+   "md5": "81c5eb041421ef448cc166cc1fc0642b"
   },
   {
    "nome": "sim_causa",

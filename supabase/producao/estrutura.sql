@@ -1,5 +1,5 @@
 -- RETRATO DA ESTRUTURA DO BANCO DE PRODUÇÃO (projeto webchat-atendimento). GERADO: não editar à mão.
--- Atualização parcial em 2026-11-23T12:17:14.962540+00:00 (remarcações e ofertas no painel). Retrato inteiro tirado em 2026-11-14T20:32:54.165875+00:00 · Postgres 17.11. Só estrutura: nenhuma linha de tabela, nenhum valor de configuração.
+-- Atualização parcial em 2026-11-27T14:00:00+00:00 (remarcações e ofertas no painel). Retrato inteiro tirado em 2026-11-14T20:32:54.165875+00:00 · Postgres 17.11. Só estrutura: nenhuma linha de tabela, nenhum valor de configuração.
 -- Serve de referência e para os testes. NÃO rodar inteiro sobre a produção. Como refazer: supabase/producao/LEIAME.md.
 
 -- ===== Extensões =====
@@ -3184,7 +3184,7 @@ CREATE TRIGGER vinculo_log_imutavel BEFORE DELETE OR UPDATE ON public.vinculo_lo
 -- public.jornada_tarefa
 -- public.mensagens
 
--- ===== Rotinas agendadas (pg_cron): 32 =====
+-- ===== Rotinas agendadas (pg_cron): 33 =====
 -- agenda-conferir · 15 seconds · ativa
 --   select net.http_post( url := 'https://nrvuynjwcgwpjdptkiay.supabase.co/functions/v1/sync-catalogo-klingo', headers := jsonb_build_object('Content-Type', 'application/json', 'x-sync-key', (select valor from public.config where chave = 'ia_segredo')), body := '{"agenda":"conferir"}'::jsonb, timeout_milliseconds := 40000) where public.agenda_conferencia_ha_trabalho(false);
 -- agenda-ocupacao · */10 8-23,0,1 * * * · ativa
@@ -3207,6 +3207,8 @@ CREATE TRIGGER vinculo_log_imutavel BEFORE DELETE OR UPDATE ON public.vinculo_lo
 --   select net.http_post( url := 'https://nrvuynjwcgwpjdptkiay.supabase.co/functions/v1/sync-catalogo-klingo', headers := jsonb_build_object('Content-Type', 'application/json', 'x-sync-key', (select valor from public.config where chave = 'ia_segredo')), body := '{"precos":"particular"}'::jsonb, timeout_milliseconds := 150000);
 -- chat-corpo-cache · */10 * * * * · ativa
 --   select public.chat_corpo_atualizar()
+-- consulta-atendida-recarga · 10 6 * * * · ativa
+--   select public.consulta_atendida_disparar((now() at time zone 'America/Sao_Paulo')::date - 30, (now() at time zone 'America/Sao_Paulo')::date - 1)
 -- consulta-atendida-sync · */10 * * * * · ativa
 --   select public.consulta_atendida_disparar()
 -- convenio-seguir-klingo · 10 7 * * * · ativa

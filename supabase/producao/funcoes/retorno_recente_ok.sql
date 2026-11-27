@@ -9,6 +9,7 @@ AS $function$
 declare
   v_dias int; pa public.pre_agendamentos; v_pref text; v_med text[]; v_procs int[]; v_esp text[];
   v_chave text; v_pront text; d jsonb; v_cpf text; v_nasc date; r record; v_hoje date := (now() at time zone 'America/Sao_Paulo')::date;
+  v_hist jsonb; v_ult date; v_esp_nome text;
 begin
   if coalesce((select valor from public.config where chave = 'retorno_dias_modo'), 'nao') <> 'sim' then return jsonb_build_object('bloqueia', false, 'motivo', 'desligado'); end if;
   v_dias := coalesce(nullif((select valor from public.config where chave = 'retorno_dias_limite'), '')::int, 30);
@@ -35,7 +36,7 @@ begin
     if v_cpf is not null and v_nasc is not null then v_chave := public.klingo_hash(v_cpf || '|' || v_nasc::text); end if;
   exception when others then v_chave := null;
   end;
-  select v.prontuario into v_pront from public.paciente_klingo_vinculo v where v.conversa_id = p_conversa and v.situacao = 'confere' and v.prontuario is not null;
+  select v.prontuario, v.historico into v_pront, v_hist from public.paciente_klingo_vinculo v where v.conversa_id = p_conversa and v.situacao = 'confere' and v.prontuario is not null;
   if v_chave is null and v_pront is null then return jsonb_build_object('bloqueia', false, 'motivo', 'sem_identificacao'); end if;
   select c.atendido_em, x.esp_nome into r
     from public.consulta_feita c
@@ -45,7 +46,19 @@ begin
       where public.norm_nome(a.profissional) = public.norm_nome(c.profissional) and public.norm_nome(a.especialidade) = any (v_esp)) x
     where (c.chave = v_chave or c.prontuario = v_pront) and c.atendido_em > v_hoje - v_dias and c.atendido_em <= v_hoje and x.esp_nome is not null
     order by c.atendido_em desc limit 1;
-  if r.atendido_em is null then return jsonb_build_object('bloqueia', false, 'motivo', 'sem_atendimento_recente'); end if;
-  return jsonb_build_object('bloqueia', true, 'motivo', 'retorno_recente', 'especialidade', r.esp_nome, 'ultimo_em', r.atendido_em, 'dias_desde', v_hoje - r.atendido_em, 'limite', v_dias);
+  if r.atendido_em is not null then
+    return jsonb_build_object('bloqueia', true, 'motivo', 'retorno_recente', 'especialidade', r.esp_nome, 'ultimo_em', r.atendido_em, 'dias_desde', v_hoje - r.atendido_em, 'limite', v_dias);
+  end if;
+  -- NOVO (27/11/2026): última marcação ativa de consulta no Klingo (vínculo) dentro do prazo que não consta como atendida em outra especialidade
+  begin
+    v_ult := nullif(v_hist ->> 'ultima_data', '')::date;
+  exception when others then v_ult := null;
+  end;
+  if v_ult is not null and v_ult > v_hoje - v_dias and v_ult <= v_hoje and coalesce(v_hist ->> 'ultimo_procedimento', '') ~* '^\s*consulta'
+     and not exists (select 1 from public.consulta_feita c where (c.chave = v_chave or c.prontuario = v_pront) and c.atendido_em = v_ult) then
+    select min(initcap(lower(a.especialidade))) into v_esp_nome from public.catalogo_agenda a where public.norm_nome(a.especialidade) = any (v_esp) and a.procedimento_id = any (v_procs);
+    return jsonb_build_object('bloqueia', true, 'motivo', 'marcacao_recente', 'especialidade', v_esp_nome, 'ultimo_em', v_ult, 'dias_desde', v_hoje - v_ult, 'limite', v_dias);
+  end if;
+  return jsonb_build_object('bloqueia', false, 'motivo', 'sem_atendimento_recente');
 end $function$;
 
