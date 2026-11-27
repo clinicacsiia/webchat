@@ -9,8 +9,14 @@ AS $function$
 declare v_ok jsonb := public.retorno_recente_ok(p_conversa); ctx jsonb;
 begin
   ctx := public.fluxo_ctx(p_conversa) || jsonb_build_object('especialidade', coalesce(v_ok ->> 'especialidade', 'mesma especialidade'), 'dias', coalesce(v_ok ->> 'limite', '30'));
-  perform public.fluxo_dizer(p_conversa, public.fluxo_t('retorno_equipe', ctx), jsonb_build_object('tipo', 'acompanhar'));
-  perform public.fluxo_transferir(p_conversa, 'RETORNO EM MENOS DE ' || coalesce(v_ok ->> 'limite', '30') || ' DIAS: já atendido(a) em consulta de ' || coalesce(v_ok ->> 'especialidade', '?')
-    || ' há ' || coalesce(v_ok ->> 'dias_desde', '?') || ' dia(s) (' || coalesce(to_char((v_ok ->> 'ultimo_em')::date, 'DD/MM/YYYY'), '?') || ', pelo Klingo). Nada foi marcado. Conferir se é retorno e agendar com o paciente.', 'media', false);
+  if v_ok ->> 'motivo' = 'marcacao_recente' then
+    perform public.fluxo_dizer(p_conversa, public.fluxo_t('retorno_equipe_marcacao', ctx), jsonb_build_object('tipo', 'acompanhar'));
+    perform public.fluxo_transferir(p_conversa, 'RETORNO EM MENOS DE ' || coalesce(v_ok ->> 'limite', '30') || ' DIAS: o Klingo mostra consulta marcada em ' || coalesce(to_char((v_ok ->> 'ultimo_em')::date, 'DD/MM/YYYY'), '?')
+      || ' (há ' || coalesce(v_ok ->> 'dias_desde', '?') || ' dia(s)) que ainda não consta como atendida. Conferir se a consulta foi feita e se o convênio libera nova consulta antes de agendar. Nada foi marcado.', 'media', false);
+  else
+    perform public.fluxo_dizer(p_conversa, public.fluxo_t('retorno_equipe', ctx), jsonb_build_object('tipo', 'acompanhar'));
+    perform public.fluxo_transferir(p_conversa, 'RETORNO EM MENOS DE ' || coalesce(v_ok ->> 'limite', '30') || ' DIAS: já atendido(a) em consulta de ' || coalesce(v_ok ->> 'especialidade', '?')
+      || ' há ' || coalesce(v_ok ->> 'dias_desde', '?') || ' dia(s) (' || coalesce(to_char((v_ok ->> 'ultimo_em')::date, 'DD/MM/YYYY'), '?') || ', pelo Klingo). Nada foi marcado. Conferir se é retorno e agendar com o paciente.', 'media', false);
+  end if;
 end $function$;
 
