@@ -1,4 +1,5 @@
 // FLUXOGRAMA: entrada (chat do paciente + Supabase simulado + relógios da Sentinela acelerados) -> validação (provoca cada problema: tela travada, erro de chamada, chamada lenta, mensagens fora de ordem, paciente parado) -> lógica (confere o aviso na tela, o código CSI-... e se o incidente chegou ao servidor com o mesmo código) -> saída (PASS/FAIL por caso e código de saída)
+// Versão 1.1 — 27/11/2026 / Mudança: os 7 casos do pedido de exames e do lado reescritos para a tela atual (tipo, depois UMA lista por parte do corpo com busca e caixinhas; o botão "Lista" e o passo "Ver exames para essas partes" não existem mais).
 // Versão 1.0 — 31/10/2026 / Mudança: Implementação inicial
 //
 // Os relógios da Sentinela andam 20× mais rápido (window.SENTINELA_RITMO = 0.05); os atrasos do servidor simulado são reais.
@@ -154,122 +155,112 @@ await caso('letra: o tamanho padrão é maior que antes (17 px) e o menu aumenta
   return { ok: a >= 17 && b > a * 1.1 && Math.abs(c - b) < 0.5, detalhe: `normal=${a}px, maior=${b.toFixed(1)}px, depois de recarregar=${c.toFixed(1)}px (guardado)` };
 });
 
-await caso('pedido de exames: tipo em grade, parte do corpo em lista alinhada (nomes na mesma coluna, botões do mesmo tamanho, sem rolagem lateral)', async () => {
-  const mundo = criarMundo(); const { page, ctx } = await novaPaginaChat(browser, mundo, { init: RAPIDO });
-  await comecarConversa(page, base);
+// ---- Pedido de exames (tela de 16/11/2026): passo 1 = tipo em botões iguais; passo 2 = UMA lista agrupada por parte do corpo, com busca, caixinhas e o seletor de lado dentro do exame marcado.
+async function irAoPedido(page, mundo) {
   mundo.perguntaPedido(); await page.evaluate(() => dispatchEvent(new Event('online')));
-  await page.waitForSelector('#msgs .btn-w >> text=Escolher exames no mapa do corpo', { timeout: 6000 });
-  await page.click('#msgs .btn-w >> text=Escolher exames no mapa do corpo');
-  await page.waitForSelector('.op-grade .op', { timeout: 6000 });
-  const grade = await page.$$eval('.op-grade .op', (bs) => bs.map((b) => Math.round(b.getBoundingClientRect().width)));
-  await page.click('.op-grade .op >> text=Ressonância');
-  await page.click('.seg button >> text=Lista');
-  await page.waitForSelector('.parte-linha', { timeout: 4000 });
-  const m = await page.evaluate(() => {
-    const linhas = [...document.querySelectorAll('.parte-linha')];
-    const x = (sel) => [...new Set(linhas.flatMap((l) => [...l.querySelectorAll(sel)].map((e) => Math.round(e.getBoundingClientRect().left))))];
-    const dir = [...document.querySelectorAll('.parte-linha button')].filter((b) => b.textContent.includes('Direito')).map((b) => Math.round(b.getBoundingClientRect().width));
-    const corpo = document.querySelector('#folhaCorpo');
-    return { linhas: linhas.length, colunasNome: x('.nome'), larguraDireito: [...new Set(dir)], semRolagemLateral: corpo.scrollWidth <= corpo.clientWidth + 1,
-      grupos: [...document.querySelectorAll('.partes-grupo h3')].map((h) => h.textContent), passos: document.querySelector('.passos') ? document.querySelectorAll('.passos li').length : 0 };
-  });
-  await ctx.close();
-  const gradeIgual = new Set(grade).size === 1;
-  return { ok: gradeIgual && m.linhas >= 5 && m.colunasNome.length === 1 && m.larguraDireito.length === 1 && m.semRolagemLateral && m.passos === 3,
-    detalhe: `tipos=${grade.length} de largura ${grade[0]}px, linhas=${m.linhas}, colunas de nome=${m.colunasNome.length}, larguras do botão=${m.larguraDireito}, grupos=${m.grupos.join('/')}` };
-});
-
-await caso('pedido de exames: escolher Joelho direito pela lista leva ao passo de exames com opções grandes e iguais', async () => {
-  const mundo = criarMundo(); const { page, ctx } = await novaPaginaChat(browser, mundo, { init: RAPIDO });
-  await comecarConversa(page, base);
-  mundo.perguntaPedido(); await page.evaluate(() => dispatchEvent(new Event('online')));
-  await page.click('#msgs .btn-w >> text=Escolher exames no mapa do corpo'); await page.click('.op-grade .op >> text=Ressonância'); await page.click('.seg button >> text=Lista');
-  await page.click('.parte-linha:has(.nome:text("Joelho")) button >> text=Direito');
-  const marcado = await page.$eval('.parte-linha:has(.nome:text("Joelho")) button[aria-pressed="true"]', (b) => b.textContent);
-  await ctx.close();
-  return { ok: /Direito/.test(marcado) && /✓/.test(marcado), detalhe: `botão marcado: "${marcado}"` };
-});
-
-await caso('pedido de exames: os nomes do Klingo aparecem legíveis (frase normal, detalhe em letra menor), os comuns primeiro e os especiais em "Ver outros"', async () => {
-  const mundo = criarMundo(); const { page, ctx } = await novaPaginaChat(browser, mundo, { init: RAPIDO });
-  await comecarConversa(page, base);
-  mundo.perguntaPedido(); await page.evaluate(() => dispatchEvent(new Event('online')));
-  await page.click('#msgs .btn-w >> text=Escolher exames no mapa do corpo'); await page.click('.op-grade .op >> text=Ressonância'); await page.click('.seg button >> text=Lista');
-  await page.click('.parte-linha:has(.nome:text("Punho")) button >> text=Esquerdo');
-  await page.click('.btn-w >> text=Ver exames para essas partes do corpo');
-  await page.waitForSelector('.opcao-ex .ex-titulo', { timeout: 6000 });
-  const m = await page.evaluate(() => {
-    const op = [...document.querySelectorAll('.opcao-ex:not(.neutra)')].map((l) => ({ t: l.querySelector('.ex-titulo').textContent, d: (l.querySelector('.ex-detalhe') || {}).textContent || '' }));
-    const l = document.querySelector('.opcao-ex'), i = l.querySelector('input').getBoundingClientRect(), t = l.querySelector('.ex-titulo').getBoundingClientRect();
-    const det = document.querySelector('.ex-detalhe');
-    return { op, textoNaMesmaLinhaDaBolinha: Math.abs((i.top + i.height / 2) - (t.top + t.height / 2)) < 30 || t.top >= i.top - 4, tituloPx: parseFloat(getComputedStyle(document.querySelector('.ex-titulo')).fontSize), detalhePx: det ? parseFloat(getComputedStyle(det).fontSize) : 0,
-      tudoMaiusculo: [...document.querySelectorAll('.ex-titulo')].some((e) => e.textContent.length > 4 && e.textContent === e.textContent.toUpperCase()), neutra: !!document.querySelector('.opcao-ex.neutra'), semRolagemLateral: document.querySelector('#folhaCorpo').scrollWidth <= document.querySelector('#folhaCorpo').clientWidth + 1 };
-  });
-  await page.click('.opcao-ex >> text=Mão e punho'); await page.waitForTimeout(150);
-  const marcada = await page.$eval('.opcao-ex.marcada .ex-titulo', (n) => n.textContent);
-  await ctx.close();
-  const titulos = m.op.map((x) => x.t);
-  return { ok: titulos.includes('Mão') && titulos.includes('Mão e punho') && titulos.includes('Punho') && titulos.includes('Articulação (Punho / mão)') && m.op.find((x) => x.t === 'Mão').d === 'Não inclui punho' && !m.tudoMaiusculo && m.tituloPx >= 17 && m.detalhePx >= 14 && m.neutra && m.semRolagemLateral && marcada === 'Mão e punho',
-    detalhe: `${m.op.map((x) => x.t + (x.d ? ' [' + x.d + ']' : '')).join(' / ')}; título ${m.tituloPx}px, detalhe ${m.detalhePx}px; marcada=${marcada}` };
-});
-
-await caso('pedido de exames: lista longa (crânio) mostra poucos exames comuns e esconde o resto em "Ver outros", sem repetir o que fica igual na tela', async () => {
-  const mundo = criarMundo(); const { page, ctx } = await novaPaginaChat(browser, mundo, { init: RAPIDO });
-  await comecarConversa(page, base);
-  mundo.perguntaPedido(); await page.evaluate(() => dispatchEvent(new Event('online')));
-  await page.click('#msgs .btn-w >> text=Escolher exames no mapa do corpo'); await page.click('.op-grade .op >> text=Ressonância'); await page.click('.seg button >> text=Lista');
-  await page.click('.parte-linha:has(.nome:text("Crânio")) button'); await page.click('.btn-w >> text=Ver exames para essas partes do corpo');
-  await page.waitForSelector('.ex-mais summary', { timeout: 6000 });
-  const m = await page.evaluate(() => {
-    const visiveis = [...document.querySelectorAll('.bloco-parte > .opcao-ex:not(.neutra)')].length, dentro = document.querySelectorAll('.ex-mais .opcao-ex').length;
-    const todos = [...document.querySelectorAll('.bloco-parte .opcao-ex:not(.neutra) .ex-txt')].map((e) => e.textContent), resumo = document.querySelector('.ex-mais summary').textContent;
-    return { visiveis, dentro, repetidos: todos.length - new Set(todos).size, resumo, fechado: !document.querySelector('.ex-mais').open };
-  });
-  await page.click('.ex-mais summary'); await page.click('.ex-mais .opcao-ex >> nth=0'); await page.waitForTimeout(150);
-  const abertoDepois = await page.$eval('.ex-mais', (n) => n.open); await ctx.close();
-  return { ok: m.visiveis === 5 && m.dentro >= 5 && m.repetidos === 0 && m.fechado && /Ver outros \d+ exames/.test(m.resumo) && abertoDepois, detalhe: `na tela=${m.visiveis}, em "ver outros"=${m.dentro}, repetidos=${m.repetidos}, "${m.resumo}"` };
-});
-
-async function irAoPassoExame(page, mundo, partes) {
-  mundo.perguntaPedido(); await page.evaluate(() => dispatchEvent(new Event('online')));
-  await page.click('#msgs .btn-w >> text=Escolher exames no mapa do corpo'); await page.click('.op-grade .op >> text=Ressonância'); await page.click('.seg button >> text=Lista');
-  for (const [parte, lado] of partes) await page.click(`.parte-linha:has(.nome:text("${parte}")) button${lado ? ` >> text=${lado}` : ''}`);
-  await page.click('.btn-w >> text=Ver exames para essas partes do corpo'); await page.waitForSelector('.opcao-ex .ex-titulo', { timeout: 6000 });
+  await page.click('#msgs .btn-w >> text=Escolher exames no mapa do corpo'); await page.waitForSelector('.op-grade .op', { timeout: 6000 });
 }
-const bloco = (page) => page.evaluate(() => ({
-  lado: [...document.querySelectorAll('.lado-sel .seg button')].map((b) => [b.textContent, b.getAttribute('aria-pressed')]),
-  cartoes: [...document.querySelectorAll('.opcao-ex:not(.neutra)')].map((l) => ({ t: l.querySelector('.ex-titulo').textContent, lado: (l.querySelector('.ex-lado') || {}).textContent || '' })),
-  texto: document.querySelector('#folhaCorpo').textContent }));
+async function irAosExames(page, mundo) {
+  await irAoPedido(page, mundo);
+  await page.click('.op-grade .op >> text=Ressonância'); await page.waitForSelector('.grupo-ex', { timeout: 6000 });
+}
+const abrirGrupo = async (page, nome) => { if (!(await page.$eval(`.grupo-ex:has(.nome:text("${nome}"))`, (d) => d.open))) await page.click(`.grupo-ex:has(.nome:text("${nome}")) summary`); };
+const marcar = (page, titulo) => page.click(`.opcao-ex:has(.ex-titulo:text-is("${titulo}")) input`);
+const lado = (page) => page.evaluate(() => ({
+  botoes: [...document.querySelectorAll('.lado-sel .seg button')].map((b) => [b.textContent, b.getAttribute('aria-pressed'), Math.round(b.getBoundingClientRect().width)]),
+  pergunta: (document.querySelector('.lado-q') || {}).textContent || '', nota: (document.querySelector('.lado-sel .w-nota') || {}).textContent || '',
+  carrinho: (document.querySelector('.carrinho') || {}).textContent || '' }));
 
-await caso('lado: cada opção diz "Lado esquerdo", o seletor mostra o lado escolhido e trocar para "Os dois lados" muda as opções ("2 exames: um de cada lado")', async () => {
+await caso('pedido de exames: tipo em botões iguais e, no passo 2, a lista por parte do corpo alinhada (nomes na mesma coluna, sem rolagem lateral, 2 passos)', async () => {
   const mundo = criarMundo(); const { page, ctx } = await novaPaginaChat(browser, mundo, { init: RAPIDO });
-  await comecarConversa(page, base); await irAoPassoExame(page, mundo, [['Punho', 'Esquerdo']]);
-  const a = await bloco(page);
-  await page.click('.lado-sel .seg button >> text=Os dois lados'); await page.waitForTimeout(150); const b = await bloco(page);
-  await page.click('.lado-sel .seg button >> text=Direito'); await page.waitForTimeout(150); const c = await bloco(page);
+  await comecarConversa(page, base); await irAoPedido(page, mundo);
+  const grade = await page.$$eval('.op-grade .op', (bs) => bs.map((b) => Math.round(b.getBoundingClientRect().width)));
+  await page.click('.op-grade .op >> text=Ressonância'); await page.waitForSelector('.grupo-ex', { timeout: 6000 });
+  const m = await page.evaluate(() => {
+    const grupos = [...document.querySelectorAll('.grupo-ex')], corpo = document.querySelector('#folhaCorpo');
+    return { grupos: grupos.map((g) => g.querySelector('.nome').textContent), colunasNome: [...new Set(grupos.map((g) => Math.round(g.querySelector('.nome').getBoundingClientRect().left)))],
+      semRolagemLateral: corpo.scrollWidth <= corpo.clientWidth + 1, passos: document.querySelectorAll('.passos li').length, busca: !!document.querySelector('.busca-ex') };
+  });
   await ctx.close();
-  const todos = (x, t) => x.cartoes.length > 0 && x.cartoes.every((k) => k.lado === t);
-  return { ok: a.lado.length === 3 && a.lado.find(([t]) => t === 'Esquerdo')[1] === 'true' && todos(a, 'Lado esquerdo') && todos(b, '2 exames: um de cada lado') && todos(c, 'Lado direito') && !/unilateral|por articula/i.test(a.texto),
-    detalhe: `esquerdo=${a.cartoes[0].lado}; os dois=${b.cartoes[0].lado}; direito=${c.cartoes[0].lado}` };
+  return { ok: new Set(grade).size === 1 && grade.length === 3 && m.grupos.length === 3 && m.colunasNome.length === 1 && m.semRolagemLateral && m.passos === 2 && m.busca,
+    detalhe: `tipos=${grade.length} de largura ${grade[0]}px, grupos=${m.grupos.join('/')}, colunas de nome=${m.colunasNome.length}, passos=${m.passos}` };
+});
+
+await caso('pedido de exames: a busca filtra ao digitar (por exame ou parte do corpo) e marcar um exame de parte com lado abre as 3 opções de lado, grandes e iguais', async () => {
+  const mundo = criarMundo(); const { page, ctx } = await novaPaginaChat(browser, mundo, { init: RAPIDO });
+  await comecarConversa(page, base); await irAosExames(page, mundo);
+  await page.fill('.busca-ex', 'punho'); await page.waitForFunction(() => document.querySelectorAll('.grupo-ex').length === 1);
+  const so = await page.$eval('.grupo-ex .nome', (n) => n.textContent);
+  await marcar(page, 'Mão e punho'); const a = await lado(page);
+  await page.click('.lado-sel .seg button >> text=Direito'); const b = await lado(page);
+  await page.fill('.busca-ex', 'zzz'); await page.waitForFunction(() => !document.querySelector('.grupo-ex'));
+  const vazio = await page.$eval('.p-dica', (n) => n.textContent);
+  await ctx.close();
+  return { ok: /Punho/.test(so) && a.botoes.length === 3 && new Set(a.botoes.map((x) => x[2])).size === 1 && a.botoes.every((x) => x[1] === 'false') && /Qual lado/.test(a.pergunta)
+      && b.botoes.find((x) => x[0] === 'Direito')[1] === 'true' && /Nenhum exame com esse nome/.test(vazio), detalhe: `grupo=${so}; lados=${a.botoes.map((x) => x[0] + ' ' + x[2] + 'px').join(', ')}` };
+});
+
+await caso('pedido de exames: os nomes do Klingo aparecem legíveis (frase normal, detalhe em letra menor), sem caixa alta, e sem repetir o mesmo exame na tela', async () => {
+  const mundo = criarMundo(); const { page, ctx } = await novaPaginaChat(browser, mundo, { init: RAPIDO });
+  await comecarConversa(page, base); await irAosExames(page, mundo); await abrirGrupo(page, 'Punho / mão');
+  const m = await page.evaluate(() => {
+    const ops = [...document.querySelectorAll('.grupo-ex:has(.nome) .opcao-ex')].filter((l) => l.closest('.grupo-ex').querySelector('.nome').textContent.includes('Punho'))
+      .map((l) => ({ t: l.querySelector('.ex-titulo').textContent, d: (l.querySelector('.ex-detalhe') || {}).textContent || '' }));
+    const t = document.querySelector('.ex-titulo'), d = document.querySelector('.ex-detalhe');
+    return { ops, tituloPx: parseFloat(getComputedStyle(t).fontSize), detalhePx: d ? parseFloat(getComputedStyle(d).fontSize) : 0,
+      tudoMaiusculo: [...document.querySelectorAll('.ex-titulo')].some((e) => e.textContent.length > 4 && e.textContent === e.textContent.toUpperCase()),
+      repetidos: ops.length - new Set(ops.map((o) => o.t + '|' + o.d)).size, semRolagemLateral: document.querySelector('#folhaCorpo').scrollWidth <= document.querySelector('#folhaCorpo').clientWidth + 1 };
+  });
+  await ctx.close();
+  const titulos = m.ops.map((x) => x.t);
+  return { ok: ['Mão', 'Mão e punho', 'Punho', 'Articulação (Punho / mão)'].every((x) => titulos.includes(x)) && m.ops.find((x) => x.t === 'Mão').d === 'Não inclui punho' && !m.tudoMaiusculo && m.tituloPx > m.detalhePx && m.detalhePx >= 12 && m.repetidos === 0 && m.semRolagemLateral,
+    detalhe: `${m.ops.map((x) => x.t + (x.d ? ' [' + x.d + ']' : '')).join(' / ')}; título ${m.tituloPx}px, detalhe ${m.detalhePx}px` };
+});
+
+await caso('pedido de exames: parte do corpo com lista longa (crânio) fica fechada com a contagem e abre ao tocar; marcar um exame mostra "1 marcado" e o botão de enviar', async () => {
+  const mundo = criarMundo(); const { page, ctx } = await novaPaginaChat(browser, mundo, { init: RAPIDO });
+  await comecarConversa(page, base); await irAosExames(page, mundo);
+  const antes = await page.$eval('.grupo-ex:has(.nome:text("Crânio"))', (d) => ({ aberto: d.open, cont: d.querySelector('.cont').textContent }));
+  await abrirGrupo(page, 'Crânio');
+  const n = await page.$$eval('.grupo-ex:has(.nome:text("Crânio")) .opcao-ex', (l) => l.length);
+  await page.click('.grupo-ex:has(.nome:text("Crânio")) .opcao-ex >> nth=0 >> input');
+  const marcado = await page.$eval('.grupo-ex:has(.nome:text("Crânio")) .cont', (c) => c.textContent);
+  const botao = await page.$eval('#folhaRodape .btn-w', (b) => ({ txt: b.textContent, off: b.disabled }));
+  await ctx.close();
+  return { ok: antes.aberto === false && antes.cont === '13' && n === 13 && marcado === '1 marcado' && /Enviar pedido \(1 exame\)/.test(botao.txt) && botao.off === false, detalhe: `fechado com "${antes.cont}", ${n} exames ao abrir, depois "${marcado}", botão "${botao.txt}"` };
+});
+
+await caso('lado: marcar o exame pede o lado (Direito, Esquerdo, Os dois lados), o botão escolhido fica marcado e "Os dois lados" avisa "2 exames: um de cada lado"', async () => {
+  const mundo = criarMundo(); const { page, ctx } = await novaPaginaChat(browser, mundo, { init: RAPIDO });
+  await comecarConversa(page, base); await irAosExames(page, mundo); await abrirGrupo(page, 'Punho / mão'); await marcar(page, 'Mão e punho');
+  const a = await lado(page);
+  await page.click('.lado-sel .seg button >> text=Os dois lados'); const b = await lado(page);
+  await page.click('.lado-sel .seg button >> text=Esquerdo'); const c = await lado(page);
+  await ctx.close();
+  const marcadoEm = (x) => x.botoes.filter((k) => k[1] === 'true').map((k) => k[0]).join();
+  return { ok: a.botoes.length === 3 && marcadoEm(a) === '' && /Qual lado/.test(a.pergunta) && marcadoEm(b) === 'Os dois lados' && /2 exames: um de cada lado/.test(b.nota) && marcadoEm(c) === 'Esquerdo' && c.nota === '' && /lado esquerdo/.test(c.carrinho),
+    detalhe: `sem escolha=[${marcadoEm(a)}]; depois=${marcadoEm(b)}; depois=${marcadoEm(c)}; carrinho="${c.carrinho.replace(/\s+/g, ' ').slice(0, 90)}"` };
 });
 
 await caso('lado: o pedido enviado ao servidor leva o lado que o paciente confirmou NO passo do exame (trocou de esquerdo para direito)', async () => {
   const mundo = criarMundo(); const { page, ctx } = await novaPaginaChat(browser, mundo, { init: RAPIDO });
-  await comecarConversa(page, base); await irAoPassoExame(page, mundo, [['Punho', 'Esquerdo']]);
-  await page.click('.lado-sel .seg button >> text=Direito'); await page.click('.opcao-ex >> text=Mão e punho');
-  await page.click('.btn-w >> text=Adicionar ao pedido'); await page.waitForSelector('.carrinho li', { timeout: 4000 });
+  await comecarConversa(page, base); await irAosExames(page, mundo); await abrirGrupo(page, 'Punho / mão'); await marcar(page, 'Mão e punho');
+  await page.click('.lado-sel .seg button >> text=Esquerdo'); await page.click('.lado-sel .seg button >> text=Direito');
   const resumo = await page.$eval('.carrinho', (n) => n.textContent);
   await page.click('#folhaRodape .btn-w'); await page.waitForTimeout(500);
   const chamada = mundo.chamadas.find((c) => c.nome === 'chat_pedido_enviar'); await ctx.close();
   const item = chamada && chamada.corpo.p_itens[0];
-  return { ok: /lado direito/.test(resumo) && !/unilateral/i.test(resumo) && item && item.lado === 'D' && item.regiao === 'punho_mao' && item.procedimento_id === 1001, detalhe: `resumo="${resumo.replace(/\s+/g, ' ').slice(0, 110)}" item=${JSON.stringify(item)}` };
+  return { ok: /lado direito/.test(resumo) && !/unilateral/i.test(resumo) && chamada.corpo.p_itens.length === 1 && item && item.lado === 'D' && item.regiao === 'punho_mao' && item.modalidade === 'RM' && typeof item.procedimento_id === 'number', detalhe: `resumo="${resumo.replace(/\s+/g, ' ').slice(0, 100)}" item=${JSON.stringify(item)}` };
 });
 
-await caso('lado: parte do corpo SEM lado (tórax) não oferece o exame "unilateral" de articulação, que o banco não saberia de que lado é', async () => {
+await caso('lado: parte do corpo SEM lado (tórax) não oferece o exame "unilateral" de articulação, que o banco não saberia de que lado é, e não pergunta lado', async () => {
   const mundo = criarMundo(); const { page, ctx } = await novaPaginaChat(browser, mundo, { init: RAPIDO });
-  await comecarConversa(page, base); await irAoPassoExame(page, mundo, [['Tórax', null]]);
-  const x = await bloco(page); await ctx.close();
-  return { ok: x.cartoes.length === 2 && !x.cartoes.some((k) => /articula/i.test(k.t)) && x.lado.length === 0 && x.cartoes.every((k) => k.lado === ''), detalhe: `opções=${x.cartoes.map((k) => k.t).join(' / ')}; seletor de lado=${x.lado.length}` };
+  await comecarConversa(page, base); await irAosExames(page, mundo); await abrirGrupo(page, 'Tórax');
+  const titulos = await page.$$eval('.grupo-ex:has(.nome:text("Tórax")) .ex-titulo', (l) => l.map((x) => x.textContent));
+  await marcar(page, titulos[0]); const x = await lado(page);
+  await page.click('#folhaRodape .btn-w'); await page.waitForTimeout(500);
+  const item = (mundo.chamadas.find((c) => c.nome === 'chat_pedido_enviar') || { corpo: { p_itens: [{}] } }).corpo.p_itens[0]; await ctx.close();
+  return { ok: titulos.length === 2 && !titulos.some((t) => /articula/i.test(t)) && x.botoes.length === 0 && item.lado === 'N' && item.regiao === 'torax', detalhe: `opções=${titulos.join(' / ')}; seletor de lado=${x.botoes.length}; lado enviado=${item.lado}` };
 });
 
 await browser.close(); srv.close();
