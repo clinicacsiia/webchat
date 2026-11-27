@@ -194,8 +194,12 @@
         await rpc('chat_consulta_salvar', Object.assign(base(), { p_procedimento_id: c.valor })); continue;
       }
       if (passo === 'medico') {
-        const livre = !dados.medico || dados.medico === 'qualquer';
-        const it = livre ? (o.itens || []).find((i) => i.valor === '') : achar(o.itens, dados.medicoNome || (dados.slot && dados.slot.profissional));
+        // Médico(a) escolhido(a) vai ao motor (antes sempre seguia "Tanto faz" e o horário podia sair com outro(a) médico(a)).
+        // "Tanto faz" com horário escolhido: pede o(a) médico(a) daquele horário. Pré-marcação: se o nome não existir na lista do motor, vale "Tanto faz" (é só um pedido).
+        const escolhido = dados.medico && dados.medico !== 'qualquer' ? dados.medicoNome : '';
+        const nomeMed = escolhido || (dados.slot && dados.slot.profissional) || '';
+        let it = nomeMed ? achar((o.itens || []).filter((i) => i.valor !== ''), nomeMed) : null;
+        if (!it && (!escolhido || pre)) it = (o.itens || []).find((i) => i.valor === '') || null;
         if (!it) throw sair('médico');
         await responder('medico', it.valor, it.rotulo); continue;
       }

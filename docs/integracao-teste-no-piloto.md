@@ -1,6 +1,6 @@
 # Tela do teste (v20261125a) no piloto, marcando de verdade
 
-Versão 1.0 — 25/11/2026 / Mudança: primeira fase construída e publicada; ligada só com `marcacao_etapas_modo = 'teste'` e só para os telefones de `marcacao_etapas_telefones`.
+Versão 1.1 — 27/11/2026 / Mudança: calendário em verde, médicos de referência e pop-up de ciência (ver seção no fim). Versão 1.0 — 25/11/2026: primeira fase construída e publicada; ligada só com `marcacao_etapas_modo = 'teste'` e só para os telefones de `marcacao_etapas_telefones`.
 
 ## O que é
 A tela do ambiente de teste (`painel/testedowebchat/`: `marcacao.js`, `marcacao.css`, `agenda-real.js`) foi copiada para a raiz do site e ligada ao **motor real** do banco por `integracao-real.js`. A tela é a mesma do teste (mesma ordem: pagamento, convênio, plano, carteirinha, consulta, médico, horário, condições, resumo). Só mudou o fim: no "Confirmar marcação", `marcar()` conduz o motor (consulta, médico, plano, horário, confirmar) com as travas de sempre (PIN, retorno em menos de 30 dias, unidade autorizada, médico escolhido nunca trocado).
@@ -31,3 +31,11 @@ Quando o motor pergunta algo que a tela do teste não sabe responder, **a conver
 4. **Antecedência de 24 h e política de cancelamento** do teste valem só como filtro e texto da tela; o motor tem as suas regras. Conferir se coincidem.
 5. **Retrato do banco** (`supabase/producao/`) não foi refeito para `marcacao_etapas_pode`, `marcacao_ciencia_registrar`, `chat_config` e a tabela `marcacao_ciencia` (procedimento em `supabase/producao/LEIAME.md`, `parcial.py`).
 6. **Teste contra o banco real**: só foi feito com o motor simulado e com a tela em página isolada. A primeira marcação e a primeira pré-marcação reais são o teste de verdade.
+
+## Calendário em verde, médicos de referência e pop-up de ciência (27/11/2026, chat 2026.11.27-1, sw v93)
+Só `marcacao.js`, `marcacao.css`, `integracao-real.js`, `index.html` e `sw.js`. **Nenhuma mudança de banco.** A cópia do teste (`painel/testedowebchat/`) **não** foi alterada.
+- **Calendário:** nas etapas *Horário* e *Preferências* os dias com horário real aparecem em **verde** num calendário mensal, com filtros (Manhã, Tarde, dias da semana), botão "Ir para o dia mais próximo", setas para passar de dia em dia e de mês em mês. Sem nenhum horário, a tela segue como antes (período e dias da semana).
+- **Médicos:** o Klingo devolve "sem médico credenciado" para alguns planos (medido em 27/11/2026: Amor Saúde/PERNAMBUES, consulta com pediatra, 0 horários; Particular: 162 horários e 10 médicos). Antes a lista vinha vazia e a tela dizia "agendada pela equipe". Agora, se o plano não devolve médico, mostra os médicos da consulta pelo Particular, com a nota "a equipe confere se atendem o seu convênio e plano". Também na tela "Sem horário pelo site". A mesma regra vale para os horários da etapa *Preferências*.
+- **Médico escolhido chega ao motor:** `confirmar()` não enviava `medico`/`medicoNome`, então o motor sempre recebia "Tanto faz". Agora envia; com "Tanto faz" e horário escolhido, pede o(a) médico(a) daquele horário. Na pré-marcação, se o nome não existir na lista do motor, vale "Tanto faz".
+- **Pop-up de ciência:** ao tocar em "Sim, quero a pré-marcação" abre um pop-up com o prazo (`prazo_pre_horas`, 24 h), o que a equipe vai confirmar e "não garante o horário"; marcar "Li as regras e estou ciente" liga o botão vermelho e **um toque** registra a ciência e já avança. Voltar/Esc desfaz o "Sim". O botão vermelho antigo só aparece se a pessoa voltar sem ter dado ciência.
+- **Pendência (decisão do dono):** o prazo de 24 h é só texto: o motor **não** vence a pré-marcação (`venceEm` é sempre vazio; ver `integracao-marcacao-por-etapas.md`, pendência 3). Também só aparecem médicos que têm horário nos próximos 45 dias; para listar todos os médicos da consulta mesmo sem horário seria preciso uma função nova no banco (nomes do `catalogo_agenda`).
